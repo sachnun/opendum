@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, Key } from "lucide-react";
 import { CreateApiKeyButton } from "./create-api-key-button";
 import { ApiKeyActions } from "./api-key-actions";
+import { CodeBlock } from "@/components/ui/code-block";
 import { headers } from "next/headers";
 
 export default async function ApiKeysPage({
@@ -120,29 +121,32 @@ export default async function ApiKeysPage({
         <CardContent className="space-y-4">
           <div>
             <h4 className="font-medium mb-2">Claude Code / opencode</h4>
-            <pre className="rounded bg-muted p-3 text-sm overflow-x-auto">
-{`# Add to your settings or environment
+            <CodeBlock
+              language="bash"
+              code={`# Add to your settings or environment
 ANTHROPIC_BASE_URL=${baseUrl}
 ANTHROPIC_AUTH_TOKEN=ifp_your-api-key-here
 ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
-            </pre>
+            />
           </div>
           <div>
             <h4 className="font-medium mb-2">cURL (OpenAI compatible)</h4>
-            <pre className="rounded bg-muted p-3 text-sm overflow-x-auto">
-{`curl -X POST ${baseUrl}/v1/chat/completions \\
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST ${baseUrl}/v1/chat/completions \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ifp_your-api-key-here" \\
   -d '{
     "model": "iflow/deepseek-v3.2",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'`}
-            </pre>
+            />
           </div>
           <div>
             <h4 className="font-medium mb-2">cURL (Anthropic compatible)</h4>
-            <pre className="rounded bg-muted p-3 text-sm overflow-x-auto">
-{`curl -X POST ${baseUrl}/v1/messages \\
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST ${baseUrl}/v1/messages \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: ifp_your-api-key-here" \\
   -H "anthropic-version: 2023-06-01" \\
@@ -151,7 +155,7 @@ ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
     "max_tokens": 1024,
     "messages": [{"role": "user", "content": "Hello!"}]
   }'`}
-            </pre>
+            />
           </div>
         </CardContent>
       </Card>
