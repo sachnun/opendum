@@ -105,7 +105,7 @@ model ProxyApiKey {
   keyHash      String  @unique // SHA-256 hash for lookup
   keyPreview   String  // First 12 chars for display: "ifp_xxxx..."
   encryptedKey String? @db.Text // AES encrypted full key (for reveal)
-  name         String  // e.g., "MacBook Pro", "Work PC"
+  name         String? // e.g., "MacBook Pro", "Work PC" (optional)
 
   isActive   Boolean   @default(true)
   lastUsedAt DateTime?

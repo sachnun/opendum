@@ -74,7 +74,7 @@ export default async function ApiKeysPage({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Key className="h-5 w-5 text-muted-foreground" />
-                    <CardTitle className="text-lg">{apiKey.name}</CardTitle>
+                    <CardTitle className="text-lg">{apiKey.name ?? "Unnamed Key"}</CardTitle>
                   </div>
                   <Badge variant={apiKey.isActive ? "default" : "secondary"}>
                     {apiKey.isActive ? "Active" : "Revoked"}

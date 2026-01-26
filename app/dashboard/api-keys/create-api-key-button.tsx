@@ -25,14 +25,9 @@ export function CreateApiKeyButton() {
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = async () => {
-    if (!name.trim()) {
-      toast.error("Please enter a name for the API key");
-      return;
-    }
-
     setIsCreating(true);
     try {
-      const result = await createApiKey(name.trim());
+      const result = await createApiKey(name.trim() || undefined);
 
       if (!result.success) {
         throw new Error(result.error);
@@ -66,7 +61,7 @@ export function CreateApiKeyButton() {
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
-          <Label htmlFor="keyName">Name</Label>
+          <Label htmlFor="keyName">Name (optional)</Label>
           <Input
             id="keyName"
             placeholder="e.g., MacBook Pro, Work PC"

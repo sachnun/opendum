@@ -17,7 +17,7 @@ import { revokeApiKey, revealApiKey } from "@/lib/actions/api-keys";
 
 interface ApiKey {
   id: string;
-  name: string;
+  name: string | null;
   keyPreview: string;
   isActive: boolean;
 }
@@ -166,7 +166,7 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
           <DialogHeader>
             <DialogTitle>Revoke API Key</DialogTitle>
             <DialogDescription>
-              Are you sure you want to revoke &quot;{apiKey.name}&quot;? Any applications
+              Are you sure you want to revoke &quot;{apiKey.name ?? "Unnamed Key"}&quot;? Any applications
               using this key will no longer be able to access the proxy.
             </DialogDescription>
           </DialogHeader>
