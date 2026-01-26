@@ -11,16 +11,14 @@ export default async function Home() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-      <div className="mx-auto max-w-2xl text-center px-4">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
+      <div className="mx-auto max-w-md text-center px-4">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           iFlow Proxy
         </h1>
-        <p className="mt-6 text-lg leading-8 text-muted-foreground">
-          A multi-account proxy for iFlow API. Connect multiple iFlow accounts,
-          load balance your requests, and use with Claude Code or any
-          OpenAI-compatible client.
+        <p className="mt-4 text-muted-foreground">
+          Multi-account proxy for iFlow CLI
         </p>
-        <div className="mt-10">
+        <div className="mt-8">
           <form
             action={async () => {
               "use server";
@@ -38,30 +36,6 @@ export default async function Home() {
               Continue with GitHub
             </Button>
           </form>
-        </div>
-
-        <div className="mt-16 grid gap-8 md:grid-cols-3">
-          <div className="rounded-lg border p-6 text-left">
-            <h3 className="font-semibold">Multi-Account Support</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Connect multiple iFlow accounts and automatically load balance
-              requests across them.
-            </p>
-          </div>
-          <div className="rounded-lg border p-6 text-left">
-            <h3 className="font-semibold">GitHub Login</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Secure authentication with GitHub OAuth. Manage your accounts and
-              API keys from the dashboard.
-            </p>
-          </div>
-          <div className="rounded-lg border p-6 text-left">
-            <h3 className="font-semibold">API Compatible</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Works with Claude Code, opencode, and any OpenAI or
-              Anthropic-compatible client.
-            </p>
-          </div>
         </div>
       </div>
     </div>
