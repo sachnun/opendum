@@ -26,6 +26,8 @@ export async function createApiKey(name?: string): Promise<ActionResult<{ id: st
     const keyPreview = getKeyPreview(key);
     const encryptedKey = encrypt(key);
 
+    const trimmedName = name?.trim() || null;
+
     // Create in database
     const apiKey = await prisma.proxyApiKey.create({
       data: {
@@ -33,7 +35,7 @@ export async function createApiKey(name?: string): Promise<ActionResult<{ id: st
         keyHash,
         keyPreview,
         encryptedKey,
-        name: name?.trim() || null,
+        name: trimmedName ?? undefined,
       },
     });
 
