@@ -325,11 +325,11 @@ function createAnthropicStreamTransformer(model: string) {
               // Determine stop_reason based on whether we had tool calls
               const stopReason = Object.keys(toolCallsByIndex).length > 0 ? "tool_use" : "end_turn";
 
-              // Send message_delta with final info
+              // Send message_delta with final info (include input_tokens from usage)
               const messageDelta = {
                 type: "message_delta",
                 delta: { stop_reason: stopReason, stop_sequence: null },
-                usage: { output_tokens: outputTokens },
+                usage: { input_tokens: inputTokens, output_tokens: outputTokens },
               };
               controller.enqueue(encoder.encode(
                 `event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`
@@ -531,11 +531,11 @@ function createAnthropicStreamTransformer(model: string) {
                 stopReason = "max_tokens";
               }
 
-              // Send message_delta with final info
+              // Send message_delta with final info (include input_tokens from usage)
               const messageDelta = {
                 type: "message_delta",
                 delta: { stop_reason: stopReason, stop_sequence: null },
-                usage: { output_tokens: outputTokens },
+                usage: { input_tokens: inputTokens, output_tokens: outputTokens },
               };
               controller.enqueue(encoder.encode(
                 `event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`
@@ -585,7 +585,7 @@ function createAnthropicStreamTransformer(model: string) {
             `event: message_delta\ndata: ${JSON.stringify({
               type: "message_delta",
               delta: { stop_reason: stopReason, stop_sequence: null },
-              usage: { output_tokens: outputTokens },
+              usage: { input_tokens: inputTokens, output_tokens: outputTokens },
             })}\n\n`
           ));
           
