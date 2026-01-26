@@ -6,6 +6,80 @@ import { getValidApiKey, makeIFlowRequest } from "@/lib/proxy/iflow-client";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Create a TransformStream that tracks usage from OpenAI streaming response
+ * and calls onComplete when the stream ends
+ */
+function createUsageTrackingStream(
+  onComplete: (usage: { inputTokens: number; outputTokens: number }) => void
+) {
+  let buffer = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  return new TransformStream({
+    transform(chunk, controller) {
+      // Pass through the chunk unchanged
+      controller.enqueue(chunk);
+
+      // Try to extract usage from the chunk
+      const text = new TextDecoder().decode(chunk);
+      buffer += text;
+
+      // Process complete SSE events
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+
+      for (const event of events) {
+        const lines = event.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            // Extract usage if present (iFlow sends usage in the final chunk)
+            if (parsed.usage) {
+              inputTokens = parsed.usage.prompt_tokens || inputTokens;
+              outputTokens = parsed.usage.completion_tokens || outputTokens;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+    },
+
+    flush() {
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        const lines = buffer.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.usage) {
+              inputTokens = parsed.usage.prompt_tokens || inputTokens;
+              outputTokens = parsed.usage.completion_tokens || outputTokens;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      // Call onComplete with the tracked usage
+      onComplete({ inputTokens, outputTokens });
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
@@ -72,12 +146,14 @@ export async function POST(request: NextRequest) {
       const errorText = await iflowResponse.text();
       console.error("iFlow error:", iflowResponse.status, errorText);
 
-      // Log failed request
+      // Log failed request with 0 tokens
       await logUsage({
         userId: userId!,
         iflowAccountId: account.id,
         proxyApiKeyId: apiKeyId,
         model,
+        inputTokens: 0,
+        outputTokens: 0,
         statusCode: iflowResponse.status,
         duration: Date.now() - startTime,
       });
@@ -93,17 +169,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log successful request
-    logUsage({
-      userId: userId!,
-      iflowAccountId: account.id,
-      proxyApiKeyId: apiKeyId,
-      model,
-      statusCode: 200,
-      duration: Date.now() - startTime,
-    });
-
-    // Return streaming response
+    // Streaming response
     if (stream) {
       const responseBody = iflowResponse.body;
 
@@ -114,17 +180,45 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return new Response(responseBody, {
+      // Create usage tracking stream that logs when complete
+      const usageTracker = createUsageTrackingStream((usage) => {
+        logUsage({
+          userId: userId!,
+          iflowAccountId: account.id,
+          proxyApiKeyId: apiKeyId,
+          model,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          statusCode: 200,
+          duration: Date.now() - startTime,
+        });
+      });
+
+      return new Response(responseBody.pipeThrough(usageTracker), {
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
         },
       });
     }
 
-    // Return non-streaming response
+    // Non-streaming response
     const responseData = await iflowResponse.json();
+
+    // Log with actual token usage from response
+    logUsage({
+      userId: userId!,
+      iflowAccountId: account.id,
+      proxyApiKeyId: apiKeyId,
+      model,
+      inputTokens: responseData.usage?.prompt_tokens ?? 0,
+      outputTokens: responseData.usage?.completion_tokens ?? 0,
+      statusCode: 200,
+      duration: Date.now() - startTime,
+    });
+
     return NextResponse.json(responseData);
   } catch (error) {
     console.error("Proxy error:", error);

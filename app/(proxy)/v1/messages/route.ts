@@ -242,8 +242,13 @@ function transformOpenAIToAnthropic(openaiResponse: any, model: string): any {
 /**
  * Transform OpenAI streaming response to Anthropic format
  * Handles reasoning_content (thinking), text content, and tool_calls
+ * @param model - The model name to include in responses
+ * @param onComplete - Optional callback called when stream ends with usage data
  */
-function createAnthropicStreamTransformer(model: string) {
+function createAnthropicStreamTransformer(
+  model: string,
+  onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void
+) {
   const messageId = `msg_${Date.now()}`;
   
   // State tracking
@@ -257,8 +262,17 @@ function createAnthropicStreamTransformer(model: string) {
   // Usage tracking
   let inputTokens = 0;
   let outputTokens = 0;
+  let usageReported = false;
 
   const encoder = new TextEncoder();
+  
+  // Helper to report usage only once
+  const reportUsage = () => {
+    if (!usageReported && onComplete) {
+      usageReported = true;
+      onComplete({ inputTokens, outputTokens });
+    }
+  };
 
   return new TransformStream({
     start(controller) {
@@ -545,6 +559,9 @@ function createAnthropicStreamTransformer(model: string) {
               controller.enqueue(encoder.encode(
                 `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`
               ));
+              
+              // Report usage to callback
+              reportUsage();
             }
 
           } catch (e) {
@@ -592,8 +609,14 @@ function createAnthropicStreamTransformer(model: string) {
           controller.enqueue(encoder.encode(
             `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`
           ));
+          
+          // Report usage to callback
+          reportUsage();
         }
       }
+      
+      // Always report usage at the end of flush (fallback)
+      reportUsage();
     },
   });
 }
@@ -662,12 +685,14 @@ export async function POST(request: NextRequest) {
       const errorText = await iflowResponse.text();
       console.error("iFlow error:", iflowResponse.status, errorText);
 
-      // Log failed request
+      // Log failed request with 0 tokens
       await logUsage({
         userId: userId!,
         iflowAccountId: account.id,
         proxyApiKeyId: apiKeyId,
         model,
+        inputTokens: 0,
+        outputTokens: 0,
         statusCode: iflowResponse.status,
         duration: Date.now() - startTime,
       });
@@ -684,20 +709,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log successful request
-    logUsage({
-      userId: userId!,
-      iflowAccountId: account.id,
-      proxyApiKeyId: apiKeyId,
-      model,
-      statusCode: 200,
-      duration: Date.now() - startTime,
-    });
-
     // Streaming response
     if (stream && iflowResponse.body) {
-      // Transform OpenAI stream to Anthropic stream
-      const transformer = createAnthropicStreamTransformer(model);
+      // Transform OpenAI stream to Anthropic stream with usage callback
+      const transformer = createAnthropicStreamTransformer(model, (usage) => {
+        logUsage({
+          userId: userId!,
+          iflowAccountId: account.id,
+          proxyApiKeyId: apiKeyId,
+          model,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          statusCode: 200,
+          duration: Date.now() - startTime,
+        });
+      });
       const transformedStream = iflowResponse.body.pipeThrough(transformer);
 
       return new Response(transformedStream, {
@@ -713,6 +739,18 @@ export async function POST(request: NextRequest) {
     // Non-streaming response - transform OpenAI to Anthropic format
     const openaiResponse = await iflowResponse.json();
     const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model);
+    
+    // Log with actual token usage from response
+    logUsage({
+      userId: userId!,
+      iflowAccountId: account.id,
+      proxyApiKeyId: apiKeyId,
+      model,
+      inputTokens: openaiResponse.usage?.prompt_tokens ?? 0,
+      outputTokens: openaiResponse.usage?.completion_tokens ?? 0,
+      statusCode: 200,
+      duration: Date.now() - startTime,
+    });
     
     return NextResponse.json(anthropicResponse);
   } catch (error) {
