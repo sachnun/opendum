@@ -123,3 +123,11 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .shiki,
+  .shiki pre,
+  .shiki pre code {
+    background-color: var(--muted) !important;
+  }
+}
