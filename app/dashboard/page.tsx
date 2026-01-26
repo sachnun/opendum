@@ -3,9 +3,16 @@ import { prisma } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, Key, Activity } from "lucide-react";
 import { AnalyticsCharts } from "./components/analytics-charts";
+import { headers } from "next/headers";
 
 export default async function DashboardPage() {
   const session = await auth();
+  
+  // Detect base URL from request headers
+  const headersList = await headers();
+  const host = headersList.get("host") || "localhost:3000";
+  const protocol = host.includes("localhost") ? "http" : "https";
+  const baseUrl = `${protocol}://${host}`;
 
   if (!session?.user?.id) {
     return null;
@@ -49,17 +56,17 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">
+        <h2 className="text-xl md:text-2xl font-bold tracking-tight">
           Welcome back, {session.user.name?.split(" ")[0]}!
         </h2>
-        <p className="text-muted-foreground">
+        <p className="text-sm md:text-base text-muted-foreground">
           Here&apos;s an overview of your iFlow proxy
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -101,7 +108,7 @@ export default async function DashboardPage() {
               Use your API key with Claude Code or other OpenAI-compatible clients.
             </p>
             <pre className="mt-2 rounded bg-muted p-2 text-xs overflow-x-auto">
-{`ANTHROPIC_BASE_URL=https://your-domain.com
+{`ANTHROPIC_BASE_URL=${baseUrl}
 ANTHROPIC_AUTH_TOKEN=your-proxy-api-key`}
             </pre>
           </div>

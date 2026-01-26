@@ -25,10 +25,10 @@ export default async function AccountsPage({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">iFlow Accounts</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-xl md:text-2xl font-bold tracking-tight">iFlow Accounts</h2>
+        <p className="text-sm md:text-base text-muted-foreground">
           Manage your connected iFlow accounts for load balancing
         </p>
       </div>
@@ -57,8 +57,8 @@ export default async function AccountsPage({
       {/* Connected Accounts */}
       {accounts.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Connected Accounts</h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <h3 className="text-base md:text-lg font-semibold">Connected Accounts</h3>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {accounts.map((account) => (
               <Card key={account.id}>
                 <CardHeader className="pb-2">

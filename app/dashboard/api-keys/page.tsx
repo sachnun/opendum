@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, Key } from "lucide-react";
 import { CreateApiKeyButton } from "./create-api-key-button";
 import { ApiKeyActions } from "./api-key-actions";
+import { headers } from "next/headers";
 
 export default async function ApiKeysPage({
   searchParams,
@@ -14,6 +15,12 @@ export default async function ApiKeysPage({
 }) {
   const session = await auth();
   const params = await searchParams;
+
+  // Detect base URL from request headers
+  const headersList = await headers();
+  const host = headersList.get("host") || "localhost:3000";
+  const protocol = host.includes("localhost") ? "http" : "https";
+  const baseUrl = `${protocol}://${host}`;
 
   if (!session?.user?.id) {
     return null;
@@ -25,11 +32,11 @@ export default async function ApiKeysPage({
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">API Keys</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl md:text-2xl font-bold tracking-tight">API Keys</h2>
+          <p className="text-sm md:text-base text-muted-foreground">
             Manage your proxy API keys for accessing the iFlow proxy
           </p>
         </div>
@@ -82,8 +89,8 @@ export default async function ApiKeysPage({
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-6 text-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                     <div>
                       <span className="text-muted-foreground">Created: </span>
                       <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
@@ -115,7 +122,7 @@ export default async function ApiKeysPage({
             <h4 className="font-medium mb-2">Claude Code / opencode</h4>
             <pre className="rounded bg-muted p-3 text-sm overflow-x-auto">
 {`# Add to your settings or environment
-ANTHROPIC_BASE_URL=https://your-domain.com
+ANTHROPIC_BASE_URL=${baseUrl}
 ANTHROPIC_AUTH_TOKEN=ifp_your-api-key-here
 ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
             </pre>
@@ -123,7 +130,7 @@ ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
           <div>
             <h4 className="font-medium mb-2">cURL (OpenAI compatible)</h4>
             <pre className="rounded bg-muted p-3 text-sm overflow-x-auto">
-{`curl -X POST https://your-domain.com/v1/chat/completions \\
+{`curl -X POST ${baseUrl}/v1/chat/completions \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ifp_your-api-key-here" \\
   -d '{
@@ -135,7 +142,7 @@ ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
           <div>
             <h4 className="font-medium mb-2">cURL (Anthropic compatible)</h4>
             <pre className="rounded bg-muted p-3 text-sm overflow-x-auto">
-{`curl -X POST https://your-domain.com/v1/messages \\
+{`curl -X POST ${baseUrl}/v1/messages \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: ifp_your-api-key-here" \\
   -H "anthropic-version: 2023-06-01" \\

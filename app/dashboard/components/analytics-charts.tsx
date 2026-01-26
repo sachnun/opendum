@@ -65,16 +65,16 @@ export function AnalyticsCharts() {
   return (
     <div className="space-y-4">
       {/* Header with period selector */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Analytics</h3>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h3 className="text-base md:text-lg font-semibold">Analytics</h3>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border p-1">
+          <div className="flex rounded-lg border p-1 overflow-x-auto">
             {PERIODS.map((p) => (
               <Button
                 key={p.value}
                 variant={period === p.value ? "secondary" : "ghost"}
                 size="sm"
-                className="h-7 px-3 text-xs"
+                className="h-7 px-2 sm:px-3 text-xs whitespace-nowrap"
                 onClick={() => handlePeriodChange(p.value)}
                 disabled={isPending}
               >
@@ -96,7 +96,7 @@ export function AnalyticsCharts() {
 
       {/* Summary stats */}
       {data && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -105,7 +105,7 @@ export function AnalyticsCharts() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl md:text-2xl font-bold">
                 {data.totals.totalRequests.toLocaleString()}
               </div>
             </CardContent>
@@ -118,7 +118,7 @@ export function AnalyticsCharts() {
               <Zap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl md:text-2xl font-bold">
                 {(data.totals.totalInputTokens + data.totals.totalOutputTokens).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -134,7 +134,7 @@ export function AnalyticsCharts() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl md:text-2xl font-bold">
                 {data.totals.avgDuration > 0 ? `${data.totals.avgDuration}ms` : "-"}
               </div>
             </CardContent>
@@ -147,7 +147,7 @@ export function AnalyticsCharts() {
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl md:text-2xl font-bold">
                 {data.totals.totalRequests > 0 ? `${data.totals.successRate}%` : "-"}
               </div>
             </CardContent>
@@ -157,7 +157,7 @@ export function AnalyticsCharts() {
 
       {/* Charts grid */}
       {data && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
           <RequestsOverTimeChart data={data.requestsOverTime} />
           <TokenUsageChart data={data.tokenUsage} />
           <RequestsByModelChart data={data.requestsByModel} />
