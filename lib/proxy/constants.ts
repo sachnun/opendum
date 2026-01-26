@@ -30,7 +30,10 @@ export const SUPPORTED_PARAMS = new Set([
 
 // Available iFlow models
 export const IFLOW_MODELS = [
+  "glm-4.7",
   "glm-4.6",
+  "iflow-rome-30ba3b",
+  "minimax-m2.1",
   "minimax-m2",
   "qwen3-coder-plus",
   "kimi-k2",
