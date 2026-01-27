@@ -5,8 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, XCircle, AlertCircle, Sparkles, Zap } from "lucide-react";
 import { AccountActions } from "./account-actions";
-import { AddAccountForm } from "./add-account-form";
-import { AddAntigravityForm } from "./add-antigravity-form";
+import { AddAccountDialog } from "./add-account-dialog";
 
 export default async function AccountsPage({
   searchParams,
@@ -31,11 +30,14 @@ export default async function AccountsPage({
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div>
-        <h2 className="text-xl md:text-2xl font-bold tracking-tight">Provider Accounts</h2>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Manage your connected AI provider accounts for load balancing
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold tracking-tight">Provider Accounts</h2>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Manage your connected AI provider accounts for load balancing
+          </p>
+        </div>
+        <AddAccountDialog />
       </div>
 
       {params.success && (
@@ -67,17 +69,16 @@ export default async function AccountsPage({
             {iflowAccounts.length} connected
           </Badge>
         </div>
-        
-        {/* Add iFlow Account Form */}
-        <AddAccountForm />
 
         {/* iFlow Accounts List */}
-        {iflowAccounts.length > 0 && (
+        {iflowAccounts.length > 0 ? (
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {iflowAccounts.map((account) => (
               <AccountCard key={account.id} account={account} />
             ))}
           </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No iFlow accounts connected yet.</p>
         )}
       </div>
 
@@ -90,17 +91,16 @@ export default async function AccountsPage({
             {antigravityAccounts.length} connected
           </Badge>
         </div>
-        
-        {/* Add Antigravity Account Form */}
-        <AddAntigravityForm />
 
         {/* Antigravity Accounts List */}
-        {antigravityAccounts.length > 0 && (
+        {antigravityAccounts.length > 0 ? (
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {antigravityAccounts.map((account) => (
               <AccountCard key={account.id} account={account} showTier />
             ))}
           </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No Antigravity accounts connected yet.</p>
         )}
       </div>
     </div>
