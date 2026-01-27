@@ -370,7 +370,7 @@ export function createGeminiToOpenAISseTransform(
             ],
           };
 
-          controller.enqueue(`data: ${JSON.stringify(openaiChunk)}\n`);
+          controller.enqueue(`data: ${JSON.stringify(openaiChunk)}\n\n`);
         }
 
         // Check for finish reason
@@ -395,14 +395,14 @@ export function createGeminiToOpenAISseTransform(
             ],
           };
 
-          controller.enqueue(`data: ${JSON.stringify(finalChunk)}\n`);
+          controller.enqueue(`data: ${JSON.stringify(finalChunk)}\n\n`);
         }
       } catch {
         // Skip malformed chunks
       }
     },
     flush(controller) {
-      controller.enqueue("data: [DONE]\n");
+      controller.enqueue("data: [DONE]\n\n");
     },
   });
 }
@@ -424,13 +424,13 @@ export function createAntigravityUnwrapTransform(): TransformStream<
 
       for (const line of lines) {
         if (!line.startsWith("data:")) {
-          controller.enqueue(line + "\n");
+          controller.enqueue(line + "\n\n");
           continue;
         }
 
         const json = line.slice(5).trim();
         if (!json) {
-          controller.enqueue(line + "\n");
+          controller.enqueue(line + "\n\n");
           continue;
         }
 
@@ -443,7 +443,7 @@ export function createAntigravityUnwrapTransform(): TransformStream<
           }
 
           if (!parsed || typeof parsed !== "object") {
-            controller.enqueue(line + "\n");
+            controller.enqueue(line + "\n\n");
             continue;
           }
 
@@ -451,12 +451,12 @@ export function createAntigravityUnwrapTransform(): TransformStream<
 
           // Unwrap response if wrapped
           if (body.response !== undefined) {
-            controller.enqueue(`data: ${JSON.stringify(body.response)}\n`);
+            controller.enqueue(`data: ${JSON.stringify(body.response)}\n\n`);
           } else {
-            controller.enqueue(line + "\n");
+            controller.enqueue(line + "\n\n");
           }
         } catch {
-          controller.enqueue(line + "\n");
+          controller.enqueue(line + "\n\n");
         }
       }
     },
