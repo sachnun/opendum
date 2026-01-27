@@ -8,6 +8,17 @@ import { ApiKeyActions } from "./api-key-actions";
 import { CodeBlock } from "@/components/ui/code-block";
 import { headers } from "next/headers";
 
+function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) {
+  const now = new Date();
+  if (!apiKey.isActive) {
+    return { label: "Disabled", variant: "secondary" as const };
+  }
+  if (apiKey.expiresAt && apiKey.expiresAt < now) {
+    return { label: "Expired", variant: "destructive" as const };
+  }
+  return { label: "Active", variant: "default" as const };
+}
+
 export default async function ApiKeysPage() {
   const session = await auth();
 
@@ -52,17 +63,21 @@ export default async function ApiKeysPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {apiKeys.map((apiKey) => (
-            <Card key={apiKey.id} className={!apiKey.isActive ? "opacity-60" : ""}>
+              <div className="space-y-4">
+          {apiKeys.map((apiKey) => {
+            const status = getApiKeyStatus(apiKey);
+            const isExpiredOrDisabled = status.label !== "Active";
+            
+            return (
+            <Card key={apiKey.id} className={isExpiredOrDisabled ? "opacity-60" : ""}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Key className="h-5 w-5 text-muted-foreground" />
                     <CardTitle className="text-lg">{apiKey.name ?? "Unnamed Key"}</CardTitle>
                   </div>
-                  <Badge variant={apiKey.isActive ? "default" : "secondary"}>
-                    {apiKey.isActive ? "Active" : "Disabled"}
+                  <Badge variant={status.variant}>
+                    {status.label}
                   </Badge>
                 </div>
               </CardHeader>
@@ -72,6 +87,14 @@ export default async function ApiKeysPage() {
                     <div>
                       <span className="text-muted-foreground">Created: </span>
                       <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Expires: </span>
+                      <span>
+                        {apiKey.expiresAt
+                          ? new Date(apiKey.expiresAt).toLocaleDateString()
+                          : "Never"}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Last used: </span>
@@ -86,7 +109,7 @@ export default async function ApiKeysPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )})}
         </div>
       )}
 

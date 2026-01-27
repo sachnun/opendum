@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,14 +15,22 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Copy, Check } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Plus, Copy, Check, CalendarIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { createApiKey } from "@/lib/actions/api-keys";
+import { cn } from "@/lib/utils";
 
 export function CreateApiKeyButton() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
   const [isCreating, setIsCreating] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -29,7 +38,10 @@ export function CreateApiKeyButton() {
   const handleCreate = async () => {
     setIsCreating(true);
     try {
-      const result = await createApiKey(name.trim() || undefined);
+      const result = await createApiKey(
+        name.trim() || undefined,
+        expiresAt ?? null
+      );
 
       if (!result.success) {
         throw new Error(result.error);
@@ -61,11 +73,17 @@ export function CreateApiKeyButton() {
   const handleClose = () => {
     setOpen(false);
     setName("");
+    setExpiresAt(undefined);
     setCreatedKey(null);
     setCopied(false);
     // Refresh the page to show the new key in the list
     router.refresh();
   };
+
+  // Minimum date is tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -119,7 +137,7 @@ export function CreateApiKeyButton() {
             </DialogFooter>
           </>
         ) : (
-          // Create state - input name
+          // Create state - input name and expiration
           <>
             <DialogHeader>
               <DialogTitle>Create API Key</DialogTitle>
@@ -127,21 +145,64 @@ export function CreateApiKeyButton() {
                 Create a new API key for accessing Opendum.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <Label htmlFor="keyName">Name (optional)</Label>
-              <Input
-                id="keyName"
-                placeholder="e.g., MacBook Pro, Work PC"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-2"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleCreate();
-                  }
-                }}
-              />
+            <div className="py-4 space-y-4">
+              <div>
+                <Label htmlFor="keyName">Name (optional)</Label>
+                <Input
+                  id="keyName"
+                  placeholder="e.g., MacBook Pro, Work PC"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-2"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCreate();
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Expiration (optional)</Label>
+                <div className="mt-2 flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !expiresAt && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {expiresAt ? format(expiresAt, "PPP") : "No expiration"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={expiresAt}
+                        onSelect={setExpiresAt}
+                        disabled={(date) => date < tomorrow}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {expiresAt && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setExpiresAt(undefined)}
+                      title="Clear expiration"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Leave empty for a key that never expires.
+                </p>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>

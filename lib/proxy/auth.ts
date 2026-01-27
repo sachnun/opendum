@@ -60,6 +60,11 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     return { valid: false, error: "API key has been revoked" };
   }
 
+  // Check if key has expired
+  if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    return { valid: false, error: "API key has expired" };
+  }
+
   // Update last used timestamp
   await prisma.proxyApiKey.update({
     where: { id: apiKey.id },

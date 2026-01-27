@@ -114,6 +114,7 @@ model ProxyApiKey {
   name         String? // e.g., "MacBook Pro", "Work PC" (optional)
 
   isActive   Boolean   @default(true)
+  expiresAt  DateTime? // null = never expires
   lastUsedAt DateTime?
 
   createdAt DateTime @default(now())

@@ -12,7 +12,10 @@ export type ActionResult<T = void> =
 /**
  * Create a new API key
  */
-export async function createApiKey(name?: string): Promise<ActionResult<{ id: string; key: string; keyPreview: string; name: string | null }>> {
+export async function createApiKey(
+  name?: string,
+  expiresAt?: Date | null
+): Promise<ActionResult<{ id: string; key: string; keyPreview: string; name: string | null; expiresAt: Date | null }>> {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -36,6 +39,7 @@ export async function createApiKey(name?: string): Promise<ActionResult<{ id: st
         keyPreview,
         encryptedKey,
         name: trimmedName ?? undefined,
+        expiresAt: expiresAt ?? undefined,
       },
     });
 
@@ -48,6 +52,7 @@ export async function createApiKey(name?: string): Promise<ActionResult<{ id: st
         key,
         keyPreview,
         name: apiKey.name,
+        expiresAt: apiKey.expiresAt,
       },
     };
   } catch (error) {
