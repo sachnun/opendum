@@ -35,8 +35,10 @@ export function AnalyticsCharts() {
   };
 
   useEffect(() => {
-    fetchData(period);
-  }, []);
+    startTransition(() => {
+      fetchData(period);
+    });
+  }, [period]);
 
   const handlePeriodChange = (newPeriod: Period) => {
     setPeriod(newPeriod);

@@ -49,8 +49,8 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
 
       setRevealedKey(result.data.key);
       setIsRevealed(true);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to reveal API key");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reveal API key");
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +84,7 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
       setCopied(true);
       toast.success("API key copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       toast.error("Failed to copy to clipboard");
     }
   };

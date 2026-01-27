@@ -19,6 +19,8 @@ export default async function DashboardPage() {
   }
 
   // Get stats
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const [accountCount, apiKeyCount, recentLogs] = await Promise.all([
     prisma.iflowAccount.count({
       where: { userId: session.user.id, isActive: true },
@@ -29,7 +31,7 @@ export default async function DashboardPage() {
     prisma.usageLog.count({
       where: {
         userId: session.user.id,
-        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        createdAt: { gte: twentyFourHoursAgo },
       },
     }),
   ]);
