@@ -3,7 +3,28 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
-export type Period = "7d" | "30d" | "90d";
+export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
+
+// Granularity determines how data points are grouped
+export type Granularity = "10s" | "1m" | "5m" | "15m" | "1h" | "1d";
+
+export interface PeriodConfig {
+  duration: number; // in milliseconds
+  granularity: Granularity;
+  granularityMs: number; // granularity in milliseconds
+}
+
+const PERIOD_CONFIG: Record<Period, PeriodConfig> = {
+  "5m": { duration: 5 * 60 * 1000, granularity: "10s", granularityMs: 10 * 1000 },
+  "15m": { duration: 15 * 60 * 1000, granularity: "1m", granularityMs: 60 * 1000 },
+  "30m": { duration: 30 * 60 * 1000, granularity: "1m", granularityMs: 60 * 1000 },
+  "1h": { duration: 60 * 60 * 1000, granularity: "5m", granularityMs: 5 * 60 * 1000 },
+  "6h": { duration: 6 * 60 * 60 * 1000, granularity: "15m", granularityMs: 15 * 60 * 1000 },
+  "24h": { duration: 24 * 60 * 60 * 1000, granularity: "1h", granularityMs: 60 * 60 * 1000 },
+  "7d": { duration: 7 * 24 * 60 * 60 * 1000, granularity: "1d", granularityMs: 24 * 60 * 60 * 1000 },
+  "30d": { duration: 30 * 24 * 60 * 60 * 1000, granularity: "1d", granularityMs: 24 * 60 * 60 * 1000 },
+  "90d": { duration: 90 * 24 * 60 * 60 * 1000, granularity: "1d", granularityMs: 24 * 60 * 60 * 1000 },
+};
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -55,29 +76,88 @@ export interface AnalyticsData {
 }
 
 function getStartDate(period: Period): Date {
-  const now = new Date();
-  switch (period) {
-    case "7d":
-      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    case "30d":
-      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    case "90d":
-      return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const config = PERIOD_CONFIG[period];
+  return new Date(Date.now() - config.duration);
+}
+
+function getPeriodConfig(period: Period): PeriodConfig {
+  return PERIOD_CONFIG[period];
+}
+
+// Format time slot key based on granularity
+function formatTimeSlot(date: Date, granularity: Granularity): string {
+  switch (granularity) {
+    case "10s": {
+      // Round to nearest 10 seconds
+      const seconds = Math.floor(date.getSeconds() / 10) * 10;
+      const d = new Date(date);
+      d.setSeconds(seconds, 0);
+      return d.toISOString();
+    }
+    case "1m": {
+      // Round to minute
+      const d = new Date(date);
+      d.setSeconds(0, 0);
+      return d.toISOString();
+    }
+    case "5m": {
+      // Round to 5 minutes
+      const minutes = Math.floor(date.getMinutes() / 5) * 5;
+      const d = new Date(date);
+      d.setMinutes(minutes, 0, 0);
+      return d.toISOString();
+    }
+    case "15m": {
+      // Round to 15 minutes
+      const minutes = Math.floor(date.getMinutes() / 15) * 15;
+      const d = new Date(date);
+      d.setMinutes(minutes, 0, 0);
+      return d.toISOString();
+    }
+    case "1h": {
+      // Round to hour
+      const d = new Date(date);
+      d.setMinutes(0, 0, 0);
+      return d.toISOString();
+    }
+    case "1d": {
+      // Round to day (date only)
+      return date.toISOString().split("T")[0];
+    }
   }
 }
 
-function formatDate(date: Date): string {
-  return date.toISOString().split("T")[0];
-}
-
-function generateDateRange(startDate: Date, endDate: Date): string[] {
-  const dates: string[] = [];
+// Generate all time slots in range
+function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig): string[] {
+  const slots: string[] = [];
   const current = new Date(startDate);
-  while (current <= endDate) {
-    dates.push(formatDate(current));
-    current.setDate(current.getDate() + 1);
+  
+  // Align start to granularity boundary
+  if (config.granularity === "1d") {
+    current.setHours(0, 0, 0, 0);
+  } else if (config.granularity === "1h") {
+    current.setMinutes(0, 0, 0);
+  } else if (config.granularity === "15m") {
+    current.setMinutes(Math.floor(current.getMinutes() / 15) * 15, 0, 0);
+  } else if (config.granularity === "5m") {
+    current.setMinutes(Math.floor(current.getMinutes() / 5) * 5, 0, 0);
+  } else if (config.granularity === "1m") {
+    current.setSeconds(0, 0);
+  } else if (config.granularity === "10s") {
+    current.setSeconds(Math.floor(current.getSeconds() / 10) * 10, 0);
   }
-  return dates;
+  
+  while (current <= endDate) {
+    slots.push(formatTimeSlot(current, config.granularity));
+    current.setTime(current.getTime() + config.granularityMs);
+  }
+  
+  return slots;
+}
+
+// Export granularity for use in charts
+export async function getGranularity(period: Period): Promise<Granularity> {
+  return PERIOD_CONFIG[period].granularity;
 }
 
 export async function getAnalyticsData(
@@ -92,6 +172,7 @@ export async function getAnalyticsData(
   const userId = session.user.id;
   const startDate = getStartDate(period);
   const endDate = new Date();
+  const config = getPeriodConfig(period);
 
   try {
     // Fetch all logs in the period
@@ -110,32 +191,32 @@ export async function getAnalyticsData(
       },
     });
 
-    // Generate date range for filling gaps
-    const dateRange = generateDateRange(startDate, endDate);
+    // Generate time slots for filling gaps based on granularity
+    const timeSlots = generateTimeSlots(startDate, endDate, config);
 
     // Process requests over time
-    const requestsByDate = new Map<string, number>();
-    dateRange.forEach((date) => requestsByDate.set(date, 0));
+    const requestsBySlot = new Map<string, number>();
+    timeSlots.forEach((slot) => requestsBySlot.set(slot, 0));
     logs.forEach((log) => {
-      const date = formatDate(log.createdAt);
-      requestsByDate.set(date, (requestsByDate.get(date) || 0) + 1);
+      const slot = formatTimeSlot(log.createdAt, config.granularity);
+      requestsBySlot.set(slot, (requestsBySlot.get(slot) || 0) + 1);
     });
     const requestsOverTime: RequestsOverTimeData[] = Array.from(
-      requestsByDate.entries()
+      requestsBySlot.entries()
     ).map(([date, count]) => ({ date, count }));
 
     // Process token usage over time
-    const tokensByDate = new Map<string, { input: number; output: number }>();
-    dateRange.forEach((date) => tokensByDate.set(date, { input: 0, output: 0 }));
+    const tokensBySlot = new Map<string, { input: number; output: number }>();
+    timeSlots.forEach((slot) => tokensBySlot.set(slot, { input: 0, output: 0 }));
     logs.forEach((log) => {
-      const date = formatDate(log.createdAt);
-      const current = tokensByDate.get(date) || { input: 0, output: 0 };
-      tokensByDate.set(date, {
+      const slot = formatTimeSlot(log.createdAt, config.granularity);
+      const current = tokensBySlot.get(slot) || { input: 0, output: 0 };
+      tokensBySlot.set(slot, {
         input: current.input + log.inputTokens,
         output: current.output + log.outputTokens,
       });
     });
-    const tokenUsage: TokenUsageData[] = Array.from(tokensByDate.entries()).map(
+    const tokenUsage: TokenUsageData[] = Array.from(tokensBySlot.entries()).map(
       ([date, tokens]) => ({
         date,
         input: tokens.input,
@@ -167,21 +248,21 @@ export async function getAnalyticsData(
     );
 
     // Process success/error rate over time
-    const successByDate = new Map<string, { success: number; error: number }>();
-    dateRange.forEach((date) =>
-      successByDate.set(date, { success: 0, error: 0 })
+    const successBySlot = new Map<string, { success: number; error: number }>();
+    timeSlots.forEach((slot) =>
+      successBySlot.set(slot, { success: 0, error: 0 })
     );
     logs.forEach((log) => {
-      const date = formatDate(log.createdAt);
-      const current = successByDate.get(date) || { success: 0, error: 0 };
+      const slot = formatTimeSlot(log.createdAt, config.granularity);
+      const current = successBySlot.get(slot) || { success: 0, error: 0 };
       const isSuccess = log.statusCode !== null && log.statusCode >= 200 && log.statusCode < 400;
-      successByDate.set(date, {
+      successBySlot.set(slot, {
         success: current.success + (isSuccess ? 1 : 0),
         error: current.error + (isSuccess ? 0 : 1),
       });
     });
     const successRate: SuccessRateData[] = Array.from(
-      successByDate.entries()
+      successBySlot.entries()
     ).map(([date, counts]) => ({
       date,
       success: counts.success,
