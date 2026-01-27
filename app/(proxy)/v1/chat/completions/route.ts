@@ -99,7 +99,15 @@ export async function POST(request: NextRequest) {
 
   try {
     // Parse request body
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: { message: "Invalid JSON in request body", type: "invalid_request_error" } },
+        { status: 400 }
+      );
+    }
     const { model, messages, stream = true, ...params } = body;
 
     if (!model) {
