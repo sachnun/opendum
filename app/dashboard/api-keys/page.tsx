@@ -77,38 +77,44 @@ export default async function ApiKeysPage({
       ) : (
         <div className="space-y-4">
           {apiKeys.map((apiKey) => (
-            <Card key={apiKey.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Key className="h-5 w-5 text-muted-foreground" />
-                    <CardTitle className="text-lg">{apiKey.name ?? "Unnamed Key"}</CardTitle>
-                  </div>
-                  <Badge variant={apiKey.isActive ? "default" : "secondary"}>
-                    {apiKey.isActive ? "Active" : "Revoked"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Created: </span>
-                      <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
+            apiKey.isActive ? (
+              <Card key={apiKey.id}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Key className="h-5 w-5 text-muted-foreground" />
+                      <CardTitle className="text-lg">{apiKey.name ?? "Unnamed Key"}</CardTitle>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Last used: </span>
-                      <span>
-                        {apiKey.lastUsedAt
-                          ? new Date(apiKey.lastUsedAt).toLocaleDateString()
-                          : "Never"}
-                      </span>
-                    </div>
+                    <Badge variant="default">Active</Badge>
                   </div>
-                  <ApiKeyActions apiKey={apiKey} />
-                </div>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Created: </span>
+                        <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Last used: </span>
+                        <span>
+                          {apiKey.lastUsedAt
+                            ? new Date(apiKey.lastUsedAt).toLocaleDateString()
+                            : "Never"}
+                        </span>
+                      </div>
+                    </div>
+                    <ApiKeyActions apiKey={apiKey} />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div key={apiKey.id} className="flex items-center gap-3 rounded-lg border px-4 py-2 bg-muted/30">
+                <Key className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{apiKey.name ?? "Unnamed Key"}</span>
+                <Badge variant="secondary" className="ml-auto">Revoked</Badge>
+              </div>
+            )
           ))}
         </div>
       )}

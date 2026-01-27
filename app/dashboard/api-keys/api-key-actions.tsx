@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -121,7 +122,10 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
     <div className="flex items-center gap-2">
       {/* Key display with reveal/copy */}
       <div className="flex items-center gap-1">
-        <code className="text-xs bg-muted px-2 py-1 rounded font-mono max-w-[200px] truncate">
+        <code className={cn(
+          "text-xs bg-muted px-2 py-1 rounded font-mono",
+          isRevealed ? "" : "max-w-[200px] truncate"
+        )}>
           {displayKey}
         </code>
         <Button
