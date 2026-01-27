@@ -8,10 +8,14 @@ export const IFLOW_API_BASE_URL = "https://apis.iflow.cn/v1";
 
 // Client credentials (from repo reference)
 export const IFLOW_CLIENT_ID = process.env.IFLOW_CLIENT_ID || "10009311001";
-export const IFLOW_CLIENT_SECRET = process.env.IFLOW_CLIENT_SECRET || "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW";
+export const IFLOW_CLIENT_SECRET =
+  process.env.IFLOW_CLIENT_SECRET || "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW";
+
+// OAuth callback - iFlow requires this specific port
+export const IFLOW_REDIRECT_URI = "http://localhost:11451/oauth2callback";
 
 // Supported OpenAI-compatible parameters for iFlow API
-export const SUPPORTED_PARAMS = new Set([
+export const IFLOW_SUPPORTED_PARAMS = new Set([
   "model",
   "messages",
   "temperature",
@@ -52,4 +56,4 @@ export const IFLOW_MODELS = new Set([
 ]);
 
 // Token refresh buffer (24 hours before expiry)
-export const REFRESH_BUFFER_SECONDS = 24 * 60 * 60;
+export const IFLOW_REFRESH_BUFFER_SECONDS = 24 * 60 * 60;
