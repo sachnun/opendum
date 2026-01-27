@@ -57,9 +57,9 @@ export async function createApiKey(name?: string): Promise<ActionResult<{ id: st
 }
 
 /**
- * Revoke (soft delete) an API key
+ * Toggle API key active status (enable/disable)
  */
-export async function revokeApiKey(id: string): Promise<ActionResult> {
+export async function toggleApiKey(id: string): Promise<ActionResult> {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -76,18 +76,18 @@ export async function revokeApiKey(id: string): Promise<ActionResult> {
       return { success: false, error: "API key not found" };
     }
 
-    // Soft delete by setting isActive to false
+    // Toggle isActive
     await prisma.proxyApiKey.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive: !apiKey.isActive },
     });
 
     revalidatePath("/dashboard/api-keys");
 
     return { success: true, data: undefined };
   } catch (error) {
-    console.error("Failed to revoke API key:", error);
-    return { success: false, error: "Failed to revoke API key" };
+    console.error("Failed to toggle API key:", error);
+    return { success: false, error: "Failed to toggle API key" };
   }
 }
 
@@ -148,10 +148,6 @@ export async function revealApiKey(id: string): Promise<ActionResult<{ key: stri
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };
-    }
-
-    if (!apiKey.isActive) {
-      return { success: false, error: "API key has been revoked" };
     }
 
     // Check if encryptedKey exists (old keys might not have it)

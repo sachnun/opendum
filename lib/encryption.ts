@@ -34,15 +34,15 @@ export function hashString(text: string): string {
 
 /**
  * Generate a random API key
- * Format: ifp_[48 random chars]
+ * Format: sk-[16 random chars]
  */
 export function generateApiKey(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "ifp_";
-  const randomValues = CryptoJS.lib.WordArray.random(48);
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "sk-";
+  const randomValues = CryptoJS.lib.WordArray.random(16);
   const randomBytes = randomValues.toString();
   
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 16; i++) {
     const index = parseInt(randomBytes.substr(i * 2, 2), 16) % chars.length;
     result += chars[index];
   }
