@@ -27,10 +27,103 @@ interface OpenAIMessage {
   tool_call_id?: string;
 }
 
+interface AnthropicContentBlock {
+  type: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown> | string;
+  tool_use_id?: string;
+  content?: AnthropicContentBlock[];
+}
+
+interface AnthropicMessage {
+  role: string;
+  content: string | AnthropicContentBlock[];
+}
+
+interface AnthropicRequestBody {
+  model: string;
+  messages?: AnthropicMessage[];
+  system?: string | AnthropicContentBlock[];
+  max_tokens?: number;
+  stream?: boolean;
+  tools?: Array<{
+    name: string;
+    description?: string;
+    input_schema: Record<string, unknown>;
+  }>;
+  tool_choice?: {
+    type: string;
+    name?: string;
+  };
+  [key: string]: unknown;
+}
+
+interface OpenAIPayload {
+  model: string;
+  messages: OpenAIMessage[];
+  max_tokens: number;
+  stream?: boolean;
+  tools?: Array<{
+    type: string;
+    function: {
+      name: string;
+      description: string;
+      parameters: Record<string, unknown>;
+    };
+  }>;
+  tool_choice?: string | { type: string; function: { name: string } };
+  [key: string]: unknown;
+}
+
+interface OpenAIChoice {
+  delta: {
+    content?: string;
+    reasoning_content?: string;
+    role?: string;
+    tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
+  };
+  finish_reason?: string;
+}
+
+interface OpenAIResponse {
+  id?: string;
+  choices: OpenAIChoice[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+  };
+  [key: string]: unknown;
+}
+
+interface AnthropicContentBlockOutput {
+  type: string;
+  thinking?: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+}
+
+interface AnthropicResponse {
+  id: string;
+  type: string;
+  role: string;
+  content: AnthropicContentBlockOutput[];
+  model: string;
+  stop_reason: string;
+  stop_sequence: string | null;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
 /**
  * Transform Anthropic messages format to OpenAI format
  */
-function transformAnthropicToOpenAI(body: any): any {
+function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload {
   const { model, messages, system, max_tokens, stream, tools, tool_choice, ...params } = body;
 
   // Build OpenAI-style messages
@@ -43,9 +136,9 @@ function transformAnthropicToOpenAI(body: any): any {
     } else if (Array.isArray(system)) {
       // System can be array of content blocks
       const systemContent = system
-        .map((block: any) => {
+        .map((block: AnthropicContentBlock | string) => {
           if (typeof block === "string") return block;
-          if (block.type === "text") return block.text;
+          if (block.type === "text") return block.text || "";
           return "";
         })
         .join("\n");
@@ -67,16 +160,16 @@ function transformAnthropicToOpenAI(body: any): any {
 
       for (const block of msg.content) {
         if (block.type === "text") {
-          textContent += block.text;
+          textContent += block.text || "";
         } else if (block.type === "tool_use") {
           // Anthropic tool_use -> OpenAI tool_calls (for assistant messages)
           toolCalls.push({
-            id: block.id,
+            id: block.id || "",
             type: "function",
             function: {
-              name: block.name,
-              arguments: typeof block.input === "string" 
-                ? block.input 
+              name: block.name || "",
+              arguments: typeof block.input === "string"
+                ? block.input
                 : JSON.stringify(block.input || {}),
             },
           });
@@ -86,14 +179,14 @@ function transformAnthropicToOpenAI(body: any): any {
             ? block.content
             : Array.isArray(block.content)
               ? block.content
-                  .filter((b: any) => b.type === "text")
-                  .map((b: any) => b.text)
+                  .filter((b: AnthropicContentBlock) => b.type === "text")
+                  .map((b: AnthropicContentBlock) => b.text || "")
                   .join("\n")
               : JSON.stringify(block.content);
-          
+
           openaiMessages.push({
             role: "tool",
-            tool_call_id: block.tool_use_id,
+            tool_call_id: block.tool_use_id || "",
             content: toolContent,
           });
           continue; // Don't add to current message
@@ -118,7 +211,7 @@ function transformAnthropicToOpenAI(body: any): any {
   }
 
   // Build OpenAI payload
-  const openaiPayload: any = {
+  const openaiPayload: OpenAIPayload = {
     model,
     messages: openaiMessages,
     max_tokens: max_tokens || 4096,
@@ -128,7 +221,7 @@ function transformAnthropicToOpenAI(body: any): any {
 
   // Convert Anthropic tools to OpenAI format
   if (tools && tools.length > 0) {
-    openaiPayload.tools = tools.map((tool: any) => ({
+    openaiPayload.tools = tools.map((tool) => ({
       type: "function",
       function: {
         name: tool.name,
@@ -142,16 +235,16 @@ function transformAnthropicToOpenAI(body: any): any {
   if (tool_choice) {
     const choiceType = tool_choice.type;
     if (choiceType === "auto") {
-      openaiPayload.tool_choice = "auto";
+      (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice = "auto";
     } else if (choiceType === "any") {
-      openaiPayload.tool_choice = "required";
+      (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice = "required";
     } else if (choiceType === "tool") {
-      openaiPayload.tool_choice = {
+      (openaiPayload as OpenAIPayload & { tool_choice?: { type: string; function: { name: string } } }).tool_choice = {
         type: "function",
-        function: { name: tool_choice.name },
+        function: { name: tool_choice.name || "" },
       };
     } else if (choiceType === "none") {
-      openaiPayload.tool_choice = "none";
+      (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice = "none";
     }
   }
 
@@ -161,16 +254,17 @@ function transformAnthropicToOpenAI(body: any): any {
 /**
  * Transform OpenAI response to Anthropic format (non-streaming)
  */
-function transformOpenAIToAnthropic(openaiResponse: any, model: string): any {
+function transformOpenAIToAnthropic(openaiResponse: OpenAIResponse, model: string): AnthropicResponse {
   const choice = openaiResponse.choices?.[0];
-  const message = choice?.message;
+  const message = choice as unknown as { message?: { reasoning_content?: string; content?: string; tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }> } };
+  const messageData = message?.message;
   const usage = openaiResponse.usage;
 
   // Build content blocks
-  const contentBlocks: any[] = [];
+  const contentBlocks: AnthropicContentBlockOutput[] = [];
 
   // 1. Add thinking block if reasoning_content is present
-  const reasoningContent = message?.reasoning_content;
+  const reasoningContent = messageData?.reasoning_content;
   if (reasoningContent) {
     contentBlocks.push({
       type: "thinking",
@@ -179,7 +273,7 @@ function transformOpenAIToAnthropic(openaiResponse: any, model: string): any {
   }
 
   // 2. Add text block if content is present
-  const textContent = message?.content;
+  const textContent = messageData?.content;
   if (textContent) {
     contentBlocks.push({
       type: "text",
@@ -188,9 +282,9 @@ function transformOpenAIToAnthropic(openaiResponse: any, model: string): any {
   }
 
   // 3. Add tool_use blocks if tool_calls are present
-  const toolCalls = message?.tool_calls || [];
+  const toolCalls = messageData?.tool_calls || [];
   for (const tc of toolCalls) {
-    let inputData = {};
+    let inputData: Record<string, unknown> = {};
     try {
       inputData = JSON.parse(tc.function?.arguments || "{}");
     } catch {
@@ -222,7 +316,7 @@ function transformOpenAIToAnthropic(openaiResponse: any, model: string): any {
     content_filter: "end_turn",
     function_call: "tool_use",
   };
-  const stopReason = stopReasonMap[finishReason] || "end_turn";
+  const stopReason = finishReason ? stopReasonMap[finishReason] : "end_turn";
 
   return {
     id: `msg_${openaiResponse.id || Date.now()}`,

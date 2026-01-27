@@ -27,14 +27,6 @@ interface UserInfoResponse {
   };
 }
 
-interface IFlowCredentials {
-  accessToken: string;
-  refreshToken: string;
-  apiKey: string;
-  expiresAt: Date;
-  email?: string;
-}
-
 /**
  * Create Basic Auth header for iFlow OAuth
  */
@@ -214,39 +206,39 @@ export async function getValidApiKey(accountId: string): Promise<string> {
 /**
  * Clean tool schemas to prevent API errors
  */
-export function cleanToolSchemas(tools: any[]): any[] {
+export function cleanToolSchemas(tools: Array<{ type: string; function: Record<string, unknown> }>): Array<{ type: string; function: Record<string, unknown> }> {
   return tools.map((tool) => {
     const cleaned = { ...tool };
-    
+
     if (cleaned.function) {
       // Remove unsupported properties
       delete cleaned.function.strict;
-      
+
       if (cleaned.function.parameters) {
-        delete cleaned.function.parameters.additionalProperties;
-        
+        delete (cleaned.function.parameters as Record<string, unknown>).additionalProperties;
+
         // Recursively clean nested properties
-        if (cleaned.function.parameters.properties) {
-          cleanSchemaProperties(cleaned.function.parameters.properties);
+        if ((cleaned.function.parameters as Record<string, unknown>).properties) {
+          cleanSchemaProperties((cleaned.function.parameters as Record<string, unknown>).properties as Record<string, unknown>);
         }
       }
     }
-    
+
     return cleaned;
   });
 }
 
-function cleanSchemaProperties(properties: Record<string, any>): void {
+function cleanSchemaProperties(properties: Record<string, unknown>): void {
   for (const key of Object.keys(properties)) {
-    const prop = properties[key];
+    const prop = properties[key] as Record<string, unknown>;
     delete prop.additionalProperties;
-    
+
     if (prop.properties) {
-      cleanSchemaProperties(prop.properties);
+      cleanSchemaProperties(prop.properties as Record<string, unknown>);
     }
-    
-    if (prop.items?.properties) {
-      cleanSchemaProperties(prop.items.properties);
+
+    if ((prop.items as Record<string, unknown>)?.properties) {
+      cleanSchemaProperties((prop.items as Record<string, unknown>).properties as Record<string, unknown>);
     }
   }
 }
@@ -254,27 +246,27 @@ function cleanSchemaProperties(properties: Record<string, any>): void {
 /**
  * Build request payload with only supported parameters
  */
-export function buildRequestPayload(params: Record<string, any>, forceStream?: boolean): Record<string, any> {
-  const payload: Record<string, any> = {};
-  
+export function buildRequestPayload(params: Record<string, unknown>, forceStream?: boolean): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+
   for (const [key, value] of Object.entries(params)) {
     if (SUPPORTED_PARAMS.has(key) && value !== undefined) {
       payload[key] = value;
     }
   }
-  
+
   // Use stream value from params, or force if specified
   if (forceStream !== undefined) {
     payload.stream = forceStream;
   } else if (payload.stream === undefined) {
     payload.stream = true; // Default to streaming
   }
-  
+
   // Clean tool schemas if present
   if (payload.tools && Array.isArray(payload.tools)) {
     if (payload.tools.length > 0) {
-      payload.tools = cleanToolSchemas(payload.tools);
-    } else if (payload.stream) {
+      payload.tools = cleanToolSchemas(payload.tools as Array<{ type: string; function: Record<string, unknown> }>);
+    } else if (payload.stream === true) {
       // Inject dummy tool for empty arrays only when streaming
       payload.tools = [
         {
@@ -288,7 +280,7 @@ export function buildRequestPayload(params: Record<string, any>, forceStream?: b
       ];
     }
   }
-  
+
   return payload;
 }
 
@@ -298,7 +290,7 @@ export function buildRequestPayload(params: Record<string, any>, forceStream?: b
 export async function makeIFlowRequest(
   apiKey: string,
   model: string,
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   stream: boolean = true
 ): Promise<Response> {
   // Strip provider prefix from model name
