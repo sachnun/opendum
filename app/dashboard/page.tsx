@@ -1,18 +1,11 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, Key, Activity } from "lucide-react";
 import { AnalyticsCharts } from "./components/analytics-charts";
-import { headers } from "next/headers";
 
 export default async function DashboardPage() {
   const session = await auth();
-  
-  // Detect base URL from request headers
-  const headersList = await headers();
-  const host = headersList.get("host") || "localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  const baseUrl = `${protocol}://${host}`;
 
   if (!session?.user?.id) {
     return null;
@@ -85,37 +78,6 @@ export default async function DashboardPage() {
 
       {/* Analytics Charts */}
       <AnalyticsCharts />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Start</CardTitle>
-          <CardDescription>Get started with your API proxy</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border p-4">
-            <h3 className="font-semibold">1. Add Provider Accounts</h3>
-            <p className="text-sm text-muted-foreground">
-              Connect your iFlow or Antigravity (Google) accounts to enable load balancing.
-            </p>
-          </div>
-          <div className="rounded-lg border p-4">
-            <h3 className="font-semibold">2. Generate API Key</h3>
-            <p className="text-sm text-muted-foreground">
-              Create a proxy API key to authenticate your requests.
-            </p>
-          </div>
-          <div className="rounded-lg border p-4">
-            <h3 className="font-semibold">3. Configure Your Client</h3>
-            <p className="text-sm text-muted-foreground">
-              Use your API key with Claude Code or other OpenAI-compatible clients.
-            </p>
-            <pre className="mt-2 rounded bg-muted p-2 text-xs overflow-x-auto">
-{`ANTHROPIC_BASE_URL=${baseUrl}
-ANTHROPIC_AUTH_TOKEN=your-proxy-api-key`}
-            </pre>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
