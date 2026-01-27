@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import { revokeApiKey, revealApiKey } from "@/lib/actions/api-keys";
+import { deleteApiKey, toggleApiKey, revealApiKey } from "@/lib/actions/api-keys";
 
 interface ApiKey {
   id: string;
@@ -24,12 +25,30 @@ interface ApiKey {
 }
 
 export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
-  const [isRevoking, setIsRevoking] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const handleToggle = async () => {
+    setIsToggling(true);
+    try {
+      const result = await toggleApiKey(apiKey.id);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast.success(apiKey.isActive ? "API key disabled" : "API key enabled");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to toggle API key");
+    } finally {
+      setIsToggling(false);
+    }
+  };
 
   const handleReveal = async () => {
     if (isRevealed) {
@@ -89,34 +108,28 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
     }
   };
 
-  const handleRevoke = async () => {
-    setIsRevoking(true);
+  const handleDelete = async () => {
+    setIsDeleting(true);
     try {
-      const result = await revokeApiKey(apiKey.id);
+      const result = await deleteApiKey(apiKey.id);
 
       if (!result.success) {
         throw new Error(result.error);
       }
 
-      toast.success("API key revoked");
+      toast.success("API key deleted");
       setDialogOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to revoke API key");
+      toast.error(error instanceof Error ? error.message : "Failed to delete API key");
     } finally {
-      setIsRevoking(false);
+      setIsDeleting(false);
     }
   };
 
   // Mask the key preview for display
   const displayKey = isRevealed && revealedKey 
     ? revealedKey 
-    : apiKey.keyPreview.substring(0, 8) + "••••••••••••••••";
-
-  if (!apiKey.isActive) {
-    return (
-      <span className="text-sm text-muted-foreground">Revoked</span>
-    );
-  }
+    : apiKey.keyPreview.substring(0, 8) + "••••••••";
 
   return (
     <div className="flex items-center gap-2">
@@ -124,7 +137,7 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
       <div className="flex items-center gap-1">
         <code className={cn(
           "text-xs bg-muted px-2 py-1 rounded font-mono",
-          isRevealed ? "" : "max-w-[200px] truncate"
+          isRevealed ? "" : "max-w-[160px] truncate"
         )}>
           {displayKey}
         </code>
@@ -158,20 +171,27 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         </Button>
       </div>
 
-      {/* Revoke dialog */}
+      {/* Enable/Disable toggle */}
+      <Switch
+        checked={apiKey.isActive}
+        onCheckedChange={handleToggle}
+        disabled={isToggling}
+        title={apiKey.isActive ? "Disable key" : "Enable key"}
+      />
+
+      {/* Delete dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
-            <Trash2 className="mr-1 h-3 w-3" />
-            Revoke
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Revoke API Key</DialogTitle>
+            <DialogTitle>Delete API Key</DialogTitle>
             <DialogDescription>
-              Are you sure you want to revoke &quot;{apiKey.name ?? "Unnamed Key"}&quot;? Any applications
-              using this key will no longer be able to access the proxy.
+              Are you sure you want to delete &quot;{apiKey.name ?? "Unnamed Key"}&quot;? This action
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -180,10 +200,10 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
             </Button>
             <Button
               variant="destructive"
-              onClick={handleRevoke}
-              disabled={isRevoking}
+              onClick={handleDelete}
+              disabled={isDeleting}
             >
-              {isRevoking ? "Revoking..." : "Revoke"}
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

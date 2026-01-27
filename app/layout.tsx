@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "iFlow Proxy",
-  description: "OpenAI-compatible API proxy for iFlow AI services",
+  title: "Opendum",
+  description: "OpenAI-compatible API proxy for multiple AI providers",
 };
 
 export default function RootLayout({

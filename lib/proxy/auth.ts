@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { hashString } from "@/lib/encryption";
-import { IFLOW_MODELS } from "./constants";
+import { isModelSupported, getAllModelsWithAliases } from "./models";
 
 /**
  * Validate model parameter against available models
@@ -11,10 +11,11 @@ export function validateModel(model: string): {
   param?: string;
   code?: string;
 } {
-  if (!IFLOW_MODELS.has(model)) {
+  if (!isModelSupported(model)) {
+    const allModels = getAllModelsWithAliases();
     return {
       valid: false,
-      error: `Invalid model: ${model}. Available models: ${Array.from(IFLOW_MODELS).sort().join(", ")}`,
+      error: `Invalid model: ${model}. Available models: ${allModels.sort().join(", ")}`,
       param: "model",
       code: "invalid_model",
     };
@@ -77,7 +78,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
  */
 export async function logUsage(params: {
   userId: string;
-  iflowAccountId?: string;
+  providerAccountId?: string;
   proxyApiKeyId?: string;
   model: string;
   inputTokens?: number;
@@ -89,7 +90,7 @@ export async function logUsage(params: {
     await prisma.usageLog.create({
       data: {
         userId: params.userId,
-        iflowAccountId: params.iflowAccountId,
+        providerAccountId: params.providerAccountId,
         proxyApiKeyId: params.proxyApiKeyId,
         model: params.model,
         inputTokens: params.inputTokens ?? 0,

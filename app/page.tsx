@@ -13,10 +13,10 @@ export default async function Home() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <div className="mx-auto max-w-md text-center px-4">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          iFlow Proxy
+          Opendum
         </h1>
         <p className="mt-4 text-muted-foreground">
-          Multi-account proxy for iFlow CLI
+          Multi-account proxy for AI providers
         </p>
         <div className="mt-8">
           <form

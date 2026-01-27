@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
 import { getNextAccount } from "@/lib/proxy/load-balancer";
-import { getValidApiKey, makeIFlowRequest } from "@/lib/proxy/iflow-client";
+import { getProvider } from "@/lib/proxy/providers";
+import type { ProviderNameType } from "@/lib/proxy/providers/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ function createUsageTrackingStream(
 
           try {
             const parsed = JSON.parse(data);
-            // Extract usage if present (iFlow sends usage in the final chunk)
+            // Extract usage if present (sent in the final chunk)
             if (parsed.usage) {
               inputTokens = parsed.usage.prompt_tokens || inputTokens;
               outputTokens = parsed.usage.completion_tokens || outputTokens;
@@ -130,14 +131,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get next iFlow account using round-robin
-    const account = await getNextAccount(userId!);
+    // Get next account using round-robin (now supports multi-provider)
+    const account = await getNextAccount(userId!, model);
 
     if (!account) {
       return NextResponse.json(
         {
           error: {
-            message: "No active iFlow accounts. Please add an account in the dashboard.",
+            message:
+              "No active accounts available for this model. Please add an account in the dashboard.",
             type: "configuration_error",
           },
         },
@@ -145,48 +147,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get valid API key (refreshes token if needed)
-    const iflowApiKey = await getValidApiKey(account.id);
+    // Get the provider implementation
+    const provider = await getProvider(account.provider as ProviderNameType);
 
-    // Make request to iFlow (respects stream parameter)
-    const iflowResponse = await makeIFlowRequest(
-      iflowApiKey,
-      model,
-      { messages, ...params },
+    // Get valid credentials (handles token refresh if needed)
+    const credentials = await provider.getValidCredentials(account);
+
+    // Make request to provider's API
+    const providerResponse = await provider.makeRequest(
+      credentials,
+      account,
+      { model, messages, stream, ...params },
       stream
     );
 
-    // Handle errors from iFlow
-    if (!iflowResponse.ok) {
-      const errorText = await iflowResponse.text();
-      console.error("iFlow error:", iflowResponse.status, errorText);
+    // Handle errors from provider
+    if (!providerResponse.ok) {
+      const errorText = await providerResponse.text();
+      console.error(`${account.provider} error:`, providerResponse.status, errorText);
 
       // Log failed request with 0 tokens
       await logUsage({
         userId: userId!,
-        iflowAccountId: account.id,
+        providerAccountId: account.id,
         proxyApiKeyId: apiKeyId,
         model,
         inputTokens: 0,
         outputTokens: 0,
-        statusCode: iflowResponse.status,
+        statusCode: providerResponse.status,
         duration: Date.now() - startTime,
       });
 
       return NextResponse.json(
         {
           error: {
-            message: `iFlow API error: ${errorText}`,
+            message: `${account.provider} API error: ${errorText}`,
             type: "api_error",
           },
         },
-        { status: iflowResponse.status }
+        { status: providerResponse.status }
       );
     }
 
     // Streaming response
     if (stream) {
-      const responseBody = iflowResponse.body;
+      const responseBody = providerResponse.body;
 
       if (!responseBody) {
         return NextResponse.json(
@@ -199,7 +204,7 @@ export async function POST(request: NextRequest) {
       const usageTracker = createUsageTrackingStream((usage) => {
         logUsage({
           userId: userId!,
-          iflowAccountId: account.id,
+          providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
           inputTokens: usage.inputTokens,
@@ -220,12 +225,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming response
-    const responseData = await iflowResponse.json();
+    const responseData = await providerResponse.json();
 
     // Log with actual token usage from response
     logUsage({
       userId: userId!,
-      iflowAccountId: account.id,
+      providerAccountId: account.id,
       proxyApiKeyId: apiKeyId,
       model,
       inputTokens: responseData.usage?.prompt_tokens ?? 0,

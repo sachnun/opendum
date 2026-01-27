@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const [accountCount, apiKeyCount, recentLogs] = await Promise.all([
-    prisma.iflowAccount.count({
+    prisma.providerAccount.count({
       where: { userId: session.user.id, isActive: true },
     }),
     prisma.proxyApiKey.count({
@@ -38,9 +38,9 @@ export default async function DashboardPage() {
 
   const stats = [
     {
-      title: "Active iFlow Accounts",
+      title: "Active Accounts",
       value: accountCount,
-      description: "Connected accounts for load balancing",
+      description: "Connected provider accounts for load balancing",
       icon: User,
     },
     {
@@ -64,7 +64,7 @@ export default async function DashboardPage() {
           Welcome back, {session.user.name?.split(" ")[0]}!
         </h2>
         <p className="text-sm md:text-base text-muted-foreground">
-          Here&apos;s an overview of your iFlow proxy
+          Here&apos;s an overview of your API proxy
         </p>
       </div>
 
@@ -89,13 +89,13 @@ export default async function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Quick Start</CardTitle>
-          <CardDescription>Get started with your iFlow proxy</CardDescription>
+          <CardDescription>Get started with your API proxy</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border p-4">
-            <h3 className="font-semibold">1. Add iFlow Accounts</h3>
+            <h3 className="font-semibold">1. Add Provider Accounts</h3>
             <p className="text-sm text-muted-foreground">
-              Connect your iFlow accounts to enable load balancing across multiple accounts.
+              Connect your iFlow or Antigravity (Google) accounts to enable load balancing.
             </p>
           </div>
           <div className="rounded-lg border p-4">

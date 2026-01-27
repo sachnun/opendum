@@ -2,20 +2,14 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, Key } from "lucide-react";
+import { Key } from "lucide-react";
 import { CreateApiKeyButton } from "./create-api-key-button";
 import { ApiKeyActions } from "./api-key-actions";
 import { CodeBlock } from "@/components/ui/code-block";
 import { headers } from "next/headers";
 
-export default async function ApiKeysPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ newKey?: string }>;
-}) {
+export default async function ApiKeysPage() {
   const session = await auth();
-  const params = await searchParams;
 
   // Detect base URL from request headers
   const headersList = await headers();
@@ -38,28 +32,11 @@ export default async function ApiKeysPage({
         <div>
           <h2 className="text-xl md:text-2xl font-bold tracking-tight">API Keys</h2>
           <p className="text-sm md:text-base text-muted-foreground">
-            Manage your proxy API keys for accessing the iFlow proxy
+            Manage your proxy API keys for accessing Opendum
           </p>
         </div>
         <CreateApiKeyButton />
       </div>
-
-      {params.newKey && (
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>
-            <div className="space-y-2">
-              <p className="font-medium">API key created successfully!</p>
-              <code className="block rounded bg-muted p-2 text-sm break-all">
-                {params.newKey}
-              </code>
-              <p className="text-sm text-muted-foreground">
-                You can reveal and copy this key anytime from the list below.
-              </p>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
 
       {apiKeys.length === 0 ? (
         <Card>
@@ -77,44 +54,38 @@ export default async function ApiKeysPage({
       ) : (
         <div className="space-y-4">
           {apiKeys.map((apiKey) => (
-            apiKey.isActive ? (
-              <Card key={apiKey.id}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Key className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle className="text-lg">{apiKey.name ?? "Unnamed Key"}</CardTitle>
-                    </div>
-                    <Badge variant="default">Active</Badge>
+            <Card key={apiKey.id} className={!apiKey.isActive ? "opacity-60" : ""}>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Key className="h-5 w-5 text-muted-foreground" />
+                    <CardTitle className="text-lg">{apiKey.name ?? "Unnamed Key"}</CardTitle>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Created: </span>
-                        <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Last used: </span>
-                        <span>
-                          {apiKey.lastUsedAt
-                            ? new Date(apiKey.lastUsedAt).toLocaleDateString()
-                            : "Never"}
-                        </span>
-                      </div>
+                  <Badge variant={apiKey.isActive ? "default" : "secondary"}>
+                    {apiKey.isActive ? "Active" : "Disabled"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Created: </span>
+                      <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
                     </div>
-                    <ApiKeyActions apiKey={apiKey} />
+                    <div>
+                      <span className="text-muted-foreground">Last used: </span>
+                      <span>
+                        {apiKey.lastUsedAt
+                          ? new Date(apiKey.lastUsedAt).toLocaleDateString()
+                          : "Never"}
+                      </span>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div key={apiKey.id} className="flex items-center gap-3 rounded-lg border px-4 py-2 bg-muted/30">
-                <Key className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{apiKey.name ?? "Unnamed Key"}</span>
-                <Badge variant="secondary" className="ml-auto">Revoked</Badge>
-              </div>
-            )
+                  <ApiKeyActions apiKey={apiKey} />
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -131,7 +102,7 @@ export default async function ApiKeysPage({
               language="bash"
               code={`# Add to your settings or environment
 ANTHROPIC_BASE_URL=${baseUrl}
-ANTHROPIC_AUTH_TOKEN=ifp_your-api-key-here
+ANTHROPIC_AUTH_TOKEN=sk-your-api-key-here
 ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
             />
           </div>
@@ -141,7 +112,7 @@ ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
               language="bash"
               code={`curl -X POST ${baseUrl}/v1/chat/completions \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ifp_your-api-key-here" \\
+  -H "Authorization: Bearer sk-your-api-key-here" \\
   -d '{
     "model": "iflow/deepseek-v3.2",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -154,7 +125,7 @@ ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
               language="bash"
               code={`curl -X POST ${baseUrl}/v1/messages \\
   -H "Content-Type: application/json" \\
-  -H "x-api-key: ifp_your-api-key-here" \\
+  -H "x-api-key: sk-your-api-key-here" \\
   -H "anthropic-version: 2023-06-01" \\
   -d '{
     "model": "iflow/deepseek-v3.2",
