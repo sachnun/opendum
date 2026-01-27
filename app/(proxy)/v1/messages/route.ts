@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
 import { getNextAccount } from "@/lib/proxy/load-balancer";
-import { getValidApiKey, makeIFlowRequest } from "@/lib/proxy/iflow-client";
+import { getProvider } from "@/lib/proxy/providers";
+import type { ProviderNameType } from "@/lib/proxy/providers/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -762,8 +763,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get next iFlow account using round-robin
-    const account = await getNextAccount(userId!);
+    // Get next account using round-robin (now supports multi-provider)
+    const account = await getNextAccount(userId!, model);
 
     if (!account) {
       return NextResponse.json(
@@ -771,36 +772,44 @@ export async function POST(request: NextRequest) {
           type: "error",
           error: {
             type: "overloaded_error",
-            message: "No active iFlow accounts. Please add an account in the dashboard.",
+            message: "No active accounts available for this model. Please add an account in the dashboard.",
           },
         },
         { status: 529 }
       );
     }
 
-    // Get valid API key (refreshes token if needed)
-    const iflowApiKey = await getValidApiKey(account.id);
+    // Get the provider implementation
+    const provider = await getProvider(account.provider as ProviderNameType);
+
+    // Get valid credentials (handles token refresh if needed)
+    const credentials = await provider.getValidCredentials(account);
 
     // Transform Anthropic format to OpenAI format
     const openaiPayload = transformAnthropicToOpenAI(body);
 
-    // Make request to iFlow with correct stream parameter
-    const iflowResponse = await makeIFlowRequest(iflowApiKey, model, openaiPayload, stream);
+    // Make request to provider's API
+    const providerResponse = await provider.makeRequest(
+      credentials,
+      account,
+      openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest,
+      stream
+    );
 
-    // Handle errors from iFlow
-    if (!iflowResponse.ok) {
-      const errorText = await iflowResponse.text();
-      console.error("iFlow error:", iflowResponse.status, errorText);
+    // Handle errors from provider
+    if (!providerResponse.ok) {
+      const errorText = await providerResponse.text();
+      console.error(`${account.provider} error:`, providerResponse.status, errorText);
 
       // Log failed request with 0 tokens
       await logUsage({
         userId: userId!,
-        iflowAccountId: account.id,
+        providerAccountId: account.id,
         proxyApiKeyId: apiKeyId,
         model,
         inputTokens: 0,
         outputTokens: 0,
-        statusCode: iflowResponse.status,
+        statusCode: providerResponse.status,
         duration: Date.now() - startTime,
       });
 
@@ -809,20 +818,20 @@ export async function POST(request: NextRequest) {
           type: "error",
           error: {
             type: "api_error",
-            message: `iFlow API error: ${errorText}`,
+            message: `${account.provider} API error: ${errorText}`,
           },
         },
-        { status: iflowResponse.status }
+        { status: providerResponse.status }
       );
     }
 
     // Streaming response
-    if (stream && iflowResponse.body) {
+    if (stream && providerResponse.body) {
       // Transform OpenAI stream to Anthropic stream with usage callback
       const transformer = createAnthropicStreamTransformer(model, (usage) => {
         logUsage({
           userId: userId!,
-          iflowAccountId: account.id,
+          providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
           inputTokens: usage.inputTokens,
@@ -831,7 +840,7 @@ export async function POST(request: NextRequest) {
           duration: Date.now() - startTime,
         });
       });
-      const transformedStream = iflowResponse.body.pipeThrough(transformer);
+      const transformedStream = providerResponse.body.pipeThrough(transformer);
 
       return new Response(transformedStream, {
         headers: {
@@ -844,13 +853,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming response - transform OpenAI to Anthropic format
-    const openaiResponse = await iflowResponse.json();
+    const openaiResponse = await providerResponse.json();
     const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model);
     
     // Log with actual token usage from response
     logUsage({
       userId: userId!,
-      iflowAccountId: account.id,
+      providerAccountId: account.id,
       proxyApiKeyId: apiKeyId,
       model,
       inputTokens: openaiResponse.usage?.prompt_tokens ?? 0,

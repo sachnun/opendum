@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
-import { IFLOW_MODELS } from "@/lib/proxy/constants";
+import { formatModelsForOpenAI } from "@/lib/proxy/models";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const models = Array.from(IFLOW_MODELS).map((modelId) => ({
-    id: modelId,
-    object: "model",
-    created: Math.floor(Date.now() / 1000),
-    owned_by: "iFlow",
+  const models = formatModelsForOpenAI().map((model) => ({
+    ...model,
     permission: [],
-    root: modelId,
+    root: model.id,
     parent: null,
   }));
 
