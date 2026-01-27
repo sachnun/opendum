@@ -1,20 +1,20 @@
 "use client";
 
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
 import type { RequestsOverTimeData } from "@/lib/actions/analytics";
 
 interface Props {
   data: RequestsOverTimeData[];
 }
+
+const chartConfig = {
+  count: {
+    label: "Requests",
+    color: "var(--chart-1)",
+  },
+} satisfies ChartConfig;
 
 export function RequestsOverTimeChart({ data }: Props) {
   const hasData = data.some((d) => d.count > 0);
@@ -24,9 +24,9 @@ export function RequestsOverTimeChart({ data }: Props) {
       {!hasData ? (
         <EmptyChart />
       ) : (
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+        <ChartContainer config={chartConfig} className="h-[200px] w-full">
+          <LineChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12 }}
@@ -34,15 +34,16 @@ export function RequestsOverTimeChart({ data }: Props) {
                 const date = new Date(value);
                 return `${date.getMonth() + 1}/${date.getDate()}`;
               }}
-              className="text-muted-foreground"
+              tickLine={false}
+              axisLine={false}
             />
-            <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "6px",
-              }}
+            <YAxis
+              tick={{ fontSize: 12 }}
+              tickLine={false}
+              axisLine={false}
+            />
+            <ChartTooltip
+              content={<ChartTooltipContent />}
               labelFormatter={(value) => {
                 const date = new Date(value);
                 return date.toLocaleDateString();
@@ -51,14 +52,13 @@ export function RequestsOverTimeChart({ data }: Props) {
             <Line
               type="monotone"
               dataKey="count"
-              stroke="hsl(var(--primary))"
+              stroke="var(--color-count)"
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
-              name="Requests"
             />
           </LineChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       )}
     </ChartCard>
   );

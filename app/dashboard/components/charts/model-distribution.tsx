@@ -1,6 +1,7 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, Legend, Tooltip } from "recharts";
+import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
 import type { ModelDistributionData } from "@/lib/actions/analytics";
 
@@ -8,31 +9,47 @@ interface Props {
   data: ModelDistributionData[];
 }
 
-const COLORS = [
-  "hsl(var(--primary))",
-  "hsl(142, 76%, 36%)",
-  "hsl(221, 83%, 53%)",
-  "hsl(262, 83%, 58%)",
-  "hsl(24, 94%, 50%)",
-  "hsl(174, 72%, 46%)",
-  "hsl(340, 82%, 52%)",
-  "hsl(47, 95%, 53%)",
-  "hsl(199, 89%, 48%)",
-  "hsl(0, 84%, 60%)",
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
+  "var(--chart-10)",
 ];
 
 export function ModelDistributionChart({ data }: Props) {
   const hasData = data.length > 0;
+
+  const chartConfig: ChartConfig = data.reduce((acc, item, index) => {
+    return {
+      ...acc,
+      [`model${index}`]: {
+        label: item.model,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      },
+    };
+  }, {} as ChartConfig);
+
+  // Transform data to include fill color directly
+  const transformedData = data.map((item, index) => ({
+    ...item,
+    fill: CHART_COLORS[index % CHART_COLORS.length],
+  }));
 
   return (
     <ChartCard title="Model Distribution">
       {!hasData ? (
         <EmptyChart />
       ) : (
-        <ResponsiveContainer width="100%" height={200}>
+        <ChartContainer config={chartConfig} className="h-[200px] w-full">
           <PieChart>
             <Pie
-              data={data}
+              data={transformedData}
               cx="50%"
               cy="50%"
               innerRadius={40}
@@ -41,19 +58,15 @@ export function ModelDistributionChart({ data }: Props) {
               dataKey="value"
               nameKey="model"
             >
-              {data.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              {transformedData.map((_, index) => (
+                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "6px",
-              }}
-              formatter={(value, name, props) => {
-                const item = props.payload as ModelDistributionData;
-                return [`${value} (${item.percentage}%)`, name];
+              content={<ChartTooltipContent />}
+              formatter={(value, name) => {
+                const item = data.find((d) => d.model === name);
+                return [`${value} (${item?.percentage}%)`, name];
               }}
             />
             <Legend
@@ -62,12 +75,11 @@ export function ModelDistributionChart({ data }: Props) {
               align="right"
               wrapperStyle={{ fontSize: "11px" }}
               formatter={(value) => {
-                // Truncate long model names in legend
                 return value.length > 12 ? value.substring(0, 12) + "..." : value;
               }}
             />
           </PieChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       )}
     </ChartCard>
   );
