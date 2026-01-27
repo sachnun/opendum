@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, TrendingUp, Zap, Clock, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import { getAnalyticsData, type Period, type AnalyticsData } from "@/lib/actions/analytics";
+import { getAnalyticsData, type Period, type AnalyticsData, type Granularity } from "@/lib/actions/analytics";
 import { RequestsOverTimeChart } from "./charts/requests-over-time";
 import { TokenUsageChart } from "./charts/token-usage";
 import { RequestsByModelChart } from "./charts/requests-by-model";
@@ -13,10 +13,29 @@ import { ModelDistributionChart } from "./charts/model-distribution";
 import { SuccessRateChart } from "./charts/success-rate";
 
 const PERIODS: { value: Period; label: string }[] = [
-  { value: "7d", label: "7 days" },
-  { value: "30d", label: "30 days" },
-  { value: "90d", label: "90 days" },
+  { value: "5m", label: "5m" },
+  { value: "15m", label: "15m" },
+  { value: "30m", label: "30m" },
+  { value: "1h", label: "1h" },
+  { value: "6h", label: "6h" },
+  { value: "24h", label: "24h" },
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "90d", label: "90d" },
 ];
+
+// Map period to granularity for chart formatting
+const PERIOD_GRANULARITY: Record<Period, Granularity> = {
+  "5m": "10s",
+  "15m": "1m",
+  "30m": "1m",
+  "1h": "5m",
+  "6h": "15m",
+  "24h": "1h",
+  "7d": "1d",
+  "30d": "1d",
+  "90d": "1d",
+};
 
 export function AnalyticsCharts() {
   const [period, setPeriod] = useState<Period>("7d");
@@ -160,11 +179,11 @@ export function AnalyticsCharts() {
       {/* Charts grid */}
       {data && (
         <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
-          <RequestsOverTimeChart data={data.requestsOverTime} />
-          <TokenUsageChart data={data.tokenUsage} />
+          <RequestsOverTimeChart data={data.requestsOverTime} granularity={PERIOD_GRANULARITY[period]} />
+          <TokenUsageChart data={data.tokenUsage} granularity={PERIOD_GRANULARITY[period]} />
           <RequestsByModelChart data={data.requestsByModel} />
           <ModelDistributionChart data={data.modelDistribution} />
-          <SuccessRateChart data={data.successRate} />
+          <SuccessRateChart data={data.successRate} granularity={PERIOD_GRANULARITY[period]} />
         </div>
       )}
     </div>
