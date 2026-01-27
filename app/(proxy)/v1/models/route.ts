@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { IFLOW_MODELS } from "@/lib/proxy/constants";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const models = Array.from(IFLOW_MODELS).map((modelId) => ({
     id: modelId,
     object: "model",

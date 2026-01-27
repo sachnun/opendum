@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { IFLOW_OAUTH_AUTHORIZE_URL, IFLOW_CLIENT_ID } from "@/lib/proxy/constants";
 
 // iFlow OAuth callback port (fixed by iFlow)
 const IFLOW_CALLBACK_PORT = "11451";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const session = await auth();
 
   if (!session?.user?.id) {
