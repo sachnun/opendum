@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Key, User, LayoutDashboard, LogOut, Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,12 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useState } from "react";
-
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "iFlow Accounts", href: "/dashboard/accounts", icon: User },
-  { name: "API Keys", href: "/dashboard/api-keys", icon: Key },
-];
+import { navigation } from "@/lib/navigation";
 
 export function MobileNav() {
   const pathname = usePathname();

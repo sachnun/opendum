@@ -3,16 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Key, User, LayoutDashboard, LogOut, Cpu } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { navigation } from "@/lib/navigation";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "iFlow Accounts", href: "/dashboard/accounts", icon: User },
-  { name: "API Keys", href: "/dashboard/api-keys", icon: Key },
-  { name: "Models", href: "/dashboard/models", icon: Cpu },
-];
 
 export function Sidebar() {
   const pathname = usePathname();
