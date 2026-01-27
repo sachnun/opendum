@@ -14,7 +14,7 @@ export interface NavItem {
 
 export const navigation: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "iFlow Accounts", href: "/dashboard/accounts", icon: User },
+  { name: "Accounts", href: "/dashboard/accounts", icon: User },
   { name: "API Keys", href: "/dashboard/api-keys", icon: Key },
   { name: "Models", href: "/dashboard/models", icon: Cpu },
 ];

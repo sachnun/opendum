@@ -21,7 +21,7 @@ export async function Header() {
       <div className="flex items-center gap-3">
         <MobileNav />
         <Link href="/dashboard" className="md:hidden text-lg font-bold">
-          iFlow Proxy
+          Opendum
         </Link>
         <h1 className="hidden md:block text-lg font-semibold">Dashboard</h1>
       </div>

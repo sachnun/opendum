@@ -1,12 +1,12 @@
-# AGENTS.md - iFlow Proxy
+# AGENTS.md - Opendum
 
 Guidelines for AI agents working on this Next.js 16 + TypeScript + Prisma codebase.
 
 ## Project Overview
 
-iFlow Proxy is a Next.js application that provides an OpenAI-compatible API proxy for iFlow AI services. It features:
-- OAuth-based iFlow account management
-- Round-robin load balancing across multiple iFlow accounts
+Opendum is a Next.js application that provides an OpenAI-compatible API proxy for multiple AI providers. It features:
+- OAuth-based provider account management (iFlow, Antigravity)
+- Round-robin load balancing across multiple provider accounts
 - Proxy API key generation and management
 - Usage analytics dashboard
 - GitHub authentication via NextAuth.js
@@ -64,7 +64,7 @@ components/
 
 lib/
 ├── actions/            # Server actions (accounts, api-keys, analytics)
-├── proxy/              # Proxy logic (iflow-client, load-balancer, auth)
+├── proxy/              # Proxy logic (providers, load-balancer, auth)
 ├── auth.ts             # NextAuth configuration
 ├── db.ts               # Prisma client singleton
 ├── encryption.ts       # AES encryption utilities
@@ -108,11 +108,11 @@ interface TokenResponse {
 ```
 
 ### Naming Conventions
-- **Files**: kebab-case (`iflow-client.ts`, `load-balancer.ts`)
+- **Files**: kebab-case (`client.ts`, `load-balancer.ts`)
 - **Components**: PascalCase (`Button`, `AnalyticsCharts`)
 - **Functions**: camelCase (`getValidApiKey`, `buildRequestPayload`)
 - **Constants**: UPPER_SNAKE_CASE (`IFLOW_API_BASE_URL`, `REFRESH_BUFFER_SECONDS`)
-- **Server Actions**: camelCase verbs (`createApiKey`, `deleteIflowAccount`)
+- **Server Actions**: camelCase verbs (`createApiKey`, `deleteProviderAccount`)
 
 ### React Components
 - Use function declarations for components
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
 ### Encryption
 - Use `encrypt()`/`decrypt()` from `@/lib/encryption` for sensitive data
 - Use `hashString()` for API key lookup (SHA-256)
-- API keys use format: `ifp_[48 random chars]`
+- API keys use format: `sk-[16 random chars]`
 
 ### Styling
 - Tailwind CSS v4 with CSS-first configuration

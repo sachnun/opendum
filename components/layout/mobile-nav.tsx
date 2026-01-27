@@ -36,7 +36,7 @@ export function MobileNav() {
               className="text-xl font-bold"
               onClick={() => setOpen(false)}
             >
-              iFlow Proxy
+              Opendum
             </Link>
           </SheetTitle>
         </SheetHeader>
