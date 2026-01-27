@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiKey, logUsage } from "@/lib/proxy/auth";
+import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
 import { getNextAccount } from "@/lib/proxy/load-balancer";
 import { getValidApiKey, makeIFlowRequest } from "@/lib/proxy/iflow-client";
 
@@ -650,6 +650,19 @@ export async function POST(request: NextRequest) {
         {
           type: "error",
           error: { type: "invalid_request_error", message: "model is required" },
+        },
+        { status: 400 }
+      );
+    }
+
+    const modelValidation = validateModel(model);
+    if (!modelValidation.valid) {
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      return NextResponse.json(
+        {
+          type: "error",
+          error: { type: "invalid_request_error", message: modelValidation.error },
+          request_id: requestId,
         },
         { status: 400 }
       );
