@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pencil, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { deleteIflowAccount, updateIflowAccount } from "@/lib/actions/accounts";
+import { deleteProviderAccount, updateProviderAccount } from "@/lib/actions/accounts";
 
 interface Account {
   id: string;
@@ -35,7 +35,7 @@ export function AccountActions({ account }: { account: Account }) {
   const handleToggleActive = async () => {
     setIsToggling(true);
     try {
-      const result = await updateIflowAccount(account.id, { isActive: !account.isActive });
+      const result = await updateProviderAccount(account.id, { isActive: !account.isActive });
 
       if (!result.success) {
         throw new Error(result.error);
@@ -57,7 +57,7 @@ export function AccountActions({ account }: { account: Account }) {
 
     setIsEditing(true);
     try {
-      const result = await updateIflowAccount(account.id, { name: editName.trim() });
+      const result = await updateProviderAccount(account.id, { name: editName.trim() });
 
       if (!result.success) {
         throw new Error(result.error);
@@ -75,7 +75,7 @@ export function AccountActions({ account }: { account: Account }) {
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const result = await deleteIflowAccount(account.id);
+      const result = await deleteProviderAccount(account.id);
 
       if (!result.success) {
         throw new Error(result.error);
@@ -112,7 +112,7 @@ export function AccountActions({ account }: { account: Account }) {
           <DialogHeader>
             <DialogTitle>Rename Account</DialogTitle>
             <DialogDescription>
-              Enter a new name for this iFlow account.
+              Enter a new name for this account.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
