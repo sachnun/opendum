@@ -29,7 +29,7 @@ export const SUPPORTED_PARAMS = new Set([
 ]);
 
 // Available iFlow models
-export const IFLOW_MODELS = [
+export const IFLOW_MODELS = new Set([
   "glm-4.7",
   "glm-4.6",
   "iflow-rome-30ba3b",
@@ -49,7 +49,7 @@ export const IFLOW_MODELS = [
   "qwen3-vl-plus",
   "qwen3-235b-a22b-instruct",
   "qwen3-235b",
-];
+]);
 
 // Token refresh buffer (24 hours before expiry)
 export const REFRESH_BUFFER_SECONDS = 24 * 60 * 60;

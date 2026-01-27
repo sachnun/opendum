@@ -1,5 +1,26 @@
 import { prisma } from "@/lib/db";
 import { hashString } from "@/lib/encryption";
+import { IFLOW_MODELS } from "./constants";
+
+/**
+ * Validate model parameter against available models
+ */
+export function validateModel(model: string): {
+  valid: boolean;
+  error?: string;
+  param?: string;
+  code?: string;
+} {
+  if (!IFLOW_MODELS.has(model)) {
+    return {
+      valid: false,
+      error: `Invalid model: ${model}. Available models: ${Array.from(IFLOW_MODELS).sort().join(", ")}`,
+      param: "model",
+      code: "invalid_model",
+    };
+  }
+  return { valid: true };
+}
 
 /**
  * Validate proxy API key and return user info
