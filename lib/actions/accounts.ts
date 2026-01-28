@@ -16,6 +16,12 @@ import {
   ANTIGRAVITY_CLIENT_ID,
   ANTIGRAVITY_SCOPES,
 } from "@/lib/proxy/providers/antigravity/constants";
+import { geminiCliProvider } from "@/lib/proxy/providers/gemini-cli";
+import {
+  GEMINI_CLI_REDIRECT_URI,
+  GEMINI_CLI_CLIENT_ID,
+  GEMINI_CLI_SCOPES,
+} from "@/lib/proxy/providers/gemini-cli/constants";
 import {
   initiateDeviceCodeFlow,
   pollDeviceCodeAuthorization,
@@ -607,5 +613,148 @@ export async function setQwenCodeAccountEmail(
   } catch (error) {
     console.error("Failed to set Qwen Code account email:", error);
     return { success: false, error: "Failed to update account" };
+  }
+}
+
+/**
+ * Get Gemini CLI (Google) OAuth authorization URL
+ */
+export async function getGeminiCliAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const params = new URLSearchParams({
+    client_id: GEMINI_CLI_CLIENT_ID,
+    redirect_uri: GEMINI_CLI_REDIRECT_URI,
+    response_type: "code",
+    scope: GEMINI_CLI_SCOPES.join(" "),
+    access_type: "offline",
+    prompt: "consent",
+  });
+
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+
+  return { success: true, data: { authUrl } };
+}
+
+/**
+ * Exchange Gemini CLI OAuth callback URL for tokens and create/update account
+ */
+export async function exchangeGeminiCliOAuthCode(
+  callbackUrl: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (!callbackUrl || typeof callbackUrl !== "string") {
+    return { success: false, error: "Callback URL is required" };
+  }
+
+  try {
+    // Parse the callback URL to extract the code
+    let url: URL;
+    try {
+      url = new URL(callbackUrl);
+    } catch {
+      return { success: false, error: "Invalid URL format" };
+    }
+
+    const code = url.searchParams.get("code");
+    if (!code) {
+      return { 
+        success: false, 
+        error: "No authorization code found in URL. Make sure you copied the complete URL from your browser." 
+      };
+    }
+
+    // Check for error in URL
+    const error = url.searchParams.get("error");
+    if (error) {
+      return { success: false, error: `Google OAuth error: ${error}` };
+    }
+
+    // Exchange code for tokens using the provider
+    console.log("Exchanging Gemini CLI code for tokens...");
+    const oauthResult = await geminiCliProvider.exchangeCode(
+      code, 
+      GEMINI_CLI_REDIRECT_URI
+    );
+    console.log("Gemini CLI token exchange successful");
+
+    // Check if account with this email already exists for this user
+    const existingAccount = await prisma.providerAccount.findFirst({
+      where: {
+        userId: session.user.id,
+        provider: "gemini_cli",
+        email: oauthResult.email,
+      },
+    });
+
+    if (existingAccount) {
+      // Update existing account
+      await prisma.providerAccount.update({
+        where: { id: existingAccount.id },
+        data: {
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          projectId: oauthResult.projectId,
+          tier: oauthResult.tier,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          email: oauthResult.email,
+          isUpdate: true,
+        },
+      };
+    } else {
+      // Create new account
+      const accountCount = await prisma.providerAccount.count({
+        where: { userId: session.user.id, provider: "gemini_cli" },
+      });
+
+      await prisma.providerAccount.create({
+        data: {
+          userId: session.user.id,
+          provider: "gemini_cli",
+          name: oauthResult.email 
+            ? `Gemini CLI (${oauthResult.email})` 
+            : `Gemini CLI Account ${accountCount + 1}`,
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          email: oauthResult.email,
+          projectId: oauthResult.projectId,
+          tier: oauthResult.tier,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          email: oauthResult.email,
+          isUpdate: false,
+        },
+      };
+    }
+  } catch (err) {
+    console.error("Failed to exchange Gemini CLI OAuth code:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
   }
 }
