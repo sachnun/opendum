@@ -69,7 +69,7 @@ export default async function AccountsPage({
       {/* iFlow Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-blue-500" />
+          <Zap className="h-5 w-5" />
           <h3 className="text-base md:text-lg font-semibold">iFlow Accounts</h3>
           <Badge variant="outline" className="text-xs">
             {iflowAccounts.length} connected
@@ -91,7 +91,7 @@ export default async function AccountsPage({
       {/* Antigravity Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-purple-500" />
+          <Sparkles className="h-5 w-5" />
           <h3 className="text-base md:text-lg font-semibold">Antigravity Accounts</h3>
           <Badge variant="outline" className="text-xs">
             {antigravityAccounts.length} connected
@@ -113,7 +113,7 @@ export default async function AccountsPage({
       {/* Gemini CLI Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <Cpu className="h-5 w-5 text-green-500" />
+          <Cpu className="h-5 w-5" />
           <h3 className="text-base md:text-lg font-semibold">Gemini CLI Accounts</h3>
           <Badge variant="outline" className="text-xs">
             {geminiCliAccounts.length} connected
@@ -135,7 +135,7 @@ export default async function AccountsPage({
       {/* Qwen Code Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <Terminal className="h-5 w-5 text-orange-500" />
+          <Terminal className="h-5 w-5" />
           <h3 className="text-base md:text-lg font-semibold">Qwen Code Accounts</h3>
           <Badge variant="outline" className="text-xs">
             {qwenCodeAccounts.length} connected

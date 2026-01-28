@@ -57,7 +57,6 @@ interface DeviceCodeConfig {
 interface ProviderConfig {
   name: string;
   icon: typeof Zap;
-  color: "blue" | "purple" | "orange" | "green";
   description: string;
 }
 
@@ -67,7 +66,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   iflow: {
     name: "iFlow",
     icon: Zap,
-    color: "blue",
     description: "Access OpenAI compatible API",
     flowType: "oauth_redirect",
     getAuthUrl: getIflowAuthUrl,
@@ -76,7 +74,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   antigravity: {
     name: "Antigravity",
     icon: Sparkles,
-    color: "purple",
     description: "Access Gemini & Claude via Google OAuth",
     flowType: "oauth_redirect",
     getAuthUrl: getAntigravityAuthUrl,
@@ -85,7 +82,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   gemini_cli: {
     name: "Gemini CLI",
     icon: Cpu,
-    color: "green",
     description: "Access Gemini 2.5 Pro & 3 models",
     flowType: "oauth_redirect",
     getAuthUrl: getGeminiCliAuthUrl,
@@ -94,18 +90,12 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   qwen_code: {
     name: "Qwen Code",
     icon: Terminal,
-    color: "orange",
     description: "Access Qwen Coder models",
     flowType: "device_code",
   },
 };
 
-const COLOR_CLASSES: Record<ProviderConfig["color"], string> = {
-  blue: "text-blue-500",
-  purple: "text-purple-500",
-  orange: "text-orange-500",
-  green: "text-green-500",
-};
+
 
 export function AddAccountDialog() {
   const router = useRouter();
@@ -384,7 +374,7 @@ export function AddAccountDialog() {
 
   const renderProviderIcon = (config: ProviderConfig, className?: string) => {
     const Icon = config.icon;
-    return <Icon className={cn(className, COLOR_CLASSES[config.color])} />;
+    return <Icon className={className} />;
   };
 
   return (
