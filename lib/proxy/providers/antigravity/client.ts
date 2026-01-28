@@ -274,15 +274,19 @@ export const antigravityProvider: Provider = {
       ? transformClaudeRequest(context, geminiPayload)
       : transformGeminiRequest(context, geminiPayload);
 
+    // Claude models require streaming - force it and buffer if user wants non-streaming
+    const needsForcedStreaming = isClaudeModel && !stream;
+    const actualStream = needsForcedStreaming ? true : stream;
+
     // Build request URL
-    const action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
+    const action = actualStream ? "streamGenerateContent?alt=sse" : "generateContent";
     const url = `${CODE_ASSIST_ENDPOINT}/v1internal:${action}`;
 
     // Build headers
     const headers = new Headers({
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      Accept: stream ? "text/event-stream" : "application/json",
+      Accept: actualStream ? "text/event-stream" : "application/json",
       ...CODE_ASSIST_HEADERS,
     });
 
@@ -297,6 +301,26 @@ export const antigravityProvider: Provider = {
       headers,
       body: result.body,
     });
+
+    // If we forced streaming for Claude, buffer and convert to non-streaming
+    if (needsForcedStreaming && response.ok && response.body) {
+      const bufferedResponse = await bufferStreamingToGeminiResponse(response);
+
+      // Cache signatures from buffered response
+      cacheSignaturesFromResponse(
+        bufferedResponse,
+        family as "claude" | "gemini-flash" | "gemini-pro",
+        sessionId
+      );
+
+      // Convert to OpenAI format and return as non-streaming
+      const openaiResponse = convertGeminiToOpenAI(bufferedResponse, rawModel, includeReasoning);
+
+      return new Response(JSON.stringify(openaiResponse), {
+        status: response.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Transform response back to OpenAI format
     return await transformAntigravityResponse(
@@ -540,3 +564,173 @@ function createSignatureCachingTransform(
 
 // Export utilities for OAuth flow
 export { generateCodeVerifier, generateCodeChallenge };
+
+/**
+ * Buffer streaming response and merge into single Gemini response object.
+ * Used when Claude models require streaming but user requested non-streaming.
+ */
+async function bufferStreamingToGeminiResponse(
+  response: Response
+): Promise<Record<string, unknown>> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+
+  let buffer = "";
+  const chunks: Record<string, unknown>[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const json = line.slice(5).trim();
+      if (!json || json === "[DONE]") continue;
+
+      try {
+        let parsed = JSON.parse(json) as Record<string, unknown>;
+
+        // Handle array-wrapped responses
+        if (Array.isArray(parsed)) {
+          parsed = (parsed.find(
+            (item) => typeof item === "object" && item !== null
+          ) ?? {}) as Record<string, unknown>;
+        }
+
+        // Unwrap Antigravity wrapper
+        const unwrapped = (parsed.response ?? parsed) as Record<string, unknown>;
+        if (unwrapped.candidates) {
+          chunks.push(unwrapped);
+        }
+      } catch {
+        /* ignore parse errors */
+      }
+    }
+  }
+
+  return mergeGeminiChunks(chunks);
+}
+
+/**
+ * Merge array of Gemini streaming chunks into single response.
+ * Concatenates text, collects tool calls, preserves thinking blocks.
+ */
+function mergeGeminiChunks(
+  chunks: Record<string, unknown>[]
+): Record<string, unknown> {
+  if (chunks.length === 0) {
+    return {
+      candidates: [
+        {
+          content: { role: "model", parts: [{ text: "" }] },
+          finishReason: "STOP",
+        },
+      ],
+      usageMetadata: { promptTokenCount: 0, candidatesTokenCount: 0, totalTokenCount: 0 },
+    };
+  }
+
+  // Collect all parts from all chunks
+  const allParts: Array<Record<string, unknown>> = [];
+  let finishReason = "STOP";
+  let usageMetadata: Record<string, unknown> = {};
+
+  for (const chunk of chunks) {
+    const candidates = chunk.candidates as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(candidates) || candidates.length === 0) continue;
+
+    const candidate = candidates[0];
+    const content = candidate.content as Record<string, unknown> | undefined;
+    const parts = content?.parts as Array<Record<string, unknown>> | undefined;
+
+    if (Array.isArray(parts)) {
+      allParts.push(...parts);
+    }
+
+    // Capture finish reason from last chunk that has it
+    if (candidate.finishReason) {
+      finishReason = candidate.finishReason as string;
+    }
+
+    // Capture usage metadata (usually in last chunk)
+    if (chunk.usageMetadata) {
+      usageMetadata = chunk.usageMetadata as Record<string, unknown>;
+    }
+  }
+
+  // Merge consecutive text parts
+  const mergedParts: Array<Record<string, unknown>> = [];
+  let currentText = "";
+  let currentThought = "";
+  let currentThoughtSignature: string | undefined;
+
+  for (const part of allParts) {
+    if (part.thought === true && typeof part.text === "string") {
+      // Thinking block
+      currentThought += part.text;
+      if (part.thoughtSignature) {
+        currentThoughtSignature = part.thoughtSignature as string;
+      }
+    } else if (typeof part.text === "string" && !part.functionCall) {
+      // Regular text
+      if (currentThought) {
+        // Flush thinking block first
+        mergedParts.push({
+          thought: true,
+          text: currentThought,
+          ...(currentThoughtSignature && { thoughtSignature: currentThoughtSignature }),
+        });
+        currentThought = "";
+        currentThoughtSignature = undefined;
+      }
+      currentText += part.text;
+    } else if (part.functionCall) {
+      // Tool call - flush any pending text first
+      if (currentThought) {
+        mergedParts.push({
+          thought: true,
+          text: currentThought,
+          ...(currentThoughtSignature && { thoughtSignature: currentThoughtSignature }),
+        });
+        currentThought = "";
+        currentThoughtSignature = undefined;
+      }
+      if (currentText) {
+        mergedParts.push({ text: currentText });
+        currentText = "";
+      }
+      mergedParts.push(part);
+    }
+  }
+
+  // Flush remaining text
+  if (currentThought) {
+    mergedParts.push({
+      thought: true,
+      text: currentThought,
+      ...(currentThoughtSignature && { thoughtSignature: currentThoughtSignature }),
+    });
+  }
+  if (currentText) {
+    mergedParts.push({ text: currentText });
+  }
+
+  // Ensure at least one part
+  if (mergedParts.length === 0) {
+    mergedParts.push({ text: "" });
+  }
+
+  return {
+    candidates: [
+      {
+        content: { role: "model", parts: mergedParts },
+        finishReason,
+      },
+    ],
+    usageMetadata,
+  };
+}
