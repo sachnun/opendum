@@ -2,6 +2,7 @@
 
 import type { ChatCompletionRequest } from "../types";
 import type { RequestPayload, ModelFamily } from "./transform/types";
+import { normalizeToolCallArgs } from "./request-helpers";
 
 /**
  * Effort to budget_tokens mapping for Anthropic/Claude
@@ -254,12 +255,14 @@ export function convertGeminiToOpenAI(
             textContent += part.text;
           } else if (part.functionCall) {
             const fc = part.functionCall as Record<string, unknown>;
+            const funcName = fc.name as string;
+            const normalizedArgs = normalizeToolCallArgs(fc.args ?? {}, funcName);
             toolCalls.push({
               id: fc.id ?? `call_${crypto.randomUUID()}`,
               type: "function",
               function: {
-                name: fc.name,
-                arguments: JSON.stringify(fc.args ?? {}),
+                name: funcName,
+                arguments: JSON.stringify(normalizedArgs),
               },
             });
           }
@@ -436,6 +439,8 @@ export function createGeminiToOpenAISseTransform(
               isFirstChunk = false;
             }
 
+            const normalizedArgs = normalizeToolCallArgs(fc.args ?? {}, funcName);
+
             delta.tool_calls = [
               {
                 index: toolCallIndex,
@@ -443,7 +448,7 @@ export function createGeminiToOpenAISseTransform(
                 type: "function",
                 function: {
                   name: funcName,
-                  arguments: JSON.stringify(fc.args ?? {}),
+                  arguments: JSON.stringify(normalizedArgs),
                 },
               },
             ];

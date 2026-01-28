@@ -123,8 +123,9 @@ export async function getNextAccountForProvider(
 /**
  * Mark an account as having failed (optional: for future failover logic)
  */
-export async function markAccountFailed(_accountId: string): Promise<void> {
+export async function markAccountFailed(accountId: string): Promise<void> {
   // For now, do nothing. Future: implement cooldown or deactivation
+  void accountId;
 }
 
 /**

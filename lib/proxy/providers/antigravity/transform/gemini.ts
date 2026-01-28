@@ -5,11 +5,72 @@ import { getCachedSignature } from "../cache";
 import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
-  GEMINI_TOOL_SCHEMA_SYSTEM_INSTRUCTION,
 } from "../request-helpers";
+import { cacheToolSchemas } from "../tool-schema-cache";
 import type { RequestPayload, TransformContext, TransformResult } from "./types";
 
 const THOUGHT_SIGNATURE_BYPASS = "skip_thought_signature_validator";
+
+const GEMINI_TOOL_SCHEMA_SYSTEM_INSTRUCTION = `<CRITICAL_TOOL_USAGE_INSTRUCTIONS>
+You are operating in a CUSTOM ENVIRONMENT where tool definitions COMPLETELY DIFFER from your training data.
+VIOLATION OF THESE RULES WILL CAUSE IMMEDIATE SYSTEM FAILURE.
+
+## ABSOLUTE RULES - NO EXCEPTIONS
+
+1. **SCHEMA IS LAW**: The JSON schema in each tool definition is the ONLY source of truth.
+   - Your pre-trained knowledge about tools like 'read_file', 'apply_diff', 'write_to_file', 'bash', etc. is INVALID here.
+   - Every tool has been REDEFINED with different parameters than what you learned during training.
+
+2. **PARAMETER NAMES ARE EXACT**: Use ONLY the parameter names from the schema.
+   - WRONG: 'suggested_answers', 'file_path', 'files_to_read', 'command_to_run'
+   - RIGHT: Check the 'properties' field in the schema for the exact names
+   - The schema's 'required' array tells you which parameters are mandatory
+
+3. **ARRAY PARAMETERS**: When a parameter has "type": "array", check the 'items' field:
+   - If items.type is "object", you MUST provide an array of objects with the EXACT properties listed
+   - If items.type is "string", you MUST provide an array of strings
+   - NEVER provide a single object when an array is expected
+   - NEVER provide an array when a single value is expected
+
+4. **NESTED OBJECTS**: When items.type is "object":
+   - Check items.properties for the EXACT field names required
+   - Check items.required for which nested fields are mandatory
+   - Include ALL required nested fields in EVERY array element
+
+5. **STRICT PARAMETERS HINT**: Tool descriptions contain "STRICT PARAMETERS: ..." which lists:
+   - Parameter name, type, and whether REQUIRED
+   - For arrays of objects: the nested structure in brackets like [field: type REQUIRED, ...]
+   - USE THIS as your quick reference, but the JSON schema is authoritative
+
+6. **BEFORE EVERY TOOL CALL**:
+   a. Read the tool's 'parametersJsonSchema' or 'parameters' field completely
+   b. Identify ALL required parameters
+   c. Verify your parameter names match EXACTLY (case-sensitive)
+   d. For arrays, verify you're providing the correct item structure
+   e. Do NOT add parameters that don't exist in the schema
+
+## COMMON FAILURE PATTERNS TO AVOID
+
+- Using 'path' when schema says 'filePath' (or vice versa)
+- Using 'content' when schema says 'text' (or vice versa)  
+- Providing {"file": "..."} when schema wants [{"path": "...", "line_ranges": [...]}]
+- Omitting required nested fields in array items
+- Adding 'additionalProperties' that the schema doesn't define
+- Guessing parameter names from similar tools you know from training
+
+## REMEMBER
+Your training data about function calling is OUTDATED for this environment.
+The tool names may look familiar, but the schemas are DIFFERENT.
+When in doubt, RE-READ THE SCHEMA before making the call.
+</CRITICAL_TOOL_USAGE_INSTRUCTIONS>
+
+## GEMINI 3 RESPONSE RULES
+- Default to a direct, concise answer; add detail only when asked or required for correctness.
+- For multi-part tasks, use a short numbered list or labeled sections.
+- For long provided context, answer only from that context and avoid assumptions.
+- For multimodal inputs, explicitly reference each modality used and synthesize across them; do not invent details from absent modalities.
+- For complex tasks, outline a short plan and verify constraints before acting.
+`;
 
 /**
  * Check if payload has function tools
@@ -42,6 +103,120 @@ function extractSystemInstructionText(systemInstruction: unknown): string {
     .map((part) => (typeof part.text === "string" ? part.text : ""))
     .filter(Boolean)
     .join("\n");
+}
+
+type ScrubResult = {
+  cleaned: string;
+  removedLines: number;
+  removedBlocks: number;
+};
+
+/**
+ * Scrub tool transcript artifacts from text
+ */
+function scrubToolTranscriptArtifacts(text: string): ScrubResult {
+  const lines = text.split("\n");
+  const output: string[] = [];
+
+  let removedLines = 0;
+  let removedBlocks = 0;
+
+  let inFence = false;
+  let fenceStart = "";
+  let fenceLines: string[] = [];
+
+  const isMarkerLine = (line: string): boolean => {
+    return (
+      /^\s*Tool:\s*\w+/i.test(line) || /^\s*(?:thought|think)\s*:/i.test(line)
+    );
+  };
+
+  for (const line of lines) {
+    const isFence = line.trim().startsWith("```");
+
+    if (isFence) {
+      if (!inFence) {
+        inFence = true;
+        fenceStart = line;
+        fenceLines = [];
+        continue;
+      }
+
+      const hadMarker = fenceLines.some(isMarkerLine);
+      const cleanedFenceLines: string[] = [];
+      for (const fenceLine of fenceLines) {
+        if (isMarkerLine(fenceLine)) {
+          removedLines += 1;
+        } else {
+          cleanedFenceLines.push(fenceLine);
+        }
+      }
+
+      const hasNonWhitespace = cleanedFenceLines.some(
+        (l) => l.trim().length > 0
+      );
+      if (hadMarker && !hasNonWhitespace) {
+        removedBlocks += 1;
+      } else {
+        output.push(fenceStart);
+        output.push(...cleanedFenceLines);
+        output.push(line);
+      }
+
+      inFence = false;
+      fenceStart = "";
+      fenceLines = [];
+      continue;
+    }
+
+    if (inFence) {
+      fenceLines.push(line);
+      continue;
+    }
+
+    if (isMarkerLine(line)) {
+      removedLines += 1;
+      continue;
+    }
+
+    output.push(line);
+  }
+
+  if (inFence) {
+    output.push(fenceStart);
+    output.push(...fenceLines);
+  }
+
+  const cleaned = output.join("\n").replace(/\n{4,}/g, "\n\n\n");
+  return { cleaned, removedLines, removedBlocks };
+}
+
+/**
+ * Scrub conversation artifacts from model history
+ */
+function scrubConversationArtifactsFromModelHistory(
+  payload: RequestPayload
+): void {
+  const contents = payload.contents as
+    | Array<Record<string, unknown>>
+    | undefined;
+  if (!Array.isArray(contents)) return;
+
+  for (const content of contents) {
+    if (content.role !== "model") continue;
+
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(parts)) continue;
+
+    for (const part of parts) {
+      if (typeof part.text !== "string") continue;
+
+      const scrubbed = scrubToolTranscriptArtifacts(part.text);
+      if (scrubbed.removedLines > 0 || scrubbed.removedBlocks > 0) {
+        part.text = scrubbed.cleaned;
+      }
+    }
+  }
 }
 
 /**
@@ -79,6 +254,156 @@ function injectSystemInstructionIfNeeded(payload: RequestPayload): void {
     ...asRecord,
     parts: [{ text: GEMINI_TOOL_SCHEMA_SYSTEM_INSTRUCTION }],
   };
+}
+
+/**
+ * Normalize schema type (handle union types)
+ */
+function normalizeSchemaType(typeValue: unknown): string | undefined {
+  if (typeof typeValue === "string") {
+    return typeValue;
+  }
+  if (Array.isArray(typeValue)) {
+    const nonNull = typeValue.filter((t) => t !== "null");
+    const first = nonNull[0] ?? typeValue[0];
+    return typeof first === "string" ? first : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Summarize schema for tool description
+ */
+function summarizeSchema(schema: unknown, depth: number): string {
+  if (!schema || typeof schema !== "object") {
+    return "unknown";
+  }
+
+  const record = schema as Record<string, unknown>;
+  const normalizedType = normalizeSchemaType(record.type);
+  const enumValues = Array.isArray(record.enum) ? record.enum : undefined;
+
+  if (normalizedType === "array") {
+    const items = record.items;
+    const itemSummary = depth > 0 ? summarizeSchema(items, depth - 1) : "unknown";
+    return `array[${itemSummary}]`;
+  }
+
+  if (normalizedType === "object") {
+    const props = record.properties as Record<string, unknown> | undefined;
+    const required = Array.isArray(record.required)
+      ? (record.required as unknown[]).filter(
+          (v): v is string => typeof v === "string"
+        )
+      : [];
+
+    if (!props || depth <= 0) {
+      return "object";
+    }
+
+    const keys = Object.keys(props);
+    const requiredKeys = keys.filter((k) => required.includes(k));
+    const optionalKeys = keys.filter((k) => !required.includes(k));
+    const orderedKeys = [...requiredKeys.sort(), ...optionalKeys.sort()];
+
+    const maxPropsToShow = 8;
+    const shownKeys = orderedKeys.slice(0, maxPropsToShow);
+
+    const inner = shownKeys
+      .map((key) => {
+        const propSchema = props[key];
+        const propType = summarizeSchema(propSchema, depth - 1);
+        const requiredSuffix = required.includes(key) ? " REQUIRED" : "";
+        return `${key}: ${propType}${requiredSuffix}`;
+      })
+      .join(", ");
+
+    const extraCount = orderedKeys.length - shownKeys.length;
+    const extra = extraCount > 0 ? `, …+${extraCount}` : "";
+
+    return `{${inner}${extra}}`;
+  }
+
+  if (enumValues && enumValues.length > 0) {
+    const preview = enumValues.slice(0, 6).map(String).join("|");
+    const suffix = enumValues.length > 6 ? "|…" : "";
+    return `${normalizedType ?? "unknown"} enum(${preview}${suffix})`;
+  }
+
+  return normalizedType ?? "unknown";
+}
+
+/**
+ * Build strict parameters summary for tool description
+ */
+function buildStrictParamsSummary(
+  parametersSchema: Record<string, unknown>
+): string {
+  const schemaType = normalizeSchemaType(parametersSchema.type);
+  const properties = parametersSchema.properties as
+    | Record<string, unknown>
+    | undefined;
+  const required = Array.isArray(parametersSchema.required)
+    ? (parametersSchema.required as unknown[]).filter(
+        (v): v is string => typeof v === "string"
+      )
+    : [];
+
+  if (schemaType !== "object" || !properties) {
+    return "(schema missing top-level object properties)";
+  }
+
+  const keys = Object.keys(properties);
+  const requiredKeys = keys.filter((k) => required.includes(k));
+  const optionalKeys = keys.filter((k) => !required.includes(k));
+  const orderedKeys = [...requiredKeys.sort(), ...optionalKeys.sort()];
+
+  const parts = orderedKeys.map((key) => {
+    const propSchema = properties[key];
+    const typeSummary = summarizeSchema(propSchema, 2);
+    const requiredSuffix = required.includes(key) ? " REQUIRED" : "";
+    return `${key}: ${typeSummary}${requiredSuffix}`;
+  });
+
+  const summary = parts.join(", ");
+  const maxLen = 900;
+  return summary.length > maxLen ? `${summary.slice(0, maxLen)}…` : summary;
+}
+
+/**
+ * Augment tool descriptions with STRICT PARAMETERS hint
+ */
+function augmentToolDescriptionsWithStrictParams(
+  payload: RequestPayload
+): void {
+  const tools = payload.tools as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(tools)) return;
+
+  for (const tool of tools) {
+    const funcDecls = tool.functionDeclarations as
+      | Array<Record<string, unknown>>
+      | undefined;
+    if (!Array.isArray(funcDecls)) continue;
+
+    for (const funcDecl of funcDecls) {
+      const schema = (funcDecl.parametersJsonSchema ?? funcDecl.parameters) as
+        | Record<string, unknown>
+        | undefined;
+      if (!schema || typeof schema !== "object") continue;
+
+      const currentDescription =
+        typeof funcDecl.description === "string" ? funcDecl.description : "";
+      if (currentDescription.includes("STRICT PARAMETERS:")) continue;
+
+      const summary = buildStrictParamsSummary(schema);
+      const nextDescription =
+        currentDescription.trim().length > 0
+          ? `${currentDescription.trim()}\n\nSTRICT PARAMETERS: ${summary}`
+          : `STRICT PARAMETERS: ${summary}`;
+
+      funcDecl.description = nextDescription;
+    }
+  }
 }
 
 /**
@@ -220,8 +545,19 @@ export function transformGeminiRequest(
   // Sanitize tool names to ensure Gemini API compatibility
   sanitizeToolNames(requestPayload);
 
+  // Cache tool schemas for response normalization
+  cacheToolSchemas(
+    requestPayload.tools as Array<Record<string, unknown>> | undefined
+  );
+
+  // Augment tool descriptions with STRICT PARAMETERS hints
+  augmentToolDescriptionsWithStrictParams(requestPayload);
+
   // Inject system instruction for tools if needed
   injectSystemInstructionIfNeeded(requestPayload);
+
+  // Scrub conversation artifacts from model history
+  scrubConversationArtifactsFromModelHistory(requestPayload);
 
   // Apply Antigravity system instruction
   applyAntigravitySystemInstruction(requestPayload, context.model);
