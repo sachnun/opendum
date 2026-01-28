@@ -112,7 +112,25 @@ export function AddAccountDialog() {
 
   const handleStartOAuth = () => {
     if (!authUrl) return;
-    window.open(authUrl, "_blank");
+
+    // Hitung posisi tengah layar
+    const width = 600;
+    const height = 700;
+    const left = Math.round((window.screen.width - width) / 2);
+    const top = Math.round((window.screen.height - height) / 2);
+
+    // Coba buka di new window (di tengah layar)
+    const popup = window.open(
+      authUrl,
+      "oauth_popup",
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+    );
+
+    // Fallback ke new tab jika popup diblock atau gagal
+    if (!popup || popup.closed) {
+      window.open(authUrl, "_blank");
+    }
+
     setStep(3);
   };
 
@@ -267,7 +285,7 @@ export function AddAccountDialog() {
                   Login to {providerConfig.name}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Click the button below to open the login page in a new tab.
+                  Click the button below to open the login page in a new window.
                   After logging in, you&apos;ll be redirected to a page that shows
                   an error - this is expected.
                 </p>
@@ -298,9 +316,8 @@ export function AddAccountDialog() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  After login, copy the <strong>entire URL</strong> from your
-                  browser&apos;s address bar (it should contain{" "}
-                  <code className="rounded bg-muted px-1">code=</code>)
+                  After login, copy the URL from address bar:{" "}
+                  <code className="rounded bg-muted px-1">localhost:11451/...?code=...</code>
                 </AlertDescription>
               </Alert>
             </div>
