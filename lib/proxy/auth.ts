@@ -1,26 +1,81 @@
 import { prisma } from "@/lib/db";
 import { hashString } from "@/lib/encryption";
-import { isModelSupported, getAllModelsWithAliases } from "./models";
+import { isModelSupported, isModelSupportedByProvider, getAllModelsWithAliases, getProvidersForModel } from "./models";
+
+/**
+ * Parsed model parameter
+ */
+export interface ParsedModel {
+  provider: string | null;  // null = auto (round-robin across all providers)
+  model: string;            // canonical model name
+}
+
+/**
+ * Parse model parameter that can be:
+ * - "model" (auto - use any provider)
+ * - "provider/model" (specific provider)
+ * 
+ * @example parseModelParam("qwen3-coder-plus") => { provider: null, model: "qwen3-coder-plus" }
+ * @example parseModelParam("iflow/qwen3-coder-plus") => { provider: "iflow", model: "qwen3-coder-plus" }
+ */
+export function parseModelParam(modelParam: string): ParsedModel {
+  const slashIndex = modelParam.indexOf("/");
+  
+  if (slashIndex === -1) {
+    // No slash - auto mode
+    return { provider: null, model: modelParam };
+  }
+  
+  // Has slash - provider/model format
+  const provider = modelParam.substring(0, slashIndex);
+  const model = modelParam.substring(slashIndex + 1);
+  
+  return { provider, model };
+}
 
 /**
  * Validate model parameter against available models
+ * Supports both "model" and "provider/model" formats
  */
-export function validateModel(model: string): {
+export function validateModel(modelParam: string): {
   valid: boolean;
+  provider: string | null;
+  model: string;
   error?: string;
   param?: string;
   code?: string;
 } {
+  const { provider, model } = parseModelParam(modelParam);
+  
+  // Check if model exists
   if (!isModelSupported(model)) {
     const allModels = getAllModelsWithAliases();
     return {
       valid: false,
+      provider,
+      model,
       error: `Invalid model: ${model}. Available models: ${allModels.sort().join(", ")}`,
       param: "model",
       code: "invalid_model",
     };
   }
-  return { valid: true };
+  
+  // If provider specified, check if it supports this model
+  if (provider !== null) {
+    if (!isModelSupportedByProvider(model, provider)) {
+      const supportedProviders = getProvidersForModel(model);
+      return {
+        valid: false,
+        provider,
+        model,
+        error: `Model "${model}" is not supported by provider "${provider}". Supported providers: ${supportedProviders.join(", ")}`,
+        param: "model",
+        code: "invalid_provider_model",
+      };
+    }
+  }
+  
+  return { valid: true, provider, model };
 }
 
 /**

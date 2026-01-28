@@ -9,24 +9,32 @@ const lastUsedIndex: Map<string, number> = new Map();
  * Get the next active provider account for a user and model using round-robin
  * @param userId User ID
  * @param model Model name (used to filter accounts by provider)
+ * @param provider Optional specific provider to use (if null, round-robin across all providers that support the model)
  */
 export async function getNextAccount(
   userId: string,
-  model: string
+  model: string,
+  provider: string | null = null
 ): Promise<ProviderAccount | null> {
-  // Get providers that support this model
-  const supportedProviders = getProvidersForModel(model);
-
-  if (supportedProviders.length === 0) {
-    console.log(`No providers support model: ${model}`);
-    return null;
+  let targetProviders: string[];
+  
+  if (provider !== null) {
+    // Specific provider requested
+    targetProviders = [provider];
+  } else {
+    // Auto mode - get all providers that support this model
+    targetProviders = getProvidersForModel(model);
+    
+    if (targetProviders.length === 0) {
+      return null;
+    }
   }
 
-  // Get all active accounts for the user that support this model's provider(s)
+  // Get all active accounts for the user that match the target provider(s)
   const accounts = await prisma.providerAccount.findMany({
     where: {
       userId,
-      provider: { in: supportedProviders },
+      provider: { in: targetProviders },
       isActive: true,
     },
     orderBy: {
@@ -35,14 +43,13 @@ export async function getNextAccount(
   });
 
   if (accounts.length === 0) {
-    console.log(
-      `No active accounts for user ${userId} with providers: ${supportedProviders.join(", ")}`
-    );
     return null;
   }
 
-  // Get last used index for this user + model combination
-  const key = `${userId}:${model}`;
+  // Get last used index for this user + model + provider combination
+  const key = provider !== null 
+    ? `${userId}:${provider}:${model}` 
+    : `${userId}:${model}`;
   const lastIndex = lastUsedIndex.get(key) ?? -1;
 
   // Calculate next index (round-robin)
@@ -61,10 +68,6 @@ export async function getNextAccount(
       requestCount: { increment: 1 },
     },
   });
-
-  console.log(
-    `Selected account ${selectedAccount.id} (${selectedAccount.provider}) for model ${model}`
-  );
 
   return selectedAccount;
 }
@@ -120,9 +123,8 @@ export async function getNextAccountForProvider(
 /**
  * Mark an account as having failed (optional: for future failover logic)
  */
-export async function markAccountFailed(accountId: string): Promise<void> {
-  // For now, just log. Future: implement cooldown or deactivation
-  console.error(`Account ${accountId} failed a request`);
+export async function markAccountFailed(_accountId: string): Promise<void> {
+  // For now, do nothing. Future: implement cooldown or deactivation
 }
 
 /**

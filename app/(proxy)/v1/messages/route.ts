@@ -777,9 +777,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { model, stream = true } = body;
+    const { model: modelParam, stream = true } = body;
 
-    if (!model) {
+    if (!modelParam) {
       return NextResponse.json(
         {
           type: "error",
@@ -789,7 +789,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const modelValidation = validateModel(model);
+    // Validate model - supports both "model" and "provider/model" formats
+    const modelValidation = validateModel(modelParam);
     if (!modelValidation.valid) {
       const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       return NextResponse.json(
@@ -802,8 +803,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get next account using round-robin (now supports multi-provider)
-    const account = await getNextAccount(userId!, model);
+    const { provider, model } = modelValidation;
+
+    // Get next account using round-robin
+    // If provider is specified, only use that provider's accounts
+    const account = await getNextAccount(userId!, model, provider);
 
     if (!account) {
       return NextResponse.json(
@@ -819,10 +823,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the provider implementation
-    const provider = await getProvider(account.provider as ProviderNameType);
+    const providerImpl = await getProvider(account.provider as ProviderNameType);
 
     // Get valid credentials (handles token refresh if needed)
-    const credentials = await provider.getValidCredentials(account);
+    const credentials = await providerImpl.getValidCredentials(account);
 
     // Transform Anthropic format to OpenAI format
     const openaiPayload = transformAnthropicToOpenAI(body);
@@ -831,7 +835,7 @@ export async function POST(request: NextRequest) {
     const includeThinking = openaiPayload._includeReasoning ?? false;
 
     // Make request to provider's API
-    const providerResponse = await provider.makeRequest(
+    const providerResponse = await providerImpl.makeRequest(
       credentials,
       account,
       openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest,

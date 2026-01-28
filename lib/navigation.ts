@@ -3,6 +3,7 @@ import {
   User,
   Key,
   Cpu,
+  FlaskConical,
   LucideIcon,
 } from "lucide-react";
 
@@ -17,4 +18,5 @@ export const navigation: NavItem[] = [
   { name: "Accounts", href: "/dashboard/accounts", icon: User },
   { name: "API Keys", href: "/dashboard/api-keys", icon: Key },
   { name: "Models", href: "/dashboard/models", icon: Cpu },
+  { name: "Playground", href: "/dashboard/playground", icon: FlaskConical },
 ];

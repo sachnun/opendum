@@ -527,6 +527,14 @@ export function isModelSupported(model: string): boolean {
 }
 
 /**
+ * Check if a model is supported by a specific provider
+ */
+export function isModelSupportedByProvider(model: string, provider: string): boolean {
+  const providers = getProvidersForModel(model);
+  return providers.includes(provider);
+}
+
+/**
  * Get all supported models (canonical names only)
  */
 export function getAllModels(): string[] {

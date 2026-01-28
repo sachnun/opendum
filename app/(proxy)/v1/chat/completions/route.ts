@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { model, messages, stream = true, ...params } = body;
+    const { model: modelParam, messages, stream = true, ...params } = body;
 
     // Determine if reasoning was explicitly requested by user
     // This controls whether reasoning_content is included in the response
@@ -119,14 +119,15 @@ export async function POST(request: NextRequest) {
       params.include_thoughts
     );
 
-    if (!model) {
+    if (!modelParam) {
       return NextResponse.json(
         { error: { message: "model is required", type: "invalid_request_error" } },
         { status: 400 }
       );
     }
 
-    const modelValidation = validateModel(model);
+    // Validate model - supports both "model" and "provider/model" formats
+    const modelValidation = validateModel(modelParam);
     if (!modelValidation.valid) {
       return NextResponse.json(
         {
@@ -141,6 +142,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { provider, model } = modelValidation;
+
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { error: { message: "messages array is required", type: "invalid_request_error" } },
@@ -148,8 +151,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get next account using round-robin (now supports multi-provider)
-    const account = await getNextAccount(userId!, model);
+    // Get next account using round-robin
+    // If provider is specified, only use that provider's accounts
+    const account = await getNextAccount(userId!, model, provider);
 
     if (!account) {
       return NextResponse.json(
@@ -165,14 +169,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the provider implementation
-    const provider = await getProvider(account.provider as ProviderNameType);
+    const providerImpl = await getProvider(account.provider as ProviderNameType);
 
     // Get valid credentials (handles token refresh if needed)
-    const credentials = await provider.getValidCredentials(account);
+    const credentials = await providerImpl.getValidCredentials(account);
 
     // Make request to provider's API
     // Pass _includeReasoning flag to control reasoning_content visibility in response
-    const providerResponse = await provider.makeRequest(
+    const providerResponse = await providerImpl.makeRequest(
       credentials,
       account,
       { model, messages, stream, _includeReasoning: reasoningRequested, ...params },
