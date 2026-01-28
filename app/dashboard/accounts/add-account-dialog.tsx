@@ -27,19 +27,22 @@ import {
   Terminal,
   Check,
   Copy,
+  Cpu,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   exchangeIflowOAuthCode,
   exchangeAntigravityOAuthCode,
+  exchangeGeminiCliOAuthCode,
   getIflowAuthUrl,
   getAntigravityAuthUrl,
+  getGeminiCliAuthUrl,
   initiateQwenCodeAuth,
   pollQwenCodeAuth,
 } from "@/lib/actions/accounts";
 import { cn } from "@/lib/utils";
 
-type Provider = "iflow" | "antigravity" | "qwen_code" | null;
+type Provider = "iflow" | "antigravity" | "qwen_code" | "gemini_cli" | null;
 
 interface OAuthRedirectConfig {
   flowType: "oauth_redirect";
@@ -54,7 +57,7 @@ interface DeviceCodeConfig {
 interface ProviderConfig {
   name: string;
   icon: typeof Zap;
-  color: "blue" | "purple" | "orange";
+  color: "blue" | "purple" | "orange" | "green";
   description: string;
 }
 
@@ -79,6 +82,15 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     getAuthUrl: getAntigravityAuthUrl,
     exchangeAction: exchangeAntigravityOAuthCode,
   },
+  gemini_cli: {
+    name: "Gemini CLI",
+    icon: Cpu,
+    color: "green",
+    description: "Access Gemini 2.5 Pro & 3 models",
+    flowType: "oauth_redirect",
+    getAuthUrl: getGeminiCliAuthUrl,
+    exchangeAction: exchangeGeminiCliOAuthCode,
+  },
   qwen_code: {
     name: "Qwen Code",
     icon: Terminal,
@@ -92,6 +104,7 @@ const COLOR_CLASSES: Record<ProviderConfig["color"], string> = {
   blue: "text-blue-500",
   purple: "text-purple-500",
   orange: "text-orange-500",
+  green: "text-green-500",
 };
 
 export function AddAccountDialog() {

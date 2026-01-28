@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, AlertCircle, Sparkles, Zap, Terminal } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, Sparkles, Zap, Terminal, Cpu } from "lucide-react";
 import { AccountActions } from "./account-actions";
 import { AddAccountDialog } from "./add-account-dialog";
 
@@ -28,6 +28,7 @@ export default async function AccountsPage({
   const iflowAccounts = accounts.filter((a) => a.provider === "iflow");
   const antigravityAccounts = accounts.filter((a) => a.provider === "antigravity");
   const qwenCodeAccounts = accounts.filter((a) => a.provider === "qwen_code");
+  const geminiCliAccounts = accounts.filter((a) => a.provider === "gemini_cli");
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -49,7 +50,9 @@ export default async function AccountsPage({
               ? "Antigravity account connected successfully!"
               : params.success === "qwen_code_added"
                 ? "Qwen Code account connected successfully!"
-                : "Account connected successfully!"}
+                : params.success === "gemini_cli_added"
+                  ? "Gemini CLI account connected successfully!"
+                  : "Account connected successfully!"}
           </AlertDescription>
         </Alert>
       )}
@@ -107,6 +110,28 @@ export default async function AccountsPage({
         )}
       </div>
 
+      {/* Gemini CLI Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Cpu className="h-5 w-5 text-green-500" />
+          <h3 className="text-base md:text-lg font-semibold">Gemini CLI Accounts</h3>
+          <Badge variant="outline" className="text-xs">
+            {geminiCliAccounts.length} connected
+          </Badge>
+        </div>
+
+        {/* Gemini CLI Accounts List */}
+        {geminiCliAccounts.length > 0 ? (
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {geminiCliAccounts.map((account) => (
+              <AccountCard key={account.id} account={account} showTier />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No Gemini CLI accounts connected yet.</p>
+        )}
+      </div>
+
       {/* Qwen Code Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -132,18 +157,6 @@ export default async function AccountsPage({
   );
 }
 
-function getProviderDisplay(provider: string): { name: string; color: string } {
-  switch (provider) {
-    case "antigravity":
-      return { name: "Antigravity", color: "purple" };
-    case "qwen_code":
-      return { name: "Qwen Code", color: "orange" };
-    case "iflow":
-    default:
-      return { name: "iFlow", color: "blue" };
-  }
-}
-
 function AccountCard({ 
   account, 
   showTier = false 
@@ -161,8 +174,6 @@ function AccountCard({
   };
   showTier?: boolean;
 }) {
-  const { name: providerName, color: providerColor } = getProviderDisplay(account.provider);
-  
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -196,15 +207,6 @@ function AccountCard({
       </CardHeader>
       <CardContent>
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Provider</span>
-            <Badge 
-              variant="outline" 
-              className={`text-${providerColor}-600 border-${providerColor}-300`}
-            >
-              {providerName}
-            </Badge>
-          </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Requests</span>
             <span className="font-medium">{account.requestCount}</span>
