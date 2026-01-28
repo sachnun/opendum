@@ -5,9 +5,17 @@ import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/encryption";
 import { revalidatePath } from "next/cache";
 import { iflowProvider } from "@/lib/proxy/providers/iflow";
-import { IFLOW_REDIRECT_URI } from "@/lib/proxy/providers/iflow/constants";
+import {
+  IFLOW_REDIRECT_URI,
+  IFLOW_OAUTH_AUTHORIZE_URL,
+  IFLOW_CLIENT_ID,
+} from "@/lib/proxy/providers/iflow/constants";
 import { antigravityProvider } from "@/lib/proxy/providers/antigravity";
-import { ANTIGRAVITY_REDIRECT_URI } from "@/lib/proxy/providers/antigravity/constants";
+import {
+  ANTIGRAVITY_REDIRECT_URI,
+  ANTIGRAVITY_CLIENT_ID,
+  ANTIGRAVITY_SCOPES,
+} from "@/lib/proxy/providers/antigravity/constants";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
@@ -250,6 +258,52 @@ export async function getAccountsByProvider(): Promise<
 // Backwards compatibility aliases
 export const deleteIflowAccount = deleteProviderAccount;
 export const updateIflowAccount = updateProviderAccount;
+
+/**
+ * Get iFlow OAuth authorization URL
+ */
+export async function getIflowAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const authParams = new URLSearchParams({
+    loginMethod: "phone",
+    type: "phone",
+    redirect: IFLOW_REDIRECT_URI,
+    client_id: IFLOW_CLIENT_ID,
+  });
+
+  const authUrl = `${IFLOW_OAUTH_AUTHORIZE_URL}?${authParams.toString()}`;
+
+  return { success: true, data: { authUrl } };
+}
+
+/**
+ * Get Antigravity (Google) OAuth authorization URL
+ */
+export async function getAntigravityAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const params = new URLSearchParams({
+    client_id: ANTIGRAVITY_CLIENT_ID,
+    redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+    response_type: "code",
+    scope: ANTIGRAVITY_SCOPES.join(" "),
+    access_type: "offline",
+    prompt: "consent",
+  });
+
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+
+  return { success: true, data: { authUrl } };
+}
 
 /**
  * Exchange Antigravity OAuth callback URL for tokens and create/update account

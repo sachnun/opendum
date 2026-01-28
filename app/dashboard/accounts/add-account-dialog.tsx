@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,15 @@ import {
   Zap,
   Sparkles,
   Check,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
-import { exchangeIflowOAuthCode, exchangeAntigravityOAuthCode } from "@/lib/actions/accounts";
+import {
+  exchangeIflowOAuthCode,
+  exchangeAntigravityOAuthCode,
+  getIflowAuthUrl,
+  getAntigravityAuthUrl,
+} from "@/lib/actions/accounts";
 import { cn } from "@/lib/utils";
 
 type Provider = "iflow" | "antigravity" | null;
@@ -38,7 +44,7 @@ const PROVIDERS = {
     icon: Zap,
     color: "blue",
     description: "Access OpenAI compatible API",
-    oauthUrl: "/api/oauth/iflow",
+    getAuthUrl: getIflowAuthUrl,
     exchangeAction: exchangeIflowOAuthCode,
   },
   antigravity: {
@@ -46,7 +52,7 @@ const PROVIDERS = {
     icon: Sparkles,
     color: "purple",
     description: "Access Gemini & Claude via Google OAuth",
-    oauthUrl: "/api/oauth/antigravity",
+    getAuthUrl: getAntigravityAuthUrl,
     exchangeAction: exchangeAntigravityOAuthCode,
   },
 } as const;
@@ -59,6 +65,26 @@ export function AddAccountDialog() {
   const [callbackUrl, setCallbackUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [authUrl, setAuthUrl] = useState("");
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
+
+  // Fetch auth URL when entering step 2
+  useEffect(() => {
+    if (step === 2 && provider) {
+      setIsFetchingUrl(true);
+      setAuthUrl("");
+      PROVIDERS[provider]
+        .getAuthUrl()
+        .then((result) => {
+          if (result.success) {
+            setAuthUrl(result.data.authUrl);
+          } else {
+            setError(result.error);
+          }
+        })
+        .finally(() => setIsFetchingUrl(false));
+    }
+  }, [step, provider]);
 
   const resetForm = () => {
     setStep(1);
@@ -66,6 +92,8 @@ export function AddAccountDialog() {
     setCallbackUrl("");
     setError("");
     setIsLoading(false);
+    setAuthUrl("");
+    setIsFetchingUrl(false);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -83,9 +111,16 @@ export function AddAccountDialog() {
   };
 
   const handleStartOAuth = () => {
-    if (!provider) return;
-    window.open(PROVIDERS[provider].oauthUrl, "_blank");
+    if (!authUrl) return;
+    window.open(authUrl, "_blank");
     setStep(3);
+  };
+
+  const handleCopyLink = async () => {
+    if (authUrl) {
+      await navigator.clipboard.writeText(authUrl);
+      toast.success("Link copied to clipboard");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -237,10 +272,29 @@ export function AddAccountDialog() {
                   an error - this is expected.
                 </p>
               </div>
-              <Button onClick={handleStartOAuth} variant="outline" className="w-full">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open {providerConfig.name} Login
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleStartOAuth}
+                  variant="outline"
+                  className="flex-1"
+                  disabled={isFetchingUrl || !authUrl}
+                >
+                  {isFetchingUrl ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                  )}
+                  Open {providerConfig.name} Login
+                </Button>
+                <Button
+                  onClick={handleCopyLink}
+                  variant="outline"
+                  disabled={isFetchingUrl || !authUrl}
+                  title="Copy login link"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
