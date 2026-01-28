@@ -831,6 +831,9 @@ export async function POST(request: NextRequest) {
     // Transform Anthropic format to OpenAI format
     const openaiPayload = transformAnthropicToOpenAI(body);
     
+    // Override model with validated model (without provider prefix)
+    openaiPayload.model = model;
+    
     // Extract includeThinking flag for response filtering
     const includeThinking = openaiPayload._includeReasoning ?? false;
 
