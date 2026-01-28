@@ -19,6 +19,23 @@ const EFFORT_TO_BUDGET: Record<string, number> = {
 };
 
 /**
+ * Pre-process messages to find tool calls without responses.
+ * Claude API requires every tool_use to have a corresponding tool_result.
+ * Returns a Set of tool call IDs that have responses.
+ */
+function getCompletedToolCallIds(messages: ChatCompletionRequest["messages"]): Set<string> {
+  const toolResponseIds = new Set<string>();
+  
+  for (const message of messages) {
+    if (message.role === "tool" && message.tool_call_id) {
+      toolResponseIds.add(message.tool_call_id);
+    }
+  }
+  
+  return toolResponseIds;
+}
+
+/**
  * Convert OpenAI messages to Gemini format
  */
 export function convertOpenAIToGemini(
@@ -26,6 +43,10 @@ export function convertOpenAIToGemini(
 ): RequestPayload {
   const contents: Array<Record<string, unknown>> = [];
   let systemInstruction: unknown = undefined;
+  
+  // Pre-process: find which tool calls have corresponding responses
+  // This prevents Claude API error: "tool_use ids were found without tool_result blocks"
+  const completedToolCallIds = getCompletedToolCallIds(request.messages);
 
   for (const message of request.messages) {
     if (message.role === "system") {
@@ -58,7 +79,16 @@ export function convertOpenAIToGemini(
     } else if (Array.isArray(message.content)) {
       for (const content of message.content) {
         if (content.type === "text") {
-          parts.push({ text: (content as { text?: string }).text ?? "" });
+          const textContent = (content as { text?: unknown }).text;
+          // Validate and coerce text to string - prevents Claude API errors
+          // when content.text is not a string (e.g., object or array)
+          if (typeof textContent === "string") {
+            parts.push({ text: textContent });
+          } else if (textContent != null) {
+            // Non-string text content - convert to string for safety
+            parts.push({ text: JSON.stringify(textContent) });
+          }
+          // Skip if textContent is null/undefined
         } else if (content.type === "image_url") {
           const imageUrl = (content as { image_url?: { url?: string } }).image_url;
           if (imageUrl?.url) {
@@ -87,12 +117,20 @@ export function convertOpenAIToGemini(
     }
 
     // Handle tool calls from assistant
+    // Only include tool calls that have corresponding responses
+    // to prevent Claude API error: "tool_use ids were found without tool_result blocks"
     if (message.tool_calls && Array.isArray(message.tool_calls)) {
       for (const toolCall of message.tool_calls) {
         const tc = toolCall as {
           id?: string;
           function?: { name?: string; arguments?: string };
         };
+        
+        // Skip tool calls without responses (prevents Claude API error)
+        if (tc.id && !completedToolCallIds.has(tc.id)) {
+          continue;
+        }
+        
         if (tc.function) {
           let args: unknown = {};
           try {

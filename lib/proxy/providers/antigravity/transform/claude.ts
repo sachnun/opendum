@@ -297,6 +297,17 @@ export function transformClaudeRequest(
           }
         }
 
+        // Defensive check: ensure text field is always a string if present
+        // This prevents Claude API errors like "messages.X.content.Y.text.text: Field required"
+        if ("text" in part && typeof part.text !== "string") {
+          if (part.text != null) {
+            part.text = JSON.stringify(part.text);
+          } else {
+            // Remove null/undefined text field
+            delete part.text;
+          }
+        }
+
         filteredParts.push(part);
       }
 
