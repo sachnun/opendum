@@ -7,6 +7,7 @@ import { ProviderName } from "./types";
 let iflowProvider: Provider | null = null;
 let antigravityProvider: Provider | null = null;
 let qwenCodeProvider: Provider | null = null;
+let geminiCliProvider: Provider | null = null;
 
 /**
  * Get a provider instance by name
@@ -34,6 +35,13 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
       }
       return qwenCodeProvider;
 
+    case ProviderName.GEMINI_CLI:
+      if (!geminiCliProvider) {
+        const { geminiCliProvider: provider } = await import("./gemini-cli");
+        geminiCliProvider = provider;
+      }
+      return geminiCliProvider;
+
     default:
       throw new Error(`Unknown provider: ${name}`);
   }
@@ -43,12 +51,13 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [iflow, antigravity, qwenCode] = await Promise.all([
+  const [iflow, antigravity, qwenCode, geminiCli] = await Promise.all([
     getProvider(ProviderName.IFLOW),
     getProvider(ProviderName.ANTIGRAVITY),
     getProvider(ProviderName.QWEN_CODE),
+    getProvider(ProviderName.GEMINI_CLI),
   ]);
-  return [iflow, antigravity, qwenCode];
+  return [iflow, antigravity, qwenCode, geminiCli];
 }
 
 /**

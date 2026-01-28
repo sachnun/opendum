@@ -145,6 +145,7 @@ export const ProviderName = {
   IFLOW: "iflow",
   ANTIGRAVITY: "antigravity",
   QWEN_CODE: "qwen_code",
+  GEMINI_CLI: "gemini_cli",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
