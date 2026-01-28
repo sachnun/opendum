@@ -144,6 +144,7 @@ export interface Provider {
 export const ProviderName = {
   IFLOW: "iflow",
   ANTIGRAVITY: "antigravity",
+  QWEN_CODE: "qwen_code",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];

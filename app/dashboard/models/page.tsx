@@ -21,6 +21,8 @@ function getProviderLabel(provider: string): string {
       return "iFlow";
     case ProviderName.ANTIGRAVITY:
       return "Antigravity";
+    case ProviderName.QWEN_CODE:
+      return "Qwen Code";
     default:
       return provider;
   }
@@ -36,7 +38,11 @@ export default async function ModelsPage() {
   // Get all models grouped by provider
   const iflowModels = getModelsForProvider(ProviderName.IFLOW);
   const antigravityModels = getModelsForProvider(ProviderName.ANTIGRAVITY);
+  const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
   const allModels = Object.keys(MODEL_REGISTRY);
+
+  // Count active providers
+  const activeProviders = [iflowModels, antigravityModels, qwenCodeModels].filter(m => m.length > 0).length;
 
   const usageStats = await prisma.usageLog.groupBy({
     by: ["model"],
@@ -60,13 +66,14 @@ export default async function ModelsPage() {
 
   const iflowModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.IFLOW));
   const antigravityModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.ANTIGRAVITY));
+  const qwenCodeModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.QWEN_CODE));
 
   return (
     <div className="space-y-6 md:space-y-8">
       <div>
         <h2 className="text-xl md:text-2xl font-bold tracking-tight">Available Models</h2>
         <p className="text-sm md:text-base text-muted-foreground">
-          Browse all {allModels.length} available models across {iflowModels.length > 0 && antigravityModels.length > 0 ? "2 providers" : "1 provider"}
+          Browse all {allModels.length} available models across {activeProviders} provider{activeProviders !== 1 ? "s" : ""}
         </p>
       </div>
 
@@ -103,6 +110,28 @@ export default async function ModelsPage() {
           </div>
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {antigravityModelsWithStats.map((model) => (
+              <ModelCard
+                key={model.id}
+                id={model.id}
+                category={model.category}
+                usage={model.usage}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Qwen Code Models */}
+      {qwenCodeModelsWithStats.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold">Qwen Code Models</h3>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {qwenCodeModels.length}
+            </span>
+          </div>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {qwenCodeModelsWithStats.map((model) => (
               <ModelCard
                 key={model.id}
                 id={model.id}

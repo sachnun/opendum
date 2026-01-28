@@ -23,7 +23,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   "iflow-rome-30ba3b": { providers: [ProviderName.IFLOW] },
   "minimax-m2.1": { providers: [ProviderName.IFLOW] },
   "minimax-m2": { providers: [ProviderName.IFLOW] },
-  "qwen3-coder-plus": { providers: [ProviderName.IFLOW] },
+  "qwen3-coder-plus": { providers: [ProviderName.IFLOW, ProviderName.QWEN_CODE] },
   "kimi-k2": { providers: [ProviderName.IFLOW] },
   "kimi-k2-0905": { providers: [ProviderName.IFLOW] },
   "kimi-k2-thinking": { providers: [ProviderName.IFLOW] },
@@ -79,6 +79,9 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
 
   // Other Antigravity models
   "gpt-oss-120b-medium": { providers: [ProviderName.ANTIGRAVITY] },
+
+  // ===== Qwen Code Models =====
+  "qwen3-coder-flash": { providers: [ProviderName.QWEN_CODE] },
 };
 
 // Build reverse lookup for aliases

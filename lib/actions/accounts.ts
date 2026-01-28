@@ -16,6 +16,10 @@ import {
   ANTIGRAVITY_CLIENT_ID,
   ANTIGRAVITY_SCOPES,
 } from "@/lib/proxy/providers/antigravity/constants";
+import {
+  initiateDeviceCodeFlow,
+  pollDeviceCodeAuthorization,
+} from "@/lib/proxy/providers/qwen-code";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
@@ -421,5 +425,187 @@ export async function exchangeAntigravityOAuthCode(
     console.error("Failed to exchange Antigravity OAuth code:", err);
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Initiate Qwen Code Device Code Flow
+ * Returns device code info including URL for user to visit
+ */
+export async function initiateQwenCodeAuth(): Promise<
+  ActionResult<{
+    deviceCode: string;
+    userCode: string;
+    verificationUrl: string;
+    verificationUrlComplete: string;
+    expiresIn: number;
+    interval: number;
+    codeVerifier: string;
+  }>
+> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const deviceCodeInfo = await initiateDeviceCodeFlow();
+
+    return {
+      success: true,
+      data: deviceCodeInfo,
+    };
+  } catch (err) {
+    console.error("Failed to initiate Qwen Code auth:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Poll Qwen Code device code authorization status
+ * Call this periodically until it returns success or error
+ */
+export async function pollQwenCodeAuth(
+  deviceCode: string,
+  codeVerifier: string
+): Promise<
+  ActionResult<
+    | { status: "pending" }
+    | { status: "success"; email: string; isUpdate: boolean }
+    | { status: "error"; message: string }
+  >
+> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const result = await pollDeviceCodeAuthorization(deviceCode, codeVerifier);
+
+    if ("pending" in result) {
+      return { success: true, data: { status: "pending" } };
+    }
+
+    if ("error" in result) {
+      return { success: true, data: { status: "error", message: result.error } };
+    }
+
+    // Success - we have tokens, now save them
+    const oauthResult = result;
+
+    // For Qwen Code, email is not automatically provided
+    // We'll use a placeholder and user can update later
+    const email = oauthResult.email || `qwen-${Date.now()}`;
+
+    // Check if account with this email already exists for this user
+    const existingAccount = await prisma.providerAccount.findFirst({
+      where: {
+        userId: session.user.id,
+        provider: "qwen_code",
+        email: email,
+      },
+    });
+
+    if (existingAccount) {
+      // Update existing account
+      await prisma.providerAccount.update({
+        where: { id: existingAccount.id },
+        data: {
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          status: "success",
+          email: email,
+          isUpdate: true,
+        },
+      };
+    } else {
+      // Create new account
+      const accountCount = await prisma.providerAccount.count({
+        where: { userId: session.user.id, provider: "qwen_code" },
+      });
+
+      await prisma.providerAccount.create({
+        data: {
+          userId: session.user.id,
+          provider: "qwen_code",
+          name: `Qwen Code Account ${accountCount + 1}`,
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          email: email,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          status: "success",
+          email: email,
+          isUpdate: false,
+        },
+      };
+    }
+  } catch (err) {
+    console.error("Failed to poll Qwen Code auth:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Complete Qwen Code auth with email identifier
+ * Call this after successful auth to set the email/identifier
+ */
+export async function setQwenCodeAccountEmail(
+  accountId: string,
+  email: string
+): Promise<ActionResult> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Verify ownership
+    const account = await prisma.providerAccount.findFirst({
+      where: { id: accountId, userId: session.user.id, provider: "qwen_code" },
+    });
+
+    if (!account) {
+      return { success: false, error: "Account not found" };
+    }
+
+    await prisma.providerAccount.update({
+      where: { id: accountId },
+      data: {
+        email: email.trim(),
+        name: `Qwen Code (${email.trim()})`,
+      },
+    });
+
+    revalidatePath("/dashboard/accounts");
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("Failed to set Qwen Code account email:", error);
+    return { success: false, error: "Failed to update account" };
   }
 }
