@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
-import { getNextAccount } from "@/lib/proxy/load-balancer";
+import { getNextAvailableAccount } from "@/lib/proxy/load-balancer";
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
+import { markRateLimited, parseRateLimitError } from "@/lib/proxy/rate-limit";
+import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -804,121 +806,196 @@ export async function POST(request: NextRequest) {
     }
 
     const { provider, model } = modelValidation;
+    const family = getModelFamily(model);
+    const MAX_ACCOUNT_RETRIES = 5;
+    const triedAccountIds: string[] = [];
 
-    // Get next account using round-robin
-    // If provider is specified, only use that provider's accounts
-    const account = await getNextAccount(userId!, model, provider);
-
-    if (!account) {
-      return NextResponse.json(
-        {
-          type: "error",
-          error: {
-            type: "overloaded_error",
-            message: "No active accounts available for this model. Please add an account in the dashboard.",
-          },
-        },
-        { status: 529 }
-      );
-    }
-
-    // Get the provider implementation
-    const providerImpl = await getProvider(account.provider as ProviderNameType);
-
-    // Get valid credentials (handles token refresh if needed)
-    const credentials = await providerImpl.getValidCredentials(account);
-
-    // Transform Anthropic format to OpenAI format
-    const openaiPayload = transformAnthropicToOpenAI(body);
-    
-    // Override model with validated model (without provider prefix)
-    openaiPayload.model = model;
-    
-    // Extract includeThinking flag for response filtering
-    const includeThinking = openaiPayload._includeReasoning ?? false;
-
-    // Make request to provider's API
-    const providerResponse = await providerImpl.makeRequest(
-      credentials,
-      account,
-      openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest,
-      stream
-    );
-
-    // Handle errors from provider
-    if (!providerResponse.ok) {
-      const errorText = await providerResponse.text();
-      console.error(`${account.provider} error:`, providerResponse.status, errorText);
-
-      // Log failed request with 0 tokens
-      await logUsage({
-        userId: userId!,
-        providerAccountId: account.id,
-        proxyApiKeyId: apiKeyId,
+    // Retry loop for rate limit rotation
+    for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
+      // Get next available account (excluding already tried)
+      const account = await getNextAvailableAccount(
+        userId!,
         model,
-        inputTokens: 0,
-        outputTokens: 0,
-        statusCode: providerResponse.status,
-        duration: Date.now() - startTime,
-      });
-
-      return NextResponse.json(
-        {
-          type: "error",
-          error: {
-            type: "api_error",
-            message: `${account.provider} API error: ${errorText}`,
-          },
-        },
-        { status: providerResponse.status }
+        provider,
+        triedAccountIds
       );
-    }
 
-    // Streaming response
-    if (stream && providerResponse.body) {
-      // Transform OpenAI stream to Anthropic stream with usage callback
-      // Pass includeThinking to control whether thinking blocks are emitted
-      const transformer = createAnthropicStreamTransformer(model, (usage) => {
-        logUsage({
+      if (!account) {
+        // No more accounts available
+        const isFirstAttempt = triedAccountIds.length === 0;
+        return NextResponse.json(
+          {
+            type: "error",
+            error: {
+              type: "overloaded_error",
+              message: isFirstAttempt
+                ? "No active accounts available for this model. Please add an account in the dashboard."
+                : "All accounts are rate limited. Please try again later.",
+            },
+          },
+          { status: 529 }
+        );
+      }
+
+      triedAccountIds.push(account.id);
+
+      // Get the provider implementation
+      const providerImpl = await getProvider(account.provider as ProviderNameType);
+
+      // Get valid credentials (handles token refresh if needed)
+      const credentials = await providerImpl.getValidCredentials(account);
+
+      // Transform Anthropic format to OpenAI format
+      const openaiPayload = transformAnthropicToOpenAI(body);
+
+      // Override model with validated model (without provider prefix)
+      openaiPayload.model = model;
+
+      // Extract includeThinking flag for response filtering
+      const includeThinking = openaiPayload._includeReasoning ?? false;
+
+      // Make request to provider's API
+      const providerResponse = await providerImpl.makeRequest(
+        credentials,
+        account,
+        openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest,
+        stream
+      );
+
+      // Handle rate limit (429) - try next account
+      if (providerResponse.status === 429) {
+        // Clone to read body while keeping original for potential return
+        const clonedResponse = providerResponse.clone();
+        try {
+          const errorBody = await clonedResponse.json();
+          const rateLimitInfo = parseRateLimitError(errorBody);
+
+          if (rateLimitInfo) {
+            markRateLimited(
+              account.id,
+              family,
+              rateLimitInfo.retryAfterMs,
+              rateLimitInfo.model,
+              rateLimitInfo.message
+            );
+          } else {
+            // Default to 1 hour if can't parse
+            markRateLimited(account.id, family, 60 * 60 * 1000);
+          }
+
+          console.log(
+            `[rate-limit] Account ${account.id} (${account.email}) hit rate limit for ${family}, trying next account...`
+          );
+
+          // Log the failed attempt
+          await logUsage({
+            userId: userId!,
+            providerAccountId: account.id,
+            proxyApiKeyId: apiKeyId,
+            model,
+            inputTokens: 0,
+            outputTokens: 0,
+            statusCode: 429,
+            duration: Date.now() - startTime,
+          });
+
+          // Continue to try next account
+          continue;
+        } catch {
+          // If we can't parse the error, still mark as rate limited and continue
+          markRateLimited(account.id, family, 60 * 60 * 1000);
+          continue;
+        }
+      }
+
+      // Handle other errors from provider (not rate limit)
+      if (!providerResponse.ok) {
+        const errorText = await providerResponse.text();
+        console.error(`${account.provider} error:`, providerResponse.status, errorText);
+
+        // Log failed request with 0 tokens
+        await logUsage({
           userId: userId!,
           providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          statusCode: 200,
+          inputTokens: 0,
+          outputTokens: 0,
+          statusCode: providerResponse.status,
           duration: Date.now() - startTime,
         });
-      }, includeThinking);
-      const transformedStream = providerResponse.body.pipeThrough(transformer);
 
-      return new Response(transformedStream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-          "X-Accel-Buffering": "no",
-        },
+        return NextResponse.json(
+          {
+            type: "error",
+            error: {
+              type: "api_error",
+              message: `${account.provider} API error: ${errorText}`,
+            },
+          },
+          { status: providerResponse.status }
+        );
+      }
+
+      // Success! Handle the response
+      // Streaming response
+      if (stream && providerResponse.body) {
+        // Transform OpenAI stream to Anthropic stream with usage callback
+        // Pass includeThinking to control whether thinking blocks are emitted
+        const transformer = createAnthropicStreamTransformer(model, (usage) => {
+          logUsage({
+            userId: userId!,
+            providerAccountId: account.id,
+            proxyApiKeyId: apiKeyId,
+            model,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            statusCode: 200,
+            duration: Date.now() - startTime,
+          });
+        }, includeThinking);
+        const transformedStream = providerResponse.body.pipeThrough(transformer);
+
+        return new Response(transformedStream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+
+      // Non-streaming response - transform OpenAI to Anthropic format
+      const openaiResponse = await providerResponse.json();
+      const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model, includeThinking);
+
+      // Log with actual token usage from response
+      logUsage({
+        userId: userId!,
+        providerAccountId: account.id,
+        proxyApiKeyId: apiKeyId,
+        model,
+        inputTokens: openaiResponse.usage?.prompt_tokens ?? 0,
+        outputTokens: openaiResponse.usage?.completion_tokens ?? 0,
+        statusCode: 200,
+        duration: Date.now() - startTime,
       });
+
+      return NextResponse.json(anthropicResponse);
     }
 
-    // Non-streaming response - transform OpenAI to Anthropic format
-    const openaiResponse = await providerResponse.json();
-    const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model, includeThinking);
-    
-    // Log with actual token usage from response
-    logUsage({
-      userId: userId!,
-      providerAccountId: account.id,
-      proxyApiKeyId: apiKeyId,
-      model,
-      inputTokens: openaiResponse.usage?.prompt_tokens ?? 0,
-      outputTokens: openaiResponse.usage?.completion_tokens ?? 0,
-      statusCode: 200,
-      duration: Date.now() - startTime,
-    });
-    
-    return NextResponse.json(anthropicResponse);
+    // All retries exhausted (shouldn't reach here normally)
+    return NextResponse.json(
+      {
+        type: "error",
+        error: {
+          type: "overloaded_error",
+          message: "All accounts are rate limited. Please try again later.",
+        },
+      },
+      { status: 529 }
+    );
   } catch (error) {
     console.error("Proxy error:", error);
 

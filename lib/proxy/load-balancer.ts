@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import type { ProviderAccount } from "@prisma/client";
 import { getProvidersForModel } from "./models";
+import { isRateLimited, clearExpiredRateLimits } from "./rate-limit";
+import { getModelFamily } from "./providers/antigravity/converter";
 
 // Track last used index per user + model combination for round-robin
 const lastUsedIndex: Map<string, number> = new Map();
@@ -59,6 +61,91 @@ export async function getNextAccount(
   lastUsedIndex.set(key, nextIndex);
 
   const selectedAccount = accounts[nextIndex];
+
+  // Update last used timestamp
+  await prisma.providerAccount.update({
+    where: { id: selectedAccount.id },
+    data: {
+      lastUsedAt: new Date(),
+      requestCount: { increment: 1 },
+    },
+  });
+
+  return selectedAccount;
+}
+
+/**
+ * Get the next available (non-rate-limited) account for a user and model
+ * Skips accounts that are rate-limited for the model's family
+ * @param userId User ID
+ * @param model Model name
+ * @param provider Optional specific provider
+ * @param excludeAccountIds Account IDs to exclude (already tried this request)
+ */
+export async function getNextAvailableAccount(
+  userId: string,
+  model: string,
+  provider: string | null = null,
+  excludeAccountIds: string[] = []
+): Promise<ProviderAccount | null> {
+  let targetProviders: string[];
+
+  if (provider !== null) {
+    targetProviders = [provider];
+  } else {
+    targetProviders = getProvidersForModel(model);
+    if (targetProviders.length === 0) {
+      return null;
+    }
+  }
+
+  // Get all active accounts
+  const accounts = await prisma.providerAccount.findMany({
+    where: {
+      userId,
+      provider: { in: targetProviders },
+      isActive: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  if (accounts.length === 0) {
+    return null;
+  }
+
+  const family = getModelFamily(model);
+
+  // Filter out excluded and rate-limited accounts
+  const availableAccounts = accounts.filter((acc) => {
+    // Skip excluded accounts
+    if (excludeAccountIds.includes(acc.id)) {
+      return false;
+    }
+
+    // Clear expired rate limits and check if rate limited
+    clearExpiredRateLimits(acc.id);
+    if (isRateLimited(acc.id, family)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (availableAccounts.length === 0) {
+    return null;
+  }
+
+  // Get last used index for round-robin among available accounts
+  const key = provider !== null
+    ? `${userId}:${provider}:${model}:available`
+    : `${userId}:${model}:available`;
+  const lastIndex = lastUsedIndex.get(key) ?? -1;
+  const nextIndex = (lastIndex + 1) % availableAccounts.length;
+  lastUsedIndex.set(key, nextIndex);
+
+  const selectedAccount = availableAccounts[nextIndex];
 
   // Update last used timestamp
   await prisma.providerAccount.update({

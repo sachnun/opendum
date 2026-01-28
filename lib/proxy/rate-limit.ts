@@ -1,0 +1,229 @@
+// Rate limit tracking for provider accounts
+// Tracks rate limits per account + model family (in-memory)
+
+import type { ModelFamily } from "./providers/antigravity/transform/types";
+
+interface RateLimitEntry {
+  resetTime: number; // Unix timestamp (ms) when rate limit expires
+  model?: string; // Which model triggered the limit
+  message?: string; // Error message from API
+}
+
+// Map: accountId -> family -> RateLimitEntry
+const rateLimits = new Map<string, Map<string, RateLimitEntry>>();
+
+/**
+ * Mark an account as rate limited for a specific model family
+ */
+export function markRateLimited(
+  accountId: string,
+  family: ModelFamily,
+  retryAfterMs: number,
+  model?: string,
+  message?: string
+): void {
+  let accountLimits = rateLimits.get(accountId);
+  if (!accountLimits) {
+    accountLimits = new Map();
+    rateLimits.set(accountId, accountLimits);
+  }
+
+  accountLimits.set(family, {
+    resetTime: Date.now() + retryAfterMs,
+    model,
+    message,
+  });
+
+  console.log(
+    `[rate-limit] Account ${accountId} marked rate limited for ${family}, resets in ${Math.ceil(retryAfterMs / 1000)}s`
+  );
+}
+
+/**
+ * Check if an account is currently rate limited for a model family
+ */
+export function isRateLimited(
+  accountId: string,
+  family: ModelFamily
+): boolean {
+  const accountLimits = rateLimits.get(accountId);
+  if (!accountLimits) return false;
+
+  const entry = accountLimits.get(family);
+  if (!entry) return false;
+
+  // Check if expired
+  if (Date.now() >= entry.resetTime) {
+    accountLimits.delete(family);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Clear expired rate limits for an account
+ */
+export function clearExpiredRateLimits(accountId: string): void {
+  const accountLimits = rateLimits.get(accountId);
+  if (!accountLimits) return;
+
+  const now = Date.now();
+  for (const [family, entry] of accountLimits) {
+    if (now >= entry.resetTime) {
+      accountLimits.delete(family);
+    }
+  }
+
+  if (accountLimits.size === 0) {
+    rateLimits.delete(accountId);
+  }
+}
+
+/**
+ * Get rate limit info for an account + family
+ */
+export function getRateLimitInfo(
+  accountId: string,
+  family: ModelFamily
+): RateLimitEntry | null {
+  const accountLimits = rateLimits.get(accountId);
+  if (!accountLimits) return null;
+
+  const entry = accountLimits.get(family);
+  if (!entry) return null;
+
+  // Check if expired
+  if (Date.now() >= entry.resetTime) {
+    accountLimits.delete(family);
+    return null;
+  }
+
+  return entry;
+}
+
+/**
+ * Get minimum wait time across multiple accounts for a family
+ * Returns 0 if at least one account is not rate limited
+ */
+export function getMinWaitTime(
+  accountIds: string[],
+  family: ModelFamily
+): number {
+  let minWait = Infinity;
+  const now = Date.now();
+
+  for (const accountId of accountIds) {
+    const accountLimits = rateLimits.get(accountId);
+    if (!accountLimits) return 0; // This account not rate limited
+
+    const entry = accountLimits.get(family);
+    if (!entry) return 0; // This account not rate limited for this family
+
+    if (now >= entry.resetTime) {
+      accountLimits.delete(family);
+      return 0; // Expired
+    }
+
+    const waitTime = entry.resetTime - now;
+    if (waitTime < minWait) {
+      minWait = waitTime;
+    }
+  }
+
+  return minWait === Infinity ? 0 : minWait;
+}
+
+/**
+ * Parse duration string like "128h12m18.724039275s" to milliseconds
+ */
+function parseDurationToMs(duration: string): number | null {
+  if (!duration) return null;
+
+  // Match patterns like "128h12m18.724039275s" or "461538.724039275s"
+  let totalMs = 0;
+
+  // Extract hours
+  const hoursMatch = duration.match(/(\d+)h/);
+  if (hoursMatch) {
+    totalMs += parseInt(hoursMatch[1], 10) * 60 * 60 * 1000;
+  }
+
+  // Extract minutes
+  const minutesMatch = duration.match(/(\d+)m(?!s)/);
+  if (minutesMatch) {
+    totalMs += parseInt(minutesMatch[1], 10) * 60 * 1000;
+  }
+
+  // Extract seconds (with optional decimal)
+  const secondsMatch = duration.match(/([\d.]+)s/);
+  if (secondsMatch) {
+    totalMs += parseFloat(secondsMatch[1]) * 1000;
+  }
+
+  return totalMs > 0 ? totalMs : null;
+}
+
+/**
+ * Parse Antigravity rate limit error response to extract retry info
+ */
+export function parseRateLimitError(errorBody: unknown): {
+  retryAfterMs: number;
+  model?: string;
+  message?: string;
+} | null {
+  if (!errorBody || typeof errorBody !== "object") return null;
+
+  const body = errorBody as Record<string, unknown>;
+  const error = body.error as Record<string, unknown> | undefined;
+
+  if (!error) return null;
+
+  const message = error.message as string | undefined;
+  let model: string | undefined;
+  let retryAfterMs: number | null = null;
+
+  // Try to extract from details array
+  const details = error.details as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(details)) {
+    for (const detail of details) {
+      // Look for ErrorInfo with quota metadata
+      if (detail["@type"]?.toString().includes("ErrorInfo")) {
+        const metadata = detail.metadata as Record<string, unknown> | undefined;
+        if (metadata) {
+          model = metadata.model as string | undefined;
+          const quotaResetDelay = metadata.quotaResetDelay as string | undefined;
+          if (quotaResetDelay) {
+            retryAfterMs = parseDurationToMs(quotaResetDelay);
+          }
+        }
+      }
+
+      // Look for RetryInfo
+      if (detail["@type"]?.toString().includes("RetryInfo")) {
+        const retryDelay = detail.retryDelay as string | undefined;
+        if (retryDelay && retryAfterMs === null) {
+          retryAfterMs = parseDurationToMs(retryDelay);
+        }
+      }
+    }
+  }
+
+  // Default to 1 hour if we couldn't parse
+  if (retryAfterMs === null) {
+    retryAfterMs = 60 * 60 * 1000; // 1 hour default
+  }
+
+  return {
+    retryAfterMs,
+    model,
+    message,
+  };
+}
+
+/**
+ * Clear all rate limits (useful for testing)
+ */
+export function clearAllRateLimits(): void {
+  rateLimits.clear();
+}
