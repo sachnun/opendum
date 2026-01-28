@@ -138,6 +138,19 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
   // Determine if thinking/reasoning was explicitly requested
   const thinkingRequested = thinking?.type === "enabled";
 
+  // Pre-process: collect all tool_result IDs to filter orphan tool_use
+  // This prevents Claude API error: "tool_use ids were found without tool_result blocks"
+  const toolResultIds = new Set<string>();
+  for (const msg of messages || []) {
+    if (Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (block.type === "tool_result" && block.tool_use_id) {
+          toolResultIds.add(block.tool_use_id);
+        }
+      }
+    }
+  }
+
   // Build OpenAI-style messages
   const openaiMessages: OpenAIMessage[] = [];
 
@@ -174,6 +187,10 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
         if (block.type === "text") {
           textContent += block.text || "";
         } else if (block.type === "tool_use") {
+          // Skip tool_use without matching tool_result (prevents Claude API error)
+          if (block.id && !toolResultIds.has(block.id)) {
+            continue;
+          }
           // Anthropic tool_use -> OpenAI tool_calls (for assistant messages)
           toolCalls.push({
             id: block.id || "",
