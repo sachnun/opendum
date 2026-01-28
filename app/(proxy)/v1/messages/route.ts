@@ -3,7 +3,7 @@ import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
 import { getNextAvailableAccount } from "@/lib/proxy/load-balancer";
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
-import { markRateLimited, parseRateLimitError } from "@/lib/proxy/rate-limit";
+import { markRateLimited, parseRateLimitError, getMinWaitTime, formatWaitTimeMs } from "@/lib/proxy/rate-limit";
 import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
 
 export const runtime = "nodejs";
@@ -840,14 +840,30 @@ export async function POST(request: NextRequest) {
       if (!account) {
         // No more accounts available
         const isFirstAttempt = triedAccountIds.length === 0;
+        
+        if (isFirstAttempt) {
+          return NextResponse.json(
+            {
+              type: "error",
+              error: {
+                type: "overloaded_error",
+                message: "No active accounts available for this model. Please add an account in the dashboard.",
+              },
+            },
+            { status: 529 }
+          );
+        }
+
+        // All accounts rate limited - calculate minimum wait time
+        const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
         return NextResponse.json(
           {
             type: "error",
             error: {
               type: "overloaded_error",
-              message: isFirstAttempt
-                ? "No active accounts available for this model. Please add an account in the dashboard."
-                : "All accounts are rate limited. Please try again later.",
+              message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
+              retry_after: formatWaitTimeMs(waitTimeMs),
+              retry_after_ms: waitTimeMs,
             },
           },
           { status: 529 }
@@ -1002,13 +1018,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(anthropicResponse);
     }
 
-    // All retries exhausted (shouldn't reach here normally)
+    // All retries exhausted
+    const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
     return NextResponse.json(
       {
         type: "error",
         error: {
           type: "overloaded_error",
-          message: "All accounts are rate limited. Please try again later.",
+          message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
+          retry_after: formatWaitTimeMs(waitTimeMs),
+          retry_after_ms: waitTimeMs,
         },
       },
       { status: 529 }

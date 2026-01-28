@@ -79,16 +79,12 @@ export function convertOpenAIToGemini(
     } else if (Array.isArray(message.content)) {
       for (const content of message.content) {
         if (content.type === "text") {
-          const textContent = (content as { text?: unknown }).text;
-          // Validate and coerce text to string - prevents Claude API errors
-          // when content.text is not a string (e.g., object or array)
-          if (typeof textContent === "string") {
+          const textContent = (content as { text?: string }).text;
+          // Only push if text is truthy (match opendumm behavior)
+          // This prevents invalid parts from being sent to Claude API
+          if (textContent) {
             parts.push({ text: textContent });
-          } else if (textContent != null) {
-            // Non-string text content - convert to string for safety
-            parts.push({ text: JSON.stringify(textContent) });
           }
-          // Skip if textContent is null/undefined
         } else if (content.type === "image_url") {
           const imageUrl = (content as { image_url?: { url?: string } }).image_url;
           if (imageUrl?.url) {

@@ -104,9 +104,13 @@ export async function getNextAvailableAccount(
 
   const family = getModelFamily(model);
 
-  // Find the first non-rate-limited account (already sorted by LRU)
+  // Separate paid and free accounts (both already sorted by LRU)
+  const paidAccounts = accounts.filter((a) => a.tier === "paid");
+  const freeAccounts = accounts.filter((a) => a.tier !== "paid");
+
+  // Prioritize paid accounts first, then free accounts
   let selectedAccount: ProviderAccount | null = null;
-  for (const acc of accounts) {
+  for (const acc of [...paidAccounts, ...freeAccounts]) {
     clearExpiredRateLimits(acc.id);
     if (!isRateLimited(acc.id, family)) {
       selectedAccount = acc;

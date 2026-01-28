@@ -297,21 +297,32 @@ export function transformClaudeRequest(
           }
         }
 
-        // Defensive check: ensure text field is always a string if present
-        // This prevents Claude API errors like "messages.X.content.Y.text.text: Field required"
-        if ("text" in part && typeof part.text !== "string") {
-          if (part.text != null) {
-            part.text = JSON.stringify(part.text);
-          } else {
-            // Remove null/undefined text field
-            delete part.text;
-          }
-        }
-
         filteredParts.push(part);
       }
 
       content.parts = filteredParts;
+    }
+  }
+
+  // Final validation: ensure all text fields in parts are valid strings
+  // This prevents Claude API errors like "messages.X.content.Y.text.text: Field required"
+  const finalContents = requestPayload.contents as
+    | Array<Record<string, unknown>>
+    | undefined;
+  if (Array.isArray(finalContents)) {
+    for (const content of finalContents) {
+      const parts = content.parts as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(parts)) {
+        // Filter out invalid parts (text must be a truthy string)
+        content.parts = parts.filter((part) => {
+          if ("text" in part) {
+            // If part has text field, it must be a non-empty string
+            return typeof part.text === "string" && part.text.length > 0;
+          }
+          // Keep non-text parts (functionCall, functionResponse, etc.)
+          return true;
+        });
+      }
     }
   }
 

@@ -227,3 +227,68 @@ export function parseRateLimitError(errorBody: unknown): {
 export function clearAllRateLimits(): void {
   rateLimits.clear();
 }
+
+/**
+ * Compute exponential backoff delay in milliseconds
+ * @param attempt - The attempt number (1-based)
+ * @param baseMs - Base delay in ms (default: 1000)
+ * @param maxMs - Maximum delay in ms (default: 1 hour)
+ * @returns Delay in milliseconds
+ */
+export function computeExponentialBackoffMs(
+  attempt: number,
+  baseMs = 1000,
+  maxMs = 3600000
+): number {
+  const safeAttempt = Math.max(1, Math.floor(attempt));
+  const multiplier = 2 ** (safeAttempt - 1);
+  return Math.min(maxMs, Math.max(0, Math.floor(baseMs * multiplier)));
+}
+
+/**
+ * Format wait time in human-readable format
+ * Examples: "2h30m", "5m12s", "45s"
+ * @param ms - Wait time in milliseconds
+ * @returns Formatted string
+ */
+export function formatWaitTimeMs(ms: number): string {
+  const totalSeconds = Math.max(1, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h${minutes}m` : `${hours}h`;
+  }
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}m${seconds}s` : `${minutes}m`;
+  }
+  return `${seconds}s`;
+}
+
+/**
+ * Parse retry-after from HTTP response headers
+ * Supports both retry-after-ms and retry-after (seconds) headers
+ * @param response - HTTP response
+ * @returns Retry delay in milliseconds, or null if not found
+ */
+export function parseRetryAfterMs(response: Response): number | null {
+  const retryAfterMsHeader = response.headers.get("retry-after-ms");
+  const retryAfterSecondsHeader = response.headers.get("retry-after");
+
+  if (retryAfterMsHeader) {
+    const parsed = parseInt(retryAfterMsHeader, 10);
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      return Math.min(parsed, 86400000); // Cap at 24 hours
+    }
+  }
+
+  if (retryAfterSecondsHeader) {
+    const parsed = parseInt(retryAfterSecondsHeader, 10);
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      return Math.min(parsed * 1000, 86400000); // Cap at 24 hours
+    }
+  }
+
+  return null;
+}

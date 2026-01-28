@@ -3,7 +3,7 @@ import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
 import { getNextAvailableAccount } from "@/lib/proxy/load-balancer";
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
-import { markRateLimited, parseRateLimitError } from "@/lib/proxy/rate-limit";
+import { markRateLimited, parseRateLimitError, getMinWaitTime, formatWaitTimeMs } from "@/lib/proxy/rate-limit";
 import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
 
 export const runtime = "nodejs";
@@ -169,16 +169,31 @@ export async function POST(request: NextRequest) {
       if (!account) {
         // No more accounts available
         const isFirstAttempt = triedAccountIds.length === 0;
+        
+        if (isFirstAttempt) {
+          return NextResponse.json(
+            {
+              error: {
+                message: "No active accounts available for this model. Please add an account in the dashboard.",
+                type: "configuration_error",
+              },
+            },
+            { status: 503 }
+          );
+        }
+
+        // All accounts rate limited - calculate minimum wait time
+        const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
         return NextResponse.json(
           {
             error: {
-              message: isFirstAttempt
-                ? "No active accounts available for this model. Please add an account in the dashboard."
-                : "All accounts are rate limited. Please try again later.",
-              type: isFirstAttempt ? "configuration_error" : "rate_limit_error",
+              message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
+              type: "rate_limit_error",
+              retry_after: formatWaitTimeMs(waitTimeMs),
+              retry_after_ms: waitTimeMs,
             },
           },
-          { status: isFirstAttempt ? 503 : 429 }
+          { status: 429 }
         );
       }
 
@@ -327,12 +342,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseData);
     }
 
-    // All retries exhausted (shouldn't reach here normally)
+    // All retries exhausted
+    const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
     return NextResponse.json(
       {
         error: {
-          message: "All accounts are rate limited. Please try again later.",
+          message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
           type: "rate_limit_error",
+          retry_after: formatWaitTimeMs(waitTimeMs),
+          retry_after_ms: waitTimeMs,
         },
       },
       { status: 429 }

@@ -14,6 +14,7 @@ import {
   ANTIGRAVITY_CLIENT_SECRET,
   ANTIGRAVITY_SCOPES,
   CODE_ASSIST_ENDPOINT,
+  CODE_ASSIST_ENDPOINT_FALLBACKS,
   CODE_ASSIST_HEADERS,
   ANTIGRAVITY_MODELS,
   MODEL_ALIASES,
@@ -278,9 +279,8 @@ export const antigravityProvider: Provider = {
     const needsForcedStreaming = isClaudeModel && !stream;
     const actualStream = needsForcedStreaming ? true : stream;
 
-    // Build request URL
+    // Build request action
     const action = actualStream ? "streamGenerateContent?alt=sse" : "generateContent";
-    const url = `${CODE_ASSIST_ENDPOINT}/v1internal:${action}`;
 
     // Build headers
     const headers = new Headers({
@@ -295,42 +295,66 @@ export const antigravityProvider: Provider = {
       headers.set("anthropic-beta", "interleaved-thinking-2025-05-14");
     }
 
-    // Make the request
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: result.body,
-    });
+    // Try each endpoint in fallback order (daily → autopush → prod)
+    let lastError: Error | null = null;
+    for (const endpoint of CODE_ASSIST_ENDPOINT_FALLBACKS) {
+      const url = `${endpoint}/v1internal:${action}`;
 
-    // If we forced streaming for Claude, buffer and convert to non-streaming
-    if (needsForcedStreaming && response.ok && response.body) {
-      const bufferedResponse = await bufferStreamingToGeminiResponse(response);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: result.body,
+        });
 
-      // Cache signatures from buffered response
-      cacheSignaturesFromResponse(
-        bufferedResponse,
-        family as "claude" | "gemini-flash" | "gemini-pro",
-        sessionId
-      );
+        // On 5xx, 403, 404: log and try next endpoint
+        if (response.status >= 500 || response.status === 403 || response.status === 404) {
+          console.log(
+            `[antigravity] Endpoint ${endpoint} returned ${response.status}, trying next...`
+          );
+          continue;
+        }
 
-      // Convert to OpenAI format and return as non-streaming
-      const openaiResponse = convertGeminiToOpenAI(bufferedResponse, rawModel, includeReasoning);
+        // On 429 (rate limit): return immediately to let route handler rotate accounts
+        // On success or other errors: return response
+        // If we forced streaming for Claude, buffer and convert to non-streaming
+        if (needsForcedStreaming && response.ok && response.body) {
+          const bufferedResponse = await bufferStreamingToGeminiResponse(response);
 
-      return new Response(JSON.stringify(openaiResponse), {
-        status: response.status,
-        headers: { "Content-Type": "application/json" },
-      });
+          // Cache signatures from buffered response
+          cacheSignaturesFromResponse(
+            bufferedResponse,
+            family as "claude" | "gemini-flash" | "gemini-pro",
+            sessionId
+          );
+
+          // Convert to OpenAI format and return as non-streaming
+          const openaiResponse = convertGeminiToOpenAI(bufferedResponse, rawModel, includeReasoning);
+
+          return new Response(JSON.stringify(openaiResponse), {
+            status: response.status,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // Transform response back to OpenAI format
+        return await transformAntigravityResponse(
+          response,
+          stream,
+          family,
+          sessionId,
+          rawModel,
+          includeReasoning
+        );
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[antigravity] Endpoint ${endpoint} failed:`, lastError.message);
+        continue;
+      }
     }
 
-    // Transform response back to OpenAI format
-    return await transformAntigravityResponse(
-      response,
-      stream,
-      family,
-      sessionId,
-      rawModel,
-      includeReasoning
-    );
+    // All endpoints failed
+    throw lastError || new Error("All Antigravity endpoints failed");
   },
 };
 
