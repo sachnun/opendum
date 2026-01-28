@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil, Trash2, RefreshCw } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteProviderAccount, updateProviderAccount } from "@/lib/actions/accounts";
 
@@ -91,16 +92,13 @@ export function AccountActions({ account }: { account: Account }) {
   };
 
   return (
-    <>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={handleToggleActive}
+    <div className="flex items-center gap-2">
+      <Switch
+        checked={account.isActive}
+        onCheckedChange={handleToggleActive}
         disabled={isToggling}
-      >
-        <RefreshCw className={`mr-1 h-3 w-3 ${isToggling ? "animate-spin" : ""}`} />
-        {account.isActive ? "Deactivate" : "Activate"}
-      </Button>
+        title={account.isActive ? "Deactivate account" : "Activate account"}
+      />
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogTrigger asChild>
@@ -169,6 +167,6 @@ export function AccountActions({ account }: { account: Account }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

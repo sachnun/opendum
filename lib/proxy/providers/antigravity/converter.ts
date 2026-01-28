@@ -293,10 +293,25 @@ export function convertGeminiToOpenAI(
 
 /**
  * Create SSE transform stream for converting Gemini SSE to OpenAI SSE format
+ *
+ * State tracking for proper OpenAI streaming format:
+ * - isFirstChunk: Ensures 'role: assistant' is sent on first delta
+ * - toolCallIndex: Tracks index for multiple tool calls (0, 1, 2...)
+ * - hasToolCalls: Determines if finish_reason should be 'tool_calls'
+ * - toolCallIds: Stores stable IDs per tool call name within this request
+ * - completionId: Single ID for entire completion (not per-chunk)
  */
 export function createGeminiToOpenAISseTransform(
   model: string
 ): TransformStream<string, string> {
+  // State variables for tracking across chunks
+  let isFirstChunk = true;
+  let toolCallIndex = 0;
+  let hasToolCalls = false;
+  const toolCallIds = new Map<string, string>();
+  const completionId = `chatcmpl-${crypto.randomUUID()}`;
+  const created = Math.floor(Date.now() / 1000);
+
   return new TransformStream<string, string>({
     transform(line, controller) {
       if (!line.startsWith("data:")) {
@@ -325,31 +340,86 @@ export function createGeminiToOpenAISseTransform(
         const parts = content?.parts as Array<Record<string, unknown>> | undefined;
 
         if (!parts || parts.length === 0) {
+          // Check for finish reason even if no parts (final chunk case)
+          const candidateFinishReason = candidate.finishReason as string | undefined;
+          if (candidateFinishReason) {
+            let openaiFinishReason = "stop";
+            if (candidateFinishReason === "MAX_TOKENS") {
+              openaiFinishReason = "length";
+            } else if (hasToolCalls) {
+              openaiFinishReason = "tool_calls";
+            }
+
+            const finalChunk = {
+              id: completionId,
+              object: "chat.completion.chunk",
+              created,
+              model,
+              choices: [
+                {
+                  index: 0,
+                  delta: {},
+                  finish_reason: openaiFinishReason,
+                },
+              ],
+            };
+
+            controller.enqueue(`data: ${JSON.stringify(finalChunk)}\n\n`);
+          }
           return;
         }
 
         for (const part of parts) {
           const delta: Record<string, unknown> = {};
-          let finishReason: string | null = null;
 
           if (part.thought === true && typeof part.text === "string") {
+            // Reasoning/thinking content
+            if (isFirstChunk) {
+              delta.role = "assistant";
+              isFirstChunk = false;
+            }
             delta.reasoning_content = part.text;
           } else if (typeof part.text === "string") {
+            // Regular text content
+            if (isFirstChunk) {
+              delta.role = "assistant";
+              isFirstChunk = false;
+            }
             delta.content = part.text;
           } else if (part.functionCall) {
+            // Tool/function call
             const fc = part.functionCall as Record<string, unknown>;
+            const funcName = fc.name as string;
+
+            // Get or create stable ID for this tool call
+            let toolId = fc.id as string | undefined;
+            if (!toolId) {
+              toolId = toolCallIds.get(funcName);
+              if (!toolId) {
+                toolId = `call_${crypto.randomUUID()}`;
+                toolCallIds.set(funcName, toolId);
+              }
+            }
+
+            if (isFirstChunk) {
+              delta.role = "assistant";
+              isFirstChunk = false;
+            }
+
             delta.tool_calls = [
               {
-                index: 0,
-                id: fc.id ?? `call_${crypto.randomUUID()}`,
+                index: toolCallIndex,
+                id: toolId,
                 type: "function",
                 function: {
-                  name: fc.name,
+                  name: funcName,
                   arguments: JSON.stringify(fc.args ?? {}),
                 },
               },
             ];
-            finishReason = "tool_calls";
+
+            toolCallIndex++;
+            hasToolCalls = true;
           }
 
           if (Object.keys(delta).length === 0) {
@@ -357,15 +427,15 @@ export function createGeminiToOpenAISseTransform(
           }
 
           const openaiChunk = {
-            id: `chatcmpl-${crypto.randomUUID()}`,
+            id: completionId,
             object: "chat.completion.chunk",
-            created: Math.floor(Date.now() / 1000),
+            created,
             model,
             choices: [
               {
                 index: 0,
                 delta,
-                finish_reason: finishReason,
+                finish_reason: null,
               },
             ],
           };
@@ -373,18 +443,20 @@ export function createGeminiToOpenAISseTransform(
           controller.enqueue(`data: ${JSON.stringify(openaiChunk)}\n\n`);
         }
 
-        // Check for finish reason
+        // Check for finish reason from Gemini
         const candidateFinishReason = candidate.finishReason as string | undefined;
         if (candidateFinishReason) {
           let openaiFinishReason = "stop";
           if (candidateFinishReason === "MAX_TOKENS") {
             openaiFinishReason = "length";
+          } else if (hasToolCalls) {
+            openaiFinishReason = "tool_calls";
           }
 
           const finalChunk = {
-            id: `chatcmpl-${crypto.randomUUID()}`,
+            id: completionId,
             object: "chat.completion.chunk",
-            created: Math.floor(Date.now() / 1000),
+            created,
             model,
             choices: [
               {
