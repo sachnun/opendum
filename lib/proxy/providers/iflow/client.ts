@@ -22,6 +22,8 @@ import {
   IFLOW_REFRESH_BUFFER_SECONDS,
 } from "./constants";
 
+import type { ReasoningConfig } from "../types";
+
 interface TokenResponse {
   access_token: string;
   refresh_token: string;
@@ -129,6 +131,18 @@ function buildRequestPayload(
   } else if (payload.stream === undefined) {
     payload.stream = true; // Default to streaming
   }
+
+  // Handle reasoning parameter - convert to reasoning_effort for API
+  // Support both OpenAI Responses API format (reasoning object) and legacy format
+  const reasoning = params.reasoning as ReasoningConfig | undefined;
+  const reasoningEffort = reasoning?.effort || params.reasoning_effort as string | undefined;
+  
+  if (reasoningEffort && reasoningEffort !== "none") {
+    payload.reasoning_effort = reasoningEffort;
+  }
+  
+  // Remove the reasoning object from payload (API uses reasoning_effort directly)
+  delete payload.reasoning;
 
   // Clean tool schemas if present
   if (payload.tools && Array.isArray(payload.tools)) {

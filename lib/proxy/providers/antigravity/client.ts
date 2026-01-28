@@ -251,6 +251,11 @@ export const antigravityProvider: Provider = {
     const sessionId = crypto.randomUUID();
     const requestId = generateRequestId();
 
+    // Determine if reasoning output should be included in response
+    // Only include if user explicitly requested reasoning
+    const includeReasoning = body._includeReasoning ?? 
+      !!(body.reasoning || body.reasoning_effort || body.thinking_budget || body.include_thoughts);
+
     const context: TransformContext = {
       model: effectiveModel,
       family,
@@ -299,20 +304,28 @@ export const antigravityProvider: Provider = {
       stream,
       family,
       sessionId,
-      rawModel
+      rawModel,
+      includeReasoning
     );
   },
 };
 
 /**
  * Transform Antigravity response to OpenAI format
+ * @param response - Raw response from Antigravity API
+ * @param streaming - Whether this is a streaming response
+ * @param family - Model family (claude, gemini-flash, gemini-pro)
+ * @param sessionId - Session ID for signature caching
+ * @param model - Model name for response
+ * @param includeReasoning - Whether to include reasoning_content in response
  */
 async function transformAntigravityResponse(
   response: Response,
   streaming: boolean,
   family: string,
   sessionId: string,
-  model: string
+  model: string,
+  includeReasoning: boolean = true
 ): Promise<Response> {
   const contentType = response.headers.get("content-type") ?? "";
   const isEventStream = contentType.includes("text/event-stream");
@@ -325,7 +338,7 @@ async function transformAntigravityResponse(
       .pipeThrough(
         createSignatureCachingTransform(family as "claude" | "gemini-flash" | "gemini-pro", sessionId)
       )
-      .pipeThrough(createGeminiToOpenAISseTransform(model))
+      .pipeThrough(createGeminiToOpenAISseTransform(model, includeReasoning))
       .pipeThrough(new TextEncoderStream());
 
     return new Response(transformedBody, {
@@ -369,8 +382,8 @@ async function transformAntigravityResponse(
       sessionId
     );
 
-    // Convert to OpenAI format
-    const openaiResponse = convertGeminiToOpenAI(unwrapped, model);
+    // Convert to OpenAI format (conditionally include reasoning)
+    const openaiResponse = convertGeminiToOpenAI(unwrapped, model, includeReasoning);
 
     return new Response(JSON.stringify(openaiResponse), {
       status: response.status,

@@ -30,6 +30,9 @@ export const IFLOW_SUPPORTED_PARAMS = new Set([
   "stop",
   "seed",
   "response_format",
+  // Reasoning parameters for thinking models
+  "reasoning_effort",
+  "reasoning",
 ]);
 
 // Available iFlow models

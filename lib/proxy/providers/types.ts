@@ -26,6 +26,19 @@ export interface OAuthResult {
 }
 
 /**
+ * Reasoning effort levels for OpenAI-style reasoning parameter
+ */
+export type ReasoningEffort = "none" | "low" | "medium" | "high";
+
+/**
+ * OpenAI-style reasoning parameter (Responses API format)
+ */
+export interface ReasoningConfig {
+  effort?: ReasoningEffort;
+  summary?: "auto" | "concise" | "detailed";
+}
+
+/**
  * Chat completion request body (OpenAI format)
  */
 export interface ChatCompletionRequest {
@@ -57,10 +70,18 @@ export interface ChatCompletionRequest {
   stop?: string | string[];
   seed?: number;
   response_format?: { type: string };
-  // Extended parameters for thinking models
-  reasoning_effort?: "none" | "low" | "medium" | "high";
+  
+  // OpenAI-style reasoning parameter (Responses API format)
+  reasoning?: ReasoningConfig;
+  
+  // Legacy/extended parameters for thinking models (backward compatibility)
+  reasoning_effort?: ReasoningEffort;
   thinking_budget?: number;
   include_thoughts?: boolean;
+  
+  // Internal flag - controls whether reasoning_content is included in response
+  // Set automatically based on whether user requested reasoning
+  _includeReasoning?: boolean;
 }
 
 /**

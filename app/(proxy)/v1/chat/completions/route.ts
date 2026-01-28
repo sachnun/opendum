@@ -110,6 +110,15 @@ export async function POST(request: NextRequest) {
     }
     const { model, messages, stream = true, ...params } = body;
 
+    // Determine if reasoning was explicitly requested by user
+    // This controls whether reasoning_content is included in the response
+    const reasoningRequested = !!(
+      params.reasoning || 
+      params.reasoning_effort || 
+      params.thinking_budget || 
+      params.include_thoughts
+    );
+
     if (!model) {
       return NextResponse.json(
         { error: { message: "model is required", type: "invalid_request_error" } },
@@ -162,10 +171,11 @@ export async function POST(request: NextRequest) {
     const credentials = await provider.getValidCredentials(account);
 
     // Make request to provider's API
+    // Pass _includeReasoning flag to control reasoning_content visibility in response
     const providerResponse = await provider.makeRequest(
       credentials,
       account,
-      { model, messages, stream, ...params },
+      { model, messages, stream, _includeReasoning: reasoningRequested, ...params },
       stream
     );
 

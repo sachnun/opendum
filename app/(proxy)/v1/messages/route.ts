@@ -58,6 +58,11 @@ interface AnthropicRequestBody {
     type: string;
     name?: string;
   };
+  // Anthropic thinking parameter for extended thinking
+  thinking?: {
+    type: "enabled" | "disabled";
+    budget_tokens?: number;
+  };
   [key: string]: unknown;
 }
 
@@ -123,9 +128,13 @@ interface AnthropicResponse {
 
 /**
  * Transform Anthropic messages format to OpenAI format
+ * @returns OpenAI payload with _includeReasoning flag for conditional thinking output
  */
-function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload {
-  const { model, messages, system, max_tokens, stream, tools, tool_choice, ...params } = body;
+function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload & { _includeReasoning?: boolean } {
+  const { model, messages, system, max_tokens, stream, tools, tool_choice, thinking, ...params } = body;
+
+  // Determine if thinking/reasoning was explicitly requested
+  const thinkingRequested = thinking?.type === "enabled";
 
   // Build OpenAI-style messages
   const openaiMessages: OpenAIMessage[] = [];
@@ -249,13 +258,30 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload {
     }
   }
 
-  return openaiPayload;
+  // Handle Anthropic thinking parameter - convert to OpenAI format
+  if (thinkingRequested) {
+    (openaiPayload as OpenAIPayload & { thinking_budget?: number }).thinking_budget = 
+      thinking?.budget_tokens || 10000; // Default to medium budget
+  }
+
+  // Return with internal flag for conditional thinking output
+  return {
+    ...openaiPayload,
+    _includeReasoning: thinkingRequested,
+  };
 }
 
 /**
  * Transform OpenAI response to Anthropic format (non-streaming)
+ * @param openaiResponse - Response from OpenAI-compatible API
+ * @param model - Model name for response
+ * @param includeThinking - Whether to include thinking blocks in response (default: true)
  */
-function transformOpenAIToAnthropic(openaiResponse: OpenAIResponse, model: string): AnthropicResponse {
+function transformOpenAIToAnthropic(
+  openaiResponse: OpenAIResponse, 
+  model: string,
+  includeThinking: boolean = true
+): AnthropicResponse {
   const choice = openaiResponse.choices?.[0];
   const message = choice as unknown as { message?: { reasoning_content?: string; content?: string; tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }> } };
   const messageData = message?.message;
@@ -264,9 +290,9 @@ function transformOpenAIToAnthropic(openaiResponse: OpenAIResponse, model: strin
   // Build content blocks
   const contentBlocks: AnthropicContentBlockOutput[] = [];
 
-  // 1. Add thinking block if reasoning_content is present
+  // 1. Add thinking block if reasoning_content is present AND thinking was requested
   const reasoningContent = messageData?.reasoning_content;
-  if (reasoningContent) {
+  if (reasoningContent && includeThinking) {
     contentBlocks.push({
       type: "thinking",
       thinking: reasoningContent,
@@ -339,10 +365,12 @@ function transformOpenAIToAnthropic(openaiResponse: OpenAIResponse, model: strin
  * Handles reasoning_content (thinking), text content, and tool_calls
  * @param model - The model name to include in responses
  * @param onComplete - Optional callback called when stream ends with usage data
+ * @param includeThinking - Whether to include thinking blocks in response (default: true)
  */
 function createAnthropicStreamTransformer(
   model: string,
-  onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void
+  onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void,
+  includeThinking: boolean = true
 ) {
   const messageId = `msg_${Date.now()}`;
   
@@ -466,9 +494,9 @@ function createAnthropicStreamTransformer(
 
             const delta = choices[0].delta || {};
 
-            // Handle reasoning/thinking content
+            // Handle reasoning/thinking content - only include if thinking was requested
             const reasoningContent = delta.reasoning_content;
-            if (reasoningContent) {
+            if (reasoningContent && includeThinking) {
               if (!thinkingBlockStarted) {
                 // Start a thinking content block
                 const blockStart = {
@@ -798,6 +826,9 @@ export async function POST(request: NextRequest) {
 
     // Transform Anthropic format to OpenAI format
     const openaiPayload = transformAnthropicToOpenAI(body);
+    
+    // Extract includeThinking flag for response filtering
+    const includeThinking = openaiPayload._includeReasoning ?? false;
 
     // Make request to provider's API
     const providerResponse = await provider.makeRequest(
@@ -839,6 +870,7 @@ export async function POST(request: NextRequest) {
     // Streaming response
     if (stream && providerResponse.body) {
       // Transform OpenAI stream to Anthropic stream with usage callback
+      // Pass includeThinking to control whether thinking blocks are emitted
       const transformer = createAnthropicStreamTransformer(model, (usage) => {
         logUsage({
           userId: userId!,
@@ -850,7 +882,7 @@ export async function POST(request: NextRequest) {
           statusCode: 200,
           duration: Date.now() - startTime,
         });
-      });
+      }, includeThinking);
       const transformedStream = providerResponse.body.pipeThrough(transformer);
 
       return new Response(transformedStream, {
@@ -865,7 +897,7 @@ export async function POST(request: NextRequest) {
 
     // Non-streaming response - transform OpenAI to Anthropic format
     const openaiResponse = await providerResponse.json();
-    const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model);
+    const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model, includeThinking);
     
     // Log with actual token usage from response
     logUsage({

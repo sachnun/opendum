@@ -4,6 +4,20 @@ import type { ChatCompletionRequest } from "../types";
 import type { RequestPayload, ModelFamily } from "./transform/types";
 
 /**
+ * Effort to budget_tokens mapping for Anthropic/Claude
+ * Based on Anthropic docs:
+ * - Minimum: 1024 tokens
+ * - Recommended starting: low, then increase incrementally
+ * - Above 32K: recommend batch processing
+ */
+const EFFORT_TO_BUDGET: Record<string, number> = {
+  none: 0,
+  low: 1024,      // Minimum required by Anthropic
+  medium: 10000,  // Default value used in Anthropic examples
+  high: 32000,    // Maximum before network timeout issues
+};
+
+/**
  * Convert OpenAI messages to Gemini format
  */
 export function convertOpenAIToGemini(
@@ -142,27 +156,31 @@ export function convertOpenAIToGemini(
   }
 
   // Thinking config from extended parameters
-  if (request.reasoning_effort || request.thinking_budget) {
+  // Support both OpenAI Responses API format (reasoning object) and legacy format
+  const reasoningEffort = request.reasoning?.effort || request.reasoning_effort;
+  const thinkingBudget = request.thinking_budget;
+  
+  if (reasoningEffort || thinkingBudget) {
     const thinkingConfig: Record<string, unknown> = {};
 
-    if (request.thinking_budget) {
-      thinkingConfig.thinkingBudget = request.thinking_budget;
-    } else if (request.reasoning_effort) {
-      // Map reasoning_effort to thinkingLevel
-      const levelMap: Record<string, string> = {
-        none: "none",
-        low: "low",
-        medium: "medium",
-        high: "high",
-      };
-      thinkingConfig.thinkingLevel = levelMap[request.reasoning_effort] ?? "medium";
+    // Priority: explicit budget > effort mapping
+    if (thinkingBudget) {
+      thinkingConfig.thinkingBudget = thinkingBudget;
+    } else if (reasoningEffort && reasoningEffort !== "none") {
+      // Use effort-to-budget mapping
+      const budget = EFFORT_TO_BUDGET[reasoningEffort];
+      if (budget && budget > 0) {
+        thinkingConfig.thinkingBudget = budget;
+      }
     }
 
     if (request.include_thoughts !== undefined) {
       thinkingConfig.include_thoughts = request.include_thoughts;
     }
 
-    generationConfig.thinkingConfig = thinkingConfig;
+    if (Object.keys(thinkingConfig).length > 0) {
+      generationConfig.thinkingConfig = thinkingConfig;
+    }
   }
 
   if (Object.keys(generationConfig).length > 0) {
@@ -200,10 +218,14 @@ export function getModelFamily(model: string): ModelFamily {
 
 /**
  * Convert Gemini response to OpenAI format (non-streaming)
+ * @param geminiResponse - Raw Gemini response
+ * @param model - Model name for response
+ * @param includeReasoning - Whether to include reasoning_content in response (default: true)
  */
 export function convertGeminiToOpenAI(
   geminiResponse: Record<string, unknown>,
-  model: string
+  model: string,
+  includeReasoning: boolean = true
 ): Record<string, unknown> {
   const candidates = geminiResponse.candidates as
     | Array<Record<string, unknown>>
@@ -253,7 +275,8 @@ export function convertGeminiToOpenAI(
         message.tool_calls = toolCalls;
       }
 
-      if (reasoningContent) {
+      // Only include reasoning_content if explicitly requested
+      if (reasoningContent && includeReasoning) {
         message.reasoning_content = reasoningContent;
       }
 
@@ -300,9 +323,13 @@ export function convertGeminiToOpenAI(
  * - hasToolCalls: Determines if finish_reason should be 'tool_calls'
  * - toolCallIds: Stores stable IDs per tool call name within this request
  * - completionId: Single ID for entire completion (not per-chunk)
+ * 
+ * @param model - Model name for response
+ * @param includeReasoning - Whether to include reasoning_content in response (default: true)
  */
 export function createGeminiToOpenAISseTransform(
-  model: string
+  model: string,
+  includeReasoning: boolean = true
 ): TransformStream<string, string> {
   // State variables for tracking across chunks
   let isFirstChunk = true;
@@ -373,7 +400,10 @@ export function createGeminiToOpenAISseTransform(
           const delta: Record<string, unknown> = {};
 
           if (part.thought === true && typeof part.text === "string") {
-            // Reasoning/thinking content
+            // Reasoning/thinking content - only include if requested
+            if (!includeReasoning) {
+              continue; // Skip reasoning chunk
+            }
             if (isFirstChunk) {
               delta.role = "assistant";
               isFirstChunk = false;
