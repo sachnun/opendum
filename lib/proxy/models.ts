@@ -38,27 +38,33 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   "qwen3-235b-a22b-instruct": { providers: [ProviderName.IFLOW] },
   "qwen3-235b": { providers: [ProviderName.IFLOW] },
 
-  // ===== Antigravity Models =====
-  // Gemini 2.5
-  "gemini-2.5-flash": { providers: [ProviderName.ANTIGRAVITY] },
+  // ===== Gemini CLI Models =====
+  // Gemini 2.5 Pro (exclusive to Gemini CLI)
+  "gemini-2.5-pro": { providers: [ProviderName.GEMINI_CLI] },
+
+  // ===== Antigravity + Gemini CLI Shared Models =====
+  // Gemini 2.5 Flash variants
+  "gemini-2.5-flash": { providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI] },
   "gemini-2.5-flash-thinking": { providers: [ProviderName.ANTIGRAVITY] },
-  "gemini-2.5-flash-lite": { providers: [ProviderName.ANTIGRAVITY] },
+  "gemini-2.5-flash-lite": { providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI] },
 
   // Gemini 3
   "gemini-3-flash": {
     providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-3-flash-preview"],
   },
+  "gemini-3-flash-preview": { providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI] },
   "gemini-3-pro-high": {
     providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-3-pro-preview", "gemini-3-pro"],
+    aliases: ["gemini-3-pro"],
   },
+  "gemini-3-pro-preview": { providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI] },
   "gemini-3-pro-low": { providers: [ProviderName.ANTIGRAVITY] },
   "gemini-3-pro-image": {
     providers: [ProviderName.ANTIGRAVITY],
     aliases: ["gemini-3-pro-image-preview"],
   },
 
+  // ===== Antigravity Exclusive Models =====
   // Claude via Antigravity
   "claude-sonnet-4-5": {
     providers: [ProviderName.ANTIGRAVITY],
