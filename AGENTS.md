@@ -4,135 +4,95 @@ Guidelines for AI agents working on this Next.js 16 + TypeScript + Prisma codeba
 
 ## Project Overview
 
-Opendum is a Next.js application that provides an OpenAI-compatible API proxy for multiple AI providers. It features:
-- OAuth-based provider account management (Iflow, Antigravity)
-- Round-robin load balancing across multiple provider accounts
-- Proxy API key generation and management
-- Usage analytics dashboard
+Opendum is an OpenAI-compatible API proxy for multiple AI providers. Features:
+- OAuth-based provider account management (Iflow, Antigravity, Gemini CLI, Qwen Code)
+- Round-robin load balancing across provider accounts
+- Proxy API key generation and usage analytics
 - GitHub authentication via NextAuth.js
 
-## Build, Lint, and Dev Commands
+## Commands
 
 ```bash
 # Development
-npm run dev          # Start dev server (next dev)
+npm run dev              # Start dev server
+npm run build            # Build (runs prisma db push first)
+npm run lint             # ESLint
 
-# Build
-npm run build        # Production build (next build)
-npm run start        # Start production server
-
-# Linting
-npm run lint         # Run ESLint
-
-# Database (Prisma)
-npx prisma generate  # Generate Prisma client
-npx prisma db push   # Push schema changes
-npx prisma migrate dev --name <migration_name>  # Create migration
-npx prisma studio    # Open database GUI
+# Database
+npx prisma generate      # Generate client after schema changes
+npx prisma db push       # Push schema to database
+npx prisma migrate dev --name <name>  # Create migration
+npx prisma studio        # Database GUI
 ```
 
 ## Testing
 
-No test framework is currently configured. If adding tests, use Vitest:
+No test framework configured. If adding tests, use Vitest:
 ```bash
-# Install
 npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react
-
-# Run tests (after setup)
-npx vitest                    # Run all tests in watch mode
-npx vitest run                # Run all tests once
-npx vitest run path/to/file   # Run single test file
-npx vitest -t "test name"     # Run tests matching pattern
+npx vitest run                    # Run all tests once
+npx vitest run path/to/file       # Run single test file
+npx vitest -t "test name"         # Run tests matching pattern
 ```
 
 ## Project Structure
 
 ```
-app/                    # Next.js App Router
-├── (proxy)/v1/         # OpenAI-compatible API routes
-│   ├── chat/completions/  # Chat completions endpoint
-│   ├── messages/          # Messages endpoint
-│   └── models/            # Models endpoint
+app/
+├── (proxy)/v1/         # OpenAI-compatible proxy endpoints
 ├── api/                # Internal API routes (auth, oauth)
-├── dashboard/          # Dashboard pages (accounts, api-keys)
-└── page.tsx            # Landing page
+├── dashboard/          # Dashboard pages
+└── layout.tsx
 
 components/
 ├── ui/                 # shadcn/ui components
-├── layout/             # Layout components (sidebar, header)
-└── theme-provider.tsx  # Theme context
+└── layout/             # Sidebar, header, nav
 
 lib/
 ├── actions/            # Server actions (accounts, api-keys, analytics)
-├── proxy/              # Proxy logic (providers, load-balancer, auth)
-├── auth.ts             # NextAuth configuration
-├── db.ts               # Prisma client singleton
-├── encryption.ts       # AES encryption utilities
-└── utils.ts            # Utility functions (cn for classnames)
+├── proxy/              # Proxy logic (providers, load-balancer, auth, models)
+│   └── providers/      # Provider implementations (iflow, antigravity, etc.)
+├── auth.ts             # NextAuth config
+├── db.ts               # Prisma singleton
+├── encryption.ts       # AES encryption (encrypt/decrypt/hashString)
+└── utils.ts            # cn() for classnames
 
-prisma/
-├── schema.prisma       # Database schema
-└── migrations/         # Database migrations
+prisma/schema.prisma    # Database schema
 ```
 
-## Code Style Guidelines
+## Code Style
 
 ### Imports
-- Use path aliases: `@/*` maps to project root
-- Order: React/Next → third-party → internal (`@/lib`, `@/components`)
-- Use named imports for components and utilities
-
+Order: React/Next -> third-party -> internal (`@/lib`, `@/components`)
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Button } from "@/components/ui/button";
 ```
 
 ### TypeScript
-- Strict mode enabled (`"strict": true`)
-- Always type function parameters and return values for public APIs
-- Use interfaces for object shapes, types for unions/aliases
-- Prefer `type` for React component props
+- Strict mode enabled
+- Use `type` for unions/aliases and React props
+- Use `interface` for object shapes with methods
 
 ```typescript
 export type ActionResult<T = void> = 
   | { success: true; data: T }
   | { success: false; error: string };
-
-interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-}
 ```
 
-### Naming Conventions
-- **Files**: kebab-case (`client.ts`, `load-balancer.ts`)
-- **Components**: PascalCase (`Button`, `AnalyticsCharts`)
-- **Functions**: camelCase (`getValidApiKey`, `buildRequestPayload`)
-- **Constants**: UPPER_SNAKE_CASE (`IFLOW_API_BASE_URL`, `REFRESH_BUFFER_SECONDS`)
-- **Server Actions**: camelCase verbs (`createApiKey`, `deleteProviderAccount`)
-
-### React Components
-- Use function declarations for components
-- Client components: add `"use client"` directive at top
-- Server components: default (no directive needed)
-- Use `cn()` utility for conditional classNames
-
-```typescript
-function Button({ className, variant, ...props }: ButtonProps) {
-  return (
-    <button className={cn(buttonVariants({ variant }), className)} {...props} />
-  );
-}
-```
+### Naming
+- **Files**: kebab-case (`load-balancer.ts`)
+- **Components**: PascalCase (`AnalyticsCharts`)
+- **Functions**: camelCase (`getValidApiKey`)
+- **Constants**: UPPER_SNAKE_CASE (`IFLOW_API_BASE_URL`)
 
 ### Server Actions
 - Mark with `"use server"` at file top
-- Always check authentication first
+- Always check auth first
 - Return `ActionResult<T>` discriminated union
-- Use `revalidatePath()` after mutations
+- Verify ownership before mutations
+- Call `revalidatePath()` after mutations
 
 ```typescript
 "use server";
@@ -142,34 +102,19 @@ export async function deleteAccount(id: string): Promise<ActionResult> {
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
   }
-  // ... implementation
+  // Verify ownership
+  const account = await prisma.providerAccount.findFirst({
+    where: { id, userId: session.user.id },
+  });
+  if (!account) return { success: false, error: "Account not found" };
+  
+  await prisma.providerAccount.delete({ where: { id } });
   revalidatePath("/dashboard/accounts");
   return { success: true, data: undefined };
 }
 ```
 
-### Error Handling
-- Wrap database operations in try/catch
-- Log errors with `console.error()` including context
-- Return user-friendly error messages (don't expose internals)
-- For API routes, return structured error responses
-
-```typescript
-try {
-  await prisma.account.delete({ where: { id } });
-  return { success: true, data: undefined };
-} catch (error) {
-  console.error("Failed to delete account:", error);
-  return { success: false, error: "Failed to delete account" };
-}
-```
-
 ### API Routes
-- Export `runtime = "nodejs"` for routes using Node.js APIs
-- Export `dynamic = "force-dynamic"` for non-cacheable routes
-- Validate Authorization header with `validateApiKey()`
-- Return JSON errors with consistent structure
-
 ```typescript
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -186,21 +131,26 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-### Database (Prisma)
-- Use the singleton from `@/lib/db`
-- Always verify ownership before mutations
-- Use indexes for frequently queried fields (see schema)
-- Sensitive data (tokens, keys) must be encrypted with `encrypt()`
+### Error Handling
+- Wrap DB operations in try/catch
+- Log with context: `console.error("Failed to X:", error)`
+- Return user-friendly messages (don't expose internals)
 
-### Encryption
-- Use `encrypt()`/`decrypt()` from `@/lib/encryption` for sensitive data
-- Use `hashString()` for API key lookup (SHA-256)
-- API keys use format: `sk-[16 random chars]`
+### React Components
+- Use function declarations
+- Client components: `"use client"` directive at top
+- Use `cn()` for conditional classNames
+
+### Database & Security
+- Use singleton: `import { prisma } from "@/lib/db"`
+- Always verify ownership before mutations
+- Encrypt sensitive data: `encrypt(token)` from `@/lib/encryption`
+- Hash API keys: `hashString(key)` for lookup (SHA-256)
+- API key format: `sk-[16 random chars]`
 
 ### Styling
-- Tailwind CSS v4 with CSS-first configuration
-- Use `tw-animate-css` for animations
-- Follow shadcn/ui patterns for new components
+- Tailwind CSS v4 with CSS-first config
+- Follow shadcn/ui patterns for components
 - Use CSS variables for theming (dark mode via `next-themes`)
 
 ## Environment Variables
@@ -211,17 +161,12 @@ DATABASE_URL=postgresql://...
 NEXTAUTH_SECRET=...
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
-IFLOW_CLIENT_ID=...       # Optional, has defaults
-IFLOW_CLIENT_SECRET=...   # Optional, has defaults
+ENCRYPTION_KEY=...
 ```
 
-## Key Libraries
+## Key Dependencies
 
-- **next**: 16.1.5 (App Router)
-- **react**: 19.2.3
-- **prisma**: 7.3.0 with PostgreSQL adapter
-- **next-auth**: 5.0.0-beta.30
-- **tailwindcss**: v4
-- **radix-ui**: For accessible UI primitives
-- **recharts**: For analytics charts
-- **crypto-js**: For encryption
+- next: 16.1.5, react: 19.2.3
+- prisma: 7.3.0 (PostgreSQL)
+- next-auth: 5.0.0-beta.30
+- tailwindcss: v4, radix-ui, recharts
