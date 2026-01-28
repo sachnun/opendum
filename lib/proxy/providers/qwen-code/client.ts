@@ -196,6 +196,7 @@ export const qwenCodeProvider: Provider = {
    * Instead, we initiate device code flow and return the verification URL.
    * This method is kept for interface compatibility but shouldn't be called directly.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getAuthUrl(_state: string, _codeVerifier?: string): string {
     // Device code flow doesn't use a redirect-based auth URL
     // The actual URL is obtained from initiateDeviceCodeFlow()
@@ -490,6 +491,7 @@ export async function pollDeviceCodeAuthorization(
  * Create transform stream to handle <think> tags in Qwen responses
  * Converts <think>...</think> to reasoning_content field
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function createThinkTagTransform(_model: string): TransformStream<string, string> {
   let buffer = "";
   let inThinkingBlock = false;

@@ -1,54 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Cpu, Zap, Eye, Code, Database, Copy, Check } from "lucide-react";
-
-type ModelCategory = "Chat" | "Thinking" | "Coding" | "Vision" | "Large" | "Other";
+import { Eye, Copy, Check, Brain, Wrench, Calendar } from "lucide-react";
+import type { ModelMeta } from "@/lib/proxy/models";
 
 interface ModelCardProps {
   id: string;
-  category: ModelCategory;
-  usage: number;
+  providers: string[];
+  meta?: ModelMeta;
 }
 
-function getCategoryIcon(category: ModelCategory) {
-  switch (category) {
-    case "Chat":
-      return <Zap className="h-4 w-4" />;
-    case "Thinking":
-      return <Database className="h-4 w-4" />;
-    case "Coding":
-      return <Code className="h-4 w-4" />;
-    case "Vision":
-      return <Eye className="h-4 w-4" />;
-    case "Large":
-      return <Cpu className="h-4 w-4" />;
-    default:
-      return <Cpu className="h-4 w-4" />;
+function formatTokens(tokens: number): string {
+  if (tokens >= 1000000) {
+    return `${(tokens / 1000000).toFixed(1)}M`;
   }
-}
-
-function getCategoryColor(category: ModelCategory) {
-  switch (category) {
-    case "Chat":
-      return "default";
-    case "Thinking":
-      return "secondary";
-    case "Coding":
-      return "outline";
-    case "Vision":
-      return "default";
-    case "Large":
-      return "secondary";
-    default:
-      return "outline";
+  if (tokens >= 1000) {
+    return `${Math.round(tokens / 1000)}K`;
   }
+  return tokens.toString();
 }
 
-export function ModelCard({ id, category, usage }: ModelCardProps) {
+function formatDate(dateStr: string): string {
+  // Format: "2025-04" or "2025-04-29"
+  const parts = dateStr.split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const year = parts[0];
+  const month = months[parseInt(parts[1], 10) - 1];
+  return `${month} ${year}`;
+}
+
+export function ModelCard({ id, providers, meta }: ModelCardProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -58,26 +42,84 @@ export function ModelCard({ id, category, usage }: ModelCardProps) {
   };
 
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg font-mono truncate">{id}</CardTitle>
-            <CardDescription className="mt-1 flex items-center">
-              {getCategoryIcon(category)}
-              <span className="ml-1">{category} Model</span>
-            </CardDescription>
+            <CardTitle className="text-sm font-mono truncate" title={id}>{id}</CardTitle>
+            {/* Provider Badges */}
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {providers.map((provider) => (
+                <Badge key={provider} variant="secondary" className="text-xs">
+                  {provider}
+                </Badge>
+              ))}
+            </div>
           </div>
-          <Badge variant={getCategoryColor(category) as "default" | "secondary" | "outline"}>
-            {usage} {usage === 1 ? "request" : "requests"}
-          </Badge>
+          {/* Pricing - top right */}
+          {meta?.pricing && (
+            <div className="text-xs text-muted-foreground whitespace-nowrap">
+              ${meta.pricing.input} · ${meta.pricing.output}
+            </div>
+          )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col flex-1">
+        {/* Metadata Section - only show if meta exists */}
+        {meta && (
+          <div className="space-y-2 text-xs text-muted-foreground mb-3">
+            {/* Context & Output */}
+            {(meta.contextLength || meta.outputLimit) && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {meta.contextLength && (
+                  <span>{formatTokens(meta.contextLength)} in</span>
+                )}
+                {meta.contextLength && meta.outputLimit && <span>·</span>}
+                {meta.outputLimit && (
+                  <span>{formatTokens(meta.outputLimit)} out</span>
+                )}
+                {meta.knowledgeCutoff && (
+                  <>
+                    <span>·</span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {formatDate(meta.knowledgeCutoff)}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Capability Badges */}
+            {(meta.reasoning || meta.toolCall || meta.vision) && (
+              <div className="flex flex-wrap gap-1">
+                {meta.reasoning && (
+                  <Badge variant="outline" className="text-xs py-0 h-5">
+                    <Brain className="h-3 w-3 mr-1" />
+                    Reasoning
+                  </Badge>
+                )}
+                {meta.toolCall && (
+                  <Badge variant="outline" className="text-xs py-0 h-5">
+                    <Wrench className="h-3 w-3 mr-1" />
+                    Tools
+                  </Badge>
+                )}
+                {meta.vision && (
+                  <Badge variant="outline" className="text-xs py-0 h-5">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Vision
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <Button
           variant="outline"
           size="sm"
-          className="w-full"
+          className="w-full mt-auto"
           onClick={handleCopy}
         >
           {copied ? (

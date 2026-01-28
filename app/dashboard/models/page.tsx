@@ -1,19 +1,7 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { MODEL_REGISTRY, getModelsForProvider } from "@/lib/proxy/models";
 import { ProviderName } from "@/lib/proxy/providers/types";
-import { ModelCard } from "./model-card";
-
-type ModelCategory = "Chat" | "Thinking" | "Coding" | "Vision" | "Large" | "Other";
-
-function getModelCategory(modelId: string): ModelCategory {
-  if (modelId.includes("thinking")) return "Thinking";
-  if (modelId.includes("coder") || modelId.includes("code")) return "Coding";
-  if (modelId.includes("vl") || modelId.includes("vision")) return "Vision";
-  if (modelId.includes("235b")) return "Large";
-  if (modelId.includes("-chat") || modelId.startsWith("glm-") || modelId === "qwen3-max") return "Chat";
-  return "Other";
-}
+import { ModelsList } from "./models-list";
 
 function getProviderLabel(provider: string): string {
   switch (provider) {
@@ -37,137 +25,51 @@ export default async function ModelsPage() {
     return null;
   }
 
-  // Get all models grouped by provider
+  // Get all models
+  const allModels = Object.keys(MODEL_REGISTRY);
+
+  // Get models per provider to determine which providers have models
   const iflowModels = getModelsForProvider(ProviderName.IFLOW);
   const antigravityModels = getModelsForProvider(ProviderName.ANTIGRAVITY);
   const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
   const geminiCliModels = getModelsForProvider(ProviderName.GEMINI_CLI);
-  const allModels = Object.keys(MODEL_REGISTRY);
 
-  // Count active providers
-  const activeProviders = [iflowModels, antigravityModels, qwenCodeModels, geminiCliModels].filter(m => m.length > 0).length;
+  // Build available providers list (only those with models)
+  const availableProviders: { id: string; label: string }[] = [];
+  if (iflowModels.length > 0) {
+    availableProviders.push({ id: ProviderName.IFLOW, label: "iFlow" });
+  }
+  if (antigravityModels.length > 0) {
+    availableProviders.push({ id: ProviderName.ANTIGRAVITY, label: "Antigravity" });
+  }
+  if (geminiCliModels.length > 0) {
+    availableProviders.push({ id: ProviderName.GEMINI_CLI, label: "Gemini CLI" });
+  }
+  if (qwenCodeModels.length > 0) {
+    availableProviders.push({ id: ProviderName.QWEN_CODE, label: "Qwen Code" });
+  }
 
-  const usageStats = await prisma.usageLog.groupBy({
-    by: ["model"],
-    where: { userId: session.user.id },
-    _count: { id: true },
-  });
-
-  const usageMap = new Map(usageStats.map((stat) => [stat.model, stat._count.id]));
-
-  // Create models with stats and provider info
-  const modelsWithStats = allModels.map((model) => {
+  // Create models with provider info
+  const modelsWithProviders = allModels.map((model) => {
     const info = MODEL_REGISTRY[model];
     return {
       id: model,
-      category: getModelCategory(model),
-      usage: usageMap.get(model) || 0,
       providers: info.providers,
-      providerLabel: info.providers.map(getProviderLabel).join(", "),
+      providerLabels: info.providers.map(getProviderLabel),
+      meta: info.meta,
     };
-  }).sort((a, b) => b.usage - a.usage);
-
-  const iflowModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.IFLOW));
-  const antigravityModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.ANTIGRAVITY));
-  const qwenCodeModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.QWEN_CODE));
-  const geminiCliModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.GEMINI_CLI));
+  });
 
   return (
     <div className="space-y-6 md:space-y-8">
       <div>
         <h2 className="text-xl md:text-2xl font-bold tracking-tight">Available Models</h2>
         <p className="text-sm md:text-base text-muted-foreground">
-          Browse all {allModels.length} available models across {activeProviders} provider{activeProviders !== 1 ? "s" : ""}
+          Browse all {allModels.length} available models across {availableProviders.length} provider{availableProviders.length !== 1 ? "s" : ""}
         </p>
       </div>
 
-      {/* iFlow Models */}
-      {iflowModelsWithStats.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">iFlow Models</h3>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {iflowModels.length}
-            </span>
-          </div>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {iflowModelsWithStats.map((model) => (
-              <ModelCard
-                key={model.id}
-                id={model.id}
-                category={model.category}
-                usage={model.usage}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Antigravity Models */}
-      {antigravityModelsWithStats.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Antigravity Models</h3>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {antigravityModels.length}
-            </span>
-          </div>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {antigravityModelsWithStats.map((model) => (
-              <ModelCard
-                key={model.id}
-                id={model.id}
-                category={model.category}
-                usage={model.usage}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Gemini CLI Models */}
-      {geminiCliModelsWithStats.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Gemini CLI Models</h3>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {geminiCliModels.length}
-            </span>
-          </div>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {geminiCliModelsWithStats.map((model) => (
-              <ModelCard
-                key={model.id}
-                id={model.id}
-                category={model.category}
-                usage={model.usage}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Qwen Code Models */}
-      {qwenCodeModelsWithStats.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Qwen Code Models</h3>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {qwenCodeModels.length}
-            </span>
-          </div>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {qwenCodeModelsWithStats.map((model) => (
-              <ModelCard
-                key={model.id}
-                id={model.id}
-                category={model.category}
-                usage={model.usage}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      <ModelsList models={modelsWithProviders} availableProviders={availableProviders} />
     </div>
   );
 }
