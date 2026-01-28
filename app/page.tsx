@@ -16,7 +16,7 @@ export default async function Home() {
           Opendum
         </h1>
         <p className="mt-4 text-muted-foreground">
-          Multi-account proxy for AI providers
+          Your accounts, one API.
         </p>
         <div className="mt-8">
           <form

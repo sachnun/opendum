@@ -1,4 +1,4 @@
-// iFlow Provider Implementation
+// Iflow Provider Implementation
 
 import type { ProviderAccount } from "@prisma/client";
 import { encrypt, decrypt } from "@/lib/encryption";
@@ -42,7 +42,7 @@ interface UserInfoResponse {
 }
 
 /**
- * Create Basic Auth header for iFlow OAuth
+ * Create Basic Auth header for Iflow OAuth
  */
 function createBasicAuth(): string {
   const authString = `${IFLOW_CLIENT_ID}:${IFLOW_CLIENT_SECRET}`;
@@ -170,7 +170,7 @@ function buildRequestPayload(
 
 export const iflowConfig: ProviderConfig = {
   name: "iflow",
-  displayName: "iFlow AI",
+  displayName: "Iflow AI",
   supportedModels: IFLOW_MODELS,
 };
 
@@ -274,7 +274,7 @@ export const iflowProvider: Provider = {
 
     // Check if token needs refresh
     if (isTokenExpired(account.expiresAt)) {
-      console.log(`Refreshing token for iFlow account ${account.id}`);
+      console.log(`Refreshing token for Iflow account ${account.id}`);
 
       try {
         // Refresh the token
@@ -293,10 +293,10 @@ export const iflowProvider: Provider = {
           },
         });
 
-        console.log(`Token refreshed successfully for iFlow account ${account.id}`);
+        console.log(`Token refreshed successfully for Iflow account ${account.id}`);
       } catch (error) {
         console.error(
-          `Failed to refresh token for iFlow account ${account.id}:`,
+          `Failed to refresh token for Iflow account ${account.id}:`,
           error
         );
         // If refresh fails but token not truly expired, try using existing key
@@ -336,7 +336,7 @@ export const iflowProvider: Provider = {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         Accept: stream ? "text/event-stream" : "application/json",
-        "User-Agent": "iFlow-Cli",
+        "User-Agent": "Iflow-Cli",
       },
       body: JSON.stringify(requestPayload),
     });
@@ -347,7 +347,7 @@ export const iflowProvider: Provider = {
 
 /**
  * Fetch user info to get API key
- * CRITICAL: iFlow uses api_key for API calls, not access_token
+ * CRITICAL: Iflow uses api_key for API calls, not access_token
  */
 async function fetchUserInfo(
   accessToken: string
@@ -367,7 +367,7 @@ async function fetchUserInfo(
   const result: UserInfoResponse = await response.json();
 
   if (!result.success) {
-    throw new Error("iFlow user info request not successful");
+    throw new Error("Iflow user info request not successful");
   }
 
   const apiKey = result.data.apiKey?.trim();

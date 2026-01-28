@@ -66,17 +66,17 @@ export default async function AccountsPage({
         </Alert>
       )}
 
-      {/* iFlow Section */}
+      {/* Iflow Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5" />
-          <h3 className="text-base md:text-lg font-semibold">iFlow Accounts</h3>
+          <h3 className="text-base md:text-lg font-semibold">Iflow Accounts</h3>
           <Badge variant="outline" className="text-xs">
             {iflowAccounts.length} connected
           </Badge>
         </div>
 
-        {/* iFlow Accounts List */}
+        {/* Iflow Accounts List */}
         {iflowAccounts.length > 0 ? (
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {iflowAccounts.map((account) => (
@@ -84,7 +84,7 @@ export default async function AccountsPage({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No iFlow accounts connected yet.</p>
+          <p className="text-sm text-muted-foreground">No Iflow accounts connected yet.</p>
         )}
       </div>
 

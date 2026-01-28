@@ -5,7 +5,7 @@ Guidelines for AI agents working on this Next.js 16 + TypeScript + Prisma codeba
 ## Project Overview
 
 Opendum is a Next.js application that provides an OpenAI-compatible API proxy for multiple AI providers. It features:
-- OAuth-based provider account management (iFlow, Antigravity)
+- OAuth-based provider account management (Iflow, Antigravity)
 - Round-robin load balancing across multiple provider accounts
 - Proxy API key generation and management
 - Usage analytics dashboard

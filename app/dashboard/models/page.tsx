@@ -6,7 +6,7 @@ import { ModelsList } from "./models-list";
 function getProviderLabel(provider: string): string {
   switch (provider) {
     case ProviderName.IFLOW:
-      return "iFlow";
+      return "Iflow";
     case ProviderName.ANTIGRAVITY:
       return "Antigravity";
     case ProviderName.QWEN_CODE:
@@ -37,7 +37,7 @@ export default async function ModelsPage() {
   // Build available providers list (only those with models)
   const availableProviders: { id: string; label: string }[] = [];
   if (iflowModels.length > 0) {
-    availableProviders.push({ id: ProviderName.IFLOW, label: "iFlow" });
+    availableProviders.push({ id: ProviderName.IFLOW, label: "Iflow" });
   }
   if (antigravityModels.length > 0) {
     availableProviders.push({ id: ProviderName.ANTIGRAVITY, label: "Antigravity" });

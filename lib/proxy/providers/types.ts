@@ -20,7 +20,7 @@ export interface OAuthResult {
   expiresAt: Date;
   email: string;
   // Provider-specific fields
-  apiKey?: string;     // iFlow only
+  apiKey?: string;     // Iflow only
   projectId?: string;  // Antigravity only
   tier?: string;       // Antigravity only: "free" | "paid"
 }
@@ -119,7 +119,7 @@ export interface Provider {
    * Get valid credentials for making API requests
    * Handles token refresh if needed
    * @param account Provider account from database
-   * @returns API key (iFlow) or access token (Antigravity)
+   * @returns API key (Iflow) or access token (Antigravity)
    */
   getValidCredentials(account: ProviderAccount): Promise<string>;
 

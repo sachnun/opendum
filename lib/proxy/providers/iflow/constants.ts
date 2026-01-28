@@ -1,4 +1,4 @@
-// iFlow OAuth and API Constants
+// Iflow OAuth and API Constants
 // Based on https://github.com/Mirrowel/LLM-API-Key-Proxy
 
 export const IFLOW_OAUTH_AUTHORIZE_URL = "https://iflow.cn/oauth";
@@ -11,10 +11,10 @@ export const IFLOW_CLIENT_ID = process.env.IFLOW_CLIENT_ID || "10009311001";
 export const IFLOW_CLIENT_SECRET =
   process.env.IFLOW_CLIENT_SECRET || "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW";
 
-// OAuth callback - iFlow requires this specific port
+// OAuth callback - Iflow requires this specific port
 export const IFLOW_REDIRECT_URI = "http://localhost:11451/oauth2callback";
 
-// Supported OpenAI-compatible parameters for iFlow API
+// Supported OpenAI-compatible parameters for Iflow API
 export const IFLOW_SUPPORTED_PARAMS = new Set([
   "model",
   "messages",
@@ -35,7 +35,7 @@ export const IFLOW_SUPPORTED_PARAMS = new Set([
   "reasoning",
 ]);
 
-// Available iFlow models
+// Available Iflow models
 export const IFLOW_MODELS = new Set([
   "glm-4.7",
   "glm-4.6",

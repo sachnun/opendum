@@ -103,7 +103,7 @@ export async function updateProviderAccount(
 }
 
 /**
- * Exchange iFlow OAuth callback URL for tokens and create/update account
+ * Exchange Iflow OAuth callback URL for tokens and create/update account
  */
 export async function exchangeIflowOAuthCode(
   callbackUrl: string
@@ -138,7 +138,7 @@ export async function exchangeIflowOAuthCode(
     // Check for error in URL
     const error = url.searchParams.get("error");
     if (error) {
-      return { success: false, error: `iFlow OAuth error: ${error}` };
+      return { success: false, error: `Iflow OAuth error: ${error}` };
     }
 
     // Exchange code for tokens using the provider
@@ -187,7 +187,7 @@ export async function exchangeIflowOAuthCode(
         data: {
           userId: session.user.id,
           provider: "iflow",
-          name: oauthResult.email ? `iFlow (${oauthResult.email})` : `iFlow Account ${accountCount + 1}`,
+          name: oauthResult.email ? `Iflow (${oauthResult.email})` : `Iflow Account ${accountCount + 1}`,
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
@@ -270,7 +270,7 @@ export const deleteIflowAccount = deleteProviderAccount;
 export const updateIflowAccount = updateProviderAccount;
 
 /**
- * Get iFlow OAuth authorization URL
+ * Get Iflow OAuth authorization URL
  */
 export async function getIflowAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
   const session = await auth();

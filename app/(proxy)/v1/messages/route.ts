@@ -631,7 +631,7 @@ function createAnthropicStreamTransformer(
               }
             }
 
-            // Handle finish_reason (iFlow doesn't send [DONE], uses finish_reason instead)
+            // Handle finish_reason (Iflow doesn't send [DONE], uses finish_reason instead)
             const finishReason = choices[0].finish_reason;
             if (finishReason) {
               // Close any open thinking block

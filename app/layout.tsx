@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Opendum",
-  description: "OpenAI-compatible API proxy for multiple AI providers",
+  description: "Your accounts, one API.",
 };
 
 export default function RootLayout({

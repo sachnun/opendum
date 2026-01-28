@@ -63,7 +63,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
 
-  // ===== iFlow Internal Models =====
+  // ===== Iflow Internal Models =====
   "iflow-rome-30ba3b": { providers: [ProviderName.IFLOW] },
 
   // ===== MiniMax Models =====

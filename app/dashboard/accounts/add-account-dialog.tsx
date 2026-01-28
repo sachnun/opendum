@@ -64,7 +64,7 @@ type ProviderFullConfig = ProviderConfig & (OAuthRedirectConfig | DeviceCodeConf
 
 const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   iflow: {
-    name: "iFlow",
+    name: "Iflow",
     icon: Zap,
     description: "Access OpenAI compatible API",
     flowType: "oauth_redirect",

@@ -67,7 +67,7 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// Provider Account - stores OAuth credentials for AI providers (iFlow, Antigravity)
+// Provider Account - stores OAuth credentials for AI providers (Iflow, Antigravity)
 model ProviderAccount {
   id       String @id @default(cuid())
   userId   String
@@ -80,7 +80,7 @@ model ProviderAccount {
   expiresAt    DateTime
 
   // Provider-specific fields
-  apiKey    String? @db.Text // iFlow only: API key from getUserInfo
+  apiKey    String? @db.Text // Iflow only: API key from getUserInfo
   projectId String?          // Antigravity only: GCP project ID
   tier      String?          // Antigravity only: "free" | "paid"
 
