@@ -4,14 +4,12 @@ import { getProvidersForModel } from "./models";
 import { isRateLimited, clearExpiredRateLimits } from "./rate-limit";
 import { getModelFamily } from "./providers/antigravity/converter";
 
-// Track last used index per user + model combination for round-robin
-const lastUsedIndex: Map<string, number> = new Map();
-
 /**
- * Get the next active provider account for a user and model using round-robin
+ * Get the next active provider account for a user and model using LRU (Least Recently Used)
+ * Selects the account that was used longest ago (or never used) for fair distribution
  * @param userId User ID
  * @param model Model name (used to filter accounts by provider)
- * @param provider Optional specific provider to use (if null, round-robin across all providers that support the model)
+ * @param provider Optional specific provider to use (if null, select across all providers that support the model)
  */
 export async function getNextAccount(
   userId: string,
@@ -19,48 +17,35 @@ export async function getNextAccount(
   provider: string | null = null
 ): Promise<ProviderAccount | null> {
   let targetProviders: string[];
-  
+
   if (provider !== null) {
     // Specific provider requested
     targetProviders = [provider];
   } else {
     // Auto mode - get all providers that support this model
     targetProviders = getProvidersForModel(model);
-    
+
     if (targetProviders.length === 0) {
       return null;
     }
   }
 
-  // Get all active accounts for the user that match the target provider(s)
-  const accounts = await prisma.providerAccount.findMany({
+  // Get the least recently used active account (nulls first = never used accounts get priority)
+  const selectedAccount = await prisma.providerAccount.findFirst({
     where: {
       userId,
       provider: { in: targetProviders },
       isActive: true,
     },
-    orderBy: {
-      createdAt: "asc",
-    },
+    orderBy: [
+      { lastUsedAt: { sort: "asc", nulls: "first" } },
+      { createdAt: "asc" }, // Tiebreaker: older accounts first
+    ],
   });
 
-  if (accounts.length === 0) {
+  if (!selectedAccount) {
     return null;
   }
-
-  // Get last used index for this user + model + provider combination
-  const key = provider !== null 
-    ? `${userId}:${provider}:${model}` 
-    : `${userId}:${model}`;
-  const lastIndex = lastUsedIndex.get(key) ?? -1;
-
-  // Calculate next index (round-robin)
-  const nextIndex = (lastIndex + 1) % accounts.length;
-
-  // Update last used index
-  lastUsedIndex.set(key, nextIndex);
-
-  const selectedAccount = accounts[nextIndex];
 
   // Update last used timestamp
   await prisma.providerAccount.update({
@@ -75,7 +60,7 @@ export async function getNextAccount(
 }
 
 /**
- * Get the next available (non-rate-limited) account for a user and model
+ * Get the next available (non-rate-limited) account for a user and model using LRU
  * Skips accounts that are rate-limited for the model's family
  * @param userId User ID
  * @param model Model name
@@ -99,16 +84,18 @@ export async function getNextAvailableAccount(
     }
   }
 
-  // Get all active accounts
+  // Get all active accounts ordered by LRU (nulls first = never used accounts get priority)
   const accounts = await prisma.providerAccount.findMany({
     where: {
       userId,
       provider: { in: targetProviders },
       isActive: true,
+      id: { notIn: excludeAccountIds.length > 0 ? excludeAccountIds : undefined },
     },
-    orderBy: {
-      createdAt: "asc",
-    },
+    orderBy: [
+      { lastUsedAt: { sort: "asc", nulls: "first" } },
+      { createdAt: "asc" }, // Tiebreaker: older accounts first
+    ],
   });
 
   if (accounts.length === 0) {
@@ -117,35 +104,19 @@ export async function getNextAvailableAccount(
 
   const family = getModelFamily(model);
 
-  // Filter out excluded and rate-limited accounts
-  const availableAccounts = accounts.filter((acc) => {
-    // Skip excluded accounts
-    if (excludeAccountIds.includes(acc.id)) {
-      return false;
-    }
-
-    // Clear expired rate limits and check if rate limited
+  // Find the first non-rate-limited account (already sorted by LRU)
+  let selectedAccount: ProviderAccount | null = null;
+  for (const acc of accounts) {
     clearExpiredRateLimits(acc.id);
-    if (isRateLimited(acc.id, family)) {
-      return false;
+    if (!isRateLimited(acc.id, family)) {
+      selectedAccount = acc;
+      break;
     }
-
-    return true;
-  });
-
-  if (availableAccounts.length === 0) {
-    return null;
   }
 
-  // Get last used index for round-robin among available accounts
-  const key = provider !== null
-    ? `${userId}:${provider}:${model}:available`
-    : `${userId}:${model}:available`;
-  const lastIndex = lastUsedIndex.get(key) ?? -1;
-  const nextIndex = (lastIndex + 1) % availableAccounts.length;
-  lastUsedIndex.set(key, nextIndex);
-
-  const selectedAccount = availableAccounts[nextIndex];
+  if (!selectedAccount) {
+    return null;
+  }
 
   // Update last used timestamp
   await prisma.providerAccount.update({
@@ -160,7 +131,7 @@ export async function getNextAvailableAccount(
 }
 
 /**
- * Get the next active account for a specific provider
+ * Get the next active account for a specific provider using LRU
  * @param userId User ID
  * @param provider Provider name
  */
@@ -168,32 +139,22 @@ export async function getNextAccountForProvider(
   userId: string,
   provider: string
 ): Promise<ProviderAccount | null> {
-  const accounts = await prisma.providerAccount.findMany({
+  // Get the least recently used active account for this provider
+  const selectedAccount = await prisma.providerAccount.findFirst({
     where: {
       userId,
       provider,
       isActive: true,
     },
-    orderBy: {
-      createdAt: "asc",
-    },
+    orderBy: [
+      { lastUsedAt: { sort: "asc", nulls: "first" } },
+      { createdAt: "asc" }, // Tiebreaker: older accounts first
+    ],
   });
 
-  if (accounts.length === 0) {
+  if (!selectedAccount) {
     return null;
   }
-
-  // Get last used index for this user + provider combination
-  const key = `${userId}:provider:${provider}`;
-  const lastIndex = lastUsedIndex.get(key) ?? -1;
-
-  // Calculate next index (round-robin)
-  const nextIndex = (lastIndex + 1) % accounts.length;
-
-  // Update last used index
-  lastUsedIndex.set(key, nextIndex);
-
-  const selectedAccount = accounts[nextIndex];
 
   // Update last used timestamp
   await prisma.providerAccount.update({
