@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, AlertCircle, Sparkles, Zap } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, Sparkles, Zap, Terminal } from "lucide-react";
 import { AccountActions } from "./account-actions";
 import { AddAccountDialog } from "./add-account-dialog";
 
@@ -27,6 +27,7 @@ export default async function AccountsPage({
   // Group accounts by provider
   const iflowAccounts = accounts.filter((a) => a.provider === "iflow");
   const antigravityAccounts = accounts.filter((a) => a.provider === "antigravity");
+  const qwenCodeAccounts = accounts.filter((a) => a.provider === "qwen_code");
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -46,7 +47,9 @@ export default async function AccountsPage({
           <AlertDescription>
             {params.success === "antigravity_added"
               ? "Antigravity account connected successfully!"
-              : "Account connected successfully!"}
+              : params.success === "qwen_code_added"
+                ? "Qwen Code account connected successfully!"
+                : "Account connected successfully!"}
           </AlertDescription>
         </Alert>
       )}
@@ -103,8 +106,42 @@ export default async function AccountsPage({
           <p className="text-sm text-muted-foreground">No Antigravity accounts connected yet.</p>
         )}
       </div>
+
+      {/* Qwen Code Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Terminal className="h-5 w-5 text-orange-500" />
+          <h3 className="text-base md:text-lg font-semibold">Qwen Code Accounts</h3>
+          <Badge variant="outline" className="text-xs">
+            {qwenCodeAccounts.length} connected
+          </Badge>
+        </div>
+
+        {/* Qwen Code Accounts List */}
+        {qwenCodeAccounts.length > 0 ? (
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {qwenCodeAccounts.map((account) => (
+              <AccountCard key={account.id} account={account} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No Qwen Code accounts connected yet.</p>
+        )}
+      </div>
     </div>
   );
+}
+
+function getProviderDisplay(provider: string): { name: string; color: string } {
+  switch (provider) {
+    case "antigravity":
+      return { name: "Antigravity", color: "purple" };
+    case "qwen_code":
+      return { name: "Qwen Code", color: "orange" };
+    case "iflow":
+    default:
+      return { name: "iFlow", color: "blue" };
+  }
 }
 
 function AccountCard({ 
@@ -124,7 +161,7 @@ function AccountCard({
   };
   showTier?: boolean;
 }) {
-  const providerColor = account.provider === "antigravity" ? "purple" : "blue";
+  const { name: providerName, color: providerColor } = getProviderDisplay(account.provider);
   
   return (
     <Card>
@@ -165,7 +202,7 @@ function AccountCard({
               variant="outline" 
               className={`text-${providerColor}-600 border-${providerColor}-300`}
             >
-              {account.provider === "antigravity" ? "Antigravity" : "iFlow"}
+              {providerName}
             </Badge>
           </div>
           <div className="flex justify-between">

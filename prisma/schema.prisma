@@ -71,7 +71,7 @@ model VerificationToken {
 model ProviderAccount {
   id       String @id @default(cuid())
   userId   String
-  provider String // "iflow" | "antigravity"
+  provider String // "iflow" | "antigravity" | "qwen_code"
   name     String // Display name: "Personal", "Work", etc.
 
   // Encrypted credentials (AES-256 encrypted)
