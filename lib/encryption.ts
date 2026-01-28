@@ -20,9 +20,29 @@ export function encrypt(text: string): string {
  * Decrypt an AES-256 encrypted string
  */
 export function decrypt(ciphertext: string): string {
+  if (!ciphertext) {
+    throw new Error("Cannot decrypt empty value");
+  }
+
+  // Check if data looks unencrypted (CryptoJS encrypted data starts with "U2FsdGVkX1")
+  if (!ciphertext.startsWith("U2FsdGVkX1")) {
+    throw new Error(
+      "Data appears to be unencrypted. Expected CryptoJS encrypted format (U2FsdGVkX1...)."
+    );
+  }
+
   const key = getEncryptionKey();
   const bytes = CryptoJS.AES.decrypt(ciphertext, key);
-  return bytes.toString(CryptoJS.enc.Utf8);
+  const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+
+  if (!decrypted) {
+    throw new Error(
+      "Decryption failed: invalid ciphertext or wrong encryption key. " +
+      "This may occur if NEXTAUTH_SECRET was changed after data was encrypted."
+    );
+  }
+
+  return decrypted;
 }
 
 /**
