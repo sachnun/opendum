@@ -23,6 +23,8 @@ function getProviderLabel(provider: string): string {
       return "Antigravity";
     case ProviderName.QWEN_CODE:
       return "Qwen Code";
+    case ProviderName.GEMINI_CLI:
+      return "Gemini CLI";
     default:
       return provider;
   }
@@ -39,10 +41,11 @@ export default async function ModelsPage() {
   const iflowModels = getModelsForProvider(ProviderName.IFLOW);
   const antigravityModels = getModelsForProvider(ProviderName.ANTIGRAVITY);
   const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
+  const geminiCliModels = getModelsForProvider(ProviderName.GEMINI_CLI);
   const allModels = Object.keys(MODEL_REGISTRY);
 
   // Count active providers
-  const activeProviders = [iflowModels, antigravityModels, qwenCodeModels].filter(m => m.length > 0).length;
+  const activeProviders = [iflowModels, antigravityModels, qwenCodeModels, geminiCliModels].filter(m => m.length > 0).length;
 
   const usageStats = await prisma.usageLog.groupBy({
     by: ["model"],
@@ -67,6 +70,7 @@ export default async function ModelsPage() {
   const iflowModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.IFLOW));
   const antigravityModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.ANTIGRAVITY));
   const qwenCodeModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.QWEN_CODE));
+  const geminiCliModelsWithStats = modelsWithStats.filter(m => m.providers.includes(ProviderName.GEMINI_CLI));
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -110,6 +114,28 @@ export default async function ModelsPage() {
           </div>
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {antigravityModelsWithStats.map((model) => (
+              <ModelCard
+                key={model.id}
+                id={model.id}
+                category={model.category}
+                usage={model.usage}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Gemini CLI Models */}
+      {geminiCliModelsWithStats.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold">Gemini CLI Models</h3>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {geminiCliModels.length}
+            </span>
+          </div>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {geminiCliModelsWithStats.map((model) => (
               <ModelCard
                 key={model.id}
                 id={model.id}
