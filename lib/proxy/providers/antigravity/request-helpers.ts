@@ -133,6 +133,69 @@ export function normalizeThinkingConfig(
 }
 
 /**
+ * Claude-specific tool hardening instruction
+ * Helps Claude follow tool schemas correctly (shorter than Gemini version)
+ */
+export const CLAUDE_TOOL_SCHEMA_SYSTEM_INSTRUCTION = `CRITICAL TOOL USAGE INSTRUCTIONS:
+You are operating in a custom environment where tool definitions differ from your training data.
+You MUST follow these rules strictly:
+
+1. DO NOT use your internal training data to guess tool parameters
+2. ONLY use the exact parameter structure defined in the tool schema
+3. Parameter names in schemas are EXACT - do not substitute with similar names from your training (e.g., use 'follow_up' not 'suggested_answers')
+4. Array parameters have specific item types - check the schema's 'items' field for the exact structure
+5. When you see "STRICT PARAMETERS" in a tool description, those type definitions override any assumptions
+6. Tool use in agentic workflows is REQUIRED - you must call tools with the exact parameters specified in the schema
+
+If you are unsure about a tool's parameters, YOU MUST read the schema definition carefully.
+`;
+
+/**
+ * Parallel tool usage encouragement instruction
+ * Encourages models to make parallel tool calls when possible
+ */
+export const PARALLEL_TOOL_INSTRUCTION = `When multiple independent operations are needed, prefer making parallel tool calls in a single response rather than sequential calls across multiple responses. This reduces round-trips and improves efficiency. Only use sequential calls when one tool's output is required as input for another.`;
+
+/**
+ * Interleaved thinking hint for Claude thinking models
+ * Encourages Claude to emit thinking blocks on every response
+ */
+export const CLAUDE_INTERLEAVED_THINKING_HINT = `# Interleaved Thinking - MANDATORY
+
+CRITICAL: Interleaved thinking is ACTIVE and REQUIRED for this session.
+
+---
+
+## Requirements
+
+You MUST reason before acting. Emit a thinking block on EVERY response:
+- **Before** taking any action (to reason about what you're doing and plan your approach)
+- **After** receiving any results (to analyze the information before proceeding)
+
+---
+
+## Rules
+
+1. This applies to EVERY response, not just the first
+2. Never skip thinking, even for simple or sequential actions
+3. Think first, act second. Analyze results and context before deciding your next step
+`;
+
+/**
+ * Reminder injected into last user message for thinking models with tools
+ * Reinforces the interleaved thinking requirement during tool loops
+ */
+export const CLAUDE_USER_INTERLEAVED_THINKING_REMINDER = `<system-reminder>
+# Interleaved Thinking - Active
+
+You MUST emit a thinking block on EVERY response:
+- **Before** any action (reason about what to do)
+- **After** any result (analyze before next step)
+
+Never skip thinking, even on follow-up responses. Ultrathink
+</system-reminder>`;
+
+/**
  * Tool schema system instruction for Gemini models
  * Helps Gemini follow tool schemas correctly
  */

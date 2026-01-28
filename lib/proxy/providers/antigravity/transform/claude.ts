@@ -5,8 +5,85 @@ import { cacheSignature, getCachedSignature } from "../cache";
 import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
+  CLAUDE_TOOL_SCHEMA_SYSTEM_INSTRUCTION,
+  PARALLEL_TOOL_INSTRUCTION,
+  CLAUDE_INTERLEAVED_THINKING_HINT,
+  CLAUDE_USER_INTERLEAVED_THINKING_REMINDER,
 } from "../request-helpers";
 import type { RequestPayload, TransformContext, TransformResult } from "./types";
+
+/**
+ * Check if payload has function tools
+ */
+function hasFunctionTools(payload: RequestPayload): boolean {
+  const tools = payload.tools as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(tools)) return false;
+  return tools.some((tool) => Array.isArray(tool.functionDeclarations));
+}
+
+/**
+ * Inject instruction into system instruction (inserts at position 0 of parts)
+ */
+function injectSystemInstruction(
+  payload: RequestPayload,
+  instructionText: string
+): void {
+  if (!instructionText) return;
+
+  const instructionPart = { text: instructionText };
+  const existing = payload.systemInstruction;
+
+  if (existing && typeof existing === "object") {
+    const asRecord = existing as Record<string, unknown>;
+    if (Array.isArray(asRecord.parts)) {
+      asRecord.parts = [instructionPart, ...(asRecord.parts as Array<unknown>)];
+    } else {
+      asRecord.parts = [instructionPart];
+    }
+  } else if (typeof existing === "string") {
+    payload.systemInstruction = {
+      role: "user",
+      parts: [instructionPart, { text: existing }],
+    };
+  } else {
+    payload.systemInstruction = {
+      role: "user",
+      parts: [instructionPart],
+    };
+  }
+}
+
+/**
+ * Inject interleaved thinking reminder into last real user message.
+ * Only injects if there's a user message with text (not just functionResponse).
+ */
+function injectInterleavedThinkingReminder(payload: RequestPayload): void {
+  const contents = payload.contents as
+    | Array<Record<string, unknown>>
+    | undefined;
+  if (!Array.isArray(contents)) return;
+
+  // Find last real user message (has text, not just functionResponse)
+  for (let i = contents.length - 1; i >= 0; i--) {
+    const content = contents[i];
+    if (content.role !== "user") continue;
+
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(parts)) continue;
+
+    const hasText = parts.some(
+      (p) => typeof p.text === "string" && p.text.trim().length > 0
+    );
+    const hasFunctionResponse = parts.some(
+      (p) => p.functionResponse !== undefined
+    );
+
+    if (hasText && !hasFunctionResponse) {
+      parts.push({ text: CLAUDE_USER_INTERLEAVED_THINKING_REMINDER });
+      return;
+    }
+  }
+}
 
 /**
  * Transforms a Gemini-format request payload for Claude proxy models.
@@ -142,6 +219,28 @@ export function transformClaudeRequest(
   }
 
   applyAntigravitySystemInstruction(requestPayload, context.model);
+
+  // Inject Claude-specific instructions when tools are present
+  // These are prepended (inserted at position 0), so inject in reverse order
+  // Final order: [tool hardening, parallel tool, interleaved thinking, Antigravity base, identity override, user prompt]
+  const hasTools = hasFunctionTools(requestPayload);
+  const isThinkingEnabled = isThinkingModel || normalizedThinking !== undefined;
+
+  if (hasTools) {
+    // 1. Claude tool hardening instruction (will end up after parallel tool)
+    injectSystemInstruction(requestPayload, CLAUDE_TOOL_SCHEMA_SYSTEM_INSTRUCTION);
+
+    // 2. Parallel tool instruction (will end up after interleaved thinking)
+    injectSystemInstruction(requestPayload, PARALLEL_TOOL_INSTRUCTION);
+
+    // 3. Interleaved thinking hint (if thinking is enabled) - will be at position 0
+    if (isThinkingEnabled) {
+      injectSystemInstruction(requestPayload, CLAUDE_INTERLEAVED_THINKING_HINT);
+
+      // Also inject reminder into last user message
+      injectInterleavedThinkingReminder(requestPayload);
+    }
+  }
 
   const cachedContentFromExtra =
     typeof requestPayload.extra_body === "object" && requestPayload.extra_body
