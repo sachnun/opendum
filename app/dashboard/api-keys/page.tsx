@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Key } from "lucide-react";
 import { CreateApiKeyButton } from "./create-api-key-button";
 import { ApiKeyActions } from "./api-key-actions";
+import { EditableApiKeyName } from "./editable-api-key-name";
 import { CodeBlock } from "@/components/ui/code-block";
 import { headers } from "next/headers";
 
@@ -74,7 +75,7 @@ export default async function ApiKeysPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Key className="h-5 w-5 text-muted-foreground" />
-                    <CardTitle className="text-lg">{apiKey.name ?? "Unnamed Key"}</CardTitle>
+                    <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
                   </div>
                   <Badge variant={status.variant}>
                     {status.label}
