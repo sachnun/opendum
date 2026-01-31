@@ -5,7 +5,7 @@
  * Based on empirical testing from LLM-API-Key-Proxy reference implementation.
  */
 
-import { ANTIGRAVITY_AUTH_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants";
+import { CODE_ASSIST_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants";
 
 // =============================================================================
 // QUOTA LIMITS (max requests per 100% quota)
@@ -220,7 +220,7 @@ export async function fetchQuotaFromApi(
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          ...ANTIGRAVITY_AUTH_HEADERS,
+          ...CODE_ASSIST_HEADERS,
         },
         body: JSON.stringify({ project: projectId }),
       });
