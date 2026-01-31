@@ -1,5 +1,6 @@
 // Cron job to proactively refresh OAuth tokens before they expire
-// Schedule: Every hour (configured in vercel.json)
+// Schedule: Daily at 00:00 UTC (configured in vercel.json)
+// Note: On-demand token refresh is handled by each provider, so this is just proactive refresh
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
