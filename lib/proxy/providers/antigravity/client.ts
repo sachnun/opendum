@@ -19,6 +19,9 @@ import {
   ANTIGRAVITY_MODELS,
   MODEL_ALIASES,
   ANTIGRAVITY_REFRESH_BUFFER_SECONDS,
+  LOAD_CODE_ASSIST_ENDPOINTS,
+  ONBOARD_USER_ENDPOINTS,
+  ANTIGRAVITY_AUTH_HEADERS,
 } from "./constants";
 import { generateRequestId } from "./request-helpers";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform";
@@ -447,70 +450,129 @@ async function transformAntigravityResponse(
 
 /**
  * Fetch account info from Antigravity API
+ * 
+ * Discovery flow:
+ * 1. Try loadCodeAssist with endpoint fallback (prod first for better resolution)
+ * 2. Extract projectId and detect tier from response
+ * 3. If no projectId and no currentTier, user needs onboarding
+ * 4. Fetch user email from Google userinfo
  */
 async function fetchAccountInfo(
   accessToken: string
 ): Promise<{ projectId: string; tier: string; email: string }> {
-  const url = `${CODE_ASSIST_ENDPOINT}/v1internal:loadCodeAssist`;
+  const errors: string[] = [];
+  
+  // Hoist tier to function scope so it accumulates across endpoint attempts
+  let detectedTier = "free";
+  let projectId = "";
+  let currentTier: Record<string, unknown> | null = null;
+  let allowedTiers: Array<Record<string, unknown>> = [];
 
-  // Use specific headers for auth/discovery calls
-  // User-Agent MUST be google-api-nodejs-client for proper tier detection
-  const authHeaders = {
-    "User-Agent": "google-api-nodejs-client/10.3.0",
-    "X-Goog-Api-Client": "gl-node/22.18.0",
-    "Client-Metadata": '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',
+  const requestMetadata = {
+    ideType: "IDE_UNSPECIFIED",
+    platform: "PLATFORM_UNSPECIFIED",
+    pluginType: "GEMINI",
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      ...authHeaders,
-    },
-    body: JSON.stringify({
-      metadata: {
-        ideType: "IDE_UNSPECIFIED",
-        platform: "PLATFORM_UNSPECIFIED",
-        pluginType: "GEMINI",
-      },
-    }),
-  });
+  // 1. Try loadCodeAssist with endpoint fallback (prod first for discovery)
+  for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
+    try {
+      console.log(`[antigravity] Trying loadCodeAssist at ${baseEndpoint}`);
+      
+      const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          ...ANTIGRAVITY_AUTH_HEADERS,
+        },
+        body: JSON.stringify({
+          metadata: requestMetadata,
+        }),
+      });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to fetch account info: ${response.status} ${error}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        errors.push(`loadCodeAssist at ${baseEndpoint}: ${response.status} ${errorText}`);
+        continue;
+      }
+
+      const data = (await response.json()) as Record<string, unknown>;
+      console.log(`[antigravity] loadCodeAssist response keys:`, Object.keys(data));
+
+      // Extract projectId (handle both string and object format)
+      projectId = extractProjectId(data);
+
+      // Store tier info for potential onboarding
+      currentTier = (data.currentTier as Record<string, unknown>) ?? null;
+      allowedTiers = (data.allowedTiers as Array<Record<string, unknown>>) ?? [];
+
+      // Detect tier from allowedTiers
+      if (Array.isArray(data.allowedTiers)) {
+        const defaultTier = (data.allowedTiers as Array<Record<string, unknown>>).find(
+          (t) => t.isDefault
+        );
+        if (defaultTier && typeof defaultTier.id === "string") {
+          const tierId = defaultTier.id;
+          // "legacy-tier" is the default free tier. Anything else is likely paid/upgraded.
+          if (tierId !== "legacy-tier" && !tierId.includes("free") && !tierId.includes("zero")) {
+            detectedTier = "paid";
+            console.log(`[antigravity] Detected paid tier from allowedTiers: ${tierId}`);
+          }
+        }
+      }
+
+      // Check paidTier field (e.g. Google One AI Pro) which overrides default project tier
+      const paidTier = data.paidTier as Record<string, unknown> | undefined;
+      if (paidTier && typeof paidTier.id === "string") {
+        const paidTierId = paidTier.id;
+        if (!paidTierId.includes("free") && !paidTierId.includes("zero")) {
+          detectedTier = "paid";
+          console.log(`[antigravity] Detected paid tier from paidTier field: ${paidTierId}`);
+        }
+      }
+
+      // If we found a projectId, we're done with discovery
+      if (projectId) {
+        console.log(`[antigravity] Found projectId: ${projectId}, tier: ${detectedTier}`);
+        break;
+      }
+
+      // No projectId found at this endpoint, try next
+      errors.push(`loadCodeAssist at ${baseEndpoint}: no projectId in response`);
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      errors.push(`loadCodeAssist at ${baseEndpoint}: ${errorMsg}`);
+    }
   }
 
-  const data = (await response.json()) as Record<string, unknown>;
-
-  // Extract project ID - can be string or object with id
-  let projectId = "";
-  const cloudProject = data.cloudaicompanionProject;
-  if (typeof cloudProject === "string" && cloudProject) {
-    projectId = cloudProject;
-  } else if (typeof cloudProject === "object" && cloudProject !== null) {
-    const projectObj = cloudProject as Record<string, unknown>;
-    projectId = (projectObj.id ?? "") as string;
+  // 2. If no projectId and no currentTier, user needs onboarding
+  if (!projectId && !currentTier) {
+    console.log("[antigravity] No projectId and no currentTier - attempting onboarding...");
+    
+    const onboardResult = await onboardUser(accessToken, allowedTiers, requestMetadata);
+    if (onboardResult) {
+      projectId = onboardResult.projectId;
+      if (onboardResult.tier) {
+        detectedTier = onboardResult.tier;
+      }
+      console.log(`[antigravity] Onboarding successful: projectId=${projectId}, tier=${detectedTier}`);
+    } else {
+      console.warn("[antigravity] Onboarding failed or no tier available");
+    }
   }
 
-  // Extract tier from currentTier - can be string or object with id
-  let tier = "free";
-  const currentTier = data.currentTier;
-  if (typeof currentTier === "string" && currentTier) {
-    tier = currentTier;
-  } else if (typeof currentTier === "object" && currentTier !== null) {
-    const tierObj = currentTier as Record<string, unknown>;
-    tier = (tierObj.id ?? tierObj.name ?? "free") as string;
-  }
-
-  // Also fetch user email from Google
+  // 3. Fetch user email from Google
   let email = "";
   try {
     const userInfoResponse = await fetch(
       "https://www.googleapis.com/oauth2/v2/userinfo",
       {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...ANTIGRAVITY_AUTH_HEADERS,
+        },
       }
     );
     if (userInfoResponse.ok) {
@@ -521,11 +583,150 @@ async function fetchAccountInfo(
     // Ignore email fetch errors
   }
 
+  // Log warnings if we had issues
+  if (errors.length && !projectId) {
+    console.warn("[antigravity] Failed to resolve account info:", errors.join("; "));
+  }
+
   return {
     projectId,
-    tier,
+    tier: detectedTier,
     email,
   };
+}
+
+/**
+ * Extract projectId from API response
+ * Handles both string and object formats:
+ * - String: "project-id-123"
+ * - Object: {"id": "project-id-123", ...}
+ */
+function extractProjectId(data: Record<string, unknown>): string {
+  const cloudProject = data.cloudaicompanionProject;
+  
+  if (typeof cloudProject === "string" && cloudProject) {
+    return cloudProject;
+  }
+  
+  if (typeof cloudProject === "object" && cloudProject !== null) {
+    const projectObj = cloudProject as Record<string, unknown>;
+    const id = projectObj.id;
+    if (typeof id === "string" && id) {
+      return id;
+    }
+  }
+  
+  return "";
+}
+
+/**
+ * Onboard new user to Antigravity
+ * 
+ * For new users who don't have a currentTier, we need to onboard them
+ * to get a projectId assigned by the server.
+ */
+async function onboardUser(
+  accessToken: string,
+  allowedTiers: Array<Record<string, unknown>>,
+  requestMetadata: Record<string, string>
+): Promise<{ projectId: string; tier: string } | null> {
+  // Find default tier for onboarding
+  let onboardTier = allowedTiers.find((t) => t.isDefault);
+  
+  // Fallback to legacy tier if no default
+  if (!onboardTier && allowedTiers.length > 0) {
+    onboardTier = allowedTiers.find((t) => t.id === "legacy-tier") ?? allowedTiers[0];
+  }
+
+  if (!onboardTier) {
+    console.warn("[antigravity] No onboarding tiers available");
+    return null;
+  }
+
+  const tierId = (onboardTier.id as string) ?? "free-tier";
+  const isFree = tierId === "free-tier" || tierId.includes("legacy");
+
+  console.log(`[antigravity] Onboarding with tier: ${tierId}, isFree: ${isFree}`);
+
+  // Build onboard request
+  // FREE tier: cloudaicompanionProject = null (server-managed)
+  // PAID tier: requires user-provided project ID
+  const onboardRequest = {
+    tierId,
+    cloudaicompanionProject: isFree ? null : undefined,
+    metadata: requestMetadata,
+  };
+
+  // Try onboarding with endpoint fallback (daily first)
+  for (const baseEndpoint of ONBOARD_USER_ENDPOINTS) {
+    try {
+      console.log(`[antigravity] Trying onboardUser at ${baseEndpoint}`);
+
+      const response = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          ...ANTIGRAVITY_AUTH_HEADERS,
+        },
+        body: JSON.stringify(onboardRequest),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`[antigravity] onboardUser returned ${response.status} at ${baseEndpoint}: ${errorText}`);
+        continue;
+      }
+
+      let lroData = (await response.json()) as Record<string, unknown>;
+      console.log(`[antigravity] Initial onboarding response: done=${lroData.done}`);
+
+      // Poll for onboarding completion (up to 60 seconds)
+      for (let i = 0; i < 30 && !lroData.done; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        
+        if ((i + 1) % 10 === 0) {
+          console.log(`[antigravity] Still waiting for onboarding completion... (${(i + 1) * 2}s elapsed)`);
+        }
+
+        const pollResponse = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            ...ANTIGRAVITY_AUTH_HEADERS,
+          },
+          body: JSON.stringify(onboardRequest),
+        });
+
+        if (pollResponse.ok) {
+          lroData = (await pollResponse.json()) as Record<string, unknown>;
+        }
+      }
+
+      if (!lroData.done) {
+        console.warn("[antigravity] Onboarding timed out after 60 seconds");
+        continue;
+      }
+
+      // Extract projectId from LRO response
+      const lroResponse = (lroData.response ?? lroData) as Record<string, unknown>;
+      const projectId = extractProjectId(lroResponse);
+
+      if (projectId) {
+        const tier = tierId.includes("free") || tierId.includes("legacy") ? "free" : "paid";
+        return { projectId, tier };
+      }
+
+      console.warn("[antigravity] Onboarding completed but no projectId in response");
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.log(`[antigravity] onboardUser failed at ${baseEndpoint}: ${errorMsg}`);
+    }
+  }
+
+  return null;
 }
 
 /**
