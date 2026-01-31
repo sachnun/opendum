@@ -20,7 +20,24 @@ export const ANTIGRAVITY_SCOPES: readonly string[] = [
 export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:11451/oauth2callback";
 
 // User Agent & API Client headers
-export const ANTIGRAVITY_USER_AGENT = "antigravity/1.11.5 windows/amd64";
+// Dynamically detect OS/arch for accurate User-Agent header
+function getAntigravityPlatform(): string {
+  const platformMap: Record<string, string> = {
+    darwin: "darwin",
+    linux: "linux",
+    win32: "windows",
+  };
+  const archMap: Record<string, string> = {
+    arm64: "arm64",
+    x64: "amd64",
+    ia32: "386",
+  };
+  const platform = platformMap[process.platform] ?? "linux";
+  const arch = archMap[process.arch] ?? "amd64";
+  return `${platform}/${arch}`;
+}
+
+export const ANTIGRAVITY_USER_AGENT = `antigravity/1.15.8 ${getAntigravityPlatform()}`;
 export const ANTIGRAVITY_API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1";
 export const ANTIGRAVITY_CLIENT_METADATA =
   '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
