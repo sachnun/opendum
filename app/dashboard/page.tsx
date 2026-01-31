@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, Key, Activity } from "lucide-react";
 import { AnalyticsCharts } from "./components/analytics-charts";
+import { QuotaMonitor } from "./components/quota-monitor";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -78,6 +79,9 @@ export default async function DashboardPage() {
 
       {/* Analytics Charts */}
       <AnalyticsCharts />
+
+      {/* Antigravity Quota Monitor */}
+      <QuotaMonitor />
     </div>
   );
 }
