@@ -25,55 +25,43 @@ function generateId(): string {
 }
 
 export function PlaygroundClient({ models }: PlaygroundClientProps) {
-  // Panels state - start with 3 panels for side-by-side comparison
   const [panels, setPanels] = React.useState<PanelState[]>([
     { id: generateId(), modelId: null },
     { id: generateId(), modelId: null },
     { id: generateId(), modelId: null },
   ]);
 
-  // Scenario selection
   const [selectedScenario, setSelectedScenario] = React.useState<Scenario | null>(null);
-
-  // Settings
   const [settings, setSettings] = React.useState<PlaygroundSettings>(DEFAULT_SETTINGS);
-
-  // Response state - keyed by panel id
   const [responses, setResponses] = React.useState<Record<string, ResponseData>>({});
   const [isAnyLoading, setIsAnyLoading] = React.useState(false);
 
-  // Update panel's model
   const updatePanelModel = (panelId: string, modelId: string) => {
     setPanels((prev) =>
       prev.map((p) => (p.id === panelId ? { ...p, modelId } : p))
     );
   };
 
-  // Handle scenario selection - auto-enable reasoning and immediately run
   const handleScenarioSelect = async (scenario: Scenario) => {
     setSelectedScenario(scenario);
 
-    // Auto-enable reasoning for reasoning scenarios
     let currentSettings = settings;
     if (scenario.isReasoning && settings.reasoningEffort === "none") {
       currentSettings = { ...settings, reasoningEffort: "medium" };
       setSettings(currentSettings);
     }
 
-    // Immediately run the test with current panels
     const panelsWithModels = panels.filter((p) => p.modelId);
     if (panelsWithModels.length === 0) return;
 
     setIsAnyLoading(true);
 
-    // Clear previous responses
     const clearedResponses: Record<string, ResponseData> = {};
     panelsWithModels.forEach((panel) => {
       clearedResponses[panel.id] = { content: "", isLoading: true };
     });
     setResponses(clearedResponses);
 
-    // Start fetching from all panels in parallel
     const promises = panelsWithModels.map((panel) =>
       fetchFromModel(panel.id, panel.modelId!, scenario.prompt, currentSettings)
     );
@@ -82,22 +70,18 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
     setIsAnyLoading(false);
   };
 
-  // Fetch response from a single model (non-streaming)
-  // modelId format: "provider/model" (e.g. "iflow/qwen3-coder-plus")
   const fetchFromModel = async (
     panelId: string,
     modelId: string,
     prompt: string,
     currentSettings: PlaygroundSettings = settings
   ) => {
-    // Initialize response state
     setResponses((prev) => ({
       ...prev,
       [panelId]: { content: "", isLoading: true },
     }));
 
     try {
-      // modelId is already in "provider/model" format, send directly
       const requestBody: Record<string, unknown> = {
         model: modelId,
         messages: [{ role: "user", content: prompt }],
@@ -109,7 +93,6 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
         frequency_penalty: currentSettings.frequencyPenalty,
       };
 
-      // Add reasoning_effort only if not "none"
       if (currentSettings.reasoningEffort !== "none") {
         requestBody.reasoning_effort = currentSettings.reasoningEffort;
       }
@@ -128,7 +111,6 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || "";
 
-      // Set response
       setResponses((prev) => ({
         ...prev,
         [panelId]: { content, isLoading: false },

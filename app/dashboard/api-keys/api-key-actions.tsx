@@ -52,7 +52,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
 
   const handleReveal = async () => {
     if (isRevealed) {
-      // Hide the key
       setIsRevealed(false);
       setRevealedKey(null);
       return;
@@ -77,7 +76,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
 
   const handleCopy = async () => {
     if (!revealedKey) {
-      // If key is not revealed, reveal it first
       setIsLoading(true);
       try {
         const result = await revealApiKey(apiKey.id);
@@ -126,7 +124,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
     }
   };
 
-  // Mask the key preview for display
   const displayKey = isRevealed && revealedKey 
     ? revealedKey 
     : apiKey.keyPreview.substring(0, 8) + "••••••••";

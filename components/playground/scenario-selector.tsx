@@ -28,7 +28,6 @@ export interface Scenario {
 }
 
 export const SCENARIOS: Scenario[] = [
-  // General scenarios
   {
     id: "explain",
     name: "Explain",
@@ -78,7 +77,6 @@ export const SCENARIOS: Scenario[] = [
     prompt: "Generate 5 creative startup ideas in the AI/ML space for 2025. For each idea, include: name, one-line description, target market, and unique value proposition.",
     isReasoning: false,
   },
-  // Reasoning scenarios
   {
     id: "reasoning",
     name: "Reasoning",

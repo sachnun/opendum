@@ -49,7 +49,6 @@ interface ChatPanelProps {
   disabled?: boolean;
 }
 
-// Family order by popularity
 const FAMILY_ORDER = [
   "Qwen",
   "DeepSeek",
@@ -62,7 +61,6 @@ const FAMILY_ORDER = [
   "Other",
 ];
 
-// Get model family from model name
 function getModelFamily(modelName: string): string {
   if (modelName.startsWith("qwen")) return "Qwen";
   if (modelName.startsWith("deepseek-")) return "DeepSeek";
@@ -75,7 +73,6 @@ function getModelFamily(modelName: string): string {
   return "Other";
 }
 
-// Group models by family
 function groupModelsByFamily(models: ModelOption[]) {
   const groups: Record<string, ModelOption[]> = {};
 
@@ -90,14 +87,12 @@ function groupModelsByFamily(models: ModelOption[]) {
   return groups;
 }
 
-// Get sorted families based on popularity order
 function getSortedFamilies(groups: Record<string, ModelOption[]>): string[] {
   return Object.keys(groups).sort(
     (a, b) => FAMILY_ORDER.indexOf(a) - FAMILY_ORDER.indexOf(b)
   );
 }
 
-// Format provider name for display
 function formatProviderName(provider: string): string {
   const names: Record<string, string> = {
     iflow: "Iflow",
@@ -125,7 +120,6 @@ export function ChatPanel({
   const selectedModelData = models.find((m) => m.id === selectedModel);
   const { content = "", isLoading = false, error } = response || {};
 
-  // Auto-scroll to bottom when content changes during streaming
   React.useEffect(() => {
     if (isLoading && scrollRef.current) {
       const viewport = scrollRef.current.querySelector("[data-slot='scroll-area-viewport']");

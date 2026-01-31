@@ -1,6 +1,3 @@
-// Rate limit tracking for provider accounts
-// Tracks rate limits per account + model family (in-memory)
-
 import type { ModelFamily } from "./providers/antigravity/transform/types";
 
 interface RateLimitEntry {

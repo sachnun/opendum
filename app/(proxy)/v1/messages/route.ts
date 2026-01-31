@@ -9,7 +9,6 @@ import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Type definitions
 interface ToolCall {
   id: string;
   name: string;
@@ -60,7 +59,6 @@ interface AnthropicRequestBody {
     type: string;
     name?: string;
   };
-  // Anthropic thinking parameter for extended thinking
   thinking?: {
     type: "enabled" | "disabled";
     budget_tokens?: number;
@@ -135,11 +133,8 @@ interface AnthropicResponse {
 function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload & { _includeReasoning?: boolean } {
   const { model, messages, system, max_tokens, stream, tools, tool_choice, thinking, ...params } = body;
 
-  // Determine if thinking/reasoning was explicitly requested
   const thinkingRequested = thinking?.type === "enabled";
 
-  // Pre-process: collect all tool_result IDs to filter orphan tool_use
-  // This prevents Claude API error: "tool_use ids were found without tool_result blocks"
   const toolResultIds = new Set<string>();
   for (const msg of messages || []) {
     if (Array.isArray(msg.content)) {
@@ -151,10 +146,8 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     }
   }
 
-  // Build OpenAI-style messages
   const openaiMessages: OpenAIMessage[] = [];
 
-  // Add system message if present
   if (system) {
     if (typeof system === "string") {
       openaiMessages.push({ role: "system", content: system });
@@ -171,7 +164,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     }
   }
 
-  // Transform messages
   for (const msg of messages || []) {
     const role = msg.role;
 
@@ -179,7 +171,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     if (typeof msg.content === "string") {
       openaiMessages.push({ role, content: msg.content });
     } else if (Array.isArray(msg.content)) {
-      // Process content blocks
       const toolCalls: OpenAIMessage["tool_calls"] = [];
       let textContent = "";
 
@@ -187,11 +178,9 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
         if (block.type === "text") {
           textContent += block.text || "";
         } else if (block.type === "tool_use") {
-          // Skip tool_use without matching tool_result (prevents Claude API error)
           if (block.id && !toolResultIds.has(block.id)) {
             continue;
           }
-          // Anthropic tool_use -> OpenAI tool_calls (for assistant messages)
           toolCalls.push({
             id: block.id || "",
             type: "function",
@@ -203,7 +192,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
             },
           });
         } else if (block.type === "tool_result") {
-          // Tool results become separate messages in OpenAI format
           const toolContent = typeof block.content === "string"
             ? block.content
             : Array.isArray(block.content)
@@ -218,16 +206,13 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
             tool_call_id: block.tool_use_id || "",
             content: toolContent,
           });
-          continue; // Don't add to current message
+          continue;
         } else if (block.type === "thinking" || block.type === "redacted_thinking") {
-          // Skip thinking blocks - they are for context only
           continue;
         }
       }
 
-      // Build the message
       if (role === "assistant" && toolCalls.length > 0) {
-        // Assistant message with tool calls
         openaiMessages.push({
           role: "assistant",
           content: textContent || null,
@@ -239,7 +224,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     }
   }
 
-  // Build OpenAI payload
   const openaiPayload: OpenAIPayload = {
     model,
     messages: openaiMessages,
@@ -248,7 +232,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     ...params,
   };
 
-  // Convert Anthropic tools to OpenAI format
   if (tools && tools.length > 0) {
     openaiPayload.tools = tools.map((tool) => ({
       type: "function",
@@ -260,7 +243,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     }));
   }
 
-  // Convert tool_choice
   if (tool_choice) {
     const choiceType = tool_choice.type;
     if (choiceType === "auto") {
@@ -277,13 +259,11 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     }
   }
 
-  // Handle Anthropic thinking parameter - convert to OpenAI format
   if (thinkingRequested) {
     (openaiPayload as OpenAIPayload & { thinking_budget?: number }).thinking_budget = 
-      thinking?.budget_tokens || 10000; // Default to medium budget
+      thinking?.budget_tokens || 10000;
   }
 
-  // Return with internal flag for conditional thinking output
   return {
     ...openaiPayload,
     _includeReasoning: thinkingRequested,
@@ -306,10 +286,8 @@ function transformOpenAIToAnthropic(
   const messageData = message?.message;
   const usage = openaiResponse.usage;
 
-  // Build content blocks
   const contentBlocks: AnthropicContentBlockOutput[] = [];
 
-  // 1. Add thinking block if reasoning_content is present AND thinking was requested
   const reasoningContent = messageData?.reasoning_content;
   if (reasoningContent && includeThinking) {
     contentBlocks.push({
@@ -318,7 +296,6 @@ function transformOpenAIToAnthropic(
     });
   }
 
-  // 2. Add text block if content is present
   const textContent = messageData?.content;
   if (textContent) {
     contentBlocks.push({
@@ -327,7 +304,6 @@ function transformOpenAIToAnthropic(
     });
   }
 
-  // 3. Add tool_use blocks if tool_calls are present
   const toolCalls = messageData?.tool_calls || [];
   for (const tc of toolCalls) {
     let inputData: Record<string, unknown> = {};
@@ -345,7 +321,6 @@ function transformOpenAIToAnthropic(
     });
   }
 
-  // If no content blocks, add empty text block
   if (contentBlocks.length === 0) {
     contentBlocks.push({
       type: "text",
@@ -353,7 +328,6 @@ function transformOpenAIToAnthropic(
     });
   }
 
-  // Map finish_reason to stop_reason
   const finishReason = choice?.finish_reason;
   const stopReasonMap: Record<string, string> = {
     stop: "end_turn",
@@ -393,7 +367,6 @@ function createAnthropicStreamTransformer(
 ) {
   const messageId = `msg_${Date.now()}`;
   
-  // State tracking
   let buffer = "";
   let thinkingBlockStarted = false;
   let contentBlockStarted = false;
@@ -401,14 +374,12 @@ function createAnthropicStreamTransformer(
   const toolCallsByIndex: Record<number, ToolCall> = {};
   const toolBlockIndices: Record<number, number> = {};
   
-  // Usage tracking
   let inputTokens = 0;
   let outputTokens = 0;
   let usageReported = false;
 
   const encoder = new TextEncoder();
   
-  // Helper to report usage only once
   const reportUsage = () => {
     if (!usageReported && onComplete) {
       usageReported = true;
@@ -418,7 +389,6 @@ function createAnthropicStreamTransformer(
 
   return new TransformStream({
     start(controller) {
-      // Send message_start event
       const startEvent = {
         type: "message_start",
         message: {
@@ -439,7 +409,6 @@ function createAnthropicStreamTransformer(
       const text = new TextDecoder().decode(chunk);
       buffer += text;
 
-      // Process complete SSE events (split by double newline)
       const events = buffer.split("\n\n");
       buffer = events.pop() || "";
 
@@ -502,7 +471,6 @@ function createAnthropicStreamTransformer(
           try {
             const parsed = JSON.parse(data);
 
-            // Extract usage if present
             if (parsed.usage) {
               inputTokens = parsed.usage.prompt_tokens || inputTokens;
               outputTokens = parsed.usage.completion_tokens || outputTokens;
@@ -513,11 +481,9 @@ function createAnthropicStreamTransformer(
 
             const delta = choices[0].delta || {};
 
-            // Handle reasoning/thinking content - only include if thinking was requested
             const reasoningContent = delta.reasoning_content;
             if (reasoningContent && includeThinking) {
               if (!thinkingBlockStarted) {
-                // Start a thinking content block
                 const blockStart = {
                   type: "content_block_start",
                   index: currentBlockIndex,
@@ -529,7 +495,6 @@ function createAnthropicStreamTransformer(
                 thinkingBlockStarted = true;
               }
 
-              // Send thinking delta
               const blockDelta = {
                 type: "content_block_delta",
                 index: currentBlockIndex,
@@ -537,13 +502,11 @@ function createAnthropicStreamTransformer(
               };
               controller.enqueue(encoder.encode(
                 `event: content_block_delta\ndata: ${JSON.stringify(blockDelta)}\n\n`
-              ));
+              )              );
             }
 
-            // Handle text content (skip whitespace-only if thinking hasn't started yet)
             const content = delta.content;
             if (content && (content.trim() || contentBlockStarted)) {
-              // If we were in a thinking block, close it first
               if (thinkingBlockStarted && !contentBlockStarted) {
                 controller.enqueue(encoder.encode(
                   `event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: currentBlockIndex })}\n\n`
@@ -553,7 +516,6 @@ function createAnthropicStreamTransformer(
               }
 
               if (!contentBlockStarted) {
-                // Start a text content block
                 const blockStart = {
                   type: "content_block_start",
                   index: currentBlockIndex,
@@ -565,7 +527,6 @@ function createAnthropicStreamTransformer(
                 contentBlockStarted = true;
               }
 
-              // Send content delta
               const blockDelta = {
                 type: "content_block_delta",
                 index: currentBlockIndex,
@@ -573,16 +534,14 @@ function createAnthropicStreamTransformer(
               };
               controller.enqueue(encoder.encode(
                 `event: content_block_delta\ndata: ${JSON.stringify(blockDelta)}\n\n`
-              ));
+              )              );
             }
 
-            // Handle tool calls
             const toolCalls = delta.tool_calls || [];
             for (const tc of toolCalls) {
               const tcIndex = tc.index ?? 0;
 
               if (!(tcIndex in toolCallsByIndex)) {
-                // Close previous thinking block if open
                 if (thinkingBlockStarted) {
                   controller.enqueue(encoder.encode(
                     `event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: currentBlockIndex })}\n\n`
@@ -591,7 +550,6 @@ function createAnthropicStreamTransformer(
                   thinkingBlockStarted = false;
                 }
 
-                // Close previous text block if open
                 if (contentBlockStarted) {
                   controller.enqueue(encoder.encode(
                     `event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: currentBlockIndex })}\n\n`
@@ -600,16 +558,13 @@ function createAnthropicStreamTransformer(
                   contentBlockStarted = false;
                 }
 
-                // Initialize new tool call
                 toolCallsByIndex[tcIndex] = {
                   id: tc.id || `toolu_${Date.now()}_${tcIndex}`,
                   name: tc.function?.name || "",
                   arguments: "",
                 };
-                // Track which block index this tool call uses
                 toolBlockIndices[tcIndex] = currentBlockIndex;
 
-                // Start new tool use block
                 const blockStart = {
                   type: "content_block_start",
                   index: currentBlockIndex,
@@ -623,11 +578,9 @@ function createAnthropicStreamTransformer(
                 controller.enqueue(encoder.encode(
                   `event: content_block_start\ndata: ${JSON.stringify(blockStart)}\n\n`
                 ));
-                // Increment for the next block
                 currentBlockIndex++;
               }
 
-              // Accumulate function data
               const func = tc.function || {};
               if (func.name) {
                 toolCallsByIndex[tcIndex].name = func.name;
@@ -635,7 +588,6 @@ function createAnthropicStreamTransformer(
               if (func.arguments) {
                 toolCallsByIndex[tcIndex].arguments += func.arguments;
 
-                // Send partial JSON delta
                 const blockDelta = {
                   type: "content_block_delta",
                   index: toolBlockIndices[tcIndex],
@@ -650,10 +602,8 @@ function createAnthropicStreamTransformer(
               }
             }
 
-            // Handle finish_reason (Iflow doesn't send [DONE], uses finish_reason instead)
             const finishReason = choices[0].finish_reason;
             if (finishReason) {
-              // Close any open thinking block
               if (thinkingBlockStarted) {
                 controller.enqueue(encoder.encode(
                   `event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: currentBlockIndex })}\n\n`
@@ -687,7 +637,6 @@ function createAnthropicStreamTransformer(
                 stopReason = "max_tokens";
               }
 
-              // Send message_delta with final info (include input_tokens from usage)
               const messageDelta = {
                 type: "message_delta",
                 delta: { stop_reason: stopReason, stop_sequence: null },
@@ -697,12 +646,10 @@ function createAnthropicStreamTransformer(
                 `event: message_delta\ndata: ${JSON.stringify(messageDelta)}\n\n`
               ));
 
-              // Send message_stop
               controller.enqueue(encoder.encode(
                 `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`
               ));
               
-              // Report usage to callback
               reportUsage();
             }
 
@@ -715,11 +662,8 @@ function createAnthropicStreamTransformer(
     },
 
     flush(controller) {
-      // Process any remaining buffer
       if (buffer.trim()) {
-        // Check if there's a final [DONE] in the buffer
         if (buffer.includes("[DONE]")) {
-          // Close any open blocks
           if (thinkingBlockStarted) {
             controller.enqueue(encoder.encode(
               `event: content_block_stop\ndata: ${JSON.stringify({ type: "content_block_stop", index: currentBlockIndex })}\n\n`
@@ -730,7 +674,6 @@ function createAnthropicStreamTransformer(
             ));
           }
 
-          // Close tool blocks
           for (const tcIndex of Object.keys(toolBlockIndices).map(Number).sort((a, b) => a - b)) {
             const blockIdx = toolBlockIndices[tcIndex];
             controller.enqueue(encoder.encode(
@@ -752,12 +695,10 @@ function createAnthropicStreamTransformer(
             `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`
           ));
           
-          // Report usage to callback
           reportUsage();
         }
       }
       
-      // Always report usage at the end of flush (fallback)
       reportUsage();
     },
   });
@@ -766,7 +707,6 @@ function createAnthropicStreamTransformer(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
-  // Validate API key
   const authHeader = request.headers.get("authorization") || request.headers.get("x-api-key");
   const authResult = await validateApiKey(authHeader);
 
@@ -783,7 +723,6 @@ export async function POST(request: NextRequest) {
   const { userId, apiKeyId } = authResult;
 
   try {
-    // Parse request body
     let body;
     try {
       body = await request.json();
@@ -808,7 +747,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate model - supports both "model" and "provider/model" formats
     const modelValidation = validateModel(modelParam);
     if (!modelValidation.valid) {
       const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -827,9 +765,7 @@ export async function POST(request: NextRequest) {
     const MAX_ACCOUNT_RETRIES = 5;
     const triedAccountIds: string[] = [];
 
-    // Retry loop for rate limit rotation
     for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
-      // Get next available account (excluding already tried)
       const account = await getNextAvailableAccount(
         userId!,
         model,
@@ -838,7 +774,6 @@ export async function POST(request: NextRequest) {
       );
 
       if (!account) {
-        // No more accounts available
         const isFirstAttempt = triedAccountIds.length === 0;
         
         if (isFirstAttempt) {
@@ -854,7 +789,6 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // All accounts rate limited - calculate minimum wait time
         const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
         return NextResponse.json(
           {
@@ -872,22 +806,16 @@ export async function POST(request: NextRequest) {
 
       triedAccountIds.push(account.id);
 
-      // Get the provider implementation
       const providerImpl = await getProvider(account.provider as ProviderNameType);
-
-      // Get valid credentials (handles token refresh if needed)
       const credentials = await providerImpl.getValidCredentials(account);
 
-      // Transform Anthropic format to OpenAI format
       const openaiPayload = transformAnthropicToOpenAI(body);
 
       // Override model with validated model (without provider prefix)
       openaiPayload.model = model;
 
-      // Extract includeThinking flag for response filtering
       const includeThinking = openaiPayload._includeReasoning ?? false;
 
-      // Make request to provider's API
       const providerResponse = await providerImpl.makeRequest(
         credentials,
         account,
@@ -895,9 +823,7 @@ export async function POST(request: NextRequest) {
         stream
       );
 
-      // Handle rate limit (429) - try next account
       if (providerResponse.status === 429) {
-        // Clone to read body while keeping original for potential return
         const clonedResponse = providerResponse.clone();
         try {
           const errorBody = await clonedResponse.json();
@@ -912,7 +838,6 @@ export async function POST(request: NextRequest) {
               rateLimitInfo.message
             );
           } else {
-            // Default to 1 hour if can't parse
             markRateLimited(account.id, family, 60 * 60 * 1000);
           }
 
@@ -920,7 +845,6 @@ export async function POST(request: NextRequest) {
             `[rate-limit] Account ${account.id} (${account.email}) hit rate limit for ${family}, trying next account...`
           );
 
-          // Log the failed attempt
           await logUsage({
             userId: userId!,
             providerAccountId: account.id,
@@ -932,21 +856,17 @@ export async function POST(request: NextRequest) {
             duration: Date.now() - startTime,
           });
 
-          // Continue to try next account
           continue;
         } catch {
-          // If we can't parse the error, still mark as rate limited and continue
           markRateLimited(account.id, family, 60 * 60 * 1000);
           continue;
         }
       }
 
-      // Handle other errors from provider (not rate limit)
       if (!providerResponse.ok) {
         const errorText = await providerResponse.text();
         console.error(`${account.provider} error:`, providerResponse.status, errorText);
 
-        // Log failed request with 0 tokens
         await logUsage({
           userId: userId!,
           providerAccountId: account.id,
@@ -970,11 +890,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Success! Handle the response
-      // Streaming response
       if (stream && providerResponse.body) {
-        // Transform OpenAI stream to Anthropic stream with usage callback
-        // Pass includeThinking to control whether thinking blocks are emitted
         const transformer = createAnthropicStreamTransformer(model, (usage) => {
           logUsage({
             userId: userId!,
@@ -1000,11 +916,9 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Non-streaming response - transform OpenAI to Anthropic format
       const openaiResponse = await providerResponse.json();
       const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model, includeThinking);
 
-      // Log with actual token usage from response
       logUsage({
         userId: userId!,
         providerAccountId: account.id,
@@ -1020,7 +934,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(anthropicResponse);
     }
 
-    // All retries exhausted
     const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
     return NextResponse.json(
       {

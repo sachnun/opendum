@@ -22,14 +22,11 @@ function createUsageTrackingStream(
 
   return new TransformStream({
     transform(chunk, controller) {
-      // Pass through the chunk unchanged
       controller.enqueue(chunk);
 
-      // Try to extract usage from the chunk
       const text = new TextDecoder().decode(chunk);
       buffer += text;
 
-      // Process complete SSE events
       const events = buffer.split("\n\n");
       buffer = events.pop() || "";
 
@@ -43,7 +40,6 @@ function createUsageTrackingStream(
 
           try {
             const parsed = JSON.parse(data);
-            // Extract usage if present (sent in the final chunk)
             if (parsed.usage) {
               inputTokens = parsed.usage.prompt_tokens || inputTokens;
               outputTokens = parsed.usage.completion_tokens || outputTokens;
@@ -56,7 +52,6 @@ function createUsageTrackingStream(
     },
 
     flush() {
-      // Process any remaining buffer
       if (buffer.trim()) {
         const lines = buffer.split("\n");
         for (const line of lines) {
@@ -77,7 +72,6 @@ function createUsageTrackingStream(
         }
       }
 
-      // Call onComplete with the tracked usage
       onComplete({ inputTokens, outputTokens });
     },
   });
@@ -86,7 +80,6 @@ function createUsageTrackingStream(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
-  // Validate API key
   const authHeader = request.headers.get("authorization");
   const authResult = await validateApiKey(authHeader);
 
@@ -100,7 +93,6 @@ export async function POST(request: NextRequest) {
   const { userId, apiKeyId } = authResult;
 
   try {
-    // Parse request body
     let body;
     try {
       body = await request.json();
@@ -112,8 +104,6 @@ export async function POST(request: NextRequest) {
     }
     const { model: modelParam, messages, stream = true, ...params } = body;
 
-    // Determine if reasoning was explicitly requested by user
-    // This controls whether reasoning_content is included in the response
     const reasoningRequested = !!(
       params.reasoning || 
       params.reasoning_effort || 
@@ -128,7 +118,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate model - supports both "model" and "provider/model" formats
     const modelValidation = validateModel(modelParam);
     if (!modelValidation.valid) {
       return NextResponse.json(
@@ -156,9 +145,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Retry loop for rate limit rotation
     for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
-      // Get next available account (excluding already tried)
       const account = await getNextAvailableAccount(
         userId!,
         model,
@@ -167,7 +154,6 @@ export async function POST(request: NextRequest) {
       );
 
       if (!account) {
-        // No more accounts available
         const isFirstAttempt = triedAccountIds.length === 0;
         
         if (isFirstAttempt) {
@@ -182,7 +168,6 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // All accounts rate limited - calculate minimum wait time
         const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
         return NextResponse.json(
           {
@@ -199,14 +184,9 @@ export async function POST(request: NextRequest) {
 
       triedAccountIds.push(account.id);
 
-      // Get the provider implementation
       const providerImpl = await getProvider(account.provider as ProviderNameType);
-
-      // Get valid credentials (handles token refresh if needed)
       const credentials = await providerImpl.getValidCredentials(account);
 
-      // Make request to provider's API
-      // Pass _includeReasoning flag to control reasoning_content visibility in response
       const providerResponse = await providerImpl.makeRequest(
         credentials,
         account,
@@ -214,9 +194,7 @@ export async function POST(request: NextRequest) {
         stream
       );
 
-      // Handle rate limit (429) - try next account
       if (providerResponse.status === 429) {
-        // Clone to read body while keeping original for potential return
         const clonedResponse = providerResponse.clone();
         try {
           const errorBody = await clonedResponse.json();
@@ -231,7 +209,6 @@ export async function POST(request: NextRequest) {
               rateLimitInfo.message
             );
           } else {
-            // Default to 1 hour if can't parse
             markRateLimited(account.id, family, 60 * 60 * 1000);
           }
 
@@ -239,7 +216,6 @@ export async function POST(request: NextRequest) {
             `[rate-limit] Account ${account.id} (${account.email}) hit rate limit for ${family}, trying next account...`
           );
 
-          // Log the failed attempt
           await logUsage({
             userId: userId!,
             providerAccountId: account.id,
@@ -251,21 +227,17 @@ export async function POST(request: NextRequest) {
             duration: Date.now() - startTime,
           });
 
-          // Continue to try next account
           continue;
         } catch {
-          // If we can't parse the error, still mark as rate limited and continue
           markRateLimited(account.id, family, 60 * 60 * 1000);
           continue;
         }
       }
 
-      // Handle other errors from provider (not rate limit)
       if (!providerResponse.ok) {
         const errorText = await providerResponse.text();
         console.error(`${account.provider} error:`, providerResponse.status, errorText);
 
-        // Log failed request with 0 tokens
         await logUsage({
           userId: userId!,
           providerAccountId: account.id,
@@ -288,8 +260,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Success! Handle the response
-      // Streaming response
       if (stream) {
         const responseBody = providerResponse.body;
 
@@ -300,7 +270,6 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Create usage tracking stream that logs when complete
         const usageTracker = createUsageTrackingStream((usage) => {
           logUsage({
             userId: userId!,
@@ -325,10 +294,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Non-streaming response
       const responseData = await providerResponse.json();
 
-      // Log with actual token usage from response
       logUsage({
         userId: userId!,
         providerAccountId: account.id,
@@ -344,7 +311,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseData);
     }
 
-    // All retries exhausted
     const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
     return NextResponse.json(
       {

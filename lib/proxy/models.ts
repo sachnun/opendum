@@ -1,6 +1,3 @@
-// Unified Model Registry
-// Maps models to their supporting providers
-
 import { ProviderName } from "./providers/types";
 
 /**

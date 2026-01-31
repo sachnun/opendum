@@ -1,4 +1,4 @@
-// OpenAI <-> Gemini format converter for Antigravity
+// OpenAI <-> Gemini format converter
 
 import type { ChatCompletionRequest } from "../types";
 import type { RequestPayload, ModelFamily } from "./transform/types";
@@ -44,13 +44,10 @@ export function convertOpenAIToGemini(
   const contents: Array<Record<string, unknown>> = [];
   let systemInstruction: unknown = undefined;
   
-  // Pre-process: find which tool calls have corresponding responses
-  // This prevents Claude API error: "tool_use ids were found without tool_result blocks"
   const completedToolCallIds = getCompletedToolCallIds(request.messages);
 
   for (const message of request.messages) {
     if (message.role === "system") {
-      // System messages become systemInstruction
       const text =
         typeof message.content === "string"
           ? message.content
@@ -62,7 +59,6 @@ export function convertOpenAIToGemini(
             : "";
 
       if (systemInstruction) {
-        // Append to existing
         const existing = systemInstruction as { parts: Array<{ text: string }> };
         existing.parts.push({ text });
       } else {
@@ -80,8 +76,6 @@ export function convertOpenAIToGemini(
       for (const content of message.content) {
         if (content.type === "text") {
           const textContent = (content as { text?: string }).text;
-          // Only push if text is truthy (match opendumm behavior)
-          // This prevents invalid parts from being sent to Claude API
           if (textContent) {
             parts.push({ text: textContent });
           }
@@ -89,7 +83,6 @@ export function convertOpenAIToGemini(
           const imageUrl = (content as { image_url?: { url?: string } }).image_url;
           if (imageUrl?.url) {
             if (imageUrl.url.startsWith("data:")) {
-              // Base64 image
               const match = imageUrl.url.match(/^data:([^;]+);base64,(.+)$/);
               if (match) {
                 parts.push({
@@ -100,7 +93,6 @@ export function convertOpenAIToGemini(
                 });
               }
             } else {
-              // URL image
               parts.push({
                 fileData: {
                   fileUri: imageUrl.url,
@@ -112,9 +104,6 @@ export function convertOpenAIToGemini(
       }
     }
 
-    // Handle tool calls from assistant
-    // Only include tool calls that have corresponding responses
-    // to prevent Claude API error: "tool_use ids were found without tool_result blocks"
     if (message.tool_calls && Array.isArray(message.tool_calls)) {
       for (const toolCall of message.tool_calls) {
         const tc = toolCall as {
@@ -122,7 +111,6 @@ export function convertOpenAIToGemini(
           function?: { name?: string; arguments?: string };
         };
         
-        // Skip tool calls without responses (prevents Claude API error)
         if (tc.id && !completedToolCallIds.has(tc.id)) {
           continue;
         }
@@ -145,7 +133,6 @@ export function convertOpenAIToGemini(
       }
     }
 
-    // Handle tool response
     if (message.role === "tool" && message.tool_call_id) {
       parts.push({
         functionResponse: {
@@ -163,7 +150,6 @@ export function convertOpenAIToGemini(
     }
   }
 
-  // Build Gemini payload
   const payload: RequestPayload = {
     contents,
   };
@@ -172,7 +158,6 @@ export function convertOpenAIToGemini(
     payload.systemInstruction = systemInstruction;
   }
 
-  // Generation config
   const generationConfig: Record<string, unknown> = {};
 
   if (request.temperature !== undefined) {
@@ -190,19 +175,15 @@ export function convertOpenAIToGemini(
       : [request.stop];
   }
 
-  // Thinking config from extended parameters
-  // Support both OpenAI Responses API format (reasoning object) and legacy format
   const reasoningEffort = request.reasoning?.effort || request.reasoning_effort;
   const thinkingBudget = request.thinking_budget;
   
   if (reasoningEffort || thinkingBudget) {
     const thinkingConfig: Record<string, unknown> = {};
 
-    // Priority: explicit budget > effort mapping
     if (thinkingBudget) {
       thinkingConfig.thinkingBudget = thinkingBudget;
     } else if (reasoningEffort && reasoningEffort !== "none") {
-      // Use effort-to-budget mapping
       const budget = EFFORT_TO_BUDGET[reasoningEffort];
       if (budget && budget > 0) {
         thinkingConfig.thinkingBudget = budget;
@@ -222,7 +203,6 @@ export function convertOpenAIToGemini(
     payload.generationConfig = generationConfig;
   }
 
-  // Tools
   if (request.tools && request.tools.length > 0) {
     const functionDeclarations = request.tools
       .filter((tool) => tool.type === "function")
@@ -309,11 +289,10 @@ export function convertGeminiToOpenAI(
       };
 
       if (toolCalls.length > 0) {
-        message.tool_calls = toolCalls;
-      }
+      message.tool_calls = toolCalls;
+    }
 
-      // Only include reasoning_content if explicitly requested
-      if (reasoningContent && includeReasoning) {
+    if (reasoningContent && includeReasoning) {
         message.reasoning_content = reasoningContent;
       }
 
@@ -368,7 +347,6 @@ export function createGeminiToOpenAISseTransform(
   model: string,
   includeReasoning: boolean = true
 ): TransformStream<string, string> {
-  // State variables for tracking across chunks
   let isFirstChunk = true;
   let toolCallIndex = 0;
   let hasToolCalls = false;
@@ -376,7 +354,6 @@ export function createGeminiToOpenAISseTransform(
   const completionId = `chatcmpl-${crypto.randomUUID()}`;
   const created = Math.floor(Date.now() / 1000);
   
-  // Track usage metadata from Gemini chunks (usually in last chunk)
   let trackedUsage: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -399,7 +376,6 @@ export function createGeminiToOpenAISseTransform(
       try {
         const geminiChunk = JSON.parse(json) as Record<string, unknown>;
         
-        // Track usage metadata (usually in last chunk)
         const usageMetadata = geminiChunk.usageMetadata as Record<string, unknown> | undefined;
         if (usageMetadata) {
           trackedUsage = {
@@ -422,7 +398,6 @@ export function createGeminiToOpenAISseTransform(
         const parts = content?.parts as Array<Record<string, unknown>> | undefined;
 
         if (!parts || parts.length === 0) {
-          // Check for finish reason even if no parts (final chunk case)
           const candidateFinishReason = candidate.finishReason as string | undefined;
           if (candidateFinishReason) {
             let openaiFinishReason = "stop";
@@ -455,9 +430,8 @@ export function createGeminiToOpenAISseTransform(
           const delta: Record<string, unknown> = {};
 
           if (part.thought === true && typeof part.text === "string") {
-            // Reasoning/thinking content - only include if requested
             if (!includeReasoning) {
-              continue; // Skip reasoning chunk
+              continue;
             }
             if (isFirstChunk) {
               delta.role = "assistant";
@@ -465,18 +439,15 @@ export function createGeminiToOpenAISseTransform(
             }
             delta.reasoning_content = part.text;
           } else if (typeof part.text === "string") {
-            // Regular text content
             if (isFirstChunk) {
               delta.role = "assistant";
               isFirstChunk = false;
             }
             delta.content = part.text;
           } else if (part.functionCall) {
-            // Tool/function call
             const fc = part.functionCall as Record<string, unknown>;
             const funcName = fc.name as string;
 
-            // Get or create stable ID for this tool call
             let toolId = fc.id as string | undefined;
             if (!toolId) {
               toolId = toolCallIds.get(funcName);
@@ -530,7 +501,6 @@ export function createGeminiToOpenAISseTransform(
           controller.enqueue(`data: ${JSON.stringify(openaiChunk)}\n\n`);
         }
 
-        // Check for finish reason from Gemini
         const candidateFinishReason = candidate.finishReason as string | undefined;
         if (candidateFinishReason) {
           let openaiFinishReason = "stop";
@@ -614,7 +584,6 @@ export function createAntigravityUnwrapTransform(): TransformStream<
         try {
           let parsed = JSON.parse(json) as unknown;
 
-          // Handle array-wrapped responses
           if (Array.isArray(parsed)) {
             parsed = parsed.find((item) => typeof item === "object" && item !== null);
           }
@@ -626,7 +595,6 @@ export function createAntigravityUnwrapTransform(): TransformStream<
 
           const body = parsed as Record<string, unknown>;
 
-          // Unwrap response if wrapped
           if (body.response !== undefined) {
             controller.enqueue(`data: ${JSON.stringify(body.response)}\n\n`);
           } else {
