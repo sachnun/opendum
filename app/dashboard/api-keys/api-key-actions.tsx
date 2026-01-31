@@ -202,6 +202,47 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         title={apiKey.isActive ? "Disable key" : "Enable key"}
       />
 
+      {/* Edit name dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+        setEditDialogOpen(open);
+        if (open) setNewName(apiKey.name ?? "");
+      }}>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Edit name">
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit API Key Name</DialogTitle>
+            <DialogDescription>
+              Change the name of your API key for easier identification.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="apiKeyName">Name</Label>
+            <Input
+              id="apiKeyName"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="My API Key"
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateName}
+              disabled={isUpdatingName}
+            >
+              {isUpdatingName ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
