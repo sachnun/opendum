@@ -13,9 +13,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Trash2, Eye, EyeOff, Copy, Check, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { deleteApiKey, toggleApiKey, revealApiKey } from "@/lib/actions/api-keys";
+import { deleteApiKey, toggleApiKey, revealApiKey, updateApiKeyName } from "@/lib/actions/api-keys";
 
 interface ApiKey {
   id: string;
@@ -28,10 +30,13 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [newName, setNewName] = useState(apiKey.name ?? "");
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
 
   const handleToggle = async () => {
     setIsToggling(true);
@@ -123,6 +128,24 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
       toast.error(error instanceof Error ? error.message : "Failed to delete API key");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleUpdateName = async () => {
+    setIsUpdatingName(true);
+    try {
+      const result = await updateApiKeyName(apiKey.id, newName);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast.success("API key name updated");
+      setEditDialogOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update API key name");
+    } finally {
+      setIsUpdatingName(false);
     }
   };
 

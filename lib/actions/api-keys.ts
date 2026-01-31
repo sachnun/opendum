@@ -131,6 +131,43 @@ export async function deleteApiKey(id: string): Promise<ActionResult> {
 }
 
 /**
+ * Update API key name
+ */
+export async function updateApiKeyName(id: string, name: string): Promise<ActionResult<{ name: string | null }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Find and verify ownership
+    const apiKey = await prisma.proxyApiKey.findFirst({
+      where: { id, userId: session.user.id },
+    });
+
+    if (!apiKey) {
+      return { success: false, error: "API key not found" };
+    }
+
+    const trimmedName = name?.trim() || null;
+
+    // Update the name
+    const updatedKey = await prisma.proxyApiKey.update({
+      where: { id },
+      data: { name: trimmedName },
+    });
+
+    revalidatePath("/dashboard/api-keys");
+
+    return { success: true, data: { name: updatedKey.name } };
+  } catch (error) {
+    console.error("Failed to update API key name:", error);
+    return { success: false, error: "Failed to update API key name" };
+  }
+}
+
+/**
  * Reveal the full API key
  */
 export async function revealApiKey(id: string): Promise<ActionResult<{ key: string }>> {
