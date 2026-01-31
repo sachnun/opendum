@@ -25,6 +25,11 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
 
   const toggleProvider = (providerId: string) => {
     setActiveProviders((prev) => {
+      // Jika semua provider sedang terpilih (All aktif), klik satu provider = hanya pilih provider itu
+      if (prev.size === availableProviders.length) {
+        return new Set([providerId]);
+      }
+
       const next = new Set(prev);
       if (next.has(providerId)) {
         // Don't allow deselecting all providers
