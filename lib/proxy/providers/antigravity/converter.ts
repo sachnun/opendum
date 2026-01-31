@@ -375,6 +375,13 @@ export function createGeminiToOpenAISseTransform(
   const toolCallIds = new Map<string, string>();
   const completionId = `chatcmpl-${crypto.randomUUID()}`;
   const created = Math.floor(Date.now() / 1000);
+  
+  // Track usage metadata from Gemini chunks (usually in last chunk)
+  let trackedUsage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  } | null = null;
 
   return new TransformStream<string, string>({
     transform(line, controller) {
@@ -391,6 +398,17 @@ export function createGeminiToOpenAISseTransform(
 
       try {
         const geminiChunk = JSON.parse(json) as Record<string, unknown>;
+        
+        // Track usage metadata (usually in last chunk)
+        const usageMetadata = geminiChunk.usageMetadata as Record<string, unknown> | undefined;
+        if (usageMetadata) {
+          trackedUsage = {
+            prompt_tokens: (usageMetadata.promptTokenCount as number) ?? 0,
+            completion_tokens: (usageMetadata.candidatesTokenCount as number) ?? 0,
+            total_tokens: (usageMetadata.totalTokenCount as number) ?? 0,
+          };
+        }
+        
         const candidates = geminiChunk.candidates as
           | Array<Record<string, unknown>>
           | undefined;
@@ -543,6 +561,24 @@ export function createGeminiToOpenAISseTransform(
       }
     },
     flush(controller) {
+      // Emit final chunk with usage data if we tracked any
+      if (trackedUsage) {
+        const usageChunk = {
+          id: completionId,
+          object: "chat.completion.chunk",
+          created,
+          model,
+          choices: [
+            {
+              index: 0,
+              delta: {},
+              finish_reason: null,
+            },
+          ],
+          usage: trackedUsage,
+        };
+        controller.enqueue(`data: ${JSON.stringify(usageChunk)}\n\n`);
+      }
       controller.enqueue("data: [DONE]\n\n");
     },
   });
