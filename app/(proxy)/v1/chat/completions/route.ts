@@ -311,6 +311,7 @@ export async function POST(request: NextRequest) {
             outputTokens: usage.outputTokens,
             statusCode: 200,
             duration: Date.now() - startTime,
+            provider: account.provider,
           });
         });
 
@@ -337,6 +338,7 @@ export async function POST(request: NextRequest) {
         outputTokens: responseData.usage?.completion_tokens ?? 0,
         statusCode: 200,
         duration: Date.now() - startTime,
+        provider: account.provider,
       });
 
       return NextResponse.json(responseData);

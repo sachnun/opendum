@@ -145,6 +145,7 @@ export async function logUsage(params: {
   outputTokens?: number;
   statusCode?: number;
   duration?: number;
+  provider?: string; // Optional: for quota tracking
 }): Promise<void> {
   try {
     await prisma.usageLog.create({
@@ -159,6 +160,25 @@ export async function logUsage(params: {
         duration: params.duration,
       },
     });
+
+    // Track quota for Antigravity requests (only successful requests)
+    if (
+      params.provider === "antigravity" &&
+      params.providerAccountId &&
+      params.statusCode &&
+      params.statusCode >= 200 &&
+      params.statusCode < 300
+    ) {
+      try {
+        // Dynamic import to avoid circular dependencies
+        const { incrementRequestCount } = await import(
+          "@/lib/proxy/providers/antigravity/quota-cache"
+        );
+        incrementRequestCount(params.providerAccountId, params.model);
+      } catch {
+        // Ignore quota tracking errors
+      }
+    }
   } catch (error) {
     console.error("Failed to log usage:", error);
   }

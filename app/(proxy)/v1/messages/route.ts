@@ -985,6 +985,7 @@ export async function POST(request: NextRequest) {
             outputTokens: usage.outputTokens,
             statusCode: 200,
             duration: Date.now() - startTime,
+            provider: account.provider,
           });
         }, includeThinking);
         const transformedStream = providerResponse.body.pipeThrough(transformer);
@@ -1013,6 +1014,7 @@ export async function POST(request: NextRequest) {
         outputTokens: openaiResponse.usage?.completion_tokens ?? 0,
         statusCode: 200,
         duration: Date.now() - startTime,
+        provider: account.provider,
       });
 
       return NextResponse.json(anthropicResponse);
