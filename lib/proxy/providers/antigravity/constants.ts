@@ -55,7 +55,30 @@ export const CODE_ASSIST_ENDPOINT_FALLBACKS = [
   CODE_ASSIST_ENDPOINT_PROD,
 ] as const;
 
+// Endpoint order for loadCodeAssist (project discovery)
+// Production FIRST for better project resolution, then fallback to sandbox
+// (Different from API request order which uses sandbox first)
+export const LOAD_CODE_ASSIST_ENDPOINTS = [
+  CODE_ASSIST_ENDPOINT_PROD,  // Prod first for discovery
+  CODE_ASSIST_ENDPOINT_DAILY, // Daily fallback
+] as const;
+
+// Endpoint order for onboardUser (daily first, then prod)
+export const ONBOARD_USER_ENDPOINTS = [
+  CODE_ASSIST_ENDPOINT_DAILY,
+  CODE_ASSIST_ENDPOINT_PROD,
+] as const;
+
 export const CODE_ASSIST_ENDPOINT = CODE_ASSIST_ENDPOINT_DAILY;
+
+// Headers for auth/discovery calls (loadCodeAssist, onboardUser)
+// CRITICAL: User-Agent MUST be google-api-nodejs-client/* for standard-tier detection.
+// Using antigravity/* UA causes server to return free-tier only (tested via matrix test).
+export const ANTIGRAVITY_AUTH_HEADERS = {
+  "User-Agent": "google-api-nodejs-client/10.3.0",
+  "X-Goog-Api-Client": "gl-node/22.18.0",
+  "Client-Metadata": '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',
+} as const;
 export const CODE_ASSIST_API_VERSION = "v1internal";
 
 export const CODE_ASSIST_HEADERS = {
