@@ -36,6 +36,163 @@ function getCompletedToolCallIds(messages: ChatCompletionRequest["messages"]): S
 }
 
 /**
+ * Pre-process messages to find all tool call IDs from assistant messages.
+ * Used for bidirectional validation - ensures tool_result has matching tool_use.
+ * Returns a Set of all tool call IDs from assistant tool_calls.
+ */
+function getToolUseIds(messages: ChatCompletionRequest["messages"]): Set<string> {
+  const toolUseIds = new Set<string>();
+  
+  for (const message of messages) {
+    if (message.role === "assistant" && message.tool_calls && Array.isArray(message.tool_calls)) {
+      for (const toolCall of message.tool_calls) {
+        const tc = toolCall as { id?: string };
+        if (tc.id) {
+          toolUseIds.add(tc.id);
+        }
+      }
+    }
+  }
+  
+  return toolUseIds;
+}
+
+/**
+ * Validate tool sequence: ensure tool_result comes right after tool_use.
+ * Returns a Set of valid tool_result IDs (those that have corresponding tool_use in previous assistant message).
+ * 
+ * This handles the case where context truncation removes a tool_use but keeps the tool_result,
+ * which causes Claude API to reject the request.
+ */
+function getValidToolResultIds(messages: ChatCompletionRequest["messages"]): Set<string> {
+  const validToolResultIds = new Set<string>();
+  let lastAssistantToolCallIds = new Set<string>();
+  
+  for (const message of messages) {
+    if (message.role === "assistant" && message.tool_calls && Array.isArray(message.tool_calls)) {
+      // Collect tool call IDs from this assistant message
+      lastAssistantToolCallIds = new Set<string>();
+      for (const toolCall of message.tool_calls) {
+        const tc = toolCall as { id?: string };
+        if (tc.id) {
+          lastAssistantToolCallIds.add(tc.id);
+        }
+      }
+    } else if (message.role === "tool" && message.tool_call_id) {
+      // Check if this tool_result's ID was in the previous assistant's tool_calls
+      if (lastAssistantToolCallIds.has(message.tool_call_id)) {
+        validToolResultIds.add(message.tool_call_id);
+      }
+      // Note: Don't clear lastAssistantToolCallIds here - multiple tool results 
+      // can follow a single assistant message with multiple tool calls
+    } else if (message.role === "user" || message.role === "system") {
+      // Reset when we see a user/system message (new turn)
+      lastAssistantToolCallIds = new Set<string>();
+    }
+  }
+  
+  return validToolResultIds;
+}
+
+/**
+ * Sanitize Gemini-format contents to remove orphan tool calls/responses.
+ * 
+ * This is the final validation layer after OpenAI->Gemini conversion.
+ * It ensures:
+ * 1. Every functionCall has a corresponding functionResponse in the next user message
+ * 2. Every functionResponse has a corresponding functionCall in the previous model message
+ * 3. Empty messages (no valid parts) are removed
+ * 
+ * This handles edge cases that may slip through the initial filtering,
+ * such as when tool calls are in the same message but responses are scattered.
+ */
+function sanitizeGeminiContents(contents: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  if (contents.length === 0) return contents;
+  
+  // First pass: collect all functionCall IDs and their positions
+  const functionCallIds = new Map<string, number>(); // id -> message index
+  const functionResponseIds = new Map<string, number>(); // id -> message index
+  
+  for (let i = 0; i < contents.length; i++) {
+    const content = contents[i];
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!parts) continue;
+    
+    for (const part of parts) {
+      if (part.functionCall) {
+        const fc = part.functionCall as Record<string, unknown>;
+        const id = fc.id as string | undefined;
+        if (id) {
+          functionCallIds.set(id, i);
+        }
+      }
+      if (part.functionResponse) {
+        const fr = part.functionResponse as Record<string, unknown>;
+        const id = fr.id as string | undefined;
+        if (id) {
+          functionResponseIds.set(id, i);
+        }
+      }
+    }
+  }
+  
+  // Determine which IDs are valid:
+  // - functionCall is valid if there's a functionResponse with same ID in a later message
+  // - functionResponse is valid if there's a functionCall with same ID in an earlier message
+  const validFunctionCallIds = new Set<string>();
+  const validFunctionResponseIds = new Set<string>();
+  
+  for (const [id, callIdx] of functionCallIds) {
+    const responseIdx = functionResponseIds.get(id);
+    if (responseIdx !== undefined && responseIdx > callIdx) {
+      validFunctionCallIds.add(id);
+      validFunctionResponseIds.add(id);
+    }
+  }
+  
+  // Second pass: filter out invalid parts and empty messages
+  const sanitizedContents: Array<Record<string, unknown>> = [];
+  
+  for (const content of contents) {
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!parts) continue;
+    
+    const filteredParts: Array<Record<string, unknown>> = [];
+    
+    for (const part of parts) {
+      if (part.functionCall) {
+        const fc = part.functionCall as Record<string, unknown>;
+        const id = fc.id as string | undefined;
+        if (id && validFunctionCallIds.has(id)) {
+          filteredParts.push(part);
+        }
+        // Skip orphan functionCall
+      } else if (part.functionResponse) {
+        const fr = part.functionResponse as Record<string, unknown>;
+        const id = fr.id as string | undefined;
+        if (id && validFunctionResponseIds.has(id)) {
+          filteredParts.push(part);
+        }
+        // Skip orphan functionResponse
+      } else {
+        // Keep non-tool parts (text, thought, etc.)
+        filteredParts.push(part);
+      }
+    }
+    
+    // Only add message if it has valid parts
+    if (filteredParts.length > 0) {
+      sanitizedContents.push({
+        ...content,
+        parts: filteredParts,
+      });
+    }
+  }
+  
+  return sanitizedContents;
+}
+
+/**
  * Convert OpenAI messages to Gemini format
  */
 export function convertOpenAIToGemini(
@@ -44,7 +201,13 @@ export function convertOpenAIToGemini(
   const contents: Array<Record<string, unknown>> = [];
   let systemInstruction: unknown = undefined;
   
+  // Bidirectional validation:
+  // 1. completedToolCallIds: tool_call IDs that have tool_result responses
+  // 2. toolUseIds: all tool_call IDs from assistant messages  
+  // 3. validToolResultIds: tool_result IDs that have matching tool_use in previous message
   const completedToolCallIds = getCompletedToolCallIds(request.messages);
+  const toolUseIds = getToolUseIds(request.messages);
+  const validToolResultIds = getValidToolResultIds(request.messages);
 
   for (const message of request.messages) {
     if (message.role === "system") {
@@ -134,6 +297,17 @@ export function convertOpenAIToGemini(
     }
 
     if (message.role === "tool" && message.tool_call_id) {
+      // Skip orphan tool_result: must have matching tool_use in previous assistant message
+      // AND the tool_use must still exist (not filtered out due to missing response)
+      if (!validToolResultIds.has(message.tool_call_id)) {
+        // This tool_result doesn't have a matching tool_use in the expected position
+        continue;
+      }
+      if (!toolUseIds.has(message.tool_call_id)) {
+        // The corresponding tool_use was removed (likely due to missing response)
+        continue;
+      }
+      
       parts.push({
         functionResponse: {
           name: message.name ?? "unknown",
@@ -150,8 +324,12 @@ export function convertOpenAIToGemini(
     }
   }
 
+  // Final sanitization: remove any remaining orphan tool calls/responses
+  // This catches edge cases that may slip through the initial filtering
+  const sanitizedContents = sanitizeGeminiContents(contents);
+
   const payload: RequestPayload = {
-    contents,
+    contents: sanitizedContents,
   };
 
   if (systemInstruction) {

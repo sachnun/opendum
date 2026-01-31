@@ -10,6 +10,113 @@ import { cacheToolSchemas } from "../tool-schema-cache";
 import type { RequestPayload, TransformContext, TransformResult } from "./types";
 
 /**
+ * Final sanitization for Claude: ensure all functionCall/functionResponse blocks are properly paired.
+ * 
+ * Claude API requires:
+ * 1. Every tool_use (functionCall) must have a corresponding tool_result (functionResponse)
+ * 2. Every tool_result must have a corresponding tool_use in the PREVIOUS message
+ * 
+ * This function removes orphan blocks that would cause Claude to reject the request.
+ */
+function sanitizeToolBlocksForClaude(
+  contents: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> {
+  if (!contents || contents.length === 0) return contents;
+  
+  // First pass: collect all functionCall IDs and track which have responses
+  const functionCallIdToMsgIdx = new Map<string, number>(); // id -> message index where call was made
+  const functionResponseIds = new Set<string>(); // IDs of all responses
+  
+  for (let i = 0; i < contents.length; i++) {
+    const content = contents[i];
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!parts) continue;
+    
+    for (const part of parts) {
+      if (part.functionCall) {
+        const fc = part.functionCall as Record<string, unknown>;
+        const id = fc.id as string | undefined;
+        if (id) {
+          functionCallIdToMsgIdx.set(id, i);
+        }
+      }
+      if (part.functionResponse) {
+        const fr = part.functionResponse as Record<string, unknown>;
+        const id = fr.id as string | undefined;
+        if (id) {
+          functionResponseIds.add(id);
+        }
+      }
+    }
+  }
+  
+  // Determine valid pairs:
+  // - functionCall is valid if there's a functionResponse with the same ID
+  // - functionResponse is valid if there's a functionCall with the same ID in an EARLIER message
+  const validFunctionCallIds = new Set<string>();
+  const validFunctionResponseIds = new Set<string>();
+  
+  for (const [id, _callMsgIdx] of functionCallIdToMsgIdx) {
+    if (functionResponseIds.has(id)) {
+      validFunctionCallIds.add(id);
+      validFunctionResponseIds.add(id);
+    }
+  }
+  
+  // Check for orphan responses (responses without calls)
+  for (const responseId of functionResponseIds) {
+    if (!functionCallIdToMsgIdx.has(responseId)) {
+      // This response has no matching call - it's orphan, don't add to valid set
+      // (already not in validFunctionResponseIds since we only add when call exists)
+    }
+  }
+  
+  // Second pass: filter contents
+  const sanitizedContents: Array<Record<string, unknown>> = [];
+  
+  for (const content of contents) {
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!parts) {
+      sanitizedContents.push(content);
+      continue;
+    }
+    
+    const filteredParts: Array<Record<string, unknown>> = [];
+    
+    for (const part of parts) {
+      if (part.functionCall) {
+        const fc = part.functionCall as Record<string, unknown>;
+        const id = fc.id as string | undefined;
+        if (id && validFunctionCallIds.has(id)) {
+          filteredParts.push(part);
+        }
+        // Skip orphan functionCall (no response)
+      } else if (part.functionResponse) {
+        const fr = part.functionResponse as Record<string, unknown>;
+        const id = fr.id as string | undefined;
+        if (id && validFunctionResponseIds.has(id)) {
+          filteredParts.push(part);
+        }
+        // Skip orphan functionResponse (no call)
+      } else {
+        // Keep non-tool parts
+        filteredParts.push(part);
+      }
+    }
+    
+    // Only add message if it has parts after filtering
+    if (filteredParts.length > 0) {
+      sanitizedContents.push({
+        ...content,
+        parts: filteredParts,
+      });
+    }
+  }
+  
+  return sanitizedContents;
+}
+
+/**
  * Transforms a Gemini-format request payload for Claude proxy models.
  *
  * The Antigravity backend routes `gemini-claude-*` models to Claude's API, but
@@ -324,6 +431,10 @@ export function transformClaudeRequest(
         });
       }
     }
+    
+    // Final sanitization: remove orphan tool blocks
+    // This is the last line of defense before sending to Claude API
+    requestPayload.contents = sanitizeToolBlocksForClaude(finalContents);
   }
 
   requestPayload.sessionId = context.sessionId;
