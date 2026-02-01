@@ -136,7 +136,7 @@ export const antigravityProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Token exchange failed: ${response.status} ${error}`);
+      throw new Error(error);
     }
 
     const tokens = (await response.json()) as {
@@ -172,7 +172,7 @@ export const antigravityProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Token refresh failed: ${response.status} ${error}`);
+      throw new Error(error);
     }
 
     const tokens = (await response.json()) as {
@@ -308,18 +308,39 @@ export const antigravityProvider: Provider = {
           body: result.body,
         });
 
-        // On 5xx, 403, 404: log and try next endpoint
-        if (response.status >= 500 || response.status === 403 || response.status === 404) {
-          console.log(
-            `[antigravity] Endpoint ${endpoint} returned ${response.status}, trying next...`
-          );
-          continue;
+        // Check if error is retryable (account/server related) vs parameter error
+        // Retryable: 5xx (server), 429 (rate limit), 401 (auth), 403 (permission), 404 (endpoint)
+        // Non-retryable: 400 (bad request), 409 (conflict), 422 (validation), other 4xx
+        const isRetryableError =
+          response.status >= 500 ||
+          response.status === 429 ||
+          response.status === 401 ||
+          response.status === 403 ||
+          response.status === 404;
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+
+          if (isRetryableError) {
+            // Capture error and try next endpoint
+            lastError = new Error(errorBody);
+            console.log(
+              `[antigravity] Endpoint ${endpoint} returned ${response.status}, trying next...`
+            );
+            continue;
+          }
+
+          // Parameter/request error (400, 409, 422, etc.) - return immediately with original error
+          return new Response(errorBody, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: { "Content-Type": "application/json" },
+          });
         }
 
-        // On 429 (rate limit): return immediately to let route handler rotate accounts
-        // On success or other errors: return response
+        // Success - process response
         // If we forced streaming for Claude, buffer and convert to non-streaming
-        if (needsForcedStreaming && response.ok && response.body) {
+        if (needsForcedStreaming && response.body) {
           const bufferedResponse = await bufferStreamingToGeminiResponse(response);
 
           // Cache signatures from buffered response

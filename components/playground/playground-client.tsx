@@ -24,11 +24,18 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
+// Default recommended models for the playground
+const DEFAULT_MODELS = [
+  "antigravity/claude-opus-4-5",
+  "iflow/glm-4.7",
+  "antigravity/gemini-3-pro-high",
+];
+
 export function PlaygroundClient({ models }: PlaygroundClientProps) {
   const [panels, setPanels] = React.useState<PanelState[]>([
-    { id: generateId(), modelId: null },
-    { id: generateId(), modelId: null },
-    { id: generateId(), modelId: null },
+    { id: generateId(), modelId: DEFAULT_MODELS[0] },
+    { id: generateId(), modelId: DEFAULT_MODELS[1] },
+    { id: generateId(), modelId: DEFAULT_MODELS[2] },
   ]);
 
   const [selectedScenario, setSelectedScenario] = React.useState<Scenario | null>(null);

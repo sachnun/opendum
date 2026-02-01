@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
-import { getNextAvailableAccount } from "@/lib/proxy/load-balancer";
+import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "@/lib/proxy/load-balancer";
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import { markRateLimited, parseRateLimitError, getMinWaitTime, formatWaitTimeMs } from "@/lib/proxy/rate-limit";
@@ -238,6 +238,11 @@ export async function POST(request: NextRequest) {
         const errorText = await providerResponse.text();
         console.error(`${account.provider} error:`, providerResponse.status, errorText);
 
+        // Track error for this account (non-blocking)
+        markAccountFailed(account.id, providerResponse.status, errorText).catch((e) =>
+          console.error("[error-tracking] Failed to mark account failed:", e)
+        );
+
         await logUsage({
           userId: userId!,
           providerAccountId: account.id,
@@ -271,6 +276,11 @@ export async function POST(request: NextRequest) {
         }
 
         const usageTracker = createUsageTrackingStream((usage) => {
+          // Track success for this account (non-blocking)
+          markAccountSuccess(account.id).catch((e) =>
+            console.error("[error-tracking] Failed to mark account success:", e)
+          );
+
           logUsage({
             userId: userId!,
             providerAccountId: account.id,
@@ -295,6 +305,11 @@ export async function POST(request: NextRequest) {
       }
 
       const responseData = await providerResponse.json();
+
+      // Track success for this account (non-blocking)
+      markAccountSuccess(account.id).catch((e) =>
+        console.error("[error-tracking] Failed to mark account success:", e)
+      );
 
       logUsage({
         userId: userId!,
