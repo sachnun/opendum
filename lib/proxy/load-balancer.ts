@@ -62,6 +62,7 @@ export async function getNextAccount(
 /**
  * Get the next available (non-rate-limited) account for a user and model using LRU
  * Skips accounts that are rate-limited for the model's family
+ * Skips accounts with "failed" status, deprioritizes "degraded" accounts
  * @param userId User ID
  * @param model Model name
  * @param provider Optional specific provider
@@ -84,15 +85,18 @@ export async function getNextAvailableAccount(
     }
   }
 
-  // Get all active accounts ordered by LRU (nulls first = never used accounts get priority)
+  // Get all active accounts, excluding failed status
+  // Ordered by: status (active before degraded), then LRU
   const accounts = await prisma.providerAccount.findMany({
     where: {
       userId,
       provider: { in: targetProviders },
       isActive: true,
+      status: { not: "failed" }, // Skip failed accounts
       id: { notIn: excludeAccountIds.length > 0 ? excludeAccountIds : undefined },
     },
     orderBy: [
+      { status: "asc" }, // "active" comes before "degraded" alphabetically
       { lastUsedAt: { sort: "asc", nulls: "first" } },
       { createdAt: "asc" }, // Tiebreaker: older accounts first
     ],
@@ -104,7 +108,7 @@ export async function getNextAvailableAccount(
 
   const family = getModelFamily(model);
 
-  // Separate paid and free accounts (both already sorted by LRU)
+  // Separate paid and free accounts (both already sorted by status then LRU)
   const paidAccounts = accounts.filter((a) => a.tier === "paid");
   const freeAccounts = accounts.filter((a) => a.tier !== "paid");
 
@@ -173,11 +177,88 @@ export async function getNextAccountForProvider(
 }
 
 /**
- * Mark an account as having failed (optional: for future failover logic)
+ * Mark an account as having failed with error details
+ * Auto-degrades status based on consecutive error count:
+ * - 5+ consecutive errors: "degraded" (deprioritized in selection)
+ * - 10+ consecutive errors: "failed" (skipped from rotation)
  */
-export async function markAccountFailed(accountId: string): Promise<void> {
-  // For now, do nothing. Future: implement cooldown or deactivation
-  void accountId;
+export async function markAccountFailed(
+  accountId: string,
+  errorCode: number,
+  errorMessage: string
+): Promise<void> {
+  // Update error tracking fields
+  const account = await prisma.providerAccount.update({
+    where: { id: accountId },
+    data: {
+      errorCount: { increment: 1 },
+      consecutiveErrors: { increment: 1 },
+      lastErrorAt: new Date(),
+      lastErrorMessage: errorMessage.slice(0, 2000), // Limit message size
+      lastErrorCode: errorCode,
+    },
+  });
+
+  // Auto-degradation based on consecutive errors
+  const newConsecutiveErrors = account.consecutiveErrors;
+  let newStatus: string | null = null;
+  let statusReason: string | null = null;
+
+  if (newConsecutiveErrors >= 10 && account.status !== "failed") {
+    newStatus = "failed";
+    statusReason = `${newConsecutiveErrors} consecutive errors (auto-disabled)`;
+  } else if (newConsecutiveErrors >= 5 && account.status === "active") {
+    newStatus = "degraded";
+    statusReason = `${newConsecutiveErrors} consecutive errors`;
+  }
+
+  if (newStatus) {
+    await prisma.providerAccount.update({
+      where: { id: accountId },
+      data: {
+        status: newStatus,
+        statusReason,
+        statusChangedAt: new Date(),
+      },
+    });
+    console.log(
+      `[load-balancer] Account ${accountId} status changed to ${newStatus}: ${statusReason}`
+    );
+  }
+}
+
+/**
+ * Mark an account as having succeeded
+ * Resets consecutive errors and restores status to "active" if it was degraded/failed
+ */
+export async function markAccountSuccess(accountId: string): Promise<void> {
+  const account = await prisma.providerAccount.findUnique({
+    where: { id: accountId },
+    select: { status: true, consecutiveErrors: true },
+  });
+
+  if (!account) return;
+
+  const updates: Record<string, unknown> = {
+    consecutiveErrors: 0,
+    successCount: { increment: 1 },
+    lastSuccessAt: new Date(),
+  };
+
+  // Restore status if it was auto-degraded (not manually disabled)
+  if (account.status === "degraded" || account.status === "failed") {
+    updates.status = "active";
+    updates.statusReason = null;
+    updates.statusChangedAt = new Date();
+    console.log(
+      `[load-balancer] Account ${accountId} restored to active after successful request`
+    );
+  }
+
+  await prisma.providerAccount.update({
+    where: { id: accountId },
+    data: updates,
+  });
 }
 
 /**
