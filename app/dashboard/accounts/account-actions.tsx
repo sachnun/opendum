@@ -14,24 +14,28 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { deleteProviderAccount, updateProviderAccount } from "@/lib/actions/accounts";
+import { deleteProviderAccount, updateProviderAccount, resetAccountStatus, clearAccountErrors } from "@/lib/actions/accounts";
 
 interface Account {
   id: string;
   name: string;
   email: string | null;
   isActive: boolean;
+  status: string;
+  errorCount: number;
 }
 
 export function AccountActions({ account }: { account: Account }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [editName, setEditName] = useState(account.name);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const handleToggleActive = async () => {
     setIsToggling(true);
@@ -91,6 +95,44 @@ export function AccountActions({ account }: { account: Account }) {
     }
   };
 
+  const handleResetStatus = async () => {
+    setIsResetting(true);
+    try {
+      const result = await resetAccountStatus(account.id);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast.success("Account status reset to active");
+      setResetDialogOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reset account status");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleClearErrors = async () => {
+    setIsResetting(true);
+    try {
+      const result = await clearAccountErrors(account.id);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast.success("Account error history cleared");
+      setResetDialogOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to clear error history");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const showResetButton = account.status !== "active" || account.errorCount > 0;
+
   return (
     <div className="flex items-center gap-2">
       <Switch
@@ -99,6 +141,56 @@ export function AccountActions({ account }: { account: Account }) {
         disabled={isToggling}
         title={account.isActive ? "Deactivate account" : "Activate account"}
       />
+
+      {showResetButton && (
+        <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" title="Reset account status">
+              <RotateCcw className="h-3 w-3 text-yellow-600" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset Account Status</DialogTitle>
+              <DialogDescription>
+                {account.status !== "active" 
+                  ? `This account is currently "${account.status}". Choose an action:`
+                  : `This account has ${account.errorCount} total errors. Choose an action:`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={handleResetStatus}
+                disabled={isResetting}
+              >
+                {isResetting ? "Resetting..." : "Reset Status to Active"}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (Keep error history, reset consecutive errors)
+                </span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={handleClearErrors}
+                disabled={isResetting}
+              >
+                {isResetting ? "Clearing..." : "Clear All Error History"}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (Reset all error counters to 0)
+                </span>
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogTrigger asChild>

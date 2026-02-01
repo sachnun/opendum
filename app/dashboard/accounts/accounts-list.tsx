@@ -17,6 +17,8 @@ import {
   Cpu,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
+  AlertCircle,
 } from "lucide-react";
 import { AccountActions } from "./account-actions";
 import { useState } from "react";
@@ -35,6 +37,15 @@ interface Account {
   lastUsedAt: Date | null;
   expiresAt: Date;
   tier: string | null;
+  // Error tracking fields
+  status: string;
+  errorCount: number;
+  consecutiveErrors: number;
+  lastErrorAt: Date | null;
+  lastErrorMessage: string | null;
+  lastErrorCode: number | null;
+  successCount: number;
+  lastSuccessAt: Date | null;
 }
 
 interface AccountsListProps {
@@ -42,6 +53,35 @@ interface AccountsListProps {
   iflowAccounts: Account[];
   geminiCliAccounts: Account[];
   qwenCodeAccounts: Account[];
+}
+
+// =============================================================================
+// STATUS BADGE COMPONENT
+// =============================================================================
+
+function StatusBadge({ status, consecutiveErrors }: { status: string; consecutiveErrors: number }) {
+  if (status === "failed") {
+    return (
+      <Badge variant="destructive" className="gap-1">
+        <AlertCircle className="h-3 w-3" />
+        Failed
+      </Badge>
+    );
+  }
+  if (status === "degraded") {
+    return (
+      <Badge variant="outline" className="border-yellow-500 text-yellow-600 gap-1">
+        <AlertTriangle className="h-3 w-3" />
+        Degraded ({consecutiveErrors})
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="default" className="gap-1">
+      <CheckCircle className="h-3 w-3" />
+      Active
+    </Badge>
+  );
 }
 
 // =============================================================================
@@ -55,12 +95,17 @@ function AccountCard({
   account: Account;
   showTier?: boolean;
 }) {
+  const hasErrors = account.errorCount > 0;
+  const successRate = account.successCount + account.errorCount > 0
+    ? Math.round((account.successCount / (account.successCount + account.errorCount)) * 100)
+    : 100;
+
   return (
-    <Card>
+    <Card className={account.status === "failed" ? "border-red-300 dark:border-red-800" : account.status === "degraded" ? "border-yellow-300 dark:border-yellow-800" : ""}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{account.name}</CardTitle>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap justify-end">
             {showTier && account.tier && (
               <Badge 
                 variant="outline" 
@@ -69,25 +114,26 @@ function AccountCard({
                 {account.tier}
               </Badge>
             )}
-            <Badge variant={account.isActive ? "default" : "secondary"}>
-              {account.isActive ? (
-                <>
-                  <CheckCircle className="mr-1 h-3 w-3" />
-                  Active
-                </>
-              ) : (
-                <>
-                  <XCircle className="mr-1 h-3 w-3" />
-                  Inactive
-                </>
-              )}
-            </Badge>
+            {account.isActive ? (
+              <StatusBadge status={account.status} consecutiveErrors={account.consecutiveErrors} />
+            ) : (
+              <Badge variant="secondary">
+                <XCircle className="mr-1 h-3 w-3" />
+                Inactive
+              </Badge>
+            )}
           </div>
         </div>
         <CardDescription>{account.email || "No email"}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Success Rate</span>
+            <span className={`font-medium ${successRate < 80 ? "text-red-500" : successRate < 95 ? "text-yellow-500" : "text-green-500"}`}>
+              {successRate}% ({account.successCount}/{account.successCount + account.errorCount})
+            </span>
+          </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Requests</span>
             <span className="font-medium">{account.requestCount}</span>
@@ -100,12 +146,35 @@ function AccountCard({
                 : "Never"}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Token expires</span>
-            <span className="font-medium">
-              {new Date(account.expiresAt).toLocaleDateString()}
-            </span>
-          </div>
+          {hasErrors && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Errors</span>
+                <span className="font-medium text-red-500">{account.errorCount}</span>
+              </div>
+              {account.lastErrorAt && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Last Error</span>
+                  <span className="font-medium text-red-500">
+                    {new Date(account.lastErrorAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+              {account.lastErrorMessage && (
+                <div className="pt-2 border-t">
+                  <span className="text-muted-foreground text-xs">Last Error Message:</span>
+                  <p 
+                    className="text-xs text-red-500 mt-1 line-clamp-2 break-all"
+                    title={account.lastErrorMessage}
+                  >
+                    {account.lastErrorCode && `[${account.lastErrorCode}] `}
+                    {account.lastErrorMessage.slice(0, 150)}
+                    {account.lastErrorMessage.length > 150 && "..."}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
         <div className="mt-4 flex gap-2">
           <AccountActions account={account} />
