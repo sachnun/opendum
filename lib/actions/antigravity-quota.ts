@@ -7,6 +7,7 @@
 import type { ProviderAccount } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { decrypt } from "@/lib/encryption";
 import { 
   fetchQuotaFromApi, 
   QUOTA_GROUPS, 
@@ -231,27 +232,52 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
         continue;
       }
 
-      // Get valid access token (auto-refreshes if expired)
+      // Get valid access token
+      // Only refresh if token is ACTUALLY expired (no buffer, for quota monitor)
       let accessToken: string;
-      try {
-        accessToken = await antigravityProvider.getValidCredentials(
-          account as unknown as ProviderAccount
-        );
-      } catch {
-        // Token refresh failed - token is truly expired
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier,
-          isActive: account.isActive,
-          status: "expired",
-          error: "Token expired - please re-authenticate",
-          groups: [],
-          fetchedAt: Date.now(),
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
-        continue;
+      const isActuallyExpired = account.expiresAt && new Date(account.expiresAt) < new Date();
+
+      if (isActuallyExpired) {
+        // Token expired - try to refresh
+        try {
+          accessToken = await antigravityProvider.getValidCredentials(
+            account as unknown as ProviderAccount
+          );
+        } catch {
+          // Refresh failed - token is truly dead
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "expired",
+            error: "Token expired - please re-authenticate",
+            groups: [],
+            fetchedAt: Date.now(),
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
+      } else {
+        // Token still valid - just decrypt (fast path)
+        try {
+          accessToken = decrypt(account.accessToken);
+        } catch {
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "error",
+            error: "Failed to decrypt credentials",
+            groups: [],
+            fetchedAt: Date.now(),
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
       }
 
       // Fetch quota from API
