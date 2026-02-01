@@ -1,11 +1,9 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, XCircle, AlertCircle, Sparkles, Zap, Terminal, Cpu } from "lucide-react";
-import { AccountActions } from "./account-actions";
+import { CheckCircle, AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "./add-account-dialog";
+import { AccountsList } from "./accounts-list";
 
 export default async function AccountsPage({
   searchParams,
@@ -66,170 +64,13 @@ export default async function AccountsPage({
         </Alert>
       )}
 
-      {/* Iflow Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5" />
-          <h3 className="text-base md:text-lg font-semibold">Iflow Accounts</h3>
-          <Badge variant="outline" className="text-xs">
-            {iflowAccounts.length} connected
-          </Badge>
-        </div>
-
-        {/* Iflow Accounts List */}
-        {iflowAccounts.length > 0 ? (
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {iflowAccounts.map((account) => (
-              <AccountCard key={account.id} account={account} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No Iflow accounts connected yet.</p>
-        )}
-      </div>
-
-      {/* Antigravity Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5" />
-          <h3 className="text-base md:text-lg font-semibold">Antigravity Accounts</h3>
-          <Badge variant="outline" className="text-xs">
-            {antigravityAccounts.length} connected
-          </Badge>
-        </div>
-
-        {/* Antigravity Accounts List */}
-        {antigravityAccounts.length > 0 ? (
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {antigravityAccounts.map((account) => (
-              <AccountCard key={account.id} account={account} showTier />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No Antigravity accounts connected yet.</p>
-        )}
-      </div>
-
-      {/* Gemini CLI Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Cpu className="h-5 w-5" />
-          <h3 className="text-base md:text-lg font-semibold">Gemini CLI Accounts</h3>
-          <Badge variant="outline" className="text-xs">
-            {geminiCliAccounts.length} connected
-          </Badge>
-        </div>
-
-        {/* Gemini CLI Accounts List */}
-        {geminiCliAccounts.length > 0 ? (
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {geminiCliAccounts.map((account) => (
-              <AccountCard key={account.id} account={account} showTier />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No Gemini CLI accounts connected yet.</p>
-        )}
-      </div>
-
-      {/* Qwen Code Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Terminal className="h-5 w-5" />
-          <h3 className="text-base md:text-lg font-semibold">Qwen Code Accounts</h3>
-          <Badge variant="outline" className="text-xs">
-            {qwenCodeAccounts.length} connected
-          </Badge>
-        </div>
-
-        {/* Qwen Code Accounts List */}
-        {qwenCodeAccounts.length > 0 ? (
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {qwenCodeAccounts.map((account) => (
-              <AccountCard key={account.id} account={account} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No Qwen Code accounts connected yet.</p>
-        )}
-      </div>
+      {/* Client Component for Collapsible Sections */}
+      <AccountsList
+        antigravityAccounts={antigravityAccounts}
+        iflowAccounts={iflowAccounts}
+        geminiCliAccounts={geminiCliAccounts}
+        qwenCodeAccounts={qwenCodeAccounts}
+      />
     </div>
-  );
-}
-
-function AccountCard({ 
-  account, 
-  showTier = false 
-}: { 
-  account: {
-    id: string;
-    name: string;
-    provider: string;
-    email: string | null;
-    isActive: boolean;
-    requestCount: number;
-    lastUsedAt: Date | null;
-    expiresAt: Date;
-    tier: string | null;
-  };
-  showTier?: boolean;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{account.name}</CardTitle>
-          <div className="flex gap-1">
-            {showTier && account.tier && (
-              <Badge 
-                variant="outline" 
-                className={account.tier === "paid" ? "border-green-500 text-green-600" : ""}
-              >
-                {account.tier}
-              </Badge>
-            )}
-            <Badge variant={account.isActive ? "default" : "secondary"}>
-              {account.isActive ? (
-                <>
-                  <CheckCircle className="mr-1 h-3 w-3" />
-                  Active
-                </>
-              ) : (
-                <>
-                  <XCircle className="mr-1 h-3 w-3" />
-                  Inactive
-                </>
-              )}
-            </Badge>
-          </div>
-        </div>
-        <CardDescription>{account.email || "No email"}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Requests</span>
-            <span className="font-medium">{account.requestCount}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Last used</span>
-            <span className="font-medium">
-              {account.lastUsedAt
-                ? new Date(account.lastUsedAt).toLocaleDateString()
-                : "Never"}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Token expires</span>
-            <span className="font-medium">
-              {new Date(account.expiresAt).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-        <div className="mt-4 flex gap-2">
-          <AccountActions account={account} />
-        </div>
-      </CardContent>
-    </Card>
   );
 }
