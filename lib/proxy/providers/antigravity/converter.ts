@@ -22,13 +22,31 @@ const EFFORT_TO_BUDGET: Record<string, number> = {
  * Pre-process messages to find tool calls without responses.
  * Claude API requires every tool_use to have a corresponding tool_result.
  * Returns a Set of tool call IDs that have responses.
+ * 
+ * Handles multiple formats:
+ * 1. Standard OpenAI: message with role="tool" and tool_call_id
+ * 2. Content array: message with content array containing tool_result blocks
  */
 function getCompletedToolCallIds(messages: ChatCompletionRequest["messages"]): Set<string> {
   const toolResponseIds = new Set<string>();
   
   for (const message of messages) {
+    // Standard OpenAI format: role="tool"
     if (message.role === "tool" && message.tool_call_id) {
       toolResponseIds.add(message.tool_call_id);
+    }
+    
+    // Alternative format: content array with tool_result blocks (Anthropic style in OpenAI wrapper)
+    if (message.role === "user" && Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (typeof block === "object" && block !== null) {
+          const b = block as Record<string, unknown>;
+          // Handle tool_result block format
+          if (b.type === "tool_result" && typeof b.tool_use_id === "string") {
+            toolResponseIds.add(b.tool_use_id);
+          }
+        }
+      }
     }
   }
   
@@ -63,6 +81,10 @@ function getToolUseIds(messages: ChatCompletionRequest["messages"]): Set<string>
  * 
  * This handles the case where context truncation removes a tool_use but keeps the tool_result,
  * which causes Claude API to reject the request.
+ * 
+ * Handles multiple formats:
+ * 1. Standard OpenAI: message with role="tool" and tool_call_id
+ * 2. Content array: message with content array containing tool_result blocks
  */
 function getValidToolResultIds(messages: ChatCompletionRequest["messages"]): Set<string> {
   const validToolResultIds = new Set<string>();
@@ -79,14 +101,35 @@ function getValidToolResultIds(messages: ChatCompletionRequest["messages"]): Set
         }
       }
     } else if (message.role === "tool" && message.tool_call_id) {
-      // Check if this tool_result's ID was in the previous assistant's tool_calls
+      // Standard format: Check if this tool_result's ID was in the previous assistant's tool_calls
       if (lastAssistantToolCallIds.has(message.tool_call_id)) {
         validToolResultIds.add(message.tool_call_id);
       }
       // Note: Don't clear lastAssistantToolCallIds here - multiple tool results 
       // can follow a single assistant message with multiple tool calls
-    } else if (message.role === "user" || message.role === "system") {
-      // Reset when we see a user/system message (new turn)
+    } else if (message.role === "user") {
+      // Check for tool_result blocks in content array (Anthropic style)
+      if (Array.isArray(message.content)) {
+        for (const block of message.content) {
+          if (typeof block === "object" && block !== null) {
+            const b = block as Record<string, unknown>;
+            if (b.type === "tool_result" && typeof b.tool_use_id === "string") {
+              if (lastAssistantToolCallIds.has(b.tool_use_id)) {
+                validToolResultIds.add(b.tool_use_id);
+              }
+            }
+          }
+        }
+      }
+      // Check if this is a real user message (not tool results)
+      // Only reset if it's not a tool_result container
+      const hasToolResults = Array.isArray(message.content) && 
+        message.content.some(b => typeof b === "object" && b !== null && (b as Record<string, unknown>).type === "tool_result");
+      if (!hasToolResults) {
+        lastAssistantToolCallIds = new Set<string>();
+      }
+    } else if (message.role === "system") {
+      // Reset when we see a system message (new context)
       lastAssistantToolCallIds = new Set<string>();
     }
   }
@@ -193,6 +236,153 @@ function sanitizeGeminiContents(contents: Array<Record<string, unknown>>): Array
 }
 
 /**
+ * Group consecutive tool responses (functionResponse) into a single user message.
+ * 
+ * Claude API requires that all tool_result blocks corresponding to tool_use blocks
+ * in a single assistant message must be in ONE user message immediately after.
+ * 
+ * Before grouping:
+ *   [model] functionCall1, functionCall2
+ *   [user] functionResponse1
+ *   [user] functionResponse2  ← SEPARATE MESSAGE = ERROR!
+ * 
+ * After grouping:
+ *   [model] functionCall1, functionCall2
+ *   [user] functionResponse1, functionResponse2  ← SINGLE MESSAGE = SUCCESS!
+ */
+function groupConsecutiveToolResponses(
+  contents: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> {
+  if (contents.length === 0) return contents;
+  
+  const grouped: Array<Record<string, unknown>> = [];
+  
+  for (const content of contents) {
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!parts) {
+      grouped.push(content);
+      continue;
+    }
+    
+    // Check if this is a user message with functionResponse parts
+    const hasFunctionResponse = parts.some(p => p.functionResponse);
+    
+    if (content.role === "user" && hasFunctionResponse) {
+      // Check if the last message in grouped is also a user message with functionResponse
+      const lastGrouped = grouped[grouped.length - 1];
+      if (lastGrouped && lastGrouped.role === "user") {
+        const lastParts = lastGrouped.parts as Array<Record<string, unknown>> | undefined;
+        const lastHasFunctionResponse = lastParts?.some(p => p.functionResponse);
+        
+        if (lastHasFunctionResponse && lastParts) {
+          // Merge parts into the previous message
+          lastParts.push(...parts);
+          continue;
+        }
+      }
+    }
+    
+    // Create a new entry with copied parts array (to avoid mutation issues)
+    grouped.push({
+      ...content,
+      parts: [...parts],
+    });
+  }
+  
+  return grouped;
+}
+
+/**
+ * Separate text and functionCall parts in model messages.
+ * 
+ * Claude API may require that model messages with functionCall blocks
+ * don't have text content mixed in. This function splits such messages.
+ * 
+ * Also removes text parts from user messages that have functionResponse.
+ * 
+ * Before:
+ *   [model] text, functionCall1, functionCall2
+ * 
+ * After:
+ *   [model] text
+ *   [model] functionCall1, functionCall2
+ */
+function separateTextAndToolParts(
+  contents: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> {
+  if (contents.length === 0) return contents;
+  
+  const result: Array<Record<string, unknown>> = [];
+  
+  for (const content of contents) {
+    const parts = content.parts as Array<Record<string, unknown>> | undefined;
+    if (!parts || parts.length === 0) {
+      result.push(content);
+      continue;
+    }
+    
+    const textParts = parts.filter(p => 
+      p.text !== undefined && !p.thought && !p.functionCall && !p.functionResponse
+    );
+    const thoughtParts = parts.filter(p => p.thought === true);
+    const functionCallParts = parts.filter(p => p.functionCall);
+    const functionResponseParts = parts.filter(p => p.functionResponse);
+    const otherParts = parts.filter(p => 
+      !p.text && !p.thought && !p.functionCall && !p.functionResponse
+    );
+    
+    if (content.role === "model") {
+      // For model messages: separate text/thought from functionCall
+      const hasFunctionCalls = functionCallParts.length > 0;
+      const hasTextOrThought = textParts.length > 0 || thoughtParts.length > 0;
+      
+      if (hasFunctionCalls && hasTextOrThought) {
+        // Split into two messages: text/thought first, then functionCalls
+        const textAndThoughtParts = [...thoughtParts, ...textParts, ...otherParts];
+        if (textAndThoughtParts.length > 0) {
+          result.push({
+            ...content,
+            parts: textAndThoughtParts,
+          });
+        }
+        
+        if (functionCallParts.length > 0) {
+          result.push({
+            ...content,
+            parts: functionCallParts,
+          });
+        }
+      } else {
+        // No need to split - keep as is
+        result.push(content);
+      }
+    } else if (content.role === "user") {
+      // For user messages with functionResponse: remove text parts
+      const hasFunctionResponses = functionResponseParts.length > 0;
+      
+      if (hasFunctionResponses) {
+        // Only keep functionResponse parts (and maybe other non-text parts)
+        const cleanParts = [...functionResponseParts, ...otherParts];
+        if (cleanParts.length > 0) {
+          result.push({
+            ...content,
+            parts: cleanParts,
+          });
+        }
+      } else {
+        // No functionResponse - keep as is
+        result.push(content);
+      }
+    } else {
+      // Other roles - keep as is
+      result.push(content);
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Convert OpenAI messages to Gemini format
  */
 export function convertOpenAIToGemini(
@@ -274,6 +464,7 @@ export function convertOpenAIToGemini(
           function?: { name?: string; arguments?: string };
         };
         
+        // Filter: skip tool_use that doesn't have a matching tool_result
         if (tc.id && !completedToolCallIds.has(tc.id)) {
           continue;
         }
@@ -327,9 +518,19 @@ export function convertOpenAIToGemini(
   // Final sanitization: remove any remaining orphan tool calls/responses
   // This catches edge cases that may slip through the initial filtering
   const sanitizedContents = sanitizeGeminiContents(contents);
+  
+  // Group consecutive tool responses into single user messages
+  // Claude API requires all tool_result blocks for a batch of tool_use blocks
+  // to be in ONE user message immediately after the assistant message
+  const groupedContents = groupConsecutiveToolResponses(sanitizedContents);
+  
+  // Separate text and functionCall parts in model messages
+  // Claude API requires functionCall to be in dedicated messages without text mixing
+  // Also removes text parts from user messages with functionResponse
+  const finalContents = separateTextAndToolParts(groupedContents);
 
   const payload: RequestPayload = {
-    contents: sanitizedContents,
+    contents: finalContents,
   };
 
   if (systemInstruction) {
