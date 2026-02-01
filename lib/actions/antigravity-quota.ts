@@ -4,15 +4,16 @@
  * Server Actions for Antigravity Quota Monitoring
  */
 
+import type { ProviderAccount } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { decrypt } from "@/lib/encryption";
 import { 
   fetchQuotaFromApi, 
   QUOTA_GROUPS, 
   getMaxRequestsForModel,
   type QuotaGroupInfo 
 } from "@/lib/proxy/providers/antigravity/quota";
+import { antigravityProvider } from "@/lib/proxy/providers/antigravity/client";
 import { 
   updateAllBaselines, 
   estimateRemainingQuota,
@@ -212,23 +213,6 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
       const tier = account.tier ?? "free";
       byTier[tier] = (byTier[tier] ?? 0) + 1;
 
-      // Check if token is expired
-      if (account.expiresAt && new Date(account.expiresAt) < new Date()) {
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier,
-          isActive: account.isActive,
-          status: "expired",
-          error: "Token expired - please re-authenticate",
-          groups: [],
-          fetchedAt: Date.now(),
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
-        continue;
-      }
-
       // Skip inactive accounts
       if (!account.isActive) {
         results.push({
@@ -246,19 +230,22 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
         continue;
       }
 
-      // Decrypt access token
+      // Get valid access token (auto-refreshes if expired)
       let accessToken: string;
       try {
-        accessToken = await decrypt(account.accessToken);
-      } catch (error) {
+        accessToken = await antigravityProvider.getValidCredentials(
+          account as unknown as ProviderAccount
+        );
+      } catch {
+        // Token refresh failed - token is truly expired
         results.push({
           accountId: account.id,
           accountName: account.name,
           email: account.email,
           tier,
           isActive: account.isActive,
-          status: "error",
-          error: "Failed to decrypt credentials",
+          status: "expired",
+          error: "Token expired - please re-authenticate",
           groups: [],
           fetchedAt: Date.now(),
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
