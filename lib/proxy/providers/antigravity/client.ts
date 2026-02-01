@@ -22,6 +22,7 @@ import {
   LOAD_CODE_ASSIST_ENDPOINTS,
   ONBOARD_USER_ENDPOINTS,
   ANTIGRAVITY_AUTH_HEADERS,
+  DEFAULT_PROJECT_ID,
 } from "./constants";
 import { generateRequestId } from "./request-helpers";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform";
@@ -586,6 +587,9 @@ async function fetchAccountInfo(
   // Log warnings if we had issues
   if (errors.length && !projectId) {
     console.warn("[antigravity] Failed to resolve account info:", errors.join("; "));
+    // Use default project ID as fallback (like antigravity-claude-proxy)
+    console.log(`[antigravity] Using default project ID fallback: ${DEFAULT_PROJECT_ID}`);
+    projectId = DEFAULT_PROJECT_ID;
   }
 
   return {
@@ -648,12 +652,9 @@ async function onboardUser(
 
   console.log(`[antigravity] Onboarding with tier: ${tierId}, isFree: ${isFree}`);
 
-  // Build onboard request
-  // FREE tier: cloudaicompanionProject = null (server-managed)
-  // PAID tier: requires user-provided project ID
+  // Build onboard request (do NOT add cloudaicompanionProject - auto-provisioned by Google)
   const onboardRequest = {
     tierId,
-    cloudaicompanionProject: isFree ? null : undefined,
     metadata: requestMetadata,
   };
 

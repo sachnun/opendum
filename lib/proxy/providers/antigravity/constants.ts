@@ -44,7 +44,7 @@ export const ANTIGRAVITY_CLIENT_METADATA =
 
 // Endpoint fallbacks (daily → autopush → prod)
 export const CODE_ASSIST_ENDPOINT_DAILY =
-  "https://daily-cloudcode-pa.sandbox.googleapis.com";
+  "https://daily-cloudcode-pa.googleapis.com";
 export const CODE_ASSIST_ENDPOINT_AUTOPUSH =
   "https://autopush-cloudcode-pa.sandbox.googleapis.com";
 export const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
@@ -72,12 +72,10 @@ export const ONBOARD_USER_ENDPOINTS = [
 export const CODE_ASSIST_ENDPOINT = CODE_ASSIST_ENDPOINT_DAILY;
 
 // Headers for auth/discovery calls (loadCodeAssist, onboardUser)
-// CRITICAL: User-Agent MUST be google-api-nodejs-client/* for standard-tier detection.
-// Using antigravity/* UA causes server to return free-tier only (tested via matrix test).
 export const ANTIGRAVITY_AUTH_HEADERS = {
-  "User-Agent": "google-api-nodejs-client/10.3.0",
-  "X-Goog-Api-Client": "gl-node/22.18.0",
-  "Client-Metadata": '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',
+  "User-Agent": ANTIGRAVITY_USER_AGENT,
+  "X-Goog-Api-Client": ANTIGRAVITY_API_CLIENT,
+  "Client-Metadata": ANTIGRAVITY_CLIENT_METADATA,
 } as const;
 export const CODE_ASSIST_API_VERSION = "v1internal";
 
@@ -132,3 +130,6 @@ export const ANTIGRAVITY_MODELS = new Set([
 
 // Token refresh buffer (1 hour before expiry)
 export const ANTIGRAVITY_REFRESH_BUFFER_SECONDS = 60 * 60;
+
+// Default project ID fallback when discovery fails
+export const DEFAULT_PROJECT_ID = "rising-fact-p41fc";
