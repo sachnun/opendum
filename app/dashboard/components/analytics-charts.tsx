@@ -38,7 +38,7 @@ const PERIOD_GRANULARITY: Record<Period, Granularity> = {
 };
 
 export function AnalyticsCharts() {
-  const [period, setPeriod] = useState<Period>("7d");
+  const [period, setPeriod] = useState<Period>("24h");
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(true);
