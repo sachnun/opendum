@@ -245,10 +245,7 @@ export const antigravityProvider: Provider = {
     body: ChatCompletionRequest,
     stream: boolean
   ): Promise<Response> {
-    const projectId = account.projectId;
-    if (!projectId) {
-      throw new Error("Antigravity account missing projectId");
-    }
+    const projectId = account.projectId || DEFAULT_PROJECT_ID;
 
     const rawModel = body.model;
     const effectiveModel = resolveModelName(rawModel);
