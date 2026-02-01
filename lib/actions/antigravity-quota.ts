@@ -181,6 +181,7 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
         tier: true,
         isActive: true,
         accessToken: true,
+        refreshToken: true,
         expiresAt: true,
         lastUsedAt: true,
       },
