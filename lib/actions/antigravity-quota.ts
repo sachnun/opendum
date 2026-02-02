@@ -211,26 +211,14 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
     const byTier: Record<string, number> = {};
 
     for (const account of accounts) {
-      // Count by tier
-      const tier = account.tier ?? "free";
-      byTier[tier] = (byTier[tier] ?? 0) + 1;
-
-      // Skip inactive accounts
+      // Skip inactive accounts - don't include them in results
       if (!account.isActive) {
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier,
-          isActive: false,
-          status: "error",
-          error: "Account is inactive",
-          groups: [],
-          fetchedAt: Date.now(),
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
         continue;
       }
+
+      // Count by tier (only for active accounts)
+      const tier = account.tier ?? "free";
+      byTier[tier] = (byTier[tier] ?? 0) + 1;
 
       // Get valid access token
       // Only refresh if token is ACTUALLY expired (no buffer, for quota monitor)
@@ -339,13 +327,16 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
       });
     }
 
+    // Only count active accounts in summary
+    const activeAccountCount = results.length;
+
     return {
       success: true,
       data: {
         accounts: results,
         summary: {
-          totalAccounts: accounts.length,
-          activeAccounts: accounts.filter((a) => a.isActive).length,
+          totalAccounts: activeAccountCount,
+          activeAccounts: activeAccountCount,
           byTier,
           exhaustedGroups,
           totalGroups,
