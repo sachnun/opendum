@@ -240,7 +240,6 @@ export async function fetchQuotaFromApi(
         let groupRemaining = 1.0;
         let groupResetTimeIso: string | null = null;
         let groupResetTimestamp: number | null = null;
-        let foundQuotaInfo = false;
 
         for (const model of groupConfig.models) {
           const apiModel = userToApiModel(model);
@@ -250,7 +249,6 @@ export async function fetchQuotaFromApi(
             groupRemaining = modelInfo.remainingFraction;
             groupResetTimeIso = modelInfo.resetTimeIso;
             groupResetTimestamp = modelInfo.resetTimestamp;
-            foundQuotaInfo = true;
             break;
           }
         }

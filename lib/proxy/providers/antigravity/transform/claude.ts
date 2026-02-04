@@ -56,7 +56,7 @@ function sanitizeToolBlocksForClaude(
   const validFunctionCallIds = new Set<string>();
   const validFunctionResponseIds = new Set<string>();
   
-  for (const [id, _callMsgIdx] of functionCallIdToMsgIdx) {
+  for (const id of functionCallIdToMsgIdx.keys()) {
     if (functionResponseIds.has(id)) {
       validFunctionCallIds.add(id);
       validFunctionResponseIds.add(id);

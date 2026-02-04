@@ -49,7 +49,6 @@ function QuotaBar({
   compact?: boolean;
 }) {
   const percentRemaining = Math.round(group.remainingFraction * 100);
-  const percentUsed = 100 - percentRemaining;
   
   // Color based on remaining percentage
   let barColor = "bg-green-500";
