@@ -15,6 +15,7 @@ import {
   Zap, 
   Terminal, 
   Cpu,
+  Bot,
   ChevronDown,
   ChevronRight,
   AlertTriangle,
@@ -53,6 +54,7 @@ interface AccountsListProps {
   iflowAccounts: Account[];
   geminiCliAccounts: Account[];
   qwenCodeAccounts: Account[];
+  codexAccounts: Account[];
 }
 
 // =============================================================================
@@ -257,6 +259,7 @@ export function AccountsList({
   iflowAccounts,
   geminiCliAccounts,
   qwenCodeAccounts,
+  codexAccounts,
 }: AccountsListProps) {
   return (
     <div className="space-y-6">
@@ -268,6 +271,15 @@ export function AccountsList({
         showTier
         defaultOpen={true}
         emptyMessage="No Antigravity accounts connected yet."
+      />
+
+      {/* ChatGPT Codex Section - Default CLOSED */}
+      <ProviderSection
+        icon={<Bot className="h-5 w-5" />}
+        title="ChatGPT Codex Accounts"
+        accounts={codexAccounts}
+        defaultOpen={false}
+        emptyMessage="No ChatGPT Codex accounts connected yet."
       />
 
       {/* Iflow Section - Default CLOSED */}

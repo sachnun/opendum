@@ -13,6 +13,8 @@ function getProviderLabel(provider: string): string {
       return "Qwen Code";
     case ProviderName.GEMINI_CLI:
       return "Gemini CLI";
+    case ProviderName.CODEX:
+      return "ChatGPT Codex";
     default:
       return provider;
   }
@@ -33,6 +35,7 @@ export default async function ModelsPage() {
   const antigravityModels = getModelsForProvider(ProviderName.ANTIGRAVITY);
   const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
   const geminiCliModels = getModelsForProvider(ProviderName.GEMINI_CLI);
+  const codexModels = getModelsForProvider(ProviderName.CODEX);
 
   // Build available providers list (only those with models)
   const availableProviders: { id: string; label: string }[] = [];
@@ -47,6 +50,9 @@ export default async function ModelsPage() {
   }
   if (qwenCodeModels.length > 0) {
     availableProviders.push({ id: ProviderName.QWEN_CODE, label: "Qwen Code" });
+  }
+  if (codexModels.length > 0) {
+    availableProviders.push({ id: ProviderName.CODEX, label: "ChatGPT Codex" });
   }
 
   // Create models with provider info

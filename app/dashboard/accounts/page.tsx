@@ -27,6 +27,7 @@ export default async function AccountsPage({
   const antigravityAccounts = accounts.filter((a) => a.provider === "antigravity");
   const qwenCodeAccounts = accounts.filter((a) => a.provider === "qwen_code");
   const geminiCliAccounts = accounts.filter((a) => a.provider === "gemini_cli");
+  const codexAccounts = accounts.filter((a) => a.provider === "codex");
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -50,7 +51,9 @@ export default async function AccountsPage({
                 ? "Qwen Code account connected successfully!"
                 : params.success === "gemini_cli_added"
                   ? "Gemini CLI account connected successfully!"
-                  : "Account connected successfully!"}
+                  : params.success === "codex_added"
+                    ? "ChatGPT Codex account connected successfully!"
+                    : "Account connected successfully!"}
           </AlertDescription>
         </Alert>
       )}
@@ -70,6 +73,7 @@ export default async function AccountsPage({
         iflowAccounts={iflowAccounts}
         geminiCliAccounts={geminiCliAccounts}
         qwenCodeAccounts={qwenCodeAccounts}
+        codexAccounts={codexAccounts}
       />
     </div>
   );

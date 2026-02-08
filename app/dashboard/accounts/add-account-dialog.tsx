@@ -28,6 +28,7 @@ import {
   Check,
   Copy,
   Cpu,
+  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -39,10 +40,12 @@ import {
   getGeminiCliAuthUrl,
   initiateQwenCodeAuth,
   pollQwenCodeAuth,
+  initiateCodexAuth,
+  pollCodexAuth,
 } from "@/lib/actions/accounts";
 import { cn } from "@/lib/utils";
 
-type Provider = "iflow" | "antigravity" | "qwen_code" | "gemini_cli" | null;
+type Provider = "iflow" | "antigravity" | "qwen_code" | "gemini_cli" | "codex" | null;
 
 interface OAuthRedirectConfig {
   flowType: "oauth_redirect";
@@ -93,6 +96,12 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     description: "Access Qwen Coder models",
     flowType: "device_code",
   },
+  codex: {
+    name: "ChatGPT Codex",
+    icon: Bot,
+    description: "Access GPT-5 Codex models",
+    flowType: "device_code",
+  },
 };
 
 
@@ -114,7 +123,8 @@ export function AddAccountDialog() {
   const [deviceCodeInfo, setDeviceCodeInfo] = useState<{
     deviceCode: string;
     verificationUrl: string;
-    codeVerifier: string;
+    codeVerifier?: string; // Qwen Code only (stored client-side)
+    userCode?: string; // Codex only (displayed to user)
   } | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -149,19 +159,38 @@ export function AddAccountDialog() {
       } else if (providerConfig.flowType === "device_code") {
         setIsFetchingUrl(true);
         setDeviceCodeInfo(null);
-        initiateQwenCodeAuth()
-          .then((result) => {
-            if (result.success) {
-              setDeviceCodeInfo({
-                deviceCode: result.data.deviceCode,
-                verificationUrl: result.data.verificationUrlComplete,
-                codeVerifier: result.data.codeVerifier,
-              });
-            } else {
-              setError(result.error);
-            }
-          })
-          .finally(() => setIsFetchingUrl(false));
+        
+        if (provider === "codex") {
+          // Codex device code flow
+          initiateCodexAuth()
+            .then((result) => {
+              if (result.success) {
+                setDeviceCodeInfo({
+                  deviceCode: result.data.deviceAuthId,
+                  verificationUrl: result.data.verificationUrl,
+                  userCode: result.data.userCode,
+                });
+              } else {
+                setError(result.error);
+              }
+            })
+            .finally(() => setIsFetchingUrl(false));
+        } else {
+          // Qwen Code device code flow
+          initiateQwenCodeAuth()
+            .then((result) => {
+              if (result.success) {
+                setDeviceCodeInfo({
+                  deviceCode: result.data.deviceCode,
+                  verificationUrl: result.data.verificationUrlComplete,
+                  codeVerifier: result.data.codeVerifier,
+                });
+              } else {
+                setError(result.error);
+              }
+            })
+            .finally(() => setIsFetchingUrl(false));
+        }
       }
     }
   }, [step, provider, providerConfig]);
@@ -228,7 +257,7 @@ export function AddAccountDialog() {
 
     const popup = window.open(
       deviceCodeInfo.verificationUrl,
-      "qwen_auth_popup",
+      "device_auth_popup",
       `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
     );
 
@@ -262,10 +291,16 @@ export function AddAccountDialog() {
       }
 
       try {
-        const result = await pollQwenCodeAuth(
-          deviceCodeInfo.deviceCode,
-          deviceCodeInfo.codeVerifier
-        );
+        // Use the correct polling action based on provider
+        const result = provider === "codex"
+          ? await pollCodexAuth(
+              deviceCodeInfo.deviceCode,
+              deviceCodeInfo.userCode || ""
+            )
+          : await pollQwenCodeAuth(
+              deviceCodeInfo.deviceCode,
+              deviceCodeInfo.codeVerifier || ""
+            );
 
         if (!result.success) {
           setError(result.error);
@@ -282,10 +317,11 @@ export function AddAccountDialog() {
           if (popup && !popup.closed) {
             popup.close();
           }
+          const providerDisplayName = provider === "codex" ? "ChatGPT Codex" : "Qwen Code";
           toast.success(
             result.data.isUpdate
-              ? "Qwen Code account updated successfully!"
-              : "Qwen Code account connected successfully!"
+              ? `${providerDisplayName} account updated successfully!`
+              : `${providerDisplayName} account connected successfully!`
           );
           setOpen(false);
           resetForm();
@@ -314,7 +350,7 @@ export function AddAccountDialog() {
 
     // Set up interval polling every 5 seconds
     pollingRef.current = setInterval(poll, 5000);
-  }, [deviceCodeInfo, isPolling, resetForm, router]);
+  }, [deviceCodeInfo, isPolling, provider, resetForm, router]);
 
   const handleCopyLink = async () => {
     const urlToCopy = providerConfig?.flowType === "device_code" 
@@ -510,10 +546,29 @@ export function AddAccountDialog() {
                       Login to {providerConfig.name}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Click the button below to open the Qwen login page. After you
-                      complete the login, authorization will be detected automatically.
+                      {provider === "codex"
+                        ? "Click the button below to open the OpenAI login page. Enter the code shown below when prompted."
+                        : "Click the button below to open the Qwen login page. After you complete the login, authorization will be detected automatically."}
                     </p>
                   </div>
+                  {/* Show user code for Codex (user must enter it on OpenAI page) */}
+                  {provider === "codex" && deviceCodeInfo?.userCode && (
+                    <div className="flex items-center justify-center gap-3 rounded-lg border-2 border-dashed border-primary/50 bg-muted/50 p-4">
+                      <code className="text-2xl font-mono font-bold tracking-widest">
+                        {deviceCodeInfo.userCode}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(deviceCodeInfo.userCode || "");
+                          toast.success("Code copied to clipboard");
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       onClick={handleStartDeviceCodeAuth}
