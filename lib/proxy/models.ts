@@ -488,6 +488,74 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 0.25, output: 0.69 },
     },
   },
+
+  // ===== ChatGPT Codex Models (OpenAI via ChatGPT Plus/Pro) =====
+  "gpt-5.3-codex": {
+    providers: [ProviderName.CODEX],
+    meta: {
+      contextLength: 192000,
+      outputLimit: 32768,
+      releaseDate: "2026-01-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "gpt-5.2-codex": {
+    providers: [ProviderName.CODEX],
+    meta: {
+      contextLength: 192000,
+      outputLimit: 32768,
+      releaseDate: "2025-10-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "gpt-5.2": {
+    providers: [ProviderName.CODEX],
+    meta: {
+      contextLength: 192000,
+      outputLimit: 32768,
+      releaseDate: "2025-10-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "gpt-5.1-codex-max": {
+    providers: [ProviderName.CODEX],
+    meta: {
+      contextLength: 192000,
+      outputLimit: 32768,
+      releaseDate: "2025-07-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "gpt-5.1-codex": {
+    providers: [ProviderName.CODEX],
+    meta: {
+      contextLength: 192000,
+      outputLimit: 32768,
+      releaseDate: "2025-07-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "gpt-5.1-codex-mini": {
+    providers: [ProviderName.CODEX],
+    meta: {
+      contextLength: 192000,
+      outputLimit: 32768,
+      releaseDate: "2025-07-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
 };
 
 // Build reverse lookup for aliases
