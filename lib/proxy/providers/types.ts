@@ -23,6 +23,7 @@ export interface OAuthResult {
   apiKey?: string;     // Iflow only
   projectId?: string;  // Antigravity only
   tier?: string;       // Antigravity only: "free" | "paid"
+  accountId?: string;  // Codex only: ChatGPT account ID from JWT
 }
 
 /**
@@ -146,6 +147,7 @@ export const ProviderName = {
   ANTIGRAVITY: "antigravity",
   QWEN_CODE: "qwen_code",
   GEMINI_CLI: "gemini_cli",
+  CODEX: "codex",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];

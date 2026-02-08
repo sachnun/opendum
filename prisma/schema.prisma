@@ -71,7 +71,7 @@ model VerificationToken {
 model ProviderAccount {
   id       String @id @default(cuid())
   userId   String
-  provider String // "iflow" | "antigravity" | "qwen_code"
+  provider String // "iflow" | "antigravity" | "qwen_code" | "codex"
   name     String // Display name: "Personal", "Work", etc.
 
   // Encrypted credentials (AES-256 encrypted)
@@ -83,6 +83,7 @@ model ProviderAccount {
   apiKey    String? @db.Text // Iflow only: API key from getUserInfo
   projectId String?          // Antigravity only: GCP project ID
   tier      String?          // Antigravity only: "free" | "paid"
+  accountId String?          // Codex only: ChatGPT account ID from JWT
 
   // Account info
   email    String? // Account email/phone
