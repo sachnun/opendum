@@ -2,8 +2,9 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { encrypt } from "@/lib/encryption";
+import { encrypt, decrypt } from "@/lib/encryption";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { iflowProvider } from "@/lib/proxy/providers/iflow";
 import {
   IFLOW_REDIRECT_URI,
@@ -26,6 +27,10 @@ import {
   initiateDeviceCodeFlow,
   pollDeviceCodeAuthorization,
 } from "@/lib/proxy/providers/qwen-code";
+import {
+  initiateCodexDeviceCodeFlow,
+  pollCodexDeviceCodeAuthorization,
+} from "@/lib/proxy/providers/codex";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
@@ -839,5 +844,222 @@ export async function exchangeGeminiCliOAuthCode(
     console.error("Failed to exchange Gemini CLI OAuth code:", err);
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Initiate ChatGPT Codex Device Code Flow
+ * Returns device code info including URL and user code for user to enter
+ */
+export async function initiateCodexAuth(): Promise<
+  ActionResult<{
+    deviceAuthId: string;
+    userCode: string;
+    verificationUrl: string;
+    expiresIn: number;
+    interval: number;
+  }>
+> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const deviceCodeInfo = await initiateCodexDeviceCodeFlow();
+
+    // Store PKCE code verifier server-side in an encrypted HttpOnly cookie
+    // keyed by deviceAuthId so it never leaves the server
+    const cookieStore = await cookies();
+    cookieStore.set(`codex_cv_${deviceCodeInfo.deviceAuthId}`, encrypt(deviceCodeInfo.codeVerifier), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      maxAge: deviceCodeInfo.expiresIn + 60, // device code TTL + buffer
+      path: "/",
+    });
+
+    // Return everything except codeVerifier
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { codeVerifier: _cv, ...data } = deviceCodeInfo;
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (err) {
+    console.error("Failed to initiate Codex auth:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Poll ChatGPT Codex device code authorization status
+ * Call this periodically until it returns success or error
+ */
+export async function pollCodexAuth(
+  deviceAuthId: string,
+  userCode: string
+): Promise<
+  ActionResult<
+    | { status: "pending" }
+    | { status: "success"; email: string; isUpdate: boolean }
+    | { status: "error"; message: string }
+  >
+> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Retrieve PKCE code verifier from server-side cookie
+    const cookieStore = await cookies();
+    const cvCookie = cookieStore.get(`codex_cv_${deviceAuthId}`);
+    if (!cvCookie?.value) {
+      return { success: false, error: "Session expired. Please restart authentication." };
+    }
+    const codeVerifier = decrypt(cvCookie.value);
+
+    const result = await pollCodexDeviceCodeAuthorization(
+      deviceAuthId,
+      userCode,
+      codeVerifier
+    );
+
+    if ("pending" in result) {
+      return { success: true, data: { status: "pending" } };
+    }
+
+    if ("error" in result) {
+      return { success: true, data: { status: "error", message: result.error } };
+    }
+
+    // Success - we have tokens, now save them
+    const oauthResult = result;
+    const chatgptAccountId = oauthResult.accountId || null;
+
+    // Clean up the PKCE cookie
+    cookieStore.delete(`codex_cv_${deviceAuthId}`);
+
+    // Try to find existing account by accountId (stable identifier from JWT)
+    // Falls back to provider-level match if no accountId available
+    let existingAccount = null;
+    if (chatgptAccountId) {
+      existingAccount = await prisma.providerAccount.findFirst({
+        where: {
+          userId: session.user.id,
+          provider: "codex",
+          accountId: chatgptAccountId,
+        },
+      });
+    }
+
+    if (existingAccount) {
+      // Update existing account with fresh tokens
+      await prisma.providerAccount.update({
+        where: { id: existingAccount.id },
+        data: {
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          accountId: chatgptAccountId,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          status: "success",
+          email: existingAccount.email || `codex-${chatgptAccountId || "unknown"}`,
+          isUpdate: true,
+        },
+      };
+    } else {
+      // Create new account
+      const accountCount = await prisma.providerAccount.count({
+        where: { userId: session.user.id, provider: "codex" },
+      });
+
+      const email = chatgptAccountId
+        ? `codex-${chatgptAccountId}`
+        : `codex-${Date.now()}`;
+
+      await prisma.providerAccount.create({
+        data: {
+          userId: session.user.id,
+          provider: "codex",
+          name: `ChatGPT Codex Account ${accountCount + 1}`,
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          email,
+          accountId: chatgptAccountId,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          status: "success",
+          email,
+          isUpdate: false,
+        },
+      };
+    }
+  } catch (err) {
+    console.error("Failed to poll Codex auth:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Set the email/identifier for a ChatGPT Codex account
+ * Call this after successful auth to set a recognizable name
+ */
+export async function setCodexAccountEmail(
+  accountId: string,
+  email: string
+): Promise<ActionResult> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Verify ownership
+    const account = await prisma.providerAccount.findFirst({
+      where: { id: accountId, userId: session.user.id, provider: "codex" },
+    });
+
+    if (!account) {
+      return { success: false, error: "Account not found" };
+    }
+
+    await prisma.providerAccount.update({
+      where: { id: accountId },
+      data: {
+        email: email.trim(),
+        name: `ChatGPT Codex (${email.trim()})`,
+      },
+    });
+
+    revalidatePath("/dashboard/accounts");
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("Failed to set Codex account email:", error);
+    return { success: false, error: "Failed to update account" };
   }
 }
