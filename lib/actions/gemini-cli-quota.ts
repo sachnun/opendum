@@ -9,9 +9,6 @@ import {
 } from "@/lib/proxy/providers/gemini-cli/client";
 import {
   fetchGeminiCliQuotaFromApi,
-  getGeminiCliQuotaSnapshot,
-  isGeminiCliQuotaStale,
-  setGeminiCliQuotaSnapshot,
   type GeminiCliQuotaGroupInfo,
   type GeminiCliQuotaSnapshot,
 } from "@/lib/proxy/providers/gemini-cli/quota";
@@ -87,18 +84,6 @@ function formatTimeUntilReset(resetTimestamp: number | null): string | null {
   }
 
   return `${minutes}m`;
-}
-
-function getConfidenceFromAge(ageMs: number): "high" | "medium" | "low" {
-  if (ageMs < 5 * 60 * 1000) {
-    return "high";
-  }
-
-  if (ageMs < 30 * 60 * 1000) {
-    return "medium";
-  }
-
-  return "low";
 }
 
 function toQuotaGroupDisplay(
@@ -266,8 +251,6 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
       const liveQuota = await fetchGeminiCliQuotaFromApi(accessToken, projectId, tier);
 
       if (liveQuota.status === "success") {
-        setGeminiCliQuotaSnapshot(account.id, liveQuota);
-
         byTier[liveQuota.tier] = (byTier[liveQuota.tier] ?? 0) + 1;
         const groups = snapshotToGroups(liveQuota, false, "high");
 
@@ -287,35 +270,6 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
           status: "success",
           groups,
           fetchedAt: liveQuota.fetchedAt,
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
-        continue;
-      }
-
-      const cachedQuota = getGeminiCliQuotaSnapshot(account.id);
-      if (cachedQuota && !isGeminiCliQuotaStale(cachedQuota)) {
-        byTier[cachedQuota.tier] = (byTier[cachedQuota.tier] ?? 0) + 1;
-        const ageMs = Math.max(0, Date.now() - cachedQuota.fetchedAt);
-        const confidence = getConfidenceFromAge(ageMs);
-        const groups = snapshotToGroups(cachedQuota, true, confidence);
-
-        for (const group of groups) {
-          totalGroups++;
-          if (group.isExhausted) {
-            exhaustedGroups++;
-          }
-        }
-
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier: cachedQuota.tier,
-          isActive: account.isActive,
-          status: "success",
-          error: liveQuota.error,
-          groups,
-          fetchedAt: cachedQuota.fetchedAt,
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
         });
         continue;

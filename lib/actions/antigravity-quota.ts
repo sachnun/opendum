@@ -10,17 +10,9 @@ import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/encryption";
 import { 
   fetchQuotaFromApi, 
-  QUOTA_GROUPS, 
-  getMaxRequestsForModel,
   type QuotaGroupInfo 
 } from "@/lib/proxy/providers/antigravity/quota";
 import { antigravityProvider } from "@/lib/proxy/providers/antigravity/client";
-import { 
-  updateAllBaselines, 
-  estimateRemainingQuota,
-  incrementRequestCount as incrementCache,
-  getAccountCacheData,
-} from "@/lib/proxy/providers/antigravity/quota-cache";
 
 // =============================================================================
 // TYPES
@@ -99,37 +91,10 @@ function formatTimeUntilReset(resetTimestamp: number | null): string | null {
 }
 
 /**
- * Convert QuotaGroupInfo to display format with estimates
+ * Convert QuotaGroupInfo to display format
  */
-function toQuotaGroupDisplay(
-  group: QuotaGroupInfo,
-  accountId: string,
-  tier: string,
-  useEstimate: boolean = false
-): QuotaGroupDisplay {
-  let remainingFraction = group.remainingFraction;
-  let remainingRequests = group.remainingRequests;
-  let isEstimated = false;
-  let confidence: "high" | "medium" | "low" = "high";
-
-  // If using estimates, get from cache
-  if (useEstimate) {
-    const estimate = estimateRemainingQuota(
-      accountId,
-      group.name,
-      tier,
-      group.maxRequests
-    );
-    
-    if (estimate.isEstimated) {
-      remainingFraction = estimate.remainingFraction;
-      remainingRequests = estimate.remainingRequests;
-      isEstimated = true;
-      confidence = estimate.confidence;
-    }
-  }
-
-  const usedRequests = group.maxRequests - remainingRequests;
+function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
+  const usedRequests = group.maxRequests - group.remainingRequests;
   const percentUsed = group.maxRequests > 0 
     ? Math.round((usedRequests / group.maxRequests) * 100) 
     : 0;
@@ -138,14 +103,14 @@ function toQuotaGroupDisplay(
     name: group.name,
     displayName: group.displayName,
     models: group.models,
-    remainingFraction,
-    remainingRequests,
+    remainingFraction: group.remainingFraction,
+    remainingRequests: group.remainingRequests,
     maxRequests: group.maxRequests,
     usedRequests,
     percentUsed,
-    isExhausted: remainingFraction <= 0,
-    isEstimated,
-    confidence,
+    isExhausted: group.remainingFraction <= 0,
+    isEstimated: false,
+    confidence: "high",
     resetTimeIso: group.resetTimeIso,
     resetInHuman: formatTimeUntilReset(group.resetTimestamp),
   };
@@ -157,9 +122,6 @@ function toQuotaGroupDisplay(
 
 /**
  * Get Antigravity quota for all user's accounts
- * 
- * This action fetches real-time quota from the Antigravity API and
- * updates the local cache for future estimations.
  */
 export async function getAntigravityQuota(): Promise<QuotaActionResult> {
   const session = await auth();
@@ -286,20 +248,8 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
         continue;
       }
 
-      // Update cache baselines
-      updateAllBaselines(
-        account.id,
-        quotaResult.groups.map((g) => ({
-          name: g.name,
-          remainingFraction: g.remainingFraction,
-          resetTimestamp: g.resetTimestamp,
-        }))
-      );
-
       // Convert to display format
-      const groups = quotaResult.groups.map((g) =>
-        toQuotaGroupDisplay(g, account.id, tier, false)
-      );
+      const groups = quotaResult.groups.map((g) => toQuotaGroupDisplay(g));
 
       // Count exhausted groups
       for (const group of groups) {
@@ -343,165 +293,4 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
       error: error instanceof Error ? error.message : "Failed to fetch quota data",
     };
   }
-}
-
-/**
- * Get estimated quota (uses cache, doesn't hit API)
- * 
- * Use this for quick updates between full API fetches.
- */
-export async function getEstimatedQuota(): Promise<QuotaActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    const accounts = await prisma.providerAccount.findMany({
-      where: {
-        userId: session.user.id,
-        provider: "antigravity",
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        tier: true,
-        isActive: true,
-        lastUsedAt: true,
-      },
-      orderBy: { lastUsedAt: "desc" },
-    });
-
-    const results: AccountQuotaInfo[] = [];
-    let exhaustedGroups = 0;
-    let totalGroups = 0;
-    const byTier: Record<string, number> = {};
-
-    for (const account of accounts) {
-      const tier = account.tier ?? "free";
-      byTier[tier] = (byTier[tier] ?? 0) + 1;
-
-      // Build groups from constants with estimates
-      const groups: QuotaGroupDisplay[] = [];
-      
-      for (const [groupName, groupConfig] of Object.entries(QUOTA_GROUPS)) {
-        const representativeModel = groupConfig.models[0];
-        const maxRequests = getMaxRequestsForModel(representativeModel, tier);
-        
-        const estimate = estimateRemainingQuota(
-          account.id,
-          groupName,
-          tier,
-          maxRequests
-        );
-
-        const usedRequests = maxRequests - estimate.remainingRequests;
-        const percentUsed = maxRequests > 0 
-          ? Math.round((usedRequests / maxRequests) * 100) 
-          : 0;
-
-        groups.push({
-          name: groupName,
-          displayName: groupConfig.displayName,
-          models: groupConfig.models,
-          remainingFraction: estimate.remainingFraction,
-          remainingRequests: estimate.remainingRequests,
-          maxRequests: estimate.maxRequests,
-          usedRequests,
-          percentUsed,
-          isExhausted: estimate.isExhausted,
-          isEstimated: estimate.isEstimated,
-          confidence: estimate.confidence,
-          resetTimeIso: null,
-          resetInHuman: null,
-        });
-
-        totalGroups++;
-        if (estimate.isExhausted) {
-          exhaustedGroups++;
-        }
-      }
-
-      results.push({
-        accountId: account.id,
-        accountName: account.name,
-        email: account.email,
-        tier,
-        isActive: account.isActive,
-        status: "success",
-        groups,
-        fetchedAt: Date.now(),
-        lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-      });
-    }
-
-    return {
-      success: true,
-      data: {
-        accounts: results,
-        summary: {
-          totalAccounts: accounts.length,
-          activeAccounts: accounts.filter((account) => account.isActive).length,
-          byTier,
-          exhaustedGroups,
-          totalGroups,
-        },
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to get quota estimates",
-    };
-  }
-}
-
-/**
- * Increment request count for an account/model (called after successful request)
- */
-export async function incrementRequestCount(
-  accountId: string,
-  model: string
-): Promise<void> {
-  // Update in-memory cache
-  incrementCache(accountId, model);
-  
-  // Also update database request count
-  try {
-    await prisma.providerAccount.update({
-      where: { id: accountId },
-      data: {
-        requestCount: { increment: 1 },
-        lastUsedAt: new Date(),
-      },
-    });
-  } catch (error) {
-    void error;
-  }
-}
-
-/**
- * Get cache debug info for an account
- */
-export async function getQuotaCacheDebug(accountId: string): Promise<{
-  baselines: Record<string, unknown>;
-  requestCounts: Record<string, number>;
-} | null> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return null;
-  }
-
-  // Verify user owns this account
-  const account = await prisma.providerAccount.findFirst({
-    where: { id: accountId, userId: session.user.id },
-    select: { id: true },
-  });
-
-  if (!account) {
-    return null;
-  }
-
-  return getAccountCacheData(accountId);
 }

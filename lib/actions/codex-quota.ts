@@ -10,9 +10,6 @@ import { prisma } from "@/lib/db";
 import { codexProvider } from "@/lib/proxy/providers/codex";
 import {
   fetchCodexQuotaFromApi,
-  getCodexQuotaSnapshot,
-  isCodexQuotaStale,
-  setCodexQuotaSnapshot,
   type CodexQuotaSnapshot,
   type CodexRateLimitWindow,
 } from "@/lib/proxy/providers/codex/quota";
@@ -112,18 +109,6 @@ function getWindowDisplayName(
   const base = name === "primary" ? "Primary window" : "Secondary window";
   const duration = formatWindowDuration(windowMinutes);
   return duration ? `${base} (${duration})` : base;
-}
-
-function getConfidenceFromAge(ageMs: number): "high" | "medium" | "low" {
-  if (ageMs < 5 * 60 * 1000) {
-    return "high";
-  }
-
-  if (ageMs < 30 * 60 * 1000) {
-    return "medium";
-  }
-
-  return "low";
 }
 
 function toQuotaGroupDisplay(
@@ -247,8 +232,6 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
       const liveQuota = await fetchCodexQuotaFromApi(accessToken, account.accountId);
 
       if (liveQuota.status === "success") {
-        setCodexQuotaSnapshot(account.id, liveQuota);
-
         const tier = liveQuota.planType ?? "unknown";
         byTier[tier] = (byTier[tier] ?? 0) + 1;
 
@@ -269,37 +252,6 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
           status: "success",
           groups,
           fetchedAt: liveQuota.fetchedAt,
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
-        continue;
-      }
-
-      const cachedQuota = getCodexQuotaSnapshot(account.id);
-      if (cachedQuota && !isCodexQuotaStale(cachedQuota)) {
-        const tier = cachedQuota.planType ?? "unknown";
-        byTier[tier] = (byTier[tier] ?? 0) + 1;
-
-        const ageMs = Math.max(0, Date.now() - cachedQuota.fetchedAt);
-        const confidence = getConfidenceFromAge(ageMs);
-        const groups = snapshotToGroups(cachedQuota, true, confidence);
-
-        for (const group of groups) {
-          totalGroups++;
-          if (group.isExhausted) {
-            exhaustedGroups++;
-          }
-        }
-
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier,
-          isActive: account.isActive,
-          status: "success",
-          error: liveQuota.error,
-          groups,
-          fetchedAt: cachedQuota.fetchedAt,
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
         });
         continue;
