@@ -188,6 +188,19 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       vision: false,
     },
   },
+  "kimi-k2.5": {
+    providers: [ProviderName.IFLOW],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 262144,
+      knowledgeCutoff: "2025-01",
+      releaseDate: "2026-01-27",
+      reasoning: true,
+      toolCall: true,
+      vision: true,
+      pricing: { input: 0.6, output: 3 },
+    },
+  },
   "kimi-k2-0905": {
     providers: [ProviderName.IFLOW],
     meta: {
