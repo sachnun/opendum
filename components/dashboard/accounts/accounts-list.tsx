@@ -575,46 +575,16 @@ export function AccountsList({
   }, [geminiCliAccounts.length]);
 
   useEffect(() => {
-    if (antigravityAccounts.length === 0) {
-      return;
-    }
-
-    const timeout = setTimeout(fetchAntigravityQuota, 0);
-    const interval = setInterval(fetchAntigravityQuota, 5 * 60 * 1000);
-
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [antigravityAccounts.length, fetchAntigravityQuota]);
+    fetchAntigravityQuota();
+  }, [fetchAntigravityQuota]);
 
   useEffect(() => {
-    if (codexAccounts.length === 0) {
-      return;
-    }
-
-    const timeout = setTimeout(fetchCodexQuota, 0);
-    const interval = setInterval(fetchCodexQuota, 5 * 60 * 1000);
-
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [codexAccounts.length, fetchCodexQuota]);
+    fetchCodexQuota();
+  }, [fetchCodexQuota]);
 
   useEffect(() => {
-    if (geminiCliAccounts.length === 0) {
-      return;
-    }
-
-    const timeout = setTimeout(fetchGeminiCliQuota, 0);
-    const interval = setInterval(fetchGeminiCliQuota, 5 * 60 * 1000);
-
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [geminiCliAccounts.length, fetchGeminiCliQuota]);
+    fetchGeminiCliQuota();
+  }, [fetchGeminiCliQuota]);
 
   return (
     <div className="space-y-6">
