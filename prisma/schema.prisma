@@ -104,7 +104,7 @@ model ProviderAccount {
   // Health status: "active" | "degraded" | "failed"
   // - active: normal operation
   // - degraded: 5+ consecutive errors, deprioritized
-  // - failed: 10+ consecutive errors, skipped from rotation
+  // - failed: 10+ consecutive errors, retried automatically after cooldown
   status          String    @default("active")
   statusReason    String?
   statusChangedAt DateTime?

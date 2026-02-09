@@ -4,6 +4,8 @@ import { getProvidersForModel } from "./models";
 import { isRateLimited, clearExpiredRateLimits } from "./rate-limit";
 import { getModelFamily } from "./providers/antigravity/converter";
 
+const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
+
 /**
  * Get the next active provider account for a user and model using LRU (Least Recently Used)
  * Selects the account that was used longest ago (or never used) for fair distribution
@@ -62,7 +64,8 @@ export async function getNextAccount(
 /**
  * Get the next available (non-rate-limited) account for a user and model using LRU
  * Skips accounts that are rate-limited for the model's family
- * Skips accounts with "failed" status, deprioritizes "degraded" accounts
+ * Deprioritizes degraded and failed accounts.
+ * Failed accounts are retried automatically after a cooldown window.
  * @param userId User ID
  * @param model Model name
  * @param provider Optional specific provider
@@ -85,14 +88,13 @@ export async function getNextAvailableAccount(
     }
   }
 
-  // Get all active accounts, excluding failed status
-  // Ordered by: status (active before degraded), then LRU
+  // Get all active accounts.
+  // Ordered by: status (active -> degraded -> failed), then LRU.
   const accounts = await prisma.providerAccount.findMany({
     where: {
       userId,
       provider: { in: targetProviders },
       isActive: true,
-      status: { not: "failed" }, // Skip failed accounts
       id: { notIn: excludeAccountIds.length > 0 ? excludeAccountIds : undefined },
     },
     orderBy: [
@@ -114,8 +116,18 @@ export async function getNextAvailableAccount(
 
   // Prioritize paid accounts first, then free accounts
   let selectedAccount: ProviderAccount | null = null;
+  const now = Date.now();
+
   for (const acc of [...paidAccounts, ...freeAccounts]) {
     clearExpiredRateLimits(acc.id);
+
+    if (acc.status === "failed" && acc.statusChangedAt) {
+      const elapsed = now - acc.statusChangedAt.getTime();
+      if (elapsed < FAILED_ACCOUNT_RETRY_COOLDOWN_MS) {
+        continue;
+      }
+    }
+
     if (!isRateLimited(acc.id, family)) {
       selectedAccount = acc;
       break;
@@ -180,7 +192,7 @@ export async function getNextAccountForProvider(
  * Mark an account as having failed with error details
  * Auto-degrades status based on consecutive error count:
  * - 5+ consecutive errors: "degraded" (deprioritized in selection)
- * - 10+ consecutive errors: "failed" (skipped from rotation)
+ * - 10+ consecutive errors: "failed" (temporarily sidelined, retried after cooldown)
  */
 export async function markAccountFailed(
   accountId: string,
