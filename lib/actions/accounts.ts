@@ -868,7 +868,7 @@ export async function exchangeGeminiCliOAuthCode(
 }
 
 /**
- * Get ChatGPT Codex OAuth authorization URL (browser flow)
+ * Get Codex OAuth authorization URL (browser flow)
  */
 export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
   const session = await auth();
@@ -916,7 +916,7 @@ export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string 
 }
 
 /**
- * Exchange ChatGPT Codex OAuth callback URL for tokens and create/update account
+ * Exchange Codex OAuth callback URL for tokens and create/update account
  */
 export async function exchangeCodexOAuthCode(
   callbackUrl: string
@@ -1038,7 +1038,7 @@ export async function exchangeCodexOAuthCode(
       data: {
         userId: session.user.id,
         provider: "codex",
-        name: `ChatGPT Codex Account ${accountCount + 1}`,
+        name: `Codex Account ${accountCount + 1}`,
         accessToken: encrypt(oauthResult.accessToken),
         refreshToken: encrypt(oauthResult.refreshToken),
         expiresAt: oauthResult.expiresAt,
@@ -1067,7 +1067,7 @@ export async function exchangeCodexOAuthCode(
 }
 
 /**
- * Initiate ChatGPT Codex Device Code Flow
+ * Initiate Codex Device Code Flow
  * Returns device code info including URL and user code for user to enter
  */
 export async function initiateCodexAuth(): Promise<
@@ -1115,7 +1115,7 @@ export async function initiateCodexAuth(): Promise<
 }
 
 /**
- * Poll ChatGPT Codex device code authorization status
+ * Poll Codex device code authorization status
  * Call this periodically until it returns success or error
  */
 export async function pollCodexAuth(
@@ -1217,7 +1217,7 @@ export async function pollCodexAuth(
         data: {
           userId: session.user.id,
           provider: "codex",
-          name: `ChatGPT Codex Account ${accountCount + 1}`,
+          name: `Codex Account ${accountCount + 1}`,
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           expiresAt: oauthResult.expiresAt,
@@ -1246,7 +1246,7 @@ export async function pollCodexAuth(
 }
 
 /**
- * Set the email/identifier for a ChatGPT Codex account
+ * Set the email/identifier for a Codex account
  * Call this after successful auth to set a recognizable name
  */
 export async function setCodexAccountEmail(
@@ -1273,7 +1273,7 @@ export async function setCodexAccountEmail(
       where: { id: accountId },
       data: {
         email: email.trim(),
-        name: `ChatGPT Codex (${email.trim()})`,
+        name: `Codex (${email.trim()})`,
       },
     });
 

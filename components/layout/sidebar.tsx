@@ -3,52 +3,79 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LogOut } from "lucide-react";
-import { navigation } from "@/lib/navigation";
-import { signOut } from "next-auth/react";
-import { Button } from "@/components/ui/button";
+import { type NavItem, primaryNavigation, supportNavigation } from "@/lib/navigation";
+import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
+
+  const renderNavItem = (item: NavItem) => {
+    const isActive =
+      pathname === item.href ||
+      (item.href !== "/dashboard" && pathname.startsWith(item.href));
+
+    return (
+      <div key={item.name} className="space-y-1">
+        <Link
+          href={item.href}
+          className={cn(
+            "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+            isActive
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+          )}
+        >
+          <item.icon
+            className={cn(
+              "h-4 w-4",
+              isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+            )}
+          />
+          {item.name}
+        </Link>
+
+        {item.children?.length ? (
+          <div className="ml-6 space-y-1 border-l border-border/60 pl-3">
+            {item.children.map((subItem) => {
+              const isSubActive = isSubItemActive(subItem);
+
+              return (
+                <Link
+                  key={`${item.name}-${subItem.name}`}
+                  href={subItem.href}
+                  onClick={(event) => handleSubItemClick(event, subItem)}
+                  className={cn(
+                    "block rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    isSubActive
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  {subItem.name}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
-    <div className="hidden md:flex h-full w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="text-xl font-bold">Opendum</span>
+    <div className="hidden md:sticky md:top-0 md:flex md:h-svh md:w-60 md:flex-col md:border-r md:border-border md:bg-card">
+      <div className="flex h-16 items-center border-b border-border px-5">
+        <Link href="/dashboard" className="inline-flex items-center gap-2.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          <span className="text-base font-semibold tracking-tight">Opendum</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href || 
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              )}
-            >
-              <item.icon className="h-5 w-5" />
-              {item.name}
-            </Link>
-          );
-        })}
+      <nav className="flex flex-1 flex-col px-3 py-4">
+        <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
+        <div className="mt-auto space-y-1 border-t border-border/60 pt-4">
+          {supportNavigation.map(renderNavItem)}
+        </div>
       </nav>
-      <div className="border-t p-3">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3"
-          onClick={() => signOut({ callbackUrl: "/" })}
-        >
-          <LogOut className="h-5 w-5" />
-          Sign Out
-        </Button>
-      </div>
     </div>
   );
 }

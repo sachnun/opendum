@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -12,54 +11,75 @@ import {
 import { signOut } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { MODEL_REGISTRY } from "@/lib/proxy/models";
+import { ModelSearchPopover } from "@/components/layout/model-search-popover";
+
+const PROVIDER_LABELS: Record<string, string> = {
+  iflow: "Iflow",
+  antigravity: "Antigravity",
+  qwen_code: "Qwen Code",
+  gemini_cli: "Gemini CLI",
+  codex: "Codex",
+};
 
 export async function Header() {
   const session = await auth();
+  const firstName = session?.user?.name?.split(" ")[0] ?? "User";
+  const models = Object.entries(MODEL_REGISTRY)
+    .map(([id, info]) => ({
+      id,
+      providers: info.providers.map((provider) => PROVIDER_LABELS[provider] ?? provider),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
-      <div className="flex items-center gap-3">
-        <MobileNav />
-        <Link href="/dashboard" className="md:hidden text-lg font-bold">
-          Opendum
-        </Link>
-        <h1 className="hidden md:block text-lg font-semibold">Dashboard</h1>
-      </div>
-      <div className="flex items-center gap-2">
-        <ThemeToggle />
-        <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-full">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={session?.user?.image ?? undefined} />
-              <AvatarFallback>
-                {session?.user?.name?.[0]?.toUpperCase() ?? "U"}
-              </AvatarFallback>
-            </Avatar>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>
-            <div className="flex flex-col">
-              <span>{session?.user?.name}</span>
-              <span className="text-xs text-muted-foreground">
-                {session?.user?.email}
-              </span>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/" });
-            }}
-          >
-            <DropdownMenuItem asChild>
-              <button className="w-full cursor-pointer">Sign out</button>
-            </DropdownMenuItem>
-          </form>
-        </DropdownMenuContent>
-        </DropdownMenu>
+    <header className="sticky top-0 z-30 h-16 border-b border-border bg-background px-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-full w-full max-w-7xl items-center gap-3">
+        <div className="flex min-w-0 items-center">
+          <MobileNav />
+        </div>
+        <div className="min-w-0 flex-1">
+          <ModelSearchPopover models={models} className="mx-auto max-w-xl" />
+        </div>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <ThemeToggle />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={session?.user?.image ?? undefined} />
+                  <AvatarFallback>
+                    {session?.user?.name?.[0]?.toUpperCase() ?? "U"}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span>{session?.user?.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {session?.user?.email}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <form
+                action={async () => {
+                  "use server";
+                  await signOut({ redirectTo: "/" });
+                }}
+              >
+                <DropdownMenuItem asChild>
+                  <button className="w-full cursor-pointer text-left">Sign out</button>
+                </DropdownMenuItem>
+              </form>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );
