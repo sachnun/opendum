@@ -46,7 +46,7 @@ export function ModelDistributionChart({ data }: Props) {
       {!hasData ? (
         <EmptyChart />
       ) : (
-        <ChartContainer config={chartConfig} className="h-[200px] w-full">
+        <ChartContainer config={chartConfig} className="h-[230px] w-full sm:h-[250px]">
           <PieChart>
             <Pie
               data={transformedData}
@@ -70,10 +70,10 @@ export function ModelDistributionChart({ data }: Props) {
               }}
             />
             <Legend
-              layout="vertical"
-              verticalAlign="middle"
-              align="right"
-              wrapperStyle={{ fontSize: "11px" }}
+              layout="horizontal"
+              verticalAlign="bottom"
+              align="center"
+              wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }}
               formatter={(value) => {
                 return value.length > 12 ? value.substring(0, 12) + "..." : value;
               }}

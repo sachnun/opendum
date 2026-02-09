@@ -97,7 +97,7 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     flowType: "device_code",
   },
   codex: {
-    name: "ChatGPT Codex",
+    name: "Codex",
     icon: Bot,
     description: "Access GPT-5 Codex models",
     flowType: "oauth_redirect",

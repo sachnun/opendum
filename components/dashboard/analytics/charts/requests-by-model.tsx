@@ -46,7 +46,7 @@ export function RequestsByModelChart({ data }: Props) {
       {!hasData ? (
         <EmptyChart />
       ) : (
-        <ChartContainer config={chartConfig} className="h-[200px] w-full">
+        <ChartContainer config={chartConfig} className="h-[230px] w-full sm:h-[250px]">
           <BarChart
             accessibilityLayer
             data={transformedData}

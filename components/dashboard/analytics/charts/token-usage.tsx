@@ -1,23 +1,23 @@
 "use client";
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
-import type { SuccessRateData, Granularity } from "@/lib/actions/analytics";
+import type { TokenUsageData, Granularity } from "@/lib/actions/analytics";
 
 interface Props {
-  data: SuccessRateData[];
+  data: TokenUsageData[];
   granularity: Granularity;
 }
 
 const chartConfig = {
-  success: {
-    label: "Success",
-    color: "var(--chart-2)",
+  input: {
+    label: "Input Tokens",
+    color: "var(--chart-1)",
   },
-  error: {
-    label: "Error",
-    color: "var(--destructive)",
+  output: {
+    label: "Output Tokens",
+    color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
 
@@ -48,16 +48,16 @@ function formatTooltipLabel(value: string, granularity: Granularity): string {
   return date.toLocaleString();
 }
 
-export function SuccessRateChart({ data, granularity }: Props) {
-  const hasData = data.some((d) => d.success > 0 || d.error > 0);
+export function TokenUsageChart({ data, granularity }: Props) {
+  const hasData = data.some((d) => d.input > 0 || d.output > 0);
 
   return (
-    <ChartCard title="Success / Error Rate" className="col-span-full">
+    <ChartCard title="Token Usage">
       {!hasData ? (
         <EmptyChart />
       ) : (
-        <ChartContainer config={chartConfig} className="h-[200px] w-full">
-          <AreaChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+        <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[250px]">
+          <LineChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
@@ -71,29 +71,34 @@ export function SuccessRateChart({ data, granularity }: Props) {
               tick={{ fontSize: 12 }}
               tickLine={false}
               axisLine={false}
+              tickFormatter={(value) => {
+                if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                return value;
+              }}
             />
             <ChartTooltip
               content={<ChartTooltipContent />}
               labelFormatter={(value) => formatTooltipLabel(value, granularity)}
             />
             <Legend />
-            <Area
+            <Line
               type="monotone"
-              dataKey="success"
-              stackId="1"
-              stroke="var(--color-success)"
-              fill="var(--color-success)"
-              fillOpacity={0.6}
+              dataKey="input"
+              stroke="var(--color-input)"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-            <Area
+            <Line
               type="monotone"
-              dataKey="error"
-              stackId="1"
-              stroke="var(--color-error)"
-              fill="var(--color-error)"
-              fillOpacity={0.6}
+              dataKey="output"
+              stroke="var(--color-output)"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
             />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       )}
     </ChartCard>

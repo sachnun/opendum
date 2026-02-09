@@ -9,19 +9,11 @@ import {
   Terminal, 
   Cpu,
   Bot,
-  ChevronDown,
-  ChevronRight,
   AlertTriangle,
   AlertCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   getAntigravityQuota,
   type AccountQuotaInfo,
@@ -64,6 +56,33 @@ interface AccountsListProps {
 
 function formatUtcDate(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function getAccountHeader(account: Account): { title: string; subtitle: string | null } {
+  const rawName = account.name.trim();
+  const rawEmail = account.email?.trim() ?? "";
+
+  if (!rawEmail) {
+    return { title: rawName, subtitle: null };
+  }
+
+  const normalizedEmail = rawEmail.toLowerCase();
+  let title = rawName;
+
+  const trailingEmailMatch = title.match(/\(([^)]+)\)\s*$/);
+  if (trailingEmailMatch?.[1]?.trim().toLowerCase() === normalizedEmail) {
+    title = title.replace(/\([^)]+\)\s*$/, "").trim();
+  }
+
+  if (!title) {
+    title = rawEmail;
+  }
+
+  if (title.toLowerCase().includes(normalizedEmail)) {
+    return { title, subtitle: null };
+  }
+
+  return { title, subtitle: rawEmail };
 }
 
 // =============================================================================
@@ -150,19 +169,27 @@ function AccountCard({
   const successRate = account.successCount + account.errorCount > 0
     ? Math.round((account.successCount / (account.successCount + account.errorCount)) * 100)
     : 100;
+  const { title, subtitle } = getAccountHeader(account);
+  const isPaidTier = account.tier === "paid" || account.tier === "standard-tier";
+  const tierLabel =
+    account.tier === "paid" || account.tier === "standard-tier"
+      ? "Paid"
+      : account.tier === "free"
+        ? "Free"
+        : account.tier;
 
   return (
-    <Card className={account.status === "failed" ? "border-red-300 dark:border-red-800" : account.status === "degraded" ? "border-yellow-300 dark:border-yellow-800" : ""}>
+    <Card className="bg-card">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{account.name}</CardTitle>
+          <CardTitle className="text-lg">{title}</CardTitle>
           <div className="flex gap-1 flex-wrap justify-end">
             {showTier && account.tier && (
               <Badge 
                 variant="outline" 
-                className={account.tier === "paid" ? "border-green-500 text-green-600" : ""}
+                className={isPaidTier ? "border-green-500 text-green-600" : ""}
               >
-                {account.tier}
+                {tierLabel}
               </Badge>
             )}
             {account.isActive ? (
@@ -175,7 +202,7 @@ function AccountCard({
             )}
           </div>
         </div>
-        <CardDescription>{account.email || "No email"}</CardDescription>
+        {subtitle && <CardDescription>{subtitle}</CardDescription>}
       </CardHeader>
       <CardContent>
         <div className="space-y-2 text-sm">
@@ -272,72 +299,54 @@ function AccountCard({
 // =============================================================================
 
 interface ProviderSectionProps {
+  id?: string;
   icon: React.ReactNode;
   title: string;
   accounts: Account[];
   showTier?: boolean;
-  defaultOpen?: boolean;
   emptyMessage: string;
   quotaByAccountId?: Record<string, AccountQuotaInfo>;
   isQuotaLoading?: boolean;
 }
 
 function ProviderSection({
+  id,
   icon,
   title,
   accounts,
   showTier = false,
-  defaultOpen = false,
   emptyMessage,
   quotaByAccountId,
   isQuotaLoading = false,
 }: ProviderSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="space-y-4">
-        <CollapsibleTrigger asChild>
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start p-0 h-auto hover:bg-transparent"
-          >
-            <div className="flex items-center gap-2 w-full">
-              <div className="flex items-center justify-center w-6 h-6">
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-              {icon}
-              <h3 className="text-base md:text-lg font-semibold">{title}</h3>
-              <Badge variant="outline" className="text-xs">
-                {accounts.length} connected
-              </Badge>
-            </div>
-          </Button>
-        </CollapsibleTrigger>
-
-        <CollapsibleContent className="pl-8">
-          {accounts.length > 0 ? (
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {accounts.map((account) => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  showTier={showTier}
-                  quotaInfo={quotaByAccountId?.[account.id]}
-                  isQuotaLoading={isQuotaLoading}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-          )}
-        </CollapsibleContent>
+    <section id={id} className="scroll-mt-24 space-y-4">
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5">
+        {icon}
+        <h3 className="text-base md:text-lg font-semibold">{title}</h3>
+        <Badge variant="outline" className="text-xs">
+          {accounts.length} connected
+        </Badge>
       </div>
-    </Collapsible>
+
+      <div className="pl-3 pt-1 sm:pl-8">
+        {accounts.length > 0 ? (
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {accounts.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                showTier={showTier}
+                quotaInfo={quotaByAccountId?.[account.id]}
+                isQuotaLoading={isQuotaLoading}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -395,52 +404,52 @@ export function AccountsList({
 
   return (
     <div className="space-y-6">
-      {/* Antigravity Section - Default OPEN */}
+      {/* Antigravity Section */}
       <ProviderSection
+        id="antigravity-accounts"
         icon={<Sparkles className="h-5 w-5" />}
         title="Antigravity Accounts"
         accounts={antigravityAccounts}
         showTier
-        defaultOpen={true}
         emptyMessage="No Antigravity accounts connected yet."
         quotaByAccountId={quotaByAccountId}
         isQuotaLoading={isQuotaLoading}
       />
 
-      {/* ChatGPT Codex Section - Default CLOSED */}
+      {/* Codex Section */}
       <ProviderSection
+        id="codex-accounts"
         icon={<Bot className="h-5 w-5" />}
-        title="ChatGPT Codex Accounts"
+        title="Codex Accounts"
         accounts={codexAccounts}
-        defaultOpen={false}
-        emptyMessage="No ChatGPT Codex accounts connected yet."
+        emptyMessage="No Codex accounts connected yet."
       />
 
-      {/* Iflow Section - Default CLOSED */}
+      {/* Iflow Section */}
       <ProviderSection
+        id="iflow-accounts"
         icon={<Zap className="h-5 w-5" />}
         title="Iflow Accounts"
         accounts={iflowAccounts}
-        defaultOpen={false}
         emptyMessage="No Iflow accounts connected yet."
       />
 
-      {/* Gemini CLI Section - Default CLOSED */}
+      {/* Gemini CLI Section */}
       <ProviderSection
+        id="gemini-cli-accounts"
         icon={<Cpu className="h-5 w-5" />}
         title="Gemini CLI Accounts"
         accounts={geminiCliAccounts}
         showTier
-        defaultOpen={false}
         emptyMessage="No Gemini CLI accounts connected yet."
       />
 
-      {/* Qwen Code Section - Default CLOSED */}
+      {/* Qwen Code Section */}
       <ProviderSection
+        id="qwen-code-accounts"
         icon={<Terminal className="h-5 w-5" />}
         title="Qwen Code Accounts"
         accounts={qwenCodeAccounts}
-        defaultOpen={false}
         emptyMessage="No Qwen Code accounts connected yet."
       />
     </div>

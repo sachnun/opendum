@@ -55,7 +55,7 @@ export function RequestsOverTimeChart({ data, granularity }: Props) {
       {!hasData ? (
         <EmptyChart />
       ) : (
-        <ChartContainer config={chartConfig} className="h-[200px] w-full">
+        <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[250px]">
           <LineChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid vertical={false} />
             <XAxis

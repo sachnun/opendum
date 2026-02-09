@@ -42,8 +42,8 @@ export function ModelCard({ id, providers, meta }: ModelCardProps) {
   };
 
   return (
-    <Card className="flex flex-col">
-      <CardHeader className="pb-2">
+    <Card className="flex flex-col bg-card py-4">
+      <CardHeader className="px-4 pb-2 sm:px-5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <CardTitle className="text-sm font-mono truncate" title={id}>{id}</CardTitle>
@@ -64,7 +64,7 @@ export function ModelCard({ id, providers, meta }: ModelCardProps) {
           )}
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col flex-1">
+      <CardContent className="flex flex-1 flex-col px-4 sm:px-5">
         {/* Metadata Section - only show if meta exists */}
         {meta && (
           <div className="space-y-2 text-xs text-muted-foreground mb-3">
@@ -119,7 +119,7 @@ export function ModelCard({ id, providers, meta }: ModelCardProps) {
         <Button
           variant="outline"
           size="sm"
-          className="w-full mt-auto"
+          className="mt-auto w-full"
           onClick={handleCopy}
         >
           {copied ? (
