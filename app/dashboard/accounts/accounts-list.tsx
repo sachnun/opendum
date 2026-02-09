@@ -57,6 +57,10 @@ interface AccountsListProps {
   codexAccounts: Account[];
 }
 
+function formatUtcDate(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
 // =============================================================================
 // STATUS BADGE COMPONENT
 // =============================================================================
@@ -144,7 +148,7 @@ function AccountCard({
             <span className="text-muted-foreground">Last used</span>
             <span className="font-medium">
               {account.lastUsedAt
-                ? new Date(account.lastUsedAt).toLocaleDateString()
+                ? formatUtcDate(new Date(account.lastUsedAt))
                 : "Never"}
             </span>
           </div>
@@ -158,7 +162,7 @@ function AccountCard({
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Last Error</span>
                   <span className="font-medium text-red-500">
-                    {new Date(account.lastErrorAt).toLocaleDateString()}
+                    {formatUtcDate(new Date(account.lastErrorAt))}
                   </span>
                 </div>
               )}
