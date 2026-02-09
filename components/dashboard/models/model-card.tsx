@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Eye, Copy, Check, Brain, Wrench, Calendar } from "lucide-react";
 import type { ModelMeta } from "@/lib/proxy/models";
 
@@ -11,6 +12,9 @@ interface ModelCardProps {
   id: string;
   providers: string[];
   meta?: ModelMeta;
+  isEnabled: boolean;
+  isUpdating: boolean;
+  onEnabledChange: (modelId: string, enabled: boolean) => void;
 }
 
 function formatTokens(tokens: number): string {
@@ -32,7 +36,14 @@ function formatDate(dateStr: string): string {
   return `${month} ${year}`;
 }
 
-export function ModelCard({ id, providers, meta }: ModelCardProps) {
+export function ModelCard({
+  id,
+  providers,
+  meta,
+  isEnabled,
+  isUpdating,
+  onEnabledChange,
+}: ModelCardProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -42,12 +53,11 @@ export function ModelCard({ id, providers, meta }: ModelCardProps) {
   };
 
   return (
-    <Card className="flex flex-col bg-card py-4">
+    <Card className={`flex flex-col bg-card py-4 ${!isEnabled ? "opacity-70" : ""}`}>
       <CardHeader className="px-4 pb-2 sm:px-5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <CardTitle className="text-sm font-mono truncate" title={id}>{id}</CardTitle>
-            {/* Provider Badges */}
             <div className="flex flex-wrap gap-1 mt-1.5">
               {providers.map((provider) => (
                 <Badge key={provider} variant="secondary" className="text-xs">
@@ -56,19 +66,29 @@ export function ModelCard({ id, providers, meta }: ModelCardProps) {
               ))}
             </div>
           </div>
-          {/* Pricing - top right */}
-          {meta?.pricing && (
-            <div className="text-xs text-muted-foreground whitespace-nowrap">
-              ${meta.pricing.input} · ${meta.pricing.output}
+          <div className="flex flex-col items-end gap-2">
+            {meta?.pricing && (
+              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                ${meta.pricing.input} · ${meta.pricing.output}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                {isEnabled ? "Enabled" : "Disabled"}
+              </span>
+              <Switch
+                checked={isEnabled}
+                onCheckedChange={(checked) => onEnabledChange(id, checked)}
+                disabled={isUpdating}
+                title={isEnabled ? "Disable model" : "Enable model"}
+              />
             </div>
-          )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col px-4 sm:px-5">
-        {/* Metadata Section - only show if meta exists */}
         {meta && (
           <div className="space-y-2 text-xs text-muted-foreground mb-3">
-            {/* Context & Output */}
             {(meta.contextLength || meta.outputLimit) && (
               <div className="flex items-center gap-2 flex-wrap">
                 {meta.contextLength && (
@@ -90,7 +110,6 @@ export function ModelCard({ id, providers, meta }: ModelCardProps) {
               </div>
             )}
 
-            {/* Capability Badges */}
             {(meta.reasoning || meta.toolCall || meta.vision) && (
               <div className="flex flex-wrap gap-1">
                 {meta.reasoning && (

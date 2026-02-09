@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiKey, logUsage, validateModel } from "@/lib/proxy/auth";
+import { validateApiKey, logUsage, validateModelForUser } from "@/lib/proxy/auth";
 import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "@/lib/proxy/load-balancer";
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const modelValidation = validateModel(modelParam);
+    const modelValidation = await validateModelForUser(authenticatedUserId, modelParam);
     if (!modelValidation.valid) {
       return NextResponse.json(
         {
@@ -251,10 +251,6 @@ export async function POST(request: NextRequest) {
             markRateLimited(account.id, family, 60 * 60 * 1000);
           }
 
-          console.log(
-            `[rate-limit] Account ${account.id} (${account.email}) hit rate limit for ${family}, trying next account...`
-          );
-
           await logUsage({
             userId: authenticatedUserId,
             providerAccountId: account.id,
@@ -278,9 +274,7 @@ export async function POST(request: NextRequest) {
         console.error(`${account.provider} error:`, providerResponse.status, errorText);
 
         // Track error for this account (non-blocking)
-        markAccountFailed(account.id, providerResponse.status, errorText).catch((e) =>
-          console.error("[error-tracking] Failed to mark account failed:", e)
-        );
+        markAccountFailed(account.id, providerResponse.status, errorText).catch(() => undefined);
 
         await logUsage({
           userId: authenticatedUserId,
@@ -316,9 +310,7 @@ export async function POST(request: NextRequest) {
 
         const usageTracker = createUsageTrackingStream((usage) => {
           // Track success for this account (non-blocking)
-          markAccountSuccess(account.id).catch((e) =>
-            console.error("[error-tracking] Failed to mark account success:", e)
-          );
+          markAccountSuccess(account.id).catch(() => undefined);
 
           logUsage({
             userId: authenticatedUserId,
@@ -346,9 +338,7 @@ export async function POST(request: NextRequest) {
       const responseData = await providerResponse.json();
 
       // Track success for this account (non-blocking)
-      markAccountSuccess(account.id).catch((e) =>
-        console.error("[error-tracking] Failed to mark account success:", e)
-      );
+      markAccountSuccess(account.id).catch(() => undefined);
 
       logUsage({
         userId: authenticatedUserId,

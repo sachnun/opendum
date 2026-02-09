@@ -30,6 +30,41 @@ const DEFAULT_MODELS = [
   "antigravity/gemini-3-pro-high",
 ];
 
+const PANEL_COUNT = 3;
+
+function getInitialPanelModels(models: ModelOption[]): Array<string | null> {
+  const availableModelIds = new Set(models.map((model) => model.id));
+  const selectedModelIds: string[] = [];
+
+  for (const modelId of DEFAULT_MODELS) {
+    if (availableModelIds.has(modelId)) {
+      selectedModelIds.push(modelId);
+    }
+
+    if (selectedModelIds.length === PANEL_COUNT) {
+      break;
+    }
+  }
+
+  if (selectedModelIds.length < PANEL_COUNT) {
+    for (const model of models) {
+      if (!selectedModelIds.includes(model.id)) {
+        selectedModelIds.push(model.id);
+      }
+
+      if (selectedModelIds.length === PANEL_COUNT) {
+        break;
+      }
+    }
+  }
+
+  while (selectedModelIds.length < PANEL_COUNT) {
+    selectedModelIds.push("");
+  }
+
+  return selectedModelIds.map((modelId) => modelId || null);
+}
+
 function extractTextContent(content: unknown): string {
   if (typeof content === "string") {
     return content;
@@ -202,11 +237,14 @@ async function consumeChatCompletionStream(
 }
 
 export function PlaygroundClient({ models }: PlaygroundClientProps) {
-  const [panels, setPanels] = React.useState<PanelState[]>([
-    { id: generateId(), modelId: DEFAULT_MODELS[0] },
-    { id: generateId(), modelId: DEFAULT_MODELS[1] },
-    { id: generateId(), modelId: DEFAULT_MODELS[2] },
-  ]);
+  const [panels, setPanels] = React.useState<PanelState[]>(() => {
+    const initialModelIds = getInitialPanelModels(models);
+
+    return Array.from({ length: PANEL_COUNT }, (_, index) => ({
+      id: generateId(),
+      modelId: initialModelIds[index],
+    }));
+  });
 
   const [selectedScenario, setSelectedScenario] = React.useState<Scenario | null>(null);
   const [settings, setSettings] = React.useState<PlaygroundSettings>(DEFAULT_SETTINGS);

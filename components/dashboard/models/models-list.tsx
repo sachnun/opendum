@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { ModelCard } from "./model-card";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
+import { setModelEnabled } from "@/lib/actions/models";
 import type { ModelMeta } from "@/lib/proxy/models";
 
 interface ModelWithStats {
@@ -11,6 +15,7 @@ interface ModelWithStats {
   providers: string[];
   providerLabels: string[];
   meta?: ModelMeta;
+  isEnabled: boolean;
 }
 
 interface ModelsListProps {
@@ -51,41 +56,101 @@ function getModelFamily(modelId: string): FeaturedFamily | "Others" {
 }
 
 export function ModelsList({ models, availableProviders }: ModelsListProps) {
-  const [activeProviders, setActiveProviders] = useState<Set<string>>(
-    new Set(availableProviders.map((p) => p.id))
+  const allProviderIds = useMemo(
+    () => availableProviders.map((p) => p.id),
+    [availableProviders]
   );
 
-  const toggleProvider = (providerId: string) => {
-    setActiveProviders((prev) => {
-      // Jika semua provider sedang terpilih (All aktif), klik satu provider = hanya pilih provider itu
-      if (prev.size === availableProviders.length) {
-        return new Set([providerId]);
+  const [activeProviders, setActiveProviders] = useState<string[]>(allProviderIds);
+  const [enabledByModel, setEnabledByModel] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(models.map((model) => [model.id, model.isEnabled]))
+  );
+  const [pendingByModel, setPendingByModel] = useState<Record<string, boolean>>({});
+
+  const modelsWithState = useMemo(
+    () =>
+      models.map((model) => ({
+        ...model,
+        isEnabled: enabledByModel[model.id] ?? model.isEnabled,
+      })),
+    [enabledByModel, models]
+  );
+
+  const allSelected = activeProviders.length === availableProviders.length;
+
+  const handleEnabledChange = useCallback(async (modelId: string, enabled: boolean) => {
+    setEnabledByModel((prev) => ({ ...prev, [modelId]: enabled }));
+    setPendingByModel((prev) => ({ ...prev, [modelId]: true }));
+
+    try {
+      const result = await setModelEnabled(modelId, enabled);
+
+      if (!result.success) {
+        throw new Error(result.error);
       }
 
-      const next = new Set(prev);
-      if (next.has(providerId)) {
-        // Don't allow deselecting all providers
-        if (next.size > 1) {
-          next.delete(providerId);
+      toast.success(enabled ? "Model enabled" : "Model disabled");
+    } catch (error) {
+      setEnabledByModel((prev) => ({ ...prev, [modelId]: !enabled }));
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update model status"
+      );
+    } finally {
+      setPendingByModel((prev) => {
+        const next = { ...prev };
+        delete next[modelId];
+        return next;
+      });
+    }
+  }, []);
+
+  const handleValueChange = useCallback(
+    (value: string[]) => {
+      const hasAll = value.includes("all");
+      const providers = value.filter((v) => v !== "all");
+
+      // User just clicked "All" (wasn't selected before)
+      if (hasAll && !allSelected) {
+        setActiveProviders(allProviderIds);
+        return;
+      }
+
+      // All was selected, user unchecked a provider — deselect "all", keep the rest
+      if (!hasAll && allSelected) {
+        // When all were selected and user deselects one, keep the rest
+        if (providers.length > 0) {
+          setActiveProviders(providers);
+          return;
         }
-      } else {
-        next.add(providerId);
+        // Don't allow empty selection
+        return;
       }
-      return next;
-    });
-  };
 
-  const selectAllProviders = () => {
-    setActiveProviders(new Set(availableProviders.map((p) => p.id)));
-  };
+      // Normal toggle — don't allow empty selection
+      if (providers.length === 0) return;
+
+      // If all individual providers are now selected, treat as "all"
+      if (providers.length === allProviderIds.length) {
+        setActiveProviders(allProviderIds);
+        return;
+      }
+
+      setActiveProviders(providers);
+    },
+    [allSelected, allProviderIds]
+  );
 
   const filteredModels = useMemo(() => {
-    return models.filter((model) =>
-      model.providers.some((provider) => activeProviders.has(provider))
+    const active = new Set(activeProviders);
+    return modelsWithState.filter((model) =>
+      model.providers.some((provider) => active.has(provider))
     );
-  }, [models, activeProviders]);
+  }, [modelsWithState, activeProviders]);
 
-  const allSelected = activeProviders.size === availableProviders.length;
+  const filteredEnabledCount = useMemo(
+    () => filteredModels.filter((model) => model.isEnabled).length,
+    [filteredModels]
+  );
 
   const modelSections = useMemo(() => {
     const groupedModels = new Map<string, ModelWithStats[]>();
@@ -130,33 +195,31 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted p-1.5">
-        <Button
-          variant={allSelected ? "default" : "outline"}
-          size="sm"
-          onClick={selectAllProviders}
-          className="h-8 rounded-lg"
-        >
+      <ToggleGroup
+        type="multiple"
+        variant="outline"
+        size="sm"
+        spacing={2}
+        value={allSelected ? ["all", ...activeProviders] : activeProviders}
+        onValueChange={handleValueChange}
+        className="flex-wrap"
+      >
+        <ToggleGroupItem value="all" aria-label="Show all providers">
           All
-        </Button>
+        </ToggleGroupItem>
         {availableProviders.map((provider) => (
-          <Button
+          <ToggleGroupItem
             key={provider.id}
-            variant={activeProviders.has(provider.id) ? "default" : "outline"}
-            size="sm"
-            onClick={() => toggleProvider(provider.id)}
-            className={cn(
-              "h-8 rounded-lg",
-              activeProviders.has(provider.id) && !allSelected && "bg-primary"
-            )}
+            value={provider.id}
+            aria-label={`Filter by ${provider.label}`}
           >
             {provider.label}
-          </Button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
 
       <p className="text-xs font-medium text-muted-foreground">
-        {filteredModels.length} / {models.length} models
+        {filteredModels.length} / {models.length} models - {filteredEnabledCount} enabled
       </p>
 
       {modelSections.length > 0 && (
@@ -174,6 +237,9 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
                     id={model.id}
                     providers={model.providerLabels}
                     meta={model.meta}
+                    isEnabled={model.isEnabled}
+                    isUpdating={Boolean(pendingByModel[model.id])}
+                    onEnabledChange={handleEnabledChange}
                   />
                 ))}
               </div>

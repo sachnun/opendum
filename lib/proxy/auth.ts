@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/db";
 import { hashString } from "@/lib/encryption";
-import { isModelSupported, isModelSupportedByProvider, getAllModelsWithAliases, getProvidersForModel } from "./models";
+import {
+  isModelSupported,
+  isModelSupportedByProvider,
+  getAllModelsWithAliases,
+  getProvidersForModel,
+  resolveModelAlias,
+} from "./models";
 
 /**
  * Parsed model parameter
@@ -8,6 +14,15 @@ import { isModelSupported, isModelSupportedByProvider, getAllModelsWithAliases, 
 export interface ParsedModel {
   provider: string | null;  // null = auto (round-robin across all providers)
   model: string;            // canonical model name
+}
+
+export interface ModelValidationResult {
+  valid: boolean;
+  provider: string | null;
+  model: string;
+  error?: string;
+  param?: string;
+  code?: string;
 }
 
 /**
@@ -37,15 +52,9 @@ export function parseModelParam(modelParam: string): ParsedModel {
  * Validate model parameter against available models
  * Supports both "model" and "provider/model" formats
  */
-export function validateModel(modelParam: string): {
-  valid: boolean;
-  provider: string | null;
-  model: string;
-  error?: string;
-  param?: string;
-  code?: string;
-} {
-  const { provider, model } = parseModelParam(modelParam);
+export function validateModel(modelParam: string): ModelValidationResult {
+  const { provider, model: rawModel } = parseModelParam(modelParam);
+  const model = resolveModelAlias(rawModel);
   
   // Check if model exists
   if (!isModelSupported(model)) {
@@ -53,8 +62,8 @@ export function validateModel(modelParam: string): {
     return {
       valid: false,
       provider,
-      model,
-      error: `Invalid model: ${model}. Available models: ${allModels.sort().join(", ")}`,
+      model: rawModel,
+      error: `Invalid model: ${rawModel}. Available models: ${allModels.sort().join(", ")}`,
       param: "model",
       code: "invalid_model",
     };
@@ -76,6 +85,43 @@ export function validateModel(modelParam: string): {
   }
   
   return { valid: true, provider, model };
+}
+
+/**
+ * Validate model against registry and user-specific enabled/disabled state.
+ */
+export async function validateModelForUser(
+  userId: string,
+  modelParam: string
+): Promise<ModelValidationResult> {
+  const baseValidation = validateModel(modelParam);
+
+  if (!baseValidation.valid) {
+    return baseValidation;
+  }
+
+  const disabledModel = await prisma.disabledModel.findUnique({
+    where: {
+      userId_model: {
+        userId,
+        model: baseValidation.model,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (disabledModel) {
+    return {
+      valid: false,
+      provider: baseValidation.provider,
+      model: baseValidation.model,
+      error: `Model "${baseValidation.model}" is disabled. Enable it from Dashboard > Models first.`,
+      param: "model",
+      code: "model_disabled",
+    };
+  }
+
+  return baseValidation;
 }
 
 /**

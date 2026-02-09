@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -24,8 +25,19 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 export async function Header() {
   const session = await auth();
-  const firstName = session?.user?.name?.split(" ")[0] ?? "User";
+
+  const disabledModels = session?.user?.id
+    ? await prisma.disabledModel.findMany({
+        where: { userId: session.user.id },
+        select: { model: true },
+      })
+    : [];
+  const disabledModelSet = new Set(
+    disabledModels.map((entry: { model: string }) => entry.model)
+  );
+
   const models = Object.entries(MODEL_REGISTRY)
+    .filter(([id]) => !disabledModelSet.has(id))
     .map(([id, info]) => ({
       id,
       providers: info.providers.map((provider) => PROVIDER_LABELS[provider] ?? provider),

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { MODEL_REGISTRY, getModelsForProvider } from "@/lib/proxy/models";
 import { ProviderName } from "@/lib/proxy/providers/types";
 import { ModelsList } from "@/components/dashboard/models/models-list";
@@ -29,6 +30,14 @@ export default async function ModelsPage() {
 
   // Get all models
   const allModels = Object.keys(MODEL_REGISTRY);
+
+  const disabledModels = await prisma.disabledModel.findMany({
+    where: { userId: session.user.id },
+    select: { model: true },
+  });
+  const disabledModelSet = new Set(
+    disabledModels.map((entry: { model: string }) => entry.model)
+  );
 
   // Get models per provider to determine which providers have models
   const iflowModels = getModelsForProvider(ProviderName.IFLOW);
@@ -63,6 +72,7 @@ export default async function ModelsPage() {
       providers: info.providers,
       providerLabels: info.providers.map(getProviderLabel),
       meta: info.meta,
+      isEnabled: !disabledModelSet.has(model),
     };
   });
 
