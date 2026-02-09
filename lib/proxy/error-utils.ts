@@ -84,3 +84,54 @@ export function shouldRotateToNextAccount(statusCode: number): boolean {
     statusCode === 401
   );
 }
+
+export type ProxyErrorType =
+  | "invalid_request_error"
+  | "authentication_error"
+  | "rate_limit_error"
+  | "api_error";
+
+export function getSanitizedProxyError(statusCode: number): {
+  type: ProxyErrorType;
+  message: string;
+} {
+  if (statusCode === 400 || statusCode === 422) {
+    return {
+      type: "invalid_request_error",
+      message: "Invalid request parameters.",
+    };
+  }
+
+  if (statusCode === 401 || statusCode === 403) {
+    return {
+      type: "authentication_error",
+      message: "Provider authentication failed. Please re-authenticate your account.",
+    };
+  }
+
+  if (statusCode === 408) {
+    return {
+      type: "api_error",
+      message: "Provider request timed out. Please retry.",
+    };
+  }
+
+  if (statusCode === 429) {
+    return {
+      type: "rate_limit_error",
+      message: "Provider rate limit reached. Please retry shortly.",
+    };
+  }
+
+  if (statusCode >= 500) {
+    return {
+      type: "api_error",
+      message: "Provider service temporarily unavailable.",
+    };
+  }
+
+  return {
+    type: "api_error",
+    message: `Provider request failed (HTTP ${statusCode}).`,
+  };
+}
