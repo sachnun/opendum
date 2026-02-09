@@ -20,6 +20,7 @@ import {
   CODEX_DEVICE_VERIFICATION_URL,
   CODEX_API_BASE_URL,
   CODEX_MODELS,
+  CODEX_SUPPORTED_PARAMS,
   CODEX_REFRESH_BUFFER_SECONDS,
   CODEX_ORIGINATOR,
 } from "./constants";
@@ -34,15 +35,17 @@ import {
 export interface CodexDeviceCodeResponse {
   device_auth_id: string;
   user_code: string;
-  expires_in: number;
-  interval: number;
+  expires_in?: number | string;
+  expires_at?: string;
+  interval?: number | string;
 }
 
 /**
  * Device code poll response (when user has authorized)
  */
 interface CodexPollSuccessResponse {
-  authorization_code: string;
+  authorization_code?: string;
+  code_verifier?: string;
 }
 
 /**
@@ -70,6 +73,41 @@ interface ResponsesInputItem {
   arguments?: string;
   status?: string;
   [key: string]: unknown;
+}
+
+const DEFAULT_CODEX_INSTRUCTIONS =
+  "You are ChatGPT Codex, an expert coding assistant.";
+
+function setIfCodexParamSupported(
+  payload: Record<string, unknown>,
+  key: string,
+  value: unknown
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (CODEX_SUPPORTED_PARAMS.has(key)) {
+    payload[key] = value;
+  }
+}
+
+function filterSupportedCodexPayload(
+  payload: Record<string, unknown>
+): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    if (CODEX_SUPPORTED_PARAMS.has(key)) {
+      filtered[key] = value;
+    }
+  }
+
+  return filtered;
 }
 
 // ============================================================
@@ -244,6 +282,61 @@ function convertMessagesToInput(
   return input;
 }
 
+function extractTextContent(
+  content: string | Array<{ type: string; [key: string]: unknown }>
+): string {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  const textParts: string[] = [];
+  for (const item of content) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    if (typeof item.text === "string") {
+      textParts.push(item.text);
+      continue;
+    }
+
+    if (typeof item.input_text === "string") {
+      textParts.push(item.input_text);
+      continue;
+    }
+
+    if (typeof item.content === "string") {
+      textParts.push(item.content);
+    }
+  }
+
+  return textParts.join("\n").trim();
+}
+
+function extractInstructionsFromMessages(
+  messages: ChatCompletionRequest["messages"]
+): string | undefined {
+  const instructionParts: string[] = [];
+
+  for (const msg of messages) {
+    if (msg.role !== "system" && msg.role !== "developer") {
+      continue;
+    }
+
+    const content = extractTextContent(msg.content);
+    if (content) {
+      instructionParts.push(content);
+    }
+  }
+
+  const combined = instructionParts.join("\n\n").trim();
+  return combined || undefined;
+}
+
 /**
  * Convert Chat Completions tools to Responses API tools format
  */
@@ -267,40 +360,43 @@ function buildResponsesApiPayload(
   body: ChatCompletionRequest,
   stream: boolean
 ): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
-    model: body.model,
-    input: convertMessagesToInput(body.messages),
-    stream,
-  };
+  const explicitInstructions =
+    typeof body.instructions === "string"
+      ? body.instructions.trim()
+      : undefined;
+  const derivedInstructions = extractInstructionsFromMessages(body.messages);
+
+  const payload: Record<string, unknown> = {};
+
+  setIfCodexParamSupported(payload, "model", body.model);
+  setIfCodexParamSupported(
+    payload,
+    "instructions",
+    explicitInstructions || derivedInstructions || DEFAULT_CODEX_INSTRUCTIONS
+  );
+  setIfCodexParamSupported(payload, "store", false);
+  setIfCodexParamSupported(payload, "input", convertMessagesToInput(body.messages));
+  setIfCodexParamSupported(payload, "stream", stream);
 
   // Convert tools
   const tools = convertTools(body.tools);
-  if (tools) {
-    payload.tools = tools;
-  }
+  setIfCodexParamSupported(payload, "tools", tools);
 
   // Map parameters
-  if (body.max_tokens !== undefined) {
-    payload.max_output_tokens = body.max_tokens;
-  }
-  if (body.temperature !== undefined) {
-    payload.temperature = body.temperature;
-  }
-  if (body.top_p !== undefined) {
-    payload.top_p = body.top_p;
-  }
-  if (body.tool_choice !== undefined) {
-    payload.tool_choice = body.tool_choice;
-  }
+  // Codex endpoint currently rejects sampling controls
+  // like temperature/top_p; omit them to avoid 400 errors.
+  setIfCodexParamSupported(payload, "tool_choice", body.tool_choice);
 
   // Reasoning config
   if (body.reasoning) {
-    payload.reasoning = body.reasoning;
+    setIfCodexParamSupported(payload, "reasoning", body.reasoning);
   } else if (body.reasoning_effort) {
-    payload.reasoning = { effort: body.reasoning_effort };
+    setIfCodexParamSupported(payload, "reasoning", {
+      effort: body.reasoning_effort,
+    });
   }
 
-  return payload;
+  return filterSupportedCodexPayload(payload);
 }
 
 // ============================================================
@@ -647,6 +743,192 @@ function convertResponseToCompletion(
   };
 }
 
+interface AccumulatedToolCall {
+  id?: string;
+  type: string;
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+/**
+ * Convert Chat Completions SSE text into a final non-streaming completion object
+ */
+function convertChatCompletionSseToCompletion(
+  sseText: string,
+  fallbackModel: string
+): Record<string, unknown> {
+  let completionId = generateChatCompletionId();
+  let created = Math.floor(Date.now() / 1000);
+  let model = fallbackModel;
+  let role = "assistant";
+  let content = "";
+  let finishReason: string | null = null;
+  const toolCallsByIndex = new Map<number, AccumulatedToolCall>();
+
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let totalTokens = 0;
+
+  const lines = sseText.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) {
+      continue;
+    }
+
+    const data = trimmed.slice(5).trim();
+    if (!data || data === "[DONE]") {
+      continue;
+    }
+
+    try {
+      const chunk = JSON.parse(data) as {
+        id?: string;
+        created?: number;
+        model?: string;
+        choices?: Array<{
+          delta?: Record<string, unknown>;
+          finish_reason?: string | null;
+        }>;
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+        };
+      };
+
+      if (chunk.id) {
+        completionId = chunk.id;
+      }
+      if (typeof chunk.created === "number") {
+        created = chunk.created;
+      }
+      if (typeof chunk.model === "string") {
+        model = chunk.model;
+      }
+
+      const choice = chunk.choices?.[0];
+      if (choice) {
+        const delta = choice.delta || {};
+
+        if (typeof delta.role === "string") {
+          role = delta.role;
+        }
+
+        if (typeof delta.content === "string") {
+          content += delta.content;
+        }
+
+        const deltaToolCalls = Array.isArray(delta.tool_calls)
+          ? (delta.tool_calls as Array<Record<string, unknown>>)
+          : [];
+
+        for (const toolCall of deltaToolCalls) {
+          const index =
+            typeof toolCall.index === "number" && Number.isFinite(toolCall.index)
+              ? toolCall.index
+              : 0;
+
+          const existing = toolCallsByIndex.get(index) || {
+            type: "function",
+            function: {
+              name: "",
+              arguments: "",
+            },
+          };
+
+          if (typeof toolCall.id === "string" && toolCall.id) {
+            existing.id = toolCall.id;
+          }
+
+          if (typeof toolCall.type === "string" && toolCall.type) {
+            existing.type = toolCall.type;
+          }
+
+          const fn = toolCall.function as Record<string, unknown> | undefined;
+          if (fn) {
+            if (typeof fn.name === "string" && fn.name) {
+              existing.function.name = fn.name;
+            }
+            if (typeof fn.arguments === "string") {
+              existing.function.arguments += fn.arguments;
+            }
+          }
+
+          toolCallsByIndex.set(index, existing);
+        }
+
+        if (choice.finish_reason !== undefined && choice.finish_reason !== null) {
+          finishReason = choice.finish_reason;
+        }
+      }
+
+      if (chunk.usage) {
+        if (typeof chunk.usage.prompt_tokens === "number") {
+          promptTokens = chunk.usage.prompt_tokens;
+        }
+        if (typeof chunk.usage.completion_tokens === "number") {
+          completionTokens = chunk.usage.completion_tokens;
+        }
+        if (typeof chunk.usage.total_tokens === "number") {
+          totalTokens = chunk.usage.total_tokens;
+        }
+      }
+    } catch {
+      // Ignore malformed SSE lines
+    }
+  }
+
+  if (!totalTokens) {
+    totalTokens = promptTokens + completionTokens;
+  }
+
+  const toolCalls = Array.from(toolCallsByIndex.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([index, toolCall]) => ({
+      id: toolCall.id || `call_${index}`,
+      type: toolCall.type || "function",
+      function: {
+        name: toolCall.function.name,
+        arguments: toolCall.function.arguments || "{}",
+      },
+    }));
+
+  if (!finishReason) {
+    finishReason = toolCalls.length > 0 ? "tool_calls" : "stop";
+  }
+
+  const message: Record<string, unknown> = {
+    role,
+    content: content || null,
+  };
+
+  if (toolCalls.length > 0) {
+    message.tool_calls = toolCalls;
+  }
+
+  return {
+    id: completionId,
+    object: "chat.completion",
+    created,
+    model,
+    choices: [
+      {
+        index: 0,
+        message,
+        finish_reason: finishReason,
+      },
+    ],
+    usage: {
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: totalTokens,
+    },
+  };
+}
+
 // ============================================================
 // Token Check
 // ============================================================
@@ -682,18 +964,18 @@ export const codexProvider: Provider = {
 
   /**
    * Exchange authorization code for tokens
-   * Called after device code flow completes with the authorization_code
+   * Called after OAuth/device-code flow completes with the authorization_code
    */
   async exchangeCode(
     code: string,
-    _redirectUri: string,
+    redirectUri: string,
     codeVerifier?: string
   ): Promise<OAuthResult> {
     const body: Record<string, string> = {
       grant_type: "authorization_code",
       code,
       client_id: CODEX_CLIENT_ID,
-      redirect_uri: CODEX_REDIRECT_URI,
+      redirect_uri: redirectUri || CODEX_REDIRECT_URI,
     };
 
     if (codeVerifier) {
@@ -836,17 +1118,21 @@ export const codexProvider: Provider = {
       ? body.model.split("/").pop()!
       : body.model;
 
+    // Codex endpoint currently requires stream=true for upstream requests.
+    // For non-streaming downstream calls, we aggregate the stream response.
+    const upstreamStream = true;
+
     // Build Responses API payload from Chat Completions format
     const payload = buildResponsesApiPayload(
       { ...body, model: modelName },
-      stream
+      upstreamStream
     );
 
     // Build headers
     const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      Accept: stream ? "text/event-stream" : "application/json",
+      Accept: "text/event-stream",
       originator: CODEX_ORIGINATOR,
       "User-Agent":
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -883,13 +1169,38 @@ export const codexProvider: Provider = {
       });
     }
 
-    // For non-streaming, convert Responses API JSON to Chat Completions JSON
+    // For non-streaming, aggregate SSE and convert to Chat Completions JSON
     if (response.ok && !stream) {
-      const responsesData = await response.json();
-      const completionData = convertResponseToCompletion(
-        responsesData,
-        modelName
-      );
+      const contentType = response.headers.get("content-type") || "";
+      let completionData: Record<string, unknown>;
+
+      if (contentType.includes("application/json")) {
+        const responsesData = await response.json();
+        completionData = convertResponseToCompletion(responsesData, modelName);
+      } else if (response.body) {
+        const converter = createResponsesToChatCompletionsStream(modelName);
+        const transformedBody = response.body
+          .pipeThrough(new TextDecoderStream())
+          .pipeThrough(converter)
+          .pipeThrough(new TextEncoderStream());
+        const sseText = await new Response(transformedBody).text();
+        completionData = convertChatCompletionSseToCompletion(sseText, modelName);
+      } else {
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: "Codex response stream is empty",
+              type: "api_error",
+            },
+          }),
+          {
+            status: 502,
+            headers: new Headers({
+              "Content-Type": "application/json",
+            }),
+          }
+        );
+      }
 
       return new Response(JSON.stringify(completionData), {
         status: 200,
@@ -945,12 +1256,44 @@ export async function initiateCodexDeviceCodeFlow(): Promise<{
 
   const data: CodexDeviceCodeResponse = await response.json();
 
+  const intervalRaw =
+    typeof data.interval === "string"
+      ? Number.parseInt(data.interval, 10)
+      : data.interval;
+  const interval =
+    typeof intervalRaw === "number" && Number.isFinite(intervalRaw) && intervalRaw > 0
+      ? intervalRaw
+      : 5;
+
+  const expiresInRaw =
+    typeof data.expires_in === "string"
+      ? Number.parseInt(data.expires_in, 10)
+      : data.expires_in;
+  let expiresIn =
+    typeof expiresInRaw === "number" && Number.isFinite(expiresInRaw) && expiresInRaw > 0
+      ? expiresInRaw
+      : undefined;
+
+  if (!expiresIn && data.expires_at) {
+    const expiresAtMs = Date.parse(data.expires_at);
+    if (Number.isFinite(expiresAtMs)) {
+      const secondsLeft = Math.ceil((expiresAtMs - Date.now()) / 1000);
+      if (secondsLeft > 0) {
+        expiresIn = secondsLeft;
+      }
+    }
+  }
+
+  if (!expiresIn) {
+    expiresIn = 600;
+  }
+
   return {
     deviceAuthId: data.device_auth_id,
     userCode: data.user_code,
     verificationUrl: CODEX_DEVICE_VERIFICATION_URL,
-    expiresIn: data.expires_in,
-    interval: data.interval || 5,
+    expiresIn,
+    interval,
     codeVerifier,
   };
 }
@@ -986,6 +1329,8 @@ export async function pollCodexDeviceCodeAuthorization(
       return { pending: true };
     }
 
+    const tokenCodeVerifier = pollData.code_verifier || codeVerifier;
+
     // Step 2: Exchange authorization code for tokens
     const tokenResponse = await fetch(CODEX_TOKEN_ENDPOINT, {
       method: "POST",
@@ -998,7 +1343,7 @@ export async function pollCodexDeviceCodeAuthorization(
         code: pollData.authorization_code,
         client_id: CODEX_CLIENT_ID,
         redirect_uri: CODEX_REDIRECT_URI,
-        code_verifier: codeVerifier,
+        code_verifier: tokenCodeVerifier,
       }),
     });
 
@@ -1023,43 +1368,72 @@ export async function pollCodexDeviceCodeAuthorization(
     };
   }
 
-  if (pollResponse.status === 400 || pollResponse.status === 403) {
+  if (
+    pollResponse.status === 400 ||
+    pollResponse.status === 403 ||
+    pollResponse.status === 404
+  ) {
     try {
-      const errorData = await pollResponse.json();
+      const errorData = (await pollResponse.json()) as {
+        error?: string | { message?: string; code?: string; type?: string };
+        detail?: string;
+        error_description?: string;
+      };
+
+      const errorCode =
+        typeof errorData.error === "string"
+          ? errorData.error
+          : errorData.error?.code;
+      const errorMessage =
+        typeof errorData.error === "string"
+          ? errorData.error
+          : errorData.error?.message;
+      const detail =
+        typeof errorData.detail === "string"
+          ? errorData.detail
+          : "";
 
       if (
-        errorData.error === "authorization_pending" ||
-        errorData.detail?.includes("pending")
+        errorCode === "authorization_pending" ||
+        errorCode === "slow_down" ||
+        errorCode === "deviceauth_authorization_unknown" ||
+        detail.toLowerCase().includes("pending") ||
+        errorMessage?.toLowerCase().includes("authorization is unknown")
       ) {
         return { pending: true };
       }
 
-      if (errorData.error === "slow_down") {
-        return { pending: true };
-      }
-
-      if (errorData.error === "expired_token") {
+      if (errorCode === "expired_token") {
         return { error: "Device code expired. Please start again." };
       }
 
-      if (errorData.error === "access_denied") {
+      if (errorCode === "access_denied") {
         return { error: "Authorization was denied by the user." };
       }
 
+      // OpenAI currently returns 403/404 with "Device authorization is unknown"
+      // while the user is still authorizing. Match opencode behavior.
+      if (pollResponse.status === 403 || pollResponse.status === 404) {
+        return { pending: true };
+      }
+
       const errorValue = errorData.error_description
-        || errorData.detail
-        || (typeof errorData.error === "string"
-          ? errorData.error
-          : errorData.error?.message)
+        || detail
+        || errorMessage
+        || errorCode
         || "Unknown error";
       return { error: errorValue };
     } catch {
-      return { pending: true };
+      if (pollResponse.status === 403 || pollResponse.status === 404) {
+        return { pending: true };
+      }
+
+      return { error: "Failed to parse authentication response" };
     }
   }
 
   // For other 4xx responses, treat as an error (not pending)
-  // 401/404 etc. indicate real problems, not authorization_pending
+  // 401 etc. indicate real problems, not authorization_pending
   if (pollResponse.status >= 400 && pollResponse.status < 500) {
     const errorBody = await pollResponse.text();
     return { error: `Authentication failed (HTTP ${pollResponse.status}): ${errorBody || "Unknown error"}` };

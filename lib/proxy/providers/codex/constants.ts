@@ -2,9 +2,12 @@
 // Based on OpenCode's codex plugin: https://github.com/anomalyco/opencode
 // Uses Device Code Flow for OAuth via auth.openai.com
 
-// OAuth Configuration (Device Code Flow)
+// OAuth Configuration
 export const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 export const CODEX_AUTH_ISSUER = "https://auth.openai.com";
+export const CODEX_OAUTH_AUTHORIZE_ENDPOINT = `${CODEX_AUTH_ISSUER}/oauth/authorize`;
+export const CODEX_BROWSER_REDIRECT_URI = "http://localhost:1455/auth/callback";
+export const CODEX_OAUTH_SCOPE = "openid profile email offline_access";
 
 // OAuth Endpoints
 export const CODEX_DEVICE_CODE_ENDPOINT =
@@ -14,6 +17,7 @@ export const CODEX_DEVICE_POLL_ENDPOINT =
 export const CODEX_TOKEN_ENDPOINT = "https://auth.openai.com/oauth/token";
 export const CODEX_DEVICE_VERIFICATION_URL =
   "https://auth.openai.com/codex/device";
+// Device-code specific redirect URI (used when exchanging authorization_code)
 export const CODEX_REDIRECT_URI =
   "https://auth.openai.com/deviceauth/callback";
 
@@ -24,17 +28,13 @@ export const CODEX_API_BASE_URL =
 // Supported parameters for Responses API requests
 export const CODEX_SUPPORTED_PARAMS = new Set([
   "model",
-  "input",
   "instructions",
-  "temperature",
-  "top_p",
-  "max_output_tokens",
+  "store",
+  "input",
   "stream",
   "tools",
   "tool_choice",
-  "previous_response_id",
   "reasoning",
-  "truncation",
 ]);
 
 // Available Codex models (from codex-rs/core/models.json)

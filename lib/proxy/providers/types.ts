@@ -44,6 +44,7 @@ export interface ReasoningConfig {
  */
 export interface ChatCompletionRequest {
   model: string;
+  instructions?: string;
   messages: Array<{
     role: string;
     content: string | Array<{ type: string; [key: string]: unknown }>;

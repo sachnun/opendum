@@ -30,11 +30,31 @@ import {
 import {
   initiateCodexDeviceCodeFlow,
   pollCodexDeviceCodeAuthorization,
+  codexProvider,
+  generateCodeVerifier,
+  generateCodeChallenge,
+  CODEX_CLIENT_ID,
+  CODEX_OAUTH_AUTHORIZE_ENDPOINT,
+  CODEX_BROWSER_REDIRECT_URI,
+  CODEX_OAUTH_SCOPE,
+  CODEX_ORIGINATOR,
 } from "@/lib/proxy/providers/codex";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
   | { success: false; error: string };
+
+const CODEX_OAUTH_COOKIE_NAME = "codex_oauth_ctx";
+
+interface CodexOAuthContext {
+  state: string;
+  codeVerifier: string;
+}
+
+function generateCodexState(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Buffer.from(bytes).toString("base64url");
+}
 
 /**
  * Delete a provider account
@@ -842,6 +862,205 @@ export async function exchangeGeminiCliOAuthCode(
     }
   } catch (err) {
     console.error("Failed to exchange Gemini CLI OAuth code:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Get ChatGPT Codex OAuth authorization URL (browser flow)
+ */
+export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const state = generateCodexState();
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    const cookieStore = await cookies();
+    const context: CodexOAuthContext = { state, codeVerifier };
+    cookieStore.set(CODEX_OAUTH_COOKIE_NAME, encrypt(JSON.stringify(context)), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      maxAge: 10 * 60,
+      path: "/",
+    });
+
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: CODEX_CLIENT_ID,
+      redirect_uri: CODEX_BROWSER_REDIRECT_URI,
+      scope: CODEX_OAUTH_SCOPE,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+      id_token_add_organizations: "true",
+      codex_cli_simplified_flow: "true",
+      state,
+      originator: CODEX_ORIGINATOR,
+    });
+
+    const authUrl = `${CODEX_OAUTH_AUTHORIZE_ENDPOINT}?${params.toString()}`;
+
+    return { success: true, data: { authUrl } };
+  } catch (err) {
+    console.error("Failed to build Codex auth URL:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Exchange ChatGPT Codex OAuth callback URL for tokens and create/update account
+ */
+export async function exchangeCodexOAuthCode(
+  callbackUrl: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (!callbackUrl || typeof callbackUrl !== "string") {
+    return { success: false, error: "Callback URL is required" };
+  }
+
+  try {
+    let url: URL;
+    try {
+      url = new URL(callbackUrl);
+    } catch {
+      return { success: false, error: "Invalid URL format" };
+    }
+
+    const error = url.searchParams.get("error");
+    if (error) {
+      const message = url.searchParams.get("error_description") || error;
+      return { success: false, error: `Codex OAuth error: ${message}` };
+    }
+
+    const code = url.searchParams.get("code");
+    if (!code) {
+      return {
+        success: false,
+        error: "No authorization code found in URL. Make sure you copied the complete URL from your browser.",
+      };
+    }
+
+    const callbackState = url.searchParams.get("state");
+    if (!callbackState) {
+      return { success: false, error: "Missing OAuth state. Please restart authentication." };
+    }
+
+    const cookieStore = await cookies();
+    const contextCookie = cookieStore.get(CODEX_OAUTH_COOKIE_NAME);
+    if (!contextCookie?.value) {
+      return { success: false, error: "Session expired. Please restart authentication." };
+    }
+
+    let oauthContext: CodexOAuthContext;
+    try {
+      oauthContext = JSON.parse(decrypt(contextCookie.value)) as CodexOAuthContext;
+    } catch {
+      cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+      return { success: false, error: "Invalid authentication state. Please restart authentication." };
+    }
+
+    if (!oauthContext.codeVerifier || !oauthContext.state) {
+      cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+      return { success: false, error: "Invalid authentication context. Please restart authentication." };
+    }
+
+    if (oauthContext.state !== callbackState) {
+      cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+      return { success: false, error: "Invalid OAuth state. Please restart authentication." };
+    }
+
+    const oauthResult = await codexProvider.exchangeCode(
+      code,
+      CODEX_BROWSER_REDIRECT_URI,
+      oauthContext.codeVerifier
+    );
+
+    cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+
+    const chatgptAccountId = oauthResult.accountId || null;
+
+    let existingAccount = null;
+    if (chatgptAccountId) {
+      existingAccount = await prisma.providerAccount.findFirst({
+        where: {
+          userId: session.user.id,
+          provider: "codex",
+          accountId: chatgptAccountId,
+        },
+      });
+    }
+
+    if (existingAccount) {
+      await prisma.providerAccount.update({
+        where: { id: existingAccount.id },
+        data: {
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          accountId: chatgptAccountId,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          email: existingAccount.email || `codex-${chatgptAccountId || "unknown"}`,
+          isUpdate: true,
+        },
+      };
+    }
+
+    const accountCount = await prisma.providerAccount.count({
+      where: { userId: session.user.id, provider: "codex" },
+    });
+
+    const email = chatgptAccountId
+      ? `codex-${chatgptAccountId}`
+      : `codex-${Date.now()}`;
+
+    await prisma.providerAccount.create({
+      data: {
+        userId: session.user.id,
+        provider: "codex",
+        name: `ChatGPT Codex Account ${accountCount + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        email,
+        accountId: chatgptAccountId,
+        isActive: true,
+      },
+    });
+
+    revalidatePath("/dashboard/accounts");
+
+    return {
+      success: true,
+      data: {
+        email,
+        isUpdate: false,
+      },
+    };
+  } catch (err) {
+    console.error("Failed to exchange Codex OAuth code:", err);
+    const cookieStore = await cookies();
+    cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: errorMessage };
   }
