@@ -224,7 +224,8 @@ function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig)
 }
 
 export async function getAnalyticsData(
-  filter: AnalyticsFilter
+  filter: AnalyticsFilter,
+  apiKeyId?: string
 ): Promise<ActionResult<AnalyticsData>> {
   const session = await auth();
 
@@ -242,11 +243,26 @@ export async function getAnalyticsData(
   const { startDate, endDate, config } = resolvedFilter.data;
 
   try {
+    if (apiKeyId) {
+      const ownedApiKey = await prisma.proxyApiKey.findFirst({
+        where: {
+          id: apiKeyId,
+          userId,
+        },
+        select: { id: true },
+      });
+
+      if (!ownedApiKey) {
+        return { success: false, error: "API key not found" };
+      }
+    }
+
     // Fetch all logs in the period
     const logs = await prisma.usageLog.findMany({
       where: {
         userId,
         createdAt: { gte: startDate, lte: endDate },
+        ...(apiKeyId ? { proxyApiKeyId: apiKeyId } : {}),
       },
       select: {
         model: true,

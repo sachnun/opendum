@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { endOfDay, format, startOfDay } from "date-fns";
 import type { LucideIcon } from "lucide-react";
-import { CheckCircle, ChevronDown, Clock3, RefreshCw, TrendingUp, Zap } from "lucide-react";
+import { CheckCircle, ChevronDown, Clock3, KeyRound, RefreshCw, TrendingUp, Zap } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -63,14 +63,26 @@ interface StatCard {
 
 interface AnalyticsChartsProps {
   initialData: AnalyticsData | null;
+  initialApiKeyId: string;
+  apiKeys: {
+    id: string;
+    name: string | null;
+    keyPreview: string;
+  }[];
 }
 
-export function AnalyticsCharts({ initialData }: AnalyticsChartsProps) {
+export function AnalyticsCharts({
+  initialData,
+  initialApiKeyId,
+  apiKeys,
+}: AnalyticsChartsProps) {
   const [period, setPeriod] = useState<Period>("24h");
+  const [selectedApiKeyId, setSelectedApiKeyId] = useState<string>(initialApiKeyId);
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
   const [draftCustomRange, setDraftCustomRange] = useState<DateRange | undefined>(undefined);
   const [isCustomRangeActive, setIsCustomRangeActive] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isApiKeyFilterOpen, setIsApiKeyFilterOpen] = useState(false);
   const [data, setData] = useState<AnalyticsData | null>(initialData);
   const [isLoading, setIsLoading] = useState(!initialData);
   const [isFetching, setIsFetching] = useState(false);
@@ -81,14 +93,23 @@ export function AnalyticsCharts({ initialData }: AnalyticsChartsProps) {
       ? `${format(customRange.from, "dd MMM yyyy")} - ${format(customRange.to, "dd MMM yyyy")}`
       : "Custom range";
   const activeFilterLabel = isCustomRangeActive ? customRangeLabel : selectedPeriod.label;
+  const selectedApiKey = apiKeys.find((apiKey) => apiKey.id === selectedApiKeyId) ?? null;
+  const selectedApiKeyLabel = selectedApiKey
+    ? `${selectedApiKey.name ?? "Unnamed key"} (${selectedApiKey.keyPreview})`
+    : "All API keys";
 
-  const fetchData = async (selectedPeriod: Period, selectedCustomRange?: CustomDateRange) => {
+  const fetchData = async (
+    selectedPeriod: Period,
+    selectedApiKey: string,
+    selectedCustomRange?: CustomDateRange
+  ) => {
     setIsFetching(true);
 
     try {
+      const apiKeyId = selectedApiKey === "all" ? undefined : selectedApiKey;
       const result = selectedCustomRange
-        ? await getAnalyticsData(selectedCustomRange)
-        : await getAnalyticsData(selectedPeriod);
+        ? await getAnalyticsData(selectedCustomRange, apiKeyId)
+        : await getAnalyticsData(selectedPeriod, apiKeyId);
 
       if (result.success) {
         setData(result.data);
@@ -118,8 +139,8 @@ export function AnalyticsCharts({ initialData }: AnalyticsChartsProps) {
       }
     }
 
-    void fetchData(period, selectedCustomRange ?? undefined);
-  }, [period, customRange, isCustomRangeActive, initialData]);
+    void fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined);
+  }, [period, customRange, isCustomRangeActive, selectedApiKeyId, initialData]);
 
   useEffect(() => {
     if (isFilterOpen) {
@@ -131,6 +152,11 @@ export function AnalyticsCharts({ initialData }: AnalyticsChartsProps) {
     setPeriod(newPeriod);
     setIsCustomRangeActive(false);
     setIsFilterOpen(false);
+  };
+
+  const handleApiKeyChange = (apiKeyId: string) => {
+    setSelectedApiKeyId(apiKeyId);
+    setIsApiKeyFilterOpen(false);
   };
 
   const handleApplyCustomRange = () => {
@@ -158,7 +184,7 @@ export function AnalyticsCharts({ initialData }: AnalyticsChartsProps) {
       return;
     }
 
-    const success = await fetchData(period, selectedCustomRange ?? undefined);
+    const success = await fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined);
 
     if (success) {
       toast.success("Analytics refreshed");
@@ -196,6 +222,52 @@ export function AnalyticsCharts({ initialData }: AnalyticsChartsProps) {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h3 className="text-sm font-semibold tracking-tight sm:text-base">Analytics</h3>
         <div className="flex items-center gap-2">
+          <Popover open={isApiKeyFilterOpen} onOpenChange={setIsApiKeyFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isFetching || apiKeys.length === 0}
+                className="h-8 min-w-36 justify-between rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
+              >
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="truncate">{selectedApiKeyLabel}</span>
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-2">
+              <div className="space-y-1">
+                <Button
+                  variant={selectedApiKeyId === "all" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 w-full justify-start rounded-md px-2.5 text-xs"
+                  onClick={() => handleApiKeyChange("all")}
+                  disabled={isFetching}
+                >
+                  All API keys
+                </Button>
+
+                {apiKeys.map((apiKey) => (
+                  <Button
+                    key={apiKey.id}
+                    variant={selectedApiKeyId === apiKey.id ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 w-full justify-start rounded-md px-2.5 text-xs"
+                    onClick={() => handleApiKeyChange(apiKey.id)}
+                    disabled={isFetching}
+                  >
+                    <span className="truncate">{apiKey.name ?? "Unnamed key"}</span>
+                    <span className="ml-1 truncate text-[11px] text-muted-foreground">
+                      {apiKey.keyPreview}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
             <PopoverTrigger asChild>
               <Button
