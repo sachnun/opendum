@@ -4,11 +4,6 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   CheckCircle, 
   XCircle, 
-  Sparkles, 
-  Zap, 
-  Terminal, 
-  Cpu,
-  Bot,
   AlertTriangle,
   AlertCircle,
 } from "lucide-react";
@@ -179,7 +174,7 @@ function AccountCard({
         : account.tier;
 
   return (
-    <Card className="bg-card">
+    <Card className={`bg-card ${!account.isActive ? "opacity-65" : ""}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{title}</CardTitle>
@@ -300,7 +295,6 @@ function AccountCard({
 
 interface ProviderSectionProps {
   id?: string;
-  icon: React.ReactNode;
   title: string;
   accounts: Account[];
   showTier?: boolean;
@@ -311,7 +305,6 @@ interface ProviderSectionProps {
 
 function ProviderSection({
   id,
-  icon,
   title,
   accounts,
   showTier = false,
@@ -322,7 +315,6 @@ function ProviderSection({
   return (
     <section id={id} className="scroll-mt-24 space-y-4">
       <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5">
-        {icon}
         <h3 className="text-base md:text-lg font-semibold">{title}</h3>
         <Badge variant="outline" className="text-xs">
           {accounts.length} connected
@@ -407,7 +399,6 @@ export function AccountsList({
       {/* Antigravity Section */}
       <ProviderSection
         id="antigravity-accounts"
-        icon={<Sparkles className="h-5 w-5" />}
         title="Antigravity Accounts"
         accounts={antigravityAccounts}
         showTier
@@ -419,7 +410,6 @@ export function AccountsList({
       {/* Codex Section */}
       <ProviderSection
         id="codex-accounts"
-        icon={<Bot className="h-5 w-5" />}
         title="Codex Accounts"
         accounts={codexAccounts}
         emptyMessage="No Codex accounts connected yet."
@@ -428,7 +418,6 @@ export function AccountsList({
       {/* Iflow Section */}
       <ProviderSection
         id="iflow-accounts"
-        icon={<Zap className="h-5 w-5" />}
         title="Iflow Accounts"
         accounts={iflowAccounts}
         emptyMessage="No Iflow accounts connected yet."
@@ -437,7 +426,6 @@ export function AccountsList({
       {/* Gemini CLI Section */}
       <ProviderSection
         id="gemini-cli-accounts"
-        icon={<Cpu className="h-5 w-5" />}
         title="Gemini CLI Accounts"
         accounts={geminiCliAccounts}
         showTier
@@ -447,7 +435,6 @@ export function AccountsList({
       {/* Qwen Code Section */}
       <ProviderSection
         id="qwen-code-accounts"
-        icon={<Terminal className="h-5 w-5" />}
         title="Qwen Code Accounts"
         accounts={qwenCodeAccounts}
         emptyMessage="No Qwen Code accounts connected yet."

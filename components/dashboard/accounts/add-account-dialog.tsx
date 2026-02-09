@@ -22,13 +22,8 @@ import {
   Plus,
   ArrowLeft,
   ArrowRight,
-  Zap,
-  Sparkles,
-  Terminal,
   Check,
   Copy,
-  Cpu,
-  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -59,7 +54,6 @@ interface DeviceCodeConfig {
 
 interface ProviderConfig {
   name: string;
-  icon: typeof Zap;
   description: string;
 }
 
@@ -68,7 +62,6 @@ type ProviderFullConfig = ProviderConfig & (OAuthRedirectConfig | DeviceCodeConf
 const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   iflow: {
     name: "Iflow",
-    icon: Zap,
     description: "Access OpenAI compatible API",
     flowType: "oauth_redirect",
     getAuthUrl: getIflowAuthUrl,
@@ -76,7 +69,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   },
   antigravity: {
     name: "Antigravity",
-    icon: Sparkles,
     description: "Access Gemini & Claude via Google OAuth",
     flowType: "oauth_redirect",
     getAuthUrl: getAntigravityAuthUrl,
@@ -84,7 +76,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   },
   gemini_cli: {
     name: "Gemini CLI",
-    icon: Cpu,
     description: "Access Gemini 2.5 Pro & 3 models",
     flowType: "oauth_redirect",
     getAuthUrl: getGeminiCliAuthUrl,
@@ -92,13 +83,11 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   },
   qwen_code: {
     name: "Qwen Code",
-    icon: Terminal,
     description: "Access Qwen Coder models",
     flowType: "device_code",
   },
   codex: {
     name: "Codex",
-    icon: Bot,
     description: "Access GPT-5 Codex models",
     flowType: "oauth_redirect",
     getAuthUrl: getCodexAuthUrl,
@@ -388,11 +377,6 @@ export function AddAccountDialog() {
     }
   };
 
-  const renderProviderIcon = (config: ProviderConfig, className?: string) => {
-    const Icon = config.icon;
-    return <Icon className={className} />;
-  };
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -457,13 +441,7 @@ export function AddAccountDialog() {
                           : "border-border"
                       )}
                     >
-                      {renderProviderIcon(config, "h-6 w-6")}
-                      <div>
-                        <div className="text-sm font-medium">{config.name}</div>
-                        <div className="text-[10px] text-muted-foreground leading-tight">
-                          {config.description}
-                        </div>
-                      </div>
+                      <div className="text-sm font-medium">{config.name}</div>
                     </button>
                   )
                 )}
@@ -609,7 +587,6 @@ export function AddAccountDialog() {
                   </>
                 ) : (
                   <>
-                    {renderProviderIcon(providerConfig, "mr-2 h-4 w-4")}
                     Connect {providerConfig.name} Account
                   </>
                 )}
