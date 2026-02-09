@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey, logUsage, validateModelForUser } from "@/lib/proxy/auth";
+import type { ApiKeyModelAccess } from "@/lib/proxy/auth";
 import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "@/lib/proxy/load-balancer";
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
@@ -9,6 +10,8 @@ import {
   buildAccountErrorMessage,
   getErrorMessage,
   getErrorStatusCode,
+  getSanitizedProxyError,
+  type ProxyErrorType,
   shouldRotateToNextAccount,
 } from "@/lib/proxy/error-utils";
 
@@ -726,6 +729,10 @@ export async function POST(request: NextRequest) {
   }
 
   const { userId, apiKeyId } = authResult;
+  const apiKeyModelAccess: ApiKeyModelAccess = {
+    mode: authResult.modelAccessMode ?? "all",
+    models: authResult.modelAccessList ?? [],
+  };
 
   try {
     let body;
@@ -752,7 +759,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const modelValidation = await validateModelForUser(userId!, modelParam);
+    const modelValidation = await validateModelForUser(
+      userId!,
+      modelParam,
+      apiKeyModelAccess
+    );
     if (!modelValidation.valid) {
       const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       return NextResponse.json(
@@ -769,7 +780,13 @@ export async function POST(request: NextRequest) {
     const family = getModelFamily(model);
     const MAX_ACCOUNT_RETRIES = 5;
     const triedAccountIds: string[] = [];
-    let lastAccountFailure: { statusCode: number; message: string } | null = null;
+    let lastAccountFailure:
+      | {
+          statusCode: number;
+          message: string;
+          type: ProxyErrorType;
+        }
+      | null = null;
     const rawErrorParams = Object.fromEntries(
       Object.entries(body as Record<string, unknown>).filter(
         ([key]) => key !== "model" && key !== "messages" && key !== "stream"
@@ -825,7 +842,7 @@ export async function POST(request: NextRequest) {
             {
               type: "error",
               error: {
-                type: "api_error",
+                type: lastAccountFailure.type,
                 message: lastAccountFailure.message,
               },
             },
@@ -923,9 +940,12 @@ export async function POST(request: NextRequest) {
             duration: Date.now() - startTime,
           });
 
+          const sanitizedError = getSanitizedProxyError(providerResponse.status);
+
           lastAccountFailure = {
             statusCode: providerResponse.status,
-            message: `${account.provider} API error: ${errorText}`,
+            message: sanitizedError.message,
+            type: sanitizedError.type,
           };
 
           if (
@@ -939,7 +959,7 @@ export async function POST(request: NextRequest) {
             {
               type: "error",
               error: {
-                type: "api_error",
+                type: lastAccountFailure.type,
                 message: lastAccountFailure.message,
               },
             },
@@ -1021,9 +1041,12 @@ export async function POST(request: NextRequest) {
           duration: Date.now() - startTime,
         });
 
+        const sanitizedError = getSanitizedProxyError(statusCode);
+
         lastAccountFailure = {
           statusCode,
-          message: errorMessage,
+          message: sanitizedError.message,
+          type: sanitizedError.type,
         };
 
         if (shouldRotateToNextAccount(statusCode) && attempt < MAX_ACCOUNT_RETRIES - 1) {
@@ -1034,7 +1057,7 @@ export async function POST(request: NextRequest) {
           {
             type: "error",
             error: {
-              type: "api_error",
+              type: lastAccountFailure.type,
               message: lastAccountFailure.message,
             },
           },
@@ -1064,7 +1087,7 @@ export async function POST(request: NextRequest) {
         {
           type: "error",
           error: {
-            type: "api_error",
+            type: lastAccountFailure.type,
             message: lastAccountFailure.message,
           },
         },
@@ -1090,7 +1113,7 @@ export async function POST(request: NextRequest) {
         type: "error",
         error: {
           type: "api_error",
-          message: error instanceof Error ? error.message : "Internal server error",
+          message: "Internal server error",
         },
       },
       { status: 500 }

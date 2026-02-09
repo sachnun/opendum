@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
     request.headers.get("authorization") ?? request.headers.get("x-api-key");
 
   let userId: string | null = null;
+  let apiKeyModelAccessMode: "all" | "whitelist" | "blacklist" = "all";
+  let apiKeyModelSet = new Set<string>();
 
   if (authHeader) {
     const authResult = await validateApiKey(authHeader);
@@ -23,6 +25,10 @@ export async function GET(request: NextRequest) {
     }
 
     userId = authResult.userId ?? null;
+    apiKeyModelAccessMode = authResult.modelAccessMode ?? "all";
+    apiKeyModelSet = new Set(
+      (authResult.modelAccessList ?? []).map((model) => resolveModelAlias(model))
+    );
   } else {
     const session = await auth();
     userId = session?.user?.id ?? null;
@@ -45,9 +51,23 @@ export async function GET(request: NextRequest) {
   const disabledModelSet = new Set(
     disabledModels.map((entry: { model: string }) => entry.model)
   );
-  const enabledModels = allModels.filter(
-    (model) => !disabledModelSet.has(resolveModelAlias(model.id))
-  );
+  const enabledModels = allModels.filter((model) => {
+    const canonicalModel = resolveModelAlias(model.id);
+
+    if (disabledModelSet.has(canonicalModel)) {
+      return false;
+    }
+
+    if (apiKeyModelAccessMode === "whitelist") {
+      return apiKeyModelSet.has(canonicalModel);
+    }
+
+    if (apiKeyModelAccessMode === "blacklist") {
+      return !apiKeyModelSet.has(canonicalModel);
+    }
+
+    return true;
+  });
 
   return NextResponse.json({
     object: "list",
