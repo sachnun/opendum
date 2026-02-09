@@ -9,6 +9,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   getAntigravityQuota,
   type AccountQuotaInfo as AntigravityAccountQuotaInfo,
   type QuotaGroupDisplay as AntigravityQuotaGroupDisplay,
@@ -204,6 +212,53 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
   );
 }
 
+function LastErrorMessageDialog({
+  message,
+  code,
+  occurredAt,
+  tone = "error",
+}: {
+  message: string;
+  code: number | null;
+  occurredAt: Date | null;
+  tone?: "error" | "warning";
+}) {
+  const preview = message.length > 150 ? `${message.slice(0, 150)}...` : message;
+  const previewColorClass =
+    tone === "warning" ? "text-amber-600 dark:text-amber-400" : "text-red-500";
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="w-full rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="text-muted-foreground text-xs">Last Error Message:</span>
+          <span className={`mt-1 block text-xs line-clamp-2 break-all ${previewColorClass}`}>
+            {code && `[${code}] `}
+            {preview}
+          </span>
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Provider Error Details</DialogTitle>
+          <DialogDescription>
+            {code ? `HTTP ${code}` : "No status code"}
+            {occurredAt ? ` - ${formatRelativeTime(occurredAt)}` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] overflow-y-auto rounded-md border bg-muted/20 p-3">
+          <p className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+            {message}
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // =============================================================================
 // ACCOUNT CARD COMPONENT
 // =============================================================================
@@ -235,6 +290,14 @@ function AccountCard({
   const tierLabel = normalizedTier ? formatTierLabel(normalizedTier) : null;
   const showTierBadge =
     showTier && Boolean(tierLabel) && normalizedTier !== "unknown" && normalizedTier !== "guest";
+  const hasSuccessAfterLastError = Boolean(
+    account.lastErrorAt &&
+      account.lastSuccessAt &&
+      account.lastSuccessAt.getTime() > account.lastErrorAt.getTime()
+  );
+  const errorToneClass = hasSuccessAfterLastError
+    ? "text-amber-600 dark:text-amber-400"
+    : "text-red-500";
 
   return (
     <Card className={`bg-card ${!account.isActive ? "opacity-65" : ""}`}>
@@ -302,27 +365,24 @@ function AccountCard({
             <>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Errors</span>
-                <span className="font-medium text-red-500">{account.errorCount}</span>
+                <span className={`font-medium ${errorToneClass}`}>{account.errorCount}</span>
               </div>
               {account.lastErrorAt && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Last Error</span>
-                  <span className="font-medium text-red-500">
+                  <span className={`font-medium ${errorToneClass}`}>
                     {formatRelativeTime(account.lastErrorAt)}
                   </span>
                 </div>
               )}
               {account.lastErrorMessage && (
-                <div className="pt-2 border-t">
-                  <span className="text-muted-foreground text-xs">Last Error Message:</span>
-                  <p 
-                    className="text-xs text-red-500 mt-1 line-clamp-2 break-all"
-                    title={account.lastErrorMessage}
-                  >
-                    {account.lastErrorCode && `[${account.lastErrorCode}] `}
-                    {account.lastErrorMessage.slice(0, 150)}
-                    {account.lastErrorMessage.length > 150 && "..."}
-                  </p>
+                <div className="border-t">
+                  <LastErrorMessageDialog
+                    message={account.lastErrorMessage}
+                    code={account.lastErrorCode}
+                    occurredAt={account.lastErrorAt}
+                    tone={hasSuccessAfterLastError ? "warning" : "error"}
+                  />
                 </div>
               )}
             </>
