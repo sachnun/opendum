@@ -1,9 +1,32 @@
 import { auth, signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
-export default async function Home() {
-  const session = await auth();
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthAccountNotLinked:
+    "We could not link this sign-in method to your existing account. Try your original provider once, then try again.",
+  AccessDenied: "Access denied. Please try signing in again.",
+};
+
+function getAuthErrorMessage(error?: string) {
+  if (!error) {
+    return null;
+  }
+
+  return AUTH_ERROR_MESSAGES[error] ?? "Sign in failed. Please try again.";
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [session, params] = await Promise.all([auth(), searchParams]);
+  const authError = getAuthErrorMessage(
+    params.error ? decodeURIComponent(params.error) : undefined
+  );
 
   if (session) {
     redirect("/dashboard");
@@ -16,6 +39,14 @@ export default async function Home() {
         <p className="mt-4 font-mono text-sm text-muted-foreground">
           Your accounts, one API.
         </p>
+
+        {authError && (
+          <Alert variant="destructive" className="mt-6 text-left">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{authError}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="mt-8 flex items-center justify-center gap-3">
           <form
             action={async () => {
