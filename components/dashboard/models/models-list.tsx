@@ -16,6 +16,11 @@ interface ModelWithStats {
   providerLabels: string[];
   meta?: ModelMeta;
   isEnabled: boolean;
+  stats: {
+    totalRequests: number;
+    successRate: number | null;
+    dailyRequests: Array<{ date: string; count: number }>;
+  };
 }
 
 interface ModelsListProps {
@@ -237,6 +242,7 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
                     id={model.id}
                     providers={model.providerLabels}
                     meta={model.meta}
+                    stats={model.stats}
                     isEnabled={model.isEnabled}
                     isUpdating={Boolean(pendingByModel[model.id])}
                     onEnabledChange={handleEnabledChange}

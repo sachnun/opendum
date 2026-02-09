@@ -5,13 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Eye, Copy, Check, Brain, Wrench, Calendar } from "lucide-react";
+import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3 } from "lucide-react";
 import type { ModelMeta } from "@/lib/proxy/models";
+
+interface ModelStats {
+  totalRequests: number;
+  successRate: number | null;
+  dailyRequests: Array<{ date: string; count: number }>;
+}
 
 interface ModelCardProps {
   id: string;
   providers: string[];
   meta?: ModelMeta;
+  stats: ModelStats;
   isEnabled: boolean;
   isUpdating: boolean;
   onEnabledChange: (modelId: string, enabled: boolean) => void;
@@ -36,15 +43,59 @@ function formatDate(dateStr: string): string {
   return `${month} ${year}`;
 }
 
+function buildSparklinePath(values: number[], width: number, height: number): string {
+  if (values.length === 0) {
+    return "";
+  }
+
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const step = values.length > 1 ? width / (values.length - 1) : 0;
+
+  if (max === min) {
+    const y = max === 0 ? height : height / 2;
+    return values
+      .map((_, index) => `${index === 0 ? "M" : "L"}${(index * step).toFixed(2)},${y.toFixed(2)}`)
+      .join(" ");
+  }
+
+  const range = max - min;
+
+  return values
+    .map((value, index) => {
+      const x = index * step;
+      const normalized = (value - min) / range;
+      const y = height - normalized * height;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
+function buildSparklineArea(path: string, width: number, height: number): string {
+  if (!path) {
+    return "";
+  }
+
+  return `${path} L${width},${height} L0,${height} Z`;
+}
+
 export function ModelCard({
   id,
   providers,
   meta,
+  stats,
   isEnabled,
   isUpdating,
   onEnabledChange,
 }: ModelCardProps) {
   const [copied, setCopied] = useState(false);
+  const chartWidth = 100;
+  const chartHeight = 26;
+  const dailyValues = stats.dailyRequests.map((point) => point.count);
+  const hasUsage = dailyValues.some((value) => value > 0);
+  const sparklinePath = buildSparklinePath(dailyValues, chartWidth, chartHeight);
+  const areaPath = buildSparklineArea(sparklinePath, chartWidth, chartHeight);
+  const maxDailyRequests = Math.max(...dailyValues, 0);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(id);
@@ -134,6 +185,66 @@ export function ModelCard({
             )}
           </div>
         )}
+
+        <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
+          <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <BarChart3 className="h-3 w-3" />
+              Last 30 days
+            </span>
+            <span>{maxDailyRequests.toLocaleString()} peak/day</span>
+          </div>
+
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+              <p className="text-[10px] text-muted-foreground">Requests</p>
+              <p className="text-sm font-semibold text-foreground">{stats.totalRequests.toLocaleString()}</p>
+            </div>
+            <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+              <p className="text-[10px] text-muted-foreground">Success</p>
+              <p className="text-sm font-semibold text-foreground">
+                {stats.successRate === null ? "-" : `${stats.successRate}%`}
+              </p>
+            </div>
+          </div>
+
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            className="h-8 w-full"
+            role="img"
+            aria-label={`Requests trend for ${id}`}
+          >
+            <path
+              d={`M0,${chartHeight} L${chartWidth},${chartHeight}`}
+              stroke="var(--border)"
+              strokeWidth="1"
+              fill="none"
+            />
+            {hasUsage && areaPath ? (
+              <path d={areaPath} fill="var(--chart-1)" fillOpacity="0.18" stroke="none" />
+            ) : null}
+            {hasUsage && sparklinePath ? (
+              <path
+                d={sparklinePath}
+                stroke="var(--chart-1)"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : (
+              <text
+                x={chartWidth / 2}
+                y={chartHeight / 2 + 3}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                style={{ fontSize: 7 }}
+              >
+                No activity yet
+              </text>
+            )}
+          </svg>
+        </div>
 
         <Button
           variant="outline"

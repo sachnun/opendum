@@ -2,19 +2,37 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
-  CheckCircle, 
-  XCircle, 
   AlertTriangle,
   AlertCircle,
+  BarChart3,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getAntigravityQuota,
-  type AccountQuotaInfo,
-  type QuotaGroupDisplay,
+  type AccountQuotaInfo as AntigravityAccountQuotaInfo,
+  type QuotaGroupDisplay as AntigravityQuotaGroupDisplay,
 } from "@/lib/actions/antigravity-quota";
+import {
+  getCodexQuota,
+  type CodexAccountQuotaInfo,
+  type CodexQuotaGroupDisplay,
+} from "@/lib/actions/codex-quota";
+import {
+  getGeminiCliQuota,
+  type GeminiCliAccountQuotaInfo,
+  type GeminiCliQuotaGroupDisplay,
+} from "@/lib/actions/gemini-cli-quota";
 import { AccountActions } from "./account-actions";
+
+type AccountQuotaInfo =
+  | AntigravityAccountQuotaInfo
+  | CodexAccountQuotaInfo
+  | GeminiCliAccountQuotaInfo;
+type QuotaGroupDisplay =
+  | AntigravityQuotaGroupDisplay
+  | CodexQuotaGroupDisplay
+  | GeminiCliQuotaGroupDisplay;
 
 // =============================================================================
 // TYPES
@@ -39,6 +57,11 @@ interface Account {
   lastErrorCode: number | null;
   successCount: number;
   lastSuccessAt: Date | null;
+  stats: {
+    totalRequests: number;
+    successRate: number | null;
+    dailyRequests: Array<{ date: string; count: number }>;
+  };
 }
 
 interface AccountsListProps {
@@ -51,6 +74,82 @@ interface AccountsListProps {
 
 function formatUtcDate(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function buildSparklinePath(values: number[], width: number, height: number): string {
+  if (values.length === 0) {
+    return "";
+  }
+
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const step = values.length > 1 ? width / (values.length - 1) : 0;
+
+  if (max === min) {
+    const y = max === 0 ? height : height / 2;
+    return values
+      .map((_, index) => `${index === 0 ? "M" : "L"}${(index * step).toFixed(2)},${y.toFixed(2)}`)
+      .join(" ");
+  }
+
+  const range = max - min;
+
+  return values
+    .map((value, index) => {
+      const x = index * step;
+      const normalized = (value - min) / range;
+      const y = height - normalized * height;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
+function buildSparklineArea(path: string, width: number, height: number): string {
+  if (!path) {
+    return "";
+  }
+
+  return `${path} L${width},${height} L0,${height} Z`;
+}
+
+function formatTierLabel(tier: string): string {
+  const normalized = tier.trim().toLowerCase();
+
+  switch (normalized) {
+    case "free":
+      return "Free";
+    case "plus":
+      return "Plus";
+    case "pro":
+      return "Pro";
+    case "team":
+      return "Team";
+    case "go":
+      return "Go";
+    case "business":
+      return "Business";
+    case "enterprise":
+      return "Enterprise";
+    case "edu":
+    case "education":
+      return "Edu";
+    case "paid":
+    case "standard-tier":
+      return "Paid";
+    default:
+      return normalized
+        .split(/[-_\s]+/)
+        .filter(Boolean)
+        .map((part) => part[0].toUpperCase() + part.slice(1))
+        .join(" ");
+  }
+}
+
+function isPaidTierValue(tier: string): boolean {
+  const normalized = tier.trim().toLowerCase();
+  return ["paid", "standard-tier", "plus", "pro", "team", "go", "business", "enterprise", "edu", "education"].includes(
+    normalized
+  );
 }
 
 function getAccountHeader(account: Account): { title: string; subtitle: string | null } {
@@ -101,16 +200,15 @@ function StatusBadge({ status, consecutiveErrors }: { status: string; consecutiv
       </Badge>
     );
   }
-  return (
-    <Badge variant="default" className="gap-1">
-      <CheckCircle className="h-3 w-3" />
-      Active
-    </Badge>
-  );
+  return null;
 }
 
 function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
   const percentRemaining = Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
+  const remainingLabel =
+    group.models.length === 0
+      ? `${percentRemaining}%`
+      : `${group.remainingRequests}/${group.maxRequests}`;
 
   let barColor = "bg-green-500";
   let textColor = "text-green-600 dark:text-green-400";
@@ -131,7 +229,7 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className="text-muted-foreground truncate">{group.displayName}</span>
         <span className={`font-mono ${textColor}`}>
-          {group.remainingRequests}/{group.maxRequests}
+          {remainingLabel}
         </span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -160,18 +258,26 @@ function AccountCard({
   isQuotaLoading?: boolean;
 }) {
   const hasErrors = account.errorCount > 0;
-  const isAntigravity = account.provider === "antigravity";
-  const successRate = account.successCount + account.errorCount > 0
-    ? Math.round((account.successCount / (account.successCount + account.errorCount)) * 100)
-    : 100;
+  const supportsQuotaMonitor =
+    account.provider === "antigravity" ||
+    account.provider === "codex" ||
+    account.provider === "gemini_cli";
+  const chartWidth = 100;
+  const chartHeight = 26;
+  const dailyValues = account.stats.dailyRequests.map((point) => point.count);
+  const hasUsage = dailyValues.some((value) => value > 0);
+  const sparklinePath = buildSparklinePath(dailyValues, chartWidth, chartHeight);
+  const areaPath = buildSparklineArea(sparklinePath, chartWidth, chartHeight);
+  const peakRequests = Math.max(...dailyValues, 0);
+  const weeklySuccessRate = account.stats.successRate;
   const { title, subtitle } = getAccountHeader(account);
-  const isPaidTier = account.tier === "paid" || account.tier === "standard-tier";
-  const tierLabel =
-    account.tier === "paid" || account.tier === "standard-tier"
-      ? "Paid"
-      : account.tier === "free"
-        ? "Free"
-        : account.tier;
+  const effectiveTier =
+    account.provider === "codex" ? (quotaInfo?.tier ?? account.tier) : account.tier;
+  const normalizedTier = effectiveTier?.trim().toLowerCase() ?? null;
+  const isPaidTier = normalizedTier ? isPaidTierValue(normalizedTier) : false;
+  const tierLabel = normalizedTier ? formatTierLabel(normalizedTier) : null;
+  const showTierBadge =
+    showTier && Boolean(tierLabel) && normalizedTier !== "unknown" && normalizedTier !== "guest";
 
   return (
     <Card className={`bg-card ${!account.isActive ? "opacity-65" : ""}`}>
@@ -179,7 +285,7 @@ function AccountCard({
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{title}</CardTitle>
           <div className="flex gap-1 flex-wrap justify-end">
-            {showTier && account.tier && (
+            {showTierBadge && tierLabel && (
               <Badge 
                 variant="outline" 
                 className={isPaidTier ? "border-green-500 text-green-600" : ""}
@@ -187,13 +293,8 @@ function AccountCard({
                 {tierLabel}
               </Badge>
             )}
-            {account.isActive ? (
+            {account.status !== "active" && (
               <StatusBadge status={account.status} consecutiveErrors={account.consecutiveErrors} />
-            ) : (
-              <Badge variant="secondary">
-                <XCircle className="mr-1 h-3 w-3" />
-                Inactive
-              </Badge>
             )}
           </div>
         </div>
@@ -201,16 +302,68 @@ function AccountCard({
       </CardHeader>
       <CardContent>
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Success Rate</span>
-            <span className={`font-medium ${successRate < 80 ? "text-red-500" : successRate < 95 ? "text-yellow-500" : "text-green-500"}`}>
-              {successRate}% ({account.successCount}/{account.successCount + account.errorCount})
-            </span>
+          <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
+            <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <BarChart3 className="h-3 w-3" />
+                Last 30 days
+              </span>
+              <span>{peakRequests.toLocaleString()} peak/day</span>
+            </div>
+
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+                <p className="text-[10px] text-muted-foreground">Requests</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {account.stats.totalRequests.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+                <p className="text-[10px] text-muted-foreground">Success</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {weeklySuccessRate === null ? "-" : `${weeklySuccessRate}%`}
+                </p>
+              </div>
+            </div>
+
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              className="h-8 w-full"
+              role="img"
+              aria-label={`Requests trend for ${title}`}
+            >
+              <path
+                d={`M0,${chartHeight} L${chartWidth},${chartHeight}`}
+                stroke="var(--border)"
+                strokeWidth="1"
+                fill="none"
+              />
+              {hasUsage && areaPath ? (
+                <path d={areaPath} fill="var(--chart-2)" fillOpacity="0.18" stroke="none" />
+              ) : null}
+              {hasUsage && sparklinePath ? (
+                <path
+                  d={sparklinePath}
+                  stroke="var(--chart-2)"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ) : (
+                <text
+                  x={chartWidth / 2}
+                  y={chartHeight / 2 + 3}
+                  textAnchor="middle"
+                  className="fill-muted-foreground"
+                  style={{ fontSize: 7 }}
+                >
+                  No activity yet
+                </text>
+              )}
+            </svg>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Requests</span>
-            <span className="font-medium">{account.requestCount}</span>
-          </div>
+
           <div className="flex justify-between">
             <span className="text-muted-foreground">Last used</span>
             <span className="font-medium">
@@ -249,7 +402,7 @@ function AccountCard({
             </>
           )}
 
-          {isAntigravity && (
+          {supportsQuotaMonitor && (
             <div className="pt-3 mt-3 border-t space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Quota</span>
@@ -314,7 +467,7 @@ function ProviderSection({
 }: ProviderSectionProps) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4">
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5">
+      <div className="flex items-center gap-2">
         <h3 className="text-base md:text-lg font-semibold">{title}</h3>
         <Badge variant="outline" className="text-xs">
           {accounts.length} connected
@@ -353,18 +506,25 @@ export function AccountsList({
   qwenCodeAccounts,
   codexAccounts,
 }: AccountsListProps) {
-  const [quotaByAccountId, setQuotaByAccountId] = useState<Record<string, AccountQuotaInfo>>({});
-  const [isQuotaLoading, startQuotaTransition] = useTransition();
+  const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
+    useState<Record<string, AccountQuotaInfo>>({});
+  const [codexQuotaByAccountId, setCodexQuotaByAccountId] =
+    useState<Record<string, AccountQuotaInfo>>({});
+  const [geminiCliQuotaByAccountId, setGeminiCliQuotaByAccountId] =
+    useState<Record<string, AccountQuotaInfo>>({});
+  const [isAntigravityQuotaLoading, startAntigravityQuotaTransition] = useTransition();
+  const [isCodexQuotaLoading, startCodexQuotaTransition] = useTransition();
+  const [isGeminiCliQuotaLoading, startGeminiCliQuotaTransition] = useTransition();
 
   const fetchAntigravityQuota = useCallback(() => {
     if (antigravityAccounts.length === 0) {
       return;
     }
 
-    startQuotaTransition(async () => {
+    startAntigravityQuotaTransition(async () => {
       const result = await getAntigravityQuota();
       if (!result.success) {
-        setQuotaByAccountId({});
+        setAntigravityQuotaByAccountId({});
         return;
       }
 
@@ -376,9 +536,57 @@ export function AccountsList({
         {}
       );
 
-      setQuotaByAccountId(quotaMap);
+      setAntigravityQuotaByAccountId(quotaMap);
     });
   }, [antigravityAccounts.length]);
+
+  const fetchCodexQuota = useCallback(() => {
+    if (codexAccounts.length === 0) {
+      return;
+    }
+
+    startCodexQuotaTransition(async () => {
+      const result = await getCodexQuota();
+      if (!result.success) {
+        setCodexQuotaByAccountId({});
+        return;
+      }
+
+      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
+        (accumulator, accountQuota) => {
+          accumulator[accountQuota.accountId] = accountQuota;
+          return accumulator;
+        },
+        {}
+      );
+
+      setCodexQuotaByAccountId(quotaMap);
+    });
+  }, [codexAccounts.length]);
+
+  const fetchGeminiCliQuota = useCallback(() => {
+    if (geminiCliAccounts.length === 0) {
+      return;
+    }
+
+    startGeminiCliQuotaTransition(async () => {
+      const result = await getGeminiCliQuota();
+      if (!result.success) {
+        setGeminiCliQuotaByAccountId({});
+        return;
+      }
+
+      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
+        (accumulator, accountQuota) => {
+          accumulator[accountQuota.accountId] = accountQuota;
+          return accumulator;
+        },
+        {}
+      );
+
+      setGeminiCliQuotaByAccountId(quotaMap);
+    });
+  }, [geminiCliAccounts.length]);
 
   useEffect(() => {
     if (antigravityAccounts.length === 0) {
@@ -394,6 +602,34 @@ export function AccountsList({
     };
   }, [antigravityAccounts.length, fetchAntigravityQuota]);
 
+  useEffect(() => {
+    if (codexAccounts.length === 0) {
+      return;
+    }
+
+    const timeout = setTimeout(fetchCodexQuota, 0);
+    const interval = setInterval(fetchCodexQuota, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [codexAccounts.length, fetchCodexQuota]);
+
+  useEffect(() => {
+    if (geminiCliAccounts.length === 0) {
+      return;
+    }
+
+    const timeout = setTimeout(fetchGeminiCliQuota, 0);
+    const interval = setInterval(fetchGeminiCliQuota, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [geminiCliAccounts.length, fetchGeminiCliQuota]);
+
   return (
     <div className="space-y-6">
       {/* Antigravity Section */}
@@ -403,8 +639,8 @@ export function AccountsList({
         accounts={antigravityAccounts}
         showTier
         emptyMessage="No Antigravity accounts connected yet."
-        quotaByAccountId={quotaByAccountId}
-        isQuotaLoading={isQuotaLoading}
+        quotaByAccountId={antigravityQuotaByAccountId}
+        isQuotaLoading={isAntigravityQuotaLoading}
       />
 
       {/* Codex Section */}
@@ -412,7 +648,10 @@ export function AccountsList({
         id="codex-accounts"
         title="Codex Accounts"
         accounts={codexAccounts}
+        showTier
         emptyMessage="No Codex accounts connected yet."
+        quotaByAccountId={codexQuotaByAccountId}
+        isQuotaLoading={isCodexQuotaLoading}
       />
 
       {/* Iflow Section */}
@@ -430,6 +669,8 @@ export function AccountsList({
         accounts={geminiCliAccounts}
         showTier
         emptyMessage="No Gemini CLI accounts connected yet."
+        quotaByAccountId={geminiCliQuotaByAccountId}
+        isQuotaLoading={isGeminiCliQuotaLoading}
       />
 
       {/* Qwen Code Section */}

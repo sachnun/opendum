@@ -46,7 +46,7 @@ export function AccountActions({ account }: { account: Account }) {
         throw new Error(result.error);
       }
 
-      toast.success(`Account ${account.isActive ? "deactivated" : "activated"}`);
+      toast.success(`Account ${account.isActive ? "disabled" : "enabled"}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update account");
     } finally {
@@ -139,7 +139,7 @@ export function AccountActions({ account }: { account: Account }) {
         checked={account.isActive}
         onCheckedChange={handleToggleActive}
         disabled={isToggling}
-        title={account.isActive ? "Deactivate account" : "Activate account"}
+        title={account.isActive ? "Disable account" : "Enable account"}
       />
 
       {showResetButton && (
