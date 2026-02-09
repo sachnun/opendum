@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
+import { RefreshAccountsButton } from "@/components/dashboard/accounts/refresh-accounts-button";
 
 const ACCOUNT_STATS_DAYS = 30;
 
@@ -127,7 +128,10 @@ export default async function AccountsPage({
               <div className="pb-4 border-b border-border">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-xl font-semibold">Provider Accounts</h2>
-                  <AddAccountDialog />
+                  <div className="flex items-center gap-2">
+                    <RefreshAccountsButton />
+                    <AddAccountDialog />
+                  </div>
                 </div>
               </div>
             </div>
