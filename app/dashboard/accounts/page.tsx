@@ -2,8 +2,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle } from "lucide-react";
-import { AddAccountDialog } from "./add-account-dialog";
-import { AccountsList } from "./accounts-list";
+import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
+import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
 
 export default async function AccountsPage({
   searchParams,
@@ -30,15 +30,21 @@ export default async function AccountsPage({
   const codexAccounts = accounts.filter((a) => a.provider === "codex");
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold tracking-tight">Provider Accounts</h2>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Manage your connected AI provider accounts for load balancing
-          </p>
+    <div className="space-y-6">
+      <div className="relative">
+        <div className="md:fixed md:inset-x-0 md:top-16 md:z-20 md:left-60 md:bg-background md:pt-2">
+          <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
+            <div className="bg-background">
+              <div className="pb-4 border-b border-border">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-xl font-semibold">Provider Accounts</h2>
+                  <AddAccountDialog />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <AddAccountDialog />
+        <div className="hidden h-16 md:block" />
       </div>
 
       {params.success && (
@@ -52,7 +58,7 @@ export default async function AccountsPage({
                 : params.success === "gemini_cli_added"
                   ? "Gemini CLI account connected successfully!"
                   : params.success === "codex_added"
-                    ? "ChatGPT Codex account connected successfully!"
+                    ? "Codex account connected successfully!"
                     : "Account connected successfully!"}
           </AlertDescription>
         </Alert>
@@ -67,7 +73,6 @@ export default async function AccountsPage({
         </Alert>
       )}
 
-      {/* Client Component for Collapsible Sections */}
       <AccountsList
         antigravityAccounts={antigravityAccounts}
         iflowAccounts={iflowAccounts}

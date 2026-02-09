@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
-import { AnalyticsCharts } from "./components/analytics-charts";
+import { AnalyticsCharts } from "@/components/dashboard/analytics/analytics-charts";
+import { getAnalyticsData } from "@/lib/actions/analytics";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -8,20 +9,8 @@ export default async function DashboardPage() {
     return null;
   }
 
-  return (
-    <div className="space-y-4 md:space-y-6">
-      <div>
-        <h2 className="text-xl md:text-2xl font-bold tracking-tight">
-          Welcome back, {session.user.name?.split(" ")[0]}!
-        </h2>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Here&apos;s an overview of your API proxy
-        </p>
-      </div>
+  const initialAnalytics = await getAnalyticsData("24h");
+  const initialData = initialAnalytics.success ? initialAnalytics.data : null;
 
-      {/* Analytics Charts */}
-      <AnalyticsCharts />
-
-    </div>
-  );
+  return <AnalyticsCharts initialData={initialData} />;
 }

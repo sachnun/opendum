@@ -146,3 +146,31 @@
     background-color: var(--muted) !important;
   }
 }
+
+/* Subtle scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.8 0 0) transparent;
+}
+
+.dark * {
+  scrollbar-color: oklch(0.3 0 0) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: oklch(0.8 0 0);
+  border-radius: 3px;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background-color: oklch(0.3 0 0);
+}

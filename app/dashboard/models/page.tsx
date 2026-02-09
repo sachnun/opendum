@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { MODEL_REGISTRY, getModelsForProvider } from "@/lib/proxy/models";
 import { ProviderName } from "@/lib/proxy/providers/types";
-import { ModelsList } from "./models-list";
+import { ModelsList } from "@/components/dashboard/models/models-list";
 
 function getProviderLabel(provider: string): string {
   switch (provider) {
@@ -14,7 +14,7 @@ function getProviderLabel(provider: string): string {
     case ProviderName.GEMINI_CLI:
       return "Gemini CLI";
     case ProviderName.CODEX:
-      return "ChatGPT Codex";
+      return "Codex";
     default:
       return provider;
   }
@@ -52,7 +52,7 @@ export default async function ModelsPage() {
     availableProviders.push({ id: ProviderName.QWEN_CODE, label: "Qwen Code" });
   }
   if (codexModels.length > 0) {
-    availableProviders.push({ id: ProviderName.CODEX, label: "ChatGPT Codex" });
+    availableProviders.push({ id: ProviderName.CODEX, label: "Codex" });
   }
 
   // Create models with provider info
@@ -67,12 +67,14 @@ export default async function ModelsPage() {
   });
 
   return (
-    <div className="space-y-6 md:space-y-8">
-      <div>
-        <h2 className="text-xl md:text-2xl font-bold tracking-tight">Available Models</h2>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Browse all {allModels.length} available models across {availableProviders.length} provider{availableProviders.length !== 1 ? "s" : ""}
-        </p>
+    <div className="space-y-6">
+      <div className="pb-4 border-b border-border">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-xl font-semibold">Available Models</h2>
+          <span className="text-sm text-muted-foreground">
+            {allModels.length} models
+          </span>
+        </div>
       </div>
 
       <ModelsList models={modelsWithProviders} availableProviders={availableProviders} />

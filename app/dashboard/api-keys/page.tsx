@@ -1,13 +1,11 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Key } from "lucide-react";
-import { CreateApiKeyButton } from "./create-api-key-button";
-import { ApiKeyActions } from "./api-key-actions";
-import { EditableApiKeyName } from "./editable-api-key-name";
-import { CodeBlock } from "@/components/ui/code-block";
-import { headers } from "next/headers";
+import { CreateApiKeyButton } from "@/components/dashboard/api-keys/create-api-key-button";
+import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
+import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
 
 function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) {
   const now = new Date();
@@ -23,12 +21,6 @@ function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) 
 export default async function ApiKeysPage() {
   const session = await auth();
 
-  // Detect base URL from request headers
-  const headersList = await headers();
-  const host = headersList.get("host") || "localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  const baseUrl = `${protocol}://${host}`;
-
   if (!session?.user?.id) {
     return null;
   }
@@ -39,127 +31,78 @@ export default async function ApiKeysPage() {
   });
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold tracking-tight">API Keys</h2>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Manage your proxy API keys for accessing Opendum
-          </p>
+    <div className="space-y-6">
+      <div className="pb-4 border-b border-border">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-semibold">API Keys</h2>
+          <CreateApiKeyButton />
         </div>
-        <CreateApiKeyButton />
       </div>
 
       {apiKeys.length === 0 ? (
-        <Card>
+        <Card className="bg-card">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="rounded-full bg-muted p-4 mb-4">
+            <div className="mb-4 rounded-full bg-muted p-4">
               <Key className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-semibold">No API keys</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create an API key to start using the proxy
-            </p>
-            <CreateApiKeyButton />
+            <div className="mt-4">
+              <CreateApiKeyButton />
+            </div>
           </CardContent>
         </Card>
       ) : (
-              <div className="space-y-4">
+        <div className="space-y-4">
           {apiKeys.map((apiKey) => {
             const status = getApiKeyStatus(apiKey);
             const isExpiredOrDisabled = status.label !== "Active";
-            
+
             return (
-            <Card key={apiKey.id} className={isExpiredOrDisabled ? "opacity-60" : ""}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Key className="h-5 w-5 text-muted-foreground" />
-                    <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
+              <Card
+                key={apiKey.id}
+                className={`bg-card ${isExpiredOrDisabled ? "opacity-65" : ""}`}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Key className="h-5 w-5 text-muted-foreground" />
+                      <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
+                    </div>
+                    <Badge variant={status.variant}>{status.label}</Badge>
                   </div>
-                  <Badge variant={status.variant}>
-                    {status.label}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Created: </span>
-                      <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Created: </span>
+                        <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Expires: </span>
+                        <span>
+                          {apiKey.expiresAt
+                            ? new Date(apiKey.expiresAt).toLocaleDateString()
+                            : "Never"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Last used: </span>
+                        <span>
+                          {apiKey.lastUsedAt
+                            ? new Date(apiKey.lastUsedAt).toLocaleDateString()
+                            : "Never"}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Expires: </span>
-                      <span>
-                        {apiKey.expiresAt
-                          ? new Date(apiKey.expiresAt).toLocaleDateString()
-                          : "Never"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Last used: </span>
-                      <span>
-                        {apiKey.lastUsedAt
-                          ? new Date(apiKey.lastUsedAt).toLocaleDateString()
-                          : "Never"}
-                      </span>
-                    </div>
+                    <ApiKeyActions apiKey={apiKey} />
                   </div>
-                  <ApiKeyActions apiKey={apiKey} />
-                </div>
-              </CardContent>
-            </Card>
-          )})}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Usage</CardTitle>
-          <CardDescription>How to use your API key</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h4 className="font-medium mb-2">Claude Code / opencode</h4>
-            <CodeBlock
-              language="bash"
-              code={`# Add to your settings or environment
-ANTHROPIC_BASE_URL=${baseUrl}
-ANTHROPIC_AUTH_TOKEN=sk-your-api-key-here
-ANTHROPIC_DEFAULT_SONNET_MODEL=iflow/deepseek-v3.2`}
-            />
-          </div>
-          <div>
-            <h4 className="font-medium mb-2">cURL (OpenAI compatible)</h4>
-            <CodeBlock
-              language="bash"
-              code={`curl -X POST ${baseUrl}/v1/chat/completions \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer sk-your-api-key-here" \\
-  -d '{
-    "model": "iflow/deepseek-v3.2",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'`}
-            />
-          </div>
-          <div>
-            <h4 className="font-medium mb-2">cURL (Anthropic compatible)</h4>
-            <CodeBlock
-              language="bash"
-              code={`curl -X POST ${baseUrl}/v1/messages \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: sk-your-api-key-here" \\
-  -H "anthropic-version: 2023-06-01" \\
-  -d '{
-    "model": "iflow/deepseek-v3.2",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'`}
-            />
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
