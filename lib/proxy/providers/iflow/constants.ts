@@ -11,8 +11,8 @@ export const IFLOW_CLIENT_ID = process.env.IFLOW_CLIENT_ID || "10009311001";
 export const IFLOW_CLIENT_SECRET =
   process.env.IFLOW_CLIENT_SECRET || "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW";
 
-// OAuth callback - Iflow requires this specific port
-export const IFLOW_REDIRECT_URI = "http://localhost:11451/oauth2callback";
+// OAuth callback on localhost (user copies URL manually)
+export const IFLOW_REDIRECT_URI = "http://localhost:1/oauth2callback";
 
 // Supported OpenAI-compatible parameters for Iflow API
 export const IFLOW_SUPPORTED_PARAMS = new Set([

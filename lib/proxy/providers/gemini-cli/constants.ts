@@ -14,8 +14,8 @@ export const GEMINI_CLI_SCOPES: readonly string[] = [
   "https://www.googleapis.com/auth/userinfo.profile",
 ];
 
-// OAuth callback - same pattern as other providers
-export const GEMINI_CLI_REDIRECT_URI = "http://localhost:11451/oauth2callback";
+// OAuth callback on localhost (user copies URL manually)
+export const GEMINI_CLI_REDIRECT_URI = "http://localhost:1/oauth2callback";
 
 // User Agent format: GeminiCLI/${version}/${model} (${platform}; ${arch})
 export const GEMINI_CLI_VERSION = "0.26.0";

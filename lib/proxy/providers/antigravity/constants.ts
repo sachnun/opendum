@@ -16,8 +16,8 @@ export const ANTIGRAVITY_SCOPES: readonly string[] = [
   "https://www.googleapis.com/auth/experimentsandconfigs",
 ];
 
-// OAuth callback - same as Iflow, redirect to localhost (user will copy URL)
-export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:11451/oauth2callback";
+// OAuth callback on localhost (user copies URL manually)
+export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:1/oauth2callback";
 
 // User Agent & API Client headers
 // Dynamically detect OS/arch for accurate User-Agent header
