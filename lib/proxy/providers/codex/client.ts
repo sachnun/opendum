@@ -24,6 +24,7 @@ import {
   CODEX_REFRESH_BUFFER_SECONDS,
   CODEX_ORIGINATOR,
 } from "./constants";
+import { updateCodexQuotaFromHeaders } from "./quota";
 
 // ============================================================
 // Types
@@ -1246,6 +1247,12 @@ export const codexProvider: Provider = {
       headers,
       body: JSON.stringify(payload),
     });
+
+    try {
+      updateCodexQuotaFromHeaders(account.id, response.headers);
+    } catch {
+      // Ignore quota header parsing failures
+    }
 
     // For streaming, convert Responses API SSE to Chat Completions SSE
     if (stream && response.ok && response.body) {
