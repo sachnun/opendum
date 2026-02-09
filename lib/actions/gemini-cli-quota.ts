@@ -188,10 +188,6 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
     const byTier: Record<string, number> = {};
 
     for (const account of accounts) {
-      if (!account.isActive) {
-        continue;
-      }
-
       let accessToken: string;
       try {
         accessToken = await geminiCliProvider.getValidCredentials(
@@ -340,13 +336,15 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
       });
     }
 
+    const activeAccountCount = results.filter((account) => account.isActive).length;
+
     return {
       success: true,
       data: {
         accounts: results,
         summary: {
           totalAccounts: results.length,
-          activeAccounts: results.length,
+          activeAccounts: activeAccountCount,
           byTier,
           exhaustedGroups,
           totalGroups,

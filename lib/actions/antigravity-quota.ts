@@ -211,12 +211,7 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
     const byTier: Record<string, number> = {};
 
     for (const account of accounts) {
-      // Skip inactive accounts - don't include them in results
-      if (!account.isActive) {
-        continue;
-      }
-
-      // Count by tier (only for active accounts)
+      // Count by tier
       const tier = account.tier ?? "free";
       byTier[tier] = (byTier[tier] ?? 0) + 1;
 
@@ -327,15 +322,14 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
       });
     }
 
-    // Only count active accounts in summary
-    const activeAccountCount = results.length;
+    const activeAccountCount = results.filter((account) => account.isActive).length;
 
     return {
       success: true,
       data: {
         accounts: results,
         summary: {
-          totalAccounts: activeAccountCount,
+          totalAccounts: results.length,
           activeAccounts: activeAccountCount,
           byTier,
           exhaustedGroups,
@@ -367,7 +361,6 @@ export async function getEstimatedQuota(): Promise<QuotaActionResult> {
       where: {
         userId: session.user.id,
         provider: "antigravity",
-        isActive: true,
       },
       select: {
         id: true,
@@ -449,7 +442,7 @@ export async function getEstimatedQuota(): Promise<QuotaActionResult> {
         accounts: results,
         summary: {
           totalAccounts: accounts.length,
-          activeAccounts: accounts.length,
+          activeAccounts: accounts.filter((account) => account.isActive).length,
           byTier,
           exhaustedGroups,
           totalGroups,

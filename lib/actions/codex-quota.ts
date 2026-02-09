@@ -222,10 +222,6 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
     const byTier: Record<string, number> = {};
 
     for (const account of accounts) {
-      if (!account.isActive) {
-        continue;
-      }
-
       let accessToken: string;
       try {
         accessToken = await codexProvider.getValidCredentials(
@@ -324,13 +320,15 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
       });
     }
 
+    const activeAccountCount = results.filter((account) => account.isActive).length;
+
     return {
       success: true,
       data: {
         accounts: results,
         summary: {
           totalAccounts: results.length,
-          activeAccounts: results.length,
+          activeAccounts: activeAccountCount,
           byTier,
           exhaustedGroups,
           totalGroups,
