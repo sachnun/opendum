@@ -1,4 +1,4 @@
-// ChatGPT Codex Provider exports
+// Codex Provider exports
 
 export { codexProvider, codexConfig } from "./client";
 export {

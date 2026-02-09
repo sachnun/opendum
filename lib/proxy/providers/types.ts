@@ -29,7 +29,7 @@ export interface OAuthResult {
 /**
  * Reasoning effort levels for OpenAI-style reasoning parameter
  */
-export type ReasoningEffort = "none" | "low" | "medium" | "high";
+export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 
 /**
  * OpenAI-style reasoning parameter (Responses API format)
@@ -45,6 +45,8 @@ export interface ReasoningConfig {
 export interface ChatCompletionRequest {
   model: string;
   instructions?: string;
+  include?: string[];
+  previous_response_id?: string;
   messages: Array<{
     role: string;
     content: string | Array<{ type: string; [key: string]: unknown }>;
@@ -84,6 +86,10 @@ export interface ChatCompletionRequest {
   // Internal flag - controls whether reasoning_content is included in response
   // Set automatically based on whether user requested reasoning
   _includeReasoning?: boolean;
+
+  // Internal passthrough for Responses API input items
+  // Used by providers that natively support the Responses API.
+  _responsesInput?: Array<Record<string, unknown>>;
 }
 
 /**

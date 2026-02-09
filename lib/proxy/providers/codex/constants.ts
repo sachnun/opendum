@@ -1,4 +1,4 @@
-// ChatGPT Codex Provider Constants
+// Codex Provider Constants
 // Based on OpenCode's codex plugin: https://github.com/anomalyco/opencode
 // Uses Device Code Flow for OAuth via auth.openai.com
 
@@ -35,6 +35,8 @@ export const CODEX_SUPPORTED_PARAMS = new Set([
   "tools",
   "tool_choice",
   "reasoning",
+  "include",
+  "previous_response_id",
 ]);
 
 // Available Codex models (from codex-rs/core/models.json)

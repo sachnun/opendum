@@ -355,8 +355,10 @@ export async function POST(request: NextRequest) {
         {
           model,
           messages,
+          instructions,
           stream,
           _includeReasoning: reasoningRequested,
+          _responsesInput: input,
           ...chatParams,
         },
         stream

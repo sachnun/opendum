@@ -1,4 +1,4 @@
-// ChatGPT Codex Provider Implementation
+// Codex Provider Implementation
 // Uses Device Code Flow for OAuth via auth.openai.com
 // API uses Responses API format, but we convert to/from Chat Completions format
 
@@ -76,7 +76,7 @@ interface ResponsesInputItem {
 }
 
 const DEFAULT_CODEX_INSTRUCTIONS =
-  "You are ChatGPT Codex, an expert coding assistant.";
+  "You are Codex, an expert coding assistant.";
 
 function setIfCodexParamSupported(
   payload: Record<string, unknown>,
@@ -365,6 +365,20 @@ function buildResponsesApiPayload(
       ? body.instructions.trim()
       : undefined;
   const derivedInstructions = extractInstructionsFromMessages(body.messages);
+  const responseInput =
+    Array.isArray(body._responsesInput) && body._responsesInput.length > 0
+      ? body._responsesInput
+      : convertMessagesToInput(body.messages);
+  const reasoningRequested =
+    body._includeReasoning ?? !!(body.reasoning || body.reasoning_effort);
+  const hasReasoningInputItem =
+    Array.isArray(body._responsesInput) &&
+    body._responsesInput.some(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        (item as { type?: unknown }).type === "reasoning"
+    );
 
   const payload: Record<string, unknown> = {};
 
@@ -375,7 +389,7 @@ function buildResponsesApiPayload(
     explicitInstructions || derivedInstructions || DEFAULT_CODEX_INSTRUCTIONS
   );
   setIfCodexParamSupported(payload, "store", false);
-  setIfCodexParamSupported(payload, "input", convertMessagesToInput(body.messages));
+  setIfCodexParamSupported(payload, "input", responseInput);
   setIfCodexParamSupported(payload, "stream", stream);
 
   // Convert tools
@@ -388,13 +402,50 @@ function buildResponsesApiPayload(
   setIfCodexParamSupported(payload, "tool_choice", body.tool_choice);
 
   // Reasoning config
-  if (body.reasoning) {
-    setIfCodexParamSupported(payload, "reasoning", body.reasoning);
+  let reasoningConfig: Record<string, unknown> | undefined;
+  if (body.reasoning && typeof body.reasoning === "object") {
+    reasoningConfig = { ...body.reasoning };
   } else if (body.reasoning_effort) {
-    setIfCodexParamSupported(payload, "reasoning", {
+    reasoningConfig = {
       effort: body.reasoning_effort,
-    });
+    };
   }
+
+  if (reasoningConfig && reasoningRequested && reasoningConfig.summary === undefined) {
+    reasoningConfig.summary = "auto";
+  }
+
+  if (reasoningConfig) {
+    setIfCodexParamSupported(payload, "reasoning", reasoningConfig);
+  }
+
+  const include = new Set<string>(
+    Array.isArray(body.include)
+      ? body.include.filter(
+          (item): item is string =>
+            typeof item === "string" && item.trim().length > 0
+        )
+      : []
+  );
+  const shouldRequestEncryptedReasoning =
+    payload.store === false &&
+    (reasoningRequested ||
+      hasReasoningInputItem ||
+      (Array.isArray(body.tools) && body.tools.length > 0));
+
+  if (shouldRequestEncryptedReasoning) {
+    include.add("reasoning.encrypted_content");
+  }
+
+  if (include.size > 0) {
+    setIfCodexParamSupported(payload, "include", Array.from(include));
+  }
+
+  setIfCodexParamSupported(
+    payload,
+    "previous_response_id",
+    body.previous_response_id
+  );
 
   return filterSupportedCodexPayload(payload);
 }
@@ -662,6 +713,34 @@ function createResponsesToChatCompletionsStream(
   });
 }
 
+function extractReasoningText(item: Record<string, unknown>): string {
+  const summary = item.summary;
+  const chunks: string[] = [];
+
+  if (Array.isArray(summary)) {
+    for (const part of summary) {
+      if (typeof part === "string") {
+        chunks.push(part);
+        continue;
+      }
+
+      if (part && typeof part === "object") {
+        const text = (part as { text?: unknown }).text;
+        if (typeof text === "string") {
+          chunks.push(text);
+        }
+      }
+    }
+  }
+
+  const text = item.text;
+  if (typeof text === "string") {
+    chunks.push(text);
+  }
+
+  return chunks.join("\n").trim();
+}
+
 /**
  * Convert a non-streaming Responses API response to Chat Completions format
  */
@@ -675,6 +754,7 @@ function convertResponseToCompletion(
   // Extract output items
   const output = (responsesData.output as Array<Record<string, unknown>>) || [];
   let content = "";
+  let reasoningContent = "";
   const toolCalls: Array<Record<string, unknown>> = [];
   let toolCallIndex = 0;
 
@@ -687,6 +767,11 @@ function convertResponseToCompletion(
             content += (part.text as string) || "";
           }
         }
+      }
+    } else if (item.type === "reasoning") {
+      const extracted = extractReasoningText(item);
+      if (extracted) {
+        reasoningContent += reasoningContent ? `\n${extracted}` : extracted;
       }
     } else if (item.type === "function_call") {
       toolCalls.push({
@@ -710,6 +795,10 @@ function convertResponseToCompletion(
     role: "assistant",
     content: content || null,
   };
+
+  if (reasoningContent) {
+    message.reasoning_content = reasoningContent;
+  }
 
   if (toolCalls.length > 0) {
     message.tool_calls = toolCalls;
@@ -764,6 +853,7 @@ function convertChatCompletionSseToCompletion(
   let model = fallbackModel;
   let role = "assistant";
   let content = "";
+  let reasoningContent = "";
   let finishReason: string | null = null;
   const toolCallsByIndex = new Map<number, AccumulatedToolCall>();
 
@@ -819,6 +909,10 @@ function convertChatCompletionSseToCompletion(
 
         if (typeof delta.content === "string") {
           content += delta.content;
+        }
+
+        if (typeof delta.reasoning_content === "string") {
+          reasoningContent += delta.reasoning_content;
         }
 
         const deltaToolCalls = Array.isArray(delta.tool_calls)
@@ -905,6 +999,10 @@ function convertChatCompletionSseToCompletion(
     content: content || null,
   };
 
+  if (reasoningContent) {
+    message.reasoning_content = reasoningContent;
+  }
+
   if (toolCalls.length > 0) {
     message.tool_calls = toolCalls;
   }
@@ -944,7 +1042,7 @@ function isTokenExpired(expiresAt: Date): boolean {
 
 export const codexConfig: ProviderConfig = {
   name: "codex",
-  displayName: "ChatGPT Codex",
+  displayName: "Codex",
   supportedModels: CODEX_MODELS,
 };
 
@@ -958,7 +1056,7 @@ export const codexProvider: Provider = {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getAuthUrl(_state: string, _codeVerifier?: string): string {
     throw new Error(
-      "ChatGPT Codex uses Device Code Flow. Use initiateCodexDeviceCodeFlow() instead."
+      "Codex uses Device Code Flow. Use initiateCodexDeviceCodeFlow() instead."
     );
   },
 
@@ -1104,7 +1202,7 @@ export const codexProvider: Provider = {
   },
 
   /**
-   * Make a request to ChatGPT Codex API
+   * Make a request to Codex API
    * Converts Chat Completions format to Responses API, sends request,
    * then converts the response back to Chat Completions format
    */
@@ -1220,7 +1318,7 @@ export const codexProvider: Provider = {
 // ============================================================
 
 /**
- * Initiate ChatGPT Codex Device Code Flow
+ * Initiate Codex Device Code Flow
  * Returns device code info including URL and user code for display
  */
 export async function initiateCodexDeviceCodeFlow(): Promise<{

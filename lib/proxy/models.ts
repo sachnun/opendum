@@ -489,7 +489,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
 
-  // ===== ChatGPT Codex Models (OpenAI via ChatGPT Plus/Pro) =====
+  // ===== Codex Models (OpenAI via ChatGPT Plus/Pro) =====
   "gpt-5.3-codex": {
     providers: [ProviderName.CODEX],
     meta: {
