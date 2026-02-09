@@ -1,14 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { 
-  Collapsible, 
-  CollapsibleContent, 
-  CollapsibleTrigger 
-} from "@/components/ui/collapsible";
-import { 
+import { useCallback, useEffect, useState, useTransition } from "react";
+import {
   CheckCircle, 
   XCircle, 
   Sparkles, 
@@ -21,8 +14,20 @@ import {
   AlertTriangle,
   AlertCircle,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  getAntigravityQuota,
+  type AccountQuotaInfo,
+  type QuotaGroupDisplay,
+} from "@/lib/actions/antigravity-quota";
 import { AccountActions } from "./account-actions";
-import { useState } from "react";
 
 // =============================================================================
 // TYPES
@@ -90,18 +95,58 @@ function StatusBadge({ status, consecutiveErrors }: { status: string; consecutiv
   );
 }
 
+function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
+  const percentRemaining = Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
+
+  let barColor = "bg-green-500";
+  let textColor = "text-green-600 dark:text-green-400";
+
+  if (percentRemaining <= 10) {
+    barColor = "bg-red-500";
+    textColor = "text-red-600 dark:text-red-400";
+  } else if (percentRemaining <= 25) {
+    barColor = "bg-orange-500";
+    textColor = "text-orange-600 dark:text-orange-400";
+  } else if (percentRemaining <= 50) {
+    barColor = "bg-yellow-500";
+    textColor = "text-yellow-600 dark:text-yellow-400";
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground truncate">{group.displayName}</span>
+        <span className={`font-mono ${textColor}`}>
+          {group.remainingRequests}/{group.maxRequests}
+        </span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className={`h-full ${barColor} transition-all duration-300`}
+          style={{ width: `${percentRemaining}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // =============================================================================
 // ACCOUNT CARD COMPONENT
 // =============================================================================
 
 function AccountCard({ 
   account, 
-  showTier = false 
+  showTier = false,
+  quotaInfo,
+  isQuotaLoading = false,
 }: { 
   account: Account;
   showTier?: boolean;
+  quotaInfo?: AccountQuotaInfo;
+  isQuotaLoading?: boolean;
 }) {
   const hasErrors = account.errorCount > 0;
+  const isAntigravity = account.provider === "antigravity";
   const successRate = account.successCount + account.errorCount > 0
     ? Math.round((account.successCount / (account.successCount + account.errorCount)) * 100)
     : 100;
@@ -181,6 +226,38 @@ function AccountCard({
               )}
             </>
           )}
+
+          {isAntigravity && (
+            <div className="pt-3 mt-3 border-t space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">Quota</span>
+                {quotaInfo?.status === "success" && quotaInfo.groups.some((group) => group.isEstimated) && (
+                  <Badge variant="outline" className="text-[10px] px-1 py-0">
+                    estimated
+                  </Badge>
+                )}
+              </div>
+
+              {!account.isActive ? (
+                <p className="text-xs text-muted-foreground">Activate account to view quota.</p>
+              ) : isQuotaLoading && !quotaInfo ? (
+                <div className="space-y-2">
+                  <div className="h-1.5 w-full rounded-full bg-muted animate-pulse" />
+                  <div className="h-1.5 w-full rounded-full bg-muted animate-pulse" />
+                </div>
+              ) : !quotaInfo ? (
+                <p className="text-xs text-muted-foreground">Quota data is not available yet.</p>
+              ) : quotaInfo.status === "success" && quotaInfo.groups.length > 0 ? (
+                <div className="space-y-2">
+                  {quotaInfo.groups.map((group) => (
+                    <QuotaGroupBar key={group.name} group={group} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-red-500">{quotaInfo.error ?? "Failed to fetch quota data."}</p>
+              )}
+            </div>
+          )}
         </div>
         <div className="mt-4 flex gap-2">
           <AccountActions account={account} />
@@ -201,6 +278,8 @@ interface ProviderSectionProps {
   showTier?: boolean;
   defaultOpen?: boolean;
   emptyMessage: string;
+  quotaByAccountId?: Record<string, AccountQuotaInfo>;
+  isQuotaLoading?: boolean;
 }
 
 function ProviderSection({
@@ -210,6 +289,8 @@ function ProviderSection({
   showTier = false,
   defaultOpen = false,
   emptyMessage,
+  quotaByAccountId,
+  isQuotaLoading = false,
 }: ProviderSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -242,7 +323,13 @@ function ProviderSection({
           {accounts.length > 0 ? (
             <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {accounts.map((account) => (
-                <AccountCard key={account.id} account={account} showTier={showTier} />
+                <AccountCard
+                  key={account.id}
+                  account={account}
+                  showTier={showTier}
+                  quotaInfo={quotaByAccountId?.[account.id]}
+                  isQuotaLoading={isQuotaLoading}
+                />
               ))}
             </div>
           ) : (
@@ -265,6 +352,47 @@ export function AccountsList({
   qwenCodeAccounts,
   codexAccounts,
 }: AccountsListProps) {
+  const [quotaByAccountId, setQuotaByAccountId] = useState<Record<string, AccountQuotaInfo>>({});
+  const [isQuotaLoading, startQuotaTransition] = useTransition();
+
+  const fetchAntigravityQuota = useCallback(() => {
+    if (antigravityAccounts.length === 0) {
+      return;
+    }
+
+    startQuotaTransition(async () => {
+      const result = await getAntigravityQuota();
+      if (!result.success) {
+        setQuotaByAccountId({});
+        return;
+      }
+
+      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
+        (accumulator, accountQuota) => {
+          accumulator[accountQuota.accountId] = accountQuota;
+          return accumulator;
+        },
+        {}
+      );
+
+      setQuotaByAccountId(quotaMap);
+    });
+  }, [antigravityAccounts.length]);
+
+  useEffect(() => {
+    if (antigravityAccounts.length === 0) {
+      return;
+    }
+
+    const timeout = setTimeout(fetchAntigravityQuota, 0);
+    const interval = setInterval(fetchAntigravityQuota, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [antigravityAccounts.length, fetchAntigravityQuota]);
+
   return (
     <div className="space-y-6">
       {/* Antigravity Section - Default OPEN */}
@@ -275,6 +403,8 @@ export function AccountsList({
         showTier
         defaultOpen={true}
         emptyMessage="No Antigravity accounts connected yet."
+        quotaByAccountId={quotaByAccountId}
+        isQuotaLoading={isQuotaLoading}
       />
 
       {/* ChatGPT Codex Section - Default CLOSED */}

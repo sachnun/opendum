@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -22,6 +23,7 @@ import {
 export type ReasoningEffort = "none" | "low" | "medium" | "high";
 
 export interface PlaygroundSettings {
+  streamResponses: boolean;
   temperature: number;
   topP: number;
   maxTokens: number;
@@ -31,6 +33,7 @@ export interface PlaygroundSettings {
 }
 
 export const DEFAULT_SETTINGS: PlaygroundSettings = {
+  streamResponses: true,
   temperature: 1.0,
   topP: 1.0,
   maxTokens: 4096,
@@ -90,6 +93,24 @@ export function SettingsSheet({
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Generation
             </h3>
+
+            {/* Stream Responses */}
+            <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+              <div className="space-y-1">
+                <Label htmlFor="stream-responses">Stream Responses</Label>
+                <p className="text-xs text-muted-foreground">
+                  Show tokens in real-time as they arrive
+                </p>
+              </div>
+              <Switch
+                id="stream-responses"
+                checked={settings.streamResponses}
+                onCheckedChange={(checked) =>
+                  updateSetting("streamResponses", checked)
+                }
+                disabled={disabled}
+              />
+            </div>
 
             {/* Temperature */}
             <div className="space-y-2">

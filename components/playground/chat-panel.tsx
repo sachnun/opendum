@@ -36,6 +36,7 @@ export interface ModelOption {
 
 export interface ResponseData {
   content: string;
+  reasoning?: string;
   isLoading: boolean;
   error?: string;
 }
@@ -118,7 +119,7 @@ export function ChatPanel({
   const sortedFamilies = React.useMemo(() => getSortedFamilies(groupedModels), [groupedModels]);
 
   const selectedModelData = models.find((m) => m.id === selectedModel);
-  const { content = "", isLoading = false, error } = response || {};
+  const { content = "", reasoning = "", isLoading = false, error } = response || {};
 
   React.useEffect(() => {
     if (isLoading && scrollRef.current) {
@@ -127,13 +128,18 @@ export function ChatPanel({
         viewport.scrollTop = viewport.scrollHeight;
       }
     }
-  }, [content, isLoading]);
+  }, [content, reasoning, isLoading]);
 
   const handleCopy = async () => {
-    if (!content) return;
+    const textToCopy =
+      reasoning && content
+        ? `Reasoning:\n${reasoning}\n\nAnswer:\n${content}`
+        : reasoning || content;
+
+    if (!textToCopy) return;
 
     try {
-      await navigator.clipboard.writeText(content);
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -202,7 +208,7 @@ export function ChatPanel({
           </Popover>
 
           {/* Copy Button */}
-          {content && !isLoading && (
+          {(content || reasoning) && !isLoading && (
             <Button
               variant="ghost"
               size="icon-xs"
@@ -224,14 +230,14 @@ export function ChatPanel({
         <ScrollArea ref={scrollRef} className="h-full">
           <div className="p-4">
             {/* No model selected */}
-            {!selectedModel && !isLoading && !content && !error && (
+            {!selectedModel && !isLoading && !content && !reasoning && !error && (
               <p className="text-muted-foreground text-sm text-center py-8">
                 Select a model to start
               </p>
             )}
 
             {/* Loading state - initial */}
-            {isLoading && !content && (
+            {isLoading && !content && !reasoning && (
               <div className="space-y-2">
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-4/5" />
@@ -249,19 +255,35 @@ export function ChatPanel({
             )}
 
             {/* Content with streaming cursor */}
-            {content && (
+            {(content || reasoning) && (
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                  {content}
-                  {isLoading && (
-                    <span className="animate-pulse text-primary">▌</span>
-                  )}
-                </pre>
+                {reasoning && (
+                  <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                      Reasoning
+                    </p>
+                    <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                      {reasoning}
+                      {isLoading && !content && (
+                        <span className="animate-pulse text-primary">▌</span>
+                      )}
+                    </pre>
+                  </div>
+                )}
+
+                {content && (
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                    {content}
+                    {isLoading && (
+                      <span className="animate-pulse text-primary">▌</span>
+                    )}
+                  </pre>
+                )}
               </div>
             )}
 
             {/* Empty state - model selected but no response yet */}
-            {selectedModel && !isLoading && !content && !error && (
+            {selectedModel && !isLoading && !content && !reasoning && !error && (
               <p className="text-muted-foreground text-sm text-center py-8">
                 Response will appear here
               </p>

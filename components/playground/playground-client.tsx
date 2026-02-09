@@ -31,6 +31,177 @@ const DEFAULT_MODELS = [
   "antigravity/gemini-3-pro-high",
 ];
 
+function extractTextContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((part) => {
+      if (typeof part === "string") {
+        return part;
+      }
+
+      if (!part || typeof part !== "object") {
+        return "";
+      }
+
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" ? text : "";
+    })
+    .join("");
+}
+
+interface ParsedCompletionData {
+  content: string;
+  reasoning: string;
+}
+
+function extractChatCompletionData(payload: unknown): ParsedCompletionData {
+  if (!payload || typeof payload !== "object") {
+    return { content: "", reasoning: "" };
+  }
+
+  const choices = (payload as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return { content: "", reasoning: "" };
+  }
+
+  const firstChoice = choices[0];
+  if (!firstChoice || typeof firstChoice !== "object") {
+    return { content: "", reasoning: "" };
+  }
+
+  const message = (firstChoice as { message?: unknown }).message;
+  if (!message || typeof message !== "object") {
+    return { content: "", reasoning: "" };
+  }
+
+  return {
+    content: extractTextContent((message as { content?: unknown }).content),
+    reasoning: extractTextContent(
+      (message as { reasoning_content?: unknown }).reasoning_content
+    ),
+  };
+}
+
+function extractStreamChunkData(payload: unknown): ParsedCompletionData {
+  if (!payload || typeof payload !== "object") {
+    return { content: "", reasoning: "" };
+  }
+
+  const choices = (payload as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return { content: "", reasoning: "" };
+  }
+
+  const firstChoice = choices[0];
+  if (!firstChoice || typeof firstChoice !== "object") {
+    return { content: "", reasoning: "" };
+  }
+
+  const delta = (firstChoice as { delta?: unknown }).delta;
+  if (!delta || typeof delta !== "object") {
+    return { content: "", reasoning: "" };
+  }
+
+  return {
+    content: extractTextContent((delta as { content?: unknown }).content),
+    reasoning: extractTextContent(
+      (delta as { reasoning_content?: unknown }).reasoning_content
+    ),
+  };
+}
+
+function extractErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const error = (payload as { error?: unknown }).error;
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" && message.trim().length > 0
+    ? message
+    : null;
+}
+
+function processSseEvents(
+  events: string[],
+  onChunk: (chunk: ParsedCompletionData) => void
+) {
+  for (const event of events) {
+    const lines = event.split(/\r?\n/);
+
+    for (const line of lines) {
+      if (!line.startsWith("data:")) {
+        continue;
+      }
+
+      const data = line.slice(5).trim();
+      if (!data || data === "[DONE]") {
+        continue;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        continue;
+      }
+
+      const errorMessage = extractErrorMessage(parsed);
+      if (errorMessage) {
+        throw new Error(errorMessage);
+      }
+
+      const chunk = extractStreamChunkData(parsed);
+      if (chunk.content || chunk.reasoning) {
+        onChunk(chunk);
+      }
+    }
+  }
+}
+
+async function consumeChatCompletionStream(
+  response: Response,
+  onChunk: (chunk: ParsedCompletionData) => void
+) {
+  if (!response.body) {
+    throw new Error("No response body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop() || "";
+    processSseEvents(events, onChunk);
+  }
+
+  buffer += decoder.decode();
+
+  if (buffer.trim()) {
+    processSseEvents([buffer], onChunk);
+  }
+}
+
 export function PlaygroundClient({ models }: PlaygroundClientProps) {
   const [panels, setPanels] = React.useState<PanelState[]>([
     { id: generateId(), modelId: DEFAULT_MODELS[0] },
@@ -65,7 +236,7 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
 
     const clearedResponses: Record<string, ResponseData> = {};
     panelsWithModels.forEach((panel) => {
-      clearedResponses[panel.id] = { content: "", isLoading: true };
+      clearedResponses[panel.id] = { content: "", reasoning: "", isLoading: true };
     });
     setResponses(clearedResponses);
 
@@ -85,14 +256,15 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
   ) => {
     setResponses((prev) => ({
       ...prev,
-      [panelId]: { content: "", isLoading: true },
+      [panelId]: { content: "", reasoning: "", isLoading: true },
     }));
 
     try {
+      const shouldStream = currentSettings.streamResponses;
       const requestBody: Record<string, unknown> = {
         model: modelId,
         messages: [{ role: "user", content: prompt }],
-        stream: false,
+        stream: shouldStream,
         temperature: currentSettings.temperature,
         top_p: currentSettings.topP,
         max_tokens: currentSettings.maxTokens,
@@ -111,22 +283,76 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Request failed");
+        const clonedResponse = response.clone();
+        let errorMessage = "Request failed";
+
+        try {
+          const errorData = await response.json();
+          const apiError = extractErrorMessage(errorData);
+          if (apiError) {
+            errorMessage = apiError;
+          }
+        } catch {
+          const errorText = await clonedResponse.text();
+          if (errorText.trim()) {
+            errorMessage = errorText;
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      const isStreamingResponse =
+        shouldStream && contentType.includes("text/event-stream");
+
+      if (isStreamingResponse) {
+        let streamedContent = "";
+        let streamedReasoning = "";
+
+        await consumeChatCompletionStream(response, (chunk) => {
+          streamedContent += chunk.content;
+          streamedReasoning += chunk.reasoning;
+
+          setResponses((prev) => ({
+            ...prev,
+            [panelId]: {
+              content: streamedContent,
+              reasoning: streamedReasoning,
+              isLoading: true,
+            },
+          }));
+        });
+
+        setResponses((prev) => ({
+          ...prev,
+          [panelId]: {
+            content: streamedContent,
+            reasoning: streamedReasoning,
+            isLoading: false,
+          },
+        }));
+
+        return;
       }
 
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || "";
+      const parsedData = extractChatCompletionData(data);
 
       setResponses((prev) => ({
         ...prev,
-        [panelId]: { content, isLoading: false },
+        [panelId]: {
+          content: parsedData.content,
+          reasoning: parsedData.reasoning,
+          isLoading: false,
+        },
       }));
     } catch (error) {
       setResponses((prev) => ({
         ...prev,
         [panelId]: {
           content: "",
+          reasoning: "",
           isLoading: false,
           error: error instanceof Error ? error.message : "Unknown error",
         },
