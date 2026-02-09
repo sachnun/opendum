@@ -5,6 +5,12 @@ import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import { markRateLimited, parseRateLimitError, getMinWaitTime, formatWaitTimeMs } from "@/lib/proxy/rate-limit";
 import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
+import {
+  buildAccountErrorMessage,
+  getErrorMessage,
+  getErrorStatusCode,
+  shouldRotateToNextAccount,
+} from "@/lib/proxy/error-utils";
 import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -176,6 +182,11 @@ export async function POST(request: NextRequest) {
     const family = getModelFamily(model);
     const MAX_ACCOUNT_RETRIES = 5;
     const triedAccountIds: string[] = [];
+    let lastAccountFailure: { statusCode: number; message: string } | null = null;
+    const requestParamsForError: Record<string, unknown> = {
+      stream,
+      ...params,
+    };
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -207,49 +218,103 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
+        const waitTimeMs = getMinWaitTime(triedAccountIds, family);
+        if (waitTimeMs > 0) {
+          return NextResponse.json(
+            {
+              error: {
+                message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
+                type: "rate_limit_error",
+                retry_after: formatWaitTimeMs(waitTimeMs),
+                retry_after_ms: waitTimeMs,
+              },
+            },
+            { status: 429 }
+          );
+        }
+
+        if (lastAccountFailure) {
+          return NextResponse.json(
+            {
+              error: {
+                message: lastAccountFailure.message,
+                type: "api_error",
+              },
+            },
+            { status: lastAccountFailure.statusCode }
+          );
+        }
+
         return NextResponse.json(
           {
             error: {
-              message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
-              type: "rate_limit_error",
-              retry_after: formatWaitTimeMs(waitTimeMs),
-              retry_after_ms: waitTimeMs,
+              message: "No available accounts for this request.",
+              type: "api_error",
             },
           },
-          { status: 429 }
+          { status: 503 }
         );
       }
 
       triedAccountIds.push(account.id);
 
-      const providerImpl = await getProvider(account.provider as ProviderNameType);
-      const credentials = await providerImpl.getValidCredentials(account);
+      try {
+        const providerImpl = await getProvider(account.provider as ProviderNameType);
+        const credentials = await providerImpl.getValidCredentials(account);
 
-      const providerResponse = await providerImpl.makeRequest(
-        credentials,
-        account,
-        { model, messages, stream, _includeReasoning: reasoningRequested, ...params },
-        stream
-      );
+        const providerResponse = await providerImpl.makeRequest(
+          credentials,
+          account,
+          { model, messages, stream, _includeReasoning: reasoningRequested, ...params },
+          stream
+        );
 
-      if (providerResponse.status === 429) {
-        const clonedResponse = providerResponse.clone();
-        try {
-          const errorBody = await clonedResponse.json();
-          const rateLimitInfo = parseRateLimitError(errorBody);
+        if (providerResponse.status === 429) {
+          const clonedResponse = providerResponse.clone();
+          try {
+            const errorBody = await clonedResponse.json();
+            const rateLimitInfo = parseRateLimitError(errorBody);
 
-          if (rateLimitInfo) {
-            markRateLimited(
-              account.id,
-              family,
-              rateLimitInfo.retryAfterMs,
-              rateLimitInfo.model,
-              rateLimitInfo.message
-            );
-          } else {
+            if (rateLimitInfo) {
+              markRateLimited(
+                account.id,
+                family,
+                rateLimitInfo.retryAfterMs,
+                rateLimitInfo.model,
+                rateLimitInfo.message
+              );
+            } else {
+              markRateLimited(account.id, family, 60 * 60 * 1000);
+            }
+
+            await logUsage({
+              userId: authenticatedUserId,
+              providerAccountId: account.id,
+              proxyApiKeyId: apiKeyId,
+              model,
+              inputTokens: 0,
+              outputTokens: 0,
+              statusCode: 429,
+              duration: Date.now() - startTime,
+            });
+
+            continue;
+          } catch {
             markRateLimited(account.id, family, 60 * 60 * 1000);
+            continue;
           }
+        }
+
+        if (!providerResponse.ok) {
+          const errorText = await providerResponse.text();
+          console.error(`${account.provider} error:`, providerResponse.status, errorText);
+
+          const detailedError = buildAccountErrorMessage(errorText, {
+            model,
+            parameters: requestParamsForError,
+          });
+
+          await markAccountFailed(account.id, providerResponse.status, detailedError);
 
           await logUsage({
             userId: authenticatedUserId,
@@ -258,23 +323,102 @@ export async function POST(request: NextRequest) {
             model,
             inputTokens: 0,
             outputTokens: 0,
-            statusCode: 429,
+            statusCode: providerResponse.status,
             duration: Date.now() - startTime,
           });
 
-          continue;
-        } catch {
-          markRateLimited(account.id, family, 60 * 60 * 1000);
-          continue;
+          lastAccountFailure = {
+            statusCode: providerResponse.status,
+            message: `${account.provider} API error: ${errorText}`,
+          };
+
+          if (
+            shouldRotateToNextAccount(providerResponse.status) &&
+            attempt < MAX_ACCOUNT_RETRIES - 1
+          ) {
+            continue;
+          }
+
+          return NextResponse.json(
+            {
+              error: {
+                message: lastAccountFailure.message,
+                type: "api_error",
+              },
+            },
+            { status: lastAccountFailure.statusCode }
+          );
         }
-      }
 
-      if (!providerResponse.ok) {
-        const errorText = await providerResponse.text();
-        console.error(`${account.provider} error:`, providerResponse.status, errorText);
+        if (stream) {
+          const responseBody = providerResponse.body;
 
-        // Track error for this account (non-blocking)
-        markAccountFailed(account.id, providerResponse.status, errorText).catch(() => undefined);
+          if (!responseBody) {
+            return NextResponse.json(
+              { error: { message: "No response body", type: "api_error" } },
+              { status: 500 }
+            );
+          }
+
+          const usageTracker = createUsageTrackingStream((usage) => {
+            // Track success for this account (non-blocking)
+            markAccountSuccess(account.id).catch(() => undefined);
+
+            logUsage({
+              userId: authenticatedUserId,
+              providerAccountId: account.id,
+              proxyApiKeyId: apiKeyId,
+              model,
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              statusCode: 200,
+              duration: Date.now() - startTime,
+              provider: account.provider,
+            });
+          });
+
+          return new Response(responseBody.pipeThrough(usageTracker), {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no",
+            },
+          });
+        }
+
+        const responseData = await providerResponse.json();
+
+        // Track success for this account (non-blocking)
+        markAccountSuccess(account.id).catch(() => undefined);
+
+        logUsage({
+          userId: authenticatedUserId,
+          providerAccountId: account.id,
+          proxyApiKeyId: apiKeyId,
+          model,
+          inputTokens: responseData.usage?.prompt_tokens ?? 0,
+          outputTokens: responseData.usage?.completion_tokens ?? 0,
+          statusCode: 200,
+          duration: Date.now() - startTime,
+          provider: account.provider,
+        });
+
+        return NextResponse.json(responseData);
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        const statusCode = getErrorStatusCode(error);
+        const detailedError = buildAccountErrorMessage(errorMessage, {
+          model,
+          parameters: requestParamsForError,
+        });
+
+        console.error(
+          `[${account.provider}] request failed for account ${account.id}:`,
+          error
+        );
+
+        await markAccountFailed(account.id, statusCode, detailedError);
 
         await logUsage({
           userId: authenticatedUserId,
@@ -283,89 +427,66 @@ export async function POST(request: NextRequest) {
           model,
           inputTokens: 0,
           outputTokens: 0,
-          statusCode: providerResponse.status,
+          statusCode,
           duration: Date.now() - startTime,
         });
+
+        lastAccountFailure = {
+          statusCode,
+          message: errorMessage,
+        };
+
+        if (shouldRotateToNextAccount(statusCode) && attempt < MAX_ACCOUNT_RETRIES - 1) {
+          continue;
+        }
 
         return NextResponse.json(
           {
             error: {
-              message: `${account.provider} API error: ${errorText}`,
+              message: lastAccountFailure.message,
               type: "api_error",
             },
           },
-          { status: providerResponse.status }
+          { status: lastAccountFailure.statusCode }
         );
       }
-
-      if (stream) {
-        const responseBody = providerResponse.body;
-
-        if (!responseBody) {
-          return NextResponse.json(
-            { error: { message: "No response body", type: "api_error" } },
-            { status: 500 }
-          );
-        }
-
-        const usageTracker = createUsageTrackingStream((usage) => {
-          // Track success for this account (non-blocking)
-          markAccountSuccess(account.id).catch(() => undefined);
-
-          logUsage({
-            userId: authenticatedUserId,
-            providerAccountId: account.id,
-            proxyApiKeyId: apiKeyId,
-            model,
-            inputTokens: usage.inputTokens,
-            outputTokens: usage.outputTokens,
-            statusCode: 200,
-            duration: Date.now() - startTime,
-            provider: account.provider,
-          });
-        });
-
-        return new Response(responseBody.pipeThrough(usageTracker), {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-          },
-        });
-      }
-
-      const responseData = await providerResponse.json();
-
-      // Track success for this account (non-blocking)
-      markAccountSuccess(account.id).catch(() => undefined);
-
-      logUsage({
-        userId: authenticatedUserId,
-        providerAccountId: account.id,
-        proxyApiKeyId: apiKeyId,
-        model,
-        inputTokens: responseData.usage?.prompt_tokens ?? 0,
-        outputTokens: responseData.usage?.completion_tokens ?? 0,
-        statusCode: 200,
-        duration: Date.now() - startTime,
-        provider: account.provider,
-      });
-
-      return NextResponse.json(responseData);
     }
 
-    const waitTimeMs = getMinWaitTime(triedAccountIds, family) || 60000;
+    const waitTimeMs = getMinWaitTime(triedAccountIds, family);
+    if (waitTimeMs > 0) {
+      return NextResponse.json(
+        {
+          error: {
+            message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
+            type: "rate_limit_error",
+            retry_after: formatWaitTimeMs(waitTimeMs),
+            retry_after_ms: waitTimeMs,
+          },
+        },
+        { status: 429 }
+      );
+    }
+
+    if (lastAccountFailure) {
+      return NextResponse.json(
+        {
+          error: {
+            message: lastAccountFailure.message,
+            type: "api_error",
+          },
+        },
+        { status: lastAccountFailure.statusCode }
+      );
+    }
+
     return NextResponse.json(
       {
         error: {
-          message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
-          type: "rate_limit_error",
-          retry_after: formatWaitTimeMs(waitTimeMs),
-          retry_after_ms: waitTimeMs,
+          message: "No available accounts for this request.",
+          type: "api_error",
         },
       },
-      { status: 429 }
+      { status: 503 }
     );
   } catch (error) {
     console.error("Proxy error:", error);
