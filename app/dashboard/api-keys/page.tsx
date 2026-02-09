@@ -6,6 +6,7 @@ import { Key } from "lucide-react";
 import { CreateApiKeyButton } from "@/components/dashboard/api-keys/create-api-key-button";
 import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
 import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
+import { formatRelativeTime } from "@/lib/date";
 
 function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) {
   const now = new Date();
@@ -90,7 +91,7 @@ export default async function ApiKeysPage() {
                         <span className="text-muted-foreground">Last used: </span>
                         <span>
                           {apiKey.lastUsedAt
-                            ? new Date(apiKey.lastUsedAt).toLocaleDateString()
+                            ? formatRelativeTime(apiKey.lastUsedAt)
                             : "Never"}
                         </span>
                       </div>
