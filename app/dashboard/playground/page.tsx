@@ -1,5 +1,5 @@
 import { MODEL_REGISTRY } from "@/lib/proxy/models";
-import { PlaygroundClient } from "@/components/playground/playground-client";
+import { PlaygroundClient } from "@/components/playground/client";
 import type { ModelOption } from "@/components/playground/chat-panel";
 
 // Get all models - one entry per provider

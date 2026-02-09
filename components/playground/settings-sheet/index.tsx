@@ -20,7 +20,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 
-export type ReasoningEffort = "none" | "low" | "medium" | "high";
+export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 
 export interface PlaygroundSettings {
   streamResponses: boolean;
@@ -53,6 +53,7 @@ const REASONING_OPTIONS: { value: ReasoningEffort; label: string }[] = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
+  { value: "xhigh", label: "XHigh" },
 ];
 
 export function SettingsSheet({
@@ -260,7 +261,7 @@ export function SettingsSheet({
                       "flex-1",
                       settings.reasoningEffort === option.value &&
                         option.value !== "none" &&
-                        "bg-amber-600 hover:bg-amber-600/90"
+                        "bg-amber-600 hover:bg-amber-700"
                     )}
                   >
                     {option.label}

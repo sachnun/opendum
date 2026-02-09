@@ -2,7 +2,6 @@
 
 import * as React from "react";
 
-import { Separator } from "@/components/ui/separator";
 import { ChatPanel, type ModelOption, type ResponseData } from "./chat-panel";
 import { ScenarioSelector, type Scenario } from "./scenario-selector";
 import {
@@ -362,36 +361,28 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with Settings */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Playground</h1>
-          <p className="text-muted-foreground">
-            Compare AI model responses side by side
-          </p>
+      <div className="pb-4 border-b border-border">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-xl font-semibold">Playground</h1>
+          <SettingsSheet
+            settings={settings}
+            onSettingsChange={setSettings}
+            disabled={isAnyLoading}
+          />
         </div>
-        <SettingsSheet
-          settings={settings}
-          onSettingsChange={setSettings}
-          disabled={isAnyLoading}
-        />
       </div>
 
-      <Separator />
-
-      {/* Scenario Selector - at top */}
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium">Choose a Test Scenario</h2>
-        <ScenarioSelector
-          selectedScenario={selectedScenario?.id || null}
-          onSelect={handleScenarioSelect}
-          disabled={isAnyLoading}
-        />
+      <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+        <h2 className="text-sm font-medium text-muted-foreground">Scenario</h2>
+        <div className="mt-3">
+          <ScenarioSelector
+            selectedScenario={selectedScenario?.id || null}
+            onSelect={handleScenarioSelect}
+            disabled={isAnyLoading}
+          />
+        </div>
       </div>
 
-      <Separator />
-
-      {/* Panels Grid - always 3 columns */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {panels.map((panel) => (
           <ChatPanel

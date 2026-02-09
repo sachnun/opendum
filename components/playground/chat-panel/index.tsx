@@ -258,7 +258,7 @@ export function ChatPanel({
             {(content || reasoning) && (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 {reasoning && (
-                  <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3">
                     <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                       Reasoning
                     </p>
