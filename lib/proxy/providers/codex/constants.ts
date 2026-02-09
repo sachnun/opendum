@@ -6,7 +6,7 @@
 export const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 export const CODEX_AUTH_ISSUER = "https://auth.openai.com";
 export const CODEX_OAUTH_AUTHORIZE_ENDPOINT = `${CODEX_AUTH_ISSUER}/oauth/authorize`;
-export const CODEX_BROWSER_REDIRECT_URI = "http://localhost:1/auth/callback";
+export const CODEX_BROWSER_REDIRECT_URI = "http://localhost:1455/auth/callback";
 export const CODEX_OAUTH_SCOPE = "openid profile email offline_access";
 
 // OAuth Endpoints

@@ -494,7 +494,7 @@ export function AddAccountDialog() {
                       After login, copy the URL from address bar:{" "}
                       <code className="rounded bg-muted px-1">
                         {provider === "codex"
-                          ? "http://localhost:1/auth/callback?code=..."
+                          ? "http://localhost:1455/auth/callback?code=..."
                           : "http://localhost:1/oauth2callback?code=..."}
                       </code>
                     </AlertDescription>
@@ -569,7 +569,7 @@ export function AddAccountDialog() {
                 <Input
                   placeholder={
                     provider === "codex"
-                      ? "http://localhost:1/auth/callback?code=..."
+                      ? "http://localhost:1455/auth/callback?code=..."
                       : "http://localhost:1/oauth2callback?code=..."
                   }
                   value={callbackUrl}
