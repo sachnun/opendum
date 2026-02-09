@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -6,6 +7,9 @@ import { Key } from "lucide-react";
 import { CreateApiKeyButton } from "@/components/dashboard/api-keys/create-api-key-button";
 import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
 import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
+import { ApiKeyModelAccess } from "@/components/dashboard/api-keys/api-key-model-access";
+import type { ApiKeyModelAccessMode } from "@/lib/actions/api-keys";
+import { MODEL_REGISTRY } from "@/lib/proxy/models";
 import { formatRelativeTime } from "@/lib/date";
 
 function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) {
@@ -19,6 +23,13 @@ function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) 
   return { label: "Active", variant: "default" as const };
 }
 
+function normalizeModelAccessMode(mode: string): ApiKeyModelAccessMode {
+  if (mode === "whitelist" || mode === "blacklist") {
+    return mode;
+  }
+  return "all";
+}
+
 export default async function ApiKeysPage() {
   const session = await auth();
 
@@ -30,6 +41,8 @@ export default async function ApiKeysPage() {
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
   });
+
+  const availableModels = Object.keys(MODEL_REGISTRY).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="space-y-6">
@@ -57,6 +70,7 @@ export default async function ApiKeysPage() {
           {apiKeys.map((apiKey) => {
             const status = getApiKeyStatus(apiKey);
             const isExpiredOrDisabled = status.label !== "Active";
+            const modelAccessMode = normalizeModelAccessMode(apiKey.modelAccessMode);
 
             return (
               <Card
@@ -97,6 +111,22 @@ export default async function ApiKeysPage() {
                       </div>
                     </div>
                     <ApiKeyActions apiKey={apiKey} />
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
+                    <ApiKeyModelAccess
+                      apiKeyId={apiKey.id}
+                      availableModels={availableModels}
+                      initialMode={modelAccessMode}
+                      initialModels={apiKey.modelAccessList}
+                    />
+
+                    <Link
+                      href={`/dashboard?apiKey=${apiKey.id}`}
+                      className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      View analytics
+                    </Link>
                   </div>
                 </CardContent>
               </Card>

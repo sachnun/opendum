@@ -3,11 +3,28 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateApiKey, hashString, getKeyPreview, encrypt, decrypt } from "@/lib/encryption";
+import { isModelSupported, resolveModelAlias } from "@/lib/proxy/models";
 import { revalidatePath } from "next/cache";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
   | { success: false; error: string };
+
+export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
+
+const API_KEY_MODEL_ACCESS_MODES: ApiKeyModelAccessMode[] = ["all", "whitelist", "blacklist"];
+
+function isApiKeyModelAccessMode(value: string): value is ApiKeyModelAccessMode {
+  return API_KEY_MODEL_ACCESS_MODES.includes(value as ApiKeyModelAccessMode);
+}
+
+function normalizeModelList(models: string[]): string[] {
+  const normalized = models
+    .map((model) => resolveModelAlias(model.trim()))
+    .filter((model) => model.length > 0);
+
+  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
+}
 
 /**
  * Create a new API key
@@ -164,6 +181,78 @@ export async function updateApiKeyName(id: string, name: string): Promise<Action
   } catch (error) {
     console.error("Failed to update API key name:", error);
     return { success: false, error: "Failed to update API key name" };
+  }
+}
+
+/**
+ * Update per-key model access mode and model list
+ */
+export async function updateApiKeyModelAccess(
+  id: string,
+  mode: ApiKeyModelAccessMode,
+  models: string[]
+): Promise<ActionResult<{ mode: ApiKeyModelAccessMode; models: string[] }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (!isApiKeyModelAccessMode(mode)) {
+    return { success: false, error: "Invalid model access mode" };
+  }
+
+  try {
+    const apiKey = await prisma.proxyApiKey.findFirst({
+      where: { id, userId: session.user.id },
+      select: { id: true },
+    });
+
+    if (!apiKey) {
+      return { success: false, error: "API key not found" };
+    }
+
+    const normalizedModels = mode === "all" ? [] : normalizeModelList(models);
+
+    if (mode !== "all" && normalizedModels.length === 0) {
+      return { success: false, error: "Select at least one model" };
+    }
+
+    const invalidModels = normalizedModels.filter((model) => !isModelSupported(model));
+    if (invalidModels.length > 0) {
+      return {
+        success: false,
+        error: `Unknown model: ${invalidModels[0]}`,
+      };
+    }
+
+    const updated = await prisma.proxyApiKey.update({
+      where: { id },
+      data: {
+        modelAccessMode: mode,
+        modelAccessList: normalizedModels,
+      },
+      select: {
+        modelAccessMode: true,
+        modelAccessList: true,
+      },
+    });
+
+    revalidatePath("/dashboard/api-keys");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: {
+        mode: isApiKeyModelAccessMode(updated.modelAccessMode)
+          ? updated.modelAccessMode
+          : "all",
+        models: updated.modelAccessList,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to update API key model access:", error);
+    return { success: false, error: "Failed to update API key model access" };
   }
 }
 

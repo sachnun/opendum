@@ -25,6 +25,29 @@ export interface ModelValidationResult {
   code?: string;
 }
 
+export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
+
+export interface ApiKeyModelAccess {
+  mode: ApiKeyModelAccessMode;
+  models: string[];
+}
+
+function normalizeApiKeyModelAccessMode(mode: string | null | undefined): ApiKeyModelAccessMode {
+  if (mode === "whitelist" || mode === "blacklist") {
+    return mode;
+  }
+  return "all";
+}
+
+function normalizeApiKeyModelList(models: string[]): string[] {
+  const normalized = models
+    .map((model) => resolveModelAlias(model.trim()))
+    .filter((model) => model.length > 0)
+    .filter((model) => isModelSupported(model));
+
+  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
+}
+
 /**
  * Parse model parameter that can be:
  * - "model" (auto - use any provider)
@@ -92,7 +115,8 @@ export function validateModel(modelParam: string): ModelValidationResult {
  */
 export async function validateModelForUser(
   userId: string,
-  modelParam: string
+  modelParam: string,
+  apiKeyModelAccess?: ApiKeyModelAccess
 ): Promise<ModelValidationResult> {
   const baseValidation = validateModel(modelParam);
 
@@ -121,6 +145,41 @@ export async function validateModelForUser(
     };
   }
 
+  if (apiKeyModelAccess) {
+    const mode = normalizeApiKeyModelAccessMode(apiKeyModelAccess.mode);
+    const modelSet = new Set(normalizeApiKeyModelList(apiKeyModelAccess.models));
+
+    if (mode === "whitelist" && !modelSet.has(baseValidation.model)) {
+      const allowedModels = Array.from(modelSet.values()).slice(0, 8);
+      const allowedModelsMessage =
+        allowedModels.length > 0
+          ? `. Allowed models: ${allowedModels.join(", ")}${
+              modelSet.size > allowedModels.length ? ` (+${modelSet.size - allowedModels.length} more)` : ""
+            }`
+          : "";
+
+      return {
+        valid: false,
+        provider: baseValidation.provider,
+        model: baseValidation.model,
+        error: `Model "${baseValidation.model}" is not allowed for this API key${allowedModelsMessage}.`,
+        param: "model",
+        code: "model_not_whitelisted",
+      };
+    }
+
+    if (mode === "blacklist" && modelSet.has(baseValidation.model)) {
+      return {
+        valid: false,
+        provider: baseValidation.provider,
+        model: baseValidation.model,
+        error: `Model "${baseValidation.model}" is blocked for this API key.`,
+        param: "model",
+        code: "model_blacklisted",
+      };
+    }
+  }
+
   return baseValidation;
 }
 
@@ -131,6 +190,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   valid: boolean;
   userId?: string;
   apiKeyId?: string;
+  modelAccessMode?: ApiKeyModelAccessMode;
+  modelAccessList?: string[];
   error?: string;
 }> {
   if (!authHeader) {
@@ -150,7 +211,14 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   // Find the API key
   const apiKey = await prisma.proxyApiKey.findUnique({
     where: { keyHash },
-    include: { user: true },
+    select: {
+      id: true,
+      userId: true,
+      isActive: true,
+      expiresAt: true,
+      modelAccessMode: true,
+      modelAccessList: true,
+    },
   });
 
   if (!apiKey) {
@@ -172,10 +240,15 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     data: { lastUsedAt: new Date() },
   });
 
+  const modelAccessMode = normalizeApiKeyModelAccessMode(apiKey.modelAccessMode);
+  const modelAccessList = normalizeApiKeyModelList(apiKey.modelAccessList);
+
   return {
     valid: true,
     userId: apiKey.userId,
     apiKeyId: apiKey.id,
+    modelAccessMode,
+    modelAccessList,
   };
 }
 
