@@ -30,10 +30,6 @@ export function markRateLimited(
     model,
     message,
   });
-
-  console.log(
-    `[rate-limit] Account ${accountId} marked rate limited for ${family}, resets in ${Math.ceil(retryAfterMs / 1000)}s`
-  );
 }
 
 /**

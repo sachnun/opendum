@@ -344,7 +344,6 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
       },
     };
   } catch (error) {
-    console.error("[quota-action] Failed to fetch quota:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to fetch quota data",
@@ -458,7 +457,6 @@ export async function getEstimatedQuota(): Promise<QuotaActionResult> {
       },
     };
   } catch (error) {
-    console.error("[quota-action] Failed to get estimated quota:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to get quota estimates",
@@ -486,7 +484,7 @@ export async function incrementRequestCount(
       },
     });
   } catch (error) {
-    console.error("[quota-action] Failed to update request count:", error);
+    void error;
   }
 }
 

@@ -66,11 +66,6 @@ export function updateQuotaBaseline(
     requestCountAtBaseline: currentCount,
     resetTimestamp,
   });
-
-  console.log(
-    `[quota-cache] Updated baseline for ${accountId}/${groupName}: ` +
-    `${(remainingFraction * 100).toFixed(1)}% remaining`
-  );
 }
 
 /**
@@ -139,7 +134,6 @@ export function getRequestCount(accountId: string, groupName: string): number {
 export function incrementRequestCount(accountId: string, model: string): void {
   const groupName = getQuotaGroupForModel(model);
   if (!groupName) {
-    console.warn(`[quota-cache] Unknown model for quota tracking: ${model}`);
     return;
   }
 
@@ -151,10 +145,6 @@ export function incrementRequestCount(accountId: string, model: string): void {
 
   const current = accountCounts.get(groupName) ?? 0;
   accountCounts.set(groupName, current + 1);
-
-  console.log(
-    `[quota-cache] Request count for ${accountId}/${groupName}: ${current + 1}`
-  );
 }
 
 /**

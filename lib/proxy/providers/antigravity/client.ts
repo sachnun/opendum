@@ -199,8 +199,6 @@ export const antigravityProvider: Provider = {
 
     // Check if token needs refresh
     if (isTokenExpired(account.expiresAt)) {
-      console.log(`Refreshing token for Antigravity account ${account.id}`);
-
       try {
         const newTokens = await this.refreshToken(refreshTokenValue);
 
@@ -218,17 +216,10 @@ export const antigravityProvider: Provider = {
         });
 
         accessToken = newTokens.accessToken;
-        console.log(
-          `Token refreshed successfully for Antigravity account ${account.id}`
-        );
       } catch (error) {
-        console.error(
-          `Failed to refresh token for Antigravity account ${account.id}:`,
-          error
-        );
         // If refresh fails but token not truly expired, use existing
         if (new Date() < account.expiresAt) {
-          console.log("Using existing token as fallback");
+          return accessToken;
         } else {
           throw error;
         }
@@ -323,9 +314,6 @@ export const antigravityProvider: Provider = {
           if (isRetryableError) {
             // Capture error and try next endpoint
             lastError = new Error(errorBody);
-            console.log(
-              `[antigravity] Endpoint ${endpoint} returned ${response.status}, trying next...`
-            );
             continue;
           }
 
@@ -369,7 +357,6 @@ export const antigravityProvider: Provider = {
         );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`[antigravity] Endpoint ${endpoint} failed:`, lastError.message);
         continue;
       }
     }
@@ -495,8 +482,6 @@ async function fetchAccountInfo(
   // 1. Try loadCodeAssist with endpoint fallback (prod first for discovery)
   for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
     try {
-      console.log(`[antigravity] Trying loadCodeAssist at ${baseEndpoint}`);
-      
       const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
         method: "POST",
         headers: {
@@ -516,7 +501,6 @@ async function fetchAccountInfo(
       }
 
       const data = (await response.json()) as Record<string, unknown>;
-      console.log(`[antigravity] loadCodeAssist response keys:`, Object.keys(data));
 
       // Extract projectId (handle both string and object format)
       projectId = extractProjectId(data);
@@ -535,7 +519,6 @@ async function fetchAccountInfo(
           // "legacy-tier" is the default free tier. Anything else is likely paid/upgraded.
           if (tierId !== "legacy-tier" && !tierId.includes("free") && !tierId.includes("zero")) {
             detectedTier = "paid";
-            console.log(`[antigravity] Detected paid tier from allowedTiers: ${tierId}`);
           }
         }
       }
@@ -546,13 +529,11 @@ async function fetchAccountInfo(
         const paidTierId = paidTier.id;
         if (!paidTierId.includes("free") && !paidTierId.includes("zero")) {
           detectedTier = "paid";
-          console.log(`[antigravity] Detected paid tier from paidTier field: ${paidTierId}`);
         }
       }
 
       // If we found a projectId, we're done with discovery
       if (projectId) {
-        console.log(`[antigravity] Found projectId: ${projectId}, tier: ${detectedTier}`);
         break;
       }
 
@@ -567,17 +548,12 @@ async function fetchAccountInfo(
 
   // 2. If no projectId and no currentTier, user needs onboarding
   if (!projectId && !currentTier) {
-    console.log("[antigravity] No projectId and no currentTier - attempting onboarding...");
-    
     const onboardResult = await onboardUser(accessToken, allowedTiers, requestMetadata);
     if (onboardResult) {
       projectId = onboardResult.projectId;
       if (onboardResult.tier) {
         detectedTier = onboardResult.tier;
       }
-      console.log(`[antigravity] Onboarding successful: projectId=${projectId}, tier=${detectedTier}`);
-    } else {
-      console.warn("[antigravity] Onboarding failed or no tier available");
     }
   }
 
@@ -601,11 +577,9 @@ async function fetchAccountInfo(
     // Ignore email fetch errors
   }
 
-  // Log warnings if we had issues
+  // Fallback to default project ID if discovery failed
   if (errors.length && !projectId) {
-    console.warn("[antigravity] Failed to resolve account info:", errors.join("; "));
     // Use default project ID as fallback (like antigravity-claude-proxy)
-    console.log(`[antigravity] Using default project ID fallback: ${DEFAULT_PROJECT_ID}`);
     projectId = DEFAULT_PROJECT_ID;
   }
 
@@ -660,14 +634,10 @@ async function onboardUser(
   }
 
   if (!onboardTier) {
-    console.warn("[antigravity] No onboarding tiers available");
     return null;
   }
 
   const tierId = (onboardTier.id as string) ?? "free-tier";
-  const isFree = tierId === "free-tier" || tierId.includes("legacy");
-
-  console.log(`[antigravity] Onboarding with tier: ${tierId}, isFree: ${isFree}`);
 
   // Build onboard request (do NOT add cloudaicompanionProject - auto-provisioned by Google)
   const onboardRequest = {
@@ -678,8 +648,6 @@ async function onboardUser(
   // Try onboarding with endpoint fallback (daily first)
   for (const baseEndpoint of ONBOARD_USER_ENDPOINTS) {
     try {
-      console.log(`[antigravity] Trying onboardUser at ${baseEndpoint}`);
-
       const response = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
         method: "POST",
         headers: {
@@ -691,21 +659,14 @@ async function onboardUser(
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.log(`[antigravity] onboardUser returned ${response.status} at ${baseEndpoint}: ${errorText}`);
         continue;
       }
 
       let lroData = (await response.json()) as Record<string, unknown>;
-      console.log(`[antigravity] Initial onboarding response: done=${lroData.done}`);
 
       // Poll for onboarding completion (up to 60 seconds)
       for (let i = 0; i < 30 && !lroData.done; i++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        
-        if ((i + 1) % 10 === 0) {
-          console.log(`[antigravity] Still waiting for onboarding completion... (${(i + 1) * 2}s elapsed)`);
-        }
 
         const pollResponse = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
           method: "POST",
@@ -723,7 +684,6 @@ async function onboardUser(
       }
 
       if (!lroData.done) {
-        console.warn("[antigravity] Onboarding timed out after 60 seconds");
         continue;
       }
 
@@ -735,12 +695,7 @@ async function onboardUser(
         const tier = tierId.includes("free") || tierId.includes("legacy") ? "free" : "paid";
         return { projectId, tier };
       }
-
-      console.warn("[antigravity] Onboarding completed but no projectId in response");
-      
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.log(`[antigravity] onboardUser failed at ${baseEndpoint}: ${errorMsg}`);
+    } catch {
     }
   }
 

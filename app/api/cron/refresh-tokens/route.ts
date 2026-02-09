@@ -47,8 +47,6 @@ export async function GET() {
       },
     });
 
-    console.log(`[Cron] Found ${accounts.length} active provider accounts`);
-
     // Calculate threshold time
     const thresholdTime = new Date(
       Date.now() + REFRESH_THRESHOLD_SECONDS * 1000
@@ -79,10 +77,6 @@ export async function GET() {
       }
 
       try {
-        console.log(
-          `[Cron] Refreshing token for ${account.provider} account ${account.id} (expires: ${account.expiresAt.toISOString()})`
-        );
-
         // Get provider instance
         const provider = await getProvider(account.provider as ProviderNameType);
 
@@ -127,10 +121,6 @@ export async function GET() {
           data: updateData,
         });
 
-        console.log(
-          `[Cron] Successfully refreshed token for ${account.provider} account ${account.id}`
-        );
-
         results.push({
           accountId: account.id,
           provider: account.provider,
@@ -140,10 +130,6 @@ export async function GET() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        console.error(
-          `[Cron] Failed to refresh token for ${account.provider} account ${account.id}:`,
-          errorMessage
-        );
 
         results.push({
           accountId: account.id,
@@ -164,8 +150,6 @@ export async function GET() {
       duration: Date.now() - startTime,
     };
 
-    console.log(`[Cron] Token refresh completed:`, summary);
-
     return NextResponse.json({
       success: true,
       summary,
@@ -173,7 +157,7 @@ export async function GET() {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[Cron] Token refresh job failed:`, errorMessage);
+    console.error("Cron refresh job failed:", errorMessage);
 
     return NextResponse.json(
       {
