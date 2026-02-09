@@ -57,6 +57,7 @@ model User {
   providerAccounts ProviderAccount[]
   proxyApiKeys     ProxyApiKey[]
   usageLogs        UsageLog[]
+  disabledModels   DisabledModel[]
 }
 
 model VerificationToken {
@@ -122,6 +123,20 @@ model ProviderAccount {
   @@index([userId])
   @@index([userId, provider, isActive])
   @@index([userId, provider, isActive, status])
+}
+
+// Disabled Model - user-specific model toggle state
+model DisabledModel {
+  id     String @id @default(cuid())
+  userId String
+  model  String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, model])
+  @@index([userId])
 }
 
 // Proxy API Key - generated keys for accessing the proxy
