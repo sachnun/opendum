@@ -330,7 +330,10 @@ export function AddAccountDialog() {
         }
 
         if (result.data.status === "error") {
-          setError(result.data.message);
+          const msg = typeof result.data.message === "string"
+            ? result.data.message
+            : "An error occurred";
+          setError(msg);
           setIsPolling(false);
           if (pollingRef.current) {
             clearInterval(pollingRef.current);

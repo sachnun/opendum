@@ -935,7 +935,10 @@ export async function pollCodexAuth(
     }
 
     if ("error" in result) {
-      return { success: true, data: { status: "error", message: result.error } };
+      const errorMsg = typeof result.error === "string"
+        ? result.error
+        : (result.error as Record<string, unknown>)?.message as string || JSON.stringify(result.error);
+      return { success: true, data: { status: "error", message: errorMsg } };
     }
 
     // Success - we have tokens, now save them

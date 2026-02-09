@@ -1046,9 +1046,13 @@ export async function pollCodexDeviceCodeAuthorization(
         return { error: "Authorization was denied by the user." };
       }
 
-      return {
-        error: errorData.error_description || errorData.detail || errorData.error || "Unknown error",
-      };
+      const errorValue = errorData.error_description
+        || errorData.detail
+        || (typeof errorData.error === "string"
+          ? errorData.error
+          : errorData.error?.message)
+        || "Unknown error";
+      return { error: errorValue };
     } catch {
       return { pending: true };
     }
