@@ -184,11 +184,7 @@ export function AnalyticsCharts({
       return;
     }
 
-    const success = await fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined);
-
-    if (success) {
-      toast.success("Analytics refreshed");
-    }
+    await fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined);
   };
 
   const statCards: StatCard[] = data
