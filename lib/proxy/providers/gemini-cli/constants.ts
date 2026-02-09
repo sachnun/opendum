@@ -37,6 +37,19 @@ export const CODE_ASSIST_ENDPOINT_FALLBACKS = [
   CODE_ASSIST_ENDPOINT_PROD,
 ] as const;
 
+// Endpoint order for loadCodeAssist (project discovery)
+// Production first tends to return better project metadata.
+export const GEMINI_CLI_LOAD_CODE_ASSIST_ENDPOINTS = [
+  CODE_ASSIST_ENDPOINT_PROD,
+  CODE_ASSIST_ENDPOINT_DAILY,
+] as const;
+
+// Endpoint order for onboardUser (daily first, then production fallback)
+export const GEMINI_CLI_ONBOARD_USER_ENDPOINTS = [
+  CODE_ASSIST_ENDPOINT_DAILY,
+  CODE_ASSIST_ENDPOINT_PROD,
+] as const;
+
 // Default endpoint
 export const CODE_ASSIST_ENDPOINT = CODE_ASSIST_ENDPOINT_DAILY;
 export const CODE_ASSIST_API_VERSION = "v1internal";

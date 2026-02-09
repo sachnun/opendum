@@ -15,6 +15,8 @@ import {
   GEMINI_CLI_CLIENT_SECRET,
   GEMINI_CLI_SCOPES,
   CODE_ASSIST_ENDPOINT,
+  GEMINI_CLI_LOAD_CODE_ASSIST_ENDPOINTS,
+  GEMINI_CLI_ONBOARD_USER_ENDPOINTS,
   GEMINI_CLI_MODELS,
   GEMINI_CLI_REFRESH_BUFFER_SECONDS,
   GEMINI_CLI_AUTH_HEADERS,
@@ -227,7 +229,14 @@ export const geminiCliProvider: Provider = {
     };
 
     // Fetch account info (projectId, email, tier)
-    const accountInfo = await fetchAccountInfo(tokens.access_token);
+    const accountInfo = await fetchGeminiCliAccountInfo(tokens.access_token);
+
+    if (!accountInfo.projectId) {
+      throw new Error(
+        accountInfo.error ??
+          "Gemini CLI account missing projectId. Set GEMINI_CLI_PROJECT_ID or retry authentication."
+      );
+    }
 
     return {
       accessToken: tokens.access_token,
@@ -263,7 +272,7 @@ export const geminiCliProvider: Provider = {
     };
 
     // Fetch updated account info
-    const accountInfo = await fetchAccountInfo(tokens.access_token);
+    const accountInfo = await fetchGeminiCliAccountInfo(tokens.access_token);
 
     return {
       accessToken: tokens.access_token,
@@ -293,8 +302,8 @@ export const geminiCliProvider: Provider = {
             accessToken: encrypt(newTokens.accessToken),
             refreshToken: encrypt(newTokens.refreshToken),
             expiresAt: newTokens.expiresAt,
-            projectId: newTokens.projectId,
-            tier: newTokens.tier,
+            projectId: newTokens.projectId || account.projectId,
+            tier: newTokens.tier || account.tier,
             email: newTokens.email || account.email,
           },
         });
@@ -326,9 +335,29 @@ export const geminiCliProvider: Provider = {
     body: ChatCompletionRequest,
     stream: boolean
   ): Promise<Response> {
-    const projectId = account.projectId;
+    let projectId = account.projectId;
     if (!projectId) {
-      throw new Error("Gemini CLI account missing projectId");
+      const accountInfo = await fetchGeminiCliAccountInfo(accessToken);
+      if (!accountInfo.projectId) {
+        throw new Error(
+          accountInfo.error ??
+            "Gemini CLI account missing projectId. Please re-authenticate or set GEMINI_CLI_PROJECT_ID."
+        );
+      }
+
+      projectId = accountInfo.projectId;
+
+      try {
+        await prisma.providerAccount.update({
+          where: { id: account.id },
+          data: {
+            projectId,
+            tier: accountInfo.tier || account.tier,
+            email: accountInfo.email || account.email,
+          },
+        });
+      } catch {
+      }
     }
 
     const model = body.model;
@@ -501,75 +530,387 @@ async function transformGeminiCliResponse(
 /**
  * Fetch account info from Gemini CLI / Code Assist API
  */
-async function fetchAccountInfo(
-  accessToken: string
-): Promise<{ projectId: string; tier: string; email: string }> {
-  const url = `${CODE_ASSIST_ENDPOINT}/v1internal:loadCodeAssist`;
+export interface GeminiCliAccountInfo {
+  projectId: string;
+  tier: string;
+  email: string;
+  error?: string;
+}
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      ...GEMINI_CLI_AUTH_HEADERS,
-    },
-    body: JSON.stringify({
-      metadata: {
-        ideType: "IDE_UNSPECIFIED",
-        platform: "PLATFORM_UNSPECIFIED",
-        pluginType: "GEMINI",
-      },
-    }),
-  });
+interface GeminiCliAllowedTier {
+  id: string;
+  isDefault: boolean;
+  requiresUserProject: boolean;
+}
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to fetch account info: ${response.status} ${error}`);
+interface GeminiCliOnboardResult {
+  projectId: string;
+  tier: string;
+  error?: string;
+}
+
+function buildGeminiCliRequestMetadata(
+  configuredProjectId: string | null
+): Record<string, string> {
+  const metadata: Record<string, string> = {
+    ideType: "IDE_UNSPECIFIED",
+    platform: "PLATFORM_UNSPECIFIED",
+    pluginType: "GEMINI",
+  };
+
+  if (configuredProjectId) {
+    metadata.duetProject = configuredProjectId;
   }
 
-  const data = (await response.json()) as Record<string, unknown>;
+  return metadata;
+}
 
-  // Extract project ID - can be string or object with id
-  let projectId = "";
+function extractGeminiCliProjectId(data: Record<string, unknown>): string {
   const cloudProject = data.cloudaicompanionProject;
+
   if (typeof cloudProject === "string" && cloudProject) {
-    projectId = cloudProject;
-  } else if (typeof cloudProject === "object" && cloudProject !== null) {
+    return cloudProject;
+  }
+
+  if (typeof cloudProject === "object" && cloudProject !== null) {
     const projectObj = cloudProject as Record<string, unknown>;
-    projectId = (projectObj.id ?? "") as string;
+    const id = projectObj.id;
+    if (typeof id === "string" && id) {
+      return id;
+    }
   }
 
-  // Extract tier from currentTier
-  let tier = "free-tier";
+  return "";
+}
+
+function extractGeminiCliCurrentTierId(
+  data: Record<string, unknown>
+): string | null {
   const currentTier = data.currentTier;
+
   if (typeof currentTier === "string" && currentTier) {
-    tier = currentTier;
-  } else if (typeof currentTier === "object" && currentTier !== null) {
-    const tierObj = currentTier as Record<string, unknown>;
-    tier = (tierObj.id ?? tierObj.name ?? "free-tier") as string;
+    return currentTier;
   }
 
-  // Fetch user email from Google
-  let email = "";
-  try {
-    const userInfoResponse = await fetch(
-      "https://www.googleapis.com/oauth2/v2/userinfo",
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
+  if (typeof currentTier === "object" && currentTier !== null) {
+    const tierObj = currentTier as Record<string, unknown>;
+    const id = tierObj.id;
+    if (typeof id === "string" && id) {
+      return id;
+    }
+
+    const name = tierObj.name;
+    if (typeof name === "string" && name) {
+      return name;
+    }
+  }
+
+  return null;
+}
+
+function extractGeminiCliAllowedTiers(
+  data: Record<string, unknown>
+): GeminiCliAllowedTier[] {
+  const allowed = data.allowedTiers;
+  if (!Array.isArray(allowed)) {
+    return [];
+  }
+
+  const result: GeminiCliAllowedTier[] = [];
+
+  for (const entry of allowed) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+
+    const tier = entry as Record<string, unknown>;
+    const id = tier.id;
+    if (typeof id !== "string" || !id) {
+      continue;
+    }
+
+    result.push({
+      id,
+      isDefault: tier.isDefault === true,
+      requiresUserProject: tier.userDefinedCloudaicompanionProject === true,
+    });
+  }
+
+  return result;
+}
+
+async function onboardGeminiCliUser(
+  accessToken: string,
+  allowedTiers: GeminiCliAllowedTier[],
+  configuredProjectId: string | null
+): Promise<GeminiCliOnboardResult | null> {
+  let onboardTier = allowedTiers.find((tier) => tier.isDefault);
+
+  if (!onboardTier && allowedTiers.length > 0) {
+    onboardTier =
+      allowedTiers.find((tier) => tier.id === "legacy-tier") ?? allowedTiers[0];
+  }
+
+  if (!onboardTier) {
+    return null;
+  }
+
+  const tierId = onboardTier.id || "free-tier";
+  const isFreeTier = tierId === "free-tier";
+
+  if (!isFreeTier && onboardTier.requiresUserProject && !configuredProjectId) {
+    return {
+      projectId: "",
+      tier: tierId,
+      error: `Gemini tier '${tierId}' requires GEMINI_CLI_PROJECT_ID.`,
+    };
+  }
+
+  const requestMetadata = buildGeminiCliRequestMetadata(configuredProjectId);
+
+  const onboardRequest = {
+    tierId,
+    cloudaicompanionProject: isFreeTier ? null : configuredProjectId,
+    metadata: requestMetadata,
+  };
+
+  for (const baseEndpoint of GEMINI_CLI_ONBOARD_USER_ENDPOINTS) {
+    try {
+      const response = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          ...GEMINI_CLI_AUTH_HEADERS,
+        },
+        body: JSON.stringify(onboardRequest),
+      });
+
+      if (!response.ok) {
+        continue;
       }
-    );
+
+      let lroData = (await response.json()) as Record<string, unknown>;
+
+      for (let i = 0; i < 30 && !lroData.done; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const pollResponse = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            ...GEMINI_CLI_AUTH_HEADERS,
+          },
+          body: JSON.stringify(onboardRequest),
+        });
+
+        if (pollResponse.ok) {
+          lroData = (await pollResponse.json()) as Record<string, unknown>;
+        }
+      }
+
+      if (!lroData.done) {
+        continue;
+      }
+
+      const lroResponse = (lroData.response ?? lroData) as Record<string, unknown>;
+      const projectId =
+        extractGeminiCliProjectId(lroResponse) || configuredProjectId || "";
+      if (!projectId) {
+        continue;
+      }
+
+      return {
+        projectId,
+        tier: tierId,
+      };
+    } catch {
+    }
+  }
+
+  return {
+    projectId: "",
+    tier: tierId,
+    error: `Gemini onboarding failed to produce projectId for tier '${tierId}'.`,
+  };
+}
+
+async function fetchGeminiCliEmail(accessToken: string): Promise<string> {
+  try {
+    const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
     if (userInfoResponse.ok) {
       const userInfo = (await userInfoResponse.json()) as { email?: string };
-      email = userInfo.email ?? "";
+      return userInfo.email ?? "";
     }
   } catch {
-    // Ignore email fetch errors
   }
+
+  return "";
+}
+
+async function fetchGeminiCliProjectFromResourceManager(
+  accessToken: string
+): Promise<string> {
+  try {
+    const response = await fetch(
+      "https://cloudresourcemanager.googleapis.com/v1/projects",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          ...GEMINI_CLI_AUTH_HEADERS,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      return "";
+    }
+
+    const payload = (await response.json()) as {
+      projects?: Array<{ projectId?: string; lifecycleState?: string }>;
+    };
+
+    const activeProject = (payload.projects ?? []).find(
+      (project) =>
+        project.lifecycleState === "ACTIVE" &&
+        typeof project.projectId === "string" &&
+        project.projectId.length > 0
+    );
+
+    return activeProject?.projectId ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export async function fetchGeminiCliAccountInfo(
+  accessToken: string
+): Promise<GeminiCliAccountInfo> {
+  const configuredProjectId = process.env.GEMINI_CLI_PROJECT_ID?.trim() || "";
+  const requestMetadata = buildGeminiCliRequestMetadata(
+    configuredProjectId || null
+  );
+
+  const errors: string[] = [];
+  let projectId = "";
+  let tier = "free-tier";
+  let allowedTiers: GeminiCliAllowedTier[] = [];
+  let discoveryError: string | undefined;
+
+  for (const baseEndpoint of GEMINI_CLI_LOAD_CODE_ASSIST_ENDPOINTS) {
+    try {
+      const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          ...GEMINI_CLI_AUTH_HEADERS,
+        },
+        body: JSON.stringify({
+          cloudaicompanionProject: configuredProjectId || null,
+          metadata: requestMetadata,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        errors.push(
+          `${baseEndpoint}: HTTP ${response.status}${
+            errorBody ? ` ${errorBody.slice(0, 250)}` : ""
+          }`
+        );
+        continue;
+      }
+
+      const data = (await response.json()) as Record<string, unknown>;
+      const currentTierId = extractGeminiCliCurrentTierId(data);
+      if (currentTierId) {
+        tier = currentTierId;
+      }
+
+      const discoveredAllowedTiers = extractGeminiCliAllowedTiers(data);
+      if (discoveredAllowedTiers.length > 0) {
+        allowedTiers = discoveredAllowedTiers;
+        if (!currentTierId) {
+          const defaultTier =
+            discoveredAllowedTiers.find((item) => item.isDefault) ??
+            discoveredAllowedTiers[0];
+          if (defaultTier?.id) {
+            tier = defaultTier.id;
+          }
+        }
+      }
+
+      projectId = extractGeminiCliProjectId(data);
+      if (!projectId && configuredProjectId) {
+        projectId = configuredProjectId;
+      }
+
+      if (!projectId && currentTierId) {
+        const matchedTier = allowedTiers.find((item) => item.id === currentTierId);
+        if (matchedTier?.requiresUserProject && !configuredProjectId) {
+          discoveryError =
+            `Gemini tier '${currentTierId}' requires GEMINI_CLI_PROJECT_ID to resolve projectId.`;
+        }
+      }
+
+      if (projectId) {
+        break;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${baseEndpoint}: ${message}`);
+    }
+  }
+
+  if (!projectId && allowedTiers.length > 0) {
+    const onboardResult = await onboardGeminiCliUser(
+      accessToken,
+      allowedTiers,
+      configuredProjectId || null
+    );
+    if (onboardResult) {
+      projectId = onboardResult.projectId;
+      tier = onboardResult.tier;
+      if (!projectId && onboardResult.error) {
+        discoveryError = onboardResult.error;
+      }
+    }
+  }
+
+  if (!projectId && configuredProjectId) {
+    projectId = configuredProjectId;
+  }
+
+  if (!projectId) {
+    const discoveredFromResourceManager =
+      await fetchGeminiCliProjectFromResourceManager(accessToken);
+    if (discoveredFromResourceManager) {
+      projectId = discoveredFromResourceManager;
+    }
+  }
+
+  if (!projectId && !discoveryError && errors.length > 0) {
+    discoveryError = `Gemini CLI project discovery failed: ${errors.join("; ")}`;
+  }
+
+  if (!projectId && errors.length > 0) {
+    console.warn(`Gemini CLI project discovery failed: ${errors.join("; ")}`);
+  }
+
+  const email = await fetchGeminiCliEmail(accessToken);
 
   return {
     projectId,
     tier,
     email,
+    error: discoveryError,
   };
 }
 
