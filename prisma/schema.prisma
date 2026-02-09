@@ -149,6 +149,9 @@ model ProxyApiKey {
   encryptedKey String? @db.Text // AES encrypted full key (for reveal)
   name         String? // e.g., "MacBook Pro", "Work PC" (optional)
 
+  modelAccessMode String   @default("all") // "all" | "whitelist" | "blacklist"
+  modelAccessList String[] @default([])
+
   isActive   Boolean   @default(true)
   expiresAt  DateTime? // null = never expires
   lastUsedAt DateTime?
