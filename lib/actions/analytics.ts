@@ -5,6 +5,13 @@ import { prisma } from "@/lib/db";
 
 export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 
+export interface CustomDateRange {
+  from: string;
+  to: string;
+}
+
+export type AnalyticsFilter = Period | CustomDateRange;
+
 // Granularity determines how data points are grouped
 export type Granularity = "10s" | "1m" | "5m" | "15m" | "1h" | "1d";
 
@@ -72,6 +79,7 @@ export interface AnalyticsData {
   requestsByModel: RequestsByModelData[];
   modelDistribution: ModelDistributionData[];
   successRate: SuccessRateData[];
+  granularity: Granularity;
   totals: AnalyticsTotals;
 }
 
@@ -82,6 +90,66 @@ function getStartDate(period: Period): Date {
 
 function getPeriodConfig(period: Period): PeriodConfig {
   return PERIOD_CONFIG[period];
+}
+
+function getCustomRangeConfig(startDate: Date, endDate: Date): PeriodConfig {
+  const duration = Math.max(endDate.getTime() - startDate.getTime(), 0);
+
+  if (duration <= PERIOD_CONFIG["5m"].duration) {
+    return { ...PERIOD_CONFIG["5m"], duration };
+  }
+
+  if (duration <= PERIOD_CONFIG["30m"].duration) {
+    return { ...PERIOD_CONFIG["30m"], duration };
+  }
+
+  if (duration <= PERIOD_CONFIG["1h"].duration) {
+    return { ...PERIOD_CONFIG["1h"], duration };
+  }
+
+  if (duration <= PERIOD_CONFIG["6h"].duration) {
+    return { ...PERIOD_CONFIG["6h"], duration };
+  }
+
+  if (duration <= PERIOD_CONFIG["24h"].duration) {
+    return { ...PERIOD_CONFIG["24h"], duration };
+  }
+
+  return { ...PERIOD_CONFIG["7d"], duration };
+}
+
+function resolveFilterConfig(
+  filter: AnalyticsFilter
+): ActionResult<{ startDate: Date; endDate: Date; config: PeriodConfig }> {
+  if (typeof filter === "string") {
+    return {
+      success: true,
+      data: {
+        startDate: getStartDate(filter),
+        endDate: new Date(),
+        config: getPeriodConfig(filter),
+      },
+    };
+  }
+
+  const fromDate = new Date(filter.from);
+  const toDate = new Date(filter.to);
+
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return { success: false, error: "Invalid custom date range" };
+  }
+
+  const startDate = fromDate <= toDate ? fromDate : toDate;
+  const endDate = toDate >= fromDate ? toDate : fromDate;
+
+  return {
+    success: true,
+    data: {
+      startDate,
+      endDate,
+      config: getCustomRangeConfig(startDate, endDate),
+    },
+  };
 }
 
 // Format time slot key based on granularity
@@ -155,13 +223,8 @@ function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig)
   return slots;
 }
 
-// Export granularity for use in charts
-export async function getGranularity(period: Period): Promise<Granularity> {
-  return PERIOD_CONFIG[period].granularity;
-}
-
 export async function getAnalyticsData(
-  period: Period
+  filter: AnalyticsFilter
 ): Promise<ActionResult<AnalyticsData>> {
   const session = await auth();
 
@@ -170,16 +233,20 @@ export async function getAnalyticsData(
   }
 
   const userId = session.user.id;
-  const startDate = getStartDate(period);
-  const endDate = new Date();
-  const config = getPeriodConfig(period);
+  const resolvedFilter = resolveFilterConfig(filter);
+
+  if (!resolvedFilter.success) {
+    return resolvedFilter;
+  }
+
+  const { startDate, endDate, config } = resolvedFilter.data;
 
   try {
     // Fetch all logs in the period
     const logs = await prisma.usageLog.findMany({
       where: {
         userId,
-        createdAt: { gte: startDate },
+        createdAt: { gte: startDate, lte: endDate },
       },
       select: {
         model: true,
@@ -302,6 +369,7 @@ export async function getAnalyticsData(
         requestsByModel,
         modelDistribution,
         successRate,
+        granularity: config.granularity,
         totals,
       },
     };
