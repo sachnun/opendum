@@ -6,7 +6,17 @@ import { cn } from "@/lib/utils";
 import { type NavItem, primaryNavigation, supportNavigation } from "@/lib/navigation";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 
-export function Sidebar() {
+interface SidebarProps {
+  accountCounts: {
+    antigravity: number;
+    codex: number;
+    iflow: number;
+    gemini_cli: number;
+    qwen_code: number;
+  };
+}
+
+export function Sidebar({ accountCounts }: SidebarProps) {
   const pathname = usePathname();
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
 
@@ -14,6 +24,14 @@ export function Sidebar() {
     const isActive =
       pathname === item.href ||
       (item.href !== "/dashboard" && pathname.startsWith(item.href));
+    const isAccountsItem = item.href === "/dashboard/accounts";
+    const accountCountByAnchorId: Record<string, number> = {
+      "antigravity-accounts": accountCounts.antigravity,
+      "codex-accounts": accountCounts.codex,
+      "iflow-accounts": accountCounts.iflow,
+      "gemini-cli-accounts": accountCounts.gemini_cli,
+      "qwen-code-accounts": accountCounts.qwen_code,
+    };
 
     return (
       <div key={item.name} className="space-y-1">
@@ -39,6 +57,10 @@ export function Sidebar() {
           <div className="ml-6 space-y-1 border-l border-border/60 pl-3">
             {item.children.map((subItem) => {
               const isSubActive = isSubItemActive(subItem);
+              const subItemCount =
+                isAccountsItem && subItem.anchorId
+                  ? accountCountByAnchorId[subItem.anchorId]
+                  : undefined;
 
               return (
                 <Link
@@ -46,13 +68,25 @@ export function Sidebar() {
                   href={subItem.href}
                   onClick={(event) => handleSubItemClick(event, subItem)}
                   className={cn(
-                    "block rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     isSubActive
                       ? "bg-accent text-foreground"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
                 >
-                  {subItem.name}
+                  <span className="truncate">{subItem.name}</span>
+                  {subItemCount !== undefined ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                        isSubActive
+                          ? "bg-background text-foreground"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {subItemCount}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
