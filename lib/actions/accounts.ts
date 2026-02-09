@@ -212,7 +212,7 @@ export async function exchangeIflowOAuthCode(
         data: {
           userId: session.user.id,
           provider: "iflow",
-          name: oauthResult.email ? `Iflow (${oauthResult.email})` : `Iflow Account ${accountCount + 1}`,
+          name: `Iflow ${accountCount + 1}`,
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
@@ -293,89 +293,6 @@ export async function getAccountsByProvider(): Promise<
 // Backwards compatibility aliases
 export const deleteIflowAccount = deleteProviderAccount;
 export const updateIflowAccount = updateProviderAccount;
-
-/**
- * Reset account error status to active
- * Clears consecutive errors and restores status to active
- */
-export async function resetAccountStatus(id: string): Promise<ActionResult> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    // Verify ownership
-    const account = await prisma.providerAccount.findFirst({
-      where: { id, userId: session.user.id },
-    });
-
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
-
-    await prisma.providerAccount.update({
-      where: { id },
-      data: {
-        status: "active",
-        statusReason: null,
-        statusChangedAt: new Date(),
-        consecutiveErrors: 0,
-      },
-    });
-
-    revalidatePath("/dashboard/accounts");
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error("Failed to reset account status:", error);
-    return { success: false, error: "Failed to reset account status" };
-  }
-}
-
-/**
- * Clear all error history for an account (reset counters)
- */
-export async function clearAccountErrors(id: string): Promise<ActionResult> {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    // Verify ownership
-    const account = await prisma.providerAccount.findFirst({
-      where: { id, userId: session.user.id },
-    });
-
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
-
-    await prisma.providerAccount.update({
-      where: { id },
-      data: {
-        status: "active",
-        statusReason: null,
-        statusChangedAt: new Date(),
-        errorCount: 0,
-        consecutiveErrors: 0,
-        lastErrorAt: null,
-        lastErrorMessage: null,
-        lastErrorCode: null,
-      },
-    });
-
-    revalidatePath("/dashboard/accounts");
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error("Failed to clear account errors:", error);
-    return { success: false, error: "Failed to clear account errors" };
-  }
-}
 
 /**
  * Get Iflow OAuth authorization URL
@@ -512,9 +429,7 @@ export async function exchangeAntigravityOAuthCode(
         data: {
           userId: session.user.id,
           provider: "antigravity",
-          name: oauthResult.email 
-            ? `Antigravity (${oauthResult.email})` 
-            : `Antigravity Account ${accountCount + 1}`,
+          name: `Antigravity ${accountCount + 1}`,
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           expiresAt: oauthResult.expiresAt,
@@ -656,7 +571,7 @@ export async function pollQwenCodeAuth(
         data: {
           userId: session.user.id,
           provider: "qwen_code",
-          name: `Qwen Code Account ${accountCount + 1}`,
+          name: `Qwen Code ${accountCount + 1}`,
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           expiresAt: oauthResult.expiresAt,
@@ -837,9 +752,7 @@ export async function exchangeGeminiCliOAuthCode(
         data: {
           userId: session.user.id,
           provider: "gemini_cli",
-          name: oauthResult.email 
-            ? `Gemini CLI (${oauthResult.email})` 
-            : `Gemini CLI Account ${accountCount + 1}`,
+          name: `Gemini CLI ${accountCount + 1}`,
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           expiresAt: oauthResult.expiresAt,
@@ -1038,7 +951,7 @@ export async function exchangeCodexOAuthCode(
       data: {
         userId: session.user.id,
         provider: "codex",
-        name: `Codex Account ${accountCount + 1}`,
+        name: `Codex ${accountCount + 1}`,
         accessToken: encrypt(oauthResult.accessToken),
         refreshToken: encrypt(oauthResult.refreshToken),
         expiresAt: oauthResult.expiresAt,
@@ -1217,7 +1130,7 @@ export async function pollCodexAuth(
         data: {
           userId: session.user.id,
           provider: "codex",
-          name: `Codex Account ${accountCount + 1}`,
+          name: `Codex ${accountCount + 1}`,
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           expiresAt: oauthResult.expiresAt,
