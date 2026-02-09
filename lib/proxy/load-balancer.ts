@@ -5,6 +5,7 @@ import { isRateLimited, clearExpiredRateLimits } from "./rate-limit";
 import { getModelFamily } from "./providers/antigravity/converter";
 
 const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
+const MAX_STORED_ERROR_MESSAGE_LENGTH = 10000;
 
 /**
  * Get the next active provider account for a user and model using LRU (Least Recently Used)
@@ -206,7 +207,7 @@ export async function markAccountFailed(
       errorCount: { increment: 1 },
       consecutiveErrors: { increment: 1 },
       lastErrorAt: new Date(),
-      lastErrorMessage: errorMessage.slice(0, 2000), // Limit message size
+      lastErrorMessage: errorMessage.slice(0, MAX_STORED_ERROR_MESSAGE_LENGTH),
       lastErrorCode: errorCode,
     },
   });
