@@ -3,17 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { type NavItem, primaryNavigation, supportNavigation } from "@/lib/navigation";
+import {
+  type NavItem,
+  type ProviderAccountCounts,
+  primaryNavigation,
+  supportNavigation,
+} from "@/lib/navigation";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 
 interface SidebarProps {
-  accountCounts: {
-    antigravity: number;
-    codex: number;
-    iflow: number;
-    gemini_cli: number;
-    qwen_code: number;
-  };
+  accountCounts: ProviderAccountCounts;
 }
 
 export function Sidebar({ accountCounts }: SidebarProps) {
@@ -61,6 +60,8 @@ export function Sidebar({ accountCounts }: SidebarProps) {
                 isAccountsItem && subItem.anchorId
                   ? accountCountByAnchorId[subItem.anchorId]
                   : undefined;
+              const shouldShowSubItemCount =
+                typeof subItemCount === "number" && subItemCount > 0;
 
               return (
                 <Link
@@ -75,7 +76,7 @@ export function Sidebar({ accountCounts }: SidebarProps) {
                   )}
                 >
                   <span className="truncate">{subItem.name}</span>
-                  {subItemCount !== undefined ? (
+                  {shouldShowSubItemCount ? (
                     <span
                       className={cn(
                         "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",

@@ -12,6 +12,7 @@ import {
 import { signOut } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import type { ProviderAccountCounts } from "@/lib/navigation";
 import { MODEL_REGISTRY } from "@/lib/proxy/models";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
@@ -23,7 +24,11 @@ const PROVIDER_LABELS: Record<string, string> = {
   codex: "Codex",
 };
 
-export async function Header() {
+interface HeaderProps {
+  accountCounts: ProviderAccountCounts;
+}
+
+export async function Header({ accountCounts }: HeaderProps) {
   const session = await auth();
 
   const disabledModels = session?.user?.id
@@ -48,7 +53,7 @@ export async function Header() {
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-background px-5 sm:px-6 lg:px-8">
       <div className="mx-auto flex h-full w-full max-w-7xl items-center gap-3">
         <div className="flex min-w-0 items-center">
-          <MobileNav />
+          <MobileNav accountCounts={accountCounts} />
         </div>
         <div className="min-w-0 flex-1">
           <ModelSearchPopover models={models} className="mx-auto max-w-xl" />

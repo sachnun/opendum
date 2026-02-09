@@ -21,6 +21,14 @@ export interface NavSubItem {
   anchorId?: string;
 }
 
+export interface ProviderAccountCounts {
+  antigravity: number;
+  codex: number;
+  iflow: number;
+  gemini_cli: number;
+  qwen_code: number;
+}
+
 export const primaryNavigation: NavItem[] = [
   { name: "Analytics", href: "/dashboard", icon: TrendingUp },
   {

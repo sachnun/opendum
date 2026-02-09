@@ -14,10 +14,19 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useState } from "react";
-import { type NavItem, primaryNavigation, supportNavigation } from "@/lib/navigation";
+import {
+  type NavItem,
+  type ProviderAccountCounts,
+  primaryNavigation,
+  supportNavigation,
+} from "@/lib/navigation";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 
-export function MobileNav() {
+interface MobileNavProps {
+  accountCounts: ProviderAccountCounts;
+}
+
+export function MobileNav({ accountCounts }: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
@@ -26,6 +35,14 @@ export function MobileNav() {
     const isActive =
       pathname === item.href ||
       (item.href !== "/dashboard" && pathname.startsWith(item.href));
+    const isAccountsItem = item.href === "/dashboard/accounts";
+    const accountCountByAnchorId: Record<string, number> = {
+      "antigravity-accounts": accountCounts.antigravity,
+      "codex-accounts": accountCounts.codex,
+      "iflow-accounts": accountCounts.iflow,
+      "gemini-cli-accounts": accountCounts.gemini_cli,
+      "qwen-code-accounts": accountCounts.qwen_code,
+    };
 
     return (
       <div key={item.name} className="space-y-1">
@@ -52,6 +69,12 @@ export function MobileNav() {
           <div className="ml-6 space-y-1 border-l border-border/60 pl-3">
             {item.children.map((subItem) => {
               const isSubActive = isSubItemActive(subItem);
+              const subItemCount =
+                isAccountsItem && subItem.anchorId
+                  ? accountCountByAnchorId[subItem.anchorId]
+                  : undefined;
+              const shouldShowSubItemCount =
+                typeof subItemCount === "number" && subItemCount > 0;
 
               return (
                 <Link
@@ -62,13 +85,25 @@ export function MobileNav() {
                     setOpen(false);
                   }}
                   className={cn(
-                    "block rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     isSubActive
                       ? "bg-accent text-foreground"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
                 >
-                  {subItem.name}
+                  <span className="truncate">{subItem.name}</span>
+                  {shouldShowSubItemCount ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                        isSubActive
+                          ? "bg-background text-foreground"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {subItemCount}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
