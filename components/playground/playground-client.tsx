@@ -104,7 +104,7 @@ export function PlaygroundClient({ models }: PlaygroundClientProps) {
         requestBody.reasoning_effort = currentSettings.reasoningEffort;
       }
 
-      const response = await fetch("/api/playground/chat", {
+      const response = await fetch("/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),

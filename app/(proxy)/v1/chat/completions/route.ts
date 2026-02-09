@@ -5,6 +5,7 @@ import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import { markRateLimited, parseRateLimitError, getMinWaitTime, formatWaitTimeMs } from "@/lib/proxy/rate-limit";
 import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
+import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,16 +82,54 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   const authHeader = request.headers.get("authorization");
-  const authResult = await validateApiKey(authHeader);
+  const xApiKeyHeader = request.headers.get("x-api-key");
 
-  if (!authResult.valid) {
+  let userId: string | undefined;
+  let apiKeyId: string | undefined;
+
+  if (authHeader || xApiKeyHeader) {
+    const authResult = await validateApiKey(authHeader || xApiKeyHeader);
+
+    if (!authResult.valid) {
+      return NextResponse.json(
+        { error: { message: authResult.error, type: "authentication_error" } },
+        { status: 401 }
+      );
+    }
+
+    userId = authResult.userId;
+    apiKeyId = authResult.apiKeyId;
+  } else {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Missing Authorization header",
+            type: "authentication_error",
+          },
+        },
+        { status: 401 }
+      );
+    }
+
+    userId = session.user.id;
+  }
+
+  if (!userId) {
     return NextResponse.json(
-      { error: { message: authResult.error, type: "authentication_error" } },
+      {
+        error: {
+          message: "Missing Authorization header",
+          type: "authentication_error",
+        },
+      },
       { status: 401 }
     );
   }
 
-  const { userId, apiKeyId } = authResult;
+  const authenticatedUserId = userId;
 
   try {
     let body;
@@ -147,7 +186,7 @@ export async function POST(request: NextRequest) {
 
     for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
       const account = await getNextAvailableAccount(
-        userId!,
+        authenticatedUserId,
         model,
         provider,
         triedAccountIds
@@ -217,7 +256,7 @@ export async function POST(request: NextRequest) {
           );
 
           await logUsage({
-            userId: userId!,
+            userId: authenticatedUserId,
             providerAccountId: account.id,
             proxyApiKeyId: apiKeyId,
             model,
@@ -244,7 +283,7 @@ export async function POST(request: NextRequest) {
         );
 
         await logUsage({
-          userId: userId!,
+          userId: authenticatedUserId,
           providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
@@ -282,7 +321,7 @@ export async function POST(request: NextRequest) {
           );
 
           logUsage({
-            userId: userId!,
+            userId: authenticatedUserId,
             providerAccountId: account.id,
             proxyApiKeyId: apiKeyId,
             model,
@@ -312,7 +351,7 @@ export async function POST(request: NextRequest) {
       );
 
       logUsage({
-        userId: userId!,
+        userId: authenticatedUserId,
         providerAccountId: account.id,
         proxyApiKeyId: apiKeyId,
         model,
