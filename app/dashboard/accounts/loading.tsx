@@ -4,7 +4,7 @@ export default function Loading() {
   return (
     <div className="space-y-6">
       <div className="relative">
-        <div className="md:fixed md:inset-x-0 md:top-16 md:z-20 md:left-60 md:bg-background md:pt-2">
+        <div className="md:fixed md:inset-x-0 md:top-16 md:z-20 md:left-60 md:bg-background md:pt-5">
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
             <div className="bg-background">
               <div className="pb-4 border-b border-border">
@@ -16,7 +16,7 @@ export default function Loading() {
             </div>
           </div>
         </div>
-        <div className="hidden h-16 md:block" />
+        <div className="hidden h-[76px] md:block" />
       </div>
 
       <div className="space-y-4">

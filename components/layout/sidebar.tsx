@@ -66,7 +66,10 @@ export function Sidebar() {
     <div className="hidden md:sticky md:top-0 md:flex md:h-svh md:w-60 md:flex-col md:border-r md:border-border md:bg-card">
       <div className="flex h-16 items-center border-b border-border px-5">
         <Link href="/dashboard" className="inline-flex items-center gap-2.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+            </span>
           <span className="text-base font-semibold tracking-tight">Opendum</span>
         </Link>
       </div>

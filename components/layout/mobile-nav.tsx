@@ -98,7 +98,10 @@ export function MobileNav() {
               className="inline-flex items-center gap-2 text-base font-semibold tracking-tight"
               onClick={() => setOpen(false)}
             >
-              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+              </span>
               Opendum
             </Link>
           </SheetTitle>
