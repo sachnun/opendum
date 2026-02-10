@@ -166,8 +166,15 @@ function convertInputToMessages(
       }
 
       case "function_call": {
+        const rawId = (item.call_id as string) || (item.id as string) || `call_${Date.now()}`;
+        // Normalize fc_-prefixed IDs to call_ for Chat Completions format
+        const normalizedId = rawId.startsWith("fc_")
+          ? "call_" + rawId.slice(3)
+          : rawId.startsWith("fc-")
+            ? "call_" + rawId.slice(3)
+            : rawId;
         pendingToolCalls.push({
-          id: (item.call_id as string) || (item.id as string) || `call_${Date.now()}`,
+          id: normalizedId,
           type: "function",
           function: {
             name: item.name as string,
@@ -188,10 +195,18 @@ function convertInputToMessages(
           pendingToolCalls.length = 0;
         }
 
+        const rawCallId = (item.call_id as string) || "";
+        // Normalize fc_-prefixed IDs to call_ for Chat Completions format
+        const normalizedCallId = rawCallId.startsWith("fc_")
+          ? "call_" + rawCallId.slice(3)
+          : rawCallId.startsWith("fc-")
+            ? "call_" + rawCallId.slice(3)
+            : rawCallId;
+
         messages.push({
           role: "tool",
           content: (item.output as string) || "",
-          tool_call_id: (item.call_id as string) || "",
+          tool_call_id: normalizedCallId,
         });
         break;
       }

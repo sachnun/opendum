@@ -76,6 +76,35 @@ interface ResponsesInputItem {
   [key: string]: unknown;
 }
 
+// ============================================================
+// Responses API ID Normalization
+// ============================================================
+
+/**
+ * Convert any tool call ID to a format accepted by the Codex Responses API.
+ * The upstream Responses API requires IDs to begin with 'fc_'.
+ * IDs with 'apc_' prefix (apply_patch tool) are natively valid.
+ */
+function toResponsesApiId(id: string): string {
+  if (!id) return `fc_${crypto.randomUUID().replace(/-/g, "")}`;
+  if (id.startsWith("fc_") || id.startsWith("fc-")) return id;
+  if (id.startsWith("apc_")) return id; // apply_patch tool IDs are valid
+  if (id.startsWith("call_")) return "fc_" + id.slice(5);
+  return "fc_" + id;
+}
+
+/**
+ * Convert an fc_-prefixed ID back to call_ format for Chat Completions responses.
+ * Preserves IDs that are already in call_ format.
+ */
+function toChatCompletionsId(id: string): string {
+  if (!id) return `call_${crypto.randomUUID().replace(/-/g, "")}`;
+  if (id.startsWith("call_")) return id;
+  if (id.startsWith("fc_")) return "call_" + id.slice(3);
+  if (id.startsWith("fc-")) return "call_" + id.slice(3);
+  return "call_" + id;
+}
+
 const DEFAULT_CODEX_INSTRUCTIONS =
   "You are Codex, an expert coding assistant.";
 
@@ -338,10 +367,11 @@ function convertMessagesToInput(
               type: string;
               function: { name: string; arguments: string };
             };
+            const fcId = toResponsesApiId(toolCall.id);
             input.push({
               type: "function_call",
-              id: toolCall.id,
-              call_id: toolCall.id,
+              id: fcId,
+              call_id: fcId,
               name: toolCall.function.name,
               arguments: toolCall.function.arguments,
             });
@@ -362,7 +392,7 @@ function convertMessagesToInput(
         // Tool result message
         input.push({
           type: "function_call_output",
-          call_id: msg.tool_call_id || "",
+          call_id: toResponsesApiId(msg.tool_call_id || ""),
           output:
             typeof msg.content === "string"
               ? msg.content
@@ -458,6 +488,42 @@ function convertTools(
 }
 
 /**
+ * Normalize IDs in a Responses API input[] array to use fc_ prefix.
+ * This handles the _responsesInput passthrough path where input items
+ * from /v1/responses are sent directly without going through convertMessagesToInput().
+ */
+function normalizeResponsesInputIds(
+  input: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> {
+  return input.map((item) => {
+    const type = item.type as string | undefined;
+
+    if (type === "function_call") {
+      const id = item.id as string | undefined;
+      const callId = item.call_id as string | undefined;
+      const normalizedId = toResponsesApiId(id || callId || "");
+      return {
+        ...item,
+        id: normalizedId,
+        call_id: normalizedId,
+      };
+    }
+
+    if (type === "function_call_output") {
+      const callId = item.call_id as string | undefined;
+      if (callId) {
+        return {
+          ...item,
+          call_id: toResponsesApiId(callId),
+        };
+      }
+    }
+
+    return item;
+  });
+}
+
+/**
  * Build Responses API request body from Chat Completions format
  */
 function buildResponsesApiPayload(
@@ -471,7 +537,7 @@ function buildResponsesApiPayload(
   const derivedInstructions = extractInstructionsFromMessages(body.messages);
   const responseInput =
     Array.isArray(body._responsesInput) && body._responsesInput.length > 0
-      ? body._responsesInput
+      ? normalizeResponsesInputIds(body._responsesInput)
       : convertMessagesToInput(body.messages);
   const reasoningRequested =
     body._includeReasoning ?? !!(body.reasoning || body.reasoning_effort);
@@ -697,8 +763,9 @@ function createResponsesToChatCompletionsStream(
                   sentRole = true;
                 }
                 currentFunctionCallName = event.item.name || "";
-                currentFunctionCallId =
-                  event.item.call_id || event.item.id || `call_${Date.now()}`;
+                currentFunctionCallId = toChatCompletionsId(
+                  event.item.call_id || event.item.id || `fc_${Date.now()}`
+                );
 
                 // Emit tool_calls delta with function name
                 controller.enqueue(
@@ -879,7 +946,9 @@ function convertResponseToCompletion(
       }
     } else if (item.type === "function_call") {
       toolCalls.push({
-        id: (item.call_id as string) || (item.id as string) || `call_${toolCallIndex}`,
+        id: toChatCompletionsId(
+          (item.call_id as string) || (item.id as string) || `fc_${toolCallIndex}`
+        ),
         type: "function",
         function: {
           name: item.name as string,
