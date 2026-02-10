@@ -169,6 +169,98 @@ export interface FetchQuotaResult {
   fetchedAt: number;
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseRemainingFraction(value: unknown): {
+  remainingFraction: number;
+  isExhausted: boolean;
+} {
+  // Null from API explicitly means exhausted.
+  if (value === null) {
+    return { remainingFraction: 0, isExhausted: true };
+  }
+
+  const parsed = toFiniteNumber(value);
+  if (parsed === null) {
+    // Unknown value: fail open to avoid accidentally marking quota as exhausted.
+    return { remainingFraction: 1, isExhausted: false };
+  }
+
+  const clamped = Math.max(0, Math.min(1, parsed));
+  return {
+    remainingFraction: clamped,
+    isExhausted: clamped <= 0,
+  };
+}
+
+function parseResetTime(resetTime: unknown): {
+  iso: string | null;
+  timestamp: number | null;
+} {
+  let timestamp: number | null = null;
+
+  if (typeof resetTime === "string") {
+    const parsed = new Date(resetTime).getTime();
+    if (Number.isFinite(parsed)) {
+      timestamp = parsed;
+    } else {
+      const numeric = toFiniteNumber(resetTime);
+      if (numeric !== null) {
+        timestamp = numeric > 10_000_000_000 ? Math.trunc(numeric) : Math.trunc(numeric * 1000);
+      }
+    }
+  } else {
+    const numeric = toFiniteNumber(resetTime);
+    if (numeric !== null) {
+      timestamp = numeric > 10_000_000_000 ? Math.trunc(numeric) : Math.trunc(numeric * 1000);
+    } else if (resetTime && typeof resetTime === "object") {
+      const record = resetTime as Record<string, unknown>;
+
+      // Handle protobuf Timestamp-like objects: { seconds, nanos }.
+      const seconds = toFiniteNumber(record.seconds);
+      if (seconds !== null) {
+        const nanos = toFiniteNumber(record.nanos) ?? 0;
+        timestamp = Math.trunc(seconds * 1000 + nanos / 1_000_000);
+      } else {
+        const nestedIso =
+          (typeof record.iso === "string" && record.iso) ||
+          (typeof record.time === "string" && record.time) ||
+          (typeof record.value === "string" && record.value) ||
+          null;
+
+        if (nestedIso) {
+          const parsed = new Date(nestedIso).getTime();
+          if (Number.isFinite(parsed)) {
+            timestamp = parsed;
+          }
+        }
+      }
+    }
+  }
+
+  if (timestamp === null || timestamp <= 0 || Number.isNaN(timestamp)) {
+    return { iso: null, timestamp: null };
+  }
+
+  return {
+    iso: new Date(timestamp).toISOString(),
+    timestamp,
+  };
+}
+
 /**
  * Fetch quota from Antigravity fetchAvailableModels API
  */
@@ -204,29 +296,18 @@ export async function fetchQuotaFromApi(
       
       for (const [apiModelName, modelInfo] of Object.entries(modelsData)) {
         const quotaInfo = (modelInfo.quotaInfo ?? {}) as Record<string, unknown>;
-        
-        // CRITICAL: NULL remainingFraction means EXHAUSTED (0.0)
-        let remaining = quotaInfo.remainingFraction as number | null;
-        const isExhausted = remaining === null || remaining <= 0;
-        if (remaining === null) {
-          remaining = 0;
-        }
 
-        const resetTimeIso = (quotaInfo.resetTime as string) ?? null;
-        let resetTimestamp: number | null = null;
-        
-        if (resetTimeIso) {
-          try {
-            resetTimestamp = new Date(resetTimeIso).getTime();
-          } catch {
-            // Invalid date format
-          }
-        }
+        const { remainingFraction, isExhausted } = parseRemainingFraction(
+          quotaInfo.remainingFraction
+        );
+        const { iso: resetTimeIso, timestamp: resetTimestamp } = parseResetTime(
+          quotaInfo.resetTime
+        );
 
         const userModel = apiToUserModel(apiModelName);
         
         models[userModel] = {
-          remainingFraction: remaining,
+          remainingFraction,
           isExhausted,
           resetTimeIso,
           resetTimestamp,

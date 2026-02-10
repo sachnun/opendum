@@ -179,6 +179,14 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
     group.models.length === 0
       ? `${percentRemaining}%`
       : `${group.remainingRequests}/${group.maxRequests}`;
+  let resetTitle: string | undefined;
+
+  if (group.resetTimeIso) {
+    const resetDate = new Date(group.resetTimeIso);
+    if (!Number.isNaN(resetDate.getTime())) {
+      resetTitle = resetDate.toLocaleString();
+    }
+  }
 
   let barColor = "bg-green-500";
   let textColor = "text-green-600 dark:text-green-400";
@@ -198,8 +206,13 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className="text-muted-foreground truncate">{group.displayName}</span>
-        <span className={`font-mono ${textColor}`}>
-          {remainingLabel}
+        <span className="flex items-center gap-2">
+          {group.resetInHuman && (
+            <span className="text-[10px] text-muted-foreground" title={resetTitle}>
+              {group.resetInHuman}
+            </span>
+          )}
+          <span className={`font-mono ${textColor}`}>{remainingLabel}</span>
         </span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
