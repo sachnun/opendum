@@ -920,7 +920,6 @@ export async function POST(request: NextRequest) {
 
         if (!providerResponse.ok) {
           const errorText = await providerResponse.text();
-          console.error(`${account.provider} error:`, providerResponse.status, errorText);
 
           const detailedError = buildAccountErrorMessage(errorText, {
             model,
