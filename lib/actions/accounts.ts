@@ -167,9 +167,7 @@ export async function exchangeIflowOAuthCode(
     }
 
     // Exchange code for tokens using the provider
-    console.log("Exchanging code for tokens...");
     const oauthResult = await iflowProvider.exchangeCode(code, IFLOW_REDIRECT_URI);
-    console.log("Token exchange successful");
 
     // Check if account with this email already exists for this user
     const existingAccount = await prisma.providerAccount.findFirst({
@@ -380,12 +378,10 @@ export async function exchangeAntigravityOAuthCode(
     }
 
     // Exchange code for tokens using the provider
-    console.log("Exchanging Antigravity code for tokens...");
     const oauthResult = await antigravityProvider.exchangeCode(
       code, 
       ANTIGRAVITY_REDIRECT_URI
     );
-    console.log("Antigravity token exchange successful");
 
     // Check if account with this email already exists for this user
     const existingAccount = await prisma.providerAccount.findFirst({
@@ -703,12 +699,10 @@ export async function exchangeGeminiCliOAuthCode(
     }
 
     // Exchange code for tokens using the provider
-    console.log("Exchanging Gemini CLI code for tokens...");
     const oauthResult = await geminiCliProvider.exchangeCode(
       code, 
       GEMINI_CLI_REDIRECT_URI
     );
-    console.log("Gemini CLI token exchange successful");
 
     // Check if account with this email already exists for this user
     const existingAccount = await prisma.providerAccount.findFirst({

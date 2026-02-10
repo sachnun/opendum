@@ -1286,8 +1286,6 @@ export const codexProvider: Provider = {
     }
 
     if (isTokenExpired(account.expiresAt)) {
-      console.log(`Refreshing token for Codex account ${account.id}`);
-
       try {
         const newTokens = await this.refreshToken(refreshTokenValue);
 
@@ -1310,16 +1308,13 @@ export const codexProvider: Provider = {
         });
 
         accessToken = newTokens.accessToken;
-        console.log(
-          `Token refreshed successfully for Codex account ${account.id}`
-        );
       } catch (error) {
         console.error(
           `Failed to refresh token for Codex account ${account.id}:`,
           error
         );
         if (new Date() < account.expiresAt) {
-          console.log("Using existing token as fallback");
+          // Use existing token as fallback
         } else {
           throw error;
         }

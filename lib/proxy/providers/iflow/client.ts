@@ -305,8 +305,6 @@ export const iflowProvider: Provider = {
 
     // Check if token needs refresh
     if (isTokenExpired(account.expiresAt)) {
-      console.log(`Refreshing token for Iflow account ${account.id}`);
-
       try {
         // Refresh the token
         const newTokens = await this.refreshToken(refreshTokenValue);
@@ -324,7 +322,6 @@ export const iflowProvider: Provider = {
           },
         });
 
-        console.log(`Token refreshed successfully for Iflow account ${account.id}`);
       } catch (error) {
         console.error(
           `Failed to refresh token for Iflow account ${account.id}:`,
@@ -332,7 +329,7 @@ export const iflowProvider: Provider = {
         );
         // If refresh fails but token not truly expired, try using existing key
         if (new Date() < account.expiresAt) {
-          console.log("Using existing token as fallback");
+          // Use existing token as fallback
         } else {
           throw error;
         }
@@ -393,17 +390,6 @@ export const iflowProvider: Provider = {
       headers["x-iflow-signature"] = signature;
       headers["x-iflow-timestamp"] = timestamp.toString();
     }
-
-    const authorization = headers.Authorization;
-    const [scheme = "", token = ""] = authorization.split(" ");
-    const maskedToken = token
-      ? `${token.slice(0, 6)}...${token.slice(-4)}`
-      : "";
-    const loggedHeaders: Record<string, string> = {
-      ...headers,
-      Authorization: `${scheme} ${maskedToken}`.trim(),
-    };
-    console.log("[iflow] outgoing headers:", loggedHeaders);
 
     const response = await fetch(`${IFLOW_API_BASE_URL}/chat/completions`, {
       method: "POST",

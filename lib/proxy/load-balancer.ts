@@ -234,9 +234,6 @@ export async function markAccountFailed(
         statusChangedAt: new Date(),
       },
     });
-    console.log(
-      `[load-balancer] Account ${accountId} status changed to ${newStatus}: ${statusReason}`
-    );
   }
 }
 
@@ -263,9 +260,6 @@ export async function markAccountSuccess(accountId: string): Promise<void> {
     updates.status = "active";
     updates.statusReason = null;
     updates.statusChangedAt = new Date();
-    console.log(
-      `[load-balancer] Account ${accountId} restored to active after successful request`
-    );
   }
 
   await prisma.providerAccount.update({
