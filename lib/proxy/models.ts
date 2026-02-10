@@ -59,6 +59,18 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 0.6, output: 2.2 },
     },
   },
+  "glm-4.5": {
+    providers: [ProviderName.IFLOW],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 98304,
+      knowledgeCutoff: "2025-04",
+      releaseDate: "2025-07-28",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
 
   // ===== Iflow Internal Models =====
   "iflow-rome-30ba3b": { providers: [ProviderName.IFLOW] },
@@ -174,6 +186,30 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       vision: true,
     },
   },
+  "qwen2.5-vl-72b-instruct": {
+    providers: [ProviderName.IFLOW],
+    meta: {
+      contextLength: 32768,
+      outputLimit: 32768,
+      releaseDate: "2025-03-31",
+      reasoning: false,
+      toolCall: false,
+      vision: true,
+    },
+  },
+  "qwen-vl-max": {
+    providers: [ProviderName.IFLOW],
+    aliases: ["qwen-vl-max-latest"],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 8192,
+      knowledgeCutoff: "2024-04",
+      releaseDate: "2024-04-08",
+      reasoning: false,
+      vision: true,
+      toolCall: true,
+    },
+  },
 
   // ===== Kimi Models (Moonshot AI) =====
   "kimi-k2": {
@@ -232,6 +268,19 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   "deepseek-v3.2-chat": {
     providers: [ProviderName.IFLOW],
     aliases: ["deepseek-v3.2-chat"],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 128000,
+      knowledgeCutoff: "2024-07",
+      releaseDate: "2025-12-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+      pricing: { input: 0.58, output: 1.68 },
+    },
+  },
+  "deepseek-v3.2-reasoner": {
+    providers: [ProviderName.IFLOW],
     meta: {
       contextLength: 128000,
       outputLimit: 128000,

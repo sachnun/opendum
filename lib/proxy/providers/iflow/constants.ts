@@ -39,6 +39,7 @@ export const IFLOW_SUPPORTED_PARAMS = new Set([
 export const IFLOW_MODELS = new Set([
   "glm-4.7",
   "glm-4.6",
+  "glm-4.5",
   "iflow-rome-30ba3b",
   "minimax-m2.1",
   "minimax-m2",
@@ -50,11 +51,15 @@ export const IFLOW_MODELS = new Set([
   "qwen3-max",
   "qwen3-235b-a22b-thinking-2507",
   "deepseek-v3.2-chat",
+  "deepseek-v3.2-reasoner",
   "deepseek-v3.2",
   "deepseek-v3.1",
   "deepseek-v3",
   "deepseek-r1",
   "qwen3-vl-plus",
+  "qwen2.5-vl-72b-instruct",
+  "qwen-vl-max",
+  "qwen-vl-max-latest",
   "qwen3-235b-a22b-instruct",
   "qwen3-235b",
 ]);
