@@ -16,9 +16,8 @@ import { CODE_ASSIST_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants";
 export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   "standard-tier": {
     "claude-sonnet-4-5": 150,
-    "claude-sonnet-4-5-thinking": 150,
     "claude-opus-4-5": 150,
-    "claude-opus-4-5-thinking": 150,
+    "claude-opus-4-6": 150,
     "gpt-oss-120b-medium": 150,
     "gemini-3-pro-high": 320,
     "gemini-3-pro-low": 320,
@@ -30,9 +29,8 @@ export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   },
   "free-tier": {
     "claude-sonnet-4-5": 50,
-    "claude-sonnet-4-5-thinking": 50,
     "claude-opus-4-5": 50,
-    "claude-opus-4-5-thinking": 50,
+    "claude-opus-4-6": 50,
     "gpt-oss-120b-medium": 50,
     "gemini-3-pro-high": 150,
     "gemini-3-pro-low": 150,
@@ -45,6 +43,7 @@ export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   "legacy-tier": {
     "claude-sonnet-4-5": 50,
     "claude-opus-4-5": 50,
+    "claude-opus-4-6": 50,
     "gpt-oss-120b-medium": 50,
     "gemini-3-pro-high": 150,
     "gemini-3-flash": 500,
@@ -60,9 +59,8 @@ export const QUOTA_GROUPS: Record<string, { displayName: string; models: string[
     displayName: "Claude / GPT-OSS",
     models: [
       "claude-sonnet-4-5",
-      "claude-sonnet-4-5-thinking",
       "claude-opus-4-5",
-      "claude-opus-4-5-thinking",
+      "claude-opus-4-6",
       "gpt-oss-120b-medium",
     ],
   },
@@ -86,12 +84,14 @@ export const QUOTA_GROUPS: Record<string, { displayName: string; models: string[
 
 const USER_TO_API_MODEL_MAP: Record<string, string> = {
   "claude-opus-4-5": "claude-opus-4-5-thinking", // Opus only exists as -thinking in API
+  "claude-opus-4-6": "claude-opus-4-6-thinking", // Opus only exists as -thinking in API
   "gemini-3-pro-preview": "gemini-3-pro-high", // Preview maps to high by default
 };
 
 // API name -> User-facing name (for normalizing API responses)
 const API_TO_USER_MODEL_MAP: Record<string, string> = {
   "claude-opus-4-5-thinking": "claude-opus-4-5",
+  "claude-opus-4-6-thinking": "claude-opus-4-6",
   "claude-sonnet-4-5-thinking": "claude-sonnet-4-5",
   "gemini-2.5-flash-thinking": "gemini-2.5-flash",
 };

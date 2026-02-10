@@ -119,7 +119,7 @@ function sanitizeToolBlocksForClaude(
 /**
  * Transforms a Gemini-format request payload for Claude proxy models.
  *
- * The Antigravity backend routes `gemini-claude-*` models to Claude's API, but
+ * The Antigravity backend routes Claude models to Claude's API, but
  * Claude expects tool schemas in a different format:
  * - Gemini: `functionDeclarations[].parameters` (or `parametersJsonSchema`)
  * - Claude: `functionDeclarations[].input_schema` with required `type` field
@@ -449,7 +449,7 @@ export function transformClaudeRequest(
   };
 
   // Remove thinking config for Claude Sonnet 4.5 (non-thinking fallback)
-  if (context.model === "gemini-claude-sonnet-4-5") {
+  if (context.model === "claude-sonnet-4-5") {
     if (
       requestPayload.generationConfig &&
       (requestPayload.generationConfig as Record<string, unknown>).thinkingConfig

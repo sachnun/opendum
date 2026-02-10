@@ -91,11 +91,7 @@ export const MODEL_ALIASES: Record<string, string> = {
   "gemini-3-pro-image-preview": "gemini-3-pro-image",
   "gemini-3-pro-preview": "gemini-3-pro-high",
   "gemini-3-flash-preview": "gemini-3-flash",
-  // Legacy gemini- prefixed aliases for backward compatibility
-  "gemini-claude-sonnet-4-5": "claude-sonnet-4-5",
-  "gemini-claude-sonnet-4-5-thinking": "claude-sonnet-4-5-thinking",
-  "gemini-claude-opus-4-5": "claude-opus-4-5",
-  "gemini-claude-opus-4-5-thinking": "claude-opus-4-5-thinking",
+  "claude-opus-4.6": "claude-opus-4-6",
 };
 
 export const MODEL_FALLBACKS: Record<string, string> = {
@@ -117,13 +113,8 @@ export const ANTIGRAVITY_MODELS = new Set([
   "gemini-3-pro-image-preview",
   // Claude models (via Antigravity)
   "claude-sonnet-4-5",
-  "claude-sonnet-4-5-thinking",
   "claude-opus-4-5",
-  "claude-opus-4-5-thinking",
-  "gemini-claude-sonnet-4-5",
-  "gemini-claude-sonnet-4-5-thinking",
-  "gemini-claude-opus-4-5",
-  "gemini-claude-opus-4-5-thinking",
+  "claude-opus-4-6",
   // Other models
   "gpt-oss-120b-medium",
 ]);

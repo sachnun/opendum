@@ -71,9 +71,12 @@ function isTokenExpired(expiresAt: Date): boolean {
 function resolveModelName(rawModel: string): string {
   let model = MODEL_ALIASES[rawModel] ?? rawModel;
   
-  // claude-opus-4-5 ALWAYS requires -thinking variant (non-thinking doesn't exist)
+  // Claude Opus models only exist as -thinking variants in Antigravity API
   if (model === "claude-opus-4-5") {
     model = "claude-opus-4-5-thinking";
+  }
+  if (model === "claude-opus-4-6") {
+    model = "claude-opus-4-6-thinking";
   }
   
   return model;
