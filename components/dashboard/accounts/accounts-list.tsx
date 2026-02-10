@@ -80,6 +80,8 @@ interface AccountsListProps {
   geminiCliAccounts: Account[];
   qwenCodeAccounts: Account[];
   codexAccounts: Account[];
+  nvidiaNimAccounts: Account[];
+  ollamaCloudAccounts: Account[];
 }
 
 function formatTierLabel(tier: string): string {
@@ -502,6 +504,8 @@ export function AccountsList({
   geminiCliAccounts,
   qwenCodeAccounts,
   codexAccounts,
+  nvidiaNimAccounts,
+  ollamaCloudAccounts,
 }: AccountsListProps) {
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
@@ -598,55 +602,93 @@ export function AccountsList({
   }, [fetchGeminiCliQuota]);
 
   return (
-    <div className="space-y-6">
-      {/* Antigravity Section */}
-      <ProviderSection
-        id="antigravity-accounts"
-        title="Antigravity Accounts"
-        accounts={antigravityAccounts}
-        showTier
-        emptyMessage="No Antigravity accounts connected yet."
-        quotaByAccountId={antigravityQuotaByAccountId}
-        isQuotaLoading={isAntigravityQuotaLoading}
-      />
+    <div className="space-y-8">
+      <section id="oauth-provider-accounts" className="space-y-5">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
+          <p className="text-sm text-muted-foreground">
+            Connected via OAuth/device authorization flows.
+          </p>
+        </div>
 
-      {/* Codex Section */}
-      <ProviderSection
-        id="codex-accounts"
-        title="Codex Accounts"
-        accounts={codexAccounts}
-        showTier
-        emptyMessage="No Codex accounts connected yet."
-        quotaByAccountId={codexQuotaByAccountId}
-        isQuotaLoading={isCodexQuotaLoading}
-      />
+        <div className="space-y-6">
+          {/* Antigravity Section */}
+          <ProviderSection
+            id="antigravity-accounts"
+            title="Antigravity Accounts"
+            accounts={antigravityAccounts}
+            showTier
+            emptyMessage="No Antigravity accounts connected yet."
+            quotaByAccountId={antigravityQuotaByAccountId}
+            isQuotaLoading={isAntigravityQuotaLoading}
+          />
 
-      {/* Iflow Section */}
-      <ProviderSection
-        id="iflow-accounts"
-        title="Iflow Accounts"
-        accounts={iflowAccounts}
-        emptyMessage="No Iflow accounts connected yet."
-      />
+          {/* Codex Section */}
+          <ProviderSection
+            id="codex-accounts"
+            title="Codex Accounts"
+            accounts={codexAccounts}
+            showTier
+            emptyMessage="No Codex accounts connected yet."
+            quotaByAccountId={codexQuotaByAccountId}
+            isQuotaLoading={isCodexQuotaLoading}
+          />
 
-      {/* Gemini CLI Section */}
-      <ProviderSection
-        id="gemini-cli-accounts"
-        title="Gemini CLI Accounts"
-        accounts={geminiCliAccounts}
-        showTier
-        emptyMessage="No Gemini CLI accounts connected yet."
-        quotaByAccountId={geminiCliQuotaByAccountId}
-        isQuotaLoading={isGeminiCliQuotaLoading}
-      />
+          {/* Iflow Section */}
+          <ProviderSection
+            id="iflow-accounts"
+            title="Iflow Accounts"
+            accounts={iflowAccounts}
+            emptyMessage="No Iflow accounts connected yet."
+          />
 
-      {/* Qwen Code Section */}
-      <ProviderSection
-        id="qwen-code-accounts"
-        title="Qwen Code Accounts"
-        accounts={qwenCodeAccounts}
-        emptyMessage="No Qwen Code accounts connected yet."
-      />
+          {/* Gemini CLI Section */}
+          <ProviderSection
+            id="gemini-cli-accounts"
+            title="Gemini CLI Accounts"
+            accounts={geminiCliAccounts}
+            showTier
+            emptyMessage="No Gemini CLI accounts connected yet."
+            quotaByAccountId={geminiCliQuotaByAccountId}
+            isQuotaLoading={isGeminiCliQuotaLoading}
+          />
+
+          {/* Qwen Code Section */}
+          <ProviderSection
+            id="qwen-code-accounts"
+            title="Qwen Code Accounts"
+            accounts={qwenCodeAccounts}
+            emptyMessage="No Qwen Code accounts connected yet."
+          />
+        </div>
+      </section>
+
+      <section id="api-key-provider-accounts" className="space-y-5">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
+          <p className="text-sm text-muted-foreground">
+            Connected directly using provider API keys.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {/* Nvidia Section */}
+          <ProviderSection
+            id="nvidia-nim-accounts"
+            title="Nvidia Accounts"
+            accounts={nvidiaNimAccounts}
+            emptyMessage="No Nvidia accounts connected yet."
+          />
+
+          {/* Ollama Cloud Section */}
+          <ProviderSection
+            id="ollama-cloud-accounts"
+            title="Ollama Cloud Accounts"
+            accounts={ollamaCloudAccounts}
+            emptyMessage="No Ollama Cloud accounts connected yet."
+          />
+        </div>
+      </section>
     </div>
   );
 }

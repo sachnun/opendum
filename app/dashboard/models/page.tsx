@@ -61,6 +61,10 @@ function getProviderLabel(provider: string): string {
       return "Gemini CLI";
     case ProviderName.CODEX:
       return "Codex";
+    case ProviderName.NVIDIA_NIM:
+      return "Nvidia";
+    case ProviderName.OLLAMA_CLOUD:
+      return "Ollama Cloud";
     default:
       return provider;
   }
@@ -163,6 +167,8 @@ export default async function ModelsPage() {
   const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
   const geminiCliModels = getModelsForProvider(ProviderName.GEMINI_CLI);
   const codexModels = getModelsForProvider(ProviderName.CODEX);
+  const nvidiaNimModels = getModelsForProvider(ProviderName.NVIDIA_NIM);
+  const ollamaCloudModels = getModelsForProvider(ProviderName.OLLAMA_CLOUD);
 
   // Build available providers list (only those with models)
   const availableProviders: { id: string; label: string }[] = [];
@@ -180,6 +186,12 @@ export default async function ModelsPage() {
   }
   if (codexModels.length > 0) {
     availableProviders.push({ id: ProviderName.CODEX, label: "Codex" });
+  }
+  if (nvidiaNimModels.length > 0) {
+    availableProviders.push({ id: ProviderName.NVIDIA_NIM, label: "Nvidia" });
+  }
+  if (ollamaCloudModels.length > 0) {
+    availableProviders.push({ id: ProviderName.OLLAMA_CLOUD, label: "Ollama Cloud" });
   }
 
   // Create models with provider info

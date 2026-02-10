@@ -37,10 +37,20 @@ import {
   getCodexAuthUrl,
   initiateQwenCodeAuth,
   pollQwenCodeAuth,
+  connectNvidiaNimApiKey,
+  connectOllamaCloudApiKey,
 } from "@/lib/actions/accounts";
 import { cn } from "@/lib/utils";
 
-type Provider = "iflow" | "antigravity" | "qwen_code" | "gemini_cli" | "codex" | null;
+type Provider =
+  | "iflow"
+  | "antigravity"
+  | "qwen_code"
+  | "gemini_cli"
+  | "codex"
+  | "nvidia_nim"
+  | "ollama_cloud"
+  | null;
 
 interface OAuthRedirectConfig {
   flowType: "oauth_redirect";
@@ -52,12 +62,27 @@ interface DeviceCodeConfig {
   flowType: "device_code";
 }
 
+interface ApiKeyConfig {
+  flowType: "api_key";
+  apiKeyPortalUrl: string;
+  apiKeyPlaceholder: string;
+  accountNamePlaceholder: string;
+  connectAction: (
+    apiKey: string,
+    accountName?: string
+  ) => Promise<
+    | { success: true; data: { email: string; isUpdate: boolean } }
+    | { success: false; error: string }
+  >;
+}
+
 interface ProviderConfig {
   name: string;
   description: string;
 }
 
-type ProviderFullConfig = ProviderConfig & (OAuthRedirectConfig | DeviceCodeConfig);
+type ProviderFullConfig = ProviderConfig &
+  (OAuthRedirectConfig | DeviceCodeConfig | ApiKeyConfig);
 
 const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   iflow: {
@@ -93,6 +118,24 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     getAuthUrl: getCodexAuthUrl,
     exchangeAction: exchangeCodexOAuthCode,
   },
+  nvidia_nim: {
+    name: "Nvidia",
+    description: "Access NIM models with direct API key",
+    flowType: "api_key",
+    apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys",
+    apiKeyPlaceholder: "nvapi-...",
+    accountNamePlaceholder: "Nvidia Personal",
+    connectAction: connectNvidiaNimApiKey,
+  },
+  ollama_cloud: {
+    name: "Ollama Cloud",
+    description: "Access Ollama Cloud via OpenAI-compatible API",
+    flowType: "api_key",
+    apiKeyPortalUrl: "https://ollama.com/settings/keys",
+    apiKeyPlaceholder: "ollama_...",
+    accountNamePlaceholder: "Ollama Cloud Personal",
+    connectAction: connectOllamaCloudApiKey,
+  },
 };
 
 
@@ -103,6 +146,9 @@ export function AddAccountDialog() {
   const [step, setStep] = useState(1);
   const [provider, setProvider] = useState<Provider>(null);
   const [callbackUrl, setCallbackUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
+  const [accountName, setAccountName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
@@ -120,6 +166,16 @@ export function AddAccountDialog() {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const providerConfig = provider ? PROVIDERS[provider] : null;
+  const providerEntries = Object.entries(PROVIDERS) as [
+    Exclude<Provider, null>,
+    ProviderFullConfig,
+  ][];
+  const oauthProviders = providerEntries.filter(
+    ([, config]) => config.flowType !== "api_key"
+  );
+  const apiKeyProviders = providerEntries.filter(
+    ([, config]) => config.flowType === "api_key"
+  );
 
   // Cleanup polling on unmount or dialog close
   useEffect(() => {
@@ -164,6 +220,14 @@ export function AddAccountDialog() {
             }
           })
           .finally(() => setIsFetchingUrl(false));
+      } else if (providerConfig.flowType === "api_key") {
+        setIsFetchingUrl(false);
+        setAuthUrl(providerConfig.apiKeyPortalUrl);
+        setDeviceCodeInfo(null);
+      } else {
+        setIsFetchingUrl(false);
+        setAuthUrl("");
+        setDeviceCodeInfo(null);
       }
     }
   }, [step, provider, providerConfig]);
@@ -172,6 +236,9 @@ export function AddAccountDialog() {
     setStep(1);
     setProvider(null);
     setCallbackUrl("");
+    setApiKey("");
+    setIsApiKeyVisible(false);
+    setAccountName("");
     setError("");
     setIsLoading(false);
     setAuthUrl("");
@@ -325,10 +392,87 @@ export function AddAccountDialog() {
     const urlToCopy = providerConfig?.flowType === "device_code" 
       ? deviceCodeInfo?.verificationUrl 
       : authUrl;
-    
+
     if (urlToCopy) {
-      await navigator.clipboard.writeText(urlToCopy);
-      toast.success("Link copied to clipboard");
+      try {
+        await navigator.clipboard.writeText(urlToCopy);
+        toast.success("Link copied to clipboard");
+      } catch {
+        toast.error("Failed to copy link");
+      }
+
+      if (step === 2 && providerConfig?.flowType === "api_key") {
+        setStep(3);
+      }
+    }
+  };
+
+  const handleOpenApiKeyPortal = () => {
+    if (!providerConfig || providerConfig.flowType !== "api_key") {
+      return;
+    }
+
+    const portalUrl = providerConfig.apiKeyPortalUrl;
+    const width = 1100;
+    const height = 760;
+    const left = Math.round((window.screen.width - width) / 2);
+    const top = Math.round((window.screen.height - height) / 2);
+
+    const popup = window.open(
+      portalUrl,
+      "api_key_portal_popup",
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+    );
+
+    if (!popup || popup.closed) {
+      window.open(portalUrl, "_blank");
+    }
+
+    if (step === 2) {
+      setStep(3);
+    }
+  };
+
+  const handleConnectWithApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!providerConfig || providerConfig.flowType !== "api_key") {
+      setError("Invalid provider configuration");
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      setError("Please enter an API key");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await providerConfig.connectAction(
+        apiKey.trim(),
+        accountName.trim() || undefined
+      );
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      const message = result.data.isUpdate
+        ? `${providerConfig.name} account updated successfully!`
+        : `${providerConfig.name} account connected successfully!`;
+
+      toast.success(message);
+      setOpen(false);
+      resetForm();
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to connect account";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -426,10 +570,10 @@ export function AddAccountDialog() {
           {/* Step 1: Select Provider */}
           {step === 1 && (
             <div className="space-y-4">
-              <Label className="text-sm font-medium">Choose a provider</Label>
-              <div className="grid grid-cols-3 gap-3">
-                {(Object.entries(PROVIDERS) as [Exclude<Provider, null>, ProviderFullConfig][]).map(
-                  ([key, config]) => (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">OAuth Providers</Label>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {oauthProviders.map(([key, config]) => (
                     <button
                       key={key}
                       type="button"
@@ -443,8 +587,29 @@ export function AddAccountDialog() {
                     >
                       <div className="text-sm font-medium">{config.name}</div>
                     </button>
-                  )
-                )}
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">API Key Providers</Label>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {apiKeyProviders.map(([key, config]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleSelectProvider(key)}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent",
+                        provider === key
+                          ? "border-primary bg-accent"
+                          : "border-border"
+                      )}
+                    >
+                      <div className="text-sm font-medium">{config.name}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -500,7 +665,7 @@ export function AddAccountDialog() {
                     </AlertDescription>
                   </Alert>
                 </>
-              ) : (
+              ) : providerConfig.flowType === "device_code" ? (
                 // Device Code Flow
                 <>
                   <div className="space-y-2">
@@ -554,6 +719,44 @@ export function AddAccountDialog() {
                     </Alert>
                   )}
                 </>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      Get {providerConfig.name} API Key
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Open the provider page below and create or copy your API key. You will continue to the next step automatically.
+                    </p>
+                  </div>
+
+                  <div className="rounded-md border border-border bg-muted/30 p-3">
+                    <p className="break-all text-xs text-muted-foreground">
+                      {providerConfig.apiKeyPortalUrl}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      onClick={handleOpenApiKeyPortal}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open {providerConfig.name} Portal
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleCopyLink}
+                      variant="outline"
+                      title="Copy API key portal link"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                </div>
               )}
             </div>
           )}
@@ -593,6 +796,95 @@ export function AddAccountDialog() {
               </Button>
             </form>
           )}
+
+          {/* Step 3: Paste API key (API key providers only) */}
+          {step === 3 && providerConfig && providerConfig.flowType === "api_key" && (
+            <form
+              onSubmit={handleConnectWithApiKey}
+              className="space-y-4"
+              autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore="true"
+            >
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Connect {providerConfig.name}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Paste your provider API key directly. The key will be stored encrypted.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="provider-api-key" className="text-sm font-medium">
+                  API Key
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="provider-api-key"
+                    type="text"
+                    name="provider-token"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    placeholder={providerConfig.apiKeyPlaceholder}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    disabled={isLoading}
+                    autoFocus
+                    style={
+                      isApiKeyVisible
+                        ? undefined
+                        : ({ WebkitTextSecurity: "disc" } as React.CSSProperties)
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsApiKeyVisible((current) => !current)}
+                    disabled={isLoading}
+                    className="min-w-16"
+                  >
+                    {isApiKeyVisible ? "Hide" : "Show"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="provider-account-name" className="text-sm font-medium">
+                  Account Name (optional)
+                </Label>
+                <Input
+                  id="provider-account-name"
+                  name="provider-account-label"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder={providerConfig.accountNamePlaceholder}
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>Connect {providerConfig.name} Account</>
+                )}
+              </Button>
+            </form>
+          )}
         </div>
 
         <DialogFooter className="sm:justify-between">
@@ -610,7 +902,7 @@ export function AddAccountDialog() {
             )}
           </div>
           <div>
-            {step === 2 && providerConfig?.flowType === "oauth_redirect" && (
+            {step === 2 && providerConfig && providerConfig.flowType !== "device_code" && (
               <Button
                 type="button"
                 variant="ghost"
