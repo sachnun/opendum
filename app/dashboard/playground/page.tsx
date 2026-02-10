@@ -2,11 +2,13 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { MODEL_REGISTRY } from "@/lib/proxy/models";
 import { PlaygroundClient } from "@/components/playground/client";
-import type { ModelOption } from "@/components/playground/chat-panel";
+import type {
+  ModelOption,
+  ProviderAccountOption,
+} from "@/components/playground/chat-panel";
 
-// Get all models - one entry per provider
-// Format: provider/model (e.g. "iflow/qwen3-coder-plus")
-function getModelsWithProviders(disabledModels: Set<string>): ModelOption[] {
+// Get all models - one entry per model
+function getModels(disabledModels: Set<string>): ModelOption[] {
   const models: ModelOption[] = [];
 
   for (const [modelName, info] of Object.entries(MODEL_REGISTRY)) {
@@ -14,25 +16,30 @@ function getModelsWithProviders(disabledModels: Set<string>): ModelOption[] {
       continue;
     }
 
-    // Create one entry per provider
-    for (const provider of info.providers) {
-      models.push({
-        id: `${provider}/${modelName}`,
-        name: modelName,
-        provider: provider,
-      });
-    }
+    models.push({
+      id: modelName,
+      name: modelName,
+      providers: [...info.providers].sort((a, b) => a.localeCompare(b)),
+    });
   }
 
-  // Sort by provider, then by model name
-  models.sort((a, b) => {
-    if (a.provider !== b.provider) {
-      return a.provider.localeCompare(b.provider);
-    }
-    return a.name.localeCompare(b.name);
-  });
+  models.sort((a, b) => a.name.localeCompare(b.name));
 
   return models;
+}
+
+function getProviderAccounts(accounts: Array<{
+  id: string;
+  provider: string;
+  name: string;
+  email: string | null;
+}>): ProviderAccountOption[] {
+  return accounts.map((account) => ({
+    id: account.id,
+    provider: account.provider,
+    name: account.name,
+    email: account.email,
+  }));
 }
 
 export default async function PlaygroundPage() {
@@ -50,7 +57,25 @@ export default async function PlaygroundPage() {
     disabledModels.map((entry: { model: string }) => entry.model)
   );
 
-  const models = getModelsWithProviders(disabledModelSet);
+  const models = getModels(disabledModelSet);
+  const providerAccounts = await prisma.providerAccount.findMany({
+    where: {
+      userId: session.user.id,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      provider: true,
+      name: true,
+      email: true,
+    },
+    orderBy: [{ provider: "asc" }, { createdAt: "asc" }],
+  });
 
-  return <PlaygroundClient models={models} />;
+  return (
+    <PlaygroundClient
+      models={models}
+      providerAccounts={getProviderAccounts(providerAccounts)}
+    />
+  );
 }

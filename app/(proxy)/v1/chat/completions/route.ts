@@ -4,8 +4,16 @@ import type { ApiKeyModelAccess } from "@/lib/proxy/auth";
 import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "@/lib/proxy/load-balancer";
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
-import { markRateLimited, parseRateLimitError, getMinWaitTime, formatWaitTimeMs } from "@/lib/proxy/rate-limit";
+import {
+  clearExpiredRateLimits,
+  formatWaitTimeMs,
+  getMinWaitTime,
+  isRateLimited,
+  markRateLimited,
+  parseRateLimitError,
+} from "@/lib/proxy/rate-limit";
 import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
+import { isModelSupportedByProvider } from "@/lib/proxy/models";
 import {
   buildAccountErrorMessage,
   getErrorMessage,
@@ -15,6 +23,7 @@ import {
   shouldRotateToNextAccount,
 } from "@/lib/proxy/error-utils";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -155,7 +164,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { model: modelParam, messages, stream = true, ...params } = body;
+    const {
+      model: modelParam,
+      messages,
+      stream = true,
+      provider_account_id: providerAccountIdParam,
+      ...params
+    } = body;
 
     const reasoningRequested = !!(
       params.reasoning || 
@@ -201,9 +216,31 @@ export async function POST(request: NextRequest) {
           type: ProxyErrorType;
         }
       | null = null;
+    const hasProviderAccountParam =
+      providerAccountIdParam !== undefined && providerAccountIdParam !== null;
+    const normalizedProviderAccountId =
+      typeof providerAccountIdParam === "string" ? providerAccountIdParam.trim() : "";
+
+    if (hasProviderAccountParam && normalizedProviderAccountId.length === 0) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "provider_account_id must be a non-empty string",
+            type: "invalid_request_error",
+            param: "provider_account_id",
+            code: "invalid_provider_account",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const requestParamsForError: Record<string, unknown> = {
       stream,
       ...params,
+      ...(normalizedProviderAccountId
+        ? { provider_account_id: normalizedProviderAccountId }
+        : {}),
     };
 
     if (!messages || !Array.isArray(messages)) {
@@ -213,13 +250,105 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
-      const account = await getNextAvailableAccount(
-        authenticatedUserId,
-        model,
-        provider,
-        triedAccountIds
+    const forcedAccount = normalizedProviderAccountId
+      ? await prisma.providerAccount.findFirst({
+          where: {
+            id: normalizedProviderAccountId,
+            userId: authenticatedUserId,
+          },
+        })
+      : null;
+
+    if (normalizedProviderAccountId && !forcedAccount) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Selected provider account was not found",
+            type: "invalid_request_error",
+            param: "provider_account_id",
+            code: "provider_account_not_found",
+          },
+        },
+        { status: 400 }
       );
+    }
+
+    if (forcedAccount && !forcedAccount.isActive) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Selected provider account is inactive",
+            type: "invalid_request_error",
+            param: "provider_account_id",
+            code: "provider_account_inactive",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (forcedAccount) {
+      if (!isModelSupportedByProvider(model, forcedAccount.provider)) {
+        return NextResponse.json(
+          {
+            error: {
+              message: `Selected account provider "${forcedAccount.provider}" does not support model "${model}"`,
+              type: "invalid_request_error",
+              param: "provider_account_id",
+              code: "provider_account_model_mismatch",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (provider !== null && forcedAccount.provider !== provider) {
+        return NextResponse.json(
+          {
+            error: {
+              message: `Selected account provider "${forcedAccount.provider}" does not match model provider "${provider}"`,
+              type: "invalid_request_error",
+              param: "provider_account_id",
+              code: "provider_account_provider_mismatch",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      clearExpiredRateLimits(forcedAccount.id);
+      if (isRateLimited(forcedAccount.id, family)) {
+        const waitTimeMs = getMinWaitTime([forcedAccount.id], family);
+        return NextResponse.json(
+          {
+            error: {
+              message:
+                waitTimeMs > 0
+                  ? `Selected account is rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`
+                  : "Selected account is rate limited.",
+              type: "rate_limit_error",
+              retry_after: waitTimeMs > 0 ? formatWaitTimeMs(waitTimeMs) : undefined,
+              retry_after_ms: waitTimeMs > 0 ? waitTimeMs : undefined,
+            },
+          },
+          { status: 429 }
+        );
+      }
+    }
+
+    const accountRetryLimit = forcedAccount ? 1 : MAX_ACCOUNT_RETRIES;
+
+    for (let attempt = 0; attempt < accountRetryLimit; attempt++) {
+      let account = forcedAccount;
+
+      if (!account) {
+        account = await getNextAvailableAccount(
+          authenticatedUserId,
+          model,
+          provider,
+          triedAccountIds
+        );
+      }
 
       if (!account) {
         const isFirstAttempt = triedAccountIds.length === 0;
@@ -275,6 +404,16 @@ export async function POST(request: NextRequest) {
       }
 
       triedAccountIds.push(account.id);
+
+      if (forcedAccount) {
+        await prisma.providerAccount.update({
+          where: { id: account.id },
+          data: {
+            lastUsedAt: new Date(),
+            requestCount: { increment: 1 },
+          },
+        });
+      }
 
       try {
         const providerImpl = await getProvider(account.provider as ProviderNameType);
@@ -355,7 +494,7 @@ export async function POST(request: NextRequest) {
 
           if (
             shouldRotateToNextAccount(providerResponse.status) &&
-            attempt < MAX_ACCOUNT_RETRIES - 1
+            attempt < accountRetryLimit - 1
           ) {
             continue;
           }
@@ -465,7 +604,7 @@ export async function POST(request: NextRequest) {
           type: sanitizedError.type,
         };
 
-        if (shouldRotateToNextAccount(statusCode) && attempt < MAX_ACCOUNT_RETRIES - 1) {
+        if (shouldRotateToNextAccount(statusCode) && attempt < accountRetryLimit - 1) {
           continue;
         }
 

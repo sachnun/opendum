@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import {
-  Lightbulb,
-  Code,
-  FileText,
-  Languages,
+  MessageSquareText,
+  Wrench,
+  Image,
   Brain,
   LucideIcon,
 } from "lucide-react";
@@ -19,36 +18,100 @@ export interface Scenario {
   icon: LucideIcon;
   prompt: string;
   isReasoning: boolean;
+  messages?: Array<{
+    role: string;
+    content: string | Array<Record<string, unknown>>;
+  }>;
+  requestOverrides?: Record<string, unknown>;
 }
 
 export const SCENARIOS: Scenario[] = [
   {
-    id: "explain",
-    name: "Explain",
-    icon: Lightbulb,
-    prompt: "Explain quantum computing in simple terms that a 10 year old could understand.",
+    id: "text",
+    name: "Text",
+    icon: MessageSquareText,
+    prompt: "Simple greeting scenario.",
     isReasoning: false,
+    messages: [
+      {
+        role: "system",
+        content: "You are a helpful assistant. Reply briefly and naturally.",
+      },
+      {
+        role: "user",
+        content: "how are you",
+      },
+    ],
   },
   {
-    id: "code",
-    name: "Code",
-    icon: Code,
-    prompt: "Write a Python function that validates an email address using regex. Include error handling and docstring.",
+    id: "tool-call",
+    name: "Tool Call",
+    icon: Wrench,
+    prompt:
+      "Use available tools to get weather in Jakarta and convert 120 USD to IDR, then summarize in 3 bullets.",
     isReasoning: false,
+    requestOverrides: {
+      stream: false,
+      tool_choice: "auto",
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "get_weather",
+            description: "Get current weather for a city",
+            parameters: {
+              type: "object",
+              properties: {
+                city: { type: "string" },
+                unit: { type: "string", enum: ["celsius", "fahrenheit"] },
+              },
+              required: ["city"],
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "convert_currency",
+            description: "Convert amount between currencies",
+            parameters: {
+              type: "object",
+              properties: {
+                amount: { type: "number" },
+                from: { type: "string" },
+                to: { type: "string" },
+              },
+              required: ["amount", "from", "to"],
+            },
+          },
+        },
+      ],
+    },
   },
   {
-    id: "summarize",
-    name: "Summarize",
-    icon: FileText,
-    prompt: "Summarize the following text in 3 bullet points:\n\nThe city opened a new community library that offers free Wi-Fi, study rooms, and weekend workshops. Residents can borrow up to 10 books at a time, and children under 12 can join a reading club. The mayor said the goal is to improve literacy and provide a safe space for learning. The library is open daily from 8am to 8pm.",
+    id: "vision",
+    name: "Vision",
+    icon: Image,
+    prompt:
+      "Describe the image, then list 3 visible objects and 1 possible scene context.",
     isReasoning: false,
-  },
-  {
-    id: "translate",
-    name: "Translate",
-    icon: Languages,
-    prompt: "Translate the following text to Indonesian:\n\n[Paste your text here]",
-    isReasoning: false,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Describe this image in short, list 3 visible objects, and infer one likely scene context.",
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/640px-Fronalpstock_big.jpg",
+            },
+          },
+        ],
+      },
+    ],
   },
   {
     id: "reasoning",

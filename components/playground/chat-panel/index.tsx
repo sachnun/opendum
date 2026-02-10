@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Copy, Check, ChevronDown } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronLeft, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -29,9 +29,24 @@ import {
 } from "@/components/ui/popover";
 
 export interface ModelOption {
-  id: string;       // unique: "modelName:provider"
-  name: string;     // model name
-  provider: string; // provider name
+  id: string; // unique: "model"
+  name: string;
+  providers: string[];
+}
+
+export interface ProviderAccountOption {
+  id: string;
+  provider: string;
+  name: string;
+  email: string | null;
+}
+
+export interface ResponseMetrics {
+  waitMs: number | null;
+  firstResponseMs: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
 }
 
 export interface ResponseData {
@@ -39,13 +54,17 @@ export interface ResponseData {
   reasoning?: string;
   isLoading: boolean;
   error?: string;
+  metrics?: ResponseMetrics;
 }
 
 interface ChatPanelProps {
   panelId: string;
   models: ModelOption[];
+  accountOptions?: ProviderAccountOption[];
   selectedModel: string | null;
-  onModelChange: (model: string) => void;
+  selectedAccountId?: string | null;
+  onModelChange: (modelId: string, accountId: string | null) => void;
+  onRemove?: () => void;
   response?: ResponseData;
   disabled?: boolean;
 }
@@ -104,22 +123,100 @@ function formatProviderName(provider: string): string {
   return names[provider] || provider;
 }
 
+function formatDurationMs(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return "-";
+  }
+
+  if (value < 1000) {
+    return `${Math.round(value)} ms`;
+  }
+
+  const seconds = value / 1000;
+  return `${seconds.toFixed(seconds >= 10 ? 0 : 1)} s`;
+}
+
+function getAccountLabel(account: ProviderAccountOption): string {
+  const name = account.name.trim();
+  const email = account.email?.trim();
+
+  if (!email) {
+    return name;
+  }
+
+  if (!name || name.toLowerCase() === email.toLowerCase()) {
+    return email;
+  }
+
+  return `${name} (${email})`;
+}
+
 export function ChatPanel({
   models,
+  accountOptions = [],
   selectedModel,
+  selectedAccountId = null,
   onModelChange,
+  onRemove,
   response,
   disabled = false,
 }: ChatPanelProps) {
   const [open, setOpen] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
+  const [selectionStep, setSelectionStep] = React.useState<"model" | "routing">("model");
+  const [pendingModelId, setPendingModelId] = React.useState<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const groupedModels = React.useMemo(() => groupModelsByFamily(models), [models]);
   const sortedFamilies = React.useMemo(() => getSortedFamilies(groupedModels), [groupedModels]);
 
   const selectedModelData = models.find((m) => m.id === selectedModel);
-  const { content = "", reasoning = "", isLoading = false, error } = response || {};
+  const selectedAccountData = accountOptions.find((account) => account.id === selectedAccountId);
+  const pendingModelData = models.find((model) => model.id === pendingModelId) ?? null;
+  const pendingModelAccounts = pendingModelData
+    ? accountOptions.filter((account) =>
+        pendingModelData.providers.includes(account.provider)
+      )
+    : [];
+
+  const selectedRouteLabel = selectedAccountData
+    ? `${getAccountLabel(selectedAccountData)} (${formatProviderName(selectedAccountData.provider)})`
+    : selectedModelData
+      ? "Auto (load balancer)"
+      : "-";
+
+  const handlePopoverOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+
+    if (!nextOpen) {
+      setSelectionStep("model");
+      setPendingModelId(null);
+    }
+  };
+
+  const handleSelectModel = (modelId: string) => {
+    setPendingModelId(modelId);
+    setSelectionStep("routing");
+  };
+
+  const handleSelectRoute = (accountId: string | null) => {
+    if (!pendingModelData) {
+      return;
+    }
+
+    onModelChange(pendingModelData.id, accountId);
+    setOpen(false);
+    setSelectionStep("model");
+    setPendingModelId(null);
+  };
+
+  const {
+    content = "",
+    reasoning = "",
+    isLoading = false,
+    error,
+    metrics,
+  } = response || {};
+  const waitLabel = formatDurationMs(metrics?.waitMs);
 
   React.useEffect(() => {
     if (isLoading && scrollRef.current) {
@@ -130,30 +227,27 @@ export function ChatPanel({
     }
   }, [content, reasoning, isLoading]);
 
-  const handleCopy = async () => {
-    const textToCopy =
-      reasoning && content
-        ? `Reasoning:\n${reasoning}\n\nAnswer:\n${content}`
-        : reasoning || content;
-
-    if (!textToCopy) return;
-
-    try {
-      await navigator.clipboard.writeText(textToCopy);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
-
   return (
-    <Card className="flex flex-col h-[400px] py-0 gap-0">
+    <Card className="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
+      {onRemove && (
+        <Button
+          variant="outline"
+          size="icon-xs"
+          onClick={onRemove}
+          title="Remove card"
+          aria-label="Remove comparison card"
+          disabled={disabled || isLoading}
+          className="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95"
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      )}
+
       {/* Header with Model Selector */}
-      <CardHeader className="flex-none border-b py-2 px-3 gap-0">
+      <CardHeader className="flex-none gap-0 border-b py-2 pl-3 pr-11">
         <div className="flex items-center gap-1">
           {/* Model Selector */}
-          <Popover open={open} onOpenChange={setOpen}>
+          <Popover open={open} onOpenChange={handlePopoverOpenChange}>
             <PopoverTrigger asChild>
               <Button
                 variant="ghost"
@@ -163,10 +257,12 @@ export function ChatPanel({
                 disabled={disabled || isLoading}
               >
                 {selectedModelData ? (
-                  <div className="flex items-center gap-2 truncate">
+                  <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate">{selectedModelData.name}</span>
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                      {formatProviderName(selectedModelData.provider)}
+                      {selectedAccountData
+                        ? formatProviderName(selectedAccountData.provider)
+                        : "Auto"}
                     </Badge>
                   </div>
                 ) : (
@@ -175,59 +271,124 @@ export function ChatPanel({
                 <ChevronDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[280px] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Search models..." />
-                <CommandList>
-                  <CommandEmpty>No model found.</CommandEmpty>
-                  {sortedFamilies.map((family) => (
-                    <CommandGroup key={family} heading={family}>
-                      {groupedModels[family].map((model) => (
+            <PopoverContent className="w-[340px] p-0" align="start">
+              {selectionStep === "model" && (
+                <Command>
+                  <CommandInput placeholder="Search models..." />
+                  <CommandList>
+                    <CommandEmpty>No model found.</CommandEmpty>
+                    {sortedFamilies.map((family) => (
+                      <CommandGroup key={family} heading={family}>
+                        {groupedModels[family].map((model) => (
+                          <CommandItem
+                            key={model.id}
+                            value={`${model.name} ${model.providers.join(" ")}`}
+                            onSelect={() => handleSelectModel(model.id)}
+                            className={cn(selectedModel === model.id && "bg-accent")}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">{model.name}</p>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {model.providers.map((provider) => (
+                                  <Badge
+                                    key={`${model.id}-${provider}`}
+                                    variant="outline"
+                                    className="h-4 px-1.5 text-[9px]"
+                                  >
+                                    {formatProviderName(provider)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ))}
+                  </CommandList>
+                </Command>
+              )}
+
+              {selectionStep === "routing" && pendingModelData && (
+                <>
+                  <div className="flex items-center justify-between border-b px-2 py-1.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={() => {
+                        setSelectionStep("model");
+                        setPendingModelId(null);
+                      }}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      Models
+                    </Button>
+
+                    <p className="max-w-[220px] truncate text-xs font-medium">
+                      {pendingModelData.name}
+                    </p>
+                  </div>
+
+                  <Command>
+                    <CommandInput placeholder="Search provider or account..." />
+                    <CommandList>
+                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandGroup heading="Routing">
                         <CommandItem
-                          key={model.id}
-                          value={`${model.name} ${model.provider}`}
-                          onSelect={() => {
-                            onModelChange(model.id);
-                            setOpen(false);
-                          }}
+                          value="auto load balancer"
+                          onSelect={() => handleSelectRoute(null)}
                           className={cn(
-                            selectedModel === model.id && "bg-accent"
+                            selectedModel === pendingModelData.id &&
+                              !selectedAccountId &&
+                              "bg-accent"
                           )}
                         >
-                          <span className="flex-1 truncate">{model.name}</span>
-                          <Badge variant="outline" className="text-[10px] ml-2">
-                            {formatProviderName(model.provider)}
-                          </Badge>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-medium">Auto (load balancer)</p>
+                            <p className="truncate text-[10px] text-muted-foreground">
+                              System chooses best provider account
+                            </p>
+                          </div>
                         </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  ))}
-                </CommandList>
-              </Command>
+
+                        {pendingModelAccounts.map((account) => (
+                          <CommandItem
+                            key={account.id}
+                            value={`${account.provider} ${account.name} ${account.email ?? ""}`}
+                            onSelect={() => handleSelectRoute(account.id)}
+                            className={cn(
+                              selectedModel === pendingModelData.id &&
+                                selectedAccountId === account.id &&
+                                "bg-accent"
+                            )}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">
+                                {getAccountLabel(account)}
+                              </p>
+                              <p className="truncate text-[10px] text-muted-foreground">
+                                {formatProviderName(account.provider)}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="ml-2 text-[10px]">
+                              {formatProviderName(account.provider)}
+                            </Badge>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </>
+              )}
             </PopoverContent>
           </Popover>
-
-          {/* Copy Button */}
-          {(content || reasoning) && !isLoading && (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleCopy}
-              title="Copy response"
-            >
-              {copied ? (
-                <Check className="h-3 w-3 text-green-500" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
-            </Button>
-          )}
         </div>
       </CardHeader>
 
       {/* Content */}
-      <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea ref={scrollRef} className="h-full">
+      <CardContent className="flex min-h-0 flex-1 flex-col p-0 overflow-hidden">
+        <ScrollArea ref={scrollRef} className="min-h-0 flex-1">
           <div className="p-4">
             {/* No model selected */}
             {!selectedModel && !isLoading && !content && !reasoning && !error && (
@@ -290,6 +451,19 @@ export function ChatPanel({
             )}
           </div>
         </ScrollArea>
+
+        <div className="shrink-0 border-t bg-card px-3 py-2 text-[11px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Wait</span>
+            <span className="font-medium tabular-nums">{waitLabel}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="shrink-0 whitespace-nowrap text-muted-foreground">
+              Provider account
+            </span>
+            <span className="min-w-0 truncate text-right font-medium">{selectedRouteLabel}</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
