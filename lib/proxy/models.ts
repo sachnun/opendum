@@ -34,7 +34,7 @@ export interface ModelInfo {
 export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // ===== GLM Models (Zhipu AI) =====
   "glm-4.7": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 204800,
       outputLimit: 131072,
@@ -47,7 +47,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "glm-4.6": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD],
     meta: {
       contextLength: 204800,
       outputLimit: 131072,
@@ -77,7 +77,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
 
   // ===== MiniMax Models =====
   "minimax-m2.1": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 204800,
       outputLimit: 131072,
@@ -88,7 +88,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "minimax-m2": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 196608,
       outputLimit: 128000,
@@ -213,7 +213,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
 
   // ===== Kimi Models (Moonshot AI) =====
   "kimi-k2": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 128000,
       outputLimit: 64000,
@@ -225,7 +225,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "kimi-k2.5": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -238,7 +238,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "kimi-k2-0905": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -251,7 +251,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "kimi-k2-thinking": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -293,7 +293,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "deepseek-v3.2": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 128000,
       outputLimit: 128000,
@@ -306,7 +306,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "deepseek-v3.1": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 131072,
       outputLimit: 131072,
@@ -411,7 +411,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gemini-3-flash-preview": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.OLLAMA_CLOUD],
     meta: {
       contextLength: 1048576,
       outputLimit: 65536,
@@ -438,7 +438,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gemini-3-pro-preview": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.OLLAMA_CLOUD],
     meta: {
       contextLength: 1000000,
       outputLimit: 65000,
@@ -522,7 +522,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
 
   // ===== GPT-OSS Models =====
   "gpt-oss-120b-medium": {
-    providers: [ProviderName.ANTIGRAVITY],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     aliases: ["gpt-oss-120b"],
     meta: {
       contextLength: 131072,
@@ -532,6 +532,309 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       toolCall: true,
       vision: false,
       pricing: { input: 0.25, output: 0.69 },
+    },
+  },
+
+  // ===== Nvidia Models =====
+  "nim-llama-3.1-70b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: ["meta/llama-3.1-70b-instruct"],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 4096,
+      releaseDate: "2025-07-23",
+      reasoning: false,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "deepseek-ai-deepseek-coder-6.7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai/deepseek-coder-6.7b-instruct"] },
+  "deepseek-ai-deepseek-r1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai/deepseek-r1"] },
+  "deepseek-ai-deepseek-r1-0528": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai/deepseek-r1-0528"] },
+  "deepseek-ai-deepseek-v3.1-terminus": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai/deepseek-v3.1-terminus"] },
+  "google-codegemma-1.1-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/codegemma-1.1-7b"] },
+  "google-codegemma-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/codegemma-7b"] },
+  "google-gemma-2-27b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-2-27b-it"] },
+  "google-gemma-2-2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-2-2b-it"] },
+  "google-gemma-3-1b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-3-1b-it"] },
+  "google-gemma-3n-e2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-3n-e2b-it"] },
+  "google-gemma-3n-e4b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-3n-e4b-it"] },
+  "meta-codellama-70b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/codellama-70b"] },
+  "meta-llama-3.1-405b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.1-405b-instruct"] },
+  "meta-llama-3.2-11b-vision-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.2-11b-vision-instruct"] },
+  "meta-llama-3.2-1b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.2-1b-instruct"] },
+  "meta-llama-3.3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.3-70b-instruct"] },
+  "meta-llama-4-maverick-17b-128e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-4-maverick-17b-128e-instruct"] },
+  "meta-llama-4-scout-17b-16e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-4-scout-17b-16e-instruct"] },
+  "meta-llama3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama3-70b-instruct"] },
+  "meta-llama3-8b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama3-8b-instruct"] },
+  "microsoft-phi-3-medium-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-medium-128k-instruct"] },
+  "microsoft-phi-3-medium-4k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-medium-4k-instruct"] },
+  "microsoft-phi-3-small-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-small-128k-instruct"] },
+  "microsoft-phi-3-small-8k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-small-8k-instruct"] },
+  "microsoft-phi-3-vision-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-vision-128k-instruct"] },
+  "microsoft-phi-3.5-moe-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3.5-moe-instruct"] },
+  "microsoft-phi-3.5-vision-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3.5-vision-instruct"] },
+  "microsoft-phi-4-mini-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-4-mini-instruct"] },
+  "mistralai-codestral-22b-instruct-v0.1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai/codestral-22b-instruct-v0.1"] },
+  "mistralai-mamba-codestral-7b-v0.1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai/mamba-codestral-7b-v0.1"] },
+  "mistralai-mistral-large-2-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai/mistral-large-2-instruct"] },
+  "mistralai-mistral-small-3.1-24b-instruct-2503": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai/mistral-small-3.1-24b-instruct-2503"] },
+  "nvidia-cosmos-nemotron-34b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/cosmos-nemotron-34b"] },
+  "nvidia-llama-3.1-nemotron-51b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/llama-3.1-nemotron-51b-instruct"] },
+  "nvidia-llama-3.1-nemotron-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/llama-3.1-nemotron-70b-instruct"] },
+  "nvidia-llama-3.1-nemotron-ultra-253b-v1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/llama-3.1-nemotron-ultra-253b-v1"] },
+  "nvidia-llama-3.3-nemotron-super-49b-v1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/llama-3.3-nemotron-super-49b-v1"] },
+  "nvidia-llama-3.3-nemotron-super-49b-v1.5": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/llama-3.3-nemotron-super-49b-v1.5"] },
+  "nvidia-llama3-chatqa-1.5-70b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/llama3-chatqa-1.5-70b"] },
+  "nvidia-nemotron-4-340b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/nemotron-4-340b-instruct"] },
+  "nvidia-nvidia-nemotron-nano-9b-v2": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/nvidia-nemotron-nano-9b-v2"] },
+  "qwen-qwen2.5-coder-32b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen2.5-coder-32b-instruct"] },
+  "qwen-qwen2.5-coder-7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen2.5-coder-7b-instruct"] },
+  "qwen-qwen3-235b-a22b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen3-235b-a22b"] },
+  "qwen-qwen3-next-80b-a3b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen3-next-80b-a3b-instruct"] },
+  "qwen-qwq-32b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwq-32b"] },
+
+  // ===== Ollama Cloud Models =====
+  "cogito-2.1-671b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["cogito-2.1:671b"],
+    meta: {
+      contextLength: 163840,
+      outputLimit: 32000,
+      releaseDate: "2025-11-19",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "deepseek-v3.1-671b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["deepseek-v3.1:671b"],
+    meta: {
+      contextLength: 163840,
+      outputLimit: 163840,
+      releaseDate: "2025-08-21",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "devstral-2-123b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["devstral-2:123b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 262144,
+      releaseDate: "2025-12-09",
+      reasoning: false,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "devstral-small-2-24b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["devstral-small-2:24b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 262144,
+      releaseDate: "2025-12-09",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "gemma3-12b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["gemma3:12b"],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 131072,
+      releaseDate: "2024-12-01",
+      reasoning: false,
+      toolCall: false,
+      vision: true,
+    },
+  },
+  "gemma3-27b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["gemma3:27b"],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 131072,
+      releaseDate: "2025-07-27",
+      reasoning: false,
+      toolCall: false,
+      vision: true,
+    },
+  },
+  "gemma3-4b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["gemma3:4b"],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 131072,
+      releaseDate: "2024-12-01",
+      reasoning: false,
+      toolCall: false,
+      vision: true,
+    },
+  },
+  "gpt-oss-20b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["gpt-oss:20b"],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 32768,
+      releaseDate: "2025-08-05",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "kimi-k2-1t": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["kimi-k2:1t"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 262144,
+      knowledgeCutoff: "2024-10",
+      releaseDate: "2025-07-11",
+      reasoning: false,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "ministral-3-14b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["ministral-3:14b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 128000,
+      releaseDate: "2024-12-01",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "ministral-3-3b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["ministral-3:3b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 128000,
+      releaseDate: "2024-10-22",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "ministral-3-8b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["ministral-3:8b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 128000,
+      releaseDate: "2024-12-01",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "mistral-large-3-675b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["mistral-large-3:675b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 262144,
+      releaseDate: "2025-12-02",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "nemotron-3-nano-30b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["nemotron-3-nano:30b"],
+    meta: {
+      contextLength: 1048576,
+      outputLimit: 131072,
+      releaseDate: "2025-12-15",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "qwen3-coder-480b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["qwen3-coder:480b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 65536,
+      releaseDate: "2025-07-22",
+      reasoning: false,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "qwen3-coder-next": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["qwen3-coder-next"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 65536,
+      releaseDate: "2026-02-02",
+      reasoning: false,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "qwen3-next-80b": {
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["qwen3-next:80b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 32768,
+      releaseDate: "2025-09-15",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "qwen3-vl-235b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["qwen3-vl:235b"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 32768,
+      releaseDate: "2025-09-22",
+      reasoning: true,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "qwen3-vl-235b-instruct": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["qwen3-vl:235b-instruct"],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 131072,
+      releaseDate: "2025-09-22",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "rnj-1-8b": {
+    providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["rnj-1:8b"],
+    meta: {
+      contextLength: 32768,
+      outputLimit: 4096,
+      releaseDate: "2025-12-06",
+      reasoning: false,
+      toolCall: true,
+      vision: false,
     },
   },
 
