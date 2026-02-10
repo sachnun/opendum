@@ -279,7 +279,7 @@ export function AnalyticsCharts({
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="p-0">
+            <PopoverContent align="end" className="w-auto p-0">
               <div className="space-y-2 p-3">
                 <p className="text-xs font-medium text-muted-foreground">Quick ranges</p>
                 <div className="grid grid-cols-1 gap-1">
