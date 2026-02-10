@@ -27,6 +27,8 @@ export interface ProviderAccountCounts {
   iflow: number;
   gemini_cli: number;
   qwen_code: number;
+  nvidia_nim: number;
+  ollama_cloud: number;
 }
 
 export const primaryNavigation: NavItem[] = [
@@ -49,6 +51,16 @@ export const primaryNavigation: NavItem[] = [
         anchorId: "gemini-cli-accounts",
       },
       { name: "Qwen Code", href: "/dashboard/accounts", anchorId: "qwen-code-accounts" },
+      {
+        name: "Nvidia",
+        href: "/dashboard/accounts",
+        anchorId: "nvidia-nim-accounts",
+      },
+      {
+        name: "Ollama Cloud",
+        href: "/dashboard/accounts",
+        anchorId: "ollama-cloud-accounts",
+      },
     ],
   },
   { name: "API Keys", href: "/dashboard/api-keys", icon: Key },

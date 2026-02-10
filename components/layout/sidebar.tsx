@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   type NavItem,
@@ -10,6 +11,7 @@ import {
   supportNavigation,
 } from "@/lib/navigation";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
+import { Input } from "@/components/ui/input";
 
 interface SidebarProps {
   accountCounts: ProviderAccountCounts;
@@ -17,7 +19,9 @@ interface SidebarProps {
 
 export function Sidebar({ accountCounts }: SidebarProps) {
   const pathname = usePathname();
+  const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
+  const normalizedAccountsSubmenuSearch = accountsSubmenuSearch.trim().toLowerCase();
 
   const renderNavItem = (item: NavItem) => {
     const isActive =
@@ -26,11 +30,19 @@ export function Sidebar({ accountCounts }: SidebarProps) {
     const isAccountsItem = item.href === "/dashboard/accounts";
     const accountCountByAnchorId: Record<string, number> = {
       "antigravity-accounts": accountCounts.antigravity,
+      "nvidia-nim-accounts": accountCounts.nvidia_nim,
+      "ollama-cloud-accounts": accountCounts.ollama_cloud,
       "codex-accounts": accountCounts.codex,
       "iflow-accounts": accountCounts.iflow,
       "gemini-cli-accounts": accountCounts.gemini_cli,
       "qwen-code-accounts": accountCounts.qwen_code,
     };
+    const visibleSubItems =
+      isAccountsItem && item.children
+        ? item.children.filter((subItem) =>
+            subItem.name.toLowerCase().includes(normalizedAccountsSubmenuSearch)
+          )
+        : (item.children ?? []);
 
     return (
       <div key={item.name} className="space-y-1">
@@ -54,43 +66,61 @@ export function Sidebar({ accountCounts }: SidebarProps) {
 
         {item.children?.length ? (
           <div className="ml-6 space-y-1 border-l border-border/60 pl-3">
-            {item.children.map((subItem) => {
-              const isSubActive = isSubItemActive(subItem);
-              const subItemCount =
-                isAccountsItem && subItem.anchorId
-                  ? accountCountByAnchorId[subItem.anchorId]
-                  : undefined;
-              const shouldShowSubItemCount =
-                typeof subItemCount === "number" && subItemCount > 0;
+            {isAccountsItem ? (
+              <div className="px-1 pb-1 pt-2">
+                <Input
+                  value={accountsSubmenuSearch}
+                  onChange={(event) => setAccountsSubmenuSearch(event.target.value)}
+                  placeholder="Search providers..."
+                  aria-label="Search provider accounts"
+                  className="h-7 border-0 bg-transparent px-2 text-xs shadow-none focus-visible:border-transparent focus-visible:ring-0"
+                />
+              </div>
+            ) : null}
 
-              return (
-                <Link
-                  key={`${item.name}-${subItem.name}`}
-                  href={subItem.href}
-                  onClick={(event) => handleSubItemClick(event, subItem)}
-                  className={cn(
-                    "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                    isSubActive
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  )}
-                >
-                  <span className="truncate">{subItem.name}</span>
-                  {shouldShowSubItemCount ? (
-                    <span
+            <div className={cn(isAccountsItem && "max-h-48 overflow-y-auto pr-1")}>
+              {visibleSubItems.length ? (
+                visibleSubItems.map((subItem) => {
+                  const isSubActive = isSubItemActive(subItem);
+                  const subItemCount =
+                    isAccountsItem && subItem.anchorId
+                      ? accountCountByAnchorId[subItem.anchorId]
+                      : undefined;
+                  const shouldShowSubItemCount =
+                    typeof subItemCount === "number" && subItemCount > 0;
+
+                  return (
+                    <Link
+                      key={`${item.name}-${subItem.name}`}
+                      href={subItem.href}
+                      onClick={(event) => handleSubItemClick(event, subItem)}
                       className={cn(
-                        "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                        "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                         isSubActive
-                          ? "bg-background text-foreground"
-                          : "bg-muted text-muted-foreground"
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       )}
                     >
-                      {subItemCount}
-                    </span>
-                  ) : null}
-                </Link>
-              );
-            })}
+                      <span className="truncate">{subItem.name}</span>
+                      {shouldShowSubItemCount ? (
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                            isSubActive
+                              ? "bg-background text-foreground"
+                              : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {subItemCount}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })
+              ) : isAccountsItem ? (
+                <p className="px-2.5 py-1 text-[11px] text-muted-foreground">No providers found.</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>
@@ -108,7 +138,7 @@ export function Sidebar({ accountCounts }: SidebarProps) {
           <span className="text-base font-semibold tracking-tight">Opendum</span>
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col px-3 py-4">
+      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-4">
         <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
         <div className="mt-auto space-y-1 border-t border-border/60 pt-4">
           {supportNavigation.map(renderNavItem)}

@@ -31,6 +31,8 @@ export default async function DashboardLayout({
     iflow: 0,
     gemini_cli: 0,
     qwen_code: 0,
+    nvidia_nim: 0,
+    ollama_cloud: 0,
   };
 
   for (const item of groupedAccountCounts) {
@@ -49,6 +51,12 @@ export default async function DashboardLayout({
         break;
       case "qwen_code":
         accountCounts.qwen_code = item._count._all;
+        break;
+      case "nvidia_nim":
+        accountCounts.nvidia_nim = item._count._all;
+        break;
+      case "ollama_cloud":
+        accountCounts.ollama_cloud = item._count._all;
         break;
       default:
         break;

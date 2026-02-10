@@ -93,7 +93,12 @@ export function ModelCard({
       <CardHeader className="px-4 pb-2 sm:px-5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-sm font-mono truncate" title={id}>{id}</CardTitle>
+            <CardTitle
+              className="overflow-hidden text-sm font-mono leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+              title={id}
+            >
+              {id}
+            </CardTitle>
             <div className="flex flex-wrap gap-1 mt-1.5">
               {providers.map((provider) => (
                 <Badge key={provider} variant="secondary" className="text-xs">
@@ -123,109 +128,112 @@ export function ModelCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col px-4 sm:px-5">
-        {meta && (
-          <div className="space-y-2 text-xs text-muted-foreground mb-3">
-            {(meta.contextLength || meta.outputLimit) && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {meta.contextLength && (
-                  <span>{formatTokens(meta.contextLength)} in</span>
-                )}
-                {meta.contextLength && meta.outputLimit && <span>·</span>}
-                {meta.outputLimit && (
-                  <span>{formatTokens(meta.outputLimit)} out</span>
-                )}
-                {meta.knowledgeCutoff && (
-                  <>
-                    <span>·</span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {formatDate(meta.knowledgeCutoff)}
-                    </span>
-                  </>
-                )}
+        <div className="mt-auto">
+          {meta && (
+            <div className="mb-3 space-y-2 text-xs text-muted-foreground">
+              {(meta.contextLength || meta.outputLimit) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {meta.contextLength && (
+                    <span>{formatTokens(meta.contextLength)} in</span>
+                  )}
+                  {meta.contextLength && meta.outputLimit && <span>·</span>}
+                  {meta.outputLimit && (
+                    <span>{formatTokens(meta.outputLimit)} out</span>
+                  )}
+                  {meta.knowledgeCutoff && (
+                    <>
+                      <span>·</span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(meta.knowledgeCutoff)}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {(meta.reasoning || meta.toolCall || meta.vision) && (
+                <div className="flex flex-wrap gap-1">
+                  {meta.reasoning && (
+                    <Badge variant="outline" className="text-xs py-0 h-5">
+                      <Brain className="h-3 w-3 mr-1" />
+                      Reasoning
+                    </Badge>
+                  )}
+                  {meta.toolCall && (
+                    <Badge variant="outline" className="text-xs py-0 h-5">
+                      <Wrench className="h-3 w-3 mr-1" />
+                      Tools
+                    </Badge>
+                  )}
+                  {meta.vision && (
+                    <Badge variant="outline" className="text-xs py-0 h-5">
+                      <Eye className="h-3 w-3 mr-1" />
+                      Vision
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
+            <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <BarChart3 className="h-3 w-3" />
+                Last 30 days
+              </span>
+              <span>{maxDailyRequests.toLocaleString()} peak/day</span>
+            </div>
+
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+                <p className="text-[10px] text-muted-foreground">Requests</p>
+                <p className="text-sm font-semibold text-foreground">{stats.totalRequests.toLocaleString()}</p>
               </div>
-            )}
-
-            {(meta.reasoning || meta.toolCall || meta.vision) && (
-              <div className="flex flex-wrap gap-1">
-                {meta.reasoning && (
-                  <Badge variant="outline" className="text-xs py-0 h-5">
-                    <Brain className="h-3 w-3 mr-1" />
-                    Reasoning
-                  </Badge>
-                )}
-                {meta.toolCall && (
-                  <Badge variant="outline" className="text-xs py-0 h-5">
-                    <Wrench className="h-3 w-3 mr-1" />
-                    Tools
-                  </Badge>
-                )}
-                {meta.vision && (
-                  <Badge variant="outline" className="text-xs py-0 h-5">
-                    <Eye className="h-3 w-3 mr-1" />
-                    Vision
-                  </Badge>
-                )}
+              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+                <p className="text-[10px] text-muted-foreground">Success</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {stats.successRate === null ? "-" : `${stats.successRate}%`}
+                </p>
               </div>
-            )}
-          </div>
-        )}
+            </div>
 
-        <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
-          <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <BarChart3 className="h-3 w-3" />
-              Last 30 days
-            </span>
-            <span>{maxDailyRequests.toLocaleString()} peak/day</span>
-          </div>
-
-          <div className="mb-2 grid grid-cols-2 gap-2">
             <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-              <p className="text-[10px] text-muted-foreground">Requests</p>
-              <p className="text-sm font-semibold text-foreground">{stats.totalRequests.toLocaleString()}</p>
+              <div className="mb-1 flex items-center justify-between text-[10px]">
+                <p className="text-muted-foreground">Avg Duration (1d)</p>
+                <p className="font-semibold text-foreground">{formatDuration(stats.avgDurationLastDay)}</p>
+              </div>
+              <UsageSparkline
+                values={durationValues}
+                color="var(--chart-2)"
+                ariaLabel={`Average duration trend for ${id} over last 24 hours`}
+                emptyLabel="No duration data"
+                className="h-6"
+                height={24}
+              />
+              <div className="mt-1 grid grid-cols-3 text-[9px] text-muted-foreground">
+                {durationLabelPoints.map((point) => (
+                  <span key={point.time} className="text-center">
+                    {formatHourLabel(point.time)}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-              <p className="text-[10px] text-muted-foreground">Success</p>
-              <p className="text-sm font-semibold text-foreground">
-                {stats.successRate === null ? "-" : `${stats.successRate}%`}
-              </p>
-            </div>
-          </div>
 
-          <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-            <div className="mb-1 flex items-center justify-between text-[10px]">
-              <p className="text-muted-foreground">Avg Duration (1d)</p>
-              <p className="font-semibold text-foreground">{formatDuration(stats.avgDurationLastDay)}</p>
-            </div>
             <UsageSparkline
-              values={durationValues}
-              color="var(--chart-2)"
-              ariaLabel={`Average duration trend for ${id} over last 24 hours`}
-              emptyLabel="No duration data"
-              className="h-6"
-              height={24}
+              values={dailyValues}
+              color="var(--chart-1)"
+              ariaLabel={`Requests trend for ${id}`}
+              className="pt-2"
             />
-            <div className="mt-1 grid grid-cols-3 text-[9px] text-muted-foreground">
-              {durationLabelPoints.map((point) => (
-                <span key={point.time} className="text-center">
-                  {formatHourLabel(point.time)}
-                </span>
-              ))}
-            </div>
           </div>
-
-          <UsageSparkline
-            values={dailyValues}
-            color="var(--chart-1)"
-            ariaLabel={`Requests trend for ${id}`}
-          />
         </div>
 
         <Button
           variant="outline"
           size="sm"
-          className="mt-auto w-full"
+          className="w-full"
           onClick={handleCopy}
         >
           {copied ? (

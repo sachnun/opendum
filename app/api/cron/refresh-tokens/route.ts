@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { getProvider, isValidProvider } from "@/lib/proxy/providers/registry";
-import type { ProviderNameType } from "@/lib/proxy/providers/types";
+import { OAUTH_PROVIDER_NAMES, type ProviderNameType } from "@/lib/proxy/providers/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +33,10 @@ export async function GET() {
   try {
     // Get all active provider accounts
     const accounts = await prisma.providerAccount.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        provider: { in: OAUTH_PROVIDER_NAMES },
+      },
       select: {
         id: true,
         provider: true,

@@ -118,6 +118,8 @@ export default async function AccountsPage({
   const qwenCodeAccounts = accountsWithStats.filter((a) => a.provider === "qwen_code");
   const geminiCliAccounts = accountsWithStats.filter((a) => a.provider === "gemini_cli");
   const codexAccounts = accountsWithStats.filter((a) => a.provider === "codex");
+  const nvidiaNimAccounts = accountsWithStats.filter((a) => a.provider === "nvidia_nim");
+  const ollamaCloudAccounts = accountsWithStats.filter((a) => a.provider === "ollama_cloud");
 
   return (
     <div className="space-y-6">
@@ -172,6 +174,8 @@ export default async function AccountsPage({
         geminiCliAccounts={geminiCliAccounts}
         qwenCodeAccounts={qwenCodeAccounts}
         codexAccounts={codexAccounts}
+        nvidiaNimAccounts={nvidiaNimAccounts}
+        ollamaCloudAccounts={ollamaCloudAccounts}
       />
     </div>
   );

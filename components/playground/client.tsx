@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus } from "lucide-react";
+import { Play, Plus, Square } from "lucide-react";
 
 import {
   ChatPanel,
@@ -16,6 +16,7 @@ import {
   type PlaygroundSettings,
 } from "./settings-sheet";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface PlaygroundClientProps {
   models: ModelOption[];
@@ -382,6 +383,7 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
   const [settings, setSettings] = React.useState<PlaygroundSettings>(DEFAULT_SETTINGS);
   const [responses, setResponses] = React.useState<Record<string, ResponseData>>({});
   const [isAnyLoading, setIsAnyLoading] = React.useState(false);
+  const controllersRef = React.useRef(new Map<string, AbortController>());
   const maxPanels = Math.max(models.length, 1);
 
   const providerAccountsById = React.useMemo(
@@ -467,11 +469,21 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
   const canAddPanel = panels.length < maxPanels;
   const hasSelectedModel = panels.some((panel) => panel.modelId);
 
-  const handleScenarioSelect = async (scenario: Scenario) => {
+  const handleScenarioSelect = (scenario: Scenario) => {
     setSelectedScenario(scenario);
 
-    let currentSettings = settings;
     if (scenario.isReasoning && settings.reasoningEffort === "none") {
+      setSettings((prev) => ({ ...prev, reasoningEffort: "medium" }));
+    }
+  };
+
+  const runSelectedScenario = async () => {
+    if (!selectedScenario) {
+      return;
+    }
+
+    let currentSettings = settings;
+    if (selectedScenario.isReasoning && settings.reasoningEffort === "none") {
       currentSettings = { ...settings, reasoningEffort: "medium" };
       setSettings(currentSettings);
     }
@@ -498,7 +510,7 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
       fetchFromModel(
         panel.id,
         panel.modelId!,
-        scenario,
+        selectedScenario,
         currentSettings,
         getValidAccountIdForPanel(panel)
       )
@@ -507,6 +519,22 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
     await Promise.all(promises);
     setIsAnyLoading(false);
   };
+
+  const stopAllRequests = React.useCallback(() => {
+    controllersRef.current.forEach((controller) => controller.abort());
+    controllersRef.current.clear();
+    setIsAnyLoading(false);
+
+    setResponses((prev) => {
+      const next: Record<string, ResponseData> = {};
+
+      for (const [panelId, response] of Object.entries(prev)) {
+        next[panelId] = response.isLoading ? { ...response, isLoading: false } : response;
+      }
+
+      return next;
+    });
+  }, []);
 
   const fetchFromModel = async (
     panelId: string,
@@ -560,9 +588,13 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
       const streamValue = requestBody.stream;
       const shouldStream = typeof streamValue === "boolean" ? streamValue : true;
 
+      const controller = new AbortController();
+      controllersRef.current.set(panelId, controller);
+
       const response = await fetch("/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify(requestBody),
       });
 
@@ -648,6 +680,25 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
         },
       }));
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setResponses((prev) => {
+          const existing = prev[panelId];
+          if (!existing) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            [panelId]: {
+              ...existing,
+              isLoading: false,
+              error: undefined,
+            },
+          };
+        });
+        return;
+      }
+
       setResponses((prev) => ({
         ...prev,
         [panelId]: {
@@ -658,6 +709,8 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
           metrics: buildResponseMetrics(waitMs, null, null),
         },
       }));
+    } finally {
+      controllersRef.current.delete(panelId);
     }
   };
 
@@ -666,11 +719,35 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
       <div className="pb-4 border-b border-border">
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold">Playground</h1>
-          <SettingsSheet
-            settings={settings}
-            onSettingsChange={setSettings}
-            disabled={isAnyLoading}
-          />
+          <div className="flex items-center gap-2">
+            {isAnyLoading ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={stopAllRequests}
+              >
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={runSelectedScenario}
+                disabled={!selectedScenario || !hasSelectedModel}
+              >
+                <Play className="h-4 w-4" />
+                Start
+              </Button>
+            )}
+            <SettingsSheet
+              settings={settings}
+              onSettingsChange={setSettings}
+              disabled={isAnyLoading}
+            />
+          </div>
         </div>
       </div>
 

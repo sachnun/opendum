@@ -119,6 +119,9 @@ function formatProviderName(provider: string): string {
     antigravity: "Antigravity",
     qwen_code: "Qwen Code",
     gemini_cli: "Gemini CLI",
+    codex: "Codex",
+    nvidia_nim: "Nvidia",
+    ollama_cloud: "Ollama Cloud",
   };
   return names[provider] || provider;
 }
