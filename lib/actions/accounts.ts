@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { encrypt, decrypt, hashString } from "@/lib/encryption";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { iflowProvider } from "@/lib/proxy/providers/iflow";
@@ -39,6 +39,14 @@ import {
   CODEX_OAUTH_SCOPE,
   CODEX_ORIGINATOR,
 } from "@/lib/proxy/providers/codex";
+import {
+  NVIDIA_NIM_API_BASE_URL,
+  NVIDIA_NIM_MODEL_MAP,
+} from "@/lib/proxy/providers/nvidia-nim/constants";
+import {
+  OLLAMA_CLOUD_API_BASE_URL,
+  OLLAMA_CLOUD_MODEL_MAP,
+} from "@/lib/proxy/providers/ollama-cloud/constants";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
@@ -54,6 +62,168 @@ interface CodexOAuthContext {
 function generateCodexState(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Buffer.from(bytes).toString("base64url");
+}
+
+const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
+const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
+
+const API_KEY_PROVIDER_SETTINGS = {
+  nvidia_nim: {
+    label: "Nvidia",
+    baseUrl: NVIDIA_NIM_API_BASE_URL,
+    modelMap: NVIDIA_NIM_MODEL_MAP,
+  },
+  ollama_cloud: {
+    label: "Ollama Cloud",
+    baseUrl: OLLAMA_CLOUD_API_BASE_URL,
+    modelMap: OLLAMA_CLOUD_MODEL_MAP,
+  },
+} as const;
+
+type ApiKeyProvider = keyof typeof API_KEY_PROVIDER_SETTINGS;
+
+async function validateProviderApiKey(
+  provider: ApiKeyProvider,
+  apiKey: string
+): Promise<ActionResult<void>> {
+  const { label, baseUrl, modelMap } = API_KEY_PROVIDER_SETTINGS[provider];
+  const validationModel = Object.values(modelMap)[0];
+
+  if (!validationModel) {
+    return {
+      success: false,
+      error: `${label} API key validation model is not configured.`,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+      cache: "no-store",
+      body: JSON.stringify({
+        model: validationModel,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+        stream: false,
+      }),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      return {
+        success: false,
+        error: `${label} API key is invalid.`,
+      };
+    }
+
+    // Any non-auth response means the key is accepted by provider auth layer.
+    return { success: true, data: undefined };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        success: false,
+        error: `${label} API key validation timed out. Please try again.`,
+      };
+    }
+
+    return {
+      success: false,
+      error: `Unable to validate ${label} API key. Please check your network and try again.`,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function connectApiKeyProviderAccount(
+  userId: string,
+  provider: ApiKeyProvider,
+  providerLabel: string,
+  apiKey: string,
+  accountName?: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const normalizedApiKey = apiKey.trim();
+  if (!normalizedApiKey) {
+    return { success: false, error: "API key is required" };
+  }
+
+  const validationResult = await validateProviderApiKey(provider, normalizedApiKey);
+  if (!validationResult.success) {
+    return validationResult;
+  }
+
+  const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
+  const normalizedAccountName = accountName?.trim();
+
+  const existingAccount = await prisma.providerAccount.findFirst({
+    where: {
+      userId,
+      provider,
+      email: identifier,
+    },
+  });
+
+  if (existingAccount) {
+    await prisma.providerAccount.update({
+      where: { id: existingAccount.id },
+      data: {
+        accessToken: encrypt(normalizedApiKey),
+        refreshToken: encrypt(normalizedApiKey),
+        expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+        ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
+        isActive: true,
+      },
+    });
+
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/accounts");
+    revalidatePath("/dashboard/playground");
+
+    return {
+      success: true,
+      data: {
+        email: identifier,
+        isUpdate: true,
+      },
+    };
+  }
+
+  const accountCount = await prisma.providerAccount.count({
+    where: { userId, provider },
+  });
+
+  await prisma.providerAccount.create({
+    data: {
+      userId,
+      provider,
+      name: normalizedAccountName || `${providerLabel} ${accountCount + 1}`,
+      accessToken: encrypt(normalizedApiKey),
+      refreshToken: encrypt(normalizedApiKey),
+      expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+      email: identifier,
+      isActive: true,
+    },
+  });
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/accounts");
+  revalidatePath("/dashboard/playground");
+
+  return {
+    success: true,
+    data: {
+      email: identifier,
+      isUpdate: false,
+    },
+  };
 }
 
 /**
@@ -124,6 +294,60 @@ export async function updateProviderAccount(
   } catch (error) {
     console.error("Failed to update account:", error);
     return { success: false, error: "Failed to update account" };
+  }
+}
+
+/**
+ * Connect Nvidia account using API key
+ */
+export async function connectNvidiaNimApiKey(
+  apiKey: string,
+  accountName?: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    return await connectApiKeyProviderAccount(
+      session.user.id,
+      "nvidia_nim",
+      "Nvidia",
+      apiKey,
+      accountName
+    );
+  } catch (error) {
+    console.error("Failed to connect Nvidia account:", error);
+    return { success: false, error: "Failed to connect Nvidia account" };
+  }
+}
+
+/**
+ * Connect Ollama Cloud account using API key
+ */
+export async function connectOllamaCloudApiKey(
+  apiKey: string,
+  accountName?: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    return await connectApiKeyProviderAccount(
+      session.user.id,
+      "ollama_cloud",
+      "Ollama Cloud",
+      apiKey,
+      accountName
+    );
+  } catch (error) {
+    console.error("Failed to connect Ollama Cloud account:", error);
+    return { success: false, error: "Failed to connect Ollama Cloud account" };
   }
 }
 
