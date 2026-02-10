@@ -346,9 +346,9 @@ export function AnalyticsCharts({
       </div>
 
       {data && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {statCards.map((item) => (
-            <Card key={item.title} className="border-border bg-card py-4">
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          {statCards.map((item, index) => (
+            <Card key={item.title} className={`border-border bg-card py-4 ${index < 2 ? "col-span-2 sm:col-span-1" : ""}`}>
               <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 pb-2 sm:px-5">
                 <CardTitle className="text-sm text-muted-foreground">
                   {item.title}
