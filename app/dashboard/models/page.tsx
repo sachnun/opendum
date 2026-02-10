@@ -9,11 +9,14 @@ import { ProviderName } from "@/lib/proxy/providers/types";
 import { ModelsList } from "@/components/dashboard/models/models-list";
 
 const MODEL_STATS_DAYS = 30;
+const MODEL_DURATION_LOOKBACK_HOURS = 24;
 
 interface ModelStats {
   totalRequests: number;
   successRate: number | null;
   dailyRequests: Array<{ date: string; count: number }>;
+  avgDurationLastDay: number | null;
+  durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
 }
 
 function buildDayKeys(days: number): string[] {
@@ -24,6 +27,19 @@ function buildDayKeys(days: number): string[] {
     const date = new Date(todayUtc);
     date.setUTCDate(todayUtc.getUTCDate() - (days - 1 - index));
     return date.toISOString().split("T")[0];
+  });
+}
+
+function buildHourKeys(hours: number): string[] {
+  const now = new Date();
+  const currentHourUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours())
+  );
+
+  return Array.from({ length: hours }, (_, index) => {
+    const date = new Date(currentHourUtc);
+    date.setUTCHours(currentHourUtc.getUTCHours() - (hours - 1 - index));
+    return date.toISOString();
   });
 }
 
@@ -70,6 +86,9 @@ export default async function ModelsPage() {
 
   const dayKeys = buildDayKeys(MODEL_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
+  const hourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
+  const hourKeySet = new Set(hourKeys);
+  const durationStartDate = new Date(hourKeys[0]);
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
 
   const usageLogs = await prisma.usageLog.findMany({
@@ -80,17 +99,19 @@ export default async function ModelsPage() {
     select: {
       model: true,
       statusCode: true,
+      duration: true,
       createdAt: true,
     },
   });
 
   const statsByModel = new Map<
     string,
-    {
-      totalRequests: number;
-      successfulRequests: number;
-      dailyCounts: Map<string, number>;
-    }
+      {
+        totalRequests: number;
+        successfulRequests: number;
+        dailyCounts: Map<string, number>;
+        durationByHour: Map<string, { total: number; count: number }>;
+      }
   >();
 
   for (const log of usageLogs) {
@@ -110,12 +131,26 @@ export default async function ModelsPage() {
         totalRequests: 0,
         successfulRequests: 0,
         dailyCounts: new Map<string, number>(),
+        durationByHour: new Map<string, { total: number; count: number }>(),
       };
 
     current.totalRequests += 1;
 
     if (log.statusCode !== null && log.statusCode >= 200 && log.statusCode < 400) {
       current.successfulRequests += 1;
+    }
+
+    if (log.duration !== null && log.createdAt >= durationStartDate) {
+      const hourDate = new Date(log.createdAt);
+      hourDate.setUTCMinutes(0, 0, 0);
+      const hourKey = hourDate.toISOString();
+
+      if (hourKeySet.has(hourKey)) {
+        const durationBucket = current.durationByHour.get(hourKey) ?? { total: 0, count: 0 };
+        durationBucket.total += log.duration;
+        durationBucket.count += 1;
+        current.durationByHour.set(hourKey, durationBucket);
+      }
     }
 
     current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + 1);
@@ -153,6 +188,31 @@ export default async function ModelsPage() {
     const modelStats = statsByModel.get(model);
     const totalRequests = modelStats?.totalRequests ?? 0;
     const successfulRequests = modelStats?.successfulRequests ?? 0;
+    const durationLast24Hours = hourKeys.map((time) => {
+      const durationBucket = modelStats?.durationByHour.get(time);
+
+      return {
+        time,
+        avgDuration:
+          durationBucket && durationBucket.count > 0
+            ? Math.round(durationBucket.total / durationBucket.count)
+            : null,
+      };
+    });
+    const durationTotalLastDay =
+      modelStats
+        ? Array.from(modelStats.durationByHour.values()).reduce(
+            (sum, durationBucket) => sum + durationBucket.total,
+            0
+          )
+        : 0;
+    const durationCountLastDay =
+      modelStats
+        ? Array.from(modelStats.durationByHour.values()).reduce(
+            (sum, durationBucket) => sum + durationBucket.count,
+            0
+          )
+        : 0;
     const stats: ModelStats = {
       totalRequests,
       successRate:
@@ -163,6 +223,11 @@ export default async function ModelsPage() {
         date: day,
         count: modelStats?.dailyCounts.get(day) ?? 0,
       })),
+      avgDurationLastDay:
+        durationCountLastDay > 0
+          ? Math.round(durationTotalLastDay / durationCountLastDay)
+          : null,
+      durationLast24Hours,
     };
 
     return {

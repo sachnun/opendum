@@ -13,6 +13,8 @@ interface ModelStats {
   totalRequests: number;
   successRate: number | null;
   dailyRequests: Array<{ date: string; count: number }>;
+  avgDurationLastDay: number | null;
+  durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
 }
 
 interface ModelCardProps {
@@ -44,6 +46,23 @@ function formatDate(dateStr: string): string {
   return `${month} ${year}`;
 }
 
+function formatDuration(duration: number | null): string {
+  if (duration === null) {
+    return "-";
+  }
+
+  if (duration >= 1000) {
+    return `${(duration / 1000).toFixed(2)}s`;
+  }
+
+  return `${duration}ms`;
+}
+
+function formatHourLabel(time: string): string {
+  const date = new Date(time);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export function ModelCard({
   id,
   providers,
@@ -55,6 +74,12 @@ export function ModelCard({
 }: ModelCardProps) {
   const [copied, setCopied] = useState(false);
   const dailyValues = stats.dailyRequests.map((point) => point.count);
+  const durationValues = stats.durationLast24Hours.map((point) => point.avgDuration ?? 0);
+  const durationLabelPoints = [
+    stats.durationLast24Hours[0],
+    stats.durationLast24Hours[Math.floor(stats.durationLast24Hours.length / 2)],
+    stats.durationLast24Hours[stats.durationLast24Hours.length - 1],
+  ].filter((point): point is { time: string; avgDuration: number | null } => Boolean(point));
   const maxDailyRequests = Math.max(...dailyValues, 0);
 
   const handleCopy = async () => {
@@ -165,6 +190,28 @@ export function ModelCard({
               <p className="text-sm font-semibold text-foreground">
                 {stats.successRate === null ? "-" : `${stats.successRate}%`}
               </p>
+            </div>
+          </div>
+
+          <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+            <div className="mb-1 flex items-center justify-between text-[10px]">
+              <p className="text-muted-foreground">Avg Duration (1d)</p>
+              <p className="font-semibold text-foreground">{formatDuration(stats.avgDurationLastDay)}</p>
+            </div>
+            <UsageSparkline
+              values={durationValues}
+              color="var(--chart-2)"
+              ariaLabel={`Average duration trend for ${id} over last 24 hours`}
+              emptyLabel="No duration data"
+              className="h-6"
+              height={24}
+            />
+            <div className="mt-1 grid grid-cols-3 text-[9px] text-muted-foreground">
+              {durationLabelPoints.map((point) => (
+                <span key={point.time} className="text-center">
+                  {formatHourLabel(point.time)}
+                </span>
+              ))}
             </div>
           </div>
 

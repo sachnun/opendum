@@ -20,6 +20,8 @@ interface ModelWithStats {
     totalRequests: number;
     successRate: number | null;
     dailyRequests: Array<{ date: string; count: number }>;
+    avgDurationLastDay: number | null;
+    durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
   };
 }
 
