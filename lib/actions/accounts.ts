@@ -904,9 +904,22 @@ export async function exchangeCodexOAuthCode(
     cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
 
     const chatgptAccountId = oauthResult.accountId || null;
+    const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
+    const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
 
     let existingAccount = null;
-    if (chatgptAccountId) {
+
+    if (workspaceEmail) {
+      existingAccount = await prisma.providerAccount.findFirst({
+        where: {
+          userId: session.user.id,
+          provider: "codex",
+          email: workspaceEmail,
+        },
+      });
+    }
+
+    if (!existingAccount && chatgptAccountId && (!workspaceAccountId || workspaceAccountId === chatgptAccountId)) {
       existingAccount = await prisma.providerAccount.findFirst({
         where: {
           userId: session.user.id,
@@ -923,7 +936,7 @@ export async function exchangeCodexOAuthCode(
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           expiresAt: oauthResult.expiresAt,
-          accountId: chatgptAccountId,
+          ...(chatgptAccountId && { accountId: chatgptAccountId }),
           isActive: true,
         },
       });
@@ -943,9 +956,7 @@ export async function exchangeCodexOAuthCode(
       where: { userId: session.user.id, provider: "codex" },
     });
 
-    const email = chatgptAccountId
-      ? `codex-${chatgptAccountId}`
-      : `codex-${Date.now()}`;
+    const email = workspaceEmail || `codex-${Date.now()}`;
 
     await prisma.providerAccount.create({
       data: {
@@ -1076,14 +1087,25 @@ export async function pollCodexAuth(
     // Success - we have tokens, now save them
     const oauthResult = result;
     const chatgptAccountId = oauthResult.accountId || null;
+    const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
+    const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
 
     // Clean up the PKCE cookie
     cookieStore.delete(`codex_cv_${deviceAuthId}`);
 
-    // Try to find existing account by accountId (stable identifier from JWT)
-    // Falls back to provider-level match if no accountId available
     let existingAccount = null;
-    if (chatgptAccountId) {
+
+    if (workspaceEmail) {
+      existingAccount = await prisma.providerAccount.findFirst({
+        where: {
+          userId: session.user.id,
+          provider: "codex",
+          email: workspaceEmail,
+        },
+      });
+    }
+
+    if (!existingAccount && chatgptAccountId && (!workspaceAccountId || workspaceAccountId === chatgptAccountId)) {
       existingAccount = await prisma.providerAccount.findFirst({
         where: {
           userId: session.user.id,
@@ -1101,7 +1123,7 @@ export async function pollCodexAuth(
           accessToken: encrypt(oauthResult.accessToken),
           refreshToken: encrypt(oauthResult.refreshToken),
           expiresAt: oauthResult.expiresAt,
-          accountId: chatgptAccountId,
+          ...(chatgptAccountId && { accountId: chatgptAccountId }),
           isActive: true,
         },
       });
@@ -1122,9 +1144,7 @@ export async function pollCodexAuth(
         where: { userId: session.user.id, provider: "codex" },
       });
 
-      const email = chatgptAccountId
-        ? `codex-${chatgptAccountId}`
-        : `codex-${Date.now()}`;
+      const email = workspaceEmail || `codex-${Date.now()}`;
 
       await prisma.providerAccount.create({
         data: {

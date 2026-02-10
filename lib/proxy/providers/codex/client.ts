@@ -143,37 +143,140 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 // ============================================================
 
 /**
- * Extract ChatGPT account ID from JWT token claims
- * Tries multiple claim paths as OpenAI uses different ones
+ * Normalize JWT value into a non-empty string.
  */
-function extractAccountIdFromJwt(token: string): string | null {
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function extractOrganizationId(claims: Record<string, unknown> | null): string | null {
+  if (!claims) {
+    return null;
+  }
+
+  const organizations = claims.organizations;
+  if (!Array.isArray(organizations)) {
+    return null;
+  }
+
+  const normalizedOrganizations = organizations
+    .map((item) => asRecord(item))
+    .filter((item): item is Record<string, unknown> => item !== null);
+
+  const defaultOrganization = normalizedOrganizations.find(
+    (organization) =>
+      organization.is_default === true || organization.default === true
+  );
+
+  if (defaultOrganization) {
+    const defaultOrganizationId = toNonEmptyString(defaultOrganization.id);
+    if (defaultOrganizationId) {
+      return defaultOrganizationId;
+    }
+  }
+
+  for (const organization of normalizedOrganizations) {
+    const organizationId = toNonEmptyString(organization.id);
+    if (organizationId) {
+      return organizationId;
+    }
+  }
+
+  return null;
+}
+
+function parseJwtClaims(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
     if (parts.length < 2) return null;
 
-    // Base64url decode the payload
     const payload = parts[1]
       .replace(/-/g, "+")
       .replace(/_/g, "/");
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
-    const decoded = JSON.parse(atob(padded));
 
-    // Try different claim paths (OpenAI uses various ones)
-    if (decoded.chatgpt_account_id) {
-      return decoded.chatgpt_account_id;
-    }
-    if (decoded["https://api.openai.com/auth"]?.chatgpt_account_id) {
-      return decoded["https://api.openai.com/auth"].chatgpt_account_id;
-    }
-    if (decoded.organizations?.[0]?.id) {
-      return decoded.organizations[0].id;
-    }
-
-    return null;
+    return asRecord(JSON.parse(atob(padded)));
   } catch {
-    console.error("Failed to parse JWT for account ID");
     return null;
   }
+}
+
+function extractWorkspaceIdFromClaims(decoded: Record<string, unknown>): string | null {
+  const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
+
+  const workspaceCandidates = [
+    toNonEmptyString(authClaims?.chatgpt_workspace_id),
+    toNonEmptyString(authClaims?.workspace_id),
+    toNonEmptyString(authClaims?.organization_id),
+    extractOrganizationId(authClaims),
+    toNonEmptyString(decoded.chatgpt_workspace_id),
+    toNonEmptyString(decoded.workspace_id),
+    toNonEmptyString(decoded.organization_id),
+    extractOrganizationId(decoded),
+  ];
+
+  for (const candidate of workspaceCandidates) {
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function extractAccountIdFromClaims(decoded: Record<string, unknown>): string | null {
+  const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
+
+  const accountCandidates = [
+    toNonEmptyString(authClaims?.chatgpt_account_id),
+    toNonEmptyString(decoded.chatgpt_account_id),
+  ];
+
+  for (const candidate of accountCandidates) {
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return extractWorkspaceIdFromClaims(decoded);
+}
+
+/**
+ * Extract ChatGPT account ID from JWT token claims.
+ * Falls back to workspace/org identifiers only when account ID is absent.
+ */
+function extractAccountIdFromJwt(token: string): string | null {
+  const decoded = parseJwtClaims(token);
+  if (!decoded) {
+    return null;
+  }
+
+  return extractAccountIdFromClaims(decoded);
+}
+
+/**
+ * Extract ChatGPT workspace/org identifier from JWT token claims.
+ */
+function extractWorkspaceIdFromJwt(token: string): string | null {
+  const decoded = parseJwtClaims(token);
+  if (!decoded) {
+    return null;
+  }
+
+  return extractWorkspaceIdFromClaims(decoded);
 }
 
 // ============================================================
@@ -1101,8 +1204,12 @@ export const codexProvider: Provider = {
 
     // Extract account ID from JWT
     const accountId =
-      extractAccountIdFromJwt(tokens.access_token) ||
-      (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null);
+      (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null) ||
+      extractAccountIdFromJwt(tokens.access_token);
+    const workspaceId =
+      (tokens.id_token ? extractWorkspaceIdFromJwt(tokens.id_token) : null) ||
+      extractWorkspaceIdFromJwt(tokens.access_token) ||
+      accountId;
 
     return {
       accessToken: tokens.access_token,
@@ -1110,6 +1217,7 @@ export const codexProvider: Provider = {
       expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
       email: "", // Codex doesn't provide email
       accountId: accountId || undefined,
+      workspaceId: workspaceId || undefined,
     };
   },
 
@@ -1140,8 +1248,12 @@ export const codexProvider: Provider = {
     const tokens: CodexTokenResponse = await response.json();
 
     const accountId =
-      extractAccountIdFromJwt(tokens.access_token) ||
-      (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null);
+      (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null) ||
+      extractAccountIdFromJwt(tokens.access_token);
+    const workspaceId =
+      (tokens.id_token ? extractWorkspaceIdFromJwt(tokens.id_token) : null) ||
+      extractWorkspaceIdFromJwt(tokens.access_token) ||
+      accountId;
 
     return {
       accessToken: tokens.access_token,
@@ -1149,6 +1261,7 @@ export const codexProvider: Provider = {
       expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
       email: "",
       accountId: accountId || undefined,
+      workspaceId: workspaceId || undefined,
     };
   },
 
@@ -1158,6 +1271,19 @@ export const codexProvider: Provider = {
   async getValidCredentials(account: ProviderAccount): Promise<string> {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
+
+    const resolvedAccountId = extractAccountIdFromJwt(accessToken);
+    if (resolvedAccountId && resolvedAccountId !== account.accountId) {
+      try {
+        await prisma.providerAccount.update({
+          where: { id: account.id },
+          data: { accountId: resolvedAccountId },
+        });
+        account.accountId = resolvedAccountId;
+      } catch {
+        // Ignore account ID sync failures
+      }
+    }
 
     if (isTokenExpired(account.expiresAt)) {
       console.log(`Refreshing token for Codex account ${account.id}`);
@@ -1175,6 +1301,7 @@ export const codexProvider: Provider = {
         // Update accountId if we got a new one
         if (newTokens.accountId) {
           updateData.accountId = newTokens.accountId;
+          account.accountId = newTokens.accountId;
         }
 
         await prisma.providerAccount.update({
@@ -1461,8 +1588,12 @@ export async function pollCodexDeviceCodeAuthorization(
 
     // Extract account ID from JWT
     const accountId =
-      extractAccountIdFromJwt(tokens.access_token) ||
-      (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null);
+      (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null) ||
+      extractAccountIdFromJwt(tokens.access_token);
+    const workspaceId =
+      (tokens.id_token ? extractWorkspaceIdFromJwt(tokens.id_token) : null) ||
+      extractWorkspaceIdFromJwt(tokens.access_token) ||
+      accountId;
 
     return {
       accessToken: tokens.access_token,
@@ -1470,6 +1601,7 @@ export async function pollCodexDeviceCodeAuthorization(
       expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
       email: "",
       accountId: accountId || undefined,
+      workspaceId: workspaceId || undefined,
     };
   }
 

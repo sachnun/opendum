@@ -24,6 +24,7 @@ export interface OAuthResult {
   projectId?: string;  // Antigravity only
   tier?: string;       // Antigravity only: "free" | "paid"
   accountId?: string;  // Codex only: ChatGPT account ID from JWT
+  workspaceId?: string; // Codex only: workspace/org identifier when available
 }
 
 /**
