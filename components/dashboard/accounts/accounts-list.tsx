@@ -300,7 +300,7 @@ function AccountCard({
     : "text-red-500";
 
   return (
-    <Card className={`bg-card ${!account.isActive ? "opacity-65" : ""}`}>
+    <Card className={`bg-card h-full flex flex-col ${!account.isActive ? "opacity-65" : ""}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{title}</CardTitle>
@@ -320,8 +320,8 @@ function AccountCard({
         </div>
         {subtitle && <CardDescription>{subtitle}</CardDescription>}
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2 text-sm">
+      <CardContent className="flex flex-1 flex-col">
+        <div className="space-y-2 text-sm flex-1">
           <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
             <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1">
@@ -399,9 +399,7 @@ function AccountCard({
                 )}
               </div>
 
-              {!account.isActive ? (
-                <p className="text-xs text-muted-foreground">Activate account to view quota.</p>
-              ) : isQuotaLoading && !quotaInfo ? (
+              {isQuotaLoading && !quotaInfo ? (
                 <div className="space-y-2">
                   <div className="h-1.5 w-full rounded-full bg-muted animate-pulse" />
                   <div className="h-1.5 w-full rounded-full bg-muted animate-pulse" />
@@ -460,7 +458,7 @@ function ProviderSection({
         </Badge>
       </div>
 
-      <div className="pl-3 pt-1 sm:pl-8">
+      <div className="pt-1">
         {accounts.length > 0 ? (
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {accounts.map((account) => (

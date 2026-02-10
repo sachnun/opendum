@@ -52,7 +52,7 @@ export function SuccessRateChart({ data, granularity }: Props) {
   const hasData = data.some((d) => d.success > 0 || d.error > 0);
 
   return (
-    <ChartCard title="Success / Error Rate" className="col-span-full">
+    <ChartCard title="Success / Error Rate">
       {!hasData ? (
         <EmptyChart />
       ) : (

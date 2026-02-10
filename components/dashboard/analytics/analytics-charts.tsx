@@ -20,7 +20,6 @@ import {
 import { RequestsOverTimeChart } from "./charts/requests-over-time";
 import { TokenUsageChart } from "./charts/token-usage";
 import { RequestsByModelChart } from "./charts/requests-by-model";
-import { ModelDistributionChart } from "./charts/model-distribution";
 import { SuccessRateChart } from "./charts/success-rate";
 
 const PERIODS: { value: Period; label: string }[] = [
@@ -371,7 +370,6 @@ export function AnalyticsCharts({
             <RequestsOverTimeChart data={data.requestsOverTime} granularity={data.granularity} />
             <TokenUsageChart data={data.tokenUsage} granularity={data.granularity} />
             <RequestsByModelChart data={data.requestsByModel} />
-            <ModelDistributionChart data={data.modelDistribution} />
             <SuccessRateChart data={data.successRate} granularity={data.granularity} />
           </div>
         ) : (
