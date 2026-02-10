@@ -432,7 +432,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // ===== Claude Models (Anthropic via Antigravity) =====
   "claude-sonnet-4-5": {
     providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-claude-sonnet-4-5"],
     meta: {
       contextLength: 200000,
       outputLimit: 64000,
@@ -444,23 +443,8 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 3, output: 15 },
     },
   },
-  "claude-sonnet-4-5-thinking": {
-    providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-claude-sonnet-4-5-thinking", "claude-sonnet-4-5-20250929-thinking"],
-    meta: {
-      contextLength: 200000,
-      outputLimit: 64000,
-      knowledgeCutoff: "2025-03",
-      releaseDate: "2025-09-30",
-      reasoning: true,
-      toolCall: true,
-      vision: true,
-      pricing: { input: 3, output: 15 },
-    },
-  },
   "claude-opus-4-5": {
     providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-claude-opus-4-5"],
     meta: {
       contextLength: 200000,
       outputLimit: 64000,
@@ -472,14 +456,14 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 5, output: 25 },
     },
   },
-  "claude-opus-4-5-thinking": {
+  "claude-opus-4-6": {
     providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-claude-opus-4-5-thinking", "claude-opus-4-5-20251101-thinking"],
+    aliases: ["claude-opus-4.6"],
     meta: {
-      contextLength: 200000,
-      outputLimit: 64000,
-      knowledgeCutoff: "2025-03",
-      releaseDate: "2025-11-25",
+      contextLength: 1000000,
+      outputLimit: 128000,
+      knowledgeCutoff: "2025-05",
+      releaseDate: "2026-02",
       reasoning: true,
       toolCall: true,
       vision: true,
