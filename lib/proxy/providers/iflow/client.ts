@@ -1,6 +1,7 @@
 // Iflow Provider Implementation
 
 import type { ProviderAccount } from "@prisma/client";
+import { createHmac, randomUUID } from "crypto";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { prisma } from "@/lib/db";
 import type {
@@ -55,6 +56,36 @@ function createBasicAuth(): string {
 function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = IFLOW_REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
+}
+
+/**
+ * Ensure header metadata values are valid strings
+ */
+function getOptionalHeaderValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Create x-iflow-signature header value
+ */
+function createIflowSignature(
+  clientName: string,
+  sessionId: string,
+  timestamp: number,
+  apiKey: string
+): string | null {
+  if (!apiKey) {
+    return null;
+  }
+
+  const payload = `${clientName}:${sessionId}:${timestamp}`;
+
+  try {
+    return createHmac("sha256", apiKey).update(payload, "utf8").digest("hex");
+  } catch (error) {
+    console.error("Failed to generate Iflow signature:", error);
+    return null;
+  }
 }
 
 /**
@@ -313,10 +344,17 @@ export const iflowProvider: Provider = {
 
   async makeRequest(
     apiKey: string,
-    account: ProviderAccount,
+    _account: ProviderAccount,
     body: ChatCompletionRequest,
     stream: boolean
   ): Promise<Response> {
+    const metadata = body as ChatCompletionRequest & {
+      session_id?: unknown;
+      sessionId?: unknown;
+      conversation_id?: unknown;
+      conversationId?: unknown;
+    };
+
     // Strip provider prefix from model name
     const modelName = body.model.includes("/")
       ? body.model.split("/").pop()!
@@ -330,14 +368,46 @@ export const iflowProvider: Provider = {
       stream
     );
 
+    const clientName = "iFlow-Cli";
+    const requestedSessionId =
+      getOptionalHeaderValue(metadata.session_id) ||
+      getOptionalHeaderValue(metadata.sessionId);
+    const requestedConversationId =
+      getOptionalHeaderValue(metadata.conversation_id) ||
+      getOptionalHeaderValue(metadata.conversationId);
+    const sessionId = requestedSessionId || randomUUID();
+    const conversationId = requestedConversationId || sessionId;
+    const timestamp = Date.now();
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      Accept: stream ? "text/event-stream" : "application/json",
+      "User-Agent": clientName,
+      "session-id": sessionId,
+      "conversation-id": conversationId,
+    };
+
+    const signature = createIflowSignature(clientName, sessionId, timestamp, apiKey);
+    if (signature) {
+      headers["x-iflow-signature"] = signature;
+      headers["x-iflow-timestamp"] = timestamp.toString();
+    }
+
+    const authorization = headers.Authorization;
+    const [scheme = "", token = ""] = authorization.split(" ");
+    const maskedToken = token
+      ? `${token.slice(0, 6)}...${token.slice(-4)}`
+      : "";
+    const loggedHeaders: Record<string, string> = {
+      ...headers,
+      Authorization: `${scheme} ${maskedToken}`.trim(),
+    };
+    console.log("[iflow] outgoing headers:", loggedHeaders);
+
     const response = await fetch(`${IFLOW_API_BASE_URL}/chat/completions`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        Accept: stream ? "text/event-stream" : "application/json",
-        "User-Agent": "Iflow-Cli",
-      },
+      headers,
       body: JSON.stringify(requestPayload),
     });
 
