@@ -65,11 +65,34 @@ export interface SuccessRateData {
   error: number;
 }
 
+export interface DurationOverTimeData {
+  date: string;
+  avg: number | null;
+  p30: number | null;
+  p50: number | null;
+  p60: number | null;
+  p75: number | null;
+  p90: number | null;
+  p95: number | null;
+  p99: number | null;
+}
+
+export interface DurationPercentiles {
+  p30: number;
+  p50: number;
+  p60: number;
+  p75: number;
+  p90: number;
+  p95: number;
+  p99: number;
+}
+
 export interface AnalyticsTotals {
   totalRequests: number;
   totalInputTokens: number;
   totalOutputTokens: number;
   avgDuration: number;
+  durationPercentiles: DurationPercentiles;
   successRate: number;
 }
 
@@ -79,8 +102,13 @@ export interface AnalyticsData {
   requestsByModel: RequestsByModelData[];
   modelDistribution: ModelDistributionData[];
   successRate: SuccessRateData[];
+  durationOverTime: DurationOverTimeData[];
   granularity: Granularity;
   totals: AnalyticsTotals;
+}
+
+function normalizeModelName(model: string): string {
+  return model.replace("iflow/", "");
 }
 
 function getStartDate(period: Period): Date {
@@ -223,6 +251,38 @@ function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig)
   return slots;
 }
 
+function calculatePercentile(sortedValues: number[], percentile: number): number {
+  if (sortedValues.length === 0) {
+    return 0;
+  }
+
+  const position = (percentile / 100) * (sortedValues.length - 1);
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+
+  if (lowerIndex === upperIndex) {
+    return sortedValues[lowerIndex] ?? 0;
+  }
+
+  const lowerValue = sortedValues[lowerIndex] ?? 0;
+  const upperValue = sortedValues[upperIndex] ?? lowerValue;
+  const interpolationFactor = position - lowerIndex;
+
+  return Math.round(lowerValue + (upperValue - lowerValue) * interpolationFactor);
+}
+
+function calculateDurationPercentiles(sortedDurations: number[]): DurationPercentiles {
+  return {
+    p30: calculatePercentile(sortedDurations, 30),
+    p50: calculatePercentile(sortedDurations, 50),
+    p60: calculatePercentile(sortedDurations, 60),
+    p75: calculatePercentile(sortedDurations, 75),
+    p90: calculatePercentile(sortedDurations, 90),
+    p95: calculatePercentile(sortedDurations, 95),
+    p99: calculatePercentile(sortedDurations, 99),
+  };
+}
+
 export async function getAnalyticsData(
   filter: AnalyticsFilter,
   apiKeyId?: string
@@ -307,18 +367,60 @@ export async function getAnalyticsData(
       })
     );
 
+    // Process duration stats over time (avg on chart, pXX in tooltip)
+    const durationsBySlot = new Map<string, number[]>();
+    timeSlots.forEach((slot) => durationsBySlot.set(slot, []));
+    logs.forEach((log) => {
+      if (log.duration === null) {
+        return;
+      }
+
+      const slot = formatTimeSlot(log.createdAt, config.granularity);
+      const current = durationsBySlot.get(slot) || [];
+      current.push(log.duration);
+      durationsBySlot.set(slot, current);
+    });
+
+    const durationOverTime: DurationOverTimeData[] = Array.from(durationsBySlot.entries()).map(
+      ([date, durations]) => {
+        if (durations.length === 0) {
+          return {
+            date,
+            avg: null,
+            p30: null,
+            p50: null,
+            p60: null,
+            p75: null,
+            p90: null,
+            p95: null,
+            p99: null,
+          };
+        }
+
+        const sortedDurations = [...durations].sort((a, b) => a - b);
+        const avg = Math.round(
+          sortedDurations.reduce((sum, duration) => sum + duration, 0) / sortedDurations.length
+        );
+
+        return {
+          date,
+          avg,
+          ...calculateDurationPercentiles(sortedDurations),
+        };
+      }
+    );
+
     // Process requests by model
     const modelCounts = new Map<string, number>();
     logs.forEach((log) => {
-      const model = log.model.replace("iflow/", ""); // Remove prefix for display
+      const model = normalizeModelName(log.model);
       modelCounts.set(model, (modelCounts.get(model) || 0) + 1);
     });
-    const requestsByModel: RequestsByModelData[] = Array.from(
-      modelCounts.entries()
-    )
+    const allModelsByCount = Array.from(modelCounts.entries())
       .map(([model, count]) => ({ model, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 models
+      .sort((a, b) => b.count - a.count);
+
+    const requestsByModel: RequestsByModelData[] = allModelsByCount.slice(0, 10); // Top 10 models
 
     // Process model distribution (for pie chart)
     const totalRequests = logs.length;
@@ -355,14 +457,18 @@ export async function getAnalyticsData(
     // Calculate totals
     const totalInputTokens = logs.reduce((sum, log) => sum + log.inputTokens, 0);
     const totalOutputTokens = logs.reduce((sum, log) => sum + log.outputTokens, 0);
-    const validDurations = logs.filter((log) => log.duration !== null);
+    const durationValues = logs
+      .map((log) => log.duration)
+      .filter((duration): duration is number => duration !== null)
+      .sort((a, b) => a - b);
     const avgDuration =
-      validDurations.length > 0
+      durationValues.length > 0
         ? Math.round(
-            validDurations.reduce((sum, log) => sum + (log.duration || 0), 0) /
-              validDurations.length
+            durationValues.reduce((sum, duration) => sum + duration, 0) /
+              durationValues.length
           )
         : 0;
+    const durationPercentiles = calculateDurationPercentiles(durationValues);
     const successfulRequests = logs.filter(
       (log) => log.statusCode !== null && log.statusCode >= 200 && log.statusCode < 400
     ).length;
@@ -374,6 +480,7 @@ export async function getAnalyticsData(
       totalInputTokens,
       totalOutputTokens,
       avgDuration,
+      durationPercentiles,
       successRate: successRatePercent,
     };
 
@@ -385,6 +492,7 @@ export async function getAnalyticsData(
         requestsByModel,
         modelDistribution,
         successRate,
+        durationOverTime,
         granularity: config.granularity,
         totals,
       },
