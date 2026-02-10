@@ -60,6 +60,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "OpenAI", href: "/dashboard/models", anchorId: "openai-models" },
       { name: "Claude", href: "/dashboard/models", anchorId: "claude-models" },
       { name: "Gemini", href: "/dashboard/models", anchorId: "gemini-models" },
+      { name: "Other", href: "/dashboard/models", anchorId: "other-models" },
     ],
   },
 ];
