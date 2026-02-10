@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LogOut, Menu } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -147,19 +146,6 @@ export function MobileNav({ accountCounts }: MobileNavProps) {
             {supportNavigation.map(renderNavItem)}
           </div>
         </nav>
-        <div className="border-t border-border p-3">
-          <Button
-            variant="ghost"
-            className="h-10 w-full justify-start gap-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
-            onClick={() => {
-              setOpen(false);
-              signOut({ callbackUrl: "/" });
-            }}
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </Button>
-        </div>
       </SheetContent>
     </Sheet>
   );
