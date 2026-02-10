@@ -313,6 +313,23 @@ function extractWorkspaceIdFromJwt(token: string): string | null {
 // ============================================================
 
 /**
+ * Convert Chat Completions content block types to Responses API types.
+ * Chat Completions uses "text" while Responses API requires "input_text" or "output_text".
+ */
+function convertContentBlockTypes(
+  content: Array<{ type: string; [key: string]: unknown }>,
+  role: string
+): Array<{ type: string; [key: string]: unknown }> {
+  const targetTextType = role === "assistant" ? "output_text" : "input_text";
+  return content.map((block) => {
+    if (block.type === "text") {
+      return { ...block, type: targetTextType };
+    }
+    return block;
+  });
+}
+
+/**
  * Convert Chat Completions messages[] to Responses API input[]
  */
 function convertMessagesToInput(
@@ -331,7 +348,7 @@ function convertMessagesToInput(
           content:
             typeof msg.content === "string"
               ? msg.content
-              : msg.content,
+              : convertContentBlockTypes(msg.content, "developer"),
         });
         break;
 
@@ -342,7 +359,7 @@ function convertMessagesToInput(
           content:
             typeof msg.content === "string"
               ? msg.content
-              : msg.content,
+              : convertContentBlockTypes(msg.content, "user"),
         });
         break;
 
@@ -357,7 +374,7 @@ function convertMessagesToInput(
               content:
                 typeof msg.content === "string"
                   ? msg.content
-                  : msg.content,
+                  : convertContentBlockTypes(msg.content, "assistant"),
             });
           }
           // Then add each tool call as a function_call item
@@ -383,7 +400,7 @@ function convertMessagesToInput(
             content:
               typeof msg.content === "string"
                 ? msg.content
-                : msg.content,
+                : convertContentBlockTypes(msg.content, "assistant"),
           });
         }
         break;
@@ -408,7 +425,7 @@ function convertMessagesToInput(
           content:
             typeof msg.content === "string"
               ? msg.content
-              : msg.content,
+              : convertContentBlockTypes(msg.content, msg.role),
         });
     }
   }
@@ -488,7 +505,25 @@ function convertTools(
 }
 
 /**
- * Normalize IDs in a Responses API input[] array to use fc_ prefix.
+ * Normalize content block types within a message's content array.
+ * Converts Chat Completions "text" type to Responses API "input_text" or "output_text".
+ */
+function normalizeContentBlockTypes(
+  content: unknown,
+  role: string
+): unknown {
+  if (!Array.isArray(content)) return content;
+  const targetTextType = role === "assistant" ? "output_text" : "input_text";
+  return content.map((block: Record<string, unknown>) => {
+    if (block && typeof block === "object" && block.type === "text") {
+      return { ...block, type: targetTextType };
+    }
+    return block;
+  });
+}
+
+/**
+ * Normalize IDs and content block types in a Responses API input[] array.
  * This handles the _responsesInput passthrough path where input items
  * from /v1/responses are sent directly without going through convertMessagesToInput().
  */
@@ -516,6 +551,15 @@ function normalizeResponsesInputIds(
           ...item,
           call_id: toResponsesApiId(callId),
         };
+      }
+    }
+
+    // Normalize content block types for message items
+    if (type === "message" && item.content) {
+      const role = (item.role as string) || "user";
+      const normalizedContent = normalizeContentBlockTypes(item.content, role);
+      if (normalizedContent !== item.content) {
+        return { ...item, content: normalizedContent };
       }
     }
 
