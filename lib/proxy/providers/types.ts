@@ -156,6 +156,21 @@ export const ProviderName = {
   QWEN_CODE: "qwen_code",
   GEMINI_CLI: "gemini_cli",
   CODEX: "codex",
+  NVIDIA_NIM: "nvidia_nim",
+  OLLAMA_CLOUD: "ollama_cloud",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
+
+export const OAUTH_PROVIDER_NAMES: ProviderNameType[] = [
+  ProviderName.IFLOW,
+  ProviderName.ANTIGRAVITY,
+  ProviderName.QWEN_CODE,
+  ProviderName.GEMINI_CLI,
+  ProviderName.CODEX,
+];
+
+export const API_KEY_PROVIDER_NAMES: ProviderNameType[] = [
+  ProviderName.NVIDIA_NIM,
+  ProviderName.OLLAMA_CLOUD,
+];
