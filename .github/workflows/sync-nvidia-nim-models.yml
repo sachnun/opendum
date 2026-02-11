@@ -1,0 +1,43 @@
+name: Sync Nvidia NIM Models
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "47 2 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-models:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync Nvidia NIM model map
+        run: npm run sync:nvidia-nim
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: sync Nvidia NIM model map"
+          title: "chore: sync Nvidia NIM model map"
+          body: |
+            This PR was generated automatically by the scheduled model sync workflow.
+
+            - Source: `https://integrate.api.nvidia.com/v1/models`
+            - Scope: chat-capable models only
+            - Script: `scripts/sync-nvidia-nim-models.mjs`
+          branch: chore/sync-nvidia-nim-model-map
+          delete-branch: true

@@ -1,5 +1,9 @@
 import { ProviderName } from "./providers/types";
 import {
+  NVIDIA_NIM_MODEL_MAP,
+  NVIDIA_NIM_MODELS,
+} from "./providers/nvidia-nim/constants";
+import {
   OLLAMA_CLOUD_MODEL_MAP,
   OLLAMA_CLOUD_MODELS,
 } from "./providers/ollama-cloud/constants";
@@ -942,6 +946,18 @@ for (const info of Object.values(MODEL_REGISTRY)) {
   }
 }
 
+const NVIDIA_NIM_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
+for (const [model, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
+  if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
+    continue;
+  }
+
+  NVIDIA_NIM_FALLBACK_REGISTRY[model] = {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [upstreamModel],
+  };
+}
+
 const OLLAMA_CLOUD_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
 for (const [model, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP)) {
   if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
@@ -956,6 +972,7 @@ for (const [model, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP)) {
 
 const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = {
   ...MODEL_REGISTRY,
+  ...NVIDIA_NIM_FALLBACK_REGISTRY,
   ...OLLAMA_CLOUD_FALLBACK_REGISTRY,
 };
 
@@ -970,6 +987,16 @@ for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
 }
 
 for (const [canonical, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP)) {
+  if (!EFFECTIVE_MODEL_REGISTRY[canonical]) {
+    continue;
+  }
+
+  if (!aliasToCanonical[upstreamModel]) {
+    aliasToCanonical[upstreamModel] = canonical;
+  }
+}
+
+for (const [canonical, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
   if (!EFFECTIVE_MODEL_REGISTRY[canonical]) {
     continue;
   }
@@ -1000,6 +1027,10 @@ export function getProvidersForModel(model: string): string[] {
   return info.providers.filter((provider) => {
     if (provider === ProviderName.OLLAMA_CLOUD) {
       return OLLAMA_CLOUD_MODELS.has(canonical);
+    }
+
+    if (provider === ProviderName.NVIDIA_NIM) {
+      return NVIDIA_NIM_MODELS.has(canonical);
     }
 
     return true;

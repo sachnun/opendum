@@ -9,7 +9,9 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "sync:ollama-cloud": "node scripts/sync-ollama-cloud-models.mjs",
-    "sync:ollama-cloud:check": "node scripts/sync-ollama-cloud-models.mjs --check"
+    "sync:ollama-cloud:check": "node scripts/sync-ollama-cloud-models.mjs --check",
+    "sync:nvidia-nim": "node scripts/sync-nvidia-nim-models.mjs",
+    "sync:nvidia-nim:check": "node scripts/sync-nvidia-nim-models.mjs --check"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
