@@ -49,6 +49,106 @@ export function getErrorStatusCode(error: unknown): number {
   return 500;
 }
 
+const MAX_STRING_LENGTH = 200;
+const MAX_ARRAY_SUMMARY_ITEMS = 10;
+
+/**
+ * Truncate a string to a max length, appending "[truncated]" if it exceeds.
+ */
+function truncateString(value: string, maxLength: number = MAX_STRING_LENGTH): string {
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength) + `...[truncated, ${value.length} chars total]`;
+}
+
+/**
+ * Summarize a tools array: show count + function names only.
+ */
+function summarizeTools(tools: unknown[]): string {
+  const names: string[] = [];
+  for (const tool of tools.slice(0, MAX_ARRAY_SUMMARY_ITEMS)) {
+    if (tool && typeof tool === "object") {
+      const t = tool as Record<string, unknown>;
+      // OpenAI format: { type: "function", function: { name, ... } }
+      if (t.function && typeof t.function === "object") {
+        const fn = t.function as Record<string, unknown>;
+        if (typeof fn.name === "string") names.push(fn.name);
+      }
+      // Anthropic format: { name, ... }
+      else if (typeof t.name === "string") {
+        names.push(t.name);
+      }
+    }
+  }
+  const suffix = tools.length > MAX_ARRAY_SUMMARY_ITEMS
+    ? `, +${tools.length - MAX_ARRAY_SUMMARY_ITEMS} more`
+    : "";
+  return `[${tools.length} tool(s): ${names.join(", ")}${suffix}]`;
+}
+
+/**
+ * Deep-sanitize a value for error logging.
+ * - Strings longer than maxLength are truncated
+ * - Arrays of tools are summarized
+ * - Other arrays show count + item type summary
+ * - Objects are recursively sanitized
+ */
+function sanitizeValue(value: unknown, key?: string): unknown {
+  if (value === null || value === undefined) return value;
+
+  if (typeof value === "string") {
+    return truncateString(value);
+  }
+
+  if (Array.isArray(value)) {
+    // Tools arrays get special summary treatment
+    if (key === "tools") {
+      return summarizeTools(value);
+    }
+
+    // Other arrays: show count + summarized items
+    if (value.length > MAX_ARRAY_SUMMARY_ITEMS) {
+      const preview = value.slice(0, MAX_ARRAY_SUMMARY_ITEMS).map((item, i) => sanitizeValue(item, `${key}[${i}]`));
+      return [...preview, `...[truncated, ${value.length} items total]`];
+    }
+
+    return value.map((item, i) => sanitizeValue(item, `${key}[${i}]`));
+  }
+
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const sanitized: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      sanitized[k] = sanitizeValue(v, k);
+    }
+    return sanitized;
+  }
+
+  // numbers, booleans, etc.
+  return value;
+}
+
+/**
+ * Sanitize the parameters object for error storage.
+ * Truncates long strings, summarizes tools arrays, and redacts large nested content.
+ */
+function sanitizeParametersForError(params: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+
+    // Messages are handled separately via summarizeMessages
+    if (key === "messages") {
+      sanitized[key] = "[redacted: see \"Messages (object keys only)\"]";
+      continue;
+    }
+
+    sanitized[key] = sanitizeValue(value, key);
+  }
+
+  return sanitized;
+}
+
 export function buildAccountErrorMessage(
   errorMessage: string,
   context: {
@@ -59,9 +159,12 @@ export function buildAccountErrorMessage(
     parameters?: Record<string, unknown>;
   }
 ): string {
-  const normalizedParameters = Object.fromEntries(
-    Object.entries(context.parameters ?? {}).filter(([, value]) => value !== undefined)
-  );
+  // Truncate the raw error message itself (can be huge from provider response body)
+  const truncatedError = errorMessage.length > 2000
+    ? errorMessage.slice(0, 2000) + `...[truncated, ${errorMessage.length} chars total]`
+    : errorMessage;
+
+  const sanitizedParameters = sanitizeParametersForError(context.parameters ?? {});
 
   const summarizeMessages = (messages: unknown): string | null => {
     if (!Array.isArray(messages)) {
@@ -99,19 +202,15 @@ export function buildAccountErrorMessage(
 
   const messageSummary = summarizeMessages(context.messages);
 
-  if ("messages" in normalizedParameters) {
-    normalizedParameters.messages = "[redacted: see \"Messages (object keys only)\"]";
-  }
-
   let serializedParameters = "{}";
   try {
-    serializedParameters = JSON.stringify(normalizedParameters, null, 2);
+    serializedParameters = JSON.stringify(sanitizedParameters, null, 2);
   } catch {
     serializedParameters = '"[unserializable parameters]"';
   }
 
   return [
-    `Error: ${errorMessage}`,
+    `Error: ${truncatedError}`,
     context.provider ? `Provider: ${context.provider}` : null,
     context.endpoint ? `Endpoint: ${context.endpoint}` : null,
     `Model: ${context.model}`,
