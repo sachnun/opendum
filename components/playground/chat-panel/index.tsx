@@ -168,6 +168,8 @@ export function ChatPanel({
   const [selectionStep, setSelectionStep] = React.useState<"model" | "routing">("model");
   const [pendingModelId, setPendingModelId] = React.useState<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const loadingStartedAtRef = React.useRef<number | null>(null);
+  const [nowMs, setNowMs] = React.useState<number | null>(null);
 
   const groupedModels = React.useMemo(() => groupModelsByFamily(models), [models]);
   const sortedFamilies = React.useMemo(() => getSortedFamilies(groupedModels), [groupedModels]);
@@ -219,7 +221,34 @@ export function ChatPanel({
     error,
     metrics,
   } = response || {};
-  const waitLabel = formatDurationMs(metrics?.waitMs);
+
+  const liveWaitMs =
+    isLoading && loadingStartedAtRef.current !== null && nowMs !== null
+      ? nowMs - loadingStartedAtRef.current
+      : metrics?.waitMs;
+  const waitLabel = formatDurationMs(liveWaitMs);
+
+  React.useEffect(() => {
+    if (!isLoading) {
+      loadingStartedAtRef.current = null;
+      setNowMs(null);
+      return;
+    }
+
+    if (loadingStartedAtRef.current === null) {
+      loadingStartedAtRef.current = Date.now();
+    }
+
+    setNowMs(Date.now());
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 100);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isLoading]);
 
   React.useEffect(() => {
     if (isLoading && scrollRef.current) {
