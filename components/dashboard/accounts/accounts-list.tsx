@@ -357,9 +357,9 @@ function LastErrorMessageDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <button
+         <button
           type="button"
-          className="w-full rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full min-h-[3.25rem] rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="text-muted-foreground text-xs">Last Error Message:</span>
           <span className={`mt-1 block text-xs line-clamp-2 break-all ${previewColorClass}`}>
@@ -575,7 +575,7 @@ function AccountCard({
                 tone={hasSuccessAfterLastError ? "warning" : "error"}
               />
             ) : (
-              <div className="w-full rounded-sm pt-2 text-left">
+              <div className="w-full min-h-[3.25rem] rounded-sm pt-2 text-left">
                 <span className="text-muted-foreground text-xs">Last Error Message:</span>
                 <span className="text-muted-foreground mt-1 block text-xs line-clamp-2 break-all">-</span>
               </div>
