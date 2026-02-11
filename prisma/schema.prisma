@@ -72,7 +72,7 @@ model VerificationToken {
 model ProviderAccount {
   id       String @id @default(cuid())
   userId   String
-  provider String // "iflow" | "antigravity" | "qwen_code" | "gemini_cli" | "codex" | "nvidia_nim" | "ollama_cloud"
+  provider String // "iflow" | "antigravity" | "qwen_code" | "gemini_cli" | "codex" | "nvidia_nim" | "ollama_cloud" | "openrouter"
   name     String // Display name: "Personal", "Work", etc.
 
   // Encrypted credentials (AES-256 encrypted)

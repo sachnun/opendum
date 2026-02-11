@@ -87,6 +87,7 @@ interface AccountsListProps {
   codexAccounts: Account[];
   nvidiaNimAccounts: Account[];
   ollamaCloudAccounts: Account[];
+  openRouterAccounts: Account[];
 }
 
 function formatTierLabel(tier: string): string {
@@ -685,6 +686,7 @@ export function AccountsList({
   codexAccounts,
   nvidiaNimAccounts,
   ollamaCloudAccounts,
+  openRouterAccounts,
 }: AccountsListProps) {
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
@@ -879,6 +881,14 @@ export function AccountsList({
             title="Ollama Cloud Accounts"
             accounts={ollamaCloudAccounts}
             emptyMessage="No Ollama Cloud accounts connected yet."
+          />
+
+          {/* OpenRouter Section */}
+          <ProviderSection
+            id="openrouter-accounts"
+            title="OpenRouter Accounts"
+            accounts={openRouterAccounts}
+            emptyMessage="No OpenRouter accounts connected yet."
           />
         </div>
       </section>

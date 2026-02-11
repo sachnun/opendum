@@ -120,6 +120,7 @@ export default async function AccountsPage({
   const codexAccounts = accountsWithStats.filter((a) => a.provider === "codex");
   const nvidiaNimAccounts = accountsWithStats.filter((a) => a.provider === "nvidia_nim");
   const ollamaCloudAccounts = accountsWithStats.filter((a) => a.provider === "ollama_cloud");
+  const openRouterAccounts = accountsWithStats.filter((a) => a.provider === "openrouter");
 
   return (
     <div className="space-y-6">
@@ -176,6 +177,7 @@ export default async function AccountsPage({
         codexAccounts={codexAccounts}
         nvidiaNimAccounts={nvidiaNimAccounts}
         ollamaCloudAccounts={ollamaCloudAccounts}
+        openRouterAccounts={openRouterAccounts}
       />
     </div>
   );

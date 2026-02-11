@@ -33,6 +33,7 @@ export default async function DashboardLayout({
     qwen_code: 0,
     nvidia_nim: 0,
     ollama_cloud: 0,
+    openrouter: 0,
   };
 
   for (const item of groupedAccountCounts) {
@@ -57,6 +58,9 @@ export default async function DashboardLayout({
         break;
       case "ollama_cloud":
         accountCounts.ollama_cloud = item._count._all;
+        break;
+      case "openrouter":
+        accountCounts.openrouter = item._count._all;
         break;
       default:
         break;

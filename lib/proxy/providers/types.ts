@@ -158,6 +158,7 @@ export const ProviderName = {
   CODEX: "codex",
   NVIDIA_NIM: "nvidia_nim",
   OLLAMA_CLOUD: "ollama_cloud",
+  OPENROUTER: "openrouter",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
@@ -173,4 +174,5 @@ export const OAUTH_PROVIDER_NAMES: ProviderNameType[] = [
 export const API_KEY_PROVIDER_NAMES: ProviderNameType[] = [
   ProviderName.NVIDIA_NIM,
   ProviderName.OLLAMA_CLOUD,
+  ProviderName.OPENROUTER,
 ];

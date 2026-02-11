@@ -11,6 +11,7 @@ let geminiCliProvider: Provider | null = null;
 let codexProvider: Provider | null = null;
 let nvidiaNimProvider: Provider | null = null;
 let ollamaCloudProvider: Provider | null = null;
+let openRouterProvider: Provider | null = null;
 
 /**
  * Get a provider instance by name
@@ -66,6 +67,13 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
       }
       return ollamaCloudProvider;
 
+    case ProviderName.OPENROUTER:
+      if (!openRouterProvider) {
+        const { openRouterProvider: provider } = await import("./openrouter");
+        openRouterProvider = provider;
+      }
+      return openRouterProvider;
+
     default:
       throw new Error(`Unknown provider: ${name}`);
   }
@@ -75,7 +83,7 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [iflow, antigravity, qwenCode, geminiCli, codex, nvidiaNim, ollamaCloud] = await Promise.all([
+  const [iflow, antigravity, qwenCode, geminiCli, codex, nvidiaNim, ollamaCloud, openRouter] = await Promise.all([
     getProvider(ProviderName.IFLOW),
     getProvider(ProviderName.ANTIGRAVITY),
     getProvider(ProviderName.QWEN_CODE),
@@ -83,8 +91,9 @@ export async function getAllProviders(): Promise<Provider[]> {
     getProvider(ProviderName.CODEX),
     getProvider(ProviderName.NVIDIA_NIM),
     getProvider(ProviderName.OLLAMA_CLOUD),
+    getProvider(ProviderName.OPENROUTER),
   ]);
-  return [iflow, antigravity, qwenCode, geminiCli, codex, nvidiaNim, ollamaCloud];
+  return [iflow, antigravity, qwenCode, geminiCli, codex, nvidiaNim, ollamaCloud, openRouter];
 }
 
 /**

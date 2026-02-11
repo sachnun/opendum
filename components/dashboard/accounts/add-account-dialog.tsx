@@ -39,6 +39,7 @@ import {
   pollQwenCodeAuth,
   connectNvidiaNimApiKey,
   connectOllamaCloudApiKey,
+  connectOpenRouterApiKey,
 } from "@/lib/actions/accounts";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,7 @@ type Provider =
   | "codex"
   | "nvidia_nim"
   | "ollama_cloud"
+  | "openrouter"
   | null;
 
 interface OAuthRedirectConfig {
@@ -135,6 +137,15 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     apiKeyPlaceholder: "ollama_...",
     accountNamePlaceholder: "Ollama Cloud Personal",
     connectAction: connectOllamaCloudApiKey,
+  },
+  openrouter: {
+    name: "OpenRouter",
+    description: "Access OpenRouter free models via API key",
+    flowType: "api_key",
+    apiKeyPortalUrl: "https://openrouter.ai/settings/keys",
+    apiKeyPlaceholder: "sk-or-v1-...",
+    accountNamePlaceholder: "OpenRouter Personal",
+    connectAction: connectOpenRouterApiKey,
   },
 };
 

@@ -47,6 +47,10 @@ import {
   OLLAMA_CLOUD_API_BASE_URL,
   OLLAMA_CLOUD_MODEL_MAP,
 } from "@/lib/proxy/providers/ollama-cloud/constants";
+import {
+  OPENROUTER_API_BASE_URL,
+  OPENROUTER_MODEL_MAP,
+} from "@/lib/proxy/providers/openrouter/constants";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
@@ -72,11 +76,22 @@ const API_KEY_PROVIDER_SETTINGS = {
     label: "Nvidia",
     baseUrl: NVIDIA_NIM_API_BASE_URL,
     modelMap: NVIDIA_NIM_MODEL_MAP,
+    validationPath: "/chat/completions",
+    requireSuccessfulStatus: false,
   },
   ollama_cloud: {
     label: "Ollama Cloud",
     baseUrl: OLLAMA_CLOUD_API_BASE_URL,
     modelMap: OLLAMA_CLOUD_MODEL_MAP,
+    validationPath: "/chat/completions",
+    requireSuccessfulStatus: false,
+  },
+  openrouter: {
+    label: "OpenRouter",
+    baseUrl: OPENROUTER_API_BASE_URL,
+    modelMap: OPENROUTER_MODEL_MAP,
+    validationPath: "/models",
+    requireSuccessfulStatus: true,
   },
 } as const;
 
@@ -86,10 +101,16 @@ async function validateProviderApiKey(
   provider: ApiKeyProvider,
   apiKey: string
 ): Promise<ActionResult<void>> {
-  const { label, baseUrl, modelMap } = API_KEY_PROVIDER_SETTINGS[provider];
+  const {
+    label,
+    baseUrl,
+    modelMap,
+    validationPath = "/chat/completions",
+    requireSuccessfulStatus = false,
+  } = API_KEY_PROVIDER_SETTINGS[provider];
   const validationModel = Object.values(modelMap)[0];
 
-  if (!validationModel) {
+  if (validationPath === "/chat/completions" && !validationModel) {
     return {
       success: false,
       error: `${label} API key validation model is not configured.`,
@@ -100,8 +121,8 @@ async function validateProviderApiKey(
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
+    const response = await fetch(`${baseUrl}${validationPath}`, {
+      method: validationPath === "/chat/completions" ? "POST" : "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -109,18 +130,49 @@ async function validateProviderApiKey(
       },
       signal: controller.signal,
       cache: "no-store",
-      body: JSON.stringify({
-        model: validationModel,
-        messages: [{ role: "user", content: "ping" }],
-        max_tokens: 1,
-        stream: false,
-      }),
+      body:
+        validationPath === "/chat/completions"
+          ? JSON.stringify({
+              model: validationModel,
+              messages: [{ role: "user", content: "ping" }],
+              max_tokens: 1,
+              stream: false,
+            })
+          : undefined,
     });
 
     if (response.status === 401 || response.status === 403) {
       return {
         success: false,
         error: `${label} API key is invalid.`,
+      };
+    }
+
+    if (requireSuccessfulStatus && !response.ok) {
+      let responseText = "";
+      try {
+        responseText = await response.text();
+      } catch {
+        responseText = "";
+      }
+
+      const normalizedBody = responseText.toLowerCase();
+      const looksLikeAuthFailure =
+        normalizedBody.includes("authenticate") ||
+        normalizedBody.includes("unauthorized") ||
+        normalizedBody.includes("invalid api key") ||
+        normalizedBody.includes("user not found");
+
+      if (looksLikeAuthFailure) {
+        return {
+          success: false,
+          error: `${label} API key is invalid.`,
+        };
+      }
+
+      return {
+        success: false,
+        error: `Unable to validate ${label} API key right now (HTTP ${response.status}). Please try again.`,
       };
     }
 
@@ -348,6 +400,33 @@ export async function connectOllamaCloudApiKey(
   } catch (error) {
     console.error("Failed to connect Ollama Cloud account:", error);
     return { success: false, error: "Failed to connect Ollama Cloud account" };
+  }
+}
+
+/**
+ * Connect OpenRouter account using API key
+ */
+export async function connectOpenRouterApiKey(
+  apiKey: string,
+  accountName?: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    return await connectApiKeyProviderAccount(
+      session.user.id,
+      "openrouter",
+      "OpenRouter",
+      apiKey,
+      accountName
+    );
+  } catch (error) {
+    console.error("Failed to connect OpenRouter account:", error);
+    return { success: false, error: "Failed to connect OpenRouter account" };
   }
 }
 

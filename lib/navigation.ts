@@ -29,6 +29,7 @@ export interface ProviderAccountCounts {
   qwen_code: number;
   nvidia_nim: number;
   ollama_cloud: number;
+  openrouter: number;
 }
 
 export const primaryNavigation: NavItem[] = [
@@ -60,6 +61,11 @@ export const primaryNavigation: NavItem[] = [
         name: "Ollama Cloud",
         href: "/dashboard/accounts",
         anchorId: "ollama-cloud-accounts",
+      },
+      {
+        name: "OpenRouter",
+        href: "/dashboard/accounts",
+        anchorId: "openrouter-accounts",
       },
     ],
   },

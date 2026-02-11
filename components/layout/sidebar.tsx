@@ -32,6 +32,7 @@ export function Sidebar({ accountCounts }: SidebarProps) {
       "antigravity-accounts": accountCounts.antigravity,
       "nvidia-nim-accounts": accountCounts.nvidia_nim,
       "ollama-cloud-accounts": accountCounts.ollama_cloud,
+      "openrouter-accounts": accountCounts.openrouter,
       "codex-accounts": accountCounts.codex,
       "iflow-accounts": accountCounts.iflow,
       "gemini-cli-accounts": accountCounts.gemini_cli,

@@ -24,6 +24,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   codex: "Codex",
   nvidia_nim: "Nvidia",
   ollama_cloud: "Ollama Cloud",
+  openrouter: "OpenRouter",
 };
 
 interface HeaderProps {

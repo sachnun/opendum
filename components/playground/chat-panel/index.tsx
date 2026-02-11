@@ -122,6 +122,7 @@ function formatProviderName(provider: string): string {
     codex: "Codex",
     nvidia_nim: "Nvidia",
     ollama_cloud: "Ollama Cloud",
+    openrouter: "OpenRouter",
   };
   return names[provider] || provider;
 }
@@ -168,7 +169,7 @@ export function ChatPanel({
   const [selectionStep, setSelectionStep] = React.useState<"model" | "routing">("model");
   const [pendingModelId, setPendingModelId] = React.useState<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
-  const loadingStartedAtRef = React.useRef<number | null>(null);
+  const [loadingStartedAt, setLoadingStartedAt] = React.useState<number | null>(null);
   const [nowMs, setNowMs] = React.useState<number | null>(null);
 
   const groupedModels = React.useMemo(() => groupModelsByFamily(models), [models]);
@@ -223,21 +224,19 @@ export function ChatPanel({
   } = response || {};
 
   const liveWaitMs =
-    isLoading && loadingStartedAtRef.current !== null && nowMs !== null
-      ? nowMs - loadingStartedAtRef.current
+    isLoading && loadingStartedAt !== null && nowMs !== null
+      ? nowMs - loadingStartedAt
       : metrics?.waitMs;
   const waitLabel = formatDurationMs(liveWaitMs);
 
   React.useEffect(() => {
     if (!isLoading) {
-      loadingStartedAtRef.current = null;
+      setLoadingStartedAt(null);
       setNowMs(null);
       return;
     }
 
-    if (loadingStartedAtRef.current === null) {
-      loadingStartedAtRef.current = Date.now();
-    }
+    setLoadingStartedAt((current) => current ?? Date.now());
 
     setNowMs(Date.now());
 
