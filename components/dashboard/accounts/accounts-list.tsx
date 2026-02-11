@@ -38,6 +38,7 @@ import { formatRelativeTime } from "@/lib/date";
 import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
+import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
 
 type AccountQuotaInfo =
   | AntigravityAccountQuotaInfo
@@ -778,6 +779,20 @@ export function AccountsList({
   useEffect(() => {
     fetchGeminiCliQuota();
   }, [fetchGeminiCliQuota]);
+
+  useEffect(() => {
+    const handleProviderAccountsRefresh = () => {
+      fetchAntigravityQuota();
+      fetchCodexQuota();
+      fetchGeminiCliQuota();
+    };
+
+    window.addEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
+
+    return () => {
+      window.removeEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
+    };
+  }, [fetchAntigravityQuota, fetchCodexQuota, fetchGeminiCliQuota]);
 
   return (
     <div className="space-y-8">
