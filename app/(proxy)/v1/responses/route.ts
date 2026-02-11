@@ -475,6 +475,9 @@ export async function POST(request: NextRequest) {
 
           const detailedError = buildAccountErrorMessage(errorText, {
             model,
+            provider: account.provider,
+            endpoint: "/v1/responses",
+            messages,
             parameters: requestParamsForError,
           });
 
@@ -585,6 +588,9 @@ export async function POST(request: NextRequest) {
         const statusCode = getErrorStatusCode(error);
         const detailedError = buildAccountErrorMessage(errorMessage, {
           model,
+          provider: account.provider,
+          endpoint: "/v1/responses",
+          messages,
           parameters: requestParamsForError,
         });
 

@@ -53,12 +53,55 @@ export function buildAccountErrorMessage(
   errorMessage: string,
   context: {
     model: string;
+    provider?: string;
+    endpoint?: string;
+    messages?: unknown;
     parameters?: Record<string, unknown>;
   }
 ): string {
   const normalizedParameters = Object.fromEntries(
     Object.entries(context.parameters ?? {}).filter(([, value]) => value !== undefined)
   );
+
+  const summarizeMessages = (messages: unknown): string | null => {
+    if (!Array.isArray(messages)) {
+      return null;
+    }
+
+    const maxEntries = 30;
+    const entries = messages.slice(0, maxEntries).map((item, index) => {
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        return {
+          index,
+          keys: Object.keys(item as Record<string, unknown>),
+        };
+      }
+
+      return {
+        index,
+        type: Array.isArray(item) ? "array" : typeof item,
+      };
+    });
+
+    if (messages.length > maxEntries) {
+      entries.push({
+        index: maxEntries,
+        type: `truncated_${messages.length - maxEntries}_more_items`,
+      });
+    }
+
+    try {
+      return JSON.stringify(entries, null, 2);
+    } catch {
+      return "[unserializable message summary]";
+    }
+  };
+
+  const messageSummary = summarizeMessages(context.messages);
+
+  if ("messages" in normalizedParameters) {
+    normalizedParameters.messages = "[redacted: see \"Messages (object keys only)\"]";
+  }
 
   let serializedParameters = "{}";
   try {
@@ -69,9 +112,16 @@ export function buildAccountErrorMessage(
 
   return [
     `Error: ${errorMessage}`,
+    context.provider ? `Provider: ${context.provider}` : null,
+    context.endpoint ? `Endpoint: ${context.endpoint}` : null,
     `Model: ${context.model}`,
     `Parameters: ${serializedParameters}`,
-  ].join("\n");
+    messageSummary
+      ? `Messages (object keys only): ${messageSummary}`
+      : null,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
 }
 
 export function shouldRotateToNextAccount(statusCode: number): boolean {

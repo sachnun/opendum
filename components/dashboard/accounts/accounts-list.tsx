@@ -5,8 +5,11 @@ import {
   AlertTriangle,
   AlertCircle,
   BarChart3,
+  Check,
+  Copy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -32,6 +35,7 @@ import {
   type GeminiCliQuotaGroupDisplay,
 } from "@/lib/actions/gemini-cli-quota";
 import { formatRelativeTime } from "@/lib/date";
+import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 
@@ -238,9 +242,116 @@ function LastErrorMessageDialog({
   occurredAt: Date | null;
   tone?: "error" | "warning";
 }) {
+  type ParsedErrorDetails = {
+    error: string | null;
+    provider: string | null;
+    endpoint: string | null;
+    model: string | null;
+    parameters: string | null;
+    messageObjects: string[] | null;
+  };
+
+  const parseStoredErrorMessage = (rawMessage: string): ParsedErrorDetails => {
+    const sections: Record<string, string[]> = {
+      error: [],
+      provider: [],
+      endpoint: [],
+      model: [],
+      parameters: [],
+      messages: [],
+    };
+
+    const labels: Array<{ key: keyof typeof sections; prefix: string }> = [
+      { key: "error", prefix: "Error:" },
+      { key: "provider", prefix: "Provider:" },
+      { key: "endpoint", prefix: "Endpoint:" },
+      { key: "model", prefix: "Model:" },
+      { key: "parameters", prefix: "Parameters:" },
+      { key: "messages", prefix: "Messages (object keys only):" },
+    ];
+
+    let currentKey: keyof typeof sections | null = null;
+
+    for (const line of rawMessage.split("\n")) {
+      const matchedLabel = labels.find((label) => line.startsWith(label.prefix));
+      if (matchedLabel) {
+        currentKey = matchedLabel.key;
+        const initialValue = line.slice(matchedLabel.prefix.length).trimStart();
+        if (initialValue) {
+          sections[currentKey].push(initialValue);
+        }
+        continue;
+      }
+
+      if (currentKey) {
+        sections[currentKey].push(line);
+      }
+    }
+
+    const parsedMessageObjects = (() => {
+      const rawMessages = sections.messages.join("\n").trim();
+      if (!rawMessages) {
+        return null;
+      }
+
+      try {
+        const parsed = JSON.parse(rawMessages) as Array<{
+          index?: number;
+          keys?: unknown;
+          type?: unknown;
+        }>;
+
+        if (!Array.isArray(parsed)) {
+          return null;
+        }
+
+        return parsed.map((entry, fallbackIndex) => {
+          const entryIndex = typeof entry.index === "number" ? entry.index : fallbackIndex;
+          if (Array.isArray(entry.keys)) {
+            const normalizedKeys = entry.keys.filter((value): value is string => typeof value === "string");
+            return `#${entryIndex}: ${normalizedKeys.length > 0 ? normalizedKeys.join(", ") : "(no keys)"}`;
+          }
+
+          if (typeof entry.type === "string") {
+            return `#${entryIndex}: (${entry.type})`;
+          }
+
+          return `#${entryIndex}: (unknown)`;
+        });
+      } catch {
+        return rawMessages
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+      }
+    })();
+
+    return {
+      error: sections.error.join("\n").trim() || null,
+      provider: sections.provider.join("\n").trim() || null,
+      endpoint: sections.endpoint.join("\n").trim() || null,
+      model: sections.model.join("\n").trim() || null,
+      parameters: sections.parameters.join("\n").trim() || null,
+      messageObjects: parsedMessageObjects,
+    };
+  };
+
+  const [copied, setCopied] = useState(false);
   const preview = message.length > 150 ? `${message.slice(0, 150)}...` : message;
   const previewColorClass =
     tone === "warning" ? "text-amber-600 dark:text-amber-400" : "text-red-500";
+  const details = parseStoredErrorMessage(message);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      toast.success("Error details copied");
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Failed to copy error details");
+    }
+  };
 
   return (
     <Dialog>
@@ -258,16 +369,82 @@ function LastErrorMessageDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Provider Error Details</DialogTitle>
-          <DialogDescription>
-            {code ? `HTTP ${code}` : "No status code"}
-            {occurredAt ? ` - ${formatRelativeTime(occurredAt)}` : ""}
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Provider Error Details</DialogTitle>
+              <DialogDescription>
+                {code ? `HTTP ${code}` : "No status code"}
+                {occurredAt ? ` - ${formatRelativeTime(occurredAt)}` : ""}
+              </DialogDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Copy error details"
+              onClick={handleCopy}
+              title="Copy error details"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto rounded-md border bg-muted/20 p-3">
-          <p className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
-            {message}
-          </p>
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/20 p-3">
+          {(details.provider || details.endpoint || details.model) && (
+            <div className="rounded-md border bg-background/70 p-2">
+              {details.provider && (
+                <p className="text-xs">
+                  <span className="text-muted-foreground">Provider:</span>{" "}
+                  <span className="font-mono">{details.provider}</span>
+                </p>
+              )}
+              {details.endpoint && (
+                <p className="text-xs">
+                  <span className="text-muted-foreground">Endpoint:</span>{" "}
+                  <span className="font-mono">{details.endpoint}</span>
+                </p>
+              )}
+              {details.model && (
+                <p className="text-xs">
+                  <span className="text-muted-foreground">Model:</span>{" "}
+                  <span className="font-mono">{details.model}</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {details.error && (
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Error</p>
+              <p className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+                {details.error}
+              </p>
+            </div>
+          )}
+
+          {details.parameters && (
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Body Parameters</p>
+              <p className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+                {details.parameters}
+              </p>
+            </div>
+          )}
+
+          {details.messageObjects && details.messageObjects.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">Messages (object keys only)</p>
+              <p className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+                {details.messageObjects.join("\n")}
+              </p>
+            </div>
+          )}
+
+          {!details.error && !details.parameters && (!details.messageObjects || details.messageObjects.length === 0) && (
+            <p className="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+              {message}
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

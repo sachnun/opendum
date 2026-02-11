@@ -796,6 +796,7 @@ export async function POST(request: NextRequest) {
       stream,
       ...rawErrorParams,
     };
+    const requestMessagesForError = (body as { messages?: unknown }).messages;
 
     for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
       const account = await getNextAvailableAccount(
@@ -923,6 +924,9 @@ export async function POST(request: NextRequest) {
 
           const detailedError = buildAccountErrorMessage(errorText, {
             model,
+            provider: account.provider,
+            endpoint: "/v1/messages",
+            messages: requestMessagesForError,
             parameters: requestParamsForError,
           });
 
@@ -1019,6 +1023,9 @@ export async function POST(request: NextRequest) {
         const statusCode = getErrorStatusCode(error);
         const detailedError = buildAccountErrorMessage(errorMessage, {
           model,
+          provider: account.provider,
+          endpoint: "/v1/messages",
+          messages: requestMessagesForError,
           parameters: requestParamsForError,
         });
 
