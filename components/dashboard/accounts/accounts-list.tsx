@@ -490,6 +490,8 @@ function AccountCard({
   const errorToneClass = hasSuccessAfterLastError
     ? "text-amber-600 dark:text-amber-400"
     : "text-red-500";
+  const errorCountToneClass = hasErrors ? errorToneClass : "text-muted-foreground";
+  const lastErrorToneClass = account.lastErrorAt ? errorToneClass : "text-muted-foreground";
 
   return (
     <Card className={`bg-card h-full flex flex-col ${!account.isActive ? "opacity-65" : ""}`}>
@@ -553,32 +555,31 @@ function AccountCard({
                 : "Never"}
             </span>
           </div>
-          {hasErrors && (
-            <>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Errors</span>
-                <span className={`font-medium ${errorToneClass}`}>{account.errorCount}</span>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Total Errors</span>
+            <span className={`font-medium ${errorCountToneClass}`}>{account.errorCount}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Last Error</span>
+            <span className={`font-medium ${lastErrorToneClass}`}>
+              {account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : "-"}
+            </span>
+          </div>
+          <div className="min-h-14 border-t">
+            {account.lastErrorMessage ? (
+              <LastErrorMessageDialog
+                message={account.lastErrorMessage}
+                code={account.lastErrorCode}
+                occurredAt={account.lastErrorAt}
+                tone={hasSuccessAfterLastError ? "warning" : "error"}
+              />
+            ) : (
+              <div className="w-full rounded-sm pt-2 text-left">
+                <span className="text-muted-foreground text-xs">Last Error Message:</span>
+                <span className="text-muted-foreground mt-1 block text-xs line-clamp-2 break-all">-</span>
               </div>
-              {account.lastErrorAt && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Last Error</span>
-                  <span className={`font-medium ${errorToneClass}`}>
-                    {formatRelativeTime(account.lastErrorAt)}
-                  </span>
-                </div>
-              )}
-              {account.lastErrorMessage && (
-                <div className="border-t">
-                  <LastErrorMessageDialog
-                    message={account.lastErrorMessage}
-                    code={account.lastErrorCode}
-                    occurredAt={account.lastErrorAt}
-                    tone={hasSuccessAfterLastError ? "warning" : "error"}
-                  />
-                </div>
-              )}
-            </>
-          )}
+            )}
+          </div>
 
           {supportsQuotaMonitor && (
             <div className="pt-3 mt-3 border-t space-y-2">
