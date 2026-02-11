@@ -65,6 +65,8 @@ function getProviderLabel(provider: string): string {
       return "Nvidia";
     case ProviderName.OLLAMA_CLOUD:
       return "Ollama Cloud";
+    case ProviderName.OPENROUTER:
+      return "OpenRouter";
     default:
       return provider;
   }
@@ -169,6 +171,9 @@ export default async function ModelsPage() {
   const codexModels = getModelsForProvider(ProviderName.CODEX);
   const nvidiaNimModels = getModelsForProvider(ProviderName.NVIDIA_NIM);
   const ollamaCloudModels = getModelsForProvider(ProviderName.OLLAMA_CLOUD);
+  const hasOpenRouterModelsInCatalog = allModels.some((model) =>
+    MODEL_REGISTRY[model]?.providers.includes(ProviderName.OPENROUTER)
+  );
 
   // Build available providers list (only those with models)
   const availableProviders: { id: string; label: string }[] = [];
@@ -192,6 +197,9 @@ export default async function ModelsPage() {
   }
   if (ollamaCloudModels.length > 0) {
     availableProviders.push({ id: ProviderName.OLLAMA_CLOUD, label: "Ollama Cloud" });
+  }
+  if (hasOpenRouterModelsInCatalog) {
+    availableProviders.push({ id: ProviderName.OPENROUTER, label: "OpenRouter" });
   }
 
   // Create models with provider info

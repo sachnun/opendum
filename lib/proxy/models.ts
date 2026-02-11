@@ -7,6 +7,10 @@ import {
   OLLAMA_CLOUD_MODEL_MAP,
   OLLAMA_CLOUD_MODELS,
 } from "./providers/ollama-cloud/constants";
+import {
+  OPENROUTER_MODEL_MAP,
+  OPENROUTER_MODELS,
+} from "./providers/openrouter/constants";
 
 /**
  * Model metadata from models.dev
@@ -43,7 +47,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // ===== GLM Models (Zhipu AI) =====
   "glm-4.7": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["glm-4.7:cloud"],
     meta: {
       contextLength: 204800,
       outputLimit: 131072,
@@ -57,7 +60,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "glm-5": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["glm-5:cloud"],
     meta: {
       contextLength: 202752,
       releaseDate: "2026-02-11",
@@ -68,7 +70,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "glm-4.6": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD],
-    aliases: ["glm-4.6:cloud"],
     meta: {
       contextLength: 204800,
       outputLimit: 131072,
@@ -99,7 +100,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // ===== MiniMax Models =====
   "minimax-m2.1": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["minimax-m2.1:cloud"],
     meta: {
       contextLength: 204800,
       outputLimit: 131072,
@@ -111,7 +111,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "minimax-m2": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["minimax-m2:cloud"],
     meta: {
       contextLength: 196608,
       outputLimit: 128000,
@@ -249,7 +248,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "kimi-k2.5": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["kimi-k2.5:cloud"],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -276,7 +274,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "kimi-k2-thinking": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["kimi-k2-thinking:cloud"],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -319,7 +316,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "deepseek-v3.2": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["deepseek-v3.2:cloud"],
     meta: {
       contextLength: 128000,
       outputLimit: 128000,
@@ -438,7 +434,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "gemini-3-flash-preview": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.OLLAMA_CLOUD],
-    aliases: ["gemini-3-flash-preview:cloud", "gemini-3-flash-preview:latest"],
+    aliases: ["gemini-3-flash-preview-latest"],
     meta: {
       contextLength: 1048576,
       outputLimit: 65536,
@@ -550,7 +546,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // ===== GPT-OSS Models =====
   "gpt-oss-120b-medium": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["gpt-oss:120b-cloud", "gpt-oss-120b"],
+    aliases: ["gpt-oss-120b"],
     meta: {
       contextLength: 131072,
       outputLimit: 32768,
@@ -559,6 +555,19 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       toolCall: true,
       vision: false,
       pricing: { input: 0.25, output: 0.69 },
+    },
+  },
+
+  // ===== OpenRouter Router Models =====
+  "openrouter-free": {
+    providers: [ProviderName.OPENROUTER],
+    description: "OpenRouter router that automatically selects a compatible free model.",
+    meta: {
+      contextLength: 200000,
+      reasoning: true,
+      toolCall: true,
+      vision: true,
+      pricing: { input: 0, output: 0 },
     },
   },
 
@@ -625,7 +634,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // ===== Ollama Cloud Models =====
   "cogito-2.1-671b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["cogito-2.1:671b-cloud", "cogito-2.1:671b"],
     meta: {
       contextLength: 163840,
       outputLimit: 32000,
@@ -637,7 +645,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "deepseek-v3.1-671b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["deepseek-v3.1:671b-cloud", "deepseek-v3.1:671b"],
     meta: {
       contextLength: 163840,
       outputLimit: 163840,
@@ -649,7 +656,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "devstral-2-123b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["devstral-2:123b-cloud", "devstral-2:123b"],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -661,7 +667,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "devstral-small-2-24b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["devstral-small-2:24b-cloud", "devstral-small-2:24b"],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -673,7 +678,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "gemma3-12b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["gemma3:12b-cloud", "gemma3:12b"],
     meta: {
       contextLength: 131072,
       outputLimit: 131072,
@@ -685,7 +689,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "gemma3-27b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["gemma3:27b-cloud", "gemma3:27b"],
     meta: {
       contextLength: 131072,
       outputLimit: 131072,
@@ -697,7 +700,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "gemma3-4b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["gemma3:4b-cloud", "gemma3:4b"],
     meta: {
       contextLength: 131072,
       outputLimit: 131072,
@@ -709,7 +711,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "gpt-oss-20b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["gpt-oss:20b-cloud", "gpt-oss:20b"],
     meta: {
       contextLength: 131072,
       outputLimit: 32768,
@@ -721,7 +722,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "kimi-k2-1t": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["kimi-k2:1t-cloud", "kimi-k2:1t"],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -734,7 +734,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "ministral-3-14b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["ministral-3:14b-cloud", "ministral-3:14b"],
     meta: {
       contextLength: 262144,
       outputLimit: 128000,
@@ -746,7 +745,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "ministral-3-3b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["ministral-3:3b-cloud", "ministral-3:3b"],
     meta: {
       contextLength: 262144,
       outputLimit: 128000,
@@ -758,7 +756,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "ministral-3-8b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["ministral-3:8b-cloud", "ministral-3:8b"],
     meta: {
       contextLength: 262144,
       outputLimit: 128000,
@@ -770,7 +767,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "mistral-large-3-675b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["mistral-large-3:675b-cloud", "mistral-large-3:675b"],
     meta: {
       contextLength: 262144,
       outputLimit: 262144,
@@ -782,7 +778,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "nemotron-3-nano-30b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["nemotron-3-nano:30b-cloud", "nemotron-3-nano:30b"],
     meta: {
       contextLength: 1048576,
       outputLimit: 131072,
@@ -794,7 +789,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "qwen3-coder-480b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["qwen3-coder:480b-cloud", "qwen3-coder:480b"],
     meta: {
       contextLength: 262144,
       outputLimit: 65536,
@@ -806,7 +800,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "qwen3-coder-next": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["qwen3-coder-next:cloud"],
     meta: {
       contextLength: 262144,
       outputLimit: 65536,
@@ -818,7 +811,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "qwen3-next-80b": {
     providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
-    aliases: ["qwen3-next:80b-cloud", "qwen3-next:80b"],
     meta: {
       contextLength: 262144,
       outputLimit: 32768,
@@ -830,7 +822,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "qwen3-vl-235b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["qwen3-vl:235b-cloud", "qwen3-vl:235b"],
     meta: {
       contextLength: 262144,
       outputLimit: 32768,
@@ -842,7 +833,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "qwen3-vl-235b-instruct": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["qwen3-vl:235b-instruct-cloud", "qwen3-vl:235b-instruct"],
     meta: {
       contextLength: 262144,
       outputLimit: 131072,
@@ -854,7 +844,6 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "rnj-1-8b": {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: ["rnj-1:8b-cloud", "rnj-1:8b"],
     meta: {
       contextLength: 32768,
       outputLimit: 4096,
@@ -959,14 +948,24 @@ for (const [model, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
 }
 
 const OLLAMA_CLOUD_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
-for (const [model, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP)) {
+for (const model of Object.keys(OLLAMA_CLOUD_MODEL_MAP)) {
   if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
     continue;
   }
 
   OLLAMA_CLOUD_FALLBACK_REGISTRY[model] = {
     providers: [ProviderName.OLLAMA_CLOUD],
-    aliases: [upstreamModel],
+  };
+}
+
+const OPENROUTER_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
+for (const model of Object.keys(OPENROUTER_MODEL_MAP)) {
+  if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
+    continue;
+  }
+
+  OPENROUTER_FALLBACK_REGISTRY[model] = {
+    providers: [ProviderName.OPENROUTER],
   };
 }
 
@@ -974,6 +973,7 @@ const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = {
   ...MODEL_REGISTRY,
   ...NVIDIA_NIM_FALLBACK_REGISTRY,
   ...OLLAMA_CLOUD_FALLBACK_REGISTRY,
+  ...OPENROUTER_FALLBACK_REGISTRY,
 };
 
 // Build reverse lookup for aliases
@@ -997,6 +997,16 @@ for (const [canonical, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP))
 }
 
 for (const [canonical, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
+  if (!EFFECTIVE_MODEL_REGISTRY[canonical]) {
+    continue;
+  }
+
+  if (!aliasToCanonical[upstreamModel]) {
+    aliasToCanonical[upstreamModel] = canonical;
+  }
+}
+
+for (const [canonical, upstreamModel] of Object.entries(OPENROUTER_MODEL_MAP)) {
   if (!EFFECTIVE_MODEL_REGISTRY[canonical]) {
     continue;
   }
@@ -1031,6 +1041,10 @@ export function getProvidersForModel(model: string): string[] {
 
     if (provider === ProviderName.NVIDIA_NIM) {
       return NVIDIA_NIM_MODELS.has(canonical);
+    }
+
+    if (provider === ProviderName.OPENROUTER) {
+      return OPENROUTER_MODELS.has(canonical);
     }
 
     return true;
