@@ -286,15 +286,24 @@ export const iflowProvider: Provider = {
       tokens = (tokens as unknown as { data: TokenResponse }).data;
     }
 
-    // Fetch new API key (may have changed)
-    const userInfo = await fetchUserInfo(tokens.access_token);
+    // Fetch new API key (may have changed).
+    // Do not fail token refresh if user-info endpoint is temporarily unavailable.
+    let userInfo: { apiKey: string; email: string } | null = null;
+    try {
+      userInfo = await fetchUserInfo(tokens.access_token);
+    } catch (error) {
+      console.warn(
+        "Iflow token refresh succeeded but failed to refresh user info:",
+        error
+      );
+    }
 
     return {
       accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
+      refreshToken: tokens.refresh_token || refreshToken,
       expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-      email: userInfo.email,
-      apiKey: userInfo.apiKey,
+      email: userInfo?.email || "",
+      apiKey: userInfo?.apiKey,
     };
   },
 
@@ -308,18 +317,35 @@ export const iflowProvider: Provider = {
       try {
         // Refresh the token
         const newTokens = await this.refreshToken(refreshTokenValue);
-        apiKey = newTokens.apiKey!;
+        const nextApiKey = newTokens.apiKey || apiKey;
+        if (!nextApiKey) {
+          throw new Error(
+            "Iflow refresh succeeded but API key is unavailable. Reconnect the account."
+          );
+        }
+        apiKey = nextApiKey;
+
+        const updateData: {
+          accessToken: string;
+          refreshToken: string;
+          expiresAt: Date;
+          email: string | null;
+          apiKey?: string;
+        } = {
+          accessToken: encrypt(newTokens.accessToken),
+          refreshToken: encrypt(newTokens.refreshToken),
+          expiresAt: newTokens.expiresAt,
+          email: newTokens.email || account.email,
+        };
+
+        if (newTokens.apiKey) {
+          updateData.apiKey = encrypt(newTokens.apiKey);
+        }
 
         // Update database IMMEDIATELY (rotating token concern)
         await prisma.providerAccount.update({
           where: { id: account.id },
-          data: {
-            accessToken: encrypt(newTokens.accessToken),
-            refreshToken: encrypt(newTokens.refreshToken),
-            apiKey: encrypt(apiKey),
-            expiresAt: newTokens.expiresAt,
-            email: newTokens.email || account.email,
-          },
+          data: updateData,
         });
 
       } catch (error) {
