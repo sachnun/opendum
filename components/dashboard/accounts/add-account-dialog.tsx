@@ -140,7 +140,11 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
 
 
 
-export function AddAccountDialog() {
+interface AddAccountDialogProps {
+  triggerClassName?: string;
+}
+
+export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
@@ -524,7 +528,7 @@ export function AddAccountDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className={cn("gap-2", triggerClassName)}>
           <Plus className="h-4 w-4" />
           Add Account
         </Button>

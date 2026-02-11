@@ -16,17 +16,31 @@ export function RefreshAccountsButton() {
   };
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="icon-sm"
-      onClick={handleRefresh}
-      disabled={isRefreshing}
-      className="size-9 sm:w-auto sm:px-4"
-      aria-label="Refresh provider accounts"
-    >
-      <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-      <span className="hidden sm:inline">Refresh</span>
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        className="hidden md:inline-flex"
+        aria-label="Refresh provider accounts"
+      >
+        <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+        <span>Refresh</span>
+      </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-lg"
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        className="fixed bottom-4 right-4 z-40 rounded-full shadow-lg md:hidden"
+        aria-label="Refresh provider accounts"
+      >
+        <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
+      </Button>
+    </>
   );
 }

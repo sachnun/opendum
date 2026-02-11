@@ -130,9 +130,9 @@ export default async function AccountsPage({
               <div className="pb-4 border-b border-border">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-xl font-semibold">Provider Accounts</h2>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <RefreshAccountsButton />
-                    <AddAccountDialog />
+                    <AddAccountDialog triggerClassName="w-full sm:w-auto" />
                   </div>
                 </div>
               </div>
