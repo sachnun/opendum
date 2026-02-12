@@ -693,11 +693,13 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
                       After login, copy the URL from address bar:{" "}
-                        <code className="rounded bg-muted px-1">
-                         {provider === "codex" || provider === "kiro"
-                           ? "http://localhost:1455/auth/callback?code=..."
-                           : "http://localhost:1/oauth2callback?code=..."}
-                       </code>
+                      <code className="rounded bg-muted px-1">
+                        {provider === "kiro"
+                          ? "http://localhost:49153/oauth/callback?code=..."
+                          : provider === "codex"
+                            ? "http://localhost:1455/auth/callback?code=..."
+                            : "http://localhost:1/oauth2callback?code=..."}
+                      </code>
                     </AlertDescription>
                   </Alert>
                 </>
@@ -807,9 +809,11 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                 </p>
                 <Input
                   placeholder={
-                    provider === "codex" || provider === "kiro"
-                      ? "http://localhost:1455/auth/callback?code=..."
-                      : "http://localhost:1/oauth2callback?code=..."
+                    provider === "kiro"
+                      ? "http://localhost:49153/oauth/callback?code=..."
+                      : provider === "codex"
+                        ? "http://localhost:1455/auth/callback?code=..."
+                        : "http://localhost:1/oauth2callback?code=..."
                   }
                   value={callbackUrl}
                   onChange={(e) => setCallbackUrl(e.target.value)}

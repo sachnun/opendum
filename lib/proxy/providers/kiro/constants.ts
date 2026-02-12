@@ -10,7 +10,7 @@ export const KIRO_API_BASE_URL =
 
 export const KIRO_BROWSER_REDIRECT_URI =
   process.env.KIRO_BROWSER_REDIRECT_URI ||
-  "http://localhost:1455/auth/callback";
+  "http://localhost:49153/oauth/callback";
 
 export const KIRO_OAUTH_AUTHORIZE_ENDPOINT = `${KIRO_AUTH_SERVICE_ENDPOINT}/login`;
 export const KIRO_OAUTH_TOKEN_ENDPOINT = `${KIRO_AUTH_SERVICE_ENDPOINT}/oauth/token`;
