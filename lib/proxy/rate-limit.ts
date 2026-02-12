@@ -1,4 +1,5 @@
 import type { ModelFamily } from "./providers/antigravity/transform/types";
+import { getRedisClient } from "@/lib/redis";
 
 interface RateLimitEntry {
   resetTime: number; // Unix timestamp (ms) when rate limit expires
@@ -8,16 +9,55 @@ interface RateLimitEntry {
 
 // Map: accountId -> family -> RateLimitEntry
 const rateLimits = new Map<string, Map<string, RateLimitEntry>>();
+const RATE_LIMIT_KEY_PREFIX = "opendum:rate-limit";
+const MAX_RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
-/**
- * Mark an account as rate limited for a specific model family
- */
-export function markRateLimited(
+function getRateLimitKey(accountId: string, family: ModelFamily): string {
+  return `${RATE_LIMIT_KEY_PREFIX}:${accountId}:${family}`;
+}
+
+function parseRateLimitEntry(rawEntry: string | null): RateLimitEntry | null {
+  if (!rawEntry) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawEntry) as Partial<RateLimitEntry>;
+    if (typeof parsed.resetTime !== "number" || !Number.isFinite(parsed.resetTime)) {
+      return null;
+    }
+
+    const entry: RateLimitEntry = { resetTime: parsed.resetTime };
+    if (typeof parsed.model === "string") {
+      entry.model = parsed.model;
+    }
+    if (typeof parsed.message === "string") {
+      entry.message = parsed.message;
+    }
+
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeRetryAfterMs(retryAfterMs: number): number {
+  if (!Number.isFinite(retryAfterMs)) {
+    return 60 * 60 * 1000;
+  }
+
+  const rounded = Math.floor(retryAfterMs);
+  return Math.max(1000, Math.min(MAX_RETRY_AFTER_MS, rounded));
+}
+
+function toTtlSeconds(ms: number): number {
+  return Math.max(1, Math.ceil(ms / 1000));
+}
+
+function setInMemoryRateLimit(
   accountId: string,
   family: ModelFamily,
-  retryAfterMs: number,
-  model?: string,
-  message?: string
+  entry: RateLimitEntry
 ): void {
   let accountLimits = rateLimits.get(accountId);
   if (!accountLimits) {
@@ -25,39 +65,10 @@ export function markRateLimited(
     rateLimits.set(accountId, accountLimits);
   }
 
-  accountLimits.set(family, {
-    resetTime: Date.now() + retryAfterMs,
-    model,
-    message,
-  });
+  accountLimits.set(family, entry);
 }
 
-/**
- * Check if an account is currently rate limited for a model family
- */
-export function isRateLimited(
-  accountId: string,
-  family: ModelFamily
-): boolean {
-  const accountLimits = rateLimits.get(accountId);
-  if (!accountLimits) return false;
-
-  const entry = accountLimits.get(family);
-  if (!entry) return false;
-
-  // Check if expired
-  if (Date.now() >= entry.resetTime) {
-    accountLimits.delete(family);
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Clear expired rate limits for an account
- */
-export function clearExpiredRateLimits(accountId: string): void {
+function clearExpiredInMemoryRateLimits(accountId: string): void {
   const accountLimits = rateLimits.get(accountId);
   if (!accountLimits) return;
 
@@ -73,10 +84,7 @@ export function clearExpiredRateLimits(accountId: string): void {
   }
 }
 
-/**
- * Get rate limit info for an account + family
- */
-export function getRateLimitInfo(
+function getInMemoryRateLimitEntry(
   accountId: string,
   family: ModelFamily
 ): RateLimitEntry | null {
@@ -86,35 +94,255 @@ export function getRateLimitInfo(
   const entry = accountLimits.get(family);
   if (!entry) return null;
 
-  // Check if expired
   if (Date.now() >= entry.resetTime) {
     accountLimits.delete(family);
+    if (accountLimits.size === 0) {
+      rateLimits.delete(accountId);
+    }
     return null;
   }
 
   return entry;
 }
 
+function deleteInMemoryRateLimit(accountId: string, family: ModelFamily): void {
+  const accountLimits = rateLimits.get(accountId);
+  if (!accountLimits) return;
+
+  accountLimits.delete(family);
+  if (accountLimits.size === 0) {
+    rateLimits.delete(accountId);
+  }
+}
+
+async function getRateLimitEntry(
+  accountId: string,
+  family: ModelFamily
+): Promise<RateLimitEntry | null> {
+  const redis = await getRedisClient();
+  if (!redis) {
+    return getInMemoryRateLimitEntry(accountId, family);
+  }
+
+  try {
+    const key = getRateLimitKey(accountId, family);
+    const rawEntry = await redis.get(key);
+    const entry = parseRateLimitEntry(rawEntry);
+
+    if (!rawEntry) {
+      return null;
+    }
+
+    if (!entry) {
+      await redis.del(key);
+      return null;
+    }
+
+    if (Date.now() >= entry.resetTime) {
+      await redis.del(key);
+      return null;
+    }
+
+    return entry;
+  } catch {
+    return getInMemoryRateLimitEntry(accountId, family);
+  }
+}
+
+/**
+ * Mark an account as rate limited for a specific model family
+ */
+export async function markRateLimited(
+  accountId: string,
+  family: ModelFamily,
+  retryAfterMs: number,
+  model?: string,
+  message?: string
+): Promise<void> {
+  const normalizedRetryAfterMs = normalizeRetryAfterMs(retryAfterMs);
+  const entry: RateLimitEntry = {
+    resetTime: Date.now() + normalizedRetryAfterMs,
+    model,
+    message,
+  };
+
+  setInMemoryRateLimit(accountId, family, entry);
+
+  const redis = await getRedisClient();
+  if (!redis) {
+    return;
+  }
+
+  try {
+    await redis.set(getRateLimitKey(accountId, family), JSON.stringify(entry), {
+      EX: toTtlSeconds(normalizedRetryAfterMs),
+    });
+  } catch {
+    // Ignore Redis errors and keep in-memory fallback
+  }
+}
+
+/**
+ * Check if an account is currently rate limited for a model family
+ */
+export async function isRateLimited(
+  accountId: string,
+  family: ModelFamily
+): Promise<boolean> {
+  const entry = await getRateLimitEntry(accountId, family);
+  return entry !== null;
+}
+
+/**
+ * Clear expired rate limits for an account
+ */
+export function clearExpiredRateLimits(accountId: string): void {
+  clearExpiredInMemoryRateLimits(accountId);
+}
+
+/**
+ * Get rate limit info for an account + family
+ */
+export async function getRateLimitInfo(
+  accountId: string,
+  family: ModelFamily
+): Promise<RateLimitEntry | null> {
+  return getRateLimitEntry(accountId, family);
+}
+
+/**
+ * Get set of currently rate-limited account IDs for a model family.
+ */
+export async function getRateLimitedAccountIds(
+  accountIds: string[],
+  family: ModelFamily
+): Promise<Set<string>> {
+  const limitedAccountIds = new Set<string>();
+
+  if (accountIds.length === 0) {
+    return limitedAccountIds;
+  }
+
+  const redis = await getRedisClient();
+
+  if (redis) {
+    const keys = accountIds.map((accountId) => getRateLimitKey(accountId, family));
+    const now = Date.now();
+
+    try {
+      const entries = await redis.mGet(keys);
+
+      for (let index = 0; index < entries.length; index++) {
+        const rawEntry = entries[index];
+        const key = keys[index];
+        const accountId = accountIds[index];
+
+        if (!rawEntry || !accountId) {
+          continue;
+        }
+
+        const entry = parseRateLimitEntry(rawEntry);
+        if (!entry) {
+          if (key) {
+            await redis.del(key);
+          }
+          continue;
+        }
+
+        if (now >= entry.resetTime) {
+          if (key) {
+            await redis.del(key);
+          }
+          continue;
+        }
+
+        limitedAccountIds.add(accountId);
+      }
+
+      return limitedAccountIds;
+    } catch {
+      // Fall through to in-memory fallback below
+    }
+  }
+
+  for (const accountId of accountIds) {
+    const entry = getInMemoryRateLimitEntry(accountId, family);
+    if (!entry) {
+      continue;
+    }
+
+    limitedAccountIds.add(accountId);
+  }
+
+  return limitedAccountIds;
+}
+
 /**
  * Get minimum wait time across multiple accounts for a family
  * Returns 0 if at least one account is not rate limited
  */
-export function getMinWaitTime(
+export async function getMinWaitTime(
   accountIds: string[],
   family: ModelFamily
-): number {
+): Promise<number> {
+  if (accountIds.length === 0) {
+    return 0;
+  }
+
+  const redis = await getRedisClient();
+
+  if (redis) {
+    const keys = accountIds.map((accountId) => getRateLimitKey(accountId, family));
+    const now = Date.now();
+
+    try {
+      const entries = await redis.mGet(keys);
+      let minWait = Infinity;
+
+      for (let index = 0; index < entries.length; index++) {
+        const rawEntry = entries[index];
+        const entry = parseRateLimitEntry(rawEntry);
+        const key = keys[index];
+
+        if (!rawEntry) {
+          return 0;
+        }
+
+        if (!entry) {
+          if (key) {
+            await redis.del(key);
+          }
+          return 0;
+        }
+
+        if (now >= entry.resetTime) {
+          if (key) {
+            await redis.del(key);
+          }
+          return 0;
+        }
+
+        const waitTime = entry.resetTime - now;
+        if (waitTime < minWait) {
+          minWait = waitTime;
+        }
+      }
+
+      return minWait === Infinity ? 0 : minWait;
+    } catch {
+      // Fall through to in-memory fallback below
+    }
+  }
+
   let minWait = Infinity;
   const now = Date.now();
 
   for (const accountId of accountIds) {
-    const accountLimits = rateLimits.get(accountId);
-    if (!accountLimits) return 0; // This account not rate limited
-
-    const entry = accountLimits.get(family);
+    const entry = getInMemoryRateLimitEntry(accountId, family);
     if (!entry) return 0; // This account not rate limited for this family
 
     if (now >= entry.resetTime) {
-      accountLimits.delete(family);
+      deleteInMemoryRateLimit(accountId, family);
       return 0; // Expired
     }
 

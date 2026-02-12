@@ -822,7 +822,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const waitTimeMs = getMinWaitTime(triedAccountIds, family);
+        const waitTimeMs = await getMinWaitTime(triedAccountIds, family);
         if (waitTimeMs > 0) {
           return NextResponse.json(
             {
@@ -890,7 +890,7 @@ export async function POST(request: NextRequest) {
             const rateLimitInfo = parseRateLimitError(errorBody);
 
             if (rateLimitInfo) {
-              markRateLimited(
+              await markRateLimited(
                 account.id,
                 family,
                 rateLimitInfo.retryAfterMs,
@@ -898,7 +898,7 @@ export async function POST(request: NextRequest) {
                 rateLimitInfo.message
               );
             } else {
-              markRateLimited(account.id, family, 60 * 60 * 1000);
+              await markRateLimited(account.id, family, 60 * 60 * 1000);
             }
 
             await logUsage({
@@ -914,7 +914,7 @@ export async function POST(request: NextRequest) {
 
             continue;
           } catch {
-            markRateLimited(account.id, family, 60 * 60 * 1000);
+            await markRateLimited(account.id, family, 60 * 60 * 1000);
             continue;
           }
         }
@@ -1072,7 +1072,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const waitTimeMs = getMinWaitTime(triedAccountIds, family);
+    const waitTimeMs = await getMinWaitTime(triedAccountIds, family);
     if (waitTimeMs > 0) {
       return NextResponse.json(
         {

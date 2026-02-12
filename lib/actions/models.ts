@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { invalidateDisabledModelsCache } from "@/lib/proxy/auth";
 import {
   getModelLookupKeys,
   isModelSupported,
@@ -56,6 +57,8 @@ export async function setModelEnabled(
         },
       });
     }
+
+    await invalidateDisabledModelsCache(session.user.id);
 
     revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/models");

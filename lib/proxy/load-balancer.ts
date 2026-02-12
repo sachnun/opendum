@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { ProviderAccount } from "@prisma/client";
 import { getProvidersForModel } from "./models";
-import { isRateLimited, clearExpiredRateLimits } from "./rate-limit";
+import { getRateLimitedAccountIds } from "./rate-limit";
 import { getModelFamily } from "./providers/antigravity/converter";
 
 const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
@@ -118,10 +118,13 @@ export async function getNextAvailableAccount(
   // Prioritize paid accounts first, then free accounts
   let selectedAccount: ProviderAccount | null = null;
   const now = Date.now();
+  const prioritizedAccounts = [...paidAccounts, ...freeAccounts];
+  const rateLimitedAccountIds = await getRateLimitedAccountIds(
+    prioritizedAccounts.map((account) => account.id),
+    family
+  );
 
-  for (const acc of [...paidAccounts, ...freeAccounts]) {
-    clearExpiredRateLimits(acc.id);
-
+  for (const acc of prioritizedAccounts) {
     if (acc.status === "failed" && acc.statusChangedAt) {
       const elapsed = now - acc.statusChangedAt.getTime();
       if (elapsed < FAILED_ACCOUNT_RETRY_COOLDOWN_MS) {
@@ -129,7 +132,7 @@ export async function getNextAvailableAccount(
       }
     }
 
-    if (!isRateLimited(acc.id, family)) {
+    if (!rateLimitedAccountIds.has(acc.id)) {
       selectedAccount = acc;
       break;
     }

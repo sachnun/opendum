@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateApiKey, hashString, getKeyPreview, encrypt, decrypt } from "@/lib/encryption";
+import { invalidateApiKeyValidationCache } from "@/lib/proxy/auth";
 import { isModelSupported, resolveModelAlias } from "@/lib/proxy/models";
 import { revalidatePath } from "next/cache";
 
@@ -104,6 +105,8 @@ export async function toggleApiKey(id: string): Promise<ActionResult> {
       data: { isActive: !apiKey.isActive },
     });
 
+    await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+
     revalidatePath("/dashboard/api-keys");
 
     return { success: true, data: undefined };
@@ -137,6 +140,8 @@ export async function deleteApiKey(id: string): Promise<ActionResult> {
     await prisma.proxyApiKey.delete({
       where: { id },
     });
+
+    await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
 
     revalidatePath("/dashboard/api-keys");
 
@@ -205,7 +210,7 @@ export async function updateApiKeyModelAccess(
   try {
     const apiKey = await prisma.proxyApiKey.findFirst({
       where: { id, userId: session.user.id },
-      select: { id: true },
+      select: { id: true, keyHash: true },
     });
 
     if (!apiKey) {
@@ -237,6 +242,8 @@ export async function updateApiKeyModelAccess(
         modelAccessList: true,
       },
     });
+
+    await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
 
     revalidatePath("/dashboard/api-keys");
     revalidatePath("/dashboard");
