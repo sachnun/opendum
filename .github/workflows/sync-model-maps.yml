@@ -15,56 +15,19 @@ on:
           - ollama-cloud
   schedule:
     - cron: "22 3 * * *"
-    - cron: "47 2 * * *"
-    - cron: "17 2 * * *"
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  sync-models:
-    name: ${{ matrix.job_name }}
+  sync-openrouter:
+    name: Sync OpenRouter Free Models
     if: >-
       (github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.provider == 'all' || github.event.inputs.provider == matrix.provider)) ||
-      (github.event_name == 'schedule' && github.event.schedule == matrix.cron)
+      (github.event.inputs.provider == 'all' || github.event.inputs.provider == 'openrouter')) ||
+      github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - provider: openrouter
-            cron: "22 3 * * *"
-            job_name: Sync OpenRouter Free Models
-            command: npm run sync:openrouter
-            source_url: https://openrouter.ai/api/v1/models
-            scope: chat-capable models with pricing.prompt=0 and pricing.completion=0
-            script_path: scripts/sync-openrouter-free-models.mjs
-            commit_message: "chore: sync OpenRouter free model map"
-            pr_title: "chore: sync OpenRouter free model map"
-            branch: chore/sync-openrouter-free-model-map
-          - provider: nvidia-nim
-            cron: "47 2 * * *"
-            job_name: Sync Nvidia NIM Models
-            command: npm run sync:nvidia-nim
-            source_url: https://integrate.api.nvidia.com/v1/models
-            scope: chat-capable models only
-            script_path: scripts/sync-nvidia-nim-models.mjs
-            commit_message: "chore: sync Nvidia NIM model map"
-            pr_title: "chore: sync Nvidia NIM model map"
-            branch: chore/sync-nvidia-nim-model-map
-          - provider: ollama-cloud
-            cron: "17 2 * * *"
-            job_name: Sync Ollama Cloud Models
-            command: npm run sync:ollama-cloud
-            source_url: https://ollama.com/v1/models
-            scope: all available models
-            script_path: scripts/sync-ollama-cloud-models.mjs
-            commit_message: "chore: sync Ollama Cloud model map"
-            pr_title: "chore: sync Ollama Cloud model map"
-            branch: chore/sync-ollama-cloud-model-map
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -78,19 +41,93 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Sync model map
-        run: ${{ matrix.command }}
+      - name: Sync OpenRouter free model map
+        run: npm run sync:openrouter
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v7
         with:
-          commit-message: ${{ matrix.commit_message }}
-          title: ${{ matrix.pr_title }}
+          commit-message: "chore: sync OpenRouter free model map"
+          title: "chore: sync OpenRouter free model map"
           body: |
             This PR was generated automatically by the scheduled model sync workflow.
 
-            - Source: `${{ matrix.source_url }}`
-            - Scope: ${{ matrix.scope }}
-            - Script: `${{ matrix.script_path }}`
-          branch: ${{ matrix.branch }}
+            - Source: `https://openrouter.ai/api/v1/models`
+            - Scope: chat-capable models with `pricing.prompt=0` and `pricing.completion=0`
+            - Script: `scripts/sync-openrouter-free-models.mjs`
+          branch: chore/sync-openrouter-free-model-map
+          delete-branch: true
+
+  sync-nvidia-nim:
+    name: Sync Nvidia NIM Models
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.provider == 'all' || github.event.inputs.provider == 'nvidia-nim')) ||
+      github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Sync Nvidia NIM model map
+        run: npm run sync:nvidia-nim
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: sync Nvidia NIM model map"
+          title: "chore: sync Nvidia NIM model map"
+          body: |
+            This PR was generated automatically by the scheduled model sync workflow.
+
+            - Source: `https://integrate.api.nvidia.com/v1/models`
+            - Scope: chat-capable models only
+            - Script: `scripts/sync-nvidia-nim-models.mjs`
+          branch: chore/sync-nvidia-nim-model-map
+          delete-branch: true
+
+  sync-ollama-cloud:
+    name: Sync Ollama Cloud Models
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.provider == 'all' || github.event.inputs.provider == 'ollama-cloud')) ||
+      github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Sync Ollama Cloud model map
+        run: npm run sync:ollama-cloud
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: sync Ollama Cloud model map"
+          title: "chore: sync Ollama Cloud model map"
+          body: |
+            This PR was generated automatically by the scheduled model sync workflow.
+
+            - Source: `https://ollama.com/v1/models`
+            - Scope: all available models
+            - Script: `scripts/sync-ollama-cloud-models.mjs`
+          branch: chore/sync-ollama-cloud-model-map
           delete-branch: true
