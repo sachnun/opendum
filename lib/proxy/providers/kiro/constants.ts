@@ -21,17 +21,43 @@ export const KIRO_OAUTH_IDP = process.env.KIRO_OAUTH_IDP || "Google";
 export const KIRO_DEFAULT_MODEL = "claude-sonnet-4-5";
 
 export const KIRO_MODEL_MAP: Record<string, string> = {
+  // Claude Haiku
+  "claude-3-haiku": "claude-3-haiku",
   "claude-haiku-4-5": "claude-haiku-4.5",
   "claude-haiku-4.5": "claude-haiku-4.5",
+  "claude-haiku4.5": "claude-haiku-4.5",
+
+  // Claude Sonnet (legacy)
+  "claude-3-7-sonnet": "CLAUDE_3_7_SONNET_20250219_V1_0",
+  "claude-3.7-sonnet": "CLAUDE_3_7_SONNET_20250219_V1_0",
+  "claude-3-7-sonnet-latest": "CLAUDE_3_7_SONNET_20250219_V1_0",
+  "claude-3.7-sonnet-latest": "CLAUDE_3_7_SONNET_20250219_V1_0",
+
+  // Claude Opus 4.5
   "claude-opus-4-5": "claude-opus-4.5",
   "claude-opus-4.5": "claude-opus-4.5",
+  "claude-opus4.5": "claude-opus-4.5",
+
+  // Claude Opus
+  "claude-opus-4": "claude-opus-4",
+  "claude-opus-4-0": "claude-opus-4",
+  "claude-opus-4.0": "claude-opus-4",
+
+  "claude-opus-4-1": "claude-opus-4.1",
+  "claude-opus-4.1": "claude-opus-4.1",
+
   "claude-opus-4-6": "claude-opus-4.6",
   "claude-opus-4.6": "claude-opus-4.6",
+  "claude-opus4.6": "claude-opus-4.6",
+
   "claude-sonnet-4": "claude-sonnet-4",
+  "claude-sonnet-4-0": "claude-sonnet-4",
+  "claude-sonnet-4.0": "claude-sonnet-4",
+  "claude-sonnet4.0": "claude-sonnet-4",
+
   "claude-sonnet-4-5": "CLAUDE_SONNET_4_5_20250929_V1_0",
   "claude-sonnet-4.5": "CLAUDE_SONNET_4_5_20250929_V1_0",
-  "claude-sonnet-4-5-20250929": "CLAUDE_SONNET_4_5_20250929_V1_0",
-  "claude-sonnet-4.5-20250929": "CLAUDE_SONNET_4_5_20250929_V1_0",
+  "claude-sonnet4.5": "CLAUDE_SONNET_4_5_20250929_V1_0",
 };
 
 export const KIRO_MODELS = new Set(Object.keys(KIRO_MODEL_MAP));

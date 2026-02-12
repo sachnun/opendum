@@ -501,17 +501,39 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
 
-  // ===== Claude Models (Anthropic via Antigravity) =====
+  // ===== Claude Models (Anthropic via Antigravity/Kiro) =====
+  "claude-3-haiku": {
+    providers: [ProviderName.KIRO],
+  },
+  "claude-3-7-sonnet": {
+    providers: [ProviderName.KIRO],
+    aliases: [
+      "claude-3.7-sonnet",
+      "claude-3-7-sonnet-latest",
+      "claude-3.7-sonnet-latest",
+    ],
+  },
   "claude-haiku-4-5": {
     providers: [ProviderName.KIRO],
-    aliases: ["claude-haiku-4.5"],
+    aliases: [
+      "claude-haiku-4.5",
+      "claude-haiku4.5",
+    ],
   },
   "claude-sonnet-4": {
     providers: [ProviderName.KIRO],
+    aliases: [
+      "claude-sonnet-4-0",
+      "claude-sonnet-4.0",
+      "claude-sonnet4.0",
+    ],
   },
   "claude-sonnet-4-5": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
-    aliases: ["claude-sonnet-4.5"],
+    aliases: [
+      "claude-sonnet-4.5",
+      "claude-sonnet4.5",
+    ],
     meta: {
       contextLength: 200000,
       outputLimit: 64000,
@@ -523,9 +545,25 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 3, output: 15 },
     },
   },
+  "claude-opus-4": {
+    providers: [ProviderName.KIRO],
+    aliases: [
+      "claude-opus-4-0",
+      "claude-opus-4.0",
+    ],
+  },
+  "claude-opus-4-1": {
+    providers: [ProviderName.KIRO],
+    aliases: [
+      "claude-opus-4.1",
+    ],
+  },
   "claude-opus-4-5": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
-    aliases: ["claude-opus-4.5"],
+    aliases: [
+      "claude-opus-4.5",
+      "claude-opus4.5",
+    ],
     meta: {
       contextLength: 200000,
       outputLimit: 64000,
@@ -539,7 +577,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "claude-opus-4-6": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
-    aliases: ["claude-opus-4.6"],
+    aliases: ["claude-opus-4.6", "claude-opus4.6"],
     meta: {
       contextLength: 1000000,
       outputLimit: 128000,
