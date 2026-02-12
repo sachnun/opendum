@@ -27,6 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { MODEL_FAMILY_SORT_ORDER, getModelFamily } from "@/lib/model-families";
 
 export interface ModelOption {
   id: string; // unique: "model"
@@ -69,35 +70,13 @@ interface ChatPanelProps {
   disabled?: boolean;
 }
 
-const FAMILY_ORDER = [
-  "Qwen",
-  "DeepSeek",
-  "Gemini",
-  "Claude",
-  "Kimi",
-  "GLM",
-  "MiniMax",
-  "GPT-OSS",
-  "Other",
-];
-
-function getModelFamily(modelName: string): string {
-  if (modelName.startsWith("qwen")) return "Qwen";
-  if (modelName.startsWith("deepseek-")) return "DeepSeek";
-  if (modelName.startsWith("gemini-")) return "Gemini";
-  if (modelName.startsWith("claude-")) return "Claude";
-  if (modelName.startsWith("kimi-")) return "Kimi";
-  if (modelName.startsWith("glm-")) return "GLM";
-  if (modelName.startsWith("minimax-")) return "MiniMax";
-  if (modelName.startsWith("gpt-oss-")) return "GPT-OSS";
-  return "Other";
-}
+const FAMILY_ORDER = MODEL_FAMILY_SORT_ORDER;
 
 function groupModelsByFamily(models: ModelOption[]) {
   const groups: Record<string, ModelOption[]> = {};
 
   for (const model of models) {
-    const family = getModelFamily(model.name);
+    const family = getModelFamily(model.id);
     if (!groups[family]) {
       groups[family] = [];
     }
@@ -108,9 +87,20 @@ function groupModelsByFamily(models: ModelOption[]) {
 }
 
 function getSortedFamilies(groups: Record<string, ModelOption[]>): string[] {
-  return Object.keys(groups).sort(
-    (a, b) => FAMILY_ORDER.indexOf(a) - FAMILY_ORDER.indexOf(b)
+  const order = new Map<string, number>(
+    FAMILY_ORDER.map((family, index) => [family, index])
   );
+
+  return Object.keys(groups).sort((a, b) => {
+    const orderA = order.get(a) ?? Number.MAX_SAFE_INTEGER;
+    const orderB = order.get(b) ?? Number.MAX_SAFE_INTEGER;
+
+    if (orderA === orderB) {
+      return a.localeCompare(b);
+    }
+
+    return orderA - orderB;
+  });
 }
 
 function formatProviderName(provider: string): string {

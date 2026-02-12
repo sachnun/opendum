@@ -7,6 +7,7 @@ import {
   FlaskConical,
   LucideIcon,
 } from "lucide-react";
+import { MODEL_FAMILY_NAV_ITEMS } from "@/lib/model-families";
 
 export interface NavItem {
   name: string;
@@ -76,12 +77,11 @@ export const primaryNavigation: NavItem[] = [
     name: "Models",
     href: "/dashboard/models",
     icon: Cpu,
-    children: [
-      { name: "OpenAI", href: "/dashboard/models", anchorId: "openai-models" },
-      { name: "Claude", href: "/dashboard/models", anchorId: "claude-models" },
-      { name: "Gemini", href: "/dashboard/models", anchorId: "gemini-models" },
-      { name: "Other", href: "/dashboard/models", anchorId: "other-models" },
-    ],
+    children: MODEL_FAMILY_NAV_ITEMS.map((family) => ({
+      name: family.name,
+      href: "/dashboard/models",
+      anchorId: family.anchorId,
+    })),
   },
 ];
 

@@ -4,6 +4,12 @@ import { useState, useMemo, useCallback } from "react";
 import { ModelCard } from "./model-card";
 import { toast } from "sonner";
 import {
+  FEATURED_MODEL_FAMILIES,
+  MODEL_FAMILY_ANCHOR_IDS,
+  getModelFamily,
+  type ModelFamily,
+} from "@/lib/model-families";
+import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
@@ -30,65 +36,10 @@ interface ModelsListProps {
   availableProviders: { id: string; label: string }[];
 }
 
-const FEATURED_FAMILIES = [
-  "OpenAI",
-  "Claude",
-  "Gemini",
-  "Qwen",
-  "DeepSeek",
-  "Kimi",
-  "MiniMax",
-  "Z.AI",
-] as const;
-
-type FeaturedFamily = (typeof FEATURED_FAMILIES)[number];
-
-const FAMILY_ANCHOR_IDS: Record<FeaturedFamily, string> = {
-  OpenAI: "openai-models",
-  Claude: "claude-models",
-  Gemini: "gemini-models",
-  Qwen: "qwen-models",
-  DeepSeek: "deepseek-models",
-  Kimi: "kimi-models",
-  MiniMax: "minimax-models",
-  "Z.AI": "zai-models",
-};
-
 interface ModelSection {
   name: string;
   anchorId: string;
   models: ModelWithStats[];
-}
-
-function getModelFamily(modelId: string): FeaturedFamily | "Others" {
-  const normalizedModelId = modelId.toLowerCase();
-
-  if (normalizedModelId.startsWith("gpt-")) {
-    return "OpenAI";
-  }
-  if (normalizedModelId.startsWith("claude-")) {
-    return "Claude";
-  }
-  if (normalizedModelId.startsWith("gemini-")) {
-    return "Gemini";
-  }
-  if (normalizedModelId.startsWith("qwen")) {
-    return "Qwen";
-  }
-  if (normalizedModelId.startsWith("deepseek")) {
-    return "DeepSeek";
-  }
-  if (normalizedModelId.startsWith("kimi-")) {
-    return "Kimi";
-  }
-  if (normalizedModelId.startsWith("minimax-")) {
-    return "MiniMax";
-  }
-  if (normalizedModelId.startsWith("glm-") || normalizedModelId.startsWith("z-ai")) {
-    return "Z.AI";
-  }
-
-  return "Others";
 }
 
 export function ModelsList({ models, availableProviders }: ModelsListProps) {
@@ -189,7 +140,7 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
   );
 
   const modelSections = useMemo(() => {
-    const groupedModels = new Map<string, ModelWithStats[]>();
+    const groupedModels = new Map<ModelFamily, ModelWithStats[]>();
 
     for (const model of filteredModels) {
       const family = getModelFamily(model.id);
@@ -204,7 +155,7 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
 
     const sections: ModelSection[] = [];
 
-    for (const family of FEATURED_FAMILIES) {
+    for (const family of FEATURED_MODEL_FAMILIES) {
       const familyModels = groupedModels.get(family);
       if (!familyModels?.length) {
         continue;
@@ -212,7 +163,7 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
 
       sections.push({
         name: family,
-        anchorId: FAMILY_ANCHOR_IDS[family],
+        anchorId: MODEL_FAMILY_ANCHOR_IDS[family],
         models: familyModels,
       });
     }
