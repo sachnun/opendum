@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertCircle, Bot, KeyRound, Link2, Terminal, type LucideIcon } from "lucide-react";
+import { AlertCircle, KeyRound, Link2, Terminal, type LucideIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { headers } from "next/headers";
 const DEFAULT_MODEL = "iflow/deepseek-v3.2";
 
 type SnippetPreset = {
-  value: "claude" | "openai" | "anthropic";
+  value: "openai" | "anthropic" | "responses";
   tabLabel: string;
   tabHint: string;
   panelTitle: string;
@@ -35,10 +35,6 @@ export default async function UsagePage() {
         : "https";
   const baseUrl = `${protocol}://${host}`;
 
-  const claudeCodeExample = `ANTHROPIC_BASE_URL=${baseUrl}
-ANTHROPIC_AUTH_TOKEN=sk-your-api-key-here
-ANTHROPIC_DEFAULT_SONNET_MODEL=${DEFAULT_MODEL}`;
-
   const openAiCurlExample = `API_KEY=sk-your-api-key-here
 BASE_URL=${baseUrl}
 
@@ -50,6 +46,17 @@ curl --request POST "$BASE_URL/v1/chat/completions" \\
     "messages": [
       { "role": "user", "content": "Hello!" }
     ]
+  }'`;
+
+  const responsesCurlExample = `API_KEY=sk-your-api-key-here
+BASE_URL=${baseUrl}
+
+curl --request POST "$BASE_URL/v1/responses" \\
+  --header "Content-Type: application/json" \\
+  --header "Authorization: Bearer $API_KEY" \\
+  --data '{
+    "model": "${DEFAULT_MODEL}",
+    "input": "Hello!"
   }'`;
 
   const anthropicCurlExample = `API_KEY=sk-your-api-key-here
@@ -68,18 +75,6 @@ curl --request POST "$BASE_URL/v1/messages" \\
   }'`;
 
   const snippetPresets: SnippetPreset[] = [
-    {
-      value: "claude",
-      tabLabel: "Claude Code / opencode",
-      tabHint: "Best for local CLI workflows",
-      panelTitle: "Anthropic-style environment setup",
-      panelHint: "Set once in your shell and your client will use this gateway by default.",
-      protocolBadge: "SDK / CLI",
-      endpoint: "Resolved by your client",
-      auth: "ANTHROPIC_AUTH_TOKEN=sk-your-api-key-here",
-      icon: Bot,
-      code: claudeCodeExample,
-    },
     {
       value: "openai",
       tabLabel: "cURL OpenAI",
@@ -103,6 +98,18 @@ curl --request POST "$BASE_URL/v1/messages" \\
       auth: "x-api-key: <api_key>",
       icon: Terminal,
       code: anthropicCurlExample,
+    },
+    {
+      value: "responses",
+      tabLabel: "cURL OpenAI Responses",
+      tabHint: "POST /v1/responses",
+      panelTitle: "OpenAI Responses request",
+      panelHint: "Use Bearer auth and send input using Responses API format.",
+      protocolBadge: "REST",
+      endpoint: "POST /v1/responses",
+      auth: "Authorization: Bearer <api_key>",
+      icon: Terminal,
+      code: responsesCurlExample,
     },
   ];
 
@@ -176,9 +183,9 @@ curl --request POST "$BASE_URL/v1/messages" \\
           <CardTitle>Compatibility reference</CardTitle>
           <CardDescription>Use the same base URL and pick the endpoint style you need.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
+        <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-            <Badge variant="outline">OpenAI compatible</Badge>
+            <Badge variant="outline">OpenAI-compatible</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
               <code className="text-sm">POST /v1/chat/completions</code>
@@ -190,7 +197,7 @@ curl --request POST "$BASE_URL/v1/messages" \\
           </div>
 
           <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-            <Badge variant="outline">Anthropic compatible</Badge>
+            <Badge variant="outline">Anthropic</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
               <code className="text-sm">POST /v1/messages</code>
@@ -201,6 +208,18 @@ curl --request POST "$BASE_URL/v1/messages" \\
                 <code className="block text-sm">x-api-key: &lt;api_key&gt;</code>
                 <code className="block text-sm">anthropic-version: 2023-06-01</code>
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+            <Badge variant="outline">OpenAI Responses</Badge>
+            <div>
+              <p className="text-xs text-muted-foreground">Endpoint</p>
+              <code className="text-sm">POST /v1/responses</code>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Auth header</p>
+              <code className="text-sm">Authorization: Bearer &lt;api_key&gt;</code>
             </div>
           </div>
         </CardContent>
@@ -221,7 +240,7 @@ curl --request POST "$BASE_URL/v1/messages" \\
             </div>
           </div>
 
-          <Tabs defaultValue="claude" className="w-full">
+          <Tabs defaultValue="openai" className="w-full">
             <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3">
               {snippetPresets.map((snippet) => (
                 <TabsTrigger
@@ -281,11 +300,11 @@ curl --request POST "$BASE_URL/v1/messages" \\
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-lg border border-border/70 bg-muted/20">
+                  <div className="overflow-hidden rounded-lg border border-border/70">
                     <CodeBlock
                       language="bash"
                       code={snippet.code}
-                      className="rounded-none bg-transparent p-4"
+                      className="rounded-none !bg-transparent p-4 [&_pre]:!bg-transparent"
                       showCopyButton
                       copyButtonLabel={`${snippet.tabLabel} snippet`}
                     />
