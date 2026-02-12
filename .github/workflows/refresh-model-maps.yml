@@ -1,0 +1,45 @@
+name: Refresh Provider Model Maps
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "22 3 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh-model-maps:
+    name: Refresh Provider Model Maps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Refresh provider model maps
+        run: npm run models:refresh
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: refresh provider model maps"
+          title: "chore: refresh provider model maps"
+          body: |
+            This PR was generated automatically by the scheduled model refresh workflow.
+
+            - Source: `https://openrouter.ai/api/v1/models`
+            - Source: `https://integrate.api.nvidia.com/v1/models`
+            - Source: `https://ollama.com/v1/models`
+            - Script: `npm run models:refresh`
+          branch: chore/refresh-provider-model-maps
+          delete-branch: true

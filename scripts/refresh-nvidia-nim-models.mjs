@@ -150,7 +150,6 @@ async function fetchNvidiaModelIds() {
       const response = await fetch(NVIDIA_MODELS_URL, {
         headers: {
           Accept: "application/json",
-          "User-Agent": "opendum-sync-nvidia-nim-models",
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -184,8 +183,6 @@ async function fetchNvidiaModelIds() {
 }
 
 async function main() {
-  const checkOnly = process.argv.includes("--check");
-
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const constantsPath = resolve(scriptDir, "../lib/proxy/providers/nvidia-nim/constants.ts");
 
@@ -199,12 +196,6 @@ async function main() {
 
   if (nextFile === currentFile) {
     console.log(`Nvidia NIM model map is already up to date (${nextMap.size} keys).`);
-    return;
-  }
-
-  if (checkOnly) {
-    console.error("Nvidia NIM model map is out of date. Run: npm run sync:nvidia-nim");
-    process.exitCode = 1;
     return;
   }
 

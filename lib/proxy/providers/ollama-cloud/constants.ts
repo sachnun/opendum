@@ -41,6 +41,7 @@ export const OLLAMA_CLOUD_MODEL_MAP: Record<string, string> = {
   "kimi-k2.5": "kimi-k2.5",
   "minimax-m2": "minimax-m2",
   "minimax-m2.1": "minimax-m2.1",
+  "minimax-m2.5": "minimax-m2.5",
   "ministral-3-14b": "ministral-3:14b",
   "ministral-3-3b": "ministral-3:3b",
   "ministral-3-8b": "ministral-3:8b",

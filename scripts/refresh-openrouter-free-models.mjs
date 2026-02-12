@@ -118,7 +118,6 @@ async function fetchOpenRouterFreeModelIds() {
       const response = await fetch(OPENROUTER_MODELS_URL, {
         headers: {
           Accept: "application/json",
-          "User-Agent": "opendum-sync-openrouter-free-models",
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -155,8 +154,6 @@ async function fetchOpenRouterFreeModelIds() {
 }
 
 async function main() {
-  const checkOnly = process.argv.includes("--check");
-
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const constantsPath = resolve(
     scriptDir,
@@ -176,12 +173,6 @@ async function main() {
 
   if (nextFile === currentFile) {
     console.log(`OpenRouter free model map is already up to date (${modelMap.size} keys).`);
-    return;
-  }
-
-  if (checkOnly) {
-    console.error("OpenRouter free model map is out of date. Run: npm run sync:openrouter");
-    process.exitCode = 1;
     return;
   }
 

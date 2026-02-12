@@ -66,7 +66,6 @@ async function fetchOllamaCloudModelIds() {
       const response = await fetch(OLLAMA_MODELS_URL, {
         headers: {
           Accept: "application/json",
-          "User-Agent": "opendum-sync-ollama-cloud-models",
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -102,8 +101,6 @@ async function fetchOllamaCloudModelIds() {
 }
 
 async function main() {
-  const checkOnly = process.argv.includes("--check");
-
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const constantsPath = resolve(
     scriptDir,
@@ -123,12 +120,6 @@ async function main() {
 
   if (nextFile === currentFile) {
     console.log(`Ollama Cloud model map is already up to date (${modelMap.size} keys).`);
-    return;
-  }
-
-  if (checkOnly) {
-    console.error("Ollama Cloud model map is out of date. Run: npm run sync:ollama-cloud");
-    process.exitCode = 1;
     return;
   }
 

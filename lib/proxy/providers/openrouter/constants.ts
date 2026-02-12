@@ -49,6 +49,8 @@ export const OPENROUTER_MODEL_MAP: Record<string, string> = {
   "qwen-qwen3-4b": "qwen/qwen3-4b:free",
   "qwen-qwen3-coder": "qwen/qwen3-coder:free",
   "qwen-qwen3-next-80b-a3b-instruct": "qwen/qwen3-next-80b-a3b-instruct:free",
+  "qwen-qwen3-vl-235b-a22b-thinking": "qwen/qwen3-vl-235b-a22b-thinking",
+  "qwen-qwen3-vl-30b-a3b-thinking": "qwen/qwen3-vl-30b-a3b-thinking",
   "stepfun-step-3.5-flash": "stepfun/step-3.5-flash:free",
   "tngtech-deepseek-r1t-chimera": "tngtech/deepseek-r1t-chimera:free",
   "tngtech-deepseek-r1t2-chimera": "tngtech/deepseek-r1t2-chimera:free",
