@@ -30,7 +30,16 @@ interface ModelsListProps {
   availableProviders: { id: string; label: string }[];
 }
 
-const FEATURED_FAMILIES = ["OpenAI", "Claude", "Gemini"] as const;
+const FEATURED_FAMILIES = [
+  "OpenAI",
+  "Claude",
+  "Gemini",
+  "Qwen",
+  "DeepSeek",
+  "Kimi",
+  "MiniMax",
+  "Z.AI",
+] as const;
 
 type FeaturedFamily = (typeof FEATURED_FAMILIES)[number];
 
@@ -38,6 +47,11 @@ const FAMILY_ANCHOR_IDS: Record<FeaturedFamily, string> = {
   OpenAI: "openai-models",
   Claude: "claude-models",
   Gemini: "gemini-models",
+  Qwen: "qwen-models",
+  DeepSeek: "deepseek-models",
+  Kimi: "kimi-models",
+  MiniMax: "minimax-models",
+  "Z.AI": "zai-models",
 };
 
 interface ModelSection {
@@ -57,6 +71,21 @@ function getModelFamily(modelId: string): FeaturedFamily | "Others" {
   }
   if (normalizedModelId.startsWith("gemini-")) {
     return "Gemini";
+  }
+  if (normalizedModelId.startsWith("qwen")) {
+    return "Qwen";
+  }
+  if (normalizedModelId.startsWith("deepseek")) {
+    return "DeepSeek";
+  }
+  if (normalizedModelId.startsWith("kimi-")) {
+    return "Kimi";
+  }
+  if (normalizedModelId.startsWith("minimax-")) {
+    return "MiniMax";
+  }
+  if (normalizedModelId.startsWith("glm-") || normalizedModelId.startsWith("z-ai")) {
+    return "Z.AI";
   }
 
   return "Others";
