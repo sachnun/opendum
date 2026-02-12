@@ -9,7 +9,7 @@ import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
 import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
 import { ApiKeyModelAccess } from "@/components/dashboard/api-keys/api-key-model-access";
 import type { ApiKeyModelAccessMode } from "@/lib/actions/api-keys";
-import { MODEL_REGISTRY } from "@/lib/proxy/models";
+import { getAllModels } from "@/lib/proxy/models";
 import { formatRelativeTime } from "@/lib/date";
 
 function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) {
@@ -42,7 +42,7 @@ export default async function ApiKeysPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const availableModels = Object.keys(MODEL_REGISTRY).sort((a, b) => a.localeCompare(b));
+  const availableModels = getAllModels().sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="space-y-6">
