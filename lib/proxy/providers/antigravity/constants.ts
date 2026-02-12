@@ -102,14 +102,9 @@ export const MODEL_FALLBACKS: Record<string, string> = {
 export const ANTIGRAVITY_MODELS = new Set([
   // Gemini models
   "gemini-2.5-flash",
-  "gemini-2.5-flash-thinking",
   "gemini-2.5-flash-lite",
-  "gemini-3-flash",
   "gemini-3-flash-preview",
-  "gemini-3-pro-high",
-  "gemini-3-pro-low",
   "gemini-3-pro-preview",
-  "gemini-3-pro-image",
   "gemini-3-pro-image-preview",
   // Claude models (via Antigravity)
   "claude-sonnet-4-5",

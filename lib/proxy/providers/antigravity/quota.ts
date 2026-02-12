@@ -19,12 +19,9 @@ export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
     "claude-opus-4-5": 150,
     "claude-opus-4-6": 150,
     "gpt-oss-120b-medium": 150,
-    "gemini-3-pro-high": 320,
-    "gemini-3-pro-low": 320,
     "gemini-3-pro-preview": 320,
-    "gemini-3-flash": 400,
+    "gemini-3-flash-preview": 400,
     "gemini-2.5-flash": 3000,
-    "gemini-2.5-flash-thinking": 3000,
     "gemini-2.5-flash-lite": 5000,
   },
   "free-tier": {
@@ -32,12 +29,9 @@ export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
     "claude-opus-4-5": 50,
     "claude-opus-4-6": 50,
     "gpt-oss-120b-medium": 50,
-    "gemini-3-pro-high": 150,
-    "gemini-3-pro-low": 150,
     "gemini-3-pro-preview": 150,
-    "gemini-3-flash": 500,
+    "gemini-3-flash-preview": 500,
     "gemini-2.5-flash": 3000,
-    "gemini-2.5-flash-thinking": 3000,
     "gemini-2.5-flash-lite": 5000,
   },
   "legacy-tier": {
@@ -45,8 +39,8 @@ export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
     "claude-opus-4-5": 50,
     "claude-opus-4-6": 50,
     "gpt-oss-120b-medium": 50,
-    "gemini-3-pro-high": 150,
-    "gemini-3-flash": 500,
+    "gemini-3-pro-preview": 150,
+    "gemini-3-flash-preview": 500,
     "gemini-2.5-flash": 3000,
     "gemini-2.5-flash-lite": 5000,
   },
@@ -66,15 +60,15 @@ export const QUOTA_GROUPS: Record<string, { displayName: string; models: string[
   },
   "g3-pro": {
     displayName: "Gemini 3 Pro",
-    models: ["gemini-3-pro-high", "gemini-3-pro-low", "gemini-3-pro-preview"],
+    models: ["gemini-3-pro-preview"],
   },
   "g3-flash": {
     displayName: "Gemini 3 Flash",
-    models: ["gemini-3-flash"],
+    models: ["gemini-3-flash-preview"],
   },
   "g25-flash": {
     displayName: "Gemini 2.5 Flash",
-    models: ["gemini-2.5-flash", "gemini-2.5-flash-thinking"],
+    models: ["gemini-2.5-flash"],
   },
   "g25-lite": {
     displayName: "Gemini 2.5 Lite",
@@ -86,6 +80,7 @@ const USER_TO_API_MODEL_MAP: Record<string, string> = {
   "claude-opus-4-5": "claude-opus-4-5-thinking", // Opus only exists as -thinking in API
   "claude-opus-4-6": "claude-opus-4-6-thinking", // Opus only exists as -thinking in API
   "gemini-3-pro-preview": "gemini-3-pro-high", // Preview maps to high by default
+  "gemini-3-flash-preview": "gemini-3-flash",
 };
 
 // API name -> User-facing name (for normalizing API responses)
@@ -93,6 +88,9 @@ const API_TO_USER_MODEL_MAP: Record<string, string> = {
   "claude-opus-4-5-thinking": "claude-opus-4-5",
   "claude-opus-4-6-thinking": "claude-opus-4-6",
   "claude-sonnet-4-5-thinking": "claude-sonnet-4-5",
+  "gemini-3-pro-high": "gemini-3-pro-preview",
+  "gemini-3-pro-low": "gemini-3-pro-preview",
+  "gemini-3-flash": "gemini-3-flash-preview",
   "gemini-2.5-flash-thinking": "gemini-2.5-flash",
 };
 

@@ -382,19 +382,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "gemini-2.5-flash": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI],
-    meta: {
-      contextLength: 1000000,
-      outputLimit: 65000,
-      knowledgeCutoff: "2025-04",
-      releaseDate: "2025-09-15",
-      reasoning: false,
-      toolCall: true,
-      vision: true,
-      pricing: { input: 0.075, output: 0.3 },
-    },
-  },
-  "gemini-2.5-flash-thinking": {
-    providers: [ProviderName.ANTIGRAVITY],
+    aliases: ["gemini-2.5-flash-thinking"],
     meta: {
       contextLength: 1000000,
       outputLimit: 65000,
@@ -419,22 +407,9 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 0.1, output: 0.4 },
     },
   },
-  "gemini-3-flash": {
-    providers: [ProviderName.ANTIGRAVITY],
-    meta: {
-      contextLength: 1048576,
-      outputLimit: 65536,
-      knowledgeCutoff: "2025-01",
-      releaseDate: "2025-12-17",
-      reasoning: true,
-      toolCall: true,
-      vision: true,
-      pricing: { input: 0.5, output: 3 },
-    },
-  },
   "gemini-3-flash-preview": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.OLLAMA_CLOUD],
-    aliases: ["gemini-3-flash-preview-latest"],
+    aliases: ["gemini-3-flash", "gemini-3-flash-preview-latest"],
     meta: {
       contextLength: 1048576,
       outputLimit: 65536,
@@ -444,24 +419,11 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       toolCall: true,
       vision: true,
       pricing: { input: 0.5, output: 3 },
-    },
-  },
-  "gemini-3-pro-high": {
-    providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-3-pro"],
-    meta: {
-      contextLength: 1048576,
-      outputLimit: 65536,
-      knowledgeCutoff: "2025-01",
-      releaseDate: "2025-11-18",
-      reasoning: true,
-      toolCall: true,
-      vision: true,
-      pricing: { input: 2, output: 12 },
     },
   },
   "gemini-3-pro-preview": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI],
+    aliases: ["gemini-3-pro", "gemini-3-pro-high", "gemini-3-pro-low"],
     meta: {
       contextLength: 1000000,
       outputLimit: 65000,
@@ -473,22 +435,9 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 2, output: 12 },
     },
   },
-  "gemini-3-pro-low": {
+  "gemini-3-pro-image-preview": {
     providers: [ProviderName.ANTIGRAVITY],
-    meta: {
-      contextLength: 1048576,
-      outputLimit: 65536,
-      knowledgeCutoff: "2025-01",
-      releaseDate: "2025-11-18",
-      reasoning: true,
-      toolCall: true,
-      vision: true,
-      pricing: { input: 2, output: 12 },
-    },
-  },
-  "gemini-3-pro-image": {
-    providers: [ProviderName.ANTIGRAVITY],
-    aliases: ["gemini-3-pro-image-preview"],
+    aliases: ["gemini-3-pro-image"],
     meta: {
       contextLength: 32768,
       outputLimit: 64000,
@@ -1195,7 +1144,7 @@ export function formatModelsForOpenAI(): Array<{
     owned_by: string;
   }> = [];
 
-  for (const [model, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
+  for (const model of Object.keys(EFFECTIVE_MODEL_REGISTRY)) {
     const providers = getProvidersForModel(model);
     if (providers.length === 0) {
       continue;
@@ -1203,25 +1152,12 @@ export function formatModelsForOpenAI(): Array<{
 
     const ownedBy = providers.join(",");
 
-    // Add canonical name
     models.push({
       id: model,
       object: "model",
       created: now,
       owned_by: ownedBy,
     });
-
-    // Add aliases
-    if (info.aliases) {
-      for (const alias of info.aliases) {
-        models.push({
-          id: alias,
-          object: "model",
-          created: now,
-          owned_by: ownedBy,
-        });
-      }
-    }
   }
 
   return models;

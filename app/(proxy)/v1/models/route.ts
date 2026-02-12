@@ -33,31 +33,7 @@ export async function GET(request: NextRequest) {
     userId = session?.user?.id ?? null;
   }
 
-  const allModelsWithAliases = formatModelsForOpenAI();
-  const canonicalModels = new Map<
-    string,
-    {
-      id: string;
-      object: string;
-      created: number;
-      owned_by: string;
-    }
-  >();
-
-  for (const model of allModelsWithAliases) {
-    const canonicalId = resolveModelAlias(model.id);
-
-    if (canonicalModels.has(canonicalId)) {
-      continue;
-    }
-
-    canonicalModels.set(canonicalId, {
-      ...model,
-      id: canonicalId,
-    });
-  }
-
-  const allModels = Array.from(canonicalModels.values());
+  const allModels = formatModelsForOpenAI();
 
   if (!userId) {
     return NextResponse.json({
