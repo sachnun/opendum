@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Bot, KeyRound, Link2, Terminal, type LucideIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { headers } from "next/headers";
 
 const DEFAULT_MODEL = "iflow/deepseek-v3.2";
+
+type SnippetPreset = {
+  value: "claude" | "openai" | "anthropic";
+  tabLabel: string;
+  tabHint: string;
+  panelTitle: string;
+  panelHint: string;
+  protocolBadge: string;
+  endpoint: string;
+  auth: string;
+  icon: LucideIcon;
+  code: string;
+};
 
 export default async function UsagePage() {
   const headersList = await headers();
@@ -53,6 +66,45 @@ curl --request POST "$BASE_URL/v1/messages" \\
       { "role": "user", "content": "Hello!" }
     ]
   }'`;
+
+  const snippetPresets: SnippetPreset[] = [
+    {
+      value: "claude",
+      tabLabel: "Claude Code / opencode",
+      tabHint: "Best for local CLI workflows",
+      panelTitle: "Anthropic-style environment setup",
+      panelHint: "Set once in your shell and your client will use this gateway by default.",
+      protocolBadge: "SDK / CLI",
+      endpoint: "Resolved by your client",
+      auth: "ANTHROPIC_AUTH_TOKEN=sk-your-api-key-here",
+      icon: Bot,
+      code: claudeCodeExample,
+    },
+    {
+      value: "openai",
+      tabLabel: "cURL OpenAI",
+      tabHint: "POST /v1/chat/completions",
+      panelTitle: "OpenAI-compatible request",
+      panelHint: "Use Bearer auth and keep request format identical to OpenAI clients.",
+      protocolBadge: "REST",
+      endpoint: "POST /v1/chat/completions",
+      auth: "Authorization: Bearer <api_key>",
+      icon: Terminal,
+      code: openAiCurlExample,
+    },
+    {
+      value: "anthropic",
+      tabLabel: "cURL Anthropic",
+      tabHint: "POST /v1/messages",
+      panelTitle: "Anthropic-compatible request",
+      panelHint: "Send x-api-key and anthropic-version headers in every request.",
+      protocolBadge: "REST",
+      endpoint: "POST /v1/messages",
+      auth: "x-api-key: <api_key>",
+      icon: Terminal,
+      code: anthropicCurlExample,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -161,25 +213,86 @@ curl --request POST "$BASE_URL/v1/messages" \\
             Replace the placeholder API key and run the snippet that matches your client.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Base URL</Badge>
+              <code className="rounded bg-background px-2 py-0.5 text-xs break-all">{baseUrl}</code>
+            </div>
+          </div>
+
           <Tabs defaultValue="claude" className="w-full">
-            <TabsList className="h-auto w-full flex-wrap justify-start">
-              <TabsTrigger value="claude">Claude Code / opencode</TabsTrigger>
-              <TabsTrigger value="openai">cURL OpenAI</TabsTrigger>
-              <TabsTrigger value="anthropic">cURL Anthropic</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3">
+              {snippetPresets.map((snippet) => (
+                <TabsTrigger
+                  key={snippet.value}
+                  value={snippet.value}
+                  className="h-auto items-start gap-2 rounded-lg border border-border bg-muted/20 px-3 py-3 text-left data-[state=active]:border-primary data-[state=active]:bg-primary/5"
+                >
+                  <snippet.icon className="mt-0.5 size-4 shrink-0" />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium leading-none">{snippet.tabLabel}</span>
+                    <span className="block text-xs text-muted-foreground">{snippet.tabHint}</span>
+                  </span>
+                </TabsTrigger>
+              ))}
             </TabsList>
 
-            <TabsContent value="claude" className="mt-4">
-              <CodeBlock language="bash" code={claudeCodeExample} />
-            </TabsContent>
+            {snippetPresets.map((snippet) => (
+              <TabsContent key={snippet.value} value={snippet.value} className="mt-4">
+                <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                    <div className="space-y-2">
+                      <Badge variant="outline">{snippet.protocolBadge}</Badge>
+                      <h3 className="text-sm font-semibold">{snippet.panelTitle}</h3>
+                      <p className="text-xs text-muted-foreground">{snippet.panelHint}</p>
+                    </div>
 
-            <TabsContent value="openai" className="mt-4">
-              <CodeBlock language="bash" code={openAiCurlExample} />
-            </TabsContent>
+                    <div className="mt-4 space-y-3">
+                      <div className="space-y-1.5">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Link2 className="size-3.5" />
+                          Endpoint
+                        </p>
+                        <code className="block rounded-md bg-background px-2.5 py-2 text-xs break-all">
+                          {snippet.endpoint}
+                        </code>
+                      </div>
 
-            <TabsContent value="anthropic" className="mt-4">
-              <CodeBlock language="bash" code={anthropicCurlExample} />
-            </TabsContent>
+                      <div className="space-y-1.5">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <KeyRound className="size-3.5" />
+                          Auth
+                        </p>
+                        <code className="block rounded-md bg-background px-2.5 py-2 text-xs break-all">
+                          {snippet.auth}
+                        </code>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Terminal className="size-3.5" />
+                          Default model
+                        </p>
+                        <code className="block rounded-md bg-background px-2.5 py-2 text-xs break-all">
+                          {DEFAULT_MODEL}
+                        </code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-border/70 bg-muted/20">
+                    <CodeBlock
+                      language="bash"
+                      code={snippet.code}
+                      className="rounded-none bg-transparent p-4"
+                      showCopyButton
+                      copyButtonLabel={`${snippet.tabLabel} snippet`}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>
