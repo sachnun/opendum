@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { hashString } from "@/lib/encryption";
 import {
+  getModelLookupKeys,
   isModelSupported,
   isModelSupportedByProvider,
   getAllModelsWithAliases,
@@ -124,12 +125,10 @@ export async function validateModelForUser(
     return baseValidation;
   }
 
-  const disabledModel = await prisma.disabledModel.findUnique({
+  const disabledModel = await prisma.disabledModel.findFirst({
     where: {
-      userId_model: {
-        userId,
-        model: baseValidation.model,
-      },
+      userId,
+      model: { in: getModelLookupKeys(baseValidation.model) },
     },
     select: { id: true },
   });

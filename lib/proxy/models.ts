@@ -976,6 +976,14 @@ const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = {
   ...OPENROUTER_FALLBACK_REGISTRY,
 };
 
+function toLegacyOpenRouterModelKey(modelId: string): string {
+  return modelId
+    .replace(/^library\//, "")
+    .replace(/[:/]/g, "-")
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-{2,}/g, "-");
+}
+
 // Build reverse lookup for aliases
 const aliasToCanonical: Record<string, string> = {};
 for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
@@ -1014,6 +1022,24 @@ for (const [canonical, upstreamModel] of Object.entries(OPENROUTER_MODEL_MAP)) {
   if (!aliasToCanonical[upstreamModel]) {
     aliasToCanonical[upstreamModel] = canonical;
   }
+
+  const legacyModelKey = toLegacyOpenRouterModelKey(upstreamModel);
+  if (!aliasToCanonical[legacyModelKey]) {
+    aliasToCanonical[legacyModelKey] = canonical;
+  }
+}
+
+const canonicalToAliases: Record<string, string[]> = {};
+for (const [alias, canonical] of Object.entries(aliasToCanonical)) {
+  if (!canonicalToAliases[canonical]) {
+    canonicalToAliases[canonical] = [];
+  }
+
+  canonicalToAliases[canonical].push(alias);
+}
+
+for (const [canonical, aliases] of Object.entries(canonicalToAliases)) {
+  canonicalToAliases[canonical] = Array.from(new Set(aliases)).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -1021,6 +1047,15 @@ for (const [canonical, upstreamModel] of Object.entries(OPENROUTER_MODEL_MAP)) {
  */
 export function resolveModelAlias(model: string): string {
   return aliasToCanonical[model] ?? model;
+}
+
+/**
+ * Get canonical model key and known aliases for lookups.
+ */
+export function getModelLookupKeys(model: string): string[] {
+  const canonical = resolveModelAlias(model);
+  const aliases = canonicalToAliases[canonical] ?? [];
+  return [canonical, ...aliases];
 }
 
 /**

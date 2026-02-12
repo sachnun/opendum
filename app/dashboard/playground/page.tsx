@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getAllModels, getProvidersForModel } from "@/lib/proxy/models";
+import { getAllModels, getProvidersForModel, resolveModelAlias } from "@/lib/proxy/models";
 import { PlaygroundClient } from "@/components/playground/client";
 import type {
   ModelOption,
@@ -56,7 +56,7 @@ export default async function PlaygroundPage() {
     select: { model: true },
   });
   const disabledModelSet = new Set<string>(
-    disabledModels.map((entry: { model: string }) => entry.model)
+    disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
 
   const models = getModels(disabledModelSet);

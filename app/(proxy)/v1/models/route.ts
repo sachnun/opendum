@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   });
 
   const disabledModelSet = new Set(
-    disabledModels.map((entry: { model: string }) => entry.model)
+    disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
   const enabledModels = allModels.filter((model) => {
     const canonicalModel = resolveModelAlias(model.id);

@@ -13,7 +13,7 @@ import { signOut } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import type { ProviderAccountCounts } from "@/lib/navigation";
-import { getAllModels, getProvidersForModel } from "@/lib/proxy/models";
+import { getAllModels, getProvidersForModel, resolveModelAlias } from "@/lib/proxy/models";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -41,7 +41,7 @@ export async function Header({ accountCounts }: HeaderProps) {
       })
     : [];
   const disabledModelSet = new Set(
-    disabledModels.map((entry: { model: string }) => entry.model)
+    disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
 
   const models = getAllModels()

@@ -89,7 +89,7 @@ export default async function ModelsPage() {
     select: { model: true },
   });
   const disabledModelSet = new Set(
-    disabledModels.map((entry: { model: string }) => entry.model)
+    disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
 
   const dayKeys = buildDayKeys(MODEL_STATS_DAYS);

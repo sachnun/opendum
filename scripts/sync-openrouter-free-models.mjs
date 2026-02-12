@@ -11,11 +11,17 @@ const MODEL_MAP_EXPORT_PATTERN =
   /export const OPENROUTER_MODEL_MAP: Record<string, string> = \{[\s\S]*?\n\};/;
 
 function toModelKey(modelId) {
-  return modelId
+  const modelKey = modelId
     .replace(/^library\//, "")
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
+
+  if (modelKey !== "openrouter-free" && modelKey.endsWith("-free")) {
+    return modelKey.slice(0, -"-free".length);
+  }
+
+  return modelKey;
 }
 
 function toNumber(value) {

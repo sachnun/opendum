@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isModelSupported, resolveModelAlias } from "@/lib/proxy/models";
+import {
+  getModelLookupKeys,
+  isModelSupported,
+  resolveModelAlias,
+} from "@/lib/proxy/models";
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -30,10 +34,11 @@ export async function setModelEnabled(
 
   try {
     if (enabled) {
+      const modelLookupKeys = getModelLookupKeys(normalizedModel);
       await prisma.disabledModel.deleteMany({
         where: {
           userId: session.user.id,
-          model: normalizedModel,
+          model: { in: modelLookupKeys },
         },
       });
     } else {
