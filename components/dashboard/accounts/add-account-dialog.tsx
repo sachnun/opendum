@@ -149,6 +149,20 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   },
 };
 
+const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
+  "antigravity",
+  "codex",
+  "iflow",
+  "gemini_cli",
+  "qwen_code",
+];
+
+const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
+  "nvidia_nim",
+  "ollama_cloud",
+  "openrouter",
+];
+
 
 
 interface AddAccountDialogProps {
@@ -181,15 +195,11 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const providerConfig = provider ? PROVIDERS[provider] : null;
-  const providerEntries = Object.entries(PROVIDERS) as [
-    Exclude<Provider, null>,
-    ProviderFullConfig,
-  ][];
-  const oauthProviders = providerEntries.filter(
-    ([, config]) => config.flowType !== "api_key"
+  const oauthProviders = OAUTH_PROVIDER_ORDER.map(
+    (providerKey) => [providerKey, PROVIDERS[providerKey]] as const
   );
-  const apiKeyProviders = providerEntries.filter(
-    ([, config]) => config.flowType === "api_key"
+  const apiKeyProviders = API_KEY_PROVIDER_ORDER.map(
+    (providerKey) => [providerKey, PROVIDERS[providerKey]] as const
   );
 
   // Cleanup polling on unmount or dialog close
