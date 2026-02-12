@@ -34,6 +34,11 @@ import {
   type GeminiCliAccountQuotaInfo,
   type GeminiCliQuotaGroupDisplay,
 } from "@/lib/actions/gemini-cli-quota";
+import {
+  getOpenRouterQuota,
+  type OpenRouterAccountQuotaInfo,
+  type OpenRouterQuotaGroupDisplay,
+} from "@/lib/actions/openrouter-quota";
 import { formatRelativeTime } from "@/lib/date";
 import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
@@ -43,11 +48,13 @@ import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
 type AccountQuotaInfo =
   | AntigravityAccountQuotaInfo
   | CodexAccountQuotaInfo
-  | GeminiCliAccountQuotaInfo;
+  | GeminiCliAccountQuotaInfo
+  | OpenRouterAccountQuotaInfo;
 type QuotaGroupDisplay =
   | AntigravityQuotaGroupDisplay
   | CodexQuotaGroupDisplay
-  | GeminiCliQuotaGroupDisplay;
+  | GeminiCliQuotaGroupDisplay
+  | OpenRouterQuotaGroupDisplay;
 
 // =============================================================================
 // TYPES
@@ -183,10 +190,15 @@ function StatusBadge({ status, consecutiveErrors }: { status: string; consecutiv
 
 function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
   const percentRemaining = Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
+  const customRemainingLabel =
+    "remainingLabel" in group && typeof group.remainingLabel === "string"
+      ? group.remainingLabel
+      : null;
   const remainingLabel =
-    group.models.length === 0
+    customRemainingLabel ??
+    (group.models.length === 0
       ? `${percentRemaining}%`
-      : `${group.remainingRequests}/${group.maxRequests}`;
+      : `${group.remainingRequests}/${group.maxRequests}`);
   let resetTitle: string | undefined;
 
   if (group.resetTimeIso) {
@@ -472,7 +484,8 @@ function AccountCard({
   const supportsQuotaMonitor =
     account.provider === "antigravity" ||
     account.provider === "codex" ||
-    account.provider === "gemini_cli";
+    account.provider === "gemini_cli" ||
+    account.provider === "openrouter";
   const dailyValues = account.stats.dailyRequests.map((point) => point.count);
   const peakRequests = Math.max(...dailyValues, 0);
   const weeklySuccessRate = account.stats.successRate;
@@ -694,9 +707,12 @@ export function AccountsList({
     useState<Record<string, AccountQuotaInfo>>({});
   const [geminiCliQuotaByAccountId, setGeminiCliQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
+  const [openRouterQuotaByAccountId, setOpenRouterQuotaByAccountId] =
+    useState<Record<string, AccountQuotaInfo>>({});
   const [isAntigravityQuotaLoading, startAntigravityQuotaTransition] = useTransition();
   const [isCodexQuotaLoading, startCodexQuotaTransition] = useTransition();
   const [isGeminiCliQuotaLoading, startGeminiCliQuotaTransition] = useTransition();
+  const [isOpenRouterQuotaLoading, startOpenRouterQuotaTransition] = useTransition();
 
   const fetchAntigravityQuota = useCallback(() => {
     if (antigravityAccounts.length === 0) {
@@ -770,6 +786,30 @@ export function AccountsList({
     });
   }, [geminiCliAccounts.length]);
 
+  const fetchOpenRouterQuota = useCallback(() => {
+    if (openRouterAccounts.length === 0) {
+      return;
+    }
+
+    startOpenRouterQuotaTransition(async () => {
+      const result = await getOpenRouterQuota();
+      if (!result.success) {
+        setOpenRouterQuotaByAccountId({});
+        return;
+      }
+
+      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
+        (accumulator, accountQuota) => {
+          accumulator[accountQuota.accountId] = accountQuota;
+          return accumulator;
+        },
+        {}
+      );
+
+      setOpenRouterQuotaByAccountId(quotaMap);
+    });
+  }, [openRouterAccounts.length]);
+
   useEffect(() => {
     fetchAntigravityQuota();
   }, [fetchAntigravityQuota]);
@@ -783,10 +823,15 @@ export function AccountsList({
   }, [fetchGeminiCliQuota]);
 
   useEffect(() => {
+    fetchOpenRouterQuota();
+  }, [fetchOpenRouterQuota]);
+
+  useEffect(() => {
     const handleProviderAccountsRefresh = () => {
       fetchAntigravityQuota();
       fetchCodexQuota();
       fetchGeminiCliQuota();
+      fetchOpenRouterQuota();
     };
 
     window.addEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
@@ -794,7 +839,7 @@ export function AccountsList({
     return () => {
       window.removeEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
     };
-  }, [fetchAntigravityQuota, fetchCodexQuota, fetchGeminiCliQuota]);
+  }, [fetchAntigravityQuota, fetchCodexQuota, fetchGeminiCliQuota, fetchOpenRouterQuota]);
 
   return (
     <div className="space-y-8">
@@ -889,6 +934,8 @@ export function AccountsList({
             title="OpenRouter Accounts"
             accounts={openRouterAccounts}
             emptyMessage="No OpenRouter accounts connected yet."
+            quotaByAccountId={openRouterQuotaByAccountId}
+            isQuotaLoading={isOpenRouterQuotaLoading}
           />
         </div>
       </section>
