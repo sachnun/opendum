@@ -139,12 +139,14 @@ export function Sidebar({ accountCounts }: SidebarProps) {
           <span className="text-base font-semibold tracking-tight">Opendum</span>
         </Link>
       </div>
-      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-4">
-        <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
-        <div className="mt-auto space-y-1 border-t border-border/60 pt-4">
+      <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
+        <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
+        </nav>
+        <nav className="mt-4 shrink-0 space-y-1 border-t border-border/60 pt-4">
           {supportNavigation.map(renderNavItem)}
-        </div>
-      </nav>
+        </nav>
+      </div>
     </div>
   );
 }
