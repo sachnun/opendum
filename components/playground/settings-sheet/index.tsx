@@ -21,8 +21,10 @@ import {
 } from "@/components/ui/sheet";
 
 export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
+export type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
 export interface PlaygroundSettings {
+  endpoint: PlaygroundEndpoint;
   streamResponses: boolean;
   temperature: number;
   topP: number;
@@ -33,6 +35,7 @@ export interface PlaygroundSettings {
 }
 
 export const DEFAULT_SETTINGS: PlaygroundSettings = {
+  endpoint: "chat_completions",
   streamResponses: true,
   temperature: 1.0,
   topP: 1.0,
@@ -54,6 +57,28 @@ const REASONING_OPTIONS: { value: ReasoningEffort; label: string }[] = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
   { value: "xhigh", label: "XHigh" },
+];
+
+const ENDPOINT_OPTIONS: Array<{
+  value: PlaygroundEndpoint;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "chat_completions",
+    label: "/v1/chat/completions",
+    description: "OpenAI-compatible format",
+  },
+  {
+    value: "messages",
+    label: "/v1/messages",
+    description: "Anthropic-compatible format",
+  },
+  {
+    value: "responses",
+    label: "/v1/responses",
+    description: "OpenAI Responses API format",
+  },
 ];
 
 export function SettingsSheet({
@@ -89,6 +114,47 @@ export function SettingsSheet({
         </SheetHeader>
 
         <div className="space-y-6 py-6">
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Endpoint
+            </h3>
+
+            <div className="space-y-2">
+              <Label>API Endpoint</Label>
+              <div className="grid grid-cols-1 gap-2">
+                {ENDPOINT_OPTIONS.map((option) => {
+                  const isSelected = settings.endpoint === option.value;
+
+                  return (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={isSelected ? "default" : "outline"}
+                      onClick={() => updateSetting("endpoint", option.value)}
+                      disabled={disabled}
+                      className={cn(
+                        "h-auto items-start justify-start px-3 py-2 text-left",
+                        isSelected && "ring-1 ring-primary/30"
+                      )}
+                    >
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium">{option.label}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {option.description}
+                        </span>
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pick the API style you want to test in Playground.
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Generation Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">

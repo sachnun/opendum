@@ -5,13 +5,16 @@ import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import {
+  clearExpiredRateLimits,
   getRateLimitScope,
+  isRateLimited,
   markRateLimited,
   parseRateLimitError,
   getMinWaitTime,
   formatWaitTimeMs,
   parseRetryAfterMs,
 } from "@/lib/proxy/rate-limit";
+import { isModelSupportedByProvider } from "@/lib/proxy/models";
 import {
   buildAccountErrorMessage,
   getErrorMessage,
@@ -20,6 +23,8 @@ import {
   type ProxyErrorType,
   shouldRotateToNextAccount,
 } from "@/lib/proxy/error-utils";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +37,7 @@ interface ToolCall {
 
 interface OpenAIMessage {
   role: string;
-  content?: string | null;
+  content?: string | null | Array<{ type: string; [key: string]: unknown }>;
   tool_calls?: Array<{
     id: string;
     type: string;
@@ -50,6 +55,10 @@ interface AnthropicContentBlock {
   id?: string;
   name?: string;
   input?: Record<string, unknown> | string;
+  source?: {
+    type?: string;
+    url?: string;
+  };
   tool_use_id?: string;
   content?: AnthropicContentBlock[];
 }
@@ -146,7 +155,19 @@ interface AnthropicResponse {
  * @returns OpenAI payload with _includeReasoning flag for conditional thinking output
  */
 function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload & { _includeReasoning?: boolean } {
-  const { model, messages, system, max_tokens, stream, tools, tool_choice, thinking, ...params } = body;
+  const {
+    model,
+    messages,
+    system,
+    max_tokens,
+    stream,
+    tools,
+    tool_choice,
+    thinking,
+    ...params
+  } = body as AnthropicRequestBody & { provider_account_id?: unknown };
+
+  delete (params as Record<string, unknown>).provider_account_id;
 
   const thinkingRequested = thinking?.type === "enabled";
 
@@ -187,11 +208,30 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
       openaiMessages.push({ role, content: msg.content });
     } else if (Array.isArray(msg.content)) {
       const toolCalls: OpenAIMessage["tool_calls"] = [];
-      let textContent = "";
+      const structuredContentParts: Array<{ type: string; [key: string]: unknown }> = [];
 
       for (const block of msg.content) {
         if (block.type === "text") {
-          textContent += block.text || "";
+          const text = block.text || "";
+          if (text) {
+            structuredContentParts.push({
+              type: "text",
+              text,
+            });
+          }
+        } else if (block.type === "image") {
+          const source = block.source;
+          const url =
+            source && typeof source === "object"
+              ? (source as { url?: unknown }).url
+              : null;
+
+          if (typeof url === "string" && url.trim()) {
+            structuredContentParts.push({
+              type: "image_url",
+              image_url: { url: url.trim() },
+            });
+          }
         } else if (block.type === "tool_use") {
           if (block.id && !toolResultIds.has(block.id)) {
             continue;
@@ -227,14 +267,31 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
         }
       }
 
+      const hasStructuredContent = structuredContentParts.length > 0;
+
       if (role === "assistant" && toolCalls.length > 0) {
         openaiMessages.push({
           role: "assistant",
-          content: textContent || null,
+          content: hasStructuredContent ? structuredContentParts : null,
           tool_calls: toolCalls,
         });
-      } else if (textContent) {
-        openaiMessages.push({ role, content: textContent });
+      } else if (hasStructuredContent) {
+        const hasNonTextPart = structuredContentParts.some(
+          (part) => part.type !== "text"
+        );
+
+        if (hasNonTextPart) {
+          openaiMessages.push({ role, content: structuredContentParts });
+        } else {
+          openaiMessages.push({
+            role,
+            content: structuredContentParts
+              .map((part) =>
+                typeof part.text === "string" ? part.text : ""
+              )
+              .join(""),
+          });
+        }
       }
     }
   }
@@ -247,30 +304,95 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     ...params,
   };
 
-  if (tools && tools.length > 0) {
-    openaiPayload.tools = tools.map((tool) => ({
-      type: "function",
-      function: {
-        name: tool.name,
-        description: tool.description || "",
-        parameters: tool.input_schema || {},
-      },
-    }));
+  if (Array.isArray(tools) && tools.length > 0) {
+    const hasOpenAIToolShape = tools.some((tool) => {
+      if (!tool || typeof tool !== "object") {
+        return false;
+      }
+
+      return Object.hasOwn(tool, "function");
+    });
+
+    if (hasOpenAIToolShape) {
+      openaiPayload.tools = tools as unknown as OpenAIPayload["tools"];
+    } else {
+      openaiPayload.tools = tools
+        .map((tool) => {
+          if (!tool || typeof tool !== "object") {
+            return null;
+          }
+
+          const name = (tool as { name?: unknown }).name;
+          if (typeof name !== "string" || !name.trim()) {
+            return null;
+          }
+
+          const description = (tool as { description?: unknown }).description;
+          const inputSchema = (tool as { input_schema?: unknown }).input_schema;
+
+          return {
+            type: "function",
+            function: {
+              name,
+              description: typeof description === "string" ? description : "",
+              parameters:
+                inputSchema &&
+                typeof inputSchema === "object" &&
+                !Array.isArray(inputSchema)
+                  ? (inputSchema as Record<string, unknown>)
+                  : {},
+            },
+          };
+        })
+        .filter(Boolean) as OpenAIPayload["tools"];
+    }
   }
 
   if (tool_choice) {
-    const choiceType = tool_choice.type;
-    if (choiceType === "auto") {
-      (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice = "auto";
-    } else if (choiceType === "any") {
-      (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice = "required";
-    } else if (choiceType === "tool") {
-      (openaiPayload as OpenAIPayload & { tool_choice?: { type: string; function: { name: string } } }).tool_choice = {
-        type: "function",
-        function: { name: tool_choice.name || "" },
-      };
-    } else if (choiceType === "none") {
-      (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice = "none";
+    if (typeof tool_choice === "string") {
+      if (tool_choice === "auto" || tool_choice === "none") {
+        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
+          tool_choice;
+      } else if (tool_choice === "required") {
+        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
+          "required";
+      }
+    } else if (typeof tool_choice === "object") {
+      const choiceType = (tool_choice as { type?: unknown }).type;
+
+      if (choiceType === "auto") {
+        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
+          "auto";
+      } else if (choiceType === "any") {
+        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
+          "required";
+      } else if (choiceType === "tool") {
+        const name = (tool_choice as { name?: unknown }).name;
+        (openaiPayload as OpenAIPayload & {
+          tool_choice?: { type: string; function: { name: string } };
+        }).tool_choice = {
+          type: "function",
+          function: { name: typeof name === "string" ? name : "" },
+        };
+      } else if (choiceType === "none") {
+        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
+          "none";
+      } else if (choiceType === "function") {
+        const fn = (tool_choice as { function?: unknown }).function;
+        const functionName =
+          fn && typeof fn === "object"
+            ? (fn as { name?: unknown }).name
+            : null;
+
+        (openaiPayload as OpenAIPayload & {
+          tool_choice?: { type: string; function: { name: string } };
+        }).tool_choice = {
+          type: "function",
+          function: {
+            name: typeof functionName === "string" ? functionName : "",
+          },
+        };
+      }
     }
   }
 
@@ -721,24 +843,65 @@ function createAnthropicStreamTransformer(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
-  const authHeader = request.headers.get("authorization") || request.headers.get("x-api-key");
-  const authResult = await validateApiKey(authHeader);
+  const authHeader = request.headers.get("authorization");
+  const xApiKeyHeader = request.headers.get("x-api-key");
 
-  if (!authResult.valid) {
+  let userId: string | undefined;
+  let apiKeyId: string | undefined;
+  let apiKeyModelAccess: ApiKeyModelAccess | undefined;
+
+  if (authHeader || xApiKeyHeader) {
+    const authResult = await validateApiKey(authHeader || xApiKeyHeader);
+
+    if (!authResult.valid) {
+      return NextResponse.json(
+        {
+          type: "error",
+          error: { type: "authentication_error", message: authResult.error },
+        },
+        { status: 401 }
+      );
+    }
+
+    userId = authResult.userId;
+    apiKeyId = authResult.apiKeyId;
+    apiKeyModelAccess = {
+      mode: authResult.modelAccessMode ?? "all",
+      models: authResult.modelAccessList ?? [],
+    };
+  } else {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        {
+          type: "error",
+          error: {
+            type: "authentication_error",
+            message: "Missing Authorization header",
+          },
+        },
+        { status: 401 }
+      );
+    }
+
+    userId = session.user.id;
+  }
+
+  if (!userId) {
     return NextResponse.json(
       {
         type: "error",
-        error: { type: "authentication_error", message: authResult.error },
+        error: {
+          type: "authentication_error",
+          message: "Missing Authorization header",
+        },
       },
       { status: 401 }
     );
   }
 
-  const { userId, apiKeyId } = authResult;
-  const apiKeyModelAccess: ApiKeyModelAccess = {
-    mode: authResult.modelAccessMode ?? "all",
-    models: authResult.modelAccessList ?? [],
-  };
+  const authenticatedUserId = userId;
 
   try {
     let body;
@@ -753,9 +916,21 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { model: modelParam, stream = true } = body;
+    const {
+      model: modelParam,
+      stream: streamParam,
+      provider_account_id: providerAccountIdParam,
+    } = body as {
+      model?: unknown;
+      stream?: unknown;
+      provider_account_id?: unknown;
+    };
 
-    if (!modelParam) {
+    const streamEnabled = typeof streamParam === "boolean" ? streamParam : true;
+
+    const requestedModel = typeof modelParam === "string" ? modelParam.trim() : "";
+
+    if (!requestedModel) {
       return NextResponse.json(
         {
           type: "error",
@@ -766,8 +941,8 @@ export async function POST(request: NextRequest) {
     }
 
     const modelValidation = await validateModelForUser(
-      userId!,
-      modelParam,
+      authenticatedUserId,
+      requestedModel,
       apiKeyModelAccess
     );
     if (!modelValidation.valid) {
@@ -795,22 +970,136 @@ export async function POST(request: NextRequest) {
       | null = null;
     const rawErrorParams = Object.fromEntries(
       Object.entries(body as Record<string, unknown>).filter(
-        ([key]) => key !== "model" && key !== "messages" && key !== "stream"
+        ([key]) =>
+          key !== "model" &&
+          key !== "messages" &&
+          key !== "stream" &&
+          key !== "provider_account_id"
       )
     );
+    const hasProviderAccountParam =
+      providerAccountIdParam !== undefined && providerAccountIdParam !== null;
+    const normalizedProviderAccountId =
+      typeof providerAccountIdParam === "string" ? providerAccountIdParam.trim() : "";
+
+    if (hasProviderAccountParam && normalizedProviderAccountId.length === 0) {
+      return NextResponse.json(
+        {
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            message: "provider_account_id must be a non-empty string",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const requestParamsForError: Record<string, unknown> = {
-      stream,
+      stream: streamEnabled,
       ...rawErrorParams,
+      ...(normalizedProviderAccountId
+        ? { provider_account_id: normalizedProviderAccountId }
+        : {}),
     };
     const requestMessagesForError = (body as { messages?: unknown }).messages;
 
-    for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
-      const account = await getNextAvailableAccount(
-        userId!,
-        model,
-        provider,
-        triedAccountIds
+    const forcedAccount = normalizedProviderAccountId
+      ? await prisma.providerAccount.findFirst({
+          where: {
+            id: normalizedProviderAccountId,
+            userId: authenticatedUserId,
+          },
+        })
+      : null;
+
+    if (normalizedProviderAccountId && !forcedAccount) {
+      return NextResponse.json(
+        {
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            message: "Selected provider account was not found",
+          },
+        },
+        { status: 400 }
       );
+    }
+
+    if (forcedAccount && !forcedAccount.isActive) {
+      return NextResponse.json(
+        {
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            message: "Selected provider account is inactive",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (forcedAccount) {
+      if (!isModelSupportedByProvider(model, forcedAccount.provider)) {
+        return NextResponse.json(
+          {
+            type: "error",
+            error: {
+              type: "invalid_request_error",
+              message: `Selected account provider "${forcedAccount.provider}" does not support model "${model}"`,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (provider !== null && forcedAccount.provider !== provider) {
+        return NextResponse.json(
+          {
+            type: "error",
+            error: {
+              type: "invalid_request_error",
+              message: `Selected account provider "${forcedAccount.provider}" does not match model provider "${provider}"`,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      clearExpiredRateLimits(forcedAccount.id);
+      if (await isRateLimited(forcedAccount.id, rateLimitScope)) {
+        const waitTimeMs = await getMinWaitTime([forcedAccount.id], rateLimitScope);
+        return NextResponse.json(
+          {
+            type: "error",
+            error: {
+              type: "overloaded_error",
+              message:
+                waitTimeMs > 0
+                  ? `Selected account is rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`
+                  : "Selected account is rate limited.",
+              retry_after: waitTimeMs > 0 ? formatWaitTimeMs(waitTimeMs) : undefined,
+              retry_after_ms: waitTimeMs > 0 ? waitTimeMs : undefined,
+            },
+          },
+          { status: 529 }
+        );
+      }
+    }
+
+    const accountRetryLimit = forcedAccount ? 1 : MAX_ACCOUNT_RETRIES;
+
+    for (let attempt = 0; attempt < accountRetryLimit; attempt++) {
+      let account = forcedAccount;
+
+      if (!account) {
+        account = await getNextAvailableAccount(
+          authenticatedUserId,
+          model,
+          provider,
+          triedAccountIds
+        );
+      }
 
       if (!account) {
         const isFirstAttempt = triedAccountIds.length === 0;
@@ -871,6 +1160,16 @@ export async function POST(request: NextRequest) {
 
       triedAccountIds.push(account.id);
 
+      if (forcedAccount) {
+        await prisma.providerAccount.update({
+          where: { id: account.id },
+          data: {
+            lastUsedAt: new Date(),
+            requestCount: { increment: 1 },
+          },
+        });
+      }
+
       try {
         const providerImpl = await getProvider(account.provider as ProviderNameType);
         const credentials = await providerImpl.getValidCredentials(account);
@@ -879,6 +1178,7 @@ export async function POST(request: NextRequest) {
 
         // Override model with validated model (without provider prefix)
         openaiPayload.model = model;
+        openaiPayload.stream = streamEnabled;
 
         const includeThinking = openaiPayload._includeReasoning ?? false;
 
@@ -886,7 +1186,7 @@ export async function POST(request: NextRequest) {
           credentials,
           account,
           openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest,
-          stream
+          streamEnabled
         );
 
         if (providerResponse.status === 429) {
@@ -911,7 +1211,7 @@ export async function POST(request: NextRequest) {
             );
 
             await logUsage({
-              userId: userId!,
+              userId: authenticatedUserId,
               providerAccountId: account.id,
               proxyApiKeyId: apiKeyId,
               model,
@@ -943,7 +1243,7 @@ export async function POST(request: NextRequest) {
           await markAccountFailed(account.id, providerResponse.status, detailedError);
 
           await logUsage({
-            userId: userId!,
+            userId: authenticatedUserId,
             providerAccountId: account.id,
             proxyApiKeyId: apiKeyId,
             model,
@@ -963,7 +1263,7 @@ export async function POST(request: NextRequest) {
 
           if (
             shouldRotateToNextAccount(providerResponse.status) &&
-            attempt < MAX_ACCOUNT_RETRIES - 1
+            attempt < accountRetryLimit - 1
           ) {
             continue;
           }
@@ -980,13 +1280,13 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if (stream && providerResponse.body) {
+        if (streamEnabled && providerResponse.body) {
           const transformer = createAnthropicStreamTransformer(model, (usage) => {
             // Track success for this account (non-blocking)
             markAccountSuccess(account.id).catch(() => undefined);
 
             logUsage({
-              userId: userId!,
+              userId: authenticatedUserId,
               providerAccountId: account.id,
               proxyApiKeyId: apiKeyId,
               model,
@@ -1016,7 +1316,7 @@ export async function POST(request: NextRequest) {
         markAccountSuccess(account.id).catch(() => undefined);
 
         logUsage({
-          userId: userId!,
+          userId: authenticatedUserId,
           providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
@@ -1047,7 +1347,7 @@ export async function POST(request: NextRequest) {
         await markAccountFailed(account.id, statusCode, detailedError);
 
         await logUsage({
-          userId: userId!,
+          userId: authenticatedUserId,
           providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
@@ -1065,7 +1365,7 @@ export async function POST(request: NextRequest) {
           type: sanitizedError.type,
         };
 
-        if (shouldRotateToNextAccount(statusCode) && attempt < MAX_ACCOUNT_RETRIES - 1) {
+        if (shouldRotateToNextAccount(statusCode) && attempt < accountRetryLimit - 1) {
           continue;
         }
 

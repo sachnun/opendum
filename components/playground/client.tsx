@@ -13,6 +13,7 @@ import { ScenarioSelector, type Scenario } from "./scenario-selector";
 import {
   SettingsSheet,
   DEFAULT_SETTINGS,
+  type PlaygroundEndpoint,
   type PlaygroundSettings,
 } from "./settings-sheet";
 import { Card } from "@/components/ui/card";
@@ -370,6 +371,882 @@ async function consumeChatCompletionStream(
   }
 }
 
+interface ScenarioMessage {
+  role: string;
+  content: string | Array<Record<string, unknown>>;
+}
+
+function getScenarioMessages(scenario: Scenario): ScenarioMessage[] {
+  return Array.isArray(scenario.messages) && scenario.messages.length > 0
+    ? scenario.messages
+    : [{ role: "user", content: scenario.prompt }];
+}
+
+function getEndpointPath(endpoint: PlaygroundEndpoint): string {
+  if (endpoint === "messages") {
+    return "/v1/messages";
+  }
+
+  if (endpoint === "responses") {
+    return "/v1/responses";
+  }
+
+  return "/v1/chat/completions";
+}
+
+function mapReasoningEffortToThinkingBudget(
+  effort: PlaygroundSettings["reasoningEffort"]
+): number {
+  switch (effort) {
+    case "low":
+      return 4000;
+    case "medium":
+      return 8000;
+    case "high":
+      return 16000;
+    case "xhigh":
+      return 32000;
+    default:
+      return 0;
+  }
+}
+
+function extractSystemTextFromContent(content: ScenarioMessage["content"]): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((part) => {
+      if (!part || typeof part !== "object") {
+        return "";
+      }
+
+      const type = (part as { type?: unknown }).type;
+      if (type !== "text") {
+        return "";
+      }
+
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" ? text : "";
+    })
+    .join("\n")
+    .trim();
+}
+
+function convertOpenAIContentToAnthropic(
+  content: ScenarioMessage["content"]
+): string | Array<Record<string, unknown>> {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  const converted = content.flatMap((part) => {
+    if (!part || typeof part !== "object") {
+      return [];
+    }
+
+    const type = (part as { type?: unknown }).type;
+
+    if (type === "text") {
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" ? [{ type: "text", text }] : [];
+    }
+
+    if (type === "image_url") {
+      const imageUrl = (part as { image_url?: unknown }).image_url;
+      const url =
+        typeof imageUrl === "string"
+          ? imageUrl
+          : imageUrl && typeof imageUrl === "object"
+            ? (imageUrl as { url?: unknown }).url
+            : null;
+
+      if (typeof url === "string" && url.trim()) {
+        return [
+          {
+            type: "image",
+            source: {
+              type: "url",
+              url: url.trim(),
+            },
+          },
+        ];
+      }
+
+      return [];
+    }
+
+    return [part as Record<string, unknown>];
+  });
+
+  if (converted.length === 0) {
+    return "";
+  }
+
+  return converted;
+}
+
+function convertScenarioMessagesToAnthropic(messages: ScenarioMessage[]): {
+  system: string | null;
+  messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>;
+} {
+  const systemParts: string[] = [];
+  const convertedMessages: Array<{
+    role: string;
+    content: string | Array<Record<string, unknown>>;
+  }> = [];
+
+  for (const message of messages) {
+    if (message.role === "system") {
+      const systemText = extractSystemTextFromContent(message.content);
+      if (systemText) {
+        systemParts.push(systemText);
+      }
+      continue;
+    }
+
+    const role = message.role === "assistant" ? "assistant" : "user";
+    convertedMessages.push({
+      role,
+      content: convertOpenAIContentToAnthropic(message.content),
+    });
+  }
+
+  if (convertedMessages.length === 0) {
+    convertedMessages.push({ role: "user", content: "" });
+  }
+
+  return {
+    system: systemParts.length > 0 ? systemParts.join("\n\n") : null,
+    messages: convertedMessages,
+  };
+}
+
+function convertScenarioMessagesToResponsesInput(
+  messages: ScenarioMessage[]
+): Array<Record<string, unknown>> {
+  return messages.map((message) => {
+    const normalizedRole =
+      message.role === "system"
+        ? "developer"
+        : message.role === "assistant"
+          ? "assistant"
+          : "user";
+
+    return {
+      type: "message",
+      role: normalizedRole,
+      content: message.content,
+    };
+  });
+}
+
+function convertOpenAIToolsToAnthropic(tools: unknown): unknown {
+  if (!Array.isArray(tools)) {
+    return tools;
+  }
+
+  const hasOpenAIShape = tools.some((tool) => {
+    if (!tool || typeof tool !== "object") {
+      return false;
+    }
+
+    const type = (tool as { type?: unknown }).type;
+    const fn = (tool as { function?: unknown }).function;
+    return type === "function" && !!fn && typeof fn === "object";
+  });
+
+  if (!hasOpenAIShape) {
+    return tools;
+  }
+
+  return tools
+    .map((tool) => {
+      if (!tool || typeof tool !== "object") {
+        return null;
+      }
+
+      const fn = (tool as { function?: unknown }).function;
+      if (!fn || typeof fn !== "object") {
+        return null;
+      }
+
+      const name = (fn as { name?: unknown }).name;
+      if (typeof name !== "string" || !name.trim()) {
+        return null;
+      }
+
+      const description = (fn as { description?: unknown }).description;
+      const parameters = (fn as { parameters?: unknown }).parameters;
+
+      return {
+        name: name.trim(),
+        ...(typeof description === "string" ? { description } : {}),
+        input_schema:
+          parameters && typeof parameters === "object" && !Array.isArray(parameters)
+            ? (parameters as Record<string, unknown>)
+            : {},
+      };
+    })
+    .filter(Boolean);
+}
+
+function convertOpenAIToolChoiceToAnthropic(toolChoice: unknown): unknown {
+  if (typeof toolChoice === "string") {
+    if (toolChoice === "auto") {
+      return { type: "auto" };
+    }
+    if (toolChoice === "none") {
+      return { type: "none" };
+    }
+    if (toolChoice === "required") {
+      return { type: "any" };
+    }
+    return toolChoice;
+  }
+
+  if (!toolChoice || typeof toolChoice !== "object") {
+    return toolChoice;
+  }
+
+  const type = (toolChoice as { type?: unknown }).type;
+  if (type !== "function") {
+    return toolChoice;
+  }
+
+  const fn = (toolChoice as { function?: unknown }).function;
+  const name = fn && typeof fn === "object" ? (fn as { name?: unknown }).name : null;
+
+  if (typeof name === "string" && name.trim()) {
+    return { type: "tool", name: name.trim() };
+  }
+
+  return { type: "any" };
+}
+
+function adaptRequestOverridesForEndpoint(
+  requestOverrides: Record<string, unknown> | undefined,
+  endpoint: PlaygroundEndpoint
+): Record<string, unknown> | null {
+  if (!requestOverrides) {
+    return null;
+  }
+
+  if (endpoint !== "messages") {
+    return requestOverrides;
+  }
+
+  const adapted: Record<string, unknown> = { ...requestOverrides };
+
+  if (Object.hasOwn(adapted, "tools")) {
+    adapted.tools = convertOpenAIToolsToAnthropic(adapted.tools);
+  }
+
+  if (Object.hasOwn(adapted, "tool_choice")) {
+    adapted.tool_choice = convertOpenAIToolChoiceToAnthropic(adapted.tool_choice);
+  }
+
+  return adapted;
+}
+
+function buildChatCompletionsRequestBody(
+  modelId: string,
+  scenarioMessages: ScenarioMessage[],
+  currentSettings: PlaygroundSettings,
+  accountId: string | null
+): Record<string, unknown> {
+  const requestBody: Record<string, unknown> = {
+    model: modelId,
+    messages: scenarioMessages,
+    stream: currentSettings.streamResponses,
+    temperature: currentSettings.temperature,
+    top_p: currentSettings.topP,
+    max_tokens: currentSettings.maxTokens,
+    presence_penalty: currentSettings.presencePenalty,
+    frequency_penalty: currentSettings.frequencyPenalty,
+  };
+
+  if (accountId) {
+    requestBody.provider_account_id = accountId;
+  }
+
+  if (currentSettings.reasoningEffort !== "none") {
+    requestBody.reasoning_effort = currentSettings.reasoningEffort;
+  }
+
+  return requestBody;
+}
+
+function buildMessagesRequestBody(
+  modelId: string,
+  scenarioMessages: ScenarioMessage[],
+  currentSettings: PlaygroundSettings,
+  accountId: string | null
+): Record<string, unknown> {
+  const anthropicPayload = convertScenarioMessagesToAnthropic(scenarioMessages);
+
+  const requestBody: Record<string, unknown> = {
+    model: modelId,
+    messages: anthropicPayload.messages,
+    stream: currentSettings.streamResponses,
+    temperature: currentSettings.temperature,
+    top_p: currentSettings.topP,
+    max_tokens: currentSettings.maxTokens,
+    presence_penalty: currentSettings.presencePenalty,
+    frequency_penalty: currentSettings.frequencyPenalty,
+  };
+
+  if (anthropicPayload.system) {
+    requestBody.system = anthropicPayload.system;
+  }
+
+  if (accountId) {
+    requestBody.provider_account_id = accountId;
+  }
+
+  if (currentSettings.reasoningEffort !== "none") {
+    requestBody.thinking = {
+      type: "enabled",
+      budget_tokens: mapReasoningEffortToThinkingBudget(currentSettings.reasoningEffort),
+    };
+  }
+
+  return requestBody;
+}
+
+function buildResponsesRequestBody(
+  modelId: string,
+  scenarioMessages: ScenarioMessage[],
+  currentSettings: PlaygroundSettings,
+  accountId: string | null
+): Record<string, unknown> {
+  const requestBody: Record<string, unknown> = {
+    model: modelId,
+    input: convertScenarioMessagesToResponsesInput(scenarioMessages),
+    stream: currentSettings.streamResponses,
+    temperature: currentSettings.temperature,
+    top_p: currentSettings.topP,
+    max_output_tokens: currentSettings.maxTokens,
+    presence_penalty: currentSettings.presencePenalty,
+    frequency_penalty: currentSettings.frequencyPenalty,
+  };
+
+  if (accountId) {
+    requestBody.provider_account_id = accountId;
+  }
+
+  if (currentSettings.reasoningEffort !== "none") {
+    requestBody.reasoning_effort = currentSettings.reasoningEffort;
+  }
+
+  return requestBody;
+}
+
+function extractAnthropicToolCallsText(content: unknown): string {
+  if (!Array.isArray(content) || content.length === 0) {
+    return "";
+  }
+
+  const lines = content
+    .map((block, index) => {
+      if (!block || typeof block !== "object") {
+        return null;
+      }
+
+      const type = (block as { type?: unknown }).type;
+      if (type !== "tool_use") {
+        return null;
+      }
+
+      const name =
+        typeof (block as { name?: unknown }).name === "string"
+          ? ((block as { name: string }).name || `tool_${index + 1}`)
+          : `tool_${index + 1}`;
+
+      const input = (block as { input?: unknown }).input;
+      const inputText =
+        typeof input === "string"
+          ? input.trim() || "{}"
+          : input === undefined
+            ? "{}"
+            : JSON.stringify(input);
+
+      return `- ${name}(${inputText})`;
+    })
+    .filter((line): line is string => typeof line === "string" && line.length > 0);
+
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return `Tool calls:\n${lines.join("\n")}`;
+}
+
+function extractAnthropicCompletionData(payload: unknown): ParsedCompletionData {
+  if (!payload || typeof payload !== "object") {
+    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+  }
+
+  const contentBlocks = (payload as { content?: unknown }).content;
+  if (!Array.isArray(contentBlocks) || contentBlocks.length === 0) {
+    return {
+      content: "",
+      reasoning: "",
+      toolCallsText: "",
+      usage: extractUsageData(payload),
+    };
+  }
+
+  const textParts: string[] = [];
+  const reasoningParts: string[] = [];
+
+  for (const block of contentBlocks) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+
+    const type = (block as { type?: unknown }).type;
+
+    if (type === "text") {
+      const text = (block as { text?: unknown }).text;
+      if (typeof text === "string" && text.length > 0) {
+        textParts.push(text);
+      }
+      continue;
+    }
+
+    if (type === "thinking") {
+      const thinking = (block as { thinking?: unknown }).thinking;
+      if (typeof thinking === "string" && thinking.length > 0) {
+        reasoningParts.push(thinking);
+      }
+    }
+  }
+
+  return {
+    content: textParts.join(""),
+    reasoning: reasoningParts.join(""),
+    toolCallsText: extractAnthropicToolCallsText(contentBlocks),
+    usage: extractUsageData(payload),
+  };
+}
+
+function extractResponsesUsageData(payload: unknown): ParsedUsageData | null {
+  const directUsage = extractUsageData(payload);
+  if (directUsage) {
+    return directUsage;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const response = (payload as { response?: unknown }).response;
+  if (!response || typeof response !== "object") {
+    return null;
+  }
+
+  return extractUsageData({
+    usage: (response as { usage?: unknown }).usage,
+  });
+}
+
+function extractResponsesCompletionData(payload: unknown): ParsedCompletionData {
+  if (!payload || typeof payload !== "object") {
+    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+  }
+
+  const outputItems = (payload as { output?: unknown }).output;
+  if (!Array.isArray(outputItems) || outputItems.length === 0) {
+    return extractChatCompletionData(payload);
+  }
+
+  const textParts: string[] = [];
+  const reasoningParts: string[] = [];
+  const toolCallLines: string[] = [];
+
+  for (const item of outputItems) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    const itemType = (item as { type?: unknown }).type;
+
+    if (itemType === "message") {
+      const content = (item as { content?: unknown }).content;
+
+      if (typeof content === "string") {
+        textParts.push(content);
+        continue;
+      }
+
+      if (!Array.isArray(content)) {
+        continue;
+      }
+
+      for (const part of content) {
+        if (!part || typeof part !== "object") {
+          continue;
+        }
+
+        const partType = (part as { type?: unknown }).type;
+
+        if (
+          partType === "output_text" ||
+          partType === "text" ||
+          partType === "input_text"
+        ) {
+          const text = (part as { text?: unknown }).text;
+          if (typeof text === "string" && text.length > 0) {
+            textParts.push(text);
+          }
+        }
+      }
+
+      continue;
+    }
+
+    if (itemType === "reasoning") {
+      const summary = (item as { summary?: unknown }).summary;
+
+      if (Array.isArray(summary)) {
+        for (const summaryPart of summary) {
+          if (!summaryPart || typeof summaryPart !== "object") {
+            continue;
+          }
+
+          const text = (summaryPart as { text?: unknown }).text;
+          if (typeof text === "string" && text.length > 0) {
+            reasoningParts.push(text);
+          }
+        }
+      }
+
+      const fallbackText = (item as { content?: unknown }).content;
+      if (
+        reasoningParts.length === 0 &&
+        typeof fallbackText === "string" &&
+        fallbackText.length > 0
+      ) {
+        reasoningParts.push(fallbackText);
+      }
+
+      continue;
+    }
+
+    if (itemType === "function_call") {
+      const name = (item as { name?: unknown }).name;
+      const argumentsText = (item as { arguments?: unknown }).arguments;
+
+      if (typeof name === "string" && name.trim()) {
+        const argText =
+          typeof argumentsText === "string"
+            ? argumentsText.trim() || "{}"
+            : argumentsText === undefined
+              ? "{}"
+              : JSON.stringify(argumentsText);
+        toolCallLines.push(`- ${name.trim()}(${argText})`);
+      }
+    }
+  }
+
+  return {
+    content: textParts.join(""),
+    reasoning: reasoningParts.join(""),
+    toolCallsText:
+      toolCallLines.length > 0 ? `Tool calls:\n${toolCallLines.join("\n")}` : "",
+    usage: extractResponsesUsageData(payload),
+  };
+}
+
+function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData {
+  if (!payload || typeof payload !== "object") {
+    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+  }
+
+  const type = (payload as { type?: unknown }).type;
+  if (typeof type !== "string") {
+    if (Array.isArray((payload as { choices?: unknown }).choices)) {
+      return extractStreamChunkData(payload);
+    }
+
+    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+  }
+
+  if (type.includes("output_text")) {
+    const deltaOrText =
+      (payload as { delta?: unknown }).delta ??
+      (payload as { text?: unknown }).text;
+
+    return {
+      content: typeof deltaOrText === "string" ? deltaOrText : "",
+      reasoning: "",
+      toolCallsText: "",
+      usage: null,
+    };
+  }
+
+  if (type.includes("reasoning")) {
+    const deltaOrText =
+      (payload as { delta?: unknown }).delta ??
+      (payload as { text?: unknown }).text;
+
+    return {
+      content: "",
+      reasoning: typeof deltaOrText === "string" ? deltaOrText : "",
+      toolCallsText: "",
+      usage: null,
+    };
+  }
+
+  if (type === "response.output_item.added" || type === "response.output_item.done") {
+    const item = (payload as { item?: unknown }).item;
+    if (!item || typeof item !== "object") {
+      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    }
+
+    if ((item as { type?: unknown }).type !== "function_call") {
+      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    }
+
+    const name = (item as { name?: unknown }).name;
+    const argumentsText = (item as { arguments?: unknown }).arguments;
+
+    if (typeof name !== "string" || !name.trim()) {
+      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    }
+
+    const argText =
+      typeof argumentsText === "string"
+        ? argumentsText.trim() || "{}"
+        : argumentsText === undefined
+          ? "{}"
+          : JSON.stringify(argumentsText);
+
+    return {
+      content: "",
+      reasoning: "",
+      toolCallsText: `Tool calls:\n- ${name.trim()}(${argText})`,
+      usage: null,
+    };
+  }
+
+  if (type === "response.completed") {
+    return {
+      content: "",
+      reasoning: "",
+      toolCallsText: "",
+      usage: extractResponsesUsageData(payload),
+    };
+  }
+
+  return { content: "", reasoning: "", toolCallsText: "", usage: null };
+}
+
+function extractAnthropicStreamChunkData(
+  eventName: string,
+  payload: unknown
+): ParsedCompletionData {
+  if (!payload || typeof payload !== "object") {
+    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+  }
+
+  if (eventName === "content_block_delta") {
+    const delta = (payload as { delta?: unknown }).delta;
+    if (!delta || typeof delta !== "object") {
+      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    }
+
+    const deltaType = (delta as { type?: unknown }).type;
+    if (deltaType === "text_delta") {
+      const text = (delta as { text?: unknown }).text;
+      return {
+        content: typeof text === "string" ? text : "",
+        reasoning: "",
+        toolCallsText: "",
+        usage: null,
+      };
+    }
+
+    if (deltaType === "thinking_delta") {
+      const thinking = (delta as { thinking?: unknown }).thinking;
+      return {
+        content: "",
+        reasoning: typeof thinking === "string" ? thinking : "",
+        toolCallsText: "",
+        usage: null,
+      };
+    }
+  }
+
+  if (eventName === "message_delta") {
+    return {
+      content: "",
+      reasoning: "",
+      toolCallsText: "",
+      usage: extractUsageData({
+        usage: (payload as { usage?: unknown }).usage,
+      }),
+    };
+  }
+
+  return { content: "", reasoning: "", toolCallsText: "", usage: null };
+}
+
+function processAnthropicSseEvents(
+  events: string[],
+  onChunk: (chunk: ParsedCompletionData) => void
+) {
+  for (const event of events) {
+    const lines = event.split(/\r?\n/);
+    let eventName = "";
+    const dataParts: string[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+        continue;
+      }
+
+      if (line.startsWith("data:")) {
+        dataParts.push(line.slice(5).trim());
+      }
+    }
+
+    const data = dataParts.join("\n").trim();
+    if (!data || data === "[DONE]") {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      continue;
+    }
+
+    const errorMessage = extractErrorMessage(parsed);
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+
+    const chunk = extractAnthropicStreamChunkData(eventName, parsed);
+    if (chunk.content || chunk.reasoning || chunk.toolCallsText || chunk.usage) {
+      onChunk(chunk);
+    }
+  }
+}
+
+async function consumeAnthropicMessageStream(
+  response: Response,
+  onChunk: (chunk: ParsedCompletionData) => void
+) {
+  if (!response.body) {
+    throw new Error("No response body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop() || "";
+    processAnthropicSseEvents(events, onChunk);
+  }
+
+  buffer += decoder.decode();
+
+  if (buffer.trim()) {
+    processAnthropicSseEvents([buffer], onChunk);
+  }
+}
+
+function processResponsesSseEvents(
+  events: string[],
+  onChunk: (chunk: ParsedCompletionData) => void
+) {
+  for (const event of events) {
+    const lines = event.split(/\r?\n/);
+
+    for (const line of lines) {
+      if (!line.startsWith("data:")) {
+        continue;
+      }
+
+      const data = line.slice(5).trim();
+      if (!data || data === "[DONE]") {
+        continue;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        continue;
+      }
+
+      const errorMessage = extractErrorMessage(parsed);
+      if (errorMessage) {
+        throw new Error(errorMessage);
+      }
+
+      const chunk = extractResponsesStreamChunkData(parsed);
+      if (chunk.content || chunk.reasoning || chunk.toolCallsText || chunk.usage) {
+        onChunk(chunk);
+      }
+    }
+  }
+}
+
+async function consumeResponsesStream(
+  response: Response,
+  onChunk: (chunk: ParsedCompletionData) => void
+) {
+  if (!response.body) {
+    throw new Error("No response body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop() || "";
+    processResponsesSseEvents(events, onChunk);
+  }
+
+  buffer += decoder.decode();
+
+  if (buffer.trim()) {
+    processResponsesSseEvents([buffer], onChunk);
+  }
+}
+
 export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientProps) {
   const [panels, setPanels] = React.useState<PanelState[]>(() => [
     {
@@ -557,32 +1434,27 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
     let waitMs: number | null = null;
 
     try {
-      const scenarioMessages =
-        Array.isArray(scenario.messages) && scenario.messages.length > 0
-          ? scenario.messages
-          : [{ role: "user", content: scenario.prompt }];
+      const scenarioMessages = getScenarioMessages(scenario);
+      const endpoint = currentSettings.endpoint;
 
-      const requestBody: Record<string, unknown> = {
-        model: modelId,
-        messages: scenarioMessages,
-        stream: currentSettings.streamResponses,
-        temperature: currentSettings.temperature,
-        top_p: currentSettings.topP,
-        max_tokens: currentSettings.maxTokens,
-        presence_penalty: currentSettings.presencePenalty,
-        frequency_penalty: currentSettings.frequencyPenalty,
-      };
+      const requestBody =
+        endpoint === "messages"
+          ? buildMessagesRequestBody(modelId, scenarioMessages, currentSettings, accountId)
+          : endpoint === "responses"
+            ? buildResponsesRequestBody(modelId, scenarioMessages, currentSettings, accountId)
+            : buildChatCompletionsRequestBody(
+                modelId,
+                scenarioMessages,
+                currentSettings,
+                accountId
+              );
 
-      if (accountId) {
-        requestBody.provider_account_id = accountId;
-      }
-
-      if (currentSettings.reasoningEffort !== "none") {
-        requestBody.reasoning_effort = currentSettings.reasoningEffort;
-      }
-
-      if (scenario.requestOverrides) {
-        Object.assign(requestBody, scenario.requestOverrides);
+      const endpointOverrides = adaptRequestOverridesForEndpoint(
+        scenario.requestOverrides,
+        endpoint
+      );
+      if (endpointOverrides) {
+        Object.assign(requestBody, endpointOverrides);
       }
 
       const streamValue = requestBody.stream;
@@ -591,7 +1463,7 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
       const controller = new AbortController();
       controllersRef.current.set(panelId, controller);
 
-      const response = await fetch("/v1/chat/completions", {
+      const response = await fetch(getEndpointPath(endpoint), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -630,7 +1502,7 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
         let firstResponseMs: number | null = null;
         let usage: ParsedUsageData | null = null;
 
-        await consumeChatCompletionStream(response, (chunk) => {
+        const handleStreamChunk = (chunk: ParsedCompletionData) => {
           if (firstResponseMs === null) {
             firstResponseMs = Date.now() - requestStartedAt;
           }
@@ -648,7 +1520,15 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
               metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
             },
           }));
-        });
+        };
+
+        if (endpoint === "messages") {
+          await consumeAnthropicMessageStream(response, handleStreamChunk);
+        } else if (endpoint === "responses") {
+          await consumeResponsesStream(response, handleStreamChunk);
+        } else {
+          await consumeChatCompletionStream(response, handleStreamChunk);
+        }
 
         setResponses((prev) => ({
           ...prev,
@@ -664,7 +1544,12 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
       }
 
       const data = await response.json();
-      const parsedData = extractChatCompletionData(data);
+      const parsedData =
+        endpoint === "messages"
+          ? extractAnthropicCompletionData(data)
+          : endpoint === "responses"
+            ? extractResponsesCompletionData(data)
+            : extractChatCompletionData(data);
       const firstResponseMs = Date.now() - requestStartedAt;
       const combinedContent = [parsedData.toolCallsText, parsedData.content]
         .filter((part) => typeof part === "string" && part.trim().length > 0)

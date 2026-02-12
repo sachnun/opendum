@@ -9,13 +9,16 @@ import {
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import {
+  clearExpiredRateLimits,
   getRateLimitScope,
+  isRateLimited,
   markRateLimited,
   parseRateLimitError,
   getMinWaitTime,
   formatWaitTimeMs,
   parseRetryAfterMs,
 } from "@/lib/proxy/rate-limit";
+import { isModelSupportedByProvider } from "@/lib/proxy/models";
 import {
   buildAccountErrorMessage,
   getErrorMessage,
@@ -24,6 +27,8 @@ import {
   type ProxyErrorType,
   shouldRotateToNextAccount,
 } from "@/lib/proxy/error-utils";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -235,20 +240,59 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   const authHeader = request.headers.get("authorization");
-  const authResult = await validateApiKey(authHeader);
+  const xApiKeyHeader = request.headers.get("x-api-key");
 
-  if (!authResult.valid) {
+  let userId: string | undefined;
+  let apiKeyId: string | undefined;
+  let apiKeyModelAccess: ApiKeyModelAccess | undefined;
+
+  if (authHeader || xApiKeyHeader) {
+    const authResult = await validateApiKey(authHeader || xApiKeyHeader);
+
+    if (!authResult.valid) {
+      return NextResponse.json(
+        { error: { message: authResult.error, type: "authentication_error" } },
+        { status: 401 }
+      );
+    }
+
+    userId = authResult.userId;
+    apiKeyId = authResult.apiKeyId;
+    apiKeyModelAccess = {
+      mode: authResult.modelAccessMode ?? "all",
+      models: authResult.modelAccessList ?? [],
+    };
+  } else {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Missing Authorization header",
+            type: "authentication_error",
+          },
+        },
+        { status: 401 }
+      );
+    }
+
+    userId = session.user.id;
+  }
+
+  if (!userId) {
     return NextResponse.json(
-      { error: { message: authResult.error, type: "authentication_error" } },
+      {
+        error: {
+          message: "Missing Authorization header",
+          type: "authentication_error",
+        },
+      },
       { status: 401 }
     );
   }
 
-  const { userId, apiKeyId } = authResult;
-  const apiKeyModelAccess: ApiKeyModelAccess = {
-    mode: authResult.modelAccessMode ?? "all",
-    models: authResult.modelAccessList ?? [],
-  };
+  const authenticatedUserId = userId;
 
   try {
     let body;
@@ -270,11 +314,26 @@ export async function POST(request: NextRequest) {
       model: modelParam,
       input,
       instructions,
-      stream = true,
+      stream: streamParam,
+      provider_account_id: providerAccountIdParam,
       ...params
-    } = body;
+    } = body as {
+      model?: unknown;
+      input?: unknown;
+      instructions?: unknown;
+      stream?: unknown;
+      provider_account_id?: unknown;
+      [key: string]: unknown;
+    };
 
-    if (!modelParam) {
+    const streamEnabled = typeof streamParam === "boolean" ? streamParam : true;
+    const requestedModel = typeof modelParam === "string" ? modelParam.trim() : "";
+    const instructionsText =
+      typeof instructions === "string" && instructions.trim()
+        ? instructions
+        : undefined;
+
+    if (!requestedModel) {
       return NextResponse.json(
         {
           error: {
@@ -299,8 +358,8 @@ export async function POST(request: NextRequest) {
     }
 
     const modelValidation = await validateModelForUser(
-      userId!,
-      modelParam,
+      authenticatedUserId,
+      requestedModel,
       apiKeyModelAccess
     );
     if (!modelValidation.valid) {
@@ -330,7 +389,7 @@ export async function POST(request: NextRequest) {
       | null = null;
 
     // Convert Responses API input to Chat Completions messages
-    const messages = convertInputToMessages(input, instructions);
+    const messages = convertInputToMessages(input, instructionsText);
 
     // Map Responses API params to Chat Completions params
     const chatParams: Record<string, unknown> = { ...params };
@@ -339,24 +398,135 @@ export async function POST(request: NextRequest) {
       delete chatParams.max_output_tokens;
     }
 
+    const hasProviderAccountParam =
+      providerAccountIdParam !== undefined && providerAccountIdParam !== null;
+    const normalizedProviderAccountId =
+      typeof providerAccountIdParam === "string" ? providerAccountIdParam.trim() : "";
+
+    if (hasProviderAccountParam && normalizedProviderAccountId.length === 0) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "provider_account_id must be a non-empty string",
+            type: "invalid_request_error",
+            param: "provider_account_id",
+            code: "invalid_provider_account",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const requestParamsForError: Record<string, unknown> = {
-      stream,
-      instructions,
+      stream: streamEnabled,
+      ...(instructionsText ? { instructions: instructionsText } : {}),
       ...chatParams,
+      ...(normalizedProviderAccountId
+        ? { provider_account_id: normalizedProviderAccountId }
+        : {}),
     };
 
-    const reasoningRequested = !!(
-      chatParams.reasoning ||
-      chatParams.reasoning_effort
-    );
+    const reasoningRequested = !!(chatParams.reasoning || chatParams.reasoning_effort);
 
-    for (let attempt = 0; attempt < MAX_ACCOUNT_RETRIES; attempt++) {
-      const account = await getNextAvailableAccount(
-        userId!,
-        model,
-        provider,
-        triedAccountIds
+    const forcedAccount = normalizedProviderAccountId
+      ? await prisma.providerAccount.findFirst({
+          where: {
+            id: normalizedProviderAccountId,
+            userId: authenticatedUserId,
+          },
+        })
+      : null;
+
+    if (normalizedProviderAccountId && !forcedAccount) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Selected provider account was not found",
+            type: "invalid_request_error",
+            param: "provider_account_id",
+            code: "provider_account_not_found",
+          },
+        },
+        { status: 400 }
       );
+    }
+
+    if (forcedAccount && !forcedAccount.isActive) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Selected provider account is inactive",
+            type: "invalid_request_error",
+            param: "provider_account_id",
+            code: "provider_account_inactive",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (forcedAccount) {
+      if (!isModelSupportedByProvider(model, forcedAccount.provider)) {
+        return NextResponse.json(
+          {
+            error: {
+              message: `Selected account provider "${forcedAccount.provider}" does not support model "${model}"`,
+              type: "invalid_request_error",
+              param: "provider_account_id",
+              code: "provider_account_model_mismatch",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (provider !== null && forcedAccount.provider !== provider) {
+        return NextResponse.json(
+          {
+            error: {
+              message: `Selected account provider "${forcedAccount.provider}" does not match model provider "${provider}"`,
+              type: "invalid_request_error",
+              param: "provider_account_id",
+              code: "provider_account_provider_mismatch",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      clearExpiredRateLimits(forcedAccount.id);
+      if (await isRateLimited(forcedAccount.id, rateLimitScope)) {
+        const waitTimeMs = await getMinWaitTime([forcedAccount.id], rateLimitScope);
+        return NextResponse.json(
+          {
+            error: {
+              message:
+                waitTimeMs > 0
+                  ? `Selected account is rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`
+                  : "Selected account is rate limited.",
+              type: "rate_limit_error",
+              retry_after: waitTimeMs > 0 ? formatWaitTimeMs(waitTimeMs) : undefined,
+              retry_after_ms: waitTimeMs > 0 ? waitTimeMs : undefined,
+            },
+          },
+          { status: 429 }
+        );
+      }
+    }
+
+    const accountRetryLimit = forcedAccount ? 1 : MAX_ACCOUNT_RETRIES;
+
+    for (let attempt = 0; attempt < accountRetryLimit; attempt++) {
+      let account = forcedAccount;
+
+      if (!account) {
+        account = await getNextAvailableAccount(
+          authenticatedUserId,
+          model,
+          provider,
+          triedAccountIds
+        );
+      }
 
       if (!account) {
         const isFirstAttempt = triedAccountIds.length === 0;
@@ -414,6 +584,16 @@ export async function POST(request: NextRequest) {
 
       triedAccountIds.push(account.id);
 
+      if (forcedAccount) {
+        await prisma.providerAccount.update({
+          where: { id: account.id },
+          data: {
+            lastUsedAt: new Date(),
+            requestCount: { increment: 1 },
+          },
+        });
+      }
+
       try {
         const providerImpl = await getProvider(
           account.provider as ProviderNameType
@@ -426,13 +606,13 @@ export async function POST(request: NextRequest) {
           {
             model,
             messages,
-            instructions,
-            stream,
+            instructions: instructionsText,
+            stream: streamEnabled,
             _includeReasoning: reasoningRequested,
             _responsesInput: input,
             ...chatParams,
           },
-          stream
+          streamEnabled
         );
 
         if (providerResponse.status === 429) {
@@ -457,7 +637,7 @@ export async function POST(request: NextRequest) {
             );
 
             await logUsage({
-              userId: userId!,
+              userId: authenticatedUserId,
               providerAccountId: account.id,
               proxyApiKeyId: apiKeyId,
               model,
@@ -493,7 +673,7 @@ export async function POST(request: NextRequest) {
           );
 
           await logUsage({
-            userId: userId!,
+            userId: authenticatedUserId,
             providerAccountId: account.id,
             proxyApiKeyId: apiKeyId,
             model,
@@ -514,7 +694,7 @@ export async function POST(request: NextRequest) {
 
           if (
             shouldRotateToNextAccount(statusCode) &&
-            attempt < MAX_ACCOUNT_RETRIES - 1
+            attempt < accountRetryLimit - 1
           ) {
             continue;
           }
@@ -530,7 +710,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if (stream) {
+        if (streamEnabled) {
           const responseBody = providerResponse.body;
 
           if (!responseBody) {
@@ -549,7 +729,7 @@ export async function POST(request: NextRequest) {
             markAccountSuccess(account.id).catch(() => undefined);
 
             logUsage({
-              userId: userId!,
+              userId: authenticatedUserId,
               providerAccountId: account.id,
               proxyApiKeyId: apiKeyId,
               model,
@@ -576,7 +756,7 @@ export async function POST(request: NextRequest) {
         markAccountSuccess(account.id).catch(() => undefined);
 
         logUsage({
-          userId: userId!,
+          userId: authenticatedUserId,
           providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
@@ -607,7 +787,7 @@ export async function POST(request: NextRequest) {
         await markAccountFailed(account.id, statusCode, detailedError);
 
         await logUsage({
-          userId: userId!,
+          userId: authenticatedUserId,
           providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
@@ -625,7 +805,7 @@ export async function POST(request: NextRequest) {
           type: sanitizedError.type,
         };
 
-        if (shouldRotateToNextAccount(statusCode) && attempt < MAX_ACCOUNT_RETRIES - 1) {
+        if (shouldRotateToNextAccount(statusCode) && attempt < accountRetryLimit - 1) {
           continue;
         }
 

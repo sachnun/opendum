@@ -6,7 +6,8 @@ const jsonErrorResponse = () =>
   NextResponse.json(
     {
       error: {
-        message: "Please use a specific endpoint like /v1/chat/completions or /v1/messages",
+        message:
+          "Please use a specific endpoint like /v1/chat/completions, /v1/messages, or /v1/responses",
         type: "invalid_request_error",
       },
     },
