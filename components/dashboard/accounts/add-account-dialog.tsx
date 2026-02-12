@@ -927,32 +927,30 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
           )}
         </div>
 
-        <DialogFooter className="sm:justify-between">
-          <div>
-            {step > 1 && !isPolling && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setStep(step - 1)}
-                disabled={isLoading}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-            )}
-          </div>
-          <div>
-            {step === 2 && providerConfig && providerConfig.flowType !== "device_code" && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setStep(3)}
-              >
-                Next
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            )}
-          </div>
+        <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between">
+          {step > 1 && !isPolling && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setStep(step - 1)}
+              disabled={isLoading}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          )}
+
+          {step === 2 && providerConfig && providerConfig.flowType !== "device_code" && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="ml-auto"
+              onClick={() => setStep(3)}
+            >
+              Next
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
