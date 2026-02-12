@@ -7,6 +7,7 @@
 import type { ProviderAccount } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import { codexProvider } from "@/lib/proxy/providers/codex";
 import {
   fetchCodexQuotaFromApi,
@@ -57,6 +58,17 @@ export type CodexQuotaActionResult =
       data: { accounts: CodexAccountQuotaInfo[]; summary: CodexQuotaSummary };
     }
   | { success: false; error: string };
+
+interface QuotaRequestOptions {
+  forceRefresh?: boolean;
+}
+
+const CODEX_QUOTA_CACHE_PREFIX = "opendum:quota:codex";
+const CODEX_QUOTA_CACHE_TTL_SECONDS = 45;
+
+function getCodexQuotaCacheKey(userId: string): string {
+  return `${CODEX_QUOTA_CACHE_PREFIX}:${userId}`;
+}
 
 function formatTimeUntilReset(resetTimestamp: number | null): string | null {
   if (!resetTimestamp) {
@@ -159,10 +171,20 @@ function snapshotToGroups(
   return groups;
 }
 
-export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
+export async function getCodexQuota(
+  options: QuotaRequestOptions = {}
+): Promise<CodexQuotaActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const cacheKey = getCodexQuotaCacheKey(session.user.id);
+  if (!options.forceRefresh) {
+    const cachedResult = await getRedisJson<CodexQuotaActionResult>(cacheKey);
+    if (cachedResult?.success) {
+      return cachedResult;
+    }
   }
 
   try {
@@ -186,7 +208,7 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
     });
 
     if (accounts.length === 0) {
-      return {
+      const emptyResult: CodexQuotaActionResult = {
         success: true,
         data: {
           accounts: [],
@@ -199,6 +221,9 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
           },
         },
       };
+
+      await setRedisJson(cacheKey, emptyResult, CODEX_QUOTA_CACHE_TTL_SECONDS);
+      return emptyResult;
     }
 
     const results: CodexAccountQuotaInfo[] = [];
@@ -274,7 +299,7 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
 
     const activeAccountCount = results.filter((account) => account.isActive).length;
 
-    return {
+    const result: CodexQuotaActionResult = {
       success: true,
       data: {
         accounts: results,
@@ -287,6 +312,9 @@ export async function getCodexQuota(): Promise<CodexQuotaActionResult> {
         },
       },
     };
+
+    await setRedisJson(cacheKey, result, CODEX_QUOTA_CACHE_TTL_SECONDS);
+    return result;
   } catch (error) {
     return {
       success: false,

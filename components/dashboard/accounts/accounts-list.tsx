@@ -714,13 +714,13 @@ export function AccountsList({
   const [isGeminiCliQuotaLoading, startGeminiCliQuotaTransition] = useTransition();
   const [isOpenRouterQuotaLoading, startOpenRouterQuotaTransition] = useTransition();
 
-  const fetchAntigravityQuota = useCallback(() => {
+  const fetchAntigravityQuota = useCallback((forceRefresh = false) => {
     if (antigravityAccounts.length === 0) {
       return;
     }
 
     startAntigravityQuotaTransition(async () => {
-      const result = await getAntigravityQuota();
+      const result = await getAntigravityQuota({ forceRefresh });
       if (!result.success) {
         setAntigravityQuotaByAccountId({});
         return;
@@ -738,13 +738,13 @@ export function AccountsList({
     });
   }, [antigravityAccounts.length]);
 
-  const fetchCodexQuota = useCallback(() => {
+  const fetchCodexQuota = useCallback((forceRefresh = false) => {
     if (codexAccounts.length === 0) {
       return;
     }
 
     startCodexQuotaTransition(async () => {
-      const result = await getCodexQuota();
+      const result = await getCodexQuota({ forceRefresh });
       if (!result.success) {
         setCodexQuotaByAccountId({});
         return;
@@ -762,13 +762,13 @@ export function AccountsList({
     });
   }, [codexAccounts.length]);
 
-  const fetchGeminiCliQuota = useCallback(() => {
+  const fetchGeminiCliQuota = useCallback((forceRefresh = false) => {
     if (geminiCliAccounts.length === 0) {
       return;
     }
 
     startGeminiCliQuotaTransition(async () => {
-      const result = await getGeminiCliQuota();
+      const result = await getGeminiCliQuota({ forceRefresh });
       if (!result.success) {
         setGeminiCliQuotaByAccountId({});
         return;
@@ -786,13 +786,13 @@ export function AccountsList({
     });
   }, [geminiCliAccounts.length]);
 
-  const fetchOpenRouterQuota = useCallback(() => {
+  const fetchOpenRouterQuota = useCallback((forceRefresh = false) => {
     if (openRouterAccounts.length === 0) {
       return;
     }
 
     startOpenRouterQuotaTransition(async () => {
-      const result = await getOpenRouterQuota();
+      const result = await getOpenRouterQuota({ forceRefresh });
       if (!result.success) {
         setOpenRouterQuotaByAccountId({});
         return;
@@ -828,10 +828,10 @@ export function AccountsList({
 
   useEffect(() => {
     const handleProviderAccountsRefresh = () => {
-      fetchAntigravityQuota();
-      fetchCodexQuota();
-      fetchGeminiCliQuota();
-      fetchOpenRouterQuota();
+      fetchAntigravityQuota(true);
+      fetchCodexQuota(true);
+      fetchGeminiCliQuota(true);
+      fetchOpenRouterQuota(true);
     };
 
     window.addEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);

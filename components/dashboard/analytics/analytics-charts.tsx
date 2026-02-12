@@ -100,15 +100,16 @@ export function AnalyticsCharts({
   const fetchData = async (
     selectedPeriod: Period,
     selectedApiKey: string,
-    selectedCustomRange?: CustomDateRange
+    selectedCustomRange?: CustomDateRange,
+    forceRefresh = false
   ) => {
     setIsFetching(true);
 
     try {
       const apiKeyId = selectedApiKey === "all" ? undefined : selectedApiKey;
       const result = selectedCustomRange
-        ? await getAnalyticsData(selectedCustomRange, apiKeyId)
-        : await getAnalyticsData(selectedPeriod, apiKeyId);
+        ? await getAnalyticsData(selectedCustomRange, apiKeyId, { forceRefresh })
+        : await getAnalyticsData(selectedPeriod, apiKeyId, { forceRefresh });
 
       if (result.success) {
         setData(result.data);
@@ -183,7 +184,7 @@ export function AnalyticsCharts({
       return;
     }
 
-    await fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined);
+    await fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined, true);
   };
 
   const statCards: StatCard[] = data
