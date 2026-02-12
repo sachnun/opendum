@@ -29,6 +29,7 @@ export default async function DashboardLayout({
     antigravity: 0,
     codex: 0,
     iflow: 0,
+    kiro: 0,
     gemini_cli: 0,
     qwen_code: 0,
     nvidia_nim: 0,
@@ -46,6 +47,9 @@ export default async function DashboardLayout({
         break;
       case "iflow":
         accountCounts.iflow = item._count._all;
+        break;
+      case "kiro":
+        accountCounts.kiro = item._count._all;
         break;
       case "gemini_cli":
         accountCounts.gemini_cli = item._count._all;

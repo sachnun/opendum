@@ -31,10 +31,12 @@ import {
   exchangeAntigravityOAuthCode,
   exchangeGeminiCliOAuthCode,
   exchangeCodexOAuthCode,
+  exchangeKiroOAuthCode,
   getIflowAuthUrl,
   getAntigravityAuthUrl,
   getGeminiCliAuthUrl,
   getCodexAuthUrl,
+  getKiroAuthUrl,
   initiateQwenCodeAuth,
   pollQwenCodeAuth,
   connectNvidiaNimApiKey,
@@ -49,6 +51,7 @@ type Provider =
   | "qwen_code"
   | "gemini_cli"
   | "codex"
+  | "kiro"
   | "nvidia_nim"
   | "ollama_cloud"
   | "openrouter"
@@ -120,6 +123,13 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     getAuthUrl: getCodexAuthUrl,
     exchangeAction: exchangeCodexOAuthCode,
   },
+  kiro: {
+    name: "Kiro",
+    description: "Access Claude via Kiro OAuth",
+    flowType: "oauth_redirect",
+    getAuthUrl: getKiroAuthUrl,
+    exchangeAction: exchangeKiroOAuthCode,
+  },
   nvidia_nim: {
     name: "Nvidia",
     description: "Access NIM models with direct API key",
@@ -152,6 +162,7 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
 const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
   "antigravity",
   "codex",
+  "kiro",
   "iflow",
   "gemini_cli",
   "qwen_code",
@@ -682,11 +693,11 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
                       After login, copy the URL from address bar:{" "}
-                      <code className="rounded bg-muted px-1">
-                        {provider === "codex"
-                          ? "http://localhost:1455/auth/callback?code=..."
-                          : "http://localhost:1/oauth2callback?code=..."}
-                      </code>
+                        <code className="rounded bg-muted px-1">
+                         {provider === "codex" || provider === "kiro"
+                           ? "http://localhost:1455/auth/callback?code=..."
+                           : "http://localhost:1/oauth2callback?code=..."}
+                       </code>
                     </AlertDescription>
                   </Alert>
                 </>
@@ -796,7 +807,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                 </p>
                 <Input
                   placeholder={
-                    provider === "codex"
+                    provider === "codex" || provider === "kiro"
                       ? "http://localhost:1455/auth/callback?code=..."
                       : "http://localhost:1/oauth2callback?code=..."
                   }

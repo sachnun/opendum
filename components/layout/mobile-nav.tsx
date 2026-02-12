@@ -44,6 +44,7 @@ export function MobileNav({ accountCounts }: MobileNavProps) {
       "ollama-cloud-accounts": accountCounts.ollama_cloud,
       "openrouter-accounts": accountCounts.openrouter,
       "codex-accounts": accountCounts.codex,
+      "kiro-accounts": accountCounts.kiro,
       "iflow-accounts": accountCounts.iflow,
       "gemini-cli-accounts": accountCounts.gemini_cli,
       "qwen-code-accounts": accountCounts.qwen_code,

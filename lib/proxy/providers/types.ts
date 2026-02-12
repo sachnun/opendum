@@ -156,6 +156,7 @@ export const ProviderName = {
   QWEN_CODE: "qwen_code",
   GEMINI_CLI: "gemini_cli",
   CODEX: "codex",
+  KIRO: "kiro",
   NVIDIA_NIM: "nvidia_nim",
   OLLAMA_CLOUD: "ollama_cloud",
   OPENROUTER: "openrouter",
@@ -169,6 +170,7 @@ export const OAUTH_PROVIDER_NAMES: ProviderNameType[] = [
   ProviderName.QWEN_CODE,
   ProviderName.GEMINI_CLI,
   ProviderName.CODEX,
+  ProviderName.KIRO,
 ];
 
 export const API_KEY_PROVIDER_NAMES: ProviderNameType[] = [

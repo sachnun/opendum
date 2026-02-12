@@ -118,6 +118,7 @@ export default async function AccountsPage({
   const qwenCodeAccounts = accountsWithStats.filter((a) => a.provider === "qwen_code");
   const geminiCliAccounts = accountsWithStats.filter((a) => a.provider === "gemini_cli");
   const codexAccounts = accountsWithStats.filter((a) => a.provider === "codex");
+  const kiroAccounts = accountsWithStats.filter((a) => a.provider === "kiro");
   const nvidiaNimAccounts = accountsWithStats.filter((a) => a.provider === "nvidia_nim");
   const ollamaCloudAccounts = accountsWithStats.filter((a) => a.provider === "ollama_cloud");
   const openRouterAccounts = accountsWithStats.filter((a) => a.provider === "openrouter");
@@ -155,6 +156,8 @@ export default async function AccountsPage({
                   ? "Gemini CLI account connected successfully!"
                   : params.success === "codex_added"
                     ? "Codex account connected successfully!"
+                    : params.success === "kiro_added"
+                      ? "Kiro account connected successfully!"
                     : "Account connected successfully!"}
           </AlertDescription>
         </Alert>
@@ -175,6 +178,7 @@ export default async function AccountsPage({
         geminiCliAccounts={geminiCliAccounts}
         qwenCodeAccounts={qwenCodeAccounts}
         codexAccounts={codexAccounts}
+        kiroAccounts={kiroAccounts}
         nvidiaNimAccounts={nvidiaNimAccounts}
         ollamaCloudAccounts={ollamaCloudAccounts}
         openRouterAccounts={openRouterAccounts}

@@ -9,6 +9,7 @@ let antigravityProvider: Provider | null = null;
 let qwenCodeProvider: Provider | null = null;
 let geminiCliProvider: Provider | null = null;
 let codexProvider: Provider | null = null;
+let kiroProvider: Provider | null = null;
 let nvidiaNimProvider: Provider | null = null;
 let ollamaCloudProvider: Provider | null = null;
 let openRouterProvider: Provider | null = null;
@@ -53,6 +54,13 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
       }
       return codexProvider;
 
+    case ProviderName.KIRO:
+      if (!kiroProvider) {
+        const { kiroProvider: provider } = await import("./kiro");
+        kiroProvider = provider;
+      }
+      return kiroProvider;
+
     case ProviderName.NVIDIA_NIM:
       if (!nvidiaNimProvider) {
         const { nvidiaNimProvider: provider } = await import("./nvidia-nim");
@@ -83,17 +91,18 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [iflow, antigravity, qwenCode, geminiCli, codex, nvidiaNim, ollamaCloud, openRouter] = await Promise.all([
+  const [iflow, antigravity, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter] = await Promise.all([
     getProvider(ProviderName.IFLOW),
     getProvider(ProviderName.ANTIGRAVITY),
     getProvider(ProviderName.QWEN_CODE),
     getProvider(ProviderName.GEMINI_CLI),
     getProvider(ProviderName.CODEX),
+    getProvider(ProviderName.KIRO),
     getProvider(ProviderName.NVIDIA_NIM),
     getProvider(ProviderName.OLLAMA_CLOUD),
     getProvider(ProviderName.OPENROUTER),
   ]);
-  return [iflow, antigravity, qwenCode, geminiCli, codex, nvidiaNim, ollamaCloud, openRouter];
+  return [iflow, antigravity, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter];
 }
 
 /**

@@ -63,6 +63,8 @@ function getProviderLabel(provider: string): string {
       return "Gemini CLI";
     case ProviderName.CODEX:
       return "Codex";
+    case ProviderName.KIRO:
+      return "Kiro";
     case ProviderName.NVIDIA_NIM:
       return "Nvidia";
     case ProviderName.OLLAMA_CLOUD:
@@ -171,6 +173,7 @@ export default async function ModelsPage() {
   const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
   const geminiCliModels = getModelsForProvider(ProviderName.GEMINI_CLI);
   const codexModels = getModelsForProvider(ProviderName.CODEX);
+  const kiroModels = getModelsForProvider(ProviderName.KIRO);
   const nvidiaNimModels = getModelsForProvider(ProviderName.NVIDIA_NIM);
   const ollamaCloudModels = getModelsForProvider(ProviderName.OLLAMA_CLOUD);
   const openRouterModels = getModelsForProvider(ProviderName.OPENROUTER);
@@ -191,6 +194,9 @@ export default async function ModelsPage() {
   }
   if (codexModels.length > 0) {
     availableProviders.push({ id: ProviderName.CODEX, label: "Codex" });
+  }
+  if (kiroModels.length > 0) {
+    availableProviders.push({ id: ProviderName.KIRO, label: "Kiro" });
   }
   if (nvidiaNimModels.length > 0) {
     availableProviders.push({ id: ProviderName.NVIDIA_NIM, label: "Nvidia" });
