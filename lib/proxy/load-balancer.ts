@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { ProviderAccount } from "@prisma/client";
 import { getProvidersForModel } from "./models";
-import { getRateLimitedAccountIds } from "./rate-limit";
-import { getModelFamily } from "./providers/antigravity/converter";
+import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit";
 
 const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 const MAX_STORED_ERROR_MESSAGE_LENGTH = 10000;
@@ -64,7 +63,7 @@ export async function getNextAccount(
 
 /**
  * Get the next available (non-rate-limited) account for a user and model using LRU
- * Skips accounts that are rate-limited for the model's family
+ * Skips accounts that are rate-limited for the requested model
  * Deprioritizes degraded and failed accounts.
  * Failed accounts are retried automatically after a cooldown window.
  * @param userId User ID
@@ -109,7 +108,7 @@ export async function getNextAvailableAccount(
     return null;
   }
 
-  const family = getModelFamily(model);
+  const rateLimitScope = getRateLimitScope(model);
 
   // Separate paid and free accounts (both already sorted by status then LRU)
   const paidAccounts = accounts.filter((a) => a.tier === "paid");
@@ -121,7 +120,7 @@ export async function getNextAvailableAccount(
   const prioritizedAccounts = [...paidAccounts, ...freeAccounts];
   const rateLimitedAccountIds = await getRateLimitedAccountIds(
     prioritizedAccounts.map((account) => account.id),
-    family
+    rateLimitScope
   );
 
   for (const acc of prioritizedAccounts) {

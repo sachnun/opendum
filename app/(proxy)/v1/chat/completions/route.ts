@@ -7,13 +7,13 @@ import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import {
   clearExpiredRateLimits,
   formatWaitTimeMs,
+  getRateLimitScope,
   getMinWaitTime,
   isRateLimited,
   markRateLimited,
   parseRateLimitError,
   parseRetryAfterMs,
 } from "@/lib/proxy/rate-limit";
-import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
 import { isModelSupportedByProvider } from "@/lib/proxy/models";
 import {
   buildAccountErrorMessage,
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { provider, model } = modelValidation;
-    const family = getModelFamily(model);
+    const rateLimitScope = getRateLimitScope(model);
     const MAX_ACCOUNT_RETRIES = 5;
     const triedAccountIds: string[] = [];
     let lastAccountFailure:
@@ -318,8 +318,8 @@ export async function POST(request: NextRequest) {
       }
 
       clearExpiredRateLimits(forcedAccount.id);
-      if (await isRateLimited(forcedAccount.id, family)) {
-        const waitTimeMs = await getMinWaitTime([forcedAccount.id], family);
+      if (await isRateLimited(forcedAccount.id, rateLimitScope)) {
+        const waitTimeMs = await getMinWaitTime([forcedAccount.id], rateLimitScope);
         return NextResponse.json(
           {
             error: {
@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const waitTimeMs = await getMinWaitTime(triedAccountIds, family);
+        const waitTimeMs = await getMinWaitTime(triedAccountIds, rateLimitScope);
         if (waitTimeMs > 0) {
           return NextResponse.json(
             {
@@ -442,7 +442,7 @@ export async function POST(request: NextRequest) {
 
             await markRateLimited(
               account.id,
-              family,
+              rateLimitScope,
               retryAfterMs,
               rateLimitInfo?.model,
               rateLimitInfo?.message
@@ -462,7 +462,7 @@ export async function POST(request: NextRequest) {
             continue;
           } catch {
             const retryAfterMs = retryAfterMsFromHeader ?? fallbackRetryAfterMs;
-            await markRateLimited(account.id, family, retryAfterMs);
+            await markRateLimited(account.id, rateLimitScope, retryAfterMs);
             continue;
           }
         }
@@ -630,7 +630,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const waitTimeMs = await getMinWaitTime(triedAccountIds, family);
+    const waitTimeMs = await getMinWaitTime(triedAccountIds, rateLimitScope);
     if (waitTimeMs > 0) {
       return NextResponse.json(
         {

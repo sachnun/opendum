@@ -9,13 +9,13 @@ import {
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import {
+  getRateLimitScope,
   markRateLimited,
   parseRateLimitError,
   getMinWaitTime,
   formatWaitTimeMs,
   parseRetryAfterMs,
 } from "@/lib/proxy/rate-limit";
-import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
 import {
   buildAccountErrorMessage,
   getErrorMessage,
@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { provider, model } = modelValidation;
-    const family = getModelFamily(model);
+    const rateLimitScope = getRateLimitScope(model);
     const MAX_ACCOUNT_RETRIES = 5;
     const triedAccountIds: string[] = [];
     let lastAccountFailure:
@@ -374,7 +374,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const waitTimeMs = await getMinWaitTime(triedAccountIds, family);
+        const waitTimeMs = await getMinWaitTime(triedAccountIds, rateLimitScope);
         if (waitTimeMs > 0) {
           return NextResponse.json(
             {
@@ -450,7 +450,7 @@ export async function POST(request: NextRequest) {
 
             await markRateLimited(
               account.id,
-              family,
+              rateLimitScope,
               retryAfterMs,
               rateLimitInfo?.model,
               rateLimitInfo?.message
@@ -470,7 +470,7 @@ export async function POST(request: NextRequest) {
             continue;
           } catch {
             const retryAfterMs = retryAfterMsFromHeader ?? fallbackRetryAfterMs;
-            await markRateLimited(account.id, family, retryAfterMs);
+            await markRateLimited(account.id, rateLimitScope, retryAfterMs);
             continue;
           }
         }
@@ -641,7 +641,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const waitTimeMs = await getMinWaitTime(triedAccountIds, family);
+    const waitTimeMs = await getMinWaitTime(triedAccountIds, rateLimitScope);
     if (waitTimeMs > 0) {
       return NextResponse.json(
         {
