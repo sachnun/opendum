@@ -35,6 +35,11 @@ import {
   type GeminiCliQuotaGroupDisplay,
 } from "@/lib/actions/gemini-cli-quota";
 import {
+  getKiroQuota,
+  type KiroAccountQuotaInfo,
+  type KiroQuotaGroupDisplay,
+} from "@/lib/actions/kiro-quota";
+import {
   getOpenRouterQuota,
   type OpenRouterAccountQuotaInfo,
   type OpenRouterQuotaGroupDisplay,
@@ -49,11 +54,13 @@ type AccountQuotaInfo =
   | AntigravityAccountQuotaInfo
   | CodexAccountQuotaInfo
   | GeminiCliAccountQuotaInfo
+  | KiroAccountQuotaInfo
   | OpenRouterAccountQuotaInfo;
 type QuotaGroupDisplay =
   | AntigravityQuotaGroupDisplay
   | CodexQuotaGroupDisplay
   | GeminiCliQuotaGroupDisplay
+  | KiroQuotaGroupDisplay
   | OpenRouterQuotaGroupDisplay;
 
 // =============================================================================
@@ -486,6 +493,7 @@ function AccountCard({
     account.provider === "antigravity" ||
     account.provider === "codex" ||
     account.provider === "gemini_cli" ||
+    account.provider === "kiro" ||
     account.provider === "openrouter";
   const dailyValues = account.stats.dailyRequests.map((point) => point.count);
   const peakRequests = Math.max(...dailyValues, 0);
@@ -709,11 +717,14 @@ export function AccountsList({
     useState<Record<string, AccountQuotaInfo>>({});
   const [geminiCliQuotaByAccountId, setGeminiCliQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
+  const [kiroQuotaByAccountId, setKiroQuotaByAccountId] =
+    useState<Record<string, AccountQuotaInfo>>({});
   const [openRouterQuotaByAccountId, setOpenRouterQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
   const [isAntigravityQuotaLoading, startAntigravityQuotaTransition] = useTransition();
   const [isCodexQuotaLoading, startCodexQuotaTransition] = useTransition();
   const [isGeminiCliQuotaLoading, startGeminiCliQuotaTransition] = useTransition();
+  const [isKiroQuotaLoading, startKiroQuotaTransition] = useTransition();
   const [isOpenRouterQuotaLoading, startOpenRouterQuotaTransition] = useTransition();
 
   const fetchAntigravityQuota = useCallback((forceRefresh = false) => {
@@ -812,6 +823,30 @@ export function AccountsList({
     });
   }, [openRouterAccounts.length]);
 
+  const fetchKiroQuota = useCallback((forceRefresh = false) => {
+    if (kiroAccounts.length === 0) {
+      return;
+    }
+
+    startKiroQuotaTransition(async () => {
+      const result = await getKiroQuota({ forceRefresh });
+      if (!result.success) {
+        setKiroQuotaByAccountId({});
+        return;
+      }
+
+      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
+        (accumulator, accountQuota) => {
+          accumulator[accountQuota.accountId] = accountQuota;
+          return accumulator;
+        },
+        {}
+      );
+
+      setKiroQuotaByAccountId(quotaMap);
+    });
+  }, [kiroAccounts.length]);
+
   useEffect(() => {
     fetchAntigravityQuota();
   }, [fetchAntigravityQuota]);
@@ -829,10 +864,15 @@ export function AccountsList({
   }, [fetchOpenRouterQuota]);
 
   useEffect(() => {
+    fetchKiroQuota();
+  }, [fetchKiroQuota]);
+
+  useEffect(() => {
     const handleProviderAccountsRefresh = () => {
       fetchAntigravityQuota(true);
       fetchCodexQuota(true);
       fetchGeminiCliQuota(true);
+      fetchKiroQuota(true);
       fetchOpenRouterQuota(true);
     };
 
@@ -841,7 +881,13 @@ export function AccountsList({
     return () => {
       window.removeEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
     };
-  }, [fetchAntigravityQuota, fetchCodexQuota, fetchGeminiCliQuota, fetchOpenRouterQuota]);
+  }, [
+    fetchAntigravityQuota,
+    fetchCodexQuota,
+    fetchGeminiCliQuota,
+    fetchKiroQuota,
+    fetchOpenRouterQuota,
+  ]);
 
   return (
     <div className="space-y-8">
@@ -890,6 +936,8 @@ export function AccountsList({
             title="Kiro Accounts"
             accounts={kiroAccounts}
             emptyMessage="No Kiro accounts connected yet."
+            quotaByAccountId={kiroQuotaByAccountId}
+            isQuotaLoading={isKiroQuotaLoading}
           />
 
           {/* Gemini CLI Section */}
