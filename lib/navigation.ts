@@ -34,6 +34,10 @@ export interface ProviderAccountCounts {
   openrouter: number;
 }
 
+export interface ModelFamilyCounts {
+  [anchorId: string]: number;
+}
+
 export const primaryNavigation: NavItem[] = [
   { name: "Analytics", href: "/dashboard", icon: TrendingUp },
   {

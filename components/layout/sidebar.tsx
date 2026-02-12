@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
+  type ModelFamilyCounts,
   type NavItem,
   type ProviderAccountCounts,
   primaryNavigation,
@@ -15,9 +16,10 @@ import { Input } from "@/components/ui/input";
 
 interface SidebarProps {
   accountCounts: ProviderAccountCounts;
+  modelFamilyCounts: ModelFamilyCounts;
 }
 
-export function Sidebar({ accountCounts }: SidebarProps) {
+export function Sidebar({ accountCounts, modelFamilyCounts }: SidebarProps) {
   const pathname = usePathname();
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
@@ -28,6 +30,7 @@ export function Sidebar({ accountCounts }: SidebarProps) {
       pathname === item.href ||
       (item.href !== "/dashboard" && pathname.startsWith(item.href));
     const isAccountsItem = item.href === "/dashboard/accounts";
+    const isModelsItem = item.href === "/dashboard/models";
     const accountCountByAnchorId: Record<string, number> = {
       "antigravity-accounts": accountCounts.antigravity,
       "nvidia-nim-accounts": accountCounts.nvidia_nim,
@@ -39,6 +42,11 @@ export function Sidebar({ accountCounts }: SidebarProps) {
       "gemini-cli-accounts": accountCounts.gemini_cli,
       "qwen-code-accounts": accountCounts.qwen_code,
     };
+    const countByAnchorId = isAccountsItem
+      ? accountCountByAnchorId
+      : isModelsItem
+        ? modelFamilyCounts
+        : null;
     const visibleSubItems =
       isAccountsItem && item.children
         ? item.children.filter((subItem) =>
@@ -85,8 +93,8 @@ export function Sidebar({ accountCounts }: SidebarProps) {
                 visibleSubItems.map((subItem) => {
                   const isSubActive = isSubItemActive(subItem);
                   const subItemCount =
-                    isAccountsItem && subItem.anchorId
-                      ? accountCountByAnchorId[subItem.anchorId]
+                    countByAnchorId && subItem.anchorId
+                      ? countByAnchorId[subItem.anchorId]
                       : undefined;
                   const shouldShowSubItemCount =
                     typeof subItemCount === "number" && subItemCount > 0;

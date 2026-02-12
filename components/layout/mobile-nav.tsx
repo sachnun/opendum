@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import {
+  type ModelFamilyCounts,
   type NavItem,
   type ProviderAccountCounts,
   primaryNavigation,
@@ -24,9 +25,10 @@ import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 
 interface MobileNavProps {
   accountCounts: ProviderAccountCounts;
+  modelFamilyCounts: ModelFamilyCounts;
 }
 
-export function MobileNav({ accountCounts }: MobileNavProps) {
+export function MobileNav({ accountCounts, modelFamilyCounts }: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
@@ -38,6 +40,7 @@ export function MobileNav({ accountCounts }: MobileNavProps) {
       pathname === item.href ||
       (item.href !== "/dashboard" && pathname.startsWith(item.href));
     const isAccountsItem = item.href === "/dashboard/accounts";
+    const isModelsItem = item.href === "/dashboard/models";
     const accountCountByAnchorId: Record<string, number> = {
       "antigravity-accounts": accountCounts.antigravity,
       "nvidia-nim-accounts": accountCounts.nvidia_nim,
@@ -49,6 +52,11 @@ export function MobileNav({ accountCounts }: MobileNavProps) {
       "gemini-cli-accounts": accountCounts.gemini_cli,
       "qwen-code-accounts": accountCounts.qwen_code,
     };
+    const countByAnchorId = isAccountsItem
+      ? accountCountByAnchorId
+      : isModelsItem
+        ? modelFamilyCounts
+        : null;
     const visibleSubItems =
       isAccountsItem && item.children
         ? item.children.filter((subItem) =>
@@ -96,8 +104,8 @@ export function MobileNav({ accountCounts }: MobileNavProps) {
                 visibleSubItems.map((subItem) => {
                   const isSubActive = isSubItemActive(subItem);
                   const subItemCount =
-                    isAccountsItem && subItem.anchorId
-                      ? accountCountByAnchorId[subItem.anchorId]
+                    countByAnchorId && subItem.anchorId
+                      ? countByAnchorId[subItem.anchorId]
                       : undefined;
                   const shouldShowSubItemCount =
                     typeof subItemCount === "number" && subItemCount > 0;
@@ -179,12 +187,14 @@ export function MobileNav({ accountCounts }: MobileNavProps) {
             </Link>
           </SheetTitle>
         </SheetHeader>
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-          <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
-          <div className="mt-auto space-y-1 border-t border-border/60 pt-4">
+        <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
+          <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
+          </nav>
+          <nav className="mt-4 shrink-0 space-y-1 border-t border-border/60 pt-4">
             {supportNavigation.map(renderNavItem)}
-          </div>
-        </nav>
+          </nav>
+        </div>
       </SheetContent>
     </Sheet>
   );

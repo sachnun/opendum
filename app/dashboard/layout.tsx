@@ -3,7 +3,15 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
-import type { ProviderAccountCounts } from "@/lib/navigation";
+import {
+  MODEL_FAMILY_NAV_ITEMS,
+  getModelFamily,
+} from "@/lib/model-families";
+import { getAllModels } from "@/lib/proxy/models";
+import type {
+  ModelFamilyCounts,
+  ProviderAccountCounts,
+} from "@/lib/navigation";
 import { Toaster } from "@/components/ui/sonner";
 
 export default async function DashboardLayout({
@@ -71,11 +79,30 @@ export default async function DashboardLayout({
     }
   }
 
+  const familyAnchorByName = new Map(
+    MODEL_FAMILY_NAV_ITEMS.map((item) => [item.name, item.anchorId] as const)
+  );
+
+  const modelFamilyCounts: ModelFamilyCounts = {};
+  for (const item of MODEL_FAMILY_NAV_ITEMS) {
+    modelFamilyCounts[item.anchorId] = 0;
+  }
+
+  for (const modelId of getAllModels()) {
+    const family = getModelFamily(modelId);
+    const anchorId = familyAnchorByName.get(family);
+    if (!anchorId) {
+      continue;
+    }
+
+    modelFamilyCounts[anchorId] += 1;
+  }
+
   return (
     <div className="relative flex min-h-svh bg-background">
-      <Sidebar accountCounts={accountCounts} />
+      <Sidebar accountCounts={accountCounts} modelFamilyCounts={modelFamilyCounts} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header accountCounts={accountCounts} />
+        <Header accountCounts={accountCounts} modelFamilyCounts={modelFamilyCounts} />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-7xl px-5 pb-8 pt-5 sm:px-6 lg:px-8">
             {children}
