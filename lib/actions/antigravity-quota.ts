@@ -8,6 +8,7 @@ import type { ProviderAccount } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/encryption";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import { 
   fetchQuotaFromApi, 
   type QuotaGroupInfo 
@@ -58,6 +59,17 @@ export interface QuotaSummary {
 export type QuotaActionResult =
   | { success: true; data: { accounts: AccountQuotaInfo[]; summary: QuotaSummary } }
   | { success: false; error: string };
+
+interface QuotaRequestOptions {
+  forceRefresh?: boolean;
+}
+
+const ANTIGRAVITY_QUOTA_CACHE_PREFIX = "opendum:quota:antigravity";
+const ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS = 45;
+
+function getAntigravityQuotaCacheKey(userId: string): string {
+  return `${ANTIGRAVITY_QUOTA_CACHE_PREFIX}:${userId}`;
+}
 
 // =============================================================================
 // HELPERS
@@ -123,10 +135,20 @@ function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
 /**
  * Get Antigravity quota for all user's accounts
  */
-export async function getAntigravityQuota(): Promise<QuotaActionResult> {
+export async function getAntigravityQuota(
+  options: QuotaRequestOptions = {}
+): Promise<QuotaActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const cacheKey = getAntigravityQuotaCacheKey(session.user.id);
+  if (!options.forceRefresh) {
+    const cachedResult = await getRedisJson<QuotaActionResult>(cacheKey);
+    if (cachedResult?.success) {
+      return cachedResult;
+    }
   }
 
   try {
@@ -152,7 +174,7 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
     });
 
     if (accounts.length === 0) {
-      return {
+      const emptyResult: QuotaActionResult = {
         success: true,
         data: {
           accounts: [],
@@ -165,6 +187,9 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
           },
         },
       };
+
+      await setRedisJson(cacheKey, emptyResult, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+      return emptyResult;
     }
 
     const results: AccountQuotaInfo[] = [];
@@ -274,7 +299,7 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
 
     const activeAccountCount = results.filter((account) => account.isActive).length;
 
-    return {
+    const result: QuotaActionResult = {
       success: true,
       data: {
         accounts: results,
@@ -287,6 +312,9 @@ export async function getAntigravityQuota(): Promise<QuotaActionResult> {
         },
       },
     };
+
+    await setRedisJson(cacheKey, result, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+    return result;
   } catch (error) {
     return {
       success: false,

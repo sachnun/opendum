@@ -3,6 +3,7 @@
 import type { ProviderAccount } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import {
   geminiCliProvider,
   fetchGeminiCliAccountInfo,
@@ -59,6 +60,17 @@ export type GeminiCliQuotaActionResult =
       };
     }
   | { success: false; error: string };
+
+interface QuotaRequestOptions {
+  forceRefresh?: boolean;
+}
+
+const GEMINI_CLI_QUOTA_CACHE_PREFIX = "opendum:quota:gemini-cli";
+const GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS = 45;
+
+function getGeminiCliQuotaCacheKey(userId: string): string {
+  return `${GEMINI_CLI_QUOTA_CACHE_PREFIX}:${userId}`;
+}
 
 function formatTimeUntilReset(resetTimestamp: number | null): string | null {
   if (!resetTimestamp) {
@@ -124,10 +136,20 @@ function snapshotToGroups(
   );
 }
 
-export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
+export async function getGeminiCliQuota(
+  options: QuotaRequestOptions = {}
+): Promise<GeminiCliQuotaActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const cacheKey = getGeminiCliQuotaCacheKey(session.user.id);
+  if (!options.forceRefresh) {
+    const cachedResult = await getRedisJson<GeminiCliQuotaActionResult>(cacheKey);
+    if (cachedResult?.success) {
+      return cachedResult;
+    }
   }
 
   try {
@@ -152,7 +174,7 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
     });
 
     if (accounts.length === 0) {
-      return {
+      const emptyResult: GeminiCliQuotaActionResult = {
         success: true,
         data: {
           accounts: [],
@@ -165,6 +187,9 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
           },
         },
       };
+
+      await setRedisJson(cacheKey, emptyResult, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
+      return emptyResult;
     }
 
     const results: GeminiCliAccountQuotaInfo[] = [];
@@ -292,7 +317,7 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
 
     const activeAccountCount = results.filter((account) => account.isActive).length;
 
-    return {
+    const result: GeminiCliQuotaActionResult = {
       success: true,
       data: {
         accounts: results,
@@ -305,6 +330,9 @@ export async function getGeminiCliQuota(): Promise<GeminiCliQuotaActionResult> {
         },
       },
     };
+
+    await setRedisJson(cacheKey, result, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
+    return result;
   } catch (error) {
     return {
       success: false,

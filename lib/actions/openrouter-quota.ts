@@ -3,6 +3,7 @@
 import type { ProviderAccount } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import { openRouterProvider } from "@/lib/proxy/providers/openrouter";
 import { OPENROUTER_API_BASE_URL } from "@/lib/proxy/providers/openrouter/constants";
 
@@ -74,6 +75,17 @@ export type OpenRouterQuotaActionResult =
       };
     }
   | { success: false; error: string };
+
+interface QuotaRequestOptions {
+  forceRefresh?: boolean;
+}
+
+const OPENROUTER_QUOTA_CACHE_PREFIX = "opendum:quota:openrouter";
+const OPENROUTER_QUOTA_CACHE_TTL_SECONDS = 45;
+
+function getOpenRouterQuotaCacheKey(userId: string): string {
+  return `${OPENROUTER_QUOTA_CACHE_PREFIX}:${userId}`;
+}
 
 function asRecord(value: unknown): JsonRecord | null {
   if (!value || typeof value !== "object") {
@@ -374,10 +386,20 @@ function buildQuotaGroups(
   return groups;
 }
 
-export async function getOpenRouterQuota(): Promise<OpenRouterQuotaActionResult> {
+export async function getOpenRouterQuota(
+  options: QuotaRequestOptions = {}
+): Promise<OpenRouterQuotaActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const cacheKey = getOpenRouterQuotaCacheKey(session.user.id);
+  if (!options.forceRefresh) {
+    const cachedResult = await getRedisJson<OpenRouterQuotaActionResult>(cacheKey);
+    if (cachedResult?.success) {
+      return cachedResult;
+    }
   }
 
   try {
@@ -400,7 +422,7 @@ export async function getOpenRouterQuota(): Promise<OpenRouterQuotaActionResult>
     });
 
     if (accounts.length === 0) {
-      return {
+      const emptyResult: OpenRouterQuotaActionResult = {
         success: true,
         data: {
           accounts: [],
@@ -413,6 +435,9 @@ export async function getOpenRouterQuota(): Promise<OpenRouterQuotaActionResult>
           },
         },
       };
+
+      await setRedisJson(cacheKey, emptyResult, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+      return emptyResult;
     }
 
     const results: OpenRouterAccountQuotaInfo[] = [];
@@ -493,7 +518,7 @@ export async function getOpenRouterQuota(): Promise<OpenRouterQuotaActionResult>
 
     const activeAccountCount = results.filter((account) => account.isActive).length;
 
-    return {
+    const result: OpenRouterQuotaActionResult = {
       success: true,
       data: {
         accounts: results,
@@ -506,6 +531,9 @@ export async function getOpenRouterQuota(): Promise<OpenRouterQuotaActionResult>
         },
       },
     };
+
+    await setRedisJson(cacheKey, result, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+    return result;
   } catch (error) {
     return {
       success: false,

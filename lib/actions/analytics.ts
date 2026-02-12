@@ -2,6 +2,8 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { buildAnalyticsCacheKey, getAnalyticsCacheVersion } from "@/lib/cache/analytics-cache";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 
 export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 
@@ -32,6 +34,26 @@ const PERIOD_CONFIG: Record<Period, PeriodConfig> = {
   "30d": { duration: 30 * 24 * 60 * 60 * 1000, granularity: "1d", granularityMs: 24 * 60 * 60 * 1000 },
   "90d": { duration: 90 * 24 * 60 * 60 * 1000, granularity: "1d", granularityMs: 24 * 60 * 60 * 1000 },
 };
+
+interface GetAnalyticsOptions {
+  forceRefresh?: boolean;
+}
+
+function getAnalyticsCacheTtlSeconds(durationMs: number): number {
+  if (durationMs <= 60 * 60 * 1000) {
+    return 15;
+  }
+
+  if (durationMs <= 24 * 60 * 60 * 1000) {
+    return 45;
+  }
+
+  if (durationMs <= 7 * 24 * 60 * 60 * 1000) {
+    return 120;
+  }
+
+  return 300;
+}
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -285,7 +307,8 @@ function calculateDurationPercentiles(sortedDurations: number[]): DurationPercen
 
 export async function getAnalyticsData(
   filter: AnalyticsFilter,
-  apiKeyId?: string
+  apiKeyId?: string,
+  options: GetAnalyticsOptions = {}
 ): Promise<ActionResult<AnalyticsData>> {
   const session = await auth();
 
@@ -314,6 +337,27 @@ export async function getAnalyticsData(
 
       if (!ownedApiKey) {
         return { success: false, error: "API key not found" };
+      }
+    }
+
+    const analyticsCacheVersion = await getAnalyticsCacheVersion(userId);
+
+    const cacheKey = buildAnalyticsCacheKey({
+      userId,
+      apiKeyId,
+      startDateMs: startDate.getTime(),
+      endDateMs: endDate.getTime(),
+      granularity: config.granularity,
+      version: analyticsCacheVersion,
+    });
+
+    if (!options.forceRefresh) {
+      const cachedAnalytics = await getRedisJson<AnalyticsData>(cacheKey);
+      if (cachedAnalytics) {
+        return {
+          success: true,
+          data: cachedAnalytics,
+        };
       }
     }
 
@@ -484,18 +528,26 @@ export async function getAnalyticsData(
       successRate: successRatePercent,
     };
 
+    const analyticsData: AnalyticsData = {
+      requestsOverTime,
+      tokenUsage,
+      requestsByModel,
+      modelDistribution,
+      successRate,
+      durationOverTime,
+      granularity: config.granularity,
+      totals,
+    };
+
+    await setRedisJson(
+      cacheKey,
+      analyticsData,
+      getAnalyticsCacheTtlSeconds(config.duration)
+    );
+
     return {
       success: true,
-      data: {
-        requestsOverTime,
-        tokenUsage,
-        requestsByModel,
-        modelDistribution,
-        successRate,
-        durationOverTime,
-        granularity: config.granularity,
-        totals,
-      },
+      data: analyticsData,
     };
   } catch (error) {
     console.error("Failed to fetch analytics:", error);
