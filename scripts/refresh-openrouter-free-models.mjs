@@ -11,8 +11,15 @@ const MODEL_MAP_EXPORT_PATTERN =
   /export const OPENROUTER_MODEL_MAP: Record<string, string> = \{[\s\S]*?\n\};/;
 
 function toModelKey(modelId) {
-  const modelKey = modelId
-    .replace(/^library\//, "")
+  const normalizedModelId = modelId.replace(/^library\//, "");
+  const providerStrippedModelId =
+    normalizedModelId === "openrouter/free"
+      ? normalizedModelId
+      : normalizedModelId.includes("/")
+        ? normalizedModelId.slice(normalizedModelId.indexOf("/") + 1)
+        : normalizedModelId;
+
+  const modelKey = providerStrippedModelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
