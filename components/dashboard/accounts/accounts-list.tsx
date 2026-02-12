@@ -92,6 +92,7 @@ interface AccountsListProps {
   geminiCliAccounts: Account[];
   qwenCodeAccounts: Account[];
   codexAccounts: Account[];
+  kiroAccounts: Account[];
   nvidiaNimAccounts: Account[];
   ollamaCloudAccounts: Account[];
   openRouterAccounts: Account[];
@@ -697,6 +698,7 @@ export function AccountsList({
   geminiCliAccounts,
   qwenCodeAccounts,
   codexAccounts,
+  kiroAccounts,
   nvidiaNimAccounts,
   ollamaCloudAccounts,
   openRouterAccounts,
@@ -880,6 +882,14 @@ export function AccountsList({
             title="Iflow Accounts"
             accounts={iflowAccounts}
             emptyMessage="No Iflow accounts connected yet."
+          />
+
+          {/* Kiro Section */}
+          <ProviderSection
+            id="kiro-accounts"
+            title="Kiro Accounts"
+            accounts={kiroAccounts}
+            emptyMessage="No Kiro accounts connected yet."
           />
 
           {/* Gemini CLI Section */}

@@ -25,6 +25,7 @@ export interface ProviderAccountCounts {
   antigravity: number;
   codex: number;
   iflow: number;
+  kiro: number;
   gemini_cli: number;
   qwen_code: number;
   nvidia_nim: number;
@@ -45,6 +46,7 @@ export const primaryNavigation: NavItem[] = [
         anchorId: "antigravity-accounts",
       },
       { name: "Codex", href: "/dashboard/accounts", anchorId: "codex-accounts" },
+      { name: "Kiro", href: "/dashboard/accounts", anchorId: "kiro-accounts" },
       { name: "Iflow", href: "/dashboard/accounts", anchorId: "iflow-accounts" },
       {
         name: "Gemini CLI",
