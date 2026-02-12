@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { MODEL_REGISTRY } from "@/lib/proxy/models";
+import { getAllModels, getProvidersForModel } from "@/lib/proxy/models";
 import { PlaygroundClient } from "@/components/playground/client";
 import type {
   ModelOption,
@@ -11,15 +11,17 @@ import type {
 function getModels(disabledModels: Set<string>): ModelOption[] {
   const models: ModelOption[] = [];
 
-  for (const [modelName, info] of Object.entries(MODEL_REGISTRY)) {
+  for (const modelName of getAllModels()) {
     if (disabledModels.has(modelName)) {
       continue;
     }
 
+    const providers = getProvidersForModel(modelName).sort((a, b) => a.localeCompare(b));
+
     models.push({
       id: modelName,
       name: modelName,
-      providers: [...info.providers].sort((a, b) => a.localeCompare(b)),
+      providers,
     });
   }
 

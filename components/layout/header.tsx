@@ -13,7 +13,7 @@ import { signOut } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import type { ProviderAccountCounts } from "@/lib/navigation";
-import { MODEL_REGISTRY } from "@/lib/proxy/models";
+import { getAllModels, getProvidersForModel } from "@/lib/proxy/models";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -44,11 +44,11 @@ export async function Header({ accountCounts }: HeaderProps) {
     disabledModels.map((entry: { model: string }) => entry.model)
   );
 
-  const models = Object.entries(MODEL_REGISTRY)
-    .filter(([id]) => !disabledModelSet.has(id))
-    .map(([id, info]) => ({
+  const models = getAllModels()
+    .filter((id) => !disabledModelSet.has(id))
+    .map((id) => ({
       id,
-      providers: info.providers.map((provider) => PROVIDER_LABELS[provider] ?? provider),
+      providers: getProvidersForModel(id).map((provider) => PROVIDER_LABELS[provider] ?? provider),
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
 

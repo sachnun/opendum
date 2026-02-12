@@ -2,7 +2,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   MODEL_REGISTRY,
+  getAllModels,
   getModelsForProvider,
+  getProvidersForModel,
   resolveModelAlias,
 } from "@/lib/proxy/models";
 import { ProviderName } from "@/lib/proxy/providers/types";
@@ -79,8 +81,8 @@ export default async function ModelsPage() {
     return null;
   }
 
-  // Get all models
-  const allModels = Object.keys(MODEL_REGISTRY);
+  const allModels = getAllModels();
+  const supportedModelSet = new Set(allModels);
 
   const disabledModels = await prisma.disabledModel.findMany({
     where: { userId: session.user.id },
@@ -122,7 +124,7 @@ export default async function ModelsPage() {
 
   for (const log of usageLogs) {
     const modelId = normalizeLoggedModel(log.model);
-    if (!(modelId in MODEL_REGISTRY)) {
+    if (!supportedModelSet.has(modelId)) {
       continue;
     }
 
@@ -171,9 +173,7 @@ export default async function ModelsPage() {
   const codexModels = getModelsForProvider(ProviderName.CODEX);
   const nvidiaNimModels = getModelsForProvider(ProviderName.NVIDIA_NIM);
   const ollamaCloudModels = getModelsForProvider(ProviderName.OLLAMA_CLOUD);
-  const hasOpenRouterModelsInCatalog = allModels.some((model) =>
-    MODEL_REGISTRY[model]?.providers.includes(ProviderName.OPENROUTER)
-  );
+  const openRouterModels = getModelsForProvider(ProviderName.OPENROUTER);
 
   // Build available providers list (only those with models)
   const availableProviders: { id: string; label: string }[] = [];
@@ -198,13 +198,14 @@ export default async function ModelsPage() {
   if (ollamaCloudModels.length > 0) {
     availableProviders.push({ id: ProviderName.OLLAMA_CLOUD, label: "Ollama Cloud" });
   }
-  if (hasOpenRouterModelsInCatalog) {
+  if (openRouterModels.length > 0) {
     availableProviders.push({ id: ProviderName.OPENROUTER, label: "OpenRouter" });
   }
 
   // Create models with provider info
   const modelsWithProviders = allModels.map((model) => {
     const info = MODEL_REGISTRY[model];
+    const providers = getProvidersForModel(model);
     const modelStats = statsByModel.get(model);
     const totalRequests = modelStats?.totalRequests ?? 0;
     const successfulRequests = modelStats?.successfulRequests ?? 0;
@@ -252,9 +253,9 @@ export default async function ModelsPage() {
 
     return {
       id: model,
-      providers: info.providers,
-      providerLabels: info.providers.map(getProviderLabel),
-      meta: info.meta,
+      providers,
+      providerLabels: providers.map(getProviderLabel),
+      meta: info?.meta,
       isEnabled: !disabledModelSet.has(model),
       stats,
     };
