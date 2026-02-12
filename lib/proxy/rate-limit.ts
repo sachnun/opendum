@@ -385,8 +385,61 @@ function parseDurationToMs(duration: string): number | null {
   return totalMs > 0 ? totalMs : null;
 }
 
+function parseRetryAfterHint(
+  value: unknown,
+  assumeSeconds: boolean = false
+): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.round(assumeSeconds ? value * 1000 : value);
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric) && numeric >= 0) {
+    return Math.round(assumeSeconds ? numeric * 1000 : numeric);
+  }
+
+  const durationMs = parseDurationToMs(trimmed);
+  if (durationMs !== null) {
+    return durationMs;
+  }
+
+  const unitMatch = trimmed.match(
+    /(\d+(?:\.\d+)?)\s*(ms|millisecond(?:s)?|s|sec(?:ond)?(?:s)?|m|min(?:ute)?(?:s)?|h|hour(?:s)?)/i
+  );
+  if (!unitMatch) {
+    return null;
+  }
+
+  const amount = Number.parseFloat(unitMatch[1]);
+  if (!Number.isFinite(amount) || amount < 0) {
+    return null;
+  }
+
+  const unit = unitMatch[2].toLowerCase();
+  if (unit === "ms" || unit.startsWith("millisecond")) {
+    return Math.round(amount);
+  }
+  if (unit === "h" || unit.startsWith("hour")) {
+    return Math.round(amount * 60 * 60 * 1000);
+  }
+  if (unit === "m" || unit.startsWith("min")) {
+    return Math.round(amount * 60 * 1000);
+  }
+
+  return Math.round(amount * 1000);
+}
+
 /**
- * Parse Antigravity rate limit error response to extract retry info
+ * Parse provider rate limit error response to extract retry info
  */
 export function parseRateLimitError(errorBody: unknown): {
   retryAfterMs: number;
@@ -396,16 +449,32 @@ export function parseRateLimitError(errorBody: unknown): {
   if (!errorBody || typeof errorBody !== "object") return null;
 
   const body = errorBody as Record<string, unknown>;
-  const error = body.error as Record<string, unknown> | undefined;
+  const error =
+    body.error && typeof body.error === "object"
+      ? (body.error as Record<string, unknown>)
+      : undefined;
 
-  if (!error) return null;
-
-  const message = error.message as string | undefined;
+  const message =
+    (typeof error?.message === "string" ? error.message : undefined) ||
+    (typeof body.message === "string" ? body.message : undefined);
   let model: string | undefined;
-  let retryAfterMs: number | null = null;
+  let retryAfterMs: number | null =
+    parseRetryAfterHint(body.retry_after_ms) ??
+    parseRetryAfterHint(body.retryAfterMs) ??
+    parseRetryAfterHint(body.retry_after, true) ??
+    parseRetryAfterHint(body.retryAfter, true);
+
+  if (error) {
+    retryAfterMs =
+      retryAfterMs ??
+      parseRetryAfterHint(error.retry_after_ms) ??
+      parseRetryAfterHint(error.retryAfterMs) ??
+      parseRetryAfterHint(error.retry_after, true) ??
+      parseRetryAfterHint(error.retryAfter, true);
+  }
 
   // Try to extract from details array
-  const details = error.details as Array<Record<string, unknown>> | undefined;
+  const details = error?.details as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(details)) {
     for (const detail of details) {
       // Look for ErrorInfo with quota metadata
@@ -419,7 +488,6 @@ export function parseRateLimitError(errorBody: unknown): {
           }
         }
       }
-
       // Look for RetryInfo
       if (detail["@type"]?.toString().includes("RetryInfo")) {
         const retryDelay = detail.retryDelay as string | undefined;
@@ -430,9 +498,18 @@ export function parseRateLimitError(errorBody: unknown): {
     }
   }
 
-  // Default to 1 hour if we couldn't parse
+  if (retryAfterMs === null && message) {
+    const retryAfterMatch = message.match(
+      /retry\s+after\s+(\d+(?:\.\d+)?)\s*(ms|millisecond(?:s)?|s|sec(?:ond)?(?:s)?|m|min(?:ute)?(?:s)?|h|hour(?:s)?)/i
+    );
+    if (retryAfterMatch) {
+      retryAfterMs = parseRetryAfterHint(`${retryAfterMatch[1]}${retryAfterMatch[2]}`);
+    }
+  }
+
+  // Conservative default when provider omits retry metadata
   if (retryAfterMs === null) {
-    retryAfterMs = 60 * 60 * 1000; // 1 hour default
+    retryAfterMs = 60 * 1000;
   }
 
   return {

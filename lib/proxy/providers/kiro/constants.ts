@@ -22,10 +22,16 @@ export const KIRO_DEFAULT_MODEL = "claude-sonnet-4-5";
 
 export const KIRO_MODEL_MAP: Record<string, string> = {
   "claude-haiku-4-5": "claude-haiku-4.5",
+  "claude-haiku-4.5": "claude-haiku-4.5",
   "claude-opus-4-5": "claude-opus-4.5",
+  "claude-opus-4.5": "claude-opus-4.5",
   "claude-opus-4-6": "claude-opus-4.6",
+  "claude-opus-4.6": "claude-opus-4.6",
+  "claude-sonnet-4": "claude-sonnet-4",
   "claude-sonnet-4-5": "CLAUDE_SONNET_4_5_20250929_V1_0",
+  "claude-sonnet-4.5": "CLAUDE_SONNET_4_5_20250929_V1_0",
   "claude-sonnet-4-5-20250929": "CLAUDE_SONNET_4_5_20250929_V1_0",
+  "claude-sonnet-4.5-20250929": "CLAUDE_SONNET_4_5_20250929_V1_0",
 };
 
 export const KIRO_MODELS = new Set(Object.keys(KIRO_MODEL_MAP));

@@ -11,6 +11,7 @@ import {
   isRateLimited,
   markRateLimited,
   parseRateLimitError,
+  parseRetryAfterMs,
 } from "@/lib/proxy/rate-limit";
 import { getModelFamily } from "@/lib/proxy/providers/antigravity/converter";
 import { isModelSupportedByProvider } from "@/lib/proxy/models";
@@ -427,22 +428,25 @@ export async function POST(request: NextRequest) {
         );
 
         if (providerResponse.status === 429) {
+          const retryAfterMsFromHeader = parseRetryAfterMs(providerResponse);
+          const fallbackRetryAfterMs =
+            account.provider === "kiro" ? 60 * 1000 : 60 * 60 * 1000;
           const clonedResponse = providerResponse.clone();
           try {
             const errorBody = await clonedResponse.json();
             const rateLimitInfo = parseRateLimitError(errorBody);
+            const retryAfterMs =
+              rateLimitInfo?.retryAfterMs ??
+              retryAfterMsFromHeader ??
+              fallbackRetryAfterMs;
 
-            if (rateLimitInfo) {
-              await markRateLimited(
-                account.id,
-                family,
-                rateLimitInfo.retryAfterMs,
-                rateLimitInfo.model,
-                rateLimitInfo.message
-              );
-            } else {
-              await markRateLimited(account.id, family, 60 * 60 * 1000);
-            }
+            await markRateLimited(
+              account.id,
+              family,
+              retryAfterMs,
+              rateLimitInfo?.model,
+              rateLimitInfo?.message
+            );
 
             await logUsage({
               userId: authenticatedUserId,
@@ -457,7 +461,8 @@ export async function POST(request: NextRequest) {
 
             continue;
           } catch {
-            await markRateLimited(account.id, family, 60 * 60 * 1000);
+            const retryAfterMs = retryAfterMsFromHeader ?? fallbackRetryAfterMs;
+            await markRateLimited(account.id, family, retryAfterMs);
             continue;
           }
         }

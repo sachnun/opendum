@@ -542,6 +542,7 @@ export const kiroProvider: Provider = {
   ): Promise<Response> {
     const modelName = body.model.includes("/") ? body.model.split("/").pop() || body.model : body.model;
     const payload = buildKiroRequest(body);
+    const invocationId = crypto.randomUUID();
 
     if (account.accountId) {
       payload.profileArn = account.accountId;
@@ -553,8 +554,12 @@ export const kiroProvider: Provider = {
         Authorization: `Bearer ${credentials}`,
         "Content-Type": "application/json",
         Accept: "*/*",
-        "User-Agent": "KiroIDE",
+        "User-Agent": "KiroIDE-0.7.45",
+        "x-amz-user-agent": "KiroIDE-0.7.45",
+        "x-amzn-codewhisperer-optout": "true",
         "x-amzn-kiro-agent-mode": "vibe",
+        "amz-sdk-invocation-id": invocationId,
+        "amz-sdk-request": "attempt=1; max=3",
       },
       body: JSON.stringify(payload),
     });

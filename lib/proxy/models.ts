@@ -502,8 +502,16 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
 
   // ===== Claude Models (Anthropic via Antigravity) =====
+  "claude-haiku-4-5": {
+    providers: [ProviderName.KIRO],
+    aliases: ["claude-haiku-4.5"],
+  },
+  "claude-sonnet-4": {
+    providers: [ProviderName.KIRO],
+  },
   "claude-sonnet-4-5": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
+    aliases: ["claude-sonnet-4.5"],
     meta: {
       contextLength: 200000,
       outputLimit: 64000,
@@ -517,6 +525,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "claude-opus-4-5": {
     providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
+    aliases: ["claude-opus-4.5"],
     meta: {
       contextLength: 200000,
       outputLimit: 64000,
