@@ -25,6 +25,11 @@ import {
   type QuotaGroupDisplay as AntigravityQuotaGroupDisplay,
 } from "@/lib/actions/antigravity-quota";
 import {
+  getCopilotQuota,
+  type CopilotAccountQuotaInfo,
+  type CopilotQuotaGroupDisplay,
+} from "@/lib/actions/copilot-quota";
+import {
   getCodexQuota,
   type CodexAccountQuotaInfo,
   type CodexQuotaGroupDisplay,
@@ -52,12 +57,14 @@ import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
 
 type AccountQuotaInfo =
   | AntigravityAccountQuotaInfo
+  | CopilotAccountQuotaInfo
   | CodexAccountQuotaInfo
   | GeminiCliAccountQuotaInfo
   | KiroAccountQuotaInfo
   | OpenRouterAccountQuotaInfo;
 type QuotaGroupDisplay =
   | AntigravityQuotaGroupDisplay
+  | CopilotQuotaGroupDisplay
   | CodexQuotaGroupDisplay
   | GeminiCliQuotaGroupDisplay
   | KiroQuotaGroupDisplay
@@ -717,6 +724,8 @@ export function AccountsList({
     useState<Record<string, AccountQuotaInfo>>({});
   const [codexQuotaByAccountId, setCodexQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
+  const [copilotQuotaByAccountId, setCopilotQuotaByAccountId] =
+    useState<Record<string, AccountQuotaInfo>>({});
   const [geminiCliQuotaByAccountId, setGeminiCliQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
   const [kiroQuotaByAccountId, setKiroQuotaByAccountId] =
@@ -725,6 +734,7 @@ export function AccountsList({
     useState<Record<string, AccountQuotaInfo>>({});
   const [isAntigravityQuotaLoading, startAntigravityQuotaTransition] = useTransition();
   const [isCodexQuotaLoading, startCodexQuotaTransition] = useTransition();
+  const [isCopilotQuotaLoading, startCopilotQuotaTransition] = useTransition();
   const [isGeminiCliQuotaLoading, startGeminiCliQuotaTransition] = useTransition();
   const [isKiroQuotaLoading, startKiroQuotaTransition] = useTransition();
   const [isOpenRouterQuotaLoading, startOpenRouterQuotaTransition] = useTransition();
@@ -776,6 +786,30 @@ export function AccountsList({
       setCodexQuotaByAccountId(quotaMap);
     });
   }, [codexAccounts.length]);
+
+  const fetchCopilotQuota = useCallback((forceRefresh = false) => {
+    if (copilotAccounts.length === 0) {
+      return;
+    }
+
+    startCopilotQuotaTransition(async () => {
+      const result = await getCopilotQuota({ forceRefresh });
+      if (!result.success) {
+        setCopilotQuotaByAccountId({});
+        return;
+      }
+
+      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
+        (accumulator, accountQuota) => {
+          accumulator[accountQuota.accountId] = accountQuota;
+          return accumulator;
+        },
+        {}
+      );
+
+      setCopilotQuotaByAccountId(quotaMap);
+    });
+  }, [copilotAccounts.length]);
 
   const fetchGeminiCliQuota = useCallback((forceRefresh = false) => {
     if (geminiCliAccounts.length === 0) {
@@ -858,6 +892,10 @@ export function AccountsList({
   }, [fetchCodexQuota]);
 
   useEffect(() => {
+    fetchCopilotQuota();
+  }, [fetchCopilotQuota]);
+
+  useEffect(() => {
     fetchGeminiCliQuota();
   }, [fetchGeminiCliQuota]);
 
@@ -873,6 +911,7 @@ export function AccountsList({
     const handleProviderAccountsRefresh = () => {
       fetchAntigravityQuota(true);
       fetchCodexQuota(true);
+      fetchCopilotQuota(true);
       fetchGeminiCliQuota(true);
       fetchKiroQuota(true);
       fetchOpenRouterQuota(true);
@@ -886,6 +925,7 @@ export function AccountsList({
   }, [
     fetchAntigravityQuota,
     fetchCodexQuota,
+    fetchCopilotQuota,
     fetchGeminiCliQuota,
     fetchKiroQuota,
     fetchOpenRouterQuota,
@@ -967,6 +1007,8 @@ export function AccountsList({
             title="Copilot Accounts"
             accounts={copilotAccounts}
             emptyMessage="No Copilot accounts connected yet."
+            quotaByAccountId={copilotQuotaByAccountId}
+            isQuotaLoading={isCopilotQuotaLoading}
           />
         </div>
       </section>
