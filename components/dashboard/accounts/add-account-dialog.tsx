@@ -209,6 +209,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
   const [deviceCodeInfo, setDeviceCodeInfo] = useState<{
     provider: "qwen_code" | "copilot";
     deviceCode: string;
+    userCode: string;
     verificationUrl: string;
     codeVerifier?: string; // Qwen Code only (stored client-side)
   } | null>(null);
@@ -261,6 +262,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
               setDeviceCodeInfo({
                 provider: provider === "copilot" ? "copilot" : "qwen_code",
                 deviceCode: result.data.deviceCode,
+                userCode: result.data.userCode,
                 verificationUrl: result.data.verificationUrlComplete,
                 codeVerifier:
                   "codeVerifier" in result.data
@@ -461,6 +463,17 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
       if (step === 2 && providerConfig?.flowType === "api_key") {
         setStep(3);
       }
+    }
+  };
+
+  const handleCopyDeviceCode = async () => {
+    if (!deviceCodeInfo?.userCode) return;
+
+    try {
+      await navigator.clipboard.writeText(deviceCodeInfo.userCode);
+      toast.success("Code copied to clipboard");
+    } catch {
+      toast.error("Failed to copy code");
     }
   };
 
@@ -733,10 +746,33 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                     </Label>
                     <p className="text-sm text-muted-foreground">
                       Click the button below to open the provider login page.
+                      If the page asks for a code, use the one shown below.
                       After you complete the login, authorization will be
                       detected automatically.
                     </p>
                   </div>
+                  {deviceCodeInfo?.userCode && (
+                    <div className="rounded-md border border-border bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Enter this code if prompted:
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <code className="rounded bg-background px-2 py-1 font-mono text-sm font-semibold tracking-[0.15em]">
+                          {deviceCodeInfo.userCode}
+                        </code>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCopyDeviceCode}
+                          title="Copy code"
+                        >
+                          <Copy className="mr-1 h-3.5 w-3.5" />
+                          Copy code
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       onClick={handleStartDeviceCodeAuth}
