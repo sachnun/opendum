@@ -746,7 +746,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                     </Label>
                     <p className="text-sm text-muted-foreground">
                       Click the button below to open the provider login page.
-                      If the page asks for a code, use the one shown below.
+                      Enter the code shown below on the provider login page.
                       After you complete the login, authorization will be
                       detected automatically.
                     </p>
@@ -754,7 +754,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                   {deviceCodeInfo?.userCode && (
                     <div className="rounded-md border border-border bg-muted/30 p-3">
                       <p className="text-xs text-muted-foreground">
-                        Enter this code if prompted:
+                        Enter this code on the provider page:
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <code className="rounded bg-background px-2 py-1 font-mono text-sm font-semibold tracking-[0.15em]">

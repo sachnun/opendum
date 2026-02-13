@@ -63,6 +63,8 @@ function getProviderLabel(provider: string): string {
       return "Gemini CLI";
     case ProviderName.CODEX:
       return "Codex";
+    case ProviderName.COPILOT:
+      return "Copilot";
     case ProviderName.KIRO:
       return "Kiro";
     case ProviderName.NVIDIA_NIM:
