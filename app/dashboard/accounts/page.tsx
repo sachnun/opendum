@@ -127,8 +127,8 @@ export default async function AccountsPage({
   return (
     <div className="space-y-6">
       <div className="relative">
-        <div className="sticky top-16 z-20 bg-background md:fixed md:inset-x-0 md:top-16 md:left-60 md:pt-5">
-          <div className="mx-auto w-full max-w-7xl md:px-5 lg:px-8">
+        <div className="fixed inset-x-0 top-16 z-20 bg-background md:left-60 md:pt-5">
+          <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
             <div className="bg-background">
               <div className="pb-4 border-b border-border">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -142,7 +142,7 @@ export default async function AccountsPage({
             </div>
           </div>
         </div>
-        <div className="hidden h-[76px] md:block" />
+        <div className="h-[104px] sm:h-[76px]" />
       </div>
 
       {params.success && (
