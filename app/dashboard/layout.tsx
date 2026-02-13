@@ -99,6 +99,19 @@ export default async function DashboardLayout({
     openrouter: 0,
   };
 
+  const activeAccountCounts: ProviderAccountCounts = {
+    antigravity: 0,
+    copilot: 0,
+    codex: 0,
+    iflow: 0,
+    kiro: 0,
+    gemini_cli: 0,
+    qwen_code: 0,
+    nvidia_nim: 0,
+    ollama_cloud: 0,
+    openrouter: 0,
+  };
+
   const accountIndicators: ProviderAccountIndicators = {
     antigravity: "normal",
     copilot: "normal",
@@ -123,6 +136,8 @@ export default async function DashboardLayout({
     if (!account.isActive) {
       continue;
     }
+
+    activeAccountCounts[providerKey] += 1;
 
     const nextIndicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt);
     if (INDICATOR_WEIGHT[nextIndicator] > INDICATOR_WEIGHT[accountIndicators[providerKey]]) {
@@ -153,12 +168,14 @@ export default async function DashboardLayout({
     <div className="relative flex min-h-svh bg-background">
       <Sidebar
         accountCounts={accountCounts}
+        activeAccountCounts={activeAccountCounts}
         accountIndicators={accountIndicators}
         modelFamilyCounts={modelFamilyCounts}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           accountCounts={accountCounts}
+          activeAccountCounts={activeAccountCounts}
           accountIndicators={accountIndicators}
           modelFamilyCounts={modelFamilyCounts}
         />

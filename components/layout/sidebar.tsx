@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 
 interface SidebarProps {
   accountCounts: ProviderAccountCounts;
+  activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
 }
@@ -34,7 +35,12 @@ function getAccountIndicatorClass(indicator: ProviderAccountIndicator): string {
   return "bg-primary";
 }
 
-export function Sidebar({ accountCounts, accountIndicators, modelFamilyCounts }: SidebarProps) {
+export function Sidebar({
+  accountCounts,
+  activeAccountCounts,
+  accountIndicators,
+  modelFamilyCounts,
+}: SidebarProps) {
   const pathname = usePathname();
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
@@ -57,6 +63,18 @@ export function Sidebar({ accountCounts, accountIndicators, modelFamilyCounts }:
       "iflow-accounts": accountCounts.iflow,
       "gemini-cli-accounts": accountCounts.gemini_cli,
       "qwen-code-accounts": accountCounts.qwen_code,
+    };
+    const activeAccountCountByAnchorId: Record<string, number> = {
+      "antigravity-accounts": activeAccountCounts.antigravity,
+      "nvidia-nim-accounts": activeAccountCounts.nvidia_nim,
+      "ollama-cloud-accounts": activeAccountCounts.ollama_cloud,
+      "openrouter-accounts": activeAccountCounts.openrouter,
+      "codex-accounts": activeAccountCounts.codex,
+      "copilot-accounts": activeAccountCounts.copilot,
+      "kiro-accounts": activeAccountCounts.kiro,
+      "iflow-accounts": activeAccountCounts.iflow,
+      "gemini-cli-accounts": activeAccountCounts.gemini_cli,
+      "qwen-code-accounts": activeAccountCounts.qwen_code,
     };
     const accountIndicatorByAnchorId: Record<string, ProviderAccountIndicator> = {
       "antigravity-accounts": accountIndicators.antigravity,
@@ -124,12 +142,18 @@ export function Sidebar({ accountCounts, accountIndicators, modelFamilyCounts }:
                     countByAnchorId && subItem.anchorId
                       ? countByAnchorId[subItem.anchorId]
                       : undefined;
+                  const activeSubItemCount =
+                    isAccountsItem && subItem.anchorId
+                      ? activeAccountCountByAnchorId[subItem.anchorId]
+                      : undefined;
                   const subItemIndicator =
                     isAccountsItem && subItem.anchorId
                       ? accountIndicatorByAnchorId[subItem.anchorId]
                       : undefined;
                   const shouldShowSubItemCount =
                     typeof subItemCount === "number" && subItemCount > 0;
+                  const shouldShowIndicator =
+                    typeof activeSubItemCount === "number" && activeSubItemCount > 0;
 
                   return (
                     <Link
@@ -144,16 +168,23 @@ export function Sidebar({ accountCounts, accountIndicators, modelFamilyCounts }:
                       )}
                     >
                       <span className="truncate">{subItem.name}</span>
-                      {isAccountsItem || shouldShowSubItemCount ? (
+                      {shouldShowIndicator || shouldShowSubItemCount ? (
                         <span className="flex items-center gap-2">
-                          {isAccountsItem && subItemIndicator ? (
-                            <span
-                              aria-hidden="true"
-                              className={cn(
-                                "h-2 w-2 shrink-0 rounded-full",
-                                getAccountIndicatorClass(subItemIndicator)
-                              )}
-                            />
+                          {shouldShowIndicator && subItemIndicator ? (
+                            <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+                              <span
+                                className={cn(
+                                  "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                                  getAccountIndicatorClass(subItemIndicator)
+                                )}
+                              />
+                              <span
+                                className={cn(
+                                  "relative inline-flex h-2.5 w-2.5 rounded-full",
+                                  getAccountIndicatorClass(subItemIndicator)
+                                )}
+                              />
+                            </span>
                           ) : null}
                           {shouldShowSubItemCount ? (
                             <span

@@ -35,11 +35,17 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 interface HeaderProps {
   accountCounts: ProviderAccountCounts;
+  activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
 }
 
-export async function Header({ accountCounts, accountIndicators, modelFamilyCounts }: HeaderProps) {
+export async function Header({
+  accountCounts,
+  activeAccountCounts,
+  accountIndicators,
+  modelFamilyCounts,
+}: HeaderProps) {
   const session = await auth();
 
   const disabledModels = session?.user?.id
@@ -66,6 +72,7 @@ export async function Header({ accountCounts, accountIndicators, modelFamilyCoun
         <div className="flex min-w-0 items-center">
           <MobileNav
             accountCounts={accountCounts}
+            activeAccountCounts={activeAccountCounts}
             accountIndicators={accountIndicators}
             modelFamilyCounts={modelFamilyCounts}
           />
