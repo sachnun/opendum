@@ -368,7 +368,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
 
   // ===== Gemini Models (Google) =====
   "gemini-2.5-pro": {
-    providers: [ProviderName.GEMINI_CLI],
+    providers: [ProviderName.GEMINI_CLI, ProviderName.COPILOT],
     meta: {
       contextLength: 2000000,
       outputLimit: 65000,
@@ -408,7 +408,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gemini-3-flash-preview": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.OLLAMA_CLOUD],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.OLLAMA_CLOUD, ProviderName.COPILOT],
     aliases: ["gemini-3-flash", "gemini-3-flash-preview-latest"],
     meta: {
       contextLength: 1048576,
@@ -422,7 +422,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gemini-3-pro-preview": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.COPILOT],
     aliases: ["gemini-3-pro", "gemini-3-pro-high", "gemini-3-pro-low"],
     meta: {
       contextLength: 1000000,
@@ -463,14 +463,14 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     ],
   },
   "claude-haiku-4-5": {
-    providers: [ProviderName.KIRO],
+    providers: [ProviderName.KIRO, ProviderName.COPILOT],
     aliases: [
       "claude-haiku-4.5",
       "claude-haiku4.5",
     ],
   },
   "claude-sonnet-4": {
-    providers: [ProviderName.KIRO],
+    providers: [ProviderName.KIRO, ProviderName.COPILOT],
     aliases: [
       "claude-sonnet-4-0",
       "claude-sonnet-4.0",
@@ -478,7 +478,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     ],
   },
   "claude-sonnet-4-5": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO, ProviderName.COPILOT],
     aliases: [
       "claude-sonnet-4.5",
       "claude-sonnet4.5",
@@ -502,13 +502,14 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     ],
   },
   "claude-opus-4-1": {
-    providers: [ProviderName.KIRO],
+    providers: [ProviderName.KIRO, ProviderName.COPILOT],
     aliases: [
       "claude-opus-4.1",
+      "claude-opus-41",
     ],
   },
   "claude-opus-4-5": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO, ProviderName.COPILOT],
     aliases: [
       "claude-opus-4.5",
       "claude-opus4.5",
@@ -525,7 +526,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "claude-opus-4-6": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO],
+    providers: [ProviderName.ANTIGRAVITY, ProviderName.KIRO, ProviderName.COPILOT],
     aliases: ["claude-opus-4.6", "claude-opus4.6"],
     meta: {
       contextLength: 1000000,
@@ -863,7 +864,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gpt-5.2-codex": {
-    providers: [ProviderName.CODEX],
+    providers: [ProviderName.CODEX, ProviderName.COPILOT],
     meta: {
       contextLength: 192000,
       outputLimit: 32768,
@@ -874,7 +875,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gpt-5.2": {
-    providers: [ProviderName.CODEX],
+    providers: [ProviderName.CODEX, ProviderName.COPILOT],
     meta: {
       contextLength: 192000,
       outputLimit: 32768,
@@ -885,7 +886,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gpt-5.1-codex-max": {
-    providers: [ProviderName.CODEX],
+    providers: [ProviderName.CODEX, ProviderName.COPILOT],
     meta: {
       contextLength: 192000,
       outputLimit: 32768,
@@ -896,7 +897,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gpt-5.1-codex": {
-    providers: [ProviderName.CODEX],
+    providers: [ProviderName.CODEX, ProviderName.COPILOT],
     meta: {
       contextLength: 192000,
       outputLimit: 32768,
@@ -907,11 +908,79 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gpt-5.1-codex-mini": {
-    providers: [ProviderName.CODEX],
+    providers: [ProviderName.CODEX, ProviderName.COPILOT],
     meta: {
       contextLength: 192000,
       outputLimit: 32768,
       releaseDate: "2025-07-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+
+  // ===== GitHub Copilot Models =====
+  "gpt-5": {
+    providers: [ProviderName.COPILOT],
+    meta: {
+      contextLength: 200000,
+      outputLimit: 65536,
+      releaseDate: "2025-08-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "gpt-5-mini": {
+    providers: [ProviderName.COPILOT],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 32768,
+      releaseDate: "2025-08-01",
+      reasoning: true,
+      toolCall: true,
+      vision: false,
+    },
+  },
+  "gpt-5.1": {
+    providers: [ProviderName.COPILOT],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 64000,
+      releaseDate: "2025-11-13",
+      reasoning: true,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "gpt-4.1": {
+    providers: [ProviderName.COPILOT],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 16384,
+      releaseDate: "2025-04-01",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "gpt-4o": {
+    providers: [ProviderName.COPILOT],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 16384,
+      releaseDate: "2024-05-13",
+      reasoning: false,
+      toolCall: true,
+      vision: true,
+    },
+  },
+  "grok-code-fast-1": {
+    providers: [ProviderName.COPILOT],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 64000,
+      releaseDate: "2025-08-27",
       reasoning: true,
       toolCall: true,
       vision: false,

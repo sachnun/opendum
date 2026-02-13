@@ -1174,7 +1174,7 @@ export async function POST(request: NextRequest) {
         const providerImpl = await getProvider(account.provider as ProviderNameType);
         const credentials = await providerImpl.getValidCredentials(account);
 
-        const openaiPayload = transformAnthropicToOpenAI(body);
+        const openaiPayload = transformAnthropicToOpenAI(body as AnthropicRequestBody);
 
         // Override model with validated model (without provider prefix)
         openaiPayload.model = model;
@@ -1182,10 +1182,17 @@ export async function POST(request: NextRequest) {
 
         const includeThinking = openaiPayload._includeReasoning ?? false;
 
+        const normalizedOpenAIPayload =
+          openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest;
+
+        const requestBody = providerImpl.prepareRequest
+          ? await providerImpl.prepareRequest(account, normalizedOpenAIPayload, "messages")
+          : normalizedOpenAIPayload;
+
         const providerResponse = await providerImpl.makeRequest(
           credentials,
           account,
-          openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest,
+          requestBody,
           streamEnabled
         );
 

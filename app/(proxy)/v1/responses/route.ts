@@ -388,8 +388,10 @@ export async function POST(request: NextRequest) {
         }
       | null = null;
 
+    const responsesInput = input as Array<Record<string, unknown>>;
+
     // Convert Responses API input to Chat Completions messages
-    const messages = convertInputToMessages(input, instructionsText);
+    const messages = convertInputToMessages(responsesInput, instructionsText);
 
     // Map Responses API params to Chat Completions params
     const chatParams: Record<string, unknown> = { ...params };
@@ -600,18 +602,24 @@ export async function POST(request: NextRequest) {
         );
         const credentials = await providerImpl.getValidCredentials(account);
 
+        const baseRequestBody = {
+          model,
+          messages,
+          instructions: instructionsText,
+          stream: streamEnabled,
+          _includeReasoning: reasoningRequested,
+          _responsesInput: responsesInput,
+          ...chatParams,
+        };
+
+        const requestBody = providerImpl.prepareRequest
+          ? await providerImpl.prepareRequest(account, baseRequestBody, "responses")
+          : baseRequestBody;
+
         const providerResponse = await providerImpl.makeRequest(
           credentials,
           account,
-          {
-            model,
-            messages,
-            instructions: instructionsText,
-            stream: streamEnabled,
-            _includeReasoning: reasoningRequested,
-            _responsesInput: input,
-            ...chatParams,
-          },
+          requestBody,
           streamEnabled
         );
 

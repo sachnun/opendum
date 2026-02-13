@@ -91,13 +91,31 @@ export interface ChatCompletionRequest {
   // Internal passthrough for Responses API input items
   // Used by providers that natively support the Responses API.
   _responsesInput?: Array<Record<string, unknown>>;
+
+  // Internal header hint for Copilot requests
+  _copilotXInitiator?: "user" | "agent";
 }
+
+export type ProxyEndpointType =
+  | "chat_completions"
+  | "messages"
+  | "responses";
 
 /**
  * Provider interface - all providers must implement this
  */
 export interface Provider {
   readonly config: ProviderConfig;
+
+  /**
+   * Optional request preparation hook.
+   * Allows provider-specific normalization/injection before upstream request.
+   */
+  prepareRequest?(
+    account: ProviderAccount,
+    body: ChatCompletionRequest,
+    endpoint: ProxyEndpointType
+  ): ChatCompletionRequest | Promise<ChatCompletionRequest>;
 
   /**
    * Generate OAuth authorization URL
@@ -153,6 +171,7 @@ export interface Provider {
 export const ProviderName = {
   IFLOW: "iflow",
   ANTIGRAVITY: "antigravity",
+  COPILOT: "copilot",
   QWEN_CODE: "qwen_code",
   GEMINI_CLI: "gemini_cli",
   CODEX: "codex",
@@ -164,9 +183,23 @@ export const ProviderName = {
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
 
+export const PROVIDER_ALIASES: Record<string, ProviderNameType> = {
+  copilot: ProviderName.COPILOT,
+  "github-copilot": ProviderName.COPILOT,
+  github_copilot: ProviderName.COPILOT,
+  "github-copilot-enterprise": ProviderName.COPILOT,
+  github_copilot_enterprise: ProviderName.COPILOT,
+};
+
+export function normalizeProviderAlias(provider: string): string {
+  const normalized = provider.trim().toLowerCase();
+  return PROVIDER_ALIASES[normalized] ?? normalized;
+}
+
 export const OAUTH_PROVIDER_NAMES: ProviderNameType[] = [
   ProviderName.IFLOW,
   ProviderName.ANTIGRAVITY,
+  ProviderName.COPILOT,
   ProviderName.QWEN_CODE,
   ProviderName.GEMINI_CLI,
   ProviderName.CODEX,

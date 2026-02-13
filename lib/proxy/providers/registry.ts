@@ -6,6 +6,7 @@ import { ProviderName } from "./types";
 // Provider instances will be lazily imported
 let iflowProvider: Provider | null = null;
 let antigravityProvider: Provider | null = null;
+let copilotProvider: Provider | null = null;
 let qwenCodeProvider: Provider | null = null;
 let geminiCliProvider: Provider | null = null;
 let codexProvider: Provider | null = null;
@@ -32,6 +33,13 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
         antigravityProvider = provider;
       }
       return antigravityProvider;
+
+    case ProviderName.COPILOT:
+      if (!copilotProvider) {
+        const { copilotProvider: provider } = await import("./copilot");
+        copilotProvider = provider;
+      }
+      return copilotProvider;
 
     case ProviderName.QWEN_CODE:
       if (!qwenCodeProvider) {
@@ -91,9 +99,10 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [iflow, antigravity, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter] = await Promise.all([
+  const [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter] = await Promise.all([
     getProvider(ProviderName.IFLOW),
     getProvider(ProviderName.ANTIGRAVITY),
+    getProvider(ProviderName.COPILOT),
     getProvider(ProviderName.QWEN_CODE),
     getProvider(ProviderName.GEMINI_CLI),
     getProvider(ProviderName.CODEX),
@@ -102,7 +111,7 @@ export async function getAllProviders(): Promise<Provider[]> {
     getProvider(ProviderName.OLLAMA_CLOUD),
     getProvider(ProviderName.OPENROUTER),
   ]);
-  return [iflow, antigravity, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter];
+  return [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter];
 }
 
 /**

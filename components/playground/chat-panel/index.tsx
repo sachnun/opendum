@@ -110,6 +110,7 @@ function formatProviderName(provider: string): string {
     qwen_code: "Qwen Code",
     gemini_cli: "Gemini CLI",
     codex: "Codex",
+    copilot: "Copilot",
     kiro: "Kiro",
     nvidia_nim: "Nvidia",
     ollama_cloud: "Ollama Cloud",
