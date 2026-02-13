@@ -35,6 +35,7 @@ export default async function DashboardLayout({
 
   const accountCounts: ProviderAccountCounts = {
     antigravity: 0,
+    copilot: 0,
     codex: 0,
     iflow: 0,
     kiro: 0,
@@ -52,6 +53,9 @@ export default async function DashboardLayout({
         break;
       case "codex":
         accountCounts.codex = item._count._all;
+        break;
+      case "copilot":
+        accountCounts.copilot = item._count._all;
         break;
       case "iflow":
         accountCounts.iflow = item._count._all;

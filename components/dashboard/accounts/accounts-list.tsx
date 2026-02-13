@@ -98,6 +98,7 @@ interface AccountsListProps {
   iflowAccounts: Account[];
   geminiCliAccounts: Account[];
   qwenCodeAccounts: Account[];
+  copilotAccounts: Account[];
   codexAccounts: Account[];
   kiroAccounts: Account[];
   nvidiaNimAccounts: Account[];
@@ -705,6 +706,7 @@ export function AccountsList({
   iflowAccounts,
   geminiCliAccounts,
   qwenCodeAccounts,
+  copilotAccounts,
   codexAccounts,
   kiroAccounts,
   nvidiaNimAccounts,
@@ -957,6 +959,14 @@ export function AccountsList({
             title="Qwen Code Accounts"
             accounts={qwenCodeAccounts}
             emptyMessage="No Qwen Code accounts connected yet."
+          />
+
+          {/* Copilot Section */}
+          <ProviderSection
+            id="copilot-accounts"
+            title="Copilot Accounts"
+            accounts={copilotAccounts}
+            emptyMessage="No Copilot accounts connected yet."
           />
         </div>
       </section>

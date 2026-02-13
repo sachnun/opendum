@@ -37,6 +37,7 @@ export function Sidebar({ accountCounts, modelFamilyCounts }: SidebarProps) {
       "ollama-cloud-accounts": accountCounts.ollama_cloud,
       "openrouter-accounts": accountCounts.openrouter,
       "codex-accounts": accountCounts.codex,
+      "copilot-accounts": accountCounts.copilot,
       "kiro-accounts": accountCounts.kiro,
       "iflow-accounts": accountCounts.iflow,
       "gemini-cli-accounts": accountCounts.gemini_cli,

@@ -24,6 +24,7 @@ export interface NavSubItem {
 
 export interface ProviderAccountCounts {
   antigravity: number;
+  copilot: number;
   codex: number;
   iflow: number;
   kiro: number;
@@ -51,6 +52,7 @@ export const primaryNavigation: NavItem[] = [
         anchorId: "antigravity-accounts",
       },
       { name: "Codex", href: "/dashboard/accounts", anchorId: "codex-accounts" },
+      { name: "Copilot", href: "/dashboard/accounts", anchorId: "copilot-accounts" },
       { name: "Kiro", href: "/dashboard/accounts", anchorId: "kiro-accounts" },
       { name: "Iflow", href: "/dashboard/accounts", anchorId: "iflow-accounts" },
       {

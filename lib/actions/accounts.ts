@@ -28,6 +28,10 @@ import {
   pollDeviceCodeAuthorization,
 } from "@/lib/proxy/providers/qwen-code";
 import {
+  initiateCopilotDeviceCodeFlow,
+  pollCopilotDeviceCodeAuthorization,
+} from "@/lib/proxy/providers/copilot";
+import {
   initiateCodexDeviceCodeFlow,
   pollCodexDeviceCodeAuthorization,
   codexProvider,
@@ -952,6 +956,136 @@ export async function setQwenCodeAccountEmail(
   } catch (error) {
     console.error("Failed to set Qwen Code account email:", error);
     return { success: false, error: "Failed to update account" };
+  }
+}
+
+/**
+ * Initiate GitHub Copilot Device Code Flow
+ */
+export async function initiateCopilotAuth(): Promise<
+  ActionResult<{
+    deviceCode: string;
+    userCode: string;
+    verificationUrl: string;
+    verificationUrlComplete: string;
+    expiresIn: number;
+    interval: number;
+  }>
+> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const deviceCodeInfo = await initiateCopilotDeviceCodeFlow();
+
+    return {
+      success: true,
+      data: deviceCodeInfo,
+    };
+  } catch (err) {
+    console.error("Failed to initiate Copilot auth:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Poll GitHub Copilot device code authorization status
+ */
+export async function pollCopilotAuth(
+  deviceCode: string
+): Promise<
+  ActionResult<
+    | { status: "pending" }
+    | { status: "success"; email: string; isUpdate: boolean }
+    | { status: "error"; message: string }
+  >
+> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const result = await pollCopilotDeviceCodeAuthorization(deviceCode);
+
+    if ("pending" in result) {
+      return { success: true, data: { status: "pending" } };
+    }
+
+    if ("error" in result) {
+      return { success: true, data: { status: "error", message: result.error } };
+    }
+
+    const oauthResult = result;
+    const email = oauthResult.email || `copilot-${Date.now()}`;
+
+    const existingAccount = await prisma.providerAccount.findFirst({
+      where: {
+        userId: session.user.id,
+        provider: "copilot",
+        email,
+      },
+    });
+
+    if (existingAccount) {
+      await prisma.providerAccount.update({
+        where: { id: existingAccount.id },
+        data: {
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          expiresAt: oauthResult.expiresAt,
+          isActive: true,
+        },
+      });
+
+      revalidatePath("/dashboard/accounts");
+
+      return {
+        success: true,
+        data: {
+          status: "success",
+          email,
+          isUpdate: true,
+        },
+      };
+    }
+
+    const accountCount = await prisma.providerAccount.count({
+      where: { userId: session.user.id, provider: "copilot" },
+    });
+
+    await prisma.providerAccount.create({
+      data: {
+        userId: session.user.id,
+        provider: "copilot",
+        name: `Copilot ${accountCount + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        email,
+        isActive: true,
+      },
+    });
+
+    revalidatePath("/dashboard/accounts");
+
+    return {
+      success: true,
+      data: {
+        status: "success",
+        email,
+        isUpdate: false,
+      },
+    };
+  } catch (err) {
+    console.error("Failed to poll Copilot auth:", err);
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: errorMessage };
   }
 }
 

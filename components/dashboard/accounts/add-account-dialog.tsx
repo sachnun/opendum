@@ -39,6 +39,8 @@ import {
   getKiroAuthUrl,
   initiateQwenCodeAuth,
   pollQwenCodeAuth,
+  initiateCopilotAuth,
+  pollCopilotAuth,
   connectNvidiaNimApiKey,
   connectOllamaCloudApiKey,
   connectOpenRouterApiKey,
@@ -49,6 +51,7 @@ type Provider =
   | "iflow"
   | "antigravity"
   | "qwen_code"
+  | "copilot"
   | "gemini_cli"
   | "codex"
   | "kiro"
@@ -116,6 +119,11 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     description: "Access Qwen Coder models",
     flowType: "device_code",
   },
+  copilot: {
+    name: "Copilot",
+    description: "Access GitHub Copilot chat models",
+    flowType: "device_code",
+  },
   codex: {
     name: "Codex",
     description: "Access GPT-5 Codex models",
@@ -166,6 +174,7 @@ const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
   "iflow",
   "gemini_cli",
   "qwen_code",
+  "copilot",
 ];
 
 const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
@@ -198,6 +207,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
   
   // Device code flow state
   const [deviceCodeInfo, setDeviceCodeInfo] = useState<{
+    provider: "qwen_code" | "copilot";
     deviceCode: string;
     verificationUrl: string;
     codeVerifier?: string; // Qwen Code only (stored client-side)
@@ -242,14 +252,22 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
         setIsFetchingUrl(true);
         setDeviceCodeInfo(null);
 
-        // Qwen Code device code flow
-        initiateQwenCodeAuth()
+        const initiateAction =
+          provider === "copilot" ? initiateCopilotAuth : initiateQwenCodeAuth;
+
+        initiateAction()
           .then((result) => {
             if (result.success) {
               setDeviceCodeInfo({
+                provider: provider === "copilot" ? "copilot" : "qwen_code",
                 deviceCode: result.data.deviceCode,
                 verificationUrl: result.data.verificationUrlComplete,
-                codeVerifier: result.data.codeVerifier,
+                codeVerifier:
+                  "codeVerifier" in result.data
+                    ? typeof result.data.codeVerifier === "string"
+                      ? result.data.codeVerifier
+                      : undefined
+                    : undefined,
               });
             } else {
               setError(result.error);
@@ -367,10 +385,13 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
       }
 
       try {
-        const result = await pollQwenCodeAuth(
-          deviceCodeInfo.deviceCode,
-          deviceCodeInfo.codeVerifier || ""
-        );
+        const result =
+          deviceCodeInfo.provider === "copilot"
+            ? await pollCopilotAuth(deviceCodeInfo.deviceCode)
+            : await pollQwenCodeAuth(
+                deviceCodeInfo.deviceCode,
+                deviceCodeInfo.codeVerifier || ""
+              );
 
         if (!result.success) {
           setError(result.error);
@@ -389,8 +410,8 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
           }
           toast.success(
             result.data.isUpdate
-              ? "Qwen Code account updated successfully!"
-              : "Qwen Code account connected successfully!"
+              ? `${providerConfig?.name || "Provider"} account updated successfully!`
+              : `${providerConfig?.name || "Provider"} account connected successfully!`
           );
           setOpen(false);
           resetForm();
@@ -422,7 +443,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
 
     // Set up interval polling every 5 seconds
     pollingRef.current = setInterval(poll, 5000);
-  }, [deviceCodeInfo, isPolling, resetForm, router]);
+  }, [deviceCodeInfo, isPolling, resetForm, router, providerConfig?.name]);
 
   const handleCopyLink = async () => {
     const urlToCopy = providerConfig?.flowType === "device_code" 
@@ -711,9 +732,9 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                       Login to {providerConfig.name}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Click the button below to open the Qwen login page. After
-                      you complete the login, authorization will be detected
-                      automatically.
+                      Click the button below to open the provider login page.
+                      After you complete the login, authorization will be
+                      detected automatically.
                     </p>
                   </div>
                   <div className="flex gap-2">

@@ -116,6 +116,7 @@ export default async function AccountsPage({
   const iflowAccounts = accountsWithStats.filter((a) => a.provider === "iflow");
   const antigravityAccounts = accountsWithStats.filter((a) => a.provider === "antigravity");
   const qwenCodeAccounts = accountsWithStats.filter((a) => a.provider === "qwen_code");
+  const copilotAccounts = accountsWithStats.filter((a) => a.provider === "copilot");
   const geminiCliAccounts = accountsWithStats.filter((a) => a.provider === "gemini_cli");
   const codexAccounts = accountsWithStats.filter((a) => a.provider === "codex");
   const kiroAccounts = accountsWithStats.filter((a) => a.provider === "kiro");
@@ -152,6 +153,8 @@ export default async function AccountsPage({
               ? "Antigravity account connected successfully!"
               : params.success === "qwen_code_added"
                 ? "Qwen Code account connected successfully!"
+                : params.success === "copilot_added"
+                  ? "Copilot account connected successfully!"
                 : params.success === "gemini_cli_added"
                   ? "Gemini CLI account connected successfully!"
                   : params.success === "codex_added"
@@ -177,6 +180,7 @@ export default async function AccountsPage({
         iflowAccounts={iflowAccounts}
         geminiCliAccounts={geminiCliAccounts}
         qwenCodeAccounts={qwenCodeAccounts}
+        copilotAccounts={copilotAccounts}
         codexAccounts={codexAccounts}
         kiroAccounts={kiroAccounts}
         nvidiaNimAccounts={nvidiaNimAccounts}
