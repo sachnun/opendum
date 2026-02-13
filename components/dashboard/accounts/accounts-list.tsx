@@ -499,6 +499,7 @@ function AccountCard({
   const hasErrors = account.errorCount > 0;
   const supportsQuotaMonitor =
     account.provider === "antigravity" ||
+    account.provider === "copilot" ||
     account.provider === "codex" ||
     account.provider === "gemini_cli" ||
     account.provider === "kiro" ||
