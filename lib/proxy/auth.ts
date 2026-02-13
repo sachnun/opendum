@@ -10,6 +10,7 @@ import {
   getProvidersForModel,
   resolveModelAlias,
 } from "./models";
+import { normalizeProviderAlias } from "./providers/types";
 
 /**
  * Parsed model parameter
@@ -336,7 +337,7 @@ export function parseModelParam(modelParam: string): ParsedModel {
   }
   
   // Has slash - provider/model format
-  const provider = modelParam.substring(0, slashIndex);
+  const provider = normalizeProviderAlias(modelParam.substring(0, slashIndex));
   const model = modelParam.substring(slashIndex + 1);
   
   return { provider, model };

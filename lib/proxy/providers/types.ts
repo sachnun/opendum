@@ -153,6 +153,7 @@ export interface Provider {
 export const ProviderName = {
   IFLOW: "iflow",
   ANTIGRAVITY: "antigravity",
+  COPILOT: "copilot",
   QWEN_CODE: "qwen_code",
   GEMINI_CLI: "gemini_cli",
   CODEX: "codex",
@@ -164,9 +165,23 @@ export const ProviderName = {
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
 
+export const PROVIDER_ALIASES: Record<string, ProviderNameType> = {
+  copilot: ProviderName.COPILOT,
+  "github-copilot": ProviderName.COPILOT,
+  github_copilot: ProviderName.COPILOT,
+  "github-copilot-enterprise": ProviderName.COPILOT,
+  github_copilot_enterprise: ProviderName.COPILOT,
+};
+
+export function normalizeProviderAlias(provider: string): string {
+  const normalized = provider.trim().toLowerCase();
+  return PROVIDER_ALIASES[normalized] ?? normalized;
+}
+
 export const OAUTH_PROVIDER_NAMES: ProviderNameType[] = [
   ProviderName.IFLOW,
   ProviderName.ANTIGRAVITY,
+  ProviderName.COPILOT,
   ProviderName.QWEN_CODE,
   ProviderName.GEMINI_CLI,
   ProviderName.CODEX,
