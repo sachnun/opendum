@@ -161,3 +161,129 @@ export function injectCopilotResponsesSystemTool(
 
   return [toolCall, toolOutput, ...input];
 }
+
+export function convertResponsesInputToChatMessages(
+  input: Array<Record<string, unknown>>,
+  instructions?: string
+): Array<Record<string, unknown>> {
+  const messages: Array<Record<string, unknown>> = [];
+
+  if (instructions) {
+    messages.push({ role: "system", content: instructions });
+  }
+
+  const pendingToolCalls: Array<Record<string, unknown>> = [];
+
+  for (const item of input) {
+    const type = item.type;
+    if (typeof type !== "string") {
+      continue;
+    }
+
+    if (type === "message") {
+      if (pendingToolCalls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: "",
+          tool_calls: [...pendingToolCalls],
+        });
+        pendingToolCalls.length = 0;
+      }
+
+      const role = typeof item.role === "string" ? item.role : "user";
+      const content = item.content;
+
+      if (role === "developer") {
+        messages.push({
+          role: "system",
+          content:
+            typeof content === "string"
+              ? content
+              : content === undefined
+                ? ""
+                : JSON.stringify(content),
+        });
+      } else {
+        messages.push({
+          role,
+          content:
+            typeof content === "string" || Array.isArray(content)
+              ? content
+              : content === undefined
+                ? ""
+                : JSON.stringify(content),
+        });
+      }
+
+      continue;
+    }
+
+    if (type === "function_call") {
+      const rawId =
+        (typeof item.call_id === "string" && item.call_id) ||
+        (typeof item.id === "string" && item.id) ||
+        `call_${Date.now()}`;
+
+      const normalizedId = rawId.startsWith("fc_")
+        ? `call_${rawId.slice(3)}`
+        : rawId.startsWith("fc-")
+          ? `call_${rawId.slice(3)}`
+          : rawId;
+
+      pendingToolCalls.push({
+        id: normalizedId,
+        type: "function",
+        function: {
+          name: typeof item.name === "string" ? item.name : "",
+          arguments:
+            typeof item.arguments === "string"
+              ? item.arguments
+              : item.arguments === undefined
+                ? "{}"
+                : JSON.stringify(item.arguments),
+        },
+      });
+
+      continue;
+    }
+
+    if (type === "function_call_output") {
+      if (pendingToolCalls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: "",
+          tool_calls: [...pendingToolCalls],
+        });
+        pendingToolCalls.length = 0;
+      }
+
+      const rawCallId = typeof item.call_id === "string" ? item.call_id : "";
+      const normalizedCallId = rawCallId.startsWith("fc_")
+        ? `call_${rawCallId.slice(3)}`
+        : rawCallId.startsWith("fc-")
+          ? `call_${rawCallId.slice(3)}`
+          : rawCallId;
+
+      messages.push({
+        role: "tool",
+        tool_call_id: normalizedCallId,
+        content:
+          typeof item.output === "string"
+            ? item.output
+            : item.output === undefined
+              ? ""
+              : JSON.stringify(item.output),
+      });
+    }
+  }
+
+  if (pendingToolCalls.length > 0) {
+    messages.push({
+      role: "assistant",
+      content: "",
+      tool_calls: [...pendingToolCalls],
+    });
+  }
+
+  return messages;
+}

@@ -23,6 +23,7 @@ import {
   COPILOT_REFRESH_BUFFER_SECONDS,
 } from "./constants";
 import {
+  convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
   injectCopilotChatSystemTool,
   injectCopilotResponsesSystemTool,
@@ -150,9 +151,20 @@ export const copilotProvider: Provider = {
     }
 
     if (endpoint === "responses" && Array.isArray(preparedBody._responsesInput)) {
-      preparedBody._responsesInput = injectCopilotResponsesSystemTool(
+      const injectedResponsesInput = injectCopilotResponsesSystemTool(
         preparedBody._responsesInput as Array<Record<string, unknown>>
       );
+
+      preparedBody._responsesInput = injectedResponsesInput;
+
+      preparedBody.messages = convertResponsesInputToChatMessages(
+        injectedResponsesInput,
+        typeof preparedBody.instructions === "string"
+          ? preparedBody.instructions
+          : undefined
+      ) as ChatCompletionRequest["messages"];
+
+      return preparedBody;
     }
 
     if (Array.isArray(preparedBody.messages)) {
