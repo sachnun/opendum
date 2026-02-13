@@ -175,6 +175,7 @@ export default async function ModelsPage() {
   const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
   const geminiCliModels = getModelsForProvider(ProviderName.GEMINI_CLI);
   const codexModels = getModelsForProvider(ProviderName.CODEX);
+  const copilotModels = getModelsForProvider(ProviderName.COPILOT);
   const kiroModels = getModelsForProvider(ProviderName.KIRO);
   const nvidiaNimModels = getModelsForProvider(ProviderName.NVIDIA_NIM);
   const ollamaCloudModels = getModelsForProvider(ProviderName.OLLAMA_CLOUD);
@@ -196,6 +197,9 @@ export default async function ModelsPage() {
   }
   if (codexModels.length > 0) {
     availableProviders.push({ id: ProviderName.CODEX, label: "Codex" });
+  }
+  if (copilotModels.length > 0) {
+    availableProviders.push({ id: ProviderName.COPILOT, label: "Copilot" });
   }
   if (kiroModels.length > 0) {
     availableProviders.push({ id: ProviderName.KIRO, label: "Kiro" });
