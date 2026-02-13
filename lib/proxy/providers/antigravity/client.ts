@@ -82,6 +82,29 @@ function resolveModelName(rawModel: string): string {
   return model;
 }
 
+function isOpusThinkingModel(model: string): boolean {
+  return model.startsWith("claude-opus-") && model.endsWith("-thinking");
+}
+
+function normalizeRequestForModel(
+  body: ChatCompletionRequest,
+  effectiveModel: string
+): ChatCompletionRequest {
+  const normalizedBody: ChatCompletionRequest = { ...body };
+
+  // Antigravity/Claude Opus thinking models reject top_p < 0.95.
+  // Drop invalid values so upstream can apply its default safely.
+  if (
+    isOpusThinkingModel(effectiveModel) &&
+    typeof normalizedBody.top_p === "number" &&
+    normalizedBody.top_p < 0.95
+  ) {
+    delete normalizedBody.top_p;
+  }
+
+  return normalizedBody;
+}
+
 export const antigravityConfig: ProviderConfig = {
   name: "antigravity",
   displayName: "Antigravity (Google)",
@@ -242,14 +265,21 @@ export const antigravityProvider: Provider = {
 
     const rawModel = body.model;
     const effectiveModel = resolveModelName(rawModel);
+    const normalizedBody = normalizeRequestForModel(body, effectiveModel);
     const family = getModelFamily(effectiveModel);
     const sessionId = crypto.randomUUID();
     const requestId = generateRequestId();
 
     // Determine if reasoning output should be included in response
     // Only include if user explicitly requested reasoning
-    const includeReasoning = body._includeReasoning ?? 
-      !!(body.reasoning || body.reasoning_effort || body.thinking_budget || body.include_thoughts);
+    const includeReasoning =
+      normalizedBody._includeReasoning ??
+      !!(
+        normalizedBody.reasoning ||
+        normalizedBody.reasoning_effort ||
+        normalizedBody.thinking_budget ||
+        normalizedBody.include_thoughts
+      );
 
     const context: TransformContext = {
       model: effectiveModel,
@@ -261,7 +291,7 @@ export const antigravityProvider: Provider = {
     };
 
     // Convert OpenAI format to Gemini format
-    const geminiPayload = convertOpenAIToGemini(body);
+    const geminiPayload = convertOpenAIToGemini(normalizedBody);
 
     // Transform for Antigravity (inject system prompts, wrap request, etc.)
     const isClaudeModel = effectiveModel.includes("claude");

@@ -240,14 +240,133 @@ export type ProxyErrorType =
   | "rate_limit_error"
   | "api_error";
 
-export function getSanitizedProxyError(statusCode: number): {
+const MAX_CLIENT_ERROR_DETAIL_LENGTH = 320;
+
+function truncateForClient(value: string, maxLength: number = MAX_CLIENT_ERROR_DETAIL_LENGTH): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}...[truncated]`;
+}
+
+function normalizeClientErrorDetail(value: string): string {
+  return truncateForClient(value.replace(/\s+/g, " ").trim());
+}
+
+function looksLikeJson(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  );
+}
+
+function parseJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function extractStringProperty(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function extractProviderErrorDetail(providerErrorBody?: string): string | null {
+  if (!providerErrorBody) return null;
+
+  const maxDepth = 6;
+  let current: unknown = providerErrorBody.trim();
+  let bestMessage: string | null = null;
+  let requestId: string | null = null;
+
+  for (let depth = 0; depth < maxDepth; depth += 1) {
+    if (typeof current === "string") {
+      const text = current.trim();
+      if (!text) break;
+
+      if (looksLikeJson(text)) {
+        const parsed = parseJson(text);
+        if (parsed !== null) {
+          current = parsed;
+          continue;
+        }
+      }
+
+      bestMessage = text;
+      break;
+    }
+
+    if (!current || typeof current !== "object") {
+      break;
+    }
+
+    const obj = current as Record<string, unknown>;
+
+    requestId =
+      requestId ??
+      extractStringProperty(obj, ["request_id", "requestId", "req_id", "trace_id", "traceId"]);
+
+    const directMessage = extractStringProperty(obj, [
+      "message",
+      "detail",
+      "error_description",
+      "error",
+    ]);
+
+    if (directMessage) {
+      bestMessage = directMessage;
+      current = directMessage;
+      continue;
+    }
+
+    if (obj.error && typeof obj.error === "object") {
+      current = obj.error;
+      continue;
+    }
+
+    if (Array.isArray(obj.errors) && obj.errors.length > 0) {
+      current = obj.errors[0];
+      continue;
+    }
+
+    break;
+  }
+
+  if (!bestMessage) return null;
+
+  const normalizedMessage = normalizeClientErrorDetail(bestMessage);
+  if (!normalizedMessage) return null;
+
+  if (!requestId) {
+    return normalizedMessage;
+  }
+
+  const normalizedRequestId = normalizeClientErrorDetail(requestId);
+  return `${normalizedMessage} (request_id: ${normalizedRequestId})`;
+}
+
+export function getSanitizedProxyError(
+  statusCode: number,
+  providerErrorBody?: string
+): {
   type: ProxyErrorType;
   message: string;
 } {
+  const providerDetail = extractProviderErrorDetail(providerErrorBody);
+
   if (statusCode === 400 || statusCode === 422) {
     return {
       type: "invalid_request_error",
-      message: "Invalid request parameters.",
+      message: providerDetail
+        ? `Invalid request parameters: ${providerDetail}`
+        : "Invalid request parameters.",
     };
   }
 

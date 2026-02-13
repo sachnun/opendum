@@ -511,7 +511,10 @@ export async function POST(request: NextRequest) {
             duration: Date.now() - startTime,
           });
 
-          const sanitizedError = getSanitizedProxyError(providerResponse.status);
+          const sanitizedError = getSanitizedProxyError(
+            providerResponse.status,
+            errorText
+          );
 
           lastAccountFailure = {
             statusCode: providerResponse.status,
@@ -626,7 +629,7 @@ export async function POST(request: NextRequest) {
           duration: Date.now() - startTime,
         });
 
-        const sanitizedError = getSanitizedProxyError(statusCode);
+        const sanitizedError = getSanitizedProxyError(statusCode, errorMessage);
 
         lastAccountFailure = {
           statusCode,
