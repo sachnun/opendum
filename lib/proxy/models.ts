@@ -39,6 +39,14 @@ export interface ModelInfo {
   meta?: ModelMeta;
 }
 
+function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
+  return upstreamModel
+    .replace(/^library\//, "")
+    .replace(/[:/]/g, "-")
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-{2,}/g, "-");
+}
+
 /**
  * Unified model registry
  * Maps canonical model names to their provider support
@@ -569,6 +577,10 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
 
   // ===== Nvidia Models =====
+  "baichuan2-13b-chat": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: ["baichuan-inc-baichuan2-13b-chat", "baichuan-inc/baichuan2-13b-chat"],
+  },
   "nim-llama-3.1-70b-instruct": {
     providers: [ProviderName.NVIDIA_NIM],
     aliases: ["meta/llama-3.1-70b-instruct"],
@@ -585,22 +597,22 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   "deepseek-ai-deepseek-r1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai/deepseek-r1"] },
   "deepseek-ai-deepseek-r1-0528": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai/deepseek-r1-0528"] },
   "deepseek-ai-deepseek-v3.1-terminus": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai/deepseek-v3.1-terminus"] },
-  "google-codegemma-1.1-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/codegemma-1.1-7b"] },
-  "google-codegemma-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/codegemma-7b"] },
-  "google-gemma-2-27b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-2-27b-it"] },
-  "google-gemma-2-2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-2-2b-it"] },
-  "google-gemma-3-1b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-3-1b-it"] },
-  "google-gemma-3n-e2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-3n-e2b-it"] },
-  "google-gemma-3n-e4b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google/gemma-3n-e4b-it"] },
-  "meta-codellama-70b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/codellama-70b"] },
-  "meta-llama-3.1-405b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.1-405b-instruct"] },
-  "meta-llama-3.2-11b-vision-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.2-11b-vision-instruct"] },
-  "meta-llama-3.2-1b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.2-1b-instruct"] },
-  "meta-llama-3.3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-3.3-70b-instruct"] },
-  "meta-llama-4-maverick-17b-128e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-4-maverick-17b-128e-instruct"] },
-  "meta-llama-4-scout-17b-16e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama-4-scout-17b-16e-instruct"] },
-  "meta-llama3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama3-70b-instruct"] },
-  "meta-llama3-8b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta/llama3-8b-instruct"] },
+  "codegemma-1.1-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-codegemma-1.1-7b", "google/codegemma-1.1-7b"] },
+  "codegemma-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-codegemma-7b", "google/codegemma-7b"] },
+  "gemma-2-27b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-2-27b-it", "google/gemma-2-27b-it"] },
+  "gemma-2-2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-2-2b-it", "google/gemma-2-2b-it"] },
+  "gemma-3-1b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-3-1b-it", "google/gemma-3-1b-it"] },
+  "gemma-3n-e2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-3n-e2b-it", "google/gemma-3n-e2b-it"] },
+  "gemma-3n-e4b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-3n-e4b-it", "google/gemma-3n-e4b-it"] },
+  "codellama-70b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-codellama-70b", "meta/codellama-70b"] },
+  "llama-3.1-405b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.1-405b-instruct", "meta/llama-3.1-405b-instruct"] },
+  "llama-3.2-11b-vision-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.2-11b-vision-instruct", "meta/llama-3.2-11b-vision-instruct"] },
+  "llama-3.2-1b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.2-1b-instruct", "meta/llama-3.2-1b-instruct"] },
+  "llama-3.3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.3-70b-instruct", "meta/llama-3.3-70b-instruct"] },
+  "llama-4-maverick-17b-128e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-4-maverick-17b-128e-instruct", "meta/llama-4-maverick-17b-128e-instruct"] },
+  "llama-4-scout-17b-16e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-4-scout-17b-16e-instruct", "meta/llama-4-scout-17b-16e-instruct"] },
+  "llama3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama3-70b-instruct", "meta/llama3-70b-instruct"] },
+  "llama3-8b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama3-8b-instruct", "meta/llama3-8b-instruct"] },
   "microsoft-phi-3-medium-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-medium-128k-instruct"] },
   "microsoft-phi-3-medium-4k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-medium-4k-instruct"] },
   "microsoft-phi-3-small-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft/phi-3-small-128k-instruct"] },
@@ -622,11 +634,13 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   "nvidia-llama3-chatqa-1.5-70b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/llama3-chatqa-1.5-70b"] },
   "nvidia-nemotron-4-340b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/nemotron-4-340b-instruct"] },
   "nvidia-nvidia-nemotron-nano-9b-v2": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia/nvidia-nemotron-nano-9b-v2"] },
-  "qwen-qwen2.5-coder-32b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen2.5-coder-32b-instruct"] },
-  "qwen-qwen2.5-coder-7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen2.5-coder-7b-instruct"] },
-  "qwen-qwen3-235b-a22b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen3-235b-a22b"] },
-  "qwen-qwen3-next-80b-a3b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwen3-next-80b-a3b-instruct"] },
-  "qwen-qwq-32b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen/qwq-32b"] },
+  "qwen2.5-coder-32b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2.5-coder-32b-instruct", "qwen/qwen2.5-coder-32b-instruct"] },
+  "qwen2.5-coder-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2.5-coder-7b-instruct", "qwen/qwen2.5-coder-7b-instruct"] },
+  "qwen2-7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2-7b-instruct", "qwen/qwen2-7b-instruct"] },
+  "qwen2.5-7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2.5-7b-instruct", "qwen/qwen2.5-7b-instruct"] },
+  "qwen3-235b-a22b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen3-235b-a22b", "qwen/qwen3-235b-a22b"] },
+  "qwen3-next-80b-a3b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen3-next-80b-a3b-instruct", "qwen/qwen3-next-80b-a3b-instruct"] },
+  "qwq-32b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwq-32b", "qwen/qwq-32b"] },
 
   // ===== Ollama Cloud Models =====
   "cogito-2.1-671b": {
@@ -707,7 +721,8 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gpt-oss-20b": {
-    providers: [ProviderName.OLLAMA_CLOUD],
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    aliases: ["openai-gpt-oss-20b"],
     meta: {
       contextLength: 131072,
       outputLimit: 32768,
@@ -1066,9 +1081,10 @@ for (const [canonical, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
     continue;
   }
 
-  if (!aliasToCanonical[upstreamModel]) {
-    aliasToCanonical[upstreamModel] = canonical;
-  }
+  aliasToCanonical[upstreamModel] = canonical;
+
+  const legacyAlias = getLegacyNvidiaNimModelAlias(upstreamModel);
+  aliasToCanonical[legacyAlias] = canonical;
 }
 
 for (const [canonical, upstreamModel] of Object.entries(OPENROUTER_MODEL_MAP)) {

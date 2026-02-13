@@ -10,6 +10,12 @@ const MAX_FETCH_ATTEMPTS = 3;
 const MODEL_MAP_EXPORT_PATTERN =
   /export const NVIDIA_NIM_MODEL_MAP: Record<string, string> = \{[\s\S]*?\n\};/;
 
+const MODEL_KEY_OVERRIDES = {
+  "baichuan-inc/baichuan2-13b-chat": "baichuan2-13b-chat",
+  "qwen/qwen2.5-coder-32b-instruct": "qwen2.5-coder-32b",
+  "qwen/qwen2.5-coder-7b-instruct": "qwen2.5-coder-7b",
+};
+
 const NON_CHAT_MODEL_TOKENS = [
   "embed",
   "retriever",
@@ -53,8 +59,18 @@ function sleep(ms) {
 }
 
 function toModelKey(modelId) {
-  return modelId
-    .replace(/^library\//, "")
+  const normalizedModelId = modelId.replace(/^library\//, "");
+  const overriddenKey = MODEL_KEY_OVERRIDES[normalizedModelId];
+  if (overriddenKey) {
+    return overriddenKey;
+  }
+
+  const slashIndex = normalizedModelId.indexOf("/");
+  const baseModelId = slashIndex === -1
+    ? normalizedModelId
+    : normalizedModelId.slice(slashIndex + 1);
+
+  return baseModelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
