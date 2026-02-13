@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { DashboardDataRefresher } from "@/components/layout/dashboard-data-refresher";
 import {
   MODEL_FAMILY_NAV_ITEMS,
   getModelFamily,
@@ -186,6 +187,7 @@ export default async function DashboardLayout({
           </div>
         </main>
       </div>
+      <DashboardDataRefresher />
       <Toaster />
     </div>
   );
