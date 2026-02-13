@@ -200,8 +200,8 @@ export const copilotConfig: ProviderConfig = {
 export const copilotProvider: Provider = {
   config: copilotConfig,
 
-  prepareRequest(account, body, endpoint) {
-    const mode = getCopilotSystemToolMode(account.id);
+  async prepareRequest(account, body, endpoint) {
+    const mode = await getCopilotSystemToolMode(account.id);
 
     const preparedBody: ChatCompletionRequest = {
       ...body,

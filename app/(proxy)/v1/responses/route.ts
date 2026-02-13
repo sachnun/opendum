@@ -613,7 +613,7 @@ export async function POST(request: NextRequest) {
         };
 
         const requestBody = providerImpl.prepareRequest
-          ? providerImpl.prepareRequest(account, baseRequestBody, "responses")
+          ? await providerImpl.prepareRequest(account, baseRequestBody, "responses")
           : baseRequestBody;
 
         const providerResponse = await providerImpl.makeRequest(

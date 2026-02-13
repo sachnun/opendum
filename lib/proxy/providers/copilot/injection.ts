@@ -1,3 +1,4 @@
+import { getRedisClient } from "@/lib/redis";
 import { COPILOT_X_INITIATOR_WINDOW_MS } from "./constants";
 
 export type CopilotInitiator = "user" | "agent";
@@ -7,7 +8,8 @@ export interface CopilotSystemToolMode {
   injectSystemTool: boolean;
 }
 
-const copilotWindowByAccount = new Map<string, number>();
+const fallbackWindowByAccount = new Map<string, number>();
+const COPILOT_SYSTEM_TOOL_KEY_PREFIX = "opendum:copilot:system-tool-window";
 
 const TOOL_NAME = "get_context";
 const TOOL_CALL_ID = "call_init";
@@ -17,32 +19,61 @@ function getCurrentYear(): string {
 }
 
 function clearExpiredWindows(now: number): void {
-  for (const [accountId, expiresAt] of copilotWindowByAccount.entries()) {
+  for (const [accountId, expiresAt] of fallbackWindowByAccount.entries()) {
     if (expiresAt <= now) {
-      copilotWindowByAccount.delete(accountId);
+      fallbackWindowByAccount.delete(accountId);
     }
   }
 }
 
-export function getCopilotSystemToolMode(accountId: string): CopilotSystemToolMode {
+function getWindowKey(accountId: string): string {
+  return `${COPILOT_SYSTEM_TOOL_KEY_PREFIX}:${accountId}`;
+}
+
+function toTtlSeconds(windowMs: number): number {
+  return Math.max(1, Math.ceil(windowMs / 1000));
+}
+
+function getFallbackSystemToolMode(accountId: string): CopilotSystemToolMode {
+  const now = Date.now();
+  clearExpiredWindows(now);
+
+  const expiresAt = fallbackWindowByAccount.get(accountId);
+  if (!expiresAt) {
+    fallbackWindowByAccount.set(accountId, now + COPILOT_X_INITIATOR_WINDOW_MS);
+    return { xInitiator: "user", injectSystemTool: false };
+  }
+
+  return { xInitiator: "agent", injectSystemTool: true };
+}
+
+export async function getCopilotSystemToolMode(
+  accountId: string
+): Promise<CopilotSystemToolMode> {
   const normalizedAccountId = accountId.trim();
   if (!normalizedAccountId) {
     return { xInitiator: "user", injectSystemTool: false };
   }
 
-  const now = Date.now();
-  clearExpiredWindows(now);
+  const redis = await getRedisClient();
+  if (redis) {
+    try {
+      const setResult = await redis.set(getWindowKey(normalizedAccountId), "1", {
+        NX: true,
+        EX: toTtlSeconds(COPILOT_X_INITIATOR_WINDOW_MS),
+      });
 
-  const expiresAt = copilotWindowByAccount.get(normalizedAccountId);
-  if (!expiresAt) {
-    copilotWindowByAccount.set(
-      normalizedAccountId,
-      now + COPILOT_X_INITIATOR_WINDOW_MS
-    );
-    return { xInitiator: "user", injectSystemTool: false };
+      if (setResult === "OK") {
+        return { xInitiator: "user", injectSystemTool: false };
+      }
+
+      return { xInitiator: "agent", injectSystemTool: true };
+    } catch {
+      return getFallbackSystemToolMode(normalizedAccountId);
+    }
   }
 
-  return { xInitiator: "agent", injectSystemTool: true };
+  return getFallbackSystemToolMode(normalizedAccountId);
 }
 
 export function injectCopilotChatSystemTool(

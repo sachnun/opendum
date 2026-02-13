@@ -421,7 +421,7 @@ export async function POST(request: NextRequest) {
         const credentials = await providerImpl.getValidCredentials(account);
 
         const requestBody = providerImpl.prepareRequest
-          ? providerImpl.prepareRequest(
+          ? await providerImpl.prepareRequest(
               account,
               {
                 model,

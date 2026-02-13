@@ -1186,7 +1186,7 @@ export async function POST(request: NextRequest) {
           openaiPayload as unknown as import("@/lib/proxy/providers/types").ChatCompletionRequest;
 
         const requestBody = providerImpl.prepareRequest
-          ? providerImpl.prepareRequest(account, normalizedOpenAIPayload, "messages")
+          ? await providerImpl.prepareRequest(account, normalizedOpenAIPayload, "messages")
           : normalizedOpenAIPayload;
 
         const providerResponse = await providerImpl.makeRequest(

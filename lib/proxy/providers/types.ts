@@ -115,7 +115,7 @@ export interface Provider {
     account: ProviderAccount,
     body: ChatCompletionRequest,
     endpoint: ProxyEndpointType
-  ): ChatCompletionRequest;
+  ): ChatCompletionRequest | Promise<ChatCompletionRequest>;
 
   /**
    * Generate OAuth authorization URL
