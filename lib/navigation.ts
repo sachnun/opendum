@@ -35,6 +35,21 @@ export interface ProviderAccountCounts {
   openrouter: number;
 }
 
+export type ProviderAccountIndicator = "normal" | "warning" | "error";
+
+export interface ProviderAccountIndicators {
+  antigravity: ProviderAccountIndicator;
+  copilot: ProviderAccountIndicator;
+  codex: ProviderAccountIndicator;
+  iflow: ProviderAccountIndicator;
+  kiro: ProviderAccountIndicator;
+  gemini_cli: ProviderAccountIndicator;
+  qwen_code: ProviderAccountIndicator;
+  nvidia_nim: ProviderAccountIndicator;
+  ollama_cloud: ProviderAccountIndicator;
+  openrouter: ProviderAccountIndicator;
+}
+
 export interface ModelFamilyCounts {
   [anchorId: string]: number;
 }

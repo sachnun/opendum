@@ -12,7 +12,11 @@ import {
 import { signOut } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
-import type { ModelFamilyCounts, ProviderAccountCounts } from "@/lib/navigation";
+import type {
+  ModelFamilyCounts,
+  ProviderAccountCounts,
+  ProviderAccountIndicators,
+} from "@/lib/navigation";
 import { getAllModels, getProvidersForModel, resolveModelAlias } from "@/lib/proxy/models";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
@@ -31,10 +35,11 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 interface HeaderProps {
   accountCounts: ProviderAccountCounts;
+  accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
 }
 
-export async function Header({ accountCounts, modelFamilyCounts }: HeaderProps) {
+export async function Header({ accountCounts, accountIndicators, modelFamilyCounts }: HeaderProps) {
   const session = await auth();
 
   const disabledModels = session?.user?.id
@@ -61,6 +66,7 @@ export async function Header({ accountCounts, modelFamilyCounts }: HeaderProps) 
         <div className="flex min-w-0 items-center">
           <MobileNav
             accountCounts={accountCounts}
+            accountIndicators={accountIndicators}
             modelFamilyCounts={modelFamilyCounts}
           />
         </div>

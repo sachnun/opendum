@@ -10,9 +10,60 @@ import {
 import { getAllModels } from "@/lib/proxy/models";
 import type {
   ModelFamilyCounts,
+  ProviderAccountIndicator,
+  ProviderAccountIndicators,
   ProviderAccountCounts,
 } from "@/lib/navigation";
 import { Toaster } from "@/components/ui/sonner";
+
+const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
+
+const PROVIDER_KEY_BY_PROVIDER_NAME = {
+  antigravity: "antigravity",
+  copilot: "copilot",
+  codex: "codex",
+  iflow: "iflow",
+  kiro: "kiro",
+  gemini_cli: "gemini_cli",
+  qwen_code: "qwen_code",
+  nvidia_nim: "nvidia_nim",
+  ollama_cloud: "ollama_cloud",
+  openrouter: "openrouter",
+} as const;
+
+const INDICATOR_WEIGHT: Record<ProviderAccountIndicator, number> = {
+  normal: 0,
+  warning: 1,
+  error: 2,
+};
+
+function isKnownProvider(provider: string): provider is keyof typeof PROVIDER_KEY_BY_PROVIDER_NAME {
+  return provider in PROVIDER_KEY_BY_PROVIDER_NAME;
+}
+
+function getAccountIndicator(
+  lastErrorAt: Date | null,
+  lastSuccessAt: Date | null
+): ProviderAccountIndicator {
+  if (!lastErrorAt) {
+    return "normal";
+  }
+
+  const nowMs = Date.now();
+
+  const errorTimeMs = lastErrorAt.getTime();
+  const successTimeMs = lastSuccessAt?.getTime() ?? 0;
+
+  if (!lastSuccessAt || successTimeMs <= errorTimeMs) {
+    return "error";
+  }
+
+  if (nowMs - successTimeMs > WARNING_INDICATOR_STALE_WINDOW_MS) {
+    return "normal";
+  }
+
+  return "warning";
+}
 
 export default async function DashboardLayout({
   children,
@@ -25,11 +76,13 @@ export default async function DashboardLayout({
     redirect("/");
   }
 
-  const groupedAccountCounts = await prisma.providerAccount.groupBy({
-    by: ["provider"],
+  const providerAccounts = await prisma.providerAccount.findMany({
     where: { userId: session.user.id },
-    _count: {
-      _all: true,
+    select: {
+      provider: true,
+      isActive: true,
+      lastErrorAt: true,
+      lastSuccessAt: true,
     },
   });
 
@@ -46,40 +99,34 @@ export default async function DashboardLayout({
     openrouter: 0,
   };
 
-  for (const item of groupedAccountCounts) {
-    switch (item.provider) {
-      case "antigravity":
-        accountCounts.antigravity = item._count._all;
-        break;
-      case "codex":
-        accountCounts.codex = item._count._all;
-        break;
-      case "copilot":
-        accountCounts.copilot = item._count._all;
-        break;
-      case "iflow":
-        accountCounts.iflow = item._count._all;
-        break;
-      case "kiro":
-        accountCounts.kiro = item._count._all;
-        break;
-      case "gemini_cli":
-        accountCounts.gemini_cli = item._count._all;
-        break;
-      case "qwen_code":
-        accountCounts.qwen_code = item._count._all;
-        break;
-      case "nvidia_nim":
-        accountCounts.nvidia_nim = item._count._all;
-        break;
-      case "ollama_cloud":
-        accountCounts.ollama_cloud = item._count._all;
-        break;
-      case "openrouter":
-        accountCounts.openrouter = item._count._all;
-        break;
-      default:
-        break;
+  const accountIndicators: ProviderAccountIndicators = {
+    antigravity: "normal",
+    copilot: "normal",
+    codex: "normal",
+    iflow: "normal",
+    kiro: "normal",
+    gemini_cli: "normal",
+    qwen_code: "normal",
+    nvidia_nim: "normal",
+    ollama_cloud: "normal",
+    openrouter: "normal",
+  };
+
+  for (const account of providerAccounts) {
+    if (!isKnownProvider(account.provider)) {
+      continue;
+    }
+
+    const providerKey = PROVIDER_KEY_BY_PROVIDER_NAME[account.provider];
+    accountCounts[providerKey] += 1;
+
+    if (!account.isActive) {
+      continue;
+    }
+
+    const nextIndicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt);
+    if (INDICATOR_WEIGHT[nextIndicator] > INDICATOR_WEIGHT[accountIndicators[providerKey]]) {
+      accountIndicators[providerKey] = nextIndicator;
     }
   }
 
@@ -104,9 +151,17 @@ export default async function DashboardLayout({
 
   return (
     <div className="relative flex min-h-svh bg-background">
-      <Sidebar accountCounts={accountCounts} modelFamilyCounts={modelFamilyCounts} />
+      <Sidebar
+        accountCounts={accountCounts}
+        accountIndicators={accountIndicators}
+        modelFamilyCounts={modelFamilyCounts}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header accountCounts={accountCounts} modelFamilyCounts={modelFamilyCounts} />
+        <Header
+          accountCounts={accountCounts}
+          accountIndicators={accountIndicators}
+          modelFamilyCounts={modelFamilyCounts}
+        />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-7xl px-5 pb-8 pt-5 sm:px-6 lg:px-8">
             {children}

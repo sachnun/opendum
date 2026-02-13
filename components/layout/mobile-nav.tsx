@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import {
+  type ProviderAccountIndicator,
+  type ProviderAccountIndicators,
   type ModelFamilyCounts,
   type NavItem,
   type ProviderAccountCounts,
@@ -25,10 +27,23 @@ import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 
 interface MobileNavProps {
   accountCounts: ProviderAccountCounts;
+  accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
 }
 
-export function MobileNav({ accountCounts, modelFamilyCounts }: MobileNavProps) {
+function getAccountIndicatorClass(indicator: ProviderAccountIndicator): string {
+  if (indicator === "error") {
+    return "bg-red-500";
+  }
+
+  if (indicator === "warning") {
+    return "bg-yellow-500";
+  }
+
+  return "bg-primary";
+}
+
+export function MobileNav({ accountCounts, accountIndicators, modelFamilyCounts }: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
@@ -52,6 +67,18 @@ export function MobileNav({ accountCounts, modelFamilyCounts }: MobileNavProps) 
       "iflow-accounts": accountCounts.iflow,
       "gemini-cli-accounts": accountCounts.gemini_cli,
       "qwen-code-accounts": accountCounts.qwen_code,
+    };
+    const accountIndicatorByAnchorId: Record<string, ProviderAccountIndicator> = {
+      "antigravity-accounts": accountIndicators.antigravity,
+      "nvidia-nim-accounts": accountIndicators.nvidia_nim,
+      "ollama-cloud-accounts": accountIndicators.ollama_cloud,
+      "openrouter-accounts": accountIndicators.openrouter,
+      "codex-accounts": accountIndicators.codex,
+      "copilot-accounts": accountIndicators.copilot,
+      "kiro-accounts": accountIndicators.kiro,
+      "iflow-accounts": accountIndicators.iflow,
+      "gemini-cli-accounts": accountIndicators.gemini_cli,
+      "qwen-code-accounts": accountIndicators.qwen_code,
     };
     const countByAnchorId = isAccountsItem
       ? accountCountByAnchorId
@@ -108,6 +135,10 @@ export function MobileNav({ accountCounts, modelFamilyCounts }: MobileNavProps) 
                     countByAnchorId && subItem.anchorId
                       ? countByAnchorId[subItem.anchorId]
                       : undefined;
+                  const subItemIndicator =
+                    isAccountsItem && subItem.anchorId
+                      ? accountIndicatorByAnchorId[subItem.anchorId]
+                      : undefined;
                   const shouldShowSubItemCount =
                     typeof subItemCount === "number" && subItemCount > 0;
 
@@ -127,16 +158,29 @@ export function MobileNav({ accountCounts, modelFamilyCounts }: MobileNavProps) 
                       )}
                     >
                       <span className="truncate">{subItem.name}</span>
-                      {shouldShowSubItemCount ? (
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
-                            isSubActive
-                              ? "bg-background text-foreground"
-                              : "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {subItemCount}
+                      {isAccountsItem || shouldShowSubItemCount ? (
+                        <span className="flex items-center gap-2">
+                          {isAccountsItem && subItemIndicator ? (
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "h-2 w-2 shrink-0 rounded-full",
+                                getAccountIndicatorClass(subItemIndicator)
+                              )}
+                            />
+                          ) : null}
+                          {shouldShowSubItemCount ? (
+                            <span
+                              className={cn(
+                                "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                                isSubActive
+                                  ? "bg-background text-foreground"
+                                  : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {subItemCount}
+                            </span>
+                          ) : null}
                         </span>
                       ) : null}
                     </Link>
