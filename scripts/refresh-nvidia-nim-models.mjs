@@ -12,6 +12,7 @@ const MODEL_MAP_EXPORT_PATTERN =
 
 const MODEL_KEY_OVERRIDES = {
   "baichuan-inc/baichuan2-13b-chat": "baichuan2-13b-chat",
+  "nvidia/nvidia-nemotron-nano-9b-v2": "nemotron-nano-9b-v2",
   "qwen/qwen2.5-coder-32b-instruct": "qwen2.5-coder-32b",
   "qwen/qwen2.5-coder-7b-instruct": "qwen2.5-coder-7b",
 };

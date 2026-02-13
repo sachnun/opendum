@@ -89,8 +89,6 @@ const MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
     "deepseek-v3",
     "deepseek-r1",
     "deepseek-coder-6.7b-instruct",
-    "deepseek-ai-deepseek-r1",
-    "deepseek-ai-deepseek-r1-0528",
     "deepseek-v3.1-terminus",
     "deepseek-v3.1-671b",
   ],
