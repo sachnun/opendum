@@ -53,12 +53,13 @@ function getAccountIndicator(
 
   const errorTimeMs = lastErrorAt.getTime();
   const successTimeMs = lastSuccessAt?.getTime() ?? 0;
+  const hasRecoveredAfterError = Boolean(lastSuccessAt && successTimeMs > errorTimeMs);
 
-  if (!lastSuccessAt || successTimeMs <= errorTimeMs) {
+  if (!hasRecoveredAfterError) {
     return "error";
   }
 
-  if (nowMs - successTimeMs > WARNING_INDICATOR_STALE_WINDOW_MS) {
+  if (nowMs - errorTimeMs > WARNING_INDICATOR_STALE_WINDOW_MS) {
     return "normal";
   }
 
