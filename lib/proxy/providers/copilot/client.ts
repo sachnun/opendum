@@ -15,7 +15,8 @@ import {
   COPILOT_USER_ENDPOINT,
   COPILOT_SCOPE,
   COPILOT_SUPPORTED_PARAMS,
-  COPILOT_DEFAULT_HEADERS,
+  COPILOT_OPENCODE_USER_AGENT,
+  COPILOT_OPENCODE_INTENT,
   COPILOT_MODELS,
   COPILOT_MODEL_MAP,
   COPILOT_POLLING_INTERVAL,
@@ -86,17 +87,78 @@ function resolveCopilotModel(model: string): string {
   return COPILOT_MODEL_MAP[normalizedModel] ?? normalizedModel;
 }
 
+function hasVisionInResponsesInput(
+  input: Array<Record<string, unknown>> | undefined
+): boolean {
+  if (!Array.isArray(input)) {
+    return false;
+  }
+
+  return input.some((item) => {
+    const content = item.content;
+    if (!Array.isArray(content)) {
+      return false;
+    }
+
+    return content.some((part) => {
+      if (!part || typeof part !== "object") {
+        return false;
+      }
+
+      return (part as { type?: unknown }).type === "input_image";
+    });
+  });
+}
+
+function hasVisionInChatMessages(messages: ChatCompletionRequest["messages"]): boolean {
+  if (!Array.isArray(messages)) {
+    return false;
+  }
+
+  return messages.some((message) => {
+    const content = message.content;
+    if (!Array.isArray(content)) {
+      return false;
+    }
+
+    return content.some((part) => {
+      if (!part || typeof part !== "object") {
+        return false;
+      }
+
+      const type = (part as { type?: unknown }).type;
+      return type === "image_url" || type === "image";
+    });
+  });
+}
+
+function isCopilotVisionRequest(body: ChatCompletionRequest): boolean {
+  return (
+    hasVisionInResponsesInput(body._responsesInput) ||
+    hasVisionInChatMessages(body.messages)
+  );
+}
+
 function buildCopilotHeaders(
   accessToken: string,
   stream: boolean,
-  initiator: "user" | "agent"
+  initiator: "user" | "agent",
+  visionRequest: boolean
 ): Record<string, string> {
-  return {
-    ...COPILOT_DEFAULT_HEADERS,
+  const headers: Record<string, string> = {
+    "x-initiator": initiator,
+    "User-Agent": COPILOT_OPENCODE_USER_AGENT,
     Authorization: `Bearer ${accessToken}`,
-    "X-Initiator": initiator,
-    Accept: stream ? "text/event-stream" : COPILOT_DEFAULT_HEADERS.Accept,
+    "Openai-Intent": COPILOT_OPENCODE_INTENT,
+    "Content-Type": "application/json",
+    Accept: stream ? "text/event-stream" : "application/json",
   };
+
+  if (visionRequest) {
+    headers["Copilot-Vision-Request"] = "true";
+  }
+
+  return headers;
 }
 
 async function fetchCopilotIdentity(accessToken: string): Promise<string> {
@@ -292,6 +354,7 @@ export const copilotProvider: Provider = {
     const modelName = body.model.includes("/") ? body.model.split("/").pop()! : body.model;
     const upstreamModel = resolveCopilotModel(modelName);
     const xInitiator = body._copilotXInitiator === "agent" ? "agent" : "user";
+    const visionRequest = isCopilotVisionRequest(body);
 
     const requestPayload = buildRequestPayload(
       {
@@ -303,7 +366,7 @@ export const copilotProvider: Provider = {
 
     return fetch(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",
-      headers: buildCopilotHeaders(accessToken, stream, xInitiator),
+      headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
       body: JSON.stringify(requestPayload),
     });
   },

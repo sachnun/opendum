@@ -38,13 +38,9 @@ export const COPILOT_SUPPORTED_PARAMS = new Set([
   "reasoning_effort",
 ]);
 
-export const COPILOT_DEFAULT_HEADERS: Record<string, string> = {
-  "User-Agent": "opencode/1.1.53",
-  "Openai-Intent": "conversation-edits",
-  "X-Initiator": "user",
-  Accept: "application/json",
-  "Content-Type": "application/json",
-};
+// Keep Copilot request headers aligned with OpenCode plugin behavior.
+export const COPILOT_OPENCODE_USER_AGENT = "opencode/1.1.65";
+export const COPILOT_OPENCODE_INTENT = "conversation-edits";
 
 // Copilot models (synced from models.dev github-copilot)
 export const COPILOT_MODELS = new Set([
