@@ -38,6 +38,14 @@ export const COPILOT_SUPPORTED_PARAMS = new Set([
   "reasoning_effort",
 ]);
 
+export const COPILOT_DEFAULT_HEADERS: Record<string, string> = {
+  "User-Agent": "opencode/1.1.53",
+  "Openai-Intent": "conversation-edits",
+  "X-Initiator": "user",
+  Accept: "application/json",
+  "Content-Type": "application/json",
+};
+
 // Copilot models (synced from models.dev github-copilot)
 export const COPILOT_MODELS = new Set([
   "claude-haiku-4-5",
@@ -77,3 +85,6 @@ export const COPILOT_DEVICE_CODE_EXPIRY = 900;
 
 // Refresh buffer for expiring OAuth tokens
 export const COPILOT_REFRESH_BUFFER_SECONDS = 5 * 60;
+
+// Keep X-Initiator in agent mode for 5 hours per account
+export const COPILOT_X_INITIATOR_WINDOW_MS = 5 * 60 * 60 * 1000;

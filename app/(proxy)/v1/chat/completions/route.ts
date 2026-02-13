@@ -420,10 +420,30 @@ export async function POST(request: NextRequest) {
         const providerImpl = await getProvider(account.provider as ProviderNameType);
         const credentials = await providerImpl.getValidCredentials(account);
 
+        const requestBody = providerImpl.prepareRequest
+          ? providerImpl.prepareRequest(
+              account,
+              {
+                model,
+                messages,
+                stream,
+                _includeReasoning: reasoningRequested,
+                ...params,
+              },
+              "chat_completions"
+            )
+          : {
+              model,
+              messages,
+              stream,
+              _includeReasoning: reasoningRequested,
+              ...params,
+            };
+
         const providerResponse = await providerImpl.makeRequest(
           credentials,
           account,
-          { model, messages, stream, _includeReasoning: reasoningRequested, ...params },
+          requestBody,
           stream
         );
 

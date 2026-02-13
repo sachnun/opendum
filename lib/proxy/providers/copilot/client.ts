@@ -15,12 +15,18 @@ import {
   COPILOT_USER_ENDPOINT,
   COPILOT_SCOPE,
   COPILOT_SUPPORTED_PARAMS,
+  COPILOT_DEFAULT_HEADERS,
   COPILOT_MODELS,
   COPILOT_MODEL_MAP,
   COPILOT_POLLING_INTERVAL,
   COPILOT_DEVICE_CODE_EXPIRY,
   COPILOT_REFRESH_BUFFER_SECONDS,
 } from "./constants";
+import {
+  getCopilotSystemToolMode,
+  injectCopilotChatSystemTool,
+  injectCopilotResponsesSystemTool,
+} from "./injection";
 
 interface CopilotDeviceCodeResponse {
   device_code: string;
@@ -79,6 +85,19 @@ function resolveCopilotModel(model: string): string {
   return COPILOT_MODEL_MAP[normalizedModel] ?? normalizedModel;
 }
 
+function buildCopilotHeaders(
+  accessToken: string,
+  stream: boolean,
+  initiator: "user" | "agent"
+): Record<string, string> {
+  return {
+    ...COPILOT_DEFAULT_HEADERS,
+    Authorization: `Bearer ${accessToken}`,
+    "X-Initiator": initiator,
+    Accept: stream ? "text/event-stream" : COPILOT_DEFAULT_HEADERS.Accept,
+  };
+}
+
 async function fetchCopilotIdentity(accessToken: string): Promise<string> {
   try {
     const response = await fetch(COPILOT_USER_ENDPOINT, {
@@ -117,6 +136,33 @@ export const copilotConfig: ProviderConfig = {
 
 export const copilotProvider: Provider = {
   config: copilotConfig,
+
+  prepareRequest(account, body, endpoint) {
+    const mode = getCopilotSystemToolMode(account.id);
+
+    const preparedBody: ChatCompletionRequest = {
+      ...body,
+      _copilotXInitiator: mode.xInitiator,
+    };
+
+    if (!mode.injectSystemTool) {
+      return preparedBody;
+    }
+
+    if (endpoint === "responses" && Array.isArray(preparedBody._responsesInput)) {
+      preparedBody._responsesInput = injectCopilotResponsesSystemTool(
+        preparedBody._responsesInput as Array<Record<string, unknown>>
+      );
+    }
+
+    if (Array.isArray(preparedBody.messages)) {
+      preparedBody.messages = injectCopilotChatSystemTool(
+        preparedBody.messages as Array<Record<string, unknown>>
+      ) as ChatCompletionRequest["messages"];
+    }
+
+    return preparedBody;
+  },
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getAuthUrl(_state: string, _codeVerifier?: string): string {
@@ -233,6 +279,7 @@ export const copilotProvider: Provider = {
   ): Promise<Response> {
     const modelName = body.model.includes("/") ? body.model.split("/").pop()! : body.model;
     const upstreamModel = resolveCopilotModel(modelName);
+    const xInitiator = body._copilotXInitiator === "agent" ? "agent" : "user";
 
     const requestPayload = buildRequestPayload(
       {
@@ -244,15 +291,7 @@ export const copilotProvider: Provider = {
 
     return fetch(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        Accept: stream ? "text/event-stream" : "application/json",
-        "User-Agent": "GitHubCopilotChat/0.28.0",
-        "editor-version": "vscode/1.100.0",
-        "editor-plugin-version": "copilot-chat/0.28.0",
-        "openai-intent": "conversation-panel",
-      },
+      headers: buildCopilotHeaders(accessToken, stream, xInitiator),
       body: JSON.stringify(requestPayload),
     });
   },

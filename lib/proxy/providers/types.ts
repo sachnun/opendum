@@ -91,13 +91,31 @@ export interface ChatCompletionRequest {
   // Internal passthrough for Responses API input items
   // Used by providers that natively support the Responses API.
   _responsesInput?: Array<Record<string, unknown>>;
+
+  // Internal header hint for Copilot requests
+  _copilotXInitiator?: "user" | "agent";
 }
+
+export type ProxyEndpointType =
+  | "chat_completions"
+  | "messages"
+  | "responses";
 
 /**
  * Provider interface - all providers must implement this
  */
 export interface Provider {
   readonly config: ProviderConfig;
+
+  /**
+   * Optional request preparation hook.
+   * Allows provider-specific normalization/injection before upstream request.
+   */
+  prepareRequest?(
+    account: ProviderAccount,
+    body: ChatCompletionRequest,
+    endpoint: ProxyEndpointType
+  ): ChatCompletionRequest;
 
   /**
    * Generate OAuth authorization URL
