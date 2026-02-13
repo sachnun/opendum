@@ -16,7 +16,7 @@ export const COPILOT_API_BASE_URL = "https://api.githubcopilot.com";
 export const COPILOT_USER_ENDPOINT = "https://api.github.com/user";
 
 // OAuth scope
-export const COPILOT_SCOPE = "read:user";
+export const COPILOT_SCOPE = "read:user user";
 
 // Supported OpenAI-compatible parameters
 export const COPILOT_SUPPORTED_PARAMS = new Set([
