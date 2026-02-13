@@ -35,13 +35,13 @@ export function RefreshAccountsButton() {
       <Button
         type="button"
         variant="outline"
-        size="icon-lg"
+        size="icon"
         onClick={handleRefresh}
         disabled={isRefreshing}
-        className="fixed bottom-4 right-4 z-40 rounded-full bg-background shadow-lg md:hidden dark:bg-background"
+        className="md:hidden"
         aria-label="Refresh provider accounts"
       >
-        <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
+        <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
       </Button>
     </>
   );

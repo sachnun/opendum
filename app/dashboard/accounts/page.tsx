@@ -127,15 +127,15 @@ export default async function AccountsPage({
   return (
     <div className="space-y-6">
       <div className="relative">
-        <div className="md:fixed md:inset-x-0 md:top-16 md:z-20 md:left-60 md:bg-background md:pt-5">
-            <div className="mx-auto w-full max-w-7xl md:px-5 lg:px-8">
+        <div className="sticky top-16 z-20 bg-background md:fixed md:inset-x-0 md:top-16 md:left-60 md:pt-5">
+          <div className="mx-auto w-full max-w-7xl md:px-5 lg:px-8">
             <div className="bg-background">
               <div className="pb-4 border-b border-border">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-xl font-semibold">Provider Accounts</h2>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <RefreshAccountsButton />
-                    <AddAccountDialog triggerClassName="w-full sm:w-auto" />
+                    <AddAccountDialog triggerClassName="flex-1 sm:w-auto sm:flex-none" />
                   </div>
                 </div>
               </div>
