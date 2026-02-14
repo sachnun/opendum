@@ -579,66 +579,875 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // ===== Nvidia Models =====
   "baichuan2-13b-chat": {
     providers: [ProviderName.NVIDIA_NIM],
-    aliases: ["baichuan-inc-baichuan2-13b-chat", "baichuan-inc/baichuan2-13b-chat"],
+    aliases: [
+      "baichuan-inc-baichuan2-13b-chat",
+      "baichuan-inc/baichuan2-13b-chat",
+    ],
   },
   "nim-llama-3.1-70b-instruct": {
     providers: [ProviderName.NVIDIA_NIM],
-    aliases: ["meta/llama-3.1-70b-instruct"],
+    aliases: [
+      "meta/llama-3.1-70b-instruct",
+    ],
     meta: {
-      contextLength: 131072,
+      contextLength: 128000,
       outputLimit: 4096,
-      releaseDate: "2025-07-23",
-      reasoning: false,
-      toolCall: true,
-      vision: false,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
     },
   },
-  "deepseek-coder-6.7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai-deepseek-coder-6.7b-instruct", "deepseek-ai/deepseek-coder-6.7b-instruct"] },
-  "deepseek-v3.1-terminus": { providers: [ProviderName.NVIDIA_NIM], aliases: ["deepseek-ai-deepseek-v3.1-terminus", "deepseek-ai/deepseek-v3.1-terminus"] },
-  "codegemma-1.1-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-codegemma-1.1-7b", "google/codegemma-1.1-7b"] },
-  "codegemma-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-codegemma-7b", "google/codegemma-7b"] },
-  "gemma-2-27b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-2-27b-it", "google/gemma-2-27b-it"] },
-  "gemma-2-2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-2-2b-it", "google/gemma-2-2b-it"] },
-  "gemma-3-1b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-3-1b-it", "google/gemma-3-1b-it"] },
-  "gemma-3n-e2b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-3n-e2b-it", "google/gemma-3n-e2b-it"] },
-  "gemma-3n-e4b-it": { providers: [ProviderName.NVIDIA_NIM], aliases: ["google-gemma-3n-e4b-it", "google/gemma-3n-e4b-it"] },
-  "codellama-70b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-codellama-70b", "meta/codellama-70b"] },
-  "llama-3.1-405b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.1-405b-instruct", "meta/llama-3.1-405b-instruct"] },
-  "llama-3.2-11b-vision-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.2-11b-vision-instruct", "meta/llama-3.2-11b-vision-instruct"] },
-  "llama-3.2-1b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.2-1b-instruct", "meta/llama-3.2-1b-instruct"] },
-  "llama-3.3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-3.3-70b-instruct", "meta/llama-3.3-70b-instruct"] },
-  "llama-4-maverick-17b-128e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-4-maverick-17b-128e-instruct", "meta/llama-4-maverick-17b-128e-instruct"] },
-  "llama-4-scout-17b-16e-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama-4-scout-17b-16e-instruct", "meta/llama-4-scout-17b-16e-instruct"] },
-  "llama3-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama3-70b-instruct", "meta/llama3-70b-instruct"] },
-  "llama3-8b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["meta-llama3-8b-instruct", "meta/llama3-8b-instruct"] },
-  "phi-3-medium-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-3-medium-128k-instruct", "microsoft/phi-3-medium-128k-instruct"] },
-  "phi-3-medium-4k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-3-medium-4k-instruct", "microsoft/phi-3-medium-4k-instruct"] },
-  "phi-3-small-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-3-small-128k-instruct", "microsoft/phi-3-small-128k-instruct"] },
-  "phi-3-small-8k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-3-small-8k-instruct", "microsoft/phi-3-small-8k-instruct"] },
-  "phi-3-vision-128k-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-3-vision-128k-instruct", "microsoft/phi-3-vision-128k-instruct"] },
-  "phi-3.5-moe-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-3.5-moe-instruct", "microsoft/phi-3.5-moe-instruct"] },
-  "phi-3.5-vision-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-3.5-vision-instruct", "microsoft/phi-3.5-vision-instruct"] },
-  "phi-4-mini-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["microsoft-phi-4-mini-instruct", "microsoft/phi-4-mini-instruct"] },
-  "codestral-22b-instruct-v0.1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai-codestral-22b-instruct-v0.1", "mistralai/codestral-22b-instruct-v0.1"] },
-  "mamba-codestral-7b-v0.1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai-mamba-codestral-7b-v0.1", "mistralai/mamba-codestral-7b-v0.1"] },
-  "mistral-large-2-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai-mistral-large-2-instruct", "mistralai/mistral-large-2-instruct"] },
-  "mistral-small-3.1-24b-instruct-2503": { providers: [ProviderName.NVIDIA_NIM], aliases: ["mistralai-mistral-small-3.1-24b-instruct-2503", "mistralai/mistral-small-3.1-24b-instruct-2503"] },
-  "llama-3.1-nemotron-51b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-llama-3.1-nemotron-51b-instruct", "nvidia/llama-3.1-nemotron-51b-instruct"] },
-  "llama-3.1-nemotron-70b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-llama-3.1-nemotron-70b-instruct", "nvidia/llama-3.1-nemotron-70b-instruct"] },
-  "llama-3.1-nemotron-ultra-253b-v1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-llama-3.1-nemotron-ultra-253b-v1", "nvidia/llama-3.1-nemotron-ultra-253b-v1"] },
-  "llama-3.3-nemotron-super-49b-v1": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-llama-3.3-nemotron-super-49b-v1", "nvidia/llama-3.3-nemotron-super-49b-v1"] },
-  "llama-3.3-nemotron-super-49b-v1.5": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-llama-3.3-nemotron-super-49b-v1.5", "nvidia/llama-3.3-nemotron-super-49b-v1.5"] },
-  "llama3-chatqa-1.5-70b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-llama3-chatqa-1.5-70b", "nvidia/llama3-chatqa-1.5-70b"] },
-  "nemotron-4-340b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-nemotron-4-340b-instruct", "nvidia/nemotron-4-340b-instruct"] },
-  "nemotron-nano-9b-v2": { providers: [ProviderName.NVIDIA_NIM], aliases: ["nvidia-nvidia-nemotron-nano-9b-v2", "nvidia-nemotron-nano-9b-v2", "nvidia/nvidia-nemotron-nano-9b-v2"] },
-  "qwen2.5-coder-32b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2.5-coder-32b-instruct", "qwen/qwen2.5-coder-32b-instruct"] },
-  "qwen2.5-coder-7b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2.5-coder-7b-instruct", "qwen/qwen2.5-coder-7b-instruct"] },
-  "qwen2-7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2-7b-instruct", "qwen/qwen2-7b-instruct"] },
-  "qwen2.5-7b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen2.5-7b-instruct", "qwen/qwen2.5-7b-instruct"] },
-  "qwen3-235b-a22b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen3-235b-a22b", "qwen/qwen3-235b-a22b"] },
-  "qwen3-next-80b-a3b-instruct": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwen3-next-80b-a3b-instruct", "qwen/qwen3-next-80b-a3b-instruct"] },
-  "qwq-32b": { providers: [ProviderName.NVIDIA_NIM], aliases: ["qwen-qwq-32b", "qwen/qwq-32b"] },
-
+  "deepseek-coder-6.7b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "deepseek-ai-deepseek-coder-6.7b-instruct",
+      "deepseek-ai/deepseek-coder-6.7b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "deepseek-v3.1-terminus": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "deepseek-ai-deepseek-v3.1-terminus",
+      "deepseek-ai/deepseek-v3.1-terminus",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 8192,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "codegemma-1.1-7b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "google-codegemma-1.1-7b",
+      "google/codegemma-1.1-7b",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "codegemma-7b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "google-codegemma-7b",
+      "google/codegemma-7b",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "gemma-2-27b-it": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "google-gemma-2-27b-it",
+      "google/gemma-2-27b-it",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "gemma-2-2b-it": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "google-gemma-2-2b-it",
+      "google/gemma-2-2b-it",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "gemma-3-1b-it": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "google-gemma-3-1b-it",
+      "google/gemma-3-1b-it",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "gemma-3n-e2b-it": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "google-gemma-3n-e2b-it",
+      "google/gemma-3n-e2b-it",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "gemma-3n-e4b-it": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "google-gemma-3n-e4b-it",
+      "google/gemma-3n-e4b-it",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "codellama-70b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-codellama-70b",
+      "meta/codellama-70b",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.1-405b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama-3.1-405b-instruct",
+      "meta/llama-3.1-405b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.2-11b-vision-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama-3.2-11b-vision-instruct",
+      "meta/llama-3.2-11b-vision-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.2-1b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama-3.2-1b-instruct",
+      "meta/llama-3.2-1b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.3-70b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama-3.3-70b-instruct",
+      "meta/llama-3.3-70b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-4-maverick-17b-128e-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama-4-maverick-17b-128e-instruct",
+      "meta/llama-4-maverick-17b-128e-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-4-scout-17b-16e-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama-4-scout-17b-16e-instruct",
+      "meta/llama-4-scout-17b-16e-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama3-70b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama3-70b-instruct",
+      "meta/llama3-70b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama3-8b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "meta-llama3-8b-instruct",
+      "meta/llama3-8b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-3-medium-128k-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-3-medium-128k-instruct",
+      "microsoft/phi-3-medium-128k-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-3-medium-4k-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-3-medium-4k-instruct",
+      "microsoft/phi-3-medium-4k-instruct",
+    ],
+    meta: {
+      contextLength: 4000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-3-small-128k-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-3-small-128k-instruct",
+      "microsoft/phi-3-small-128k-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-3-small-8k-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-3-small-8k-instruct",
+      "microsoft/phi-3-small-8k-instruct",
+    ],
+    meta: {
+      contextLength: 8000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-3-vision-128k-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-3-vision-128k-instruct",
+      "microsoft/phi-3-vision-128k-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-3.5-moe-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-3.5-moe-instruct",
+      "microsoft/phi-3.5-moe-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-3.5-vision-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-3.5-vision-instruct",
+      "microsoft/phi-3.5-vision-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+          "image",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "phi-4-mini-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "microsoft-phi-4-mini-instruct",
+      "microsoft/phi-4-mini-instruct",
+    ],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 8192,
+      modalities: {
+        input: [
+          "text",
+          "image",
+          "audio",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "codestral-22b-instruct-v0.1": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "mistralai-codestral-22b-instruct-v0.1",
+      "mistralai/codestral-22b-instruct-v0.1",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "mamba-codestral-7b-v0.1": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "mistralai-mamba-codestral-7b-v0.1",
+      "mistralai/mamba-codestral-7b-v0.1",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "mistral-large-2-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "mistralai-mistral-large-2-instruct",
+      "mistralai/mistral-large-2-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "mistral-small-3.1-24b-instruct-2503": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "mistralai-mistral-small-3.1-24b-instruct-2503",
+      "mistralai/mistral-small-3.1-24b-instruct-2503",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.1-nemotron-51b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-llama-3.1-nemotron-51b-instruct",
+      "nvidia/llama-3.1-nemotron-51b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.1-nemotron-70b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-llama-3.1-nemotron-70b-instruct",
+      "nvidia/llama-3.1-nemotron-70b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.1-nemotron-ultra-253b-v1": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-llama-3.1-nemotron-ultra-253b-v1",
+      "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    ],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 8192,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.3-nemotron-super-49b-v1": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-llama-3.3-nemotron-super-49b-v1",
+      "nvidia/llama-3.3-nemotron-super-49b-v1",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama-3.3-nemotron-super-49b-v1.5": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-llama-3.3-nemotron-super-49b-v1.5",
+      "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "llama3-chatqa-1.5-70b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-llama3-chatqa-1.5-70b",
+      "nvidia/llama3-chatqa-1.5-70b",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "nemotron-4-340b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-nemotron-4-340b-instruct",
+      "nvidia/nemotron-4-340b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "nemotron-nano-9b-v2": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "nvidia-nvidia-nemotron-nano-9b-v2",
+      "nvidia-nemotron-nano-9b-v2",
+      "nvidia/nvidia-nemotron-nano-9b-v2",
+    ],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 131072,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "qwen2.5-coder-32b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "qwen-qwen2.5-coder-32b-instruct",
+      "qwen/qwen2.5-coder-32b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "qwen2.5-coder-7b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "qwen-qwen2.5-coder-7b-instruct",
+      "qwen/qwen2.5-coder-7b-instruct",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "qwen2-7b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "qwen-qwen2-7b-instruct",
+      "qwen/qwen2-7b-instruct",
+    ],
+  },
+  "qwen2.5-7b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "qwen-qwen2.5-7b-instruct",
+      "qwen/qwen2.5-7b-instruct",
+    ],
+  },
+  "qwen3-235b-a22b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "qwen-qwen3-235b-a22b",
+      "qwen/qwen3-235b-a22b",
+    ],
+    meta: {
+      contextLength: 131072,
+      outputLimit: 8192,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "qwen3-next-80b-a3b-instruct": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "qwen-qwen3-next-80b-a3b-instruct",
+      "qwen/qwen3-next-80b-a3b-instruct",
+    ],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 16384,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
+  "qwq-32b": {
+    providers: [ProviderName.NVIDIA_NIM],
+    aliases: [
+      "qwen-qwq-32b",
+      "qwen/qwq-32b",
+    ],
+    meta: {
+      contextLength: 128000,
+      outputLimit: 4096,
+      modalities: {
+        input: [
+          "text",
+        ],
+        output: [
+          "text",
+        ],
+      },
+    },
+  },
   // ===== Ollama Cloud Models =====
   "cogito-2.1-671b": {
     providers: [ProviderName.OLLAMA_CLOUD],
