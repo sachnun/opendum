@@ -27,6 +27,10 @@ export interface ModelMeta {
     input: number;             // $ per 1M tokens
     output: number;
   };
+  modalities?: {
+    input: string[];           // e.g. ["text", "image"]
+    output: string[];          // e.g. ["text"]
+  };
 }
 
 /**
