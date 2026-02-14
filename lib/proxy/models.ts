@@ -71,7 +71,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "glm-5": {
-    providers: [ProviderName.OLLAMA_CLOUD],
+    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 202752,
       releaseDate: "2026-02-11",
