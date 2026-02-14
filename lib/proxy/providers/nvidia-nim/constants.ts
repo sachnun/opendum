@@ -49,7 +49,7 @@ export const NVIDIA_NIM_MODEL_MAP: Record<string, string> = {
   "gemma3-12b": "google/gemma-3-12b-it",
   "gemma3-27b": "google/gemma-3-27b-it",
   "glm-4.7": "z-ai/glm4.7",
-  "glm5": "z-ai/glm5",
+  "glm-5": "z-ai/glm5",
   "gpt-oss-120b-medium": "openai/gpt-oss-120b",
   "gpt-oss-20b": "openai/gpt-oss-20b",
   "granite-3.0-3b-a800m-instruct": "ibm/granite-3.0-3b-a800m-instruct",
