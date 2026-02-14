@@ -1521,6 +1521,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
   "gemma3-4b": {
     providers: [ProviderName.OLLAMA_CLOUD],
+    aliases: ["gemma-3-4b-it"],
     meta: {
       contextLength: 131072,
       outputLimit: 131072,
@@ -1825,6 +1826,34 @@ for (const info of Object.values(MODEL_REGISTRY)) {
   }
 }
 
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function mergeModelInfo(existing: ModelInfo | undefined, incoming: ModelInfo): ModelInfo {
+  const providers = uniqueValues([...(existing?.providers ?? []), ...incoming.providers]);
+  const aliases = uniqueValues([...(existing?.aliases ?? []), ...(incoming.aliases ?? [])]);
+
+  return {
+    providers,
+    aliases: aliases.length > 0 ? aliases : undefined,
+    description: existing?.description ?? incoming.description,
+    meta: existing?.meta ?? incoming.meta,
+  };
+}
+
+function mergeModelRegistries(registries: Array<Record<string, ModelInfo>>): Record<string, ModelInfo> {
+  const merged: Record<string, ModelInfo> = {};
+
+  for (const registry of registries) {
+    for (const [model, info] of Object.entries(registry)) {
+      merged[model] = mergeModelInfo(merged[model], info);
+    }
+  }
+
+  return merged;
+}
+
 const NVIDIA_NIM_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
 for (const [model, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
   if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
@@ -1859,12 +1888,32 @@ for (const model of Object.keys(OPENROUTER_MODEL_MAP)) {
   };
 }
 
-const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = {
-  ...MODEL_REGISTRY,
-  ...NVIDIA_NIM_FALLBACK_REGISTRY,
-  ...OLLAMA_CLOUD_FALLBACK_REGISTRY,
-  ...OPENROUTER_FALLBACK_REGISTRY,
-};
+const PROVIDER_SUPPORT_INDEX = new Map<string, Set<string>>();
+
+function addProviderSupport(model: string, provider: string): void {
+  const providers = PROVIDER_SUPPORT_INDEX.get(model) ?? new Set<string>();
+  providers.add(provider);
+  PROVIDER_SUPPORT_INDEX.set(model, providers);
+}
+
+for (const model of Object.keys(NVIDIA_NIM_MODEL_MAP)) {
+  addProviderSupport(model, ProviderName.NVIDIA_NIM);
+}
+
+for (const model of Object.keys(OLLAMA_CLOUD_MODEL_MAP)) {
+  addProviderSupport(model, ProviderName.OLLAMA_CLOUD);
+}
+
+for (const model of Object.keys(OPENROUTER_MODEL_MAP)) {
+  addProviderSupport(model, ProviderName.OPENROUTER);
+}
+
+const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = mergeModelRegistries([
+  MODEL_REGISTRY,
+  NVIDIA_NIM_FALLBACK_REGISTRY,
+  OLLAMA_CLOUD_FALLBACK_REGISTRY,
+  OPENROUTER_FALLBACK_REGISTRY,
+]);
 
 // Build reverse lookup for aliases
 const aliasToCanonical: Record<string, string> = {};
@@ -1876,8 +1925,14 @@ for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
   }
 }
 
-for (const [canonical, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP)) {
-  if (!EFFECTIVE_MODEL_REGISTRY[canonical]) {
+function resolveKnownCanonical(model: string): string | null {
+  const canonical = aliasToCanonical[model] ?? model;
+  return EFFECTIVE_MODEL_REGISTRY[canonical] ? canonical : null;
+}
+
+for (const [modelKey, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP)) {
+  const canonical = resolveKnownCanonical(modelKey);
+  if (!canonical) {
     continue;
   }
 
@@ -1886,8 +1941,9 @@ for (const [canonical, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP))
   }
 }
 
-for (const [canonical, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
-  if (!EFFECTIVE_MODEL_REGISTRY[canonical]) {
+for (const [modelKey, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
+  const canonical = resolveKnownCanonical(modelKey);
+  if (!canonical) {
     continue;
   }
 
@@ -1897,8 +1953,9 @@ for (const [canonical, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
   aliasToCanonical[legacyAlias] = canonical;
 }
 
-for (const [canonical, upstreamModel] of Object.entries(OPENROUTER_MODEL_MAP)) {
-  if (!EFFECTIVE_MODEL_REGISTRY[canonical]) {
+for (const [modelKey, upstreamModel] of Object.entries(OPENROUTER_MODEL_MAP)) {
+  const canonical = resolveKnownCanonical(modelKey);
+  if (!canonical) {
     continue;
   }
 
@@ -1941,23 +1998,36 @@ export function getModelLookupKeys(model: string): string[] {
  */
 export function getProvidersForModel(model: string): string[] {
   const canonical = resolveModelAlias(model);
+  const lookupKeys = getModelLookupKeys(canonical);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
+  const providers = new Set<string>(info?.providers ?? []);
 
-  if (!info) {
+  for (const lookupKey of lookupKeys) {
+    const supportedProviders = PROVIDER_SUPPORT_INDEX.get(lookupKey);
+    if (!supportedProviders) {
+      continue;
+    }
+
+    for (const provider of supportedProviders) {
+      providers.add(provider);
+    }
+  }
+
+  if (providers.size === 0) {
     return [];
   }
 
-  return info.providers.filter((provider) => {
+  return [...providers].filter((provider) => {
     if (provider === ProviderName.OLLAMA_CLOUD) {
-      return OLLAMA_CLOUD_MODELS.has(canonical);
+      return lookupKeys.some((lookupKey) => OLLAMA_CLOUD_MODELS.has(lookupKey));
     }
 
     if (provider === ProviderName.NVIDIA_NIM) {
-      return NVIDIA_NIM_MODELS.has(canonical);
+      return lookupKeys.some((lookupKey) => NVIDIA_NIM_MODELS.has(lookupKey));
     }
 
     if (provider === ProviderName.OPENROUTER) {
-      return OPENROUTER_MODELS.has(canonical);
+      return lookupKeys.some((lookupKey) => OPENROUTER_MODELS.has(lookupKey));
     }
 
     return true;
