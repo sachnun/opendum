@@ -26,8 +26,6 @@ export const OPENROUTER_SUPPORTED_PARAMS = new Set([
 export const OPENROUTER_MODEL_MAP: Record<string, string> = {
   "aurora-alpha": "openrouter/aurora-alpha",
   "deepseek-r1-0528": "deepseek/deepseek-r1-0528:free",
-  "deepseek-r1t-chimera": "tngtech/deepseek-r1t-chimera:free",
-  "deepseek-r1t2-chimera": "tngtech/deepseek-r1t2-chimera:free",
   "dolphin-mistral-24b-venice-edition": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
   "gemma-3-12b-it": "google/gemma-3-12b-it:free",
   "gemma-3-27b-it": "google/gemma-3-27b-it:free",
@@ -47,6 +45,7 @@ export const OPENROUTER_MODEL_MAP: Record<string, string> = {
   "nemotron-nano-12b-v2-vl": "nvidia/nemotron-nano-12b-v2-vl:free",
   "nemotron-nano-9b-v2": "nvidia/nemotron-nano-9b-v2:free",
   "openrouter-free": "openrouter/free",
+  "qwen3-235b-a22b-thinking-2507": "qwen/qwen3-235b-a22b-thinking-2507",
   "qwen3-4b": "qwen/qwen3-4b:free",
   "qwen3-coder": "qwen/qwen3-coder:free",
   "qwen3-next-80b-a3b-instruct": "qwen/qwen3-next-80b-a3b-instruct:free",
@@ -54,7 +53,6 @@ export const OPENROUTER_MODEL_MAP: Record<string, string> = {
   "qwen3-vl-30b-a3b-thinking": "qwen/qwen3-vl-30b-a3b-thinking",
   "solar-pro-3": "upstage/solar-pro-3:free",
   "step-3.5-flash": "stepfun/step-3.5-flash:free",
-  "tng-r1t-chimera": "tngtech/tng-r1t-chimera:free",
   "trinity-large-preview": "arcee-ai/trinity-large-preview:free",
   "trinity-mini": "arcee-ai/trinity-mini:free",
 };
