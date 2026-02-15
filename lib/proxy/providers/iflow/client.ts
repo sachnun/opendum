@@ -27,9 +27,12 @@ import type { ReasoningConfig } from "../types";
 
 interface TokenResponse {
   access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  token_type: string;
+  refresh_token?: string;
+  expires_in?: number | string;
+  expiresIn?: number | string;
+  expires_at?: string | number;
+  expiresAt?: string | number;
+  token_type?: string;
   scope?: string;
 }
 
@@ -56,6 +59,77 @@ function createBasicAuth(): string {
 function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = IFLOW_REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
+}
+
+const IFLOW_DEFAULT_EXPIRES_IN_SECONDS = 5 * 24 * 60 * 60;
+
+function toPositiveNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseExpiryDate(value: unknown): Date | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    const timestampMs = value > 1_000_000_000_000 ? value : value * 1000;
+    const parsed = new Date(timestampMs);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const numericValue = toPositiveNumber(trimmed);
+    if (numericValue) {
+      const timestampMs =
+        numericValue > 1_000_000_000_000 ? numericValue : numericValue * 1000;
+      const parsed = new Date(timestampMs);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    const parsedTimestamp = Date.parse(trimmed);
+    if (Number.isFinite(parsedTimestamp)) {
+      return new Date(parsedTimestamp);
+    }
+  }
+
+  return null;
+}
+
+function resolveTokenExpiry(tokens: TokenResponse): Date {
+  const expiresInSeconds =
+    toPositiveNumber(tokens.expires_in) ?? toPositiveNumber(tokens.expiresIn);
+
+  if (expiresInSeconds) {
+    return new Date(Date.now() + expiresInSeconds * 1000);
+  }
+
+  const parsedExpiryDate =
+    parseExpiryDate(tokens.expires_at) ??
+    parseExpiryDate(tokens.expiresAt) ??
+    parseExpiryDate(tokens.expires_in) ??
+    parseExpiryDate(tokens.expiresIn);
+
+  if (parsedExpiryDate) {
+    return parsedExpiryDate;
+  }
+
+  console.warn(
+    "Iflow token response missing valid expiry; defaulting to 5 days"
+  );
+  return new Date(Date.now() + IFLOW_DEFAULT_EXPIRES_IN_SECONDS * 1000);
 }
 
 /**
@@ -242,14 +316,20 @@ export const iflowProvider: Provider = {
     }
 
     const tokens: TokenResponse = await response.json();
+    const accessToken = tokens.access_token?.trim();
+    const nextRefreshToken = tokens.refresh_token?.trim();
+
+    if (!accessToken || !nextRefreshToken) {
+      throw new Error("Token exchange response missing access or refresh token");
+    }
 
     // Fetch user info to get API key
-    const userInfo = await fetchUserInfo(tokens.access_token);
+    const userInfo = await fetchUserInfo(accessToken);
 
     return {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+      accessToken,
+      refreshToken: nextRefreshToken,
+      expiresAt: resolveTokenExpiry(tokens),
       email: userInfo.email,
       apiKey: userInfo.apiKey,
     };
@@ -286,11 +366,18 @@ export const iflowProvider: Provider = {
       tokens = (tokens as unknown as { data: TokenResponse }).data;
     }
 
+    const accessToken = tokens.access_token?.trim();
+    if (!accessToken) {
+      throw new Error("Token refresh response missing access token");
+    }
+
+    const nextRefreshToken = tokens.refresh_token?.trim() || refreshToken;
+
     // Fetch new API key (may have changed).
     // Do not fail token refresh if user-info endpoint is temporarily unavailable.
     let userInfo: { apiKey: string; email: string } | null = null;
     try {
-      userInfo = await fetchUserInfo(tokens.access_token);
+      userInfo = await fetchUserInfo(accessToken);
     } catch (error) {
       console.warn(
         "Iflow token refresh succeeded but failed to refresh user info:",
@@ -299,9 +386,9 @@ export const iflowProvider: Provider = {
     }
 
     return {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token || refreshToken,
-      expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+      accessToken,
+      refreshToken: nextRefreshToken,
+      expiresAt: resolveTokenExpiry(tokens),
       email: userInfo?.email || "",
       apiKey: userInfo?.apiKey,
     };
