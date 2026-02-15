@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "models:refresh": "node scripts/refresh-model-maps.mjs"
+    "models:refresh": "bun scripts/refresh-model-maps.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
