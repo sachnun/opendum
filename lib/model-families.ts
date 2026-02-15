@@ -100,6 +100,7 @@ const MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
     "kimi-k2-1t",
   ],
   MiniMax: [
+    "minimax-m2.5",
     "minimax-m2.1",
     "minimax-m2",
   ],

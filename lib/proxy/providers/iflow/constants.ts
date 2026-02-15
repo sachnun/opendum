@@ -38,9 +38,11 @@ export const IFLOW_SUPPORTED_PARAMS = new Set([
 // Available Iflow models
 export const IFLOW_MODELS = new Set([
   "glm-4.7",
+  "glm-5",
   "glm-4.6",
   "glm-4.5",
   "iflow-rome-30ba3b",
+  "minimax-m2.5",
   "minimax-m2.1",
   "minimax-m2",
   "qwen3-coder-plus",

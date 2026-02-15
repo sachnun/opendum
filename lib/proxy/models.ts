@@ -71,7 +71,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "glm-5": {
-    providers: [ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
       contextLength: 202752,
       releaseDate: "2026-02-11",
@@ -110,6 +110,9 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   "iflow-rome-30ba3b": { providers: [ProviderName.IFLOW] },
 
   // ===== MiniMax Models =====
+  "minimax-m2.5": {
+    providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD],
+  },
   "minimax-m2.1": {
     providers: [ProviderName.IFLOW, ProviderName.OLLAMA_CLOUD, ProviderName.NVIDIA_NIM],
     meta: {
