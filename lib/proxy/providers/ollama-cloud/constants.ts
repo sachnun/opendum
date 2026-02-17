@@ -52,6 +52,7 @@ export const OLLAMA_CLOUD_MODEL_MAP: Record<string, string> = {
   "qwen3-next-80b": "qwen3-next:80b",
   "qwen3-vl-235b": "qwen3-vl:235b",
   "qwen3-vl-235b-instruct": "qwen3-vl:235b-instruct",
+  "qwen3.5-397b": "qwen3.5:397b",
   "rnj-1-8b": "rnj-1:8b",
 };
 
