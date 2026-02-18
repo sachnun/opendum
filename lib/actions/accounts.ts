@@ -1,7 +1,9 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq, and, count as countFn, asc } from "drizzle-orm";
 import { encrypt, decrypt, hashString } from "@/lib/encryption";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -236,25 +238,16 @@ async function connectApiKeyProviderAccount(
   const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
 
-  const existingAccount = await prisma.providerAccount.findFirst({
-    where: {
-      userId,
-      provider,
-      email: identifier,
-    },
-  });
+  const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
 
   if (existingAccount) {
-    await prisma.providerAccount.update({
-      where: { id: existingAccount.id },
-      data: {
-        accessToken: encrypt(normalizedApiKey),
-        refreshToken: encrypt(normalizedApiKey),
-        expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
-        ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
-        isActive: true,
-      },
-    });
+    await db.update(providerAccount).set({
+      accessToken: encrypt(normalizedApiKey),
+      refreshToken: encrypt(normalizedApiKey),
+      expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+      ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
+      isActive: true,
+    }).where(eq(providerAccount.id, existingAccount.id));
 
     revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/accounts");
@@ -269,21 +262,18 @@ async function connectApiKeyProviderAccount(
     };
   }
 
-  const accountCount = await prisma.providerAccount.count({
-    where: { userId, provider },
-  });
+  const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
+  const accountCount = countResult.value;
 
-  await prisma.providerAccount.create({
-    data: {
-      userId,
-      provider,
-      name: normalizedAccountName || `${providerLabel} ${accountCount + 1}`,
-      accessToken: encrypt(normalizedApiKey),
-      refreshToken: encrypt(normalizedApiKey),
-      expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
-      email: identifier,
-      isActive: true,
-    },
+  await db.insert(providerAccount).values({
+    userId,
+    provider,
+    name: normalizedAccountName || `${providerLabel} ${accountCount + 1}`,
+    accessToken: encrypt(normalizedApiKey),
+    refreshToken: encrypt(normalizedApiKey),
+    expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+    email: identifier,
+    isActive: true,
   });
 
   revalidatePath("/dashboard", "layout");
@@ -303,7 +293,7 @@ async function connectApiKeyProviderAccount(
  * Delete a provider account
  */
 export async function deleteProviderAccount(id: string): Promise<ActionResult> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -311,15 +301,13 @@ export async function deleteProviderAccount(id: string): Promise<ActionResult> {
 
   try {
     // Verify ownership
-    const account = await prisma.providerAccount.findFirst({
-      where: { id, userId: session.user.id },
-    });
+    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, id), eq(providerAccount.userId, session.user.id))).limit(1);
 
     if (!account) {
       return { success: false, error: "Account not found" };
     }
 
-    await prisma.providerAccount.delete({ where: { id } });
+    await db.delete(providerAccount).where(eq(providerAccount.id, id));
 
     revalidatePath("/dashboard/accounts");
 
@@ -337,7 +325,7 @@ export async function updateProviderAccount(
   id: string, 
   data: { name?: string; isActive?: boolean }
 ): Promise<ActionResult> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -345,21 +333,16 @@ export async function updateProviderAccount(
 
   try {
     // Verify ownership
-    const account = await prisma.providerAccount.findFirst({
-      where: { id, userId: session.user.id },
-    });
+    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, id), eq(providerAccount.userId, session.user.id))).limit(1);
 
     if (!account) {
       return { success: false, error: "Account not found" };
     }
 
-    await prisma.providerAccount.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.isActive !== undefined && { isActive: data.isActive }),
-      },
-    });
+    await db.update(providerAccount).set({
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.isActive !== undefined && { isActive: data.isActive }),
+    }).where(eq(providerAccount.id, id));
 
     revalidatePath("/dashboard/accounts");
 
@@ -377,7 +360,7 @@ export async function connectNvidiaNimApiKey(
   apiKey: string,
   accountName?: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -404,7 +387,7 @@ export async function connectOllamaCloudApiKey(
   apiKey: string,
   accountName?: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -431,7 +414,7 @@ export async function connectOpenRouterApiKey(
   apiKey: string,
   accountName?: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -457,7 +440,7 @@ export async function connectOpenRouterApiKey(
 export async function exchangeIflowOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -494,26 +477,17 @@ export async function exchangeIflowOAuthCode(
     const oauthResult = await iflowProvider.exchangeCode(code, IFLOW_REDIRECT_URI);
 
     // Check if account with this email already exists for this user
-    const existingAccount = await prisma.providerAccount.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "iflow",
-        email: oauthResult.email,
-      },
-    });
+    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "iflow"), eq(providerAccount.email, oauthResult.email))).limit(1);
 
     if (existingAccount) {
       // Update existing account
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
-          expiresAt: oauthResult.expiresAt,
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
+        expiresAt: oauthResult.expiresAt,
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -526,22 +500,19 @@ export async function exchangeIflowOAuthCode(
       };
     } else {
       // Create new account
-      const accountCount = await prisma.providerAccount.count({
-        where: { userId: session.user.id, provider: "iflow" },
-      });
+      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "iflow")));
+      const accountCount = countResult.value;
 
-      await prisma.providerAccount.create({
-        data: {
-          userId: session.user.id,
-          provider: "iflow",
-          name: `Iflow ${accountCount + 1}`,
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
-          expiresAt: oauthResult.expiresAt,
-          email: oauthResult.email,
-          isActive: true,
-        },
+      await db.insert(providerAccount).values({
+        userId: session.user.id,
+        provider: "iflow",
+        name: `Iflow ${accountCount + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
+        expiresAt: oauthResult.expiresAt,
+        email: oauthResult.email,
+        isActive: true,
       });
 
       revalidatePath("/dashboard/accounts");
@@ -575,27 +546,23 @@ export async function getAccountsByProvider(): Promise<
     tier: string | null;
   }>>>
 > {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
   }
 
   try {
-    const accounts = await prisma.providerAccount.findMany({
-      where: { userId: session.user.id },
-      select: {
-        id: true,
-        provider: true,
-        name: true,
-        email: true,
-        isActive: true,
-        lastUsedAt: true,
-        requestCount: true,
-        tier: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const accounts = await db.select({
+      id: providerAccount.id,
+      provider: providerAccount.provider,
+      name: providerAccount.name,
+      email: providerAccount.email,
+      isActive: providerAccount.isActive,
+      lastUsedAt: providerAccount.lastUsedAt,
+      requestCount: providerAccount.requestCount,
+      tier: providerAccount.tier,
+    }).from(providerAccount).where(eq(providerAccount.userId, session.user.id)).orderBy(asc(providerAccount.createdAt));
 
     const grouped: Record<string, typeof accounts> = {};
     for (const account of accounts) {
@@ -620,7 +587,7 @@ export const updateIflowAccount = updateProviderAccount;
  * Get Iflow OAuth authorization URL
  */
 export async function getIflowAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -642,7 +609,7 @@ export async function getIflowAuthUrl(): Promise<ActionResult<{ authUrl: string 
  * Get Antigravity (Google) OAuth authorization URL
  */
 export async function getAntigravityAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -668,7 +635,7 @@ export async function getAntigravityAuthUrl(): Promise<ActionResult<{ authUrl: s
 export async function exchangeAntigravityOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -708,27 +675,18 @@ export async function exchangeAntigravityOAuthCode(
     );
 
     // Check if account with this email already exists for this user
-    const existingAccount = await prisma.providerAccount.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "antigravity",
-        email: oauthResult.email,
-      },
-    });
+    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "antigravity"), eq(providerAccount.email, oauthResult.email))).limit(1);
 
     if (existingAccount) {
       // Update existing account
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          projectId: oauthResult.projectId,
-          tier: oauthResult.tier,
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        projectId: oauthResult.projectId,
+        tier: oauthResult.tier,
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -741,23 +699,20 @@ export async function exchangeAntigravityOAuthCode(
       };
     } else {
       // Create new account
-      const accountCount = await prisma.providerAccount.count({
-        where: { userId: session.user.id, provider: "antigravity" },
-      });
+      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "antigravity")));
+      const accountCount = countResult.value;
 
-      await prisma.providerAccount.create({
-        data: {
-          userId: session.user.id,
-          provider: "antigravity",
-          name: `Antigravity ${accountCount + 1}`,
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          email: oauthResult.email,
-          projectId: oauthResult.projectId,
-          tier: oauthResult.tier,
-          isActive: true,
-        },
+      await db.insert(providerAccount).values({
+        userId: session.user.id,
+        provider: "antigravity",
+        name: `Antigravity ${accountCount + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        email: oauthResult.email,
+        projectId: oauthResult.projectId,
+        tier: oauthResult.tier,
+        isActive: true,
       });
 
       revalidatePath("/dashboard/accounts");
@@ -792,7 +747,7 @@ export async function initiateQwenCodeAuth(): Promise<
     codeVerifier: string;
   }>
 > {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -826,7 +781,7 @@ export async function pollQwenCodeAuth(
     | { status: "error"; message: string }
   >
 > {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -851,25 +806,16 @@ export async function pollQwenCodeAuth(
     const email = oauthResult.email || `qwen-${Date.now()}`;
 
     // Check if account with this email already exists for this user
-    const existingAccount = await prisma.providerAccount.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "qwen_code",
-        email: email,
-      },
-    });
+    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "qwen_code"), eq(providerAccount.email, email))).limit(1);
 
     if (existingAccount) {
       // Update existing account
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -883,21 +829,18 @@ export async function pollQwenCodeAuth(
       };
     } else {
       // Create new account
-      const accountCount = await prisma.providerAccount.count({
-        where: { userId: session.user.id, provider: "qwen_code" },
-      });
+      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "qwen_code")));
+      const accountCount = countResult.value;
 
-      await prisma.providerAccount.create({
-        data: {
-          userId: session.user.id,
-          provider: "qwen_code",
-          name: `Qwen Code ${accountCount + 1}`,
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          email: email,
-          isActive: true,
-        },
+      await db.insert(providerAccount).values({
+        userId: session.user.id,
+        provider: "qwen_code",
+        name: `Qwen Code ${accountCount + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        email: email,
+        isActive: true,
       });
 
       revalidatePath("/dashboard/accounts");
@@ -926,7 +869,7 @@ export async function setQwenCodeAccountEmail(
   accountId: string,
   email: string
 ): Promise<ActionResult> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -934,21 +877,16 @@ export async function setQwenCodeAccountEmail(
 
   try {
     // Verify ownership
-    const account = await prisma.providerAccount.findFirst({
-      where: { id: accountId, userId: session.user.id, provider: "qwen_code" },
-    });
+    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, accountId), eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "qwen_code"))).limit(1);
 
     if (!account) {
       return { success: false, error: "Account not found" };
     }
 
-    await prisma.providerAccount.update({
-      where: { id: accountId },
-      data: {
-        email: email.trim(),
-        name: `Qwen Code (${email.trim()})`,
-      },
-    });
+    await db.update(providerAccount).set({
+      email: email.trim(),
+      name: `Qwen Code (${email.trim()})`,
+    }).where(eq(providerAccount.id, accountId));
 
     revalidatePath("/dashboard/accounts");
 
@@ -972,7 +910,7 @@ export async function initiateCopilotAuth(): Promise<
     interval: number;
   }>
 > {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1004,7 +942,7 @@ export async function pollCopilotAuth(
     | { status: "error"; message: string }
   >
 > {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1024,24 +962,15 @@ export async function pollCopilotAuth(
     const oauthResult = result;
     const email = oauthResult.email || `copilot-${Date.now()}`;
 
-    const existingAccount = await prisma.providerAccount.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "copilot",
-        email,
-      },
-    });
+    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "copilot"), eq(providerAccount.email, email))).limit(1);
 
     if (existingAccount) {
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -1055,21 +984,18 @@ export async function pollCopilotAuth(
       };
     }
 
-    const accountCount = await prisma.providerAccount.count({
-      where: { userId: session.user.id, provider: "copilot" },
-    });
+    const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "copilot")));
+    const accountCount = countResult.value;
 
-    await prisma.providerAccount.create({
-      data: {
-        userId: session.user.id,
-        provider: "copilot",
-        name: `Copilot ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        email,
-        isActive: true,
-      },
+    await db.insert(providerAccount).values({
+      userId: session.user.id,
+      provider: "copilot",
+      name: `Copilot ${accountCount + 1}`,
+      accessToken: encrypt(oauthResult.accessToken),
+      refreshToken: encrypt(oauthResult.refreshToken),
+      expiresAt: oauthResult.expiresAt,
+      email,
+      isActive: true,
     });
 
     revalidatePath("/dashboard/accounts");
@@ -1093,7 +1019,7 @@ export async function pollCopilotAuth(
  * Get Gemini CLI (Google) OAuth authorization URL
  */
 export async function getGeminiCliAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1119,7 +1045,7 @@ export async function getGeminiCliAuthUrl(): Promise<ActionResult<{ authUrl: str
 export async function exchangeGeminiCliOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1159,27 +1085,18 @@ export async function exchangeGeminiCliOAuthCode(
     );
 
     // Check if account with this email already exists for this user
-    const existingAccount = await prisma.providerAccount.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "gemini_cli",
-        email: oauthResult.email,
-      },
-    });
+    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "gemini_cli"), eq(providerAccount.email, oauthResult.email))).limit(1);
 
     if (existingAccount) {
       // Update existing account
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          projectId: oauthResult.projectId,
-          tier: oauthResult.tier,
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        projectId: oauthResult.projectId,
+        tier: oauthResult.tier,
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -1192,23 +1109,20 @@ export async function exchangeGeminiCliOAuthCode(
       };
     } else {
       // Create new account
-      const accountCount = await prisma.providerAccount.count({
-        where: { userId: session.user.id, provider: "gemini_cli" },
-      });
+      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "gemini_cli")));
+      const accountCount = countResult.value;
 
-      await prisma.providerAccount.create({
-        data: {
-          userId: session.user.id,
-          provider: "gemini_cli",
-          name: `Gemini CLI ${accountCount + 1}`,
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          email: oauthResult.email,
-          projectId: oauthResult.projectId,
-          tier: oauthResult.tier,
-          isActive: true,
-        },
+      await db.insert(providerAccount).values({
+        userId: session.user.id,
+        provider: "gemini_cli",
+        name: `Gemini CLI ${accountCount + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        email: oauthResult.email,
+        projectId: oauthResult.projectId,
+        tier: oauthResult.tier,
+        isActive: true,
       });
 
       revalidatePath("/dashboard/accounts");
@@ -1232,7 +1146,7 @@ export async function exchangeGeminiCliOAuthCode(
  * Get Codex OAuth authorization URL (browser flow)
  */
 export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1282,7 +1196,7 @@ export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string 
 export async function exchangeCodexOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1358,36 +1272,23 @@ export async function exchangeCodexOAuthCode(
     let existingAccount = null;
 
     if (workspaceEmail) {
-      existingAccount = await prisma.providerAccount.findFirst({
-        where: {
-          userId: session.user.id,
-          provider: "codex",
-          email: workspaceEmail,
-        },
-      });
+      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.email, workspaceEmail))).limit(1);
+      existingAccount = found || null;
     }
 
     if (!existingAccount && chatgptAccountId && (!workspaceAccountId || workspaceAccountId === chatgptAccountId)) {
-      existingAccount = await prisma.providerAccount.findFirst({
-        where: {
-          userId: session.user.id,
-          provider: "codex",
-          accountId: chatgptAccountId,
-        },
-      });
+      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.accountId, chatgptAccountId))).limit(1);
+      existingAccount = found || null;
     }
 
     if (existingAccount) {
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          ...(chatgptAccountId && { accountId: chatgptAccountId }),
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        ...(chatgptAccountId && { accountId: chatgptAccountId }),
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -1400,24 +1301,21 @@ export async function exchangeCodexOAuthCode(
       };
     }
 
-    const accountCount = await prisma.providerAccount.count({
-      where: { userId: session.user.id, provider: "codex" },
-    });
+    const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex")));
+    const accountCount = countResult.value;
 
     const email = workspaceEmail || `codex-${Date.now()}`;
 
-    await prisma.providerAccount.create({
-      data: {
-        userId: session.user.id,
-        provider: "codex",
-        name: `Codex ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        email,
-        accountId: chatgptAccountId,
-        isActive: true,
-      },
+    await db.insert(providerAccount).values({
+      userId: session.user.id,
+      provider: "codex",
+      name: `Codex ${accountCount + 1}`,
+      accessToken: encrypt(oauthResult.accessToken),
+      refreshToken: encrypt(oauthResult.refreshToken),
+      expiresAt: oauthResult.expiresAt,
+      email,
+      accountId: chatgptAccountId,
+      isActive: true,
     });
 
     revalidatePath("/dashboard/accounts");
@@ -1442,7 +1340,7 @@ export async function exchangeCodexOAuthCode(
  * Get Kiro OAuth authorization URL (browser flow)
  */
 export async function getKiroAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1477,7 +1375,7 @@ export async function getKiroAuthUrl(): Promise<ActionResult<{ authUrl: string }
 export async function exchangeKiroOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1553,36 +1451,27 @@ export async function exchangeKiroOAuthCode(
     const accountId = oauthResult.accountId || null;
     const email = accountId ? `kiro-${accountId}` : `kiro-${Date.now()}`;
 
-    let existingAccount = await prisma.providerAccount.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "kiro",
-        email,
-      },
-    });
+    let existingAccount = null;
+
+    {
+      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "kiro"), eq(providerAccount.email, email))).limit(1);
+      existingAccount = found || null;
+    }
 
     if (!existingAccount && accountId) {
-      existingAccount = await prisma.providerAccount.findFirst({
-        where: {
-          userId: session.user.id,
-          provider: "kiro",
-          accountId,
-        },
-      });
+      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "kiro"), eq(providerAccount.accountId, accountId))).limit(1);
+      existingAccount = found || null;
     }
 
     if (existingAccount) {
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          ...(accountId ? { accountId } : {}),
-          ...(oauthResult.email ? { email: oauthResult.email } : {}),
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        ...(accountId ? { accountId } : {}),
+        ...(oauthResult.email ? { email: oauthResult.email } : {}),
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -1595,22 +1484,19 @@ export async function exchangeKiroOAuthCode(
       };
     }
 
-    const accountCount = await prisma.providerAccount.count({
-      where: { userId: session.user.id, provider: "kiro" },
-    });
+    const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "kiro")));
+    const accountCount = countResult.value;
 
-    await prisma.providerAccount.create({
-      data: {
-        userId: session.user.id,
-        provider: "kiro",
-        name: `Kiro ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        email,
-        accountId,
-        isActive: true,
-      },
+    await db.insert(providerAccount).values({
+      userId: session.user.id,
+      provider: "kiro",
+      name: `Kiro ${accountCount + 1}`,
+      accessToken: encrypt(oauthResult.accessToken),
+      refreshToken: encrypt(oauthResult.refreshToken),
+      expiresAt: oauthResult.expiresAt,
+      email,
+      accountId,
+      isActive: true,
     });
 
     revalidatePath("/dashboard/accounts");
@@ -1644,7 +1530,7 @@ export async function initiateCodexAuth(): Promise<
     interval: number;
   }>
 > {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1693,7 +1579,7 @@ export async function pollCodexAuth(
     | { status: "error"; message: string }
   >
 > {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1737,37 +1623,24 @@ export async function pollCodexAuth(
     let existingAccount = null;
 
     if (workspaceEmail) {
-      existingAccount = await prisma.providerAccount.findFirst({
-        where: {
-          userId: session.user.id,
-          provider: "codex",
-          email: workspaceEmail,
-        },
-      });
+      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.email, workspaceEmail))).limit(1);
+      existingAccount = found || null;
     }
 
     if (!existingAccount && chatgptAccountId && (!workspaceAccountId || workspaceAccountId === chatgptAccountId)) {
-      existingAccount = await prisma.providerAccount.findFirst({
-        where: {
-          userId: session.user.id,
-          provider: "codex",
-          accountId: chatgptAccountId,
-        },
-      });
+      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.accountId, chatgptAccountId))).limit(1);
+      existingAccount = found || null;
     }
 
     if (existingAccount) {
       // Update existing account with fresh tokens
-      await prisma.providerAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          ...(chatgptAccountId && { accountId: chatgptAccountId }),
-          isActive: true,
-        },
-      });
+      await db.update(providerAccount).set({
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        ...(chatgptAccountId && { accountId: chatgptAccountId }),
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
 
       revalidatePath("/dashboard/accounts");
 
@@ -1781,24 +1654,21 @@ export async function pollCodexAuth(
       };
     } else {
       // Create new account
-      const accountCount = await prisma.providerAccount.count({
-        where: { userId: session.user.id, provider: "codex" },
-      });
+      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex")));
+      const accountCount = countResult.value;
 
       const email = workspaceEmail || `codex-${Date.now()}`;
 
-      await prisma.providerAccount.create({
-        data: {
-          userId: session.user.id,
-          provider: "codex",
-          name: `Codex ${accountCount + 1}`,
-          accessToken: encrypt(oauthResult.accessToken),
-          refreshToken: encrypt(oauthResult.refreshToken),
-          expiresAt: oauthResult.expiresAt,
-          email,
-          accountId: chatgptAccountId,
-          isActive: true,
-        },
+      await db.insert(providerAccount).values({
+        userId: session.user.id,
+        provider: "codex",
+        name: `Codex ${accountCount + 1}`,
+        accessToken: encrypt(oauthResult.accessToken),
+        refreshToken: encrypt(oauthResult.refreshToken),
+        expiresAt: oauthResult.expiresAt,
+        email,
+        accountId: chatgptAccountId,
+        isActive: true,
       });
 
       revalidatePath("/dashboard/accounts");
@@ -1827,7 +1697,7 @@ export async function setCodexAccountEmail(
   accountId: string,
   email: string
 ): Promise<ActionResult> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -1835,21 +1705,16 @@ export async function setCodexAccountEmail(
 
   try {
     // Verify ownership
-    const account = await prisma.providerAccount.findFirst({
-      where: { id: accountId, userId: session.user.id, provider: "codex" },
-    });
+    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, accountId), eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"))).limit(1);
 
     if (!account) {
       return { success: false, error: "Account not found" };
     }
 
-    await prisma.providerAccount.update({
-      where: { id: accountId },
-      data: {
-        email: email.trim(),
-        name: `Codex (${email.trim()})`,
-      },
-    });
+    await db.update(providerAccount).set({
+      email: email.trim(),
+      name: `Codex (${email.trim()})`,
+    }).where(eq(providerAccount.id, accountId));
 
     revalidatePath("/dashboard/accounts");
 

@@ -1,9 +1,11 @@
 // Qwen Code Provider Implementation
 // Uses Device Code Flow for OAuth (similar to TV/device authentication)
 
-import type { ProviderAccount } from "@prisma/client";
+import type { ProviderAccount } from "@/lib/db/schema";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
@@ -291,14 +293,14 @@ export const qwenCodeProvider: Provider = {
 
         // Update database IMMEDIATELY (rotating token concern)
         // Qwen uses rotating refresh tokens - must save new token before it's invalidated
-        await prisma.providerAccount.update({
-          where: { id: account.id },
-          data: {
+        await db
+          .update(providerAccount)
+          .set({
             accessToken: encrypt(newTokens.accessToken),
             refreshToken: encrypt(newTokens.refreshToken),
             expiresAt: newTokens.expiresAt,
-          },
-        });
+          })
+          .where(eq(providerAccount.id, account.id));
 
         accessToken = newTokens.accessToken;
       } catch (error) {

@@ -1,8 +1,10 @@
 "use server";
 
-import type { ProviderAccount } from "@prisma/client";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import type { ProviderAccount } from "@/lib/db/schema";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import {
   geminiCliProvider,
@@ -139,7 +141,7 @@ function snapshotToGroups(
 export async function getGeminiCliQuota(
   options: QuotaRequestOptions = {}
 ): Promise<GeminiCliQuotaActionResult> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
   }
@@ -153,25 +155,27 @@ export async function getGeminiCliQuota(
   }
 
   try {
-    const accounts = await prisma.providerAccount.findMany({
-      where: {
-        userId: session.user.id,
-        provider: "gemini_cli",
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        projectId: true,
-        tier: true,
-        isActive: true,
-        accessToken: true,
-        refreshToken: true,
-        expiresAt: true,
-        lastUsedAt: true,
-      },
-      orderBy: { lastUsedAt: "desc" },
-    });
+    const accounts = await db
+      .select({
+        id: providerAccount.id,
+        name: providerAccount.name,
+        email: providerAccount.email,
+        projectId: providerAccount.projectId,
+        tier: providerAccount.tier,
+        isActive: providerAccount.isActive,
+        accessToken: providerAccount.accessToken,
+        refreshToken: providerAccount.refreshToken,
+        expiresAt: providerAccount.expiresAt,
+        lastUsedAt: providerAccount.lastUsedAt,
+      })
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.userId, session.user.id),
+          eq(providerAccount.provider, "gemini_cli")
+        )
+      )
+      .orderBy(desc(providerAccount.lastUsedAt));
 
     if (accounts.length === 0) {
       const emptyResult: GeminiCliQuotaActionResult = {
@@ -222,10 +226,14 @@ export async function getGeminiCliQuota(
         continue;
       }
 
-      const refreshedMeta = await prisma.providerAccount.findUnique({
-        where: { id: account.id },
-        select: { projectId: true, tier: true },
-      });
+      const [refreshedMeta] = await db
+        .select({
+          projectId: providerAccount.projectId,
+          tier: providerAccount.tier,
+        })
+        .from(providerAccount)
+        .where(eq(providerAccount.id, account.id))
+        .limit(1);
 
       let projectId = refreshedMeta?.projectId ?? account.projectId;
       let tier = refreshedMeta?.tier ?? account.tier ?? "free-tier";
@@ -241,14 +249,14 @@ export async function getGeminiCliQuota(
             tier = accountInfo.tier || tier;
             projectDiscoveryError = undefined;
 
-            await prisma.providerAccount.update({
-              where: { id: account.id },
-              data: {
+            await db
+              .update(providerAccount)
+              .set({
                 projectId: accountInfo.projectId,
                 tier,
                 email: accountInfo.email || account.email,
-              },
-            });
+              })
+              .where(eq(providerAccount.id, account.id));
           }
         } catch {
         }

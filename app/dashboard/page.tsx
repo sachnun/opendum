@@ -1,5 +1,7 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { proxyApiKey } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { AnalyticsCharts } from "@/components/dashboard/analytics/analytics-charts";
 import { getAnalyticsData } from "@/lib/actions/analytics";
 
@@ -8,21 +10,21 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ apiKey?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return null;
   }
 
-  const apiKeys = await prisma.proxyApiKey.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      keyPreview: true,
-    },
-  });
+  const apiKeys = await db
+    .select({
+      id: proxyApiKey.id,
+      name: proxyApiKey.name,
+      keyPreview: proxyApiKey.keyPreview,
+    })
+    .from(proxyApiKey)
+    .where(eq(proxyApiKey.userId, session.user.id))
+    .orderBy(desc(proxyApiKey.createdAt));
 
   const params = await searchParams;
   const requestedApiKeyId = params.apiKey;

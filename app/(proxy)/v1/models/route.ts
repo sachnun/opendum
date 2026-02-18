@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getDisabledModelSetForUser, validateApiKey } from "@/lib/proxy/auth";
 import { formatModelsForOpenAI, resolveModelAlias } from "@/lib/proxy/models";
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       (authResult.modelAccessList ?? []).map((model) => resolveModelAlias(model))
     );
   } else {
-    const session = await auth();
+    const session = await getSession();
     userId = session?.user?.id ?? null;
   }
 

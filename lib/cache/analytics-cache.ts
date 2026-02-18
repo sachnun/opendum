@@ -31,9 +31,6 @@ export function buildAnalyticsCacheKey(params: AnalyticsCacheKeyParams): string 
 
 export async function getAnalyticsCacheVersion(userId: string): Promise<number> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return 0;
-  }
 
   try {
     const rawVersion = await redis.get(getVersionKey(userId));
@@ -50,15 +47,15 @@ export async function getAnalyticsCacheVersion(userId: string): Promise<number> 
 
 export async function bumpAnalyticsCacheVersionThrottled(userId: string): Promise<void> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
 
   try {
-    const shouldBump = await redis.set(getVersionBumpKey(userId), "1", {
-      NX: true,
-      EX: ANALYTICS_VERSION_BUMP_THROTTLE_SECONDS,
-    });
+    const shouldBump = await redis.set(
+      getVersionBumpKey(userId),
+      "1",
+      "EX",
+      ANALYTICS_VERSION_BUMP_THROTTLE_SECONDS,
+      "NX"
+    );
 
     if (shouldBump !== "OK") {
       return;

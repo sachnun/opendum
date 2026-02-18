@@ -1,5 +1,7 @@
-import { prisma } from "@/lib/db";
-import type { ProviderAccount } from "@prisma/client";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq, and, inArray, notInArray, asc, sql } from "drizzle-orm";
+import type { ProviderAccount } from "@/lib/db/schema";
 import { getProvidersForModel } from "./models";
 import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit";
 
@@ -33,30 +35,34 @@ export async function getNextAccount(
   }
 
   // Get the least recently used active account (nulls first = never used accounts get priority)
-  const selectedAccount = await prisma.providerAccount.findFirst({
-    where: {
-      userId,
-      provider: { in: targetProviders },
-      isActive: true,
-    },
-    orderBy: [
-      { lastUsedAt: { sort: "asc", nulls: "first" } },
-      { createdAt: "asc" }, // Tiebreaker: older accounts first
-    ],
-  });
+  const [selectedAccount] = await db
+    .select()
+    .from(providerAccount)
+    .where(
+      and(
+        eq(providerAccount.userId, userId),
+        inArray(providerAccount.provider, targetProviders),
+        eq(providerAccount.isActive, true)
+      )
+    )
+    .orderBy(
+      sql`${providerAccount.lastUsedAt} ASC NULLS FIRST`,
+      asc(providerAccount.createdAt)
+    )
+    .limit(1);
 
   if (!selectedAccount) {
     return null;
   }
 
   // Update last used timestamp
-  await prisma.providerAccount.update({
-    where: { id: selectedAccount.id },
-    data: {
+  await db
+    .update(providerAccount)
+    .set({
       lastUsedAt: new Date(),
-      requestCount: { increment: 1 },
-    },
-  });
+      requestCount: sql`${providerAccount.requestCount} + 1`,
+    })
+    .where(eq(providerAccount.id, selectedAccount.id));
 
   return selectedAccount;
 }
@@ -90,19 +96,25 @@ export async function getNextAvailableAccount(
 
   // Get all active accounts.
   // Ordered by: status (active -> degraded -> failed), then LRU.
-  const accounts = await prisma.providerAccount.findMany({
-    where: {
-      userId,
-      provider: { in: targetProviders },
-      isActive: true,
-      id: { notIn: excludeAccountIds.length > 0 ? excludeAccountIds : undefined },
-    },
-    orderBy: [
-      { status: "asc" }, // "active" comes before "degraded" alphabetically
-      { lastUsedAt: { sort: "asc", nulls: "first" } },
-      { createdAt: "asc" }, // Tiebreaker: older accounts first
-    ],
-  });
+  const whereConditions = [
+    eq(providerAccount.userId, userId),
+    inArray(providerAccount.provider, targetProviders),
+    eq(providerAccount.isActive, true),
+  ];
+
+  if (excludeAccountIds.length > 0) {
+    whereConditions.push(notInArray(providerAccount.id, excludeAccountIds));
+  }
+
+  const accounts = await db
+    .select()
+    .from(providerAccount)
+    .where(and(...whereConditions))
+    .orderBy(
+      asc(providerAccount.status),
+      sql`${providerAccount.lastUsedAt} ASC NULLS FIRST`,
+      asc(providerAccount.createdAt)
+    );
 
   if (accounts.length === 0) {
     return null;
@@ -142,13 +154,13 @@ export async function getNextAvailableAccount(
   }
 
   // Update last used timestamp
-  await prisma.providerAccount.update({
-    where: { id: selectedAccount.id },
-    data: {
+  await db
+    .update(providerAccount)
+    .set({
       lastUsedAt: new Date(),
-      requestCount: { increment: 1 },
-    },
-  });
+      requestCount: sql`${providerAccount.requestCount} + 1`,
+    })
+    .where(eq(providerAccount.id, selectedAccount.id));
 
   return selectedAccount;
 }
@@ -163,34 +175,37 @@ export async function getNextAccountForProvider(
   provider: string
 ): Promise<ProviderAccount | null> {
   // Get the least recently used active account for this provider
-  const selectedAccount = await prisma.providerAccount.findFirst({
-    where: {
-      userId,
-      provider,
-      isActive: true,
-    },
-    orderBy: [
-      { lastUsedAt: { sort: "asc", nulls: "first" } },
-      { createdAt: "asc" }, // Tiebreaker: older accounts first
-    ],
-  });
+  const [selectedAccount] = await db
+    .select()
+    .from(providerAccount)
+    .where(
+      and(
+        eq(providerAccount.userId, userId),
+        eq(providerAccount.provider, provider),
+        eq(providerAccount.isActive, true)
+      )
+    )
+    .orderBy(
+      sql`${providerAccount.lastUsedAt} ASC NULLS FIRST`,
+      asc(providerAccount.createdAt)
+    )
+    .limit(1);
 
   if (!selectedAccount) {
     return null;
   }
 
   // Update last used timestamp
-  await prisma.providerAccount.update({
-    where: { id: selectedAccount.id },
-    data: {
+  await db
+    .update(providerAccount)
+    .set({
       lastUsedAt: new Date(),
-      requestCount: { increment: 1 },
-    },
-  });
+      requestCount: sql`${providerAccount.requestCount} + 1`,
+    })
+    .where(eq(providerAccount.id, selectedAccount.id));
 
   return selectedAccount;
 }
-
 /**
  * Mark an account as having failed with error details
  * Auto-degrades status based on consecutive error count:
@@ -203,16 +218,17 @@ export async function markAccountFailed(
   errorMessage: string
 ): Promise<void> {
   // Update error tracking fields
-  const account = await prisma.providerAccount.update({
-    where: { id: accountId },
-    data: {
-      errorCount: { increment: 1 },
-      consecutiveErrors: { increment: 1 },
+  const [account] = await db
+    .update(providerAccount)
+    .set({
+      errorCount: sql`${providerAccount.errorCount} + 1`,
+      consecutiveErrors: sql`${providerAccount.consecutiveErrors} + 1`,
       lastErrorAt: new Date(),
       lastErrorMessage: errorMessage.slice(0, MAX_STORED_ERROR_MESSAGE_LENGTH),
       lastErrorCode: errorCode,
-    },
-  });
+    })
+    .where(eq(providerAccount.id, accountId))
+    .returning();
 
   // Auto-degradation based on consecutive errors
   const newConsecutiveErrors = account.consecutiveErrors;
@@ -228,14 +244,14 @@ export async function markAccountFailed(
   }
 
   if (newStatus) {
-    await prisma.providerAccount.update({
-      where: { id: accountId },
-      data: {
+    await db
+      .update(providerAccount)
+      .set({
         status: newStatus,
         statusReason,
         statusChangedAt: new Date(),
-      },
-    });
+      })
+      .where(eq(providerAccount.id, accountId));
   }
 }
 
@@ -244,16 +260,20 @@ export async function markAccountFailed(
  * Resets consecutive errors and restores status to "active" if it was degraded/failed
  */
 export async function markAccountSuccess(accountId: string): Promise<void> {
-  const account = await prisma.providerAccount.findUnique({
-    where: { id: accountId },
-    select: { status: true, consecutiveErrors: true },
-  });
+  const [account] = await db
+    .select({
+      status: providerAccount.status,
+      consecutiveErrors: providerAccount.consecutiveErrors,
+    })
+    .from(providerAccount)
+    .where(eq(providerAccount.id, accountId))
+    .limit(1);
 
   if (!account) return;
 
   const updates: Record<string, unknown> = {
     consecutiveErrors: 0,
-    successCount: { increment: 1 },
+    successCount: sql`${providerAccount.successCount} + 1`,
     lastSuccessAt: new Date(),
   };
 
@@ -264,10 +284,10 @@ export async function markAccountSuccess(accountId: string): Promise<void> {
     updates.statusChangedAt = new Date();
   }
 
-  await prisma.providerAccount.update({
-    where: { id: accountId },
-    data: updates,
-  });
+  await db
+    .update(providerAccount)
+    .set(updates)
+    .where(eq(providerAccount.id, accountId));
 }
 
 /**
@@ -282,14 +302,14 @@ export async function getAccountStats(userId: string): Promise<{
     { total: number; active: number; requests: number }
   >;
 }> {
-  const accounts = await prisma.providerAccount.findMany({
-    where: { userId },
-    select: {
-      provider: true,
-      isActive: true,
-      requestCount: true,
-    },
-  });
+  const accounts = await db
+    .select({
+      provider: providerAccount.provider,
+      isActive: providerAccount.isActive,
+      requestCount: providerAccount.requestCount,
+    })
+    .from(providerAccount)
+    .where(eq(providerAccount.userId, userId));
 
   const byProvider: Record<
     string,
@@ -321,10 +341,11 @@ export async function getAccountStats(userId: string): Promise<{
 export async function getAccountsByProvider(
   userId: string
 ): Promise<Record<string, ProviderAccount[]>> {
-  const accounts = await prisma.providerAccount.findMany({
-    where: { userId },
-    orderBy: { createdAt: "asc" },
-  });
+  const accounts = await db
+    .select()
+    .from(providerAccount)
+    .where(eq(providerAccount.userId, userId))
+    .orderBy(asc(providerAccount.createdAt));
 
   const grouped: Record<string, ProviderAccount[]> = {};
 

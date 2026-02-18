@@ -1,88 +1,75 @@
-import NextAuth from "next-auth";
-import GitHub from "next-auth/providers/github";
-import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/db";
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
+import { headers } from "next/headers";
+import { db, schema } from "@/lib/db";
 
-const isDevelopment = process.env.NODE_ENV === "development";
 const githubClientId = process.env.GITHUB_CLIENT_ID;
 const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-const providers = [
-  ...(githubClientId && githubClientSecret
-    ? [
-        GitHub({
-          clientId: githubClientId,
-          clientSecret: githubClientSecret,
-          allowDangerousEmailAccountLinking: true,
-        }),
-      ]
-    : []),
-  ...(googleClientId && googleClientSecret
-    ? [
-        Google({
-          clientId: googleClientId,
-          clientSecret: googleClientSecret,
-          allowDangerousEmailAccountLinking: true,
-        }),
-      ]
-    : []),
-  ...(isDevelopment
-    ? [
-        Credentials({
-          name: "Local Development",
-          credentials: {},
-          async authorize() {
-            const email = "dev@localhost";
-            const user = await prisma.user.upsert({
-              where: { email },
-              update: {
-                name: "Local Dev",
-                emailVerified: new Date(),
-              },
-              create: {
-                email,
-                name: "Local Dev",
-                emailVerified: new Date(),
-              },
-            });
-
-            return {
-              id: user.id,
-              email: user.email ?? email,
-              name: user.name,
-              image: user.image,
-            };
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      ...schema,
+    },
+  }),
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: process.env.BETTER_AUTH_URL,
+  emailAndPassword: {
+    enabled: process.env.NODE_ENV === "development",
+  },
+  socialProviders: {
+    ...(githubClientId && githubClientSecret
+      ? {
+          github: {
+            clientId: githubClientId,
+            clientSecret: githubClientSecret,
           },
-        }),
-      ]
-    : []),
-];
-
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  providers,
-  session: {
-    strategy: "jwt",
+        }
+      : {}),
+    ...(googleClientId && googleClientSecret
+      ? {
+          google: {
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+          },
+        }
+      : {}),
   },
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string;
-      }
-      return session;
-    },
-  },
+  plugins: [nextCookies()],
   pages: {
     signIn: "/",
   },
 });
+
+/**
+ * Get the current session in server components and server actions.
+ * Replaces the previous `auth()` pattern from NextAuth.
+ */
+export async function getSession() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  return session;
+}
+
+/**
+ * Sign in with a social provider from a server action.
+ * Returns a redirect URL for the OAuth flow.
+ */
+export async function signInSocial(
+  provider: "github" | "google",
+  redirectTo: string,
+) {
+  const response = await auth.api.signInSocial({
+    body: {
+      provider,
+      callbackURL: redirectTo,
+    },
+    headers: await headers(),
+  });
+  return response;
+}

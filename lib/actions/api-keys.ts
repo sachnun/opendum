@@ -1,7 +1,9 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { proxyApiKey } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { generateApiKey, hashString, getKeyPreview, encrypt, decrypt } from "@/lib/encryption";
 import { invalidateApiKeyValidationCache } from "@/lib/proxy/auth";
 import { isModelSupported, resolveModelAlias } from "@/lib/proxy/models";
@@ -34,7 +36,7 @@ export async function createApiKey(
   name?: string,
   expiresAt?: Date | null
 ): Promise<ActionResult<{ id: string; key: string; keyPreview: string; name: string | null; expiresAt: Date | null }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -50,16 +52,14 @@ export async function createApiKey(
     const trimmedName = name?.trim() || null;
 
     // Create in database
-    const apiKey = await prisma.proxyApiKey.create({
-      data: {
-        userId: session.user.id,
-        keyHash,
-        keyPreview,
-        encryptedKey,
-        name: trimmedName ?? undefined,
-        expiresAt: expiresAt ?? undefined,
-      },
-    });
+    const [apiKey] = await db.insert(proxyApiKey).values({
+      userId: session.user.id,
+      keyHash,
+      keyPreview,
+      encryptedKey,
+      name: trimmedName,
+      expiresAt: expiresAt ?? null,
+    }).returning();
 
     revalidatePath("/dashboard/api-keys");
 
@@ -83,7 +83,7 @@ export async function createApiKey(
  * Toggle API key active status (enable/disable)
  */
 export async function toggleApiKey(id: string): Promise<ActionResult> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -91,19 +91,14 @@ export async function toggleApiKey(id: string): Promise<ActionResult> {
 
   try {
     // Find and verify ownership
-    const apiKey = await prisma.proxyApiKey.findFirst({
-      where: { id, userId: session.user.id },
-    });
+    const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };
     }
 
     // Toggle isActive
-    await prisma.proxyApiKey.update({
-      where: { id },
-      data: { isActive: !apiKey.isActive },
-    });
+    await db.update(proxyApiKey).set({ isActive: !apiKey.isActive }).where(eq(proxyApiKey.id, id));
 
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
 
@@ -120,7 +115,7 @@ export async function toggleApiKey(id: string): Promise<ActionResult> {
  * Delete an API key permanently
  */
 export async function deleteApiKey(id: string): Promise<ActionResult> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -128,18 +123,14 @@ export async function deleteApiKey(id: string): Promise<ActionResult> {
 
   try {
     // Find and verify ownership
-    const apiKey = await prisma.proxyApiKey.findFirst({
-      where: { id, userId: session.user.id },
-    });
+    const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };
     }
 
     // Delete permanently
-    await prisma.proxyApiKey.delete({
-      where: { id },
-    });
+    await db.delete(proxyApiKey).where(eq(proxyApiKey.id, id));
 
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
 
@@ -156,7 +147,7 @@ export async function deleteApiKey(id: string): Promise<ActionResult> {
  * Update API key name
  */
 export async function updateApiKeyName(id: string, name: string): Promise<ActionResult<{ name: string | null }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -164,9 +155,7 @@ export async function updateApiKeyName(id: string, name: string): Promise<Action
 
   try {
     // Find and verify ownership
-    const apiKey = await prisma.proxyApiKey.findFirst({
-      where: { id, userId: session.user.id },
-    });
+    const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };
@@ -175,10 +164,7 @@ export async function updateApiKeyName(id: string, name: string): Promise<Action
     const trimmedName = name?.trim() || null;
 
     // Update the name
-    const updatedKey = await prisma.proxyApiKey.update({
-      where: { id },
-      data: { name: trimmedName },
-    });
+    const [updatedKey] = await db.update(proxyApiKey).set({ name: trimmedName }).where(eq(proxyApiKey.id, id)).returning({ name: proxyApiKey.name });
 
     revalidatePath("/dashboard/api-keys");
 
@@ -197,7 +183,7 @@ export async function updateApiKeyModelAccess(
   mode: ApiKeyModelAccessMode,
   models: string[]
 ): Promise<ActionResult<{ mode: ApiKeyModelAccessMode; models: string[] }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -208,10 +194,7 @@ export async function updateApiKeyModelAccess(
   }
 
   try {
-    const apiKey = await prisma.proxyApiKey.findFirst({
-      where: { id, userId: session.user.id },
-      select: { id: true, keyHash: true },
-    });
+    const [apiKey] = await db.select({ id: proxyApiKey.id, keyHash: proxyApiKey.keyHash }).from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };
@@ -231,16 +214,12 @@ export async function updateApiKeyModelAccess(
       };
     }
 
-    const updated = await prisma.proxyApiKey.update({
-      where: { id },
-      data: {
-        modelAccessMode: mode,
-        modelAccessList: normalizedModels,
-      },
-      select: {
-        modelAccessMode: true,
-        modelAccessList: true,
-      },
+    const [updated] = await db.update(proxyApiKey).set({
+      modelAccessMode: mode,
+      modelAccessList: normalizedModels,
+    }).where(eq(proxyApiKey.id, id)).returning({
+      modelAccessMode: proxyApiKey.modelAccessMode,
+      modelAccessList: proxyApiKey.modelAccessList,
     });
 
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
@@ -267,7 +246,7 @@ export async function updateApiKeyModelAccess(
  * Reveal the full API key
  */
 export async function revealApiKey(id: string): Promise<ActionResult<{ key: string }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -275,14 +254,11 @@ export async function revealApiKey(id: string): Promise<ActionResult<{ key: stri
 
   try {
     // Find API key and verify ownership
-    const apiKey = await prisma.proxyApiKey.findFirst({
-      where: { id, userId: session.user.id },
-      select: {
-        id: true,
-        encryptedKey: true,
-        isActive: true,
-      },
-    });
+    const [apiKey] = await db.select({
+      id: proxyApiKey.id,
+      encryptedKey: proxyApiKey.encryptedKey,
+      isActive: proxyApiKey.isActive,
+    }).from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };

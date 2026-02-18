@@ -1,6 +1,8 @@
-import type { ProviderAccount } from "@prisma/client";
+import type { ProviderAccount } from "@/lib/db/schema";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import type {
   ChatCompletionRequest,
   OAuthResult,
@@ -519,16 +521,16 @@ export const kiroProvider: Provider = {
     }
 
     const refreshed = await this.refreshToken(refreshTokenValue);
-    await prisma.providerAccount.update({
-      where: { id: account.id },
-      data: {
+    await db
+      .update(providerAccount)
+      .set({
         accessToken: encrypt(refreshed.accessToken),
         refreshToken: encrypt(refreshed.refreshToken),
         expiresAt: refreshed.expiresAt,
         ...(refreshed.accountId ? { accountId: refreshed.accountId } : {}),
         ...(refreshed.email ? { email: refreshed.email } : {}),
-      },
-    });
+      })
+      .where(eq(providerAccount.id, account.id));
 
     accessToken = refreshed.accessToken;
     return accessToken;

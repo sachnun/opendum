@@ -1,9 +1,10 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { proxyApiKey, disabledModel, usageLog } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { hashString } from "@/lib/encryption";
 import { bumpAnalyticsCacheVersionThrottled } from "@/lib/cache/analytics-cache";
 import { getRedisClient } from "@/lib/redis";
 import {
-  getModelLookupKeys,
   isModelSupported,
   isModelSupportedByProvider,
   getAllModelsWithAliases,
@@ -102,30 +103,24 @@ function getDisabledModelsCacheKey(userId: string): string {
 async function touchApiKeyLastUsed(apiKeyId: string): Promise<void> {
   const redis = await getRedisClient();
 
-  if (redis) {
-    try {
-      const shouldTouch = await redis.set(
-        getApiKeyLastUsedThrottleKey(apiKeyId),
-        "1",
-        {
-          NX: true,
-          EX: API_KEY_LAST_USED_THROTTLE_SECONDS,
-        }
-      );
+  try {
+    const shouldTouch = await redis.set(
+      getApiKeyLastUsedThrottleKey(apiKeyId),
+      "1",
+      "EX",
+      API_KEY_LAST_USED_THROTTLE_SECONDS,
+      "NX"
+    );
 
-      if (shouldTouch !== "OK") {
-        return;
-      }
-    } catch {
-      // Fall through to direct DB update
+    if (shouldTouch !== "OK") {
+      return;
     }
+  } catch {
+    // Fall through to direct DB update
   }
 
   try {
-    await prisma.proxyApiKey.update({
-      where: { id: apiKeyId },
-      data: { lastUsedAt: new Date() },
-    });
+    await db.update(proxyApiKey).set({ lastUsedAt: new Date() }).where(eq(proxyApiKey.id, apiKeyId));
   } catch {
     // Best effort update only
   }
@@ -135,9 +130,6 @@ async function getCachedApiKeyValidation(
   keyHash: string
 ): Promise<ApiKeyValidationCacheValue | null> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return null;
-  }
 
   try {
     const rawValue = await redis.get(getApiKeyValidationCacheKey(keyHash));
@@ -184,39 +176,31 @@ async function setCachedApiKeyValidation(
   ttlSeconds: number
 ): Promise<void> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
 
   try {
-    await redis.set(getApiKeyValidationCacheKey(keyHash), JSON.stringify(value), {
-      EX: Math.max(1, Math.floor(ttlSeconds)),
-    });
+    await redis.set(getApiKeyValidationCacheKey(keyHash), JSON.stringify(value), "EX", Math.max(1, Math.floor(ttlSeconds)));
   } catch {
     // Ignore cache write errors
   }
 }
 
 async function getDisabledModelsFromDatabase(userId: string): Promise<string[]> {
-  const disabledModels = await prisma.disabledModel.findMany({
-    where: { userId },
-    select: { model: true },
-  });
+  const disabledModels = await db
+    .select({ model: disabledModel.model })
+    .from(disabledModel)
+    .where(eq(disabledModel.userId, userId));
 
   return Array.from(
     new Set(
       disabledModels
-        .map((entry) => resolveModelAlias(entry.model))
-        .filter((model) => model.length > 0)
+        .map((entry: { model: string }) => resolveModelAlias(entry.model))
+        .filter((model: string) => model.length > 0)
     )
-  ).sort((a, b) => a.localeCompare(b));
+  ).sort((a: string, b: string) => a.localeCompare(b));
 }
 
 async function getCachedDisabledModels(userId: string): Promise<string[] | null> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return null;
-  }
 
   try {
     const rawValue = await redis.get(getDisabledModelsCacheKey(userId));
@@ -236,17 +220,13 @@ async function getCachedDisabledModels(userId: string): Promise<string[] | null>
 
 async function setCachedDisabledModels(userId: string, models: string[]): Promise<void> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
 
   try {
     await redis.set(
       getDisabledModelsCacheKey(userId),
       JSON.stringify({ models: normalizeApiKeyModelList(models) }),
-      {
-        EX: DISABLED_MODELS_CACHE_TTL_SECONDS,
-      }
+      "EX",
+      DISABLED_MODELS_CACHE_TTL_SECONDS
     );
   } catch {
     // Ignore cache write errors
@@ -254,19 +234,6 @@ async function setCachedDisabledModels(userId: string, models: string[]): Promis
 }
 
 async function isModelDisabledForUser(userId: string, model: string): Promise<boolean> {
-  const redis = await getRedisClient();
-  if (!redis) {
-    const disabledModel = await prisma.disabledModel.findFirst({
-      where: {
-        userId,
-        model: { in: getModelLookupKeys(model) },
-      },
-      select: { id: true },
-    });
-
-    return Boolean(disabledModel);
-  }
-
   const cachedModels = await getCachedDisabledModels(userId);
   if (cachedModels) {
     return new Set(cachedModels).has(model);
@@ -290,9 +257,6 @@ export async function getDisabledModelSetForUser(userId: string): Promise<Set<st
 
 export async function invalidateDisabledModelsCache(userId: string): Promise<void> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
 
   try {
     await redis.del(getDisabledModelsCacheKey(userId));
@@ -306,9 +270,6 @@ export async function invalidateApiKeyValidationCache(
   apiKeyId?: string
 ): Promise<void> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
 
   try {
     await redis.del(getApiKeyValidationCacheKey(keyHash));
@@ -501,17 +462,18 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   }
 
   // Find the API key
-  const apiKey = await prisma.proxyApiKey.findUnique({
-    where: { keyHash },
-    select: {
-      id: true,
-      userId: true,
-      isActive: true,
-      expiresAt: true,
-      modelAccessMode: true,
-      modelAccessList: true,
-    },
-  });
+  const [apiKey] = await db
+    .select({
+      id: proxyApiKey.id,
+      userId: proxyApiKey.userId,
+      isActive: proxyApiKey.isActive,
+      expiresAt: proxyApiKey.expiresAt,
+      modelAccessMode: proxyApiKey.modelAccessMode,
+      modelAccessList: proxyApiKey.modelAccessList,
+    })
+    .from(proxyApiKey)
+    .where(eq(proxyApiKey.keyHash, keyHash))
+    .limit(1);
 
   if (!apiKey) {
     await setCachedApiKeyValidation(
@@ -590,17 +552,15 @@ export async function logUsage(params: {
   provider?: string;
 }): Promise<void> {
   try {
-    await prisma.usageLog.create({
-      data: {
-        userId: params.userId,
-        providerAccountId: params.providerAccountId,
-        proxyApiKeyId: params.proxyApiKeyId,
-        model: params.model,
-        inputTokens: params.inputTokens ?? 0,
-        outputTokens: params.outputTokens ?? 0,
-        statusCode: params.statusCode,
-        duration: params.duration,
-      },
+    await db.insert(usageLog).values({
+      userId: params.userId,
+      providerAccountId: params.providerAccountId,
+      proxyApiKeyId: params.proxyApiKeyId,
+      model: params.model,
+      inputTokens: params.inputTokens ?? 0,
+      outputTokens: params.outputTokens ?? 0,
+      statusCode: params.statusCode,
+      duration: params.duration,
     });
 
     void bumpAnalyticsCacheVersionThrottled(params.userId);

@@ -1,8 +1,10 @@
 "use server";
 
-import type { ProviderAccount } from "@prisma/client";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import type { ProviderAccount } from "@/lib/db/schema";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import { openRouterProvider } from "@/lib/proxy/providers/openrouter";
 import { OPENROUTER_API_BASE_URL } from "@/lib/proxy/providers/openrouter/constants";
@@ -389,7 +391,7 @@ function buildQuotaGroups(
 export async function getOpenRouterQuota(
   options: QuotaRequestOptions = {}
 ): Promise<OpenRouterQuotaActionResult> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
   }
@@ -403,23 +405,25 @@ export async function getOpenRouterQuota(
   }
 
   try {
-    const accounts = await prisma.providerAccount.findMany({
-      where: {
-        userId: session.user.id,
-        provider: "openrouter",
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        isActive: true,
-        accessToken: true,
-        refreshToken: true,
-        expiresAt: true,
-        lastUsedAt: true,
-      },
-      orderBy: { lastUsedAt: "desc" },
-    });
+    const accounts = await db
+      .select({
+        id: providerAccount.id,
+        name: providerAccount.name,
+        email: providerAccount.email,
+        isActive: providerAccount.isActive,
+        accessToken: providerAccount.accessToken,
+        refreshToken: providerAccount.refreshToken,
+        expiresAt: providerAccount.expiresAt,
+        lastUsedAt: providerAccount.lastUsedAt,
+      })
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.userId, session.user.id),
+          eq(providerAccount.provider, "openrouter")
+        )
+      )
+      .orderBy(desc(providerAccount.lastUsedAt));
 
     if (accounts.length === 0) {
       const emptyResult: OpenRouterQuotaActionResult = {

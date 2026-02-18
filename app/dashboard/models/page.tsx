@@ -1,5 +1,7 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { disabledModel, usageLog } from "@/lib/db/schema";
+import { eq, and, gte } from "drizzle-orm";
 import {
   MODEL_REGISTRY,
   getAllModels,
@@ -79,7 +81,7 @@ function getProviderLabel(provider: string): string {
 }
 
 export default async function ModelsPage() {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return null;
@@ -88,10 +90,10 @@ export default async function ModelsPage() {
   const allModels = getAllModels();
   const supportedModelSet = new Set(allModels);
 
-  const disabledModels = await prisma.disabledModel.findMany({
-    where: { userId: session.user.id },
-    select: { model: true },
-  });
+  const disabledModels = await db
+    .select({ model: disabledModel.model })
+    .from(disabledModel)
+    .where(eq(disabledModel.userId, session.user.id));
   const disabledModelSet = new Set(
     disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
@@ -103,18 +105,20 @@ export default async function ModelsPage() {
   const durationStartDate = new Date(hourKeys[0]);
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
 
-  const usageLogs = await prisma.usageLog.findMany({
-    where: {
-      userId: session.user.id,
-      createdAt: { gte: statsStartDate },
-    },
-    select: {
-      model: true,
-      statusCode: true,
-      duration: true,
-      createdAt: true,
-    },
-  });
+  const usageLogs = await db
+    .select({
+      model: usageLog.model,
+      statusCode: usageLog.statusCode,
+      duration: usageLog.duration,
+      createdAt: usageLog.createdAt,
+    })
+    .from(usageLog)
+    .where(
+      and(
+        eq(usageLog.userId, session.user.id),
+        gte(usageLog.createdAt, statsStartDate),
+      ),
+    );
 
   const statsByModel = new Map<
     string,

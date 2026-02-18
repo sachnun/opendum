@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { proxyApiKey } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Key } from "lucide-react";
@@ -31,16 +33,17 @@ function normalizeModelAccessMode(mode: string): ApiKeyModelAccessMode {
 }
 
 export default async function ApiKeysPage() {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return null;
   }
 
-  const apiKeys = await prisma.proxyApiKey.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const apiKeys = await db
+    .select()
+    .from(proxyApiKey)
+    .where(eq(proxyApiKey.userId, session.user.id))
+    .orderBy(desc(proxyApiKey.createdAt));
 
   const availableModels = getAllModels().sort((a, b) => a.localeCompare(b));
 

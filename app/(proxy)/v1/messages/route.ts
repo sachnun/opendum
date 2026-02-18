@@ -5,7 +5,6 @@ import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "
 import { getProvider } from "@/lib/proxy/providers";
 import type { ProviderNameType } from "@/lib/proxy/providers/types";
 import {
-  clearExpiredRateLimits,
   getRateLimitScope,
   isRateLimited,
   markRateLimited,
@@ -23,8 +22,10 @@ import {
   type ProxyErrorType,
   shouldRotateToNextAccount,
 } from "@/lib/proxy/error-utils";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -870,7 +871,7 @@ export async function POST(request: NextRequest) {
       models: authResult.modelAccessList ?? [],
     };
   } else {
-    const session = await auth();
+    const session = await getSession();
 
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -1005,12 +1006,17 @@ export async function POST(request: NextRequest) {
     const requestMessagesForError = (body as { messages?: unknown }).messages;
 
     const forcedAccount = normalizedProviderAccountId
-      ? await prisma.providerAccount.findFirst({
-          where: {
-            id: normalizedProviderAccountId,
-            userId: authenticatedUserId,
-          },
-        })
+      ? (await db
+          .select()
+          .from(providerAccount)
+          .where(
+            and(
+              eq(providerAccount.id, normalizedProviderAccountId),
+              eq(providerAccount.userId, authenticatedUserId),
+            ),
+          )
+          .limit(1)
+        )[0] ?? null
       : null;
 
     if (normalizedProviderAccountId && !forcedAccount) {
@@ -1066,7 +1072,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      clearExpiredRateLimits(forcedAccount.id);
       if (await isRateLimited(forcedAccount.id, rateLimitScope)) {
         const waitTimeMs = await getMinWaitTime([forcedAccount.id], rateLimitScope);
         return NextResponse.json(
@@ -1161,13 +1166,13 @@ export async function POST(request: NextRequest) {
       triedAccountIds.push(account.id);
 
       if (forcedAccount) {
-        await prisma.providerAccount.update({
-          where: { id: account.id },
-          data: {
+        await db
+          .update(providerAccount)
+          .set({
             lastUsedAt: new Date(),
-            requestCount: { increment: 1 },
-          },
-        });
+            requestCount: sql`${providerAccount.requestCount} + 1`,
+          })
+          .where(eq(providerAccount.id, account.id));
       }
 
       try {

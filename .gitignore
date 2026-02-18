@@ -31,7 +31,12 @@ bun-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/lib/generated/prisma
+# local dev database (PGlite)
+.pglite/
+
+# OpenCode / OpenSpec
+.opencode/
+openspec/
 
 # agent instructions
 AGENTS.md

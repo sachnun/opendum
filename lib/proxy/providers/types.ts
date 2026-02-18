@@ -1,6 +1,6 @@
 // Provider abstraction types for multi-provider support
 
-import type { ProviderAccount } from "@prisma/client";
+import type { ProviderAccount } from "@/lib/db/schema";
 
 /**
  * Provider configuration metadata
