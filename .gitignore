@@ -32,3 +32,6 @@ bun-debug.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# agent instructions
+AGENTS.md
