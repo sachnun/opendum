@@ -37,3 +37,6 @@ next-env.d.ts
 # OpenCode / OpenSpec
 .opencode/
 openspec/
+
+# agent instructions
+AGENTS.md
