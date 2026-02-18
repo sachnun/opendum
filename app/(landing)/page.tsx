@@ -1,5 +1,6 @@
-import { auth, signIn } from "@/lib/auth";
+import { auth, getSession, signInSocial } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -24,7 +25,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const [session, params] = await Promise.all([auth(), searchParams]);
+  const [session, params] = await Promise.all([getSession(), searchParams]);
   const authError = getAuthErrorMessage(
     params.error ? decodeURIComponent(params.error) : undefined
   );
@@ -63,7 +64,10 @@ export default async function Home({
                 <form
                   action={async () => {
                     "use server";
-                    await signIn("github", { redirectTo: "/dashboard" });
+                    const result = await signInSocial("github", "/dashboard");
+                    if (result.url) {
+                      redirect(result.url);
+                    }
                   }}
                 >
                   <Button
@@ -89,7 +93,10 @@ export default async function Home({
                 <form
                   action={async () => {
                     "use server";
-                    await signIn("google", { redirectTo: "/dashboard" });
+                    const result = await signInSocial("google", "/dashboard");
+                    if (result.url) {
+                      redirect(result.url);
+                    }
                   }}
                 >
                   <Button
@@ -127,7 +134,22 @@ export default async function Home({
             <form
               action={async () => {
                 "use server";
-                await signIn("credentials", { redirectTo: "/dashboard" });
+                const email = "dev@localdev.test";
+                const password = "localdev";
+                const hdrs = await headers();
+                try {
+                  await auth.api.signUpEmail({
+                    body: { email, password, name: "Local Dev" },
+                    headers: hdrs,
+                  });
+                } catch {
+                  // User already exists, sign in instead
+                  await auth.api.signInEmail({
+                    body: { email, password },
+                    headers: hdrs,
+                  });
+                }
+                redirect("/dashboard");
               }}
             >
               <Button type="submit" variant="secondary" className="min-w-52">

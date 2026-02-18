@@ -1,5 +1,9 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { auth, getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { disabledModel } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -9,7 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { signOut } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import type {
@@ -46,16 +49,16 @@ export async function Header({
   accountIndicators,
   modelFamilyCounts,
 }: HeaderProps) {
-  const session = await auth();
+  const session = await getSession();
 
-  const disabledModels = session?.user?.id
-    ? await prisma.disabledModel.findMany({
-        where: { userId: session.user.id },
-        select: { model: true },
-      })
+  const disabledModelsResult = session?.user?.id
+    ? await db
+        .select({ model: disabledModel.model })
+        .from(disabledModel)
+        .where(eq(disabledModel.userId, session.user.id))
     : [];
   const disabledModelSet = new Set(
-    disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
+    disabledModelsResult.map((entry) => resolveModelAlias(entry.model))
   );
 
   const models = getAllModels()
@@ -109,7 +112,8 @@ export async function Header({
               <form
                 action={async () => {
                   "use server";
-                  await signOut({ redirectTo: "/" });
+                  await auth.api.signOut({ headers: await headers() });
+                  redirect("/");
                 }}
               >
                 <DropdownMenuItem asChild>
