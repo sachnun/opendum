@@ -1,60 +1,35 @@
-import { createClient } from "redis";
+import Redis from "ioredis";
+import RedisMock from "ioredis-mock";
 
-type RedisClient = ReturnType<typeof createClient>;
+const globalKey = "__opendum_redis_client__";
 
-let redisClient: RedisClient | null = null;
-let redisClientPromise: Promise<RedisClient | null> | null = null;
+let redisClient: Redis | null = null;
 
-function resolveRedisUrl(): string | null {
-  return process.env.REDIS_URL ?? null;
-}
-
-export async function getRedisClient(): Promise<RedisClient | null> {
-  if (redisClient?.isOpen) {
+export async function getRedisClient(): Promise<Redis> {
+  if (redisClient) {
     return redisClient;
   }
 
-  if (redisClientPromise) {
-    return redisClientPromise;
+  // Reuse cached client across HMR in dev
+  const cached = (globalThis as Record<string, unknown>)[globalKey] as Redis | undefined;
+  if (cached) {
+    redisClient = cached;
+    return redisClient;
   }
 
-  const redisUrl = resolveRedisUrl();
-  if (!redisUrl) {
-    return null;
+  const redisUrl = process.env.REDIS_URL ?? null;
+
+  if (redisUrl) {
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: null,
+      lazyConnect: false,
+    });
+    redisClient.on("error", () => undefined);
+  } else {
+    redisClient = new RedisMock() as unknown as Redis;
   }
 
-  if (!redisClient) {
-    try {
-      redisClient = createClient({ url: redisUrl });
-      redisClient.on("error", () => undefined);
-    } catch {
-      redisClient = null;
-      return null;
-    }
-  }
+  (globalThis as Record<string, unknown>)[globalKey] = redisClient;
 
-  redisClientPromise = (async () => {
-    if (!redisClient) {
-      return null;
-    }
-
-    try {
-      if (!redisClient.isOpen) {
-        await redisClient.connect();
-      }
-
-      return redisClient;
-    } catch {
-      redisClient = null;
-      return null;
-    }
-  })().finally(() => {
-    redisClientPromise = null;
-  });
-
-  return redisClientPromise;
-}
-
-export function isRedisConfigured(): boolean {
-  return Boolean(resolveRedisUrl());
+  return redisClient;
 }

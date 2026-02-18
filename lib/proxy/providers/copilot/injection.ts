@@ -8,7 +8,6 @@ export interface CopilotSystemToolMode {
   injectSystemTool: boolean;
 }
 
-const fallbackWindowByAccount = new Map<string, number>();
 const COPILOT_SYSTEM_TOOL_KEY_PREFIX = "opendum:copilot:system-tool-window";
 
 const TOOL_NAME = "get_context";
@@ -18,33 +17,12 @@ function getCurrentYear(): string {
   return String(new Date().getFullYear());
 }
 
-function clearExpiredWindows(now: number): void {
-  for (const [accountId, expiresAt] of fallbackWindowByAccount.entries()) {
-    if (expiresAt <= now) {
-      fallbackWindowByAccount.delete(accountId);
-    }
-  }
-}
-
 function getWindowKey(accountId: string): string {
   return `${COPILOT_SYSTEM_TOOL_KEY_PREFIX}:${accountId}`;
 }
 
 function toTtlSeconds(windowMs: number): number {
   return Math.max(1, Math.ceil(windowMs / 1000));
-}
-
-function getFallbackSystemToolMode(accountId: string): CopilotSystemToolMode {
-  const now = Date.now();
-  clearExpiredWindows(now);
-
-  const expiresAt = fallbackWindowByAccount.get(accountId);
-  if (!expiresAt) {
-    fallbackWindowByAccount.set(accountId, now + COPILOT_X_INITIATOR_WINDOW_MS);
-    return { xInitiator: "user", injectSystemTool: false };
-  }
-
-  return { xInitiator: "agent", injectSystemTool: true };
 }
 
 export async function getCopilotSystemToolMode(
@@ -56,24 +34,25 @@ export async function getCopilotSystemToolMode(
   }
 
   const redis = await getRedisClient();
-  if (redis) {
-    try {
-      const setResult = await redis.set(getWindowKey(normalizedAccountId), "1", {
-        NX: true,
-        EX: toTtlSeconds(COPILOT_X_INITIATOR_WINDOW_MS),
-      });
 
-      if (setResult === "OK") {
-        return { xInitiator: "user", injectSystemTool: false };
-      }
+  try {
+    const setResult = await redis.set(
+      getWindowKey(normalizedAccountId),
+      "1",
+      "EX",
+      toTtlSeconds(COPILOT_X_INITIATOR_WINDOW_MS),
+      "NX"
+    );
 
-      return { xInitiator: "agent", injectSystemTool: true };
-    } catch {
-      return getFallbackSystemToolMode(normalizedAccountId);
+    if (setResult === "OK") {
+      return { xInitiator: "user", injectSystemTool: false };
     }
-  }
 
-  return getFallbackSystemToolMode(normalizedAccountId);
+    return { xInitiator: "agent", injectSystemTool: true };
+  } catch {
+    // Default to "user" on error
+    return { xInitiator: "user", injectSystemTool: false };
+  }
 }
 
 export function injectCopilotChatSystemTool(

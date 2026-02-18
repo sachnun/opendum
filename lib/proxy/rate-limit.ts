@@ -8,8 +8,6 @@ interface RateLimitEntry {
 
 export type RateLimitScope = string;
 
-// Map: accountId -> scope -> RateLimitEntry
-const rateLimits = new Map<string, Map<string, RateLimitEntry>>();
 const RATE_LIMIT_KEY_PREFIX = "opendum:rate-limit";
 const MAX_RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -59,75 +57,11 @@ function toTtlSeconds(ms: number): number {
   return Math.max(1, Math.ceil(ms / 1000));
 }
 
-function setInMemoryRateLimit(
-  accountId: string,
-  scope: RateLimitScope,
-  entry: RateLimitEntry
-): void {
-  let accountLimits = rateLimits.get(accountId);
-  if (!accountLimits) {
-    accountLimits = new Map();
-    rateLimits.set(accountId, accountLimits);
-  }
-
-  accountLimits.set(scope, entry);
-}
-
-function clearExpiredInMemoryRateLimits(accountId: string): void {
-  const accountLimits = rateLimits.get(accountId);
-  if (!accountLimits) return;
-
-  const now = Date.now();
-  for (const [scope, entry] of accountLimits) {
-    if (now >= entry.resetTime) {
-      accountLimits.delete(scope);
-    }
-  }
-
-  if (accountLimits.size === 0) {
-    rateLimits.delete(accountId);
-  }
-}
-
-function getInMemoryRateLimitEntry(
-  accountId: string,
-  scope: RateLimitScope
-): RateLimitEntry | null {
-  const accountLimits = rateLimits.get(accountId);
-  if (!accountLimits) return null;
-
-  const entry = accountLimits.get(scope);
-  if (!entry) return null;
-
-  if (Date.now() >= entry.resetTime) {
-    accountLimits.delete(scope);
-    if (accountLimits.size === 0) {
-      rateLimits.delete(accountId);
-    }
-    return null;
-  }
-
-  return entry;
-}
-
-function deleteInMemoryRateLimit(accountId: string, scope: RateLimitScope): void {
-  const accountLimits = rateLimits.get(accountId);
-  if (!accountLimits) return;
-
-  accountLimits.delete(scope);
-  if (accountLimits.size === 0) {
-    rateLimits.delete(accountId);
-  }
-}
-
 async function getRateLimitEntry(
   accountId: string,
   scope: RateLimitScope
 ): Promise<RateLimitEntry | null> {
   const redis = await getRedisClient();
-  if (!redis) {
-    return getInMemoryRateLimitEntry(accountId, scope);
-  }
 
   try {
     const key = getRateLimitKey(accountId, scope);
@@ -150,7 +84,7 @@ async function getRateLimitEntry(
 
     return entry;
   } catch {
-    return getInMemoryRateLimitEntry(accountId, scope);
+    return null;
   }
 }
 
@@ -171,19 +105,17 @@ export async function markRateLimited(
     message,
   };
 
-  setInMemoryRateLimit(accountId, scope, entry);
-
   const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
 
   try {
-    await redis.set(getRateLimitKey(accountId, scope), JSON.stringify(entry), {
-      EX: toTtlSeconds(normalizedRetryAfterMs),
-    });
+    await redis.set(
+      getRateLimitKey(accountId, scope),
+      JSON.stringify(entry),
+      "EX",
+      toTtlSeconds(normalizedRetryAfterMs)
+    );
   } catch {
-    // Ignore Redis errors and keep in-memory fallback
+    // Ignore Redis write errors
   }
 }
 
@@ -196,13 +128,6 @@ export async function isRateLimited(
 ): Promise<boolean> {
   const entry = await getRateLimitEntry(accountId, scope);
   return entry !== null;
-}
-
-/**
- * Clear expired rate limits for an account
- */
-export function clearExpiredRateLimits(accountId: string): void {
-  clearExpiredInMemoryRateLimits(accountId);
 }
 
 /**
@@ -229,54 +154,40 @@ export async function getRateLimitedAccountIds(
   }
 
   const redis = await getRedisClient();
+  const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
+  const now = Date.now();
 
-  if (redis) {
-    const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
-    const now = Date.now();
+  try {
+    const entries = await redis.mget(...keys);
 
-    try {
-      const entries = await redis.mGet(keys);
+    for (let index = 0; index < entries.length; index++) {
+      const rawEntry = entries[index];
+      const key = keys[index];
+      const accountId = accountIds[index];
 
-      for (let index = 0; index < entries.length; index++) {
-        const rawEntry = entries[index];
-        const key = keys[index];
-        const accountId = accountIds[index];
-
-        if (!rawEntry || !accountId) {
-          continue;
-        }
-
-        const entry = parseRateLimitEntry(rawEntry);
-        if (!entry) {
-          if (key) {
-            await redis.del(key);
-          }
-          continue;
-        }
-
-        if (now >= entry.resetTime) {
-          if (key) {
-            await redis.del(key);
-          }
-          continue;
-        }
-
-        limitedAccountIds.add(accountId);
+      if (!rawEntry || !accountId) {
+        continue;
       }
 
-      return limitedAccountIds;
-    } catch {
-      // Fall through to in-memory fallback below
-    }
-  }
+      const entry = parseRateLimitEntry(rawEntry);
+      if (!entry) {
+        if (key) {
+          await redis.del(key);
+        }
+        continue;
+      }
 
-  for (const accountId of accountIds) {
-    const entry = getInMemoryRateLimitEntry(accountId, scope);
-    if (!entry) {
-      continue;
-    }
+      if (now >= entry.resetTime) {
+        if (key) {
+          await redis.del(key);
+        }
+        continue;
+      }
 
-    limitedAccountIds.add(accountId);
+      limitedAccountIds.add(accountId);
+    }
+  } catch {
+    // Ignore Redis read errors
   }
 
   return limitedAccountIds;
@@ -295,69 +206,46 @@ export async function getMinWaitTime(
   }
 
   const redis = await getRedisClient();
-
-  if (redis) {
-    const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
-    const now = Date.now();
-
-    try {
-      const entries = await redis.mGet(keys);
-      let minWait = Infinity;
-
-      for (let index = 0; index < entries.length; index++) {
-        const rawEntry = entries[index];
-        const entry = parseRateLimitEntry(rawEntry);
-        const key = keys[index];
-
-        if (!rawEntry) {
-          return 0;
-        }
-
-        if (!entry) {
-          if (key) {
-            await redis.del(key);
-          }
-          return 0;
-        }
-
-        if (now >= entry.resetTime) {
-          if (key) {
-            await redis.del(key);
-          }
-          return 0;
-        }
-
-        const waitTime = entry.resetTime - now;
-        if (waitTime < minWait) {
-          minWait = waitTime;
-        }
-      }
-
-      return minWait === Infinity ? 0 : minWait;
-    } catch {
-      // Fall through to in-memory fallback below
-    }
-  }
-
-  let minWait = Infinity;
+  const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
   const now = Date.now();
 
-  for (const accountId of accountIds) {
-    const entry = getInMemoryRateLimitEntry(accountId, scope);
-    if (!entry) return 0; // This account not rate limited for this scope
+  try {
+    const entries = await redis.mget(...keys);
+    let minWait = Infinity;
 
-    if (now >= entry.resetTime) {
-      deleteInMemoryRateLimit(accountId, scope);
-      return 0; // Expired
+    for (let index = 0; index < entries.length; index++) {
+      const rawEntry = entries[index];
+      const entry = parseRateLimitEntry(rawEntry);
+      const key = keys[index];
+
+      if (!rawEntry) {
+        return 0;
+      }
+
+      if (!entry) {
+        if (key) {
+          await redis.del(key);
+        }
+        return 0;
+      }
+
+      if (now >= entry.resetTime) {
+        if (key) {
+          await redis.del(key);
+        }
+        return 0;
+      }
+
+      const waitTime = entry.resetTime - now;
+      if (waitTime < minWait) {
+        minWait = waitTime;
+      }
     }
 
-    const waitTime = entry.resetTime - now;
-    if (waitTime < minWait) {
-      minWait = waitTime;
-    }
+    return minWait === Infinity ? 0 : minWait;
+  } catch {
+    return 0;
   }
-
-  return minWait === Infinity ? 0 : minWait;
 }
 
 /**
@@ -522,13 +410,6 @@ export function parseRateLimitError(errorBody: unknown): {
     model,
     message,
   };
-}
-
-/**
- * Clear all rate limits (useful for testing)
- */
-export function clearAllRateLimits(): void {
-  rateLimits.clear();
 }
 
 /**
