@@ -1,16 +1,40 @@
+import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
+import {
+  getCachedAccountStats,
+  setCachedAccountStats,
+} from "@/lib/cache/accounts-cache";
 import { db } from "@/lib/db";
 import { providerAccount, usageLog } from "@/lib/db/schema";
-import { eq, and, gte, inArray, desc } from "drizzle-orm";
+import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
 import { RefreshAccountsButton } from "@/components/dashboard/accounts/refresh-accounts-button";
 
 const ACCOUNT_STATS_DAYS = 30;
+const ACCOUNT_SKELETON_CARDS = Array.from({ length: 3 });
 
-function buildDayKeys(days: number): string[] {
+interface AccountStats {
+  totalRequests: number;
+  successRate: number | null;
+  dailyRequests: Array<{ date: string; count: number }>;
+}
+
+interface CachedAccountStatsPayload {
+  statsByAccountId: Record<string, AccountStats>;
+}
+
+interface AccountStatsAggregateRow {
+  providerAccountId: string | null;
+  day: string;
+  totalRequests: number;
+  successfulRequests: number;
+}
+
+function getRecentDayKeys(days: number): string[] {
   const now = new Date();
   const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
@@ -21,47 +45,46 @@ function buildDayKeys(days: number): string[] {
   });
 }
 
-export default async function AccountsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ success?: string; error?: string }>;
-}) {
-  const session = await getSession();
-  const params = await searchParams;
+function buildEmptyAccountStats(dayKeys: string[]): AccountStats {
+  return {
+    totalRequests: 0,
+    successRate: null,
+    dailyRequests: dayKeys.map((day) => ({ date: day, count: 0 })),
+  };
+}
 
-  if (!session?.user?.id) {
-    return null;
+async function computeAccountStatsByAccountId(
+  userId: string,
+  accountIds: string[]
+): Promise<Record<string, AccountStats>> {
+  if (accountIds.length === 0) {
+    return {};
   }
 
-  const accounts = await db
-    .select()
-    .from(providerAccount)
-    .where(eq(providerAccount.userId, session.user.id))
-    .orderBy(desc(providerAccount.createdAt));
-
-  const dayKeys = buildDayKeys(ACCOUNT_STATS_DAYS);
-  const dayKeySet = new Set(dayKeys);
+  const dayKeys = getRecentDayKeys(ACCOUNT_STATS_DAYS);
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
-  const accountIds = accounts.map((account) => account.id);
 
-  const usageLogs = accountIds.length
-    ? await db
-        .select({
-          providerAccountId: usageLog.providerAccountId,
-          statusCode: usageLog.statusCode,
-          createdAt: usageLog.createdAt,
-        })
-        .from(usageLog)
-        .where(
-          and(
-            eq(usageLog.userId, session.user.id),
-            inArray(usageLog.providerAccountId, accountIds),
-            gte(usageLog.createdAt, statsStartDate),
-          ),
-        )
-    : [];
+  const aggregatedUsageRows = await db
+    .select({
+      providerAccountId: usageLog.providerAccountId,
+      day: sql<string>`DATE(${usageLog.createdAt})`.as("day"),
+      totalRequests: sql<number>`COUNT(*)::int`.as("totalRequests"),
+      successfulRequests:
+        sql<number>`SUM(CASE WHEN ${usageLog.statusCode} >= 200 AND ${usageLog.statusCode} < 400 THEN 1 ELSE 0 END)::int`.as(
+          "successfulRequests"
+        ),
+    })
+    .from(usageLog)
+    .where(
+      and(
+        eq(usageLog.userId, userId),
+        inArray(usageLog.providerAccountId, accountIds),
+        gte(usageLog.createdAt, statsStartDate)
+      )
+    )
+    .groupBy(usageLog.providerAccountId, sql`DATE(${usageLog.createdAt})`);
 
-  const statsByAccountId = new Map<
+  const rawStatsByAccountId = new Map<
     string,
     {
       totalRequests: number;
@@ -70,52 +93,178 @@ export default async function AccountsPage({
     }
   >();
 
-  for (const log of usageLogs) {
-    if (!log.providerAccountId) {
-      continue;
-    }
-
-    const dayKey = log.createdAt.toISOString().split("T")[0];
-    if (!dayKeySet.has(dayKey)) {
+  for (const row of aggregatedUsageRows as AccountStatsAggregateRow[]) {
+    if (!row.providerAccountId) {
       continue;
     }
 
     const current =
-      statsByAccountId.get(log.providerAccountId) ??
+      rawStatsByAccountId.get(row.providerAccountId) ??
       {
         totalRequests: 0,
         successfulRequests: 0,
         dailyCounts: new Map<string, number>(),
       };
 
-    current.totalRequests += 1;
-
-    if (log.statusCode !== null && log.statusCode >= 200 && log.statusCode < 400) {
-      current.successfulRequests += 1;
-    }
-
-    current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + 1);
-    statsByAccountId.set(log.providerAccountId, current);
+    current.totalRequests += row.totalRequests;
+    current.successfulRequests += row.successfulRequests;
+    current.dailyCounts.set(row.day, row.totalRequests);
+    rawStatsByAccountId.set(row.providerAccountId, current);
   }
 
-  const accountsWithStats = accounts.map((account) => {
-    const accountStats = statsByAccountId.get(account.id);
-    const totalRequests = accountStats?.totalRequests ?? 0;
-    const successfulRequests = accountStats?.successfulRequests ?? 0;
+  return Object.fromEntries(
+    accountIds.map((accountId) => {
+      const accountStats = rawStatsByAccountId.get(accountId);
+      if (!accountStats) {
+        return [accountId, buildEmptyAccountStats(dayKeys)];
+      }
 
-    return {
-      ...account,
-      stats: {
-        totalRequests,
+      const stats: AccountStats = {
+        totalRequests: accountStats.totalRequests,
         successRate:
-          totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : null,
+          accountStats.totalRequests > 0
+            ? Math.round((accountStats.successfulRequests / accountStats.totalRequests) * 100)
+            : null,
         dailyRequests: dayKeys.map((day) => ({
           date: day,
-          count: accountStats?.dailyCounts.get(day) ?? 0,
+          count: accountStats.dailyCounts.get(day) ?? 0,
         })),
-      },
-    };
-  });
+      };
+
+      return [accountId, stats];
+    })
+  );
+}
+
+async function getAccountStatsByAccountId(
+  userId: string,
+  accountIds: string[]
+): Promise<Record<string, AccountStats>> {
+  const cachedPayload = await getCachedAccountStats<CachedAccountStatsPayload>(userId);
+  if (cachedPayload?.statsByAccountId) {
+    return cachedPayload.statsByAccountId;
+  }
+
+  const statsByAccountId = await computeAccountStatsByAccountId(userId, accountIds);
+  await setCachedAccountStats<CachedAccountStatsPayload>(userId, { statsByAccountId });
+  return statsByAccountId;
+}
+
+function AccountsContentSkeleton() {
+  return (
+    <div className="space-y-8">
+      <section className="space-y-5">
+        <div className="space-y-1">
+          <Skeleton className="h-5 w-52" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+            </div>
+
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {ACCOUNT_SKELETON_CARDS.map((_, index) => (
+                <div
+                  key={`oauth-account-${index}`}
+                  className="rounded-xl border border-border bg-card p-4 sm:p-5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+
+                  <div className="mt-4 space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-3 w-14" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Skeleton className="h-12 w-full rounded-md" />
+                      <Skeleton className="h-12 w-full rounded-md" />
+                    </div>
+                    <Skeleton className="h-12 w-full rounded-md" />
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-10" />
+                    </div>
+                    <Skeleton className="h-12 w-full rounded-md" />
+                  </div>
+
+                  <div className="mt-4 flex gap-2">
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-52" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+            </div>
+
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {ACCOUNT_SKELETON_CARDS.map((_, index) => (
+                <div
+                  key={`apikey-account-${index}`}
+                  className="rounded-xl border border-border bg-card p-4 sm:p-5"
+                >
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <Skeleton className="mt-4 h-16 w-full rounded-md" />
+                  <div className="mt-4 flex gap-2">
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+interface AccountsContentProps {
+  userId: string;
+}
+
+async function AccountsContent({ userId }: AccountsContentProps) {
+  const accounts = await db
+    .select()
+    .from(providerAccount)
+    .where(eq(providerAccount.userId, userId))
+    .orderBy(desc(providerAccount.createdAt));
+
+  const accountIds = accounts.map((account) => account.id);
+  const dayKeys = getRecentDayKeys(ACCOUNT_STATS_DAYS);
+  const statsByAccountId = await getAccountStatsByAccountId(userId, accountIds);
+
+  const accountsWithStats = accounts.map((account) => ({
+    ...account,
+    stats: statsByAccountId[account.id] ?? buildEmptyAccountStats(dayKeys),
+  }));
 
   // Group accounts by provider
   const iflowAccounts = accountsWithStats.filter((a) => a.provider === "iflow");
@@ -128,6 +277,35 @@ export default async function AccountsPage({
   const nvidiaNimAccounts = accountsWithStats.filter((a) => a.provider === "nvidia_nim");
   const ollamaCloudAccounts = accountsWithStats.filter((a) => a.provider === "ollama_cloud");
   const openRouterAccounts = accountsWithStats.filter((a) => a.provider === "openrouter");
+
+  return (
+    <AccountsList
+      antigravityAccounts={antigravityAccounts}
+      iflowAccounts={iflowAccounts}
+      geminiCliAccounts={geminiCliAccounts}
+      qwenCodeAccounts={qwenCodeAccounts}
+      copilotAccounts={copilotAccounts}
+      codexAccounts={codexAccounts}
+      kiroAccounts={kiroAccounts}
+      nvidiaNimAccounts={nvidiaNimAccounts}
+      ollamaCloudAccounts={ollamaCloudAccounts}
+      openRouterAccounts={openRouterAccounts}
+    />
+  );
+}
+
+export default async function AccountsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  const params = await searchParams;
 
   return (
     <div className="space-y-6">
@@ -180,18 +358,9 @@ export default async function AccountsPage({
         </Alert>
       )}
 
-      <AccountsList
-        antigravityAccounts={antigravityAccounts}
-        iflowAccounts={iflowAccounts}
-        geminiCliAccounts={geminiCliAccounts}
-        qwenCodeAccounts={qwenCodeAccounts}
-        copilotAccounts={copilotAccounts}
-        codexAccounts={codexAccounts}
-        kiroAccounts={kiroAccounts}
-        nvidiaNimAccounts={nvidiaNimAccounts}
-        ollamaCloudAccounts={ollamaCloudAccounts}
-        openRouterAccounts={openRouterAccounts}
-      />
+      <Suspense fallback={<AccountsContentSkeleton />}>
+        <AccountsContent userId={session.user.id} />
+      </Suspense>
     </div>
   );
 }
