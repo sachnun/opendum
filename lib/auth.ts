@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -48,13 +49,14 @@ export const auth = betterAuth({
 /**
  * Get the current session in server components and server actions.
  * Replaces the previous `auth()` pattern from NextAuth.
+ * Wrapped with React.cache() to deduplicate calls within a single RSC render pass.
  */
-export async function getSession() {
+export const getSession = cache(async () => {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
   return session;
-}
+});
 
 /**
  * Sign in with a social provider from a server action.

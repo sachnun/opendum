@@ -1,15 +1,20 @@
+import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { proxyApiKey } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { AnalyticsCharts } from "@/components/dashboard/analytics/analytics-charts";
 import { getAnalyticsData } from "@/lib/actions/analytics";
+import DashboardLoading from "./loading";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
+interface AnalyticsContentProps {
   searchParams: Promise<{ apiKey?: string }>;
-}) {
+}
+
+async function AnalyticsContent({ searchParams }: AnalyticsContentProps) {
+  const params = await searchParams;
+  const requestedApiKeyId = params.apiKey;
+
   const session = await getSession();
 
   if (!session?.user?.id) {
@@ -26,8 +31,6 @@ export default async function DashboardPage({
     .where(eq(proxyApiKey.userId, session.user.id))
     .orderBy(desc(proxyApiKey.createdAt));
 
-  const params = await searchParams;
-  const requestedApiKeyId = params.apiKey;
   const initialApiKeyId =
     requestedApiKeyId && apiKeys.some((apiKey) => apiKey.id === requestedApiKeyId)
       ? requestedApiKeyId
@@ -45,5 +48,17 @@ export default async function DashboardPage({
       apiKeys={apiKeys}
       initialApiKeyId={initialApiKeyId}
     />
+  );
+}
+
+export default function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ apiKey?: string }>;
+}) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <AnalyticsContent searchParams={searchParams} />
+    </Suspense>
   );
 }

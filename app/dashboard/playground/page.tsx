@@ -18,7 +18,7 @@ function getModels(disabledModels: Set<string>): ModelOption[] {
       continue;
     }
 
-    const providers = getProvidersForModel(modelName).sort((a, b) => a.localeCompare(b));
+    const providers = getProvidersForModel(modelName);
 
     models.push({
       id: modelName,

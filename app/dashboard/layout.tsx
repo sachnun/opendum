@@ -1,10 +1,12 @@
+import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { providerAccount } from "@/lib/db/schema";
+import { disabledModel, providerAccount } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { HeaderSkeleton } from "@/components/layout/header-skeleton";
 import { DashboardDataRefresher } from "@/components/layout/dashboard-data-refresher";
 import {
   MODEL_FAMILY_NAV_ITEMS,
@@ -80,15 +82,27 @@ export default async function DashboardLayout({
     redirect("/");
   }
 
-  const providerAccounts = await db
-    .select({
-      provider: providerAccount.provider,
-      isActive: providerAccount.isActive,
-      lastErrorAt: providerAccount.lastErrorAt,
-      lastSuccessAt: providerAccount.lastSuccessAt,
-    })
-    .from(providerAccount)
-    .where(eq(providerAccount.userId, session.user.id));
+  const [providerAccounts, disabledModels] = await Promise.all([
+    db
+      .select({
+        provider: providerAccount.provider,
+        isActive: providerAccount.isActive,
+        lastErrorAt: providerAccount.lastErrorAt,
+        lastSuccessAt: providerAccount.lastSuccessAt,
+      })
+      .from(providerAccount)
+      .where(eq(providerAccount.userId, session.user.id)),
+    db
+      .select({ model: disabledModel.model })
+      .from(disabledModel)
+      .where(eq(disabledModel.userId, session.user.id)),
+  ]);
+
+  const user = {
+    name: session.user.name ?? null,
+    email: session.user.email ?? null,
+    image: session.user.image ?? null,
+  };
 
   const accountCounts: ProviderAccountCounts = {
     antigravity: 0,
@@ -177,12 +191,16 @@ export default async function DashboardLayout({
         modelFamilyCounts={modelFamilyCounts}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header
-          accountCounts={accountCounts}
-          activeAccountCounts={activeAccountCounts}
-          accountIndicators={accountIndicators}
-          modelFamilyCounts={modelFamilyCounts}
-        />
+        <Suspense fallback={<HeaderSkeleton />}>
+          <Header
+            accountCounts={accountCounts}
+            activeAccountCounts={activeAccountCounts}
+            accountIndicators={accountIndicators}
+            modelFamilyCounts={modelFamilyCounts}
+            disabledModels={disabledModels}
+            user={user}
+          />
+        </Suspense>
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-7xl px-5 pb-8 pt-5 sm:px-6 lg:px-8">
             {children}
