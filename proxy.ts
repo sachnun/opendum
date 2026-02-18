@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { maintenanceMode } from "@/lib/flags";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const isMaintenance = await maintenanceMode();
 
   if (!isMaintenance) {
