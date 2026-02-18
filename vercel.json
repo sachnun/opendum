@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "! git diff --quiet HEAD^ HEAD -- app/ components/ lib/ next.config.ts drizzle.config.ts",
+  "ignoreCommand": "! git diff --quiet HEAD^ HEAD -- app/ components/ lib/ next.config.ts drizzle.config.ts proxy.ts package.json tsconfig.json postcss.config.mjs eslint.config.mjs",
   "crons": [
     {
       "path": "/api/cron/refresh-tokens",
