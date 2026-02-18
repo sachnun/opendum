@@ -163,7 +163,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "qwen3.5-plus": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.QWEN_CODE],
     meta: {
       contextLength: 1000000,
       outputLimit: 65536,
@@ -180,7 +180,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "qwen3-max-2026-01-23": {
-    providers: [ProviderName.IFLOW],
+    providers: [ProviderName.IFLOW, ProviderName.QWEN_CODE],
     meta: {
       contextLength: 262144,
       outputLimit: 65536,

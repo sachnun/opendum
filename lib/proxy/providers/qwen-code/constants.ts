@@ -35,6 +35,8 @@ export const QWEN_CODE_SUPPORTED_PARAMS = new Set([
 export const QWEN_CODE_MODELS = new Set([
   "qwen3-coder-plus",
   "qwen3-coder-flash",
+  "qwen3.5-plus",
+  "qwen3-max-2026-01-23",
 ]);
 
 // Token refresh buffer (3 hours before expiry)
