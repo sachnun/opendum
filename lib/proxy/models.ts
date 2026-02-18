@@ -162,6 +162,40 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 0.144, output: 0.574 },
     },
   },
+  "qwen3.5-plus": {
+    providers: [ProviderName.IFLOW],
+    meta: {
+      contextLength: 1000000,
+      outputLimit: 65536,
+      knowledgeCutoff: "2025-04",
+      releaseDate: "2026-02",
+      reasoning: true,
+      toolCall: true,
+      vision: true,
+      pricing: { input: 0.4, output: 2.4 },
+      modalities: {
+        input: ["text", "image", "video"],
+        output: ["text"],
+      },
+    },
+  },
+  "qwen3-max-2026-01-23": {
+    providers: [ProviderName.IFLOW],
+    meta: {
+      contextLength: 262144,
+      outputLimit: 65536,
+      knowledgeCutoff: "2025-04",
+      releaseDate: "2025-09-23",
+      reasoning: false,
+      toolCall: true,
+      vision: false,
+      pricing: { input: 0.34, output: 1.37 },
+      modalities: {
+        input: ["text"],
+        output: ["text"],
+      },
+    },
+  },
   "qwen3-max": {
     providers: [ProviderName.IFLOW],
     meta: {
