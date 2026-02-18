@@ -1,7 +1,4 @@
-import { auth, getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { disabledModel } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,24 +38,24 @@ interface HeaderProps {
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
+  disabledModels: Array<{ model: string }>;
+  user: {
+    name: string | null;
+    email: string | null;
+    image: string | null;
+  };
 }
 
-export async function Header({
+export function Header({
   accountCounts,
   activeAccountCounts,
   accountIndicators,
   modelFamilyCounts,
+  disabledModels,
+  user,
 }: HeaderProps) {
-  const session = await getSession();
-
-  const disabledModelsResult = session?.user?.id
-    ? await db
-        .select({ model: disabledModel.model })
-        .from(disabledModel)
-        .where(eq(disabledModel.userId, session.user.id))
-    : [];
   const disabledModelSet = new Set(
-    disabledModelsResult.map((entry) => resolveModelAlias(entry.model))
+    disabledModels.map((entry) => resolveModelAlias(entry.model))
   );
 
   const models = getAllModels()
@@ -92,9 +89,9 @@ export async function Header({
                 className="flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={session?.user?.image ?? undefined} />
+                  <AvatarImage src={user.image ?? undefined} />
                   <AvatarFallback>
-                    {session?.user?.name?.[0]?.toUpperCase() ?? "U"}
+                    {user.name?.[0]?.toUpperCase() ?? "U"}
                   </AvatarFallback>
                 </Avatar>
               </button>
@@ -102,9 +99,9 @@ export async function Header({
             <DropdownMenuContent align="end" className="w-64">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span>{session?.user?.name}</span>
+                  <span>{user.name}</span>
                   <span className="text-xs text-muted-foreground">
-                    {session?.user?.email}
+                    {user.email}
                   </span>
                 </div>
               </DropdownMenuLabel>

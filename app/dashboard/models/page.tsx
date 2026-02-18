@@ -1,7 +1,10 @@
+import { Suspense } from "react";
+import { ModelsList } from "@/components/dashboard/models/models-list";
 import { getSession } from "@/lib/auth";
+import { getCachedModelStats, setCachedModelStats } from "@/lib/cache/models-cache";
 import { db } from "@/lib/db";
 import { disabledModel, usageLog } from "@/lib/db/schema";
-import { eq, and, gte } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import {
   MODEL_REGISTRY,
   getAllModels,
@@ -10,7 +13,7 @@ import {
   resolveModelAlias,
 } from "@/lib/proxy/models";
 import { ProviderName } from "@/lib/proxy/providers/types";
-import { ModelsList } from "@/components/dashboard/models/models-list";
+import ModelsLoading from "./loading";
 
 const MODEL_STATS_DAYS = 30;
 const MODEL_DURATION_LOOKBACK_HOURS = 24;
@@ -21,6 +24,17 @@ interface ModelStats {
   dailyRequests: Array<{ date: string; count: number }>;
   avgDurationLastDay: number | null;
   durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
+}
+
+interface CachedModelStatsPayload {
+  statsByModel: Record<string, ModelStats>;
+}
+
+interface RawModelStats {
+  totalRequests: number;
+  successfulRequests: number;
+  dailyCounts: Map<string, number>;
+  durationByHour: Map<string, { total: number; count: number }>;
 }
 
 function buildDayKeys(days: number): string[] {
@@ -80,30 +94,27 @@ function getProviderLabel(provider: string): string {
   }
 }
 
-export default async function ModelsPage() {
-  const session = await getSession();
+function buildEmptyModelStats(dayKeys: string[], hourKeys: string[]): ModelStats {
+  return {
+    totalRequests: 0,
+    successRate: null,
+    dailyRequests: dayKeys.map((day) => ({ date: day, count: 0 })),
+    avgDurationLastDay: null,
+    durationLast24Hours: hourKeys.map((time) => ({ time, avgDuration: null })),
+  };
+}
 
-  if (!session?.user?.id) {
-    return null;
-  }
-
-  const allModels = getAllModels();
-  const supportedModelSet = new Set(allModels);
-
-  const disabledModels = await db
-    .select({ model: disabledModel.model })
-    .from(disabledModel)
-    .where(eq(disabledModel.userId, session.user.id));
-  const disabledModelSet = new Set(
-    disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
-  );
-
+async function computeModelStatsByModel(
+  userId: string,
+  allModels: string[]
+): Promise<Record<string, ModelStats>> {
   const dayKeys = buildDayKeys(MODEL_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
   const hourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
   const hourKeySet = new Set(hourKeys);
   const durationStartDate = new Date(hourKeys[0]);
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
+  const supportedModelSet = new Set(allModels);
 
   const usageLogs = await db
     .select({
@@ -113,22 +124,9 @@ export default async function ModelsPage() {
       createdAt: usageLog.createdAt,
     })
     .from(usageLog)
-    .where(
-      and(
-        eq(usageLog.userId, session.user.id),
-        gte(usageLog.createdAt, statsStartDate),
-      ),
-    );
+    .where(and(eq(usageLog.userId, userId), gte(usageLog.createdAt, statsStartDate)));
 
-  const statsByModel = new Map<
-    string,
-      {
-        totalRequests: number;
-        successfulRequests: number;
-        dailyCounts: Map<string, number>;
-        durationByHour: Map<string, { total: number; count: number }>;
-      }
-  >();
+  const rawStatsByModel = new Map<string, RawModelStats>();
 
   for (const log of usageLogs) {
     const modelId = normalizeLoggedModel(log.model);
@@ -142,7 +140,7 @@ export default async function ModelsPage() {
     }
 
     const current =
-      statsByModel.get(modelId) ??
+      rawStatsByModel.get(modelId) ??
       {
         totalRequests: 0,
         successfulRequests: 0,
@@ -170,10 +168,91 @@ export default async function ModelsPage() {
     }
 
     current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + 1);
-    statsByModel.set(modelId, current);
+    rawStatsByModel.set(modelId, current);
   }
 
-  // Get models per provider to determine which providers have models
+  return Object.fromEntries(
+    allModels.map((model) => {
+      const modelStats = rawStatsByModel.get(model);
+      if (!modelStats) {
+        return [model, buildEmptyModelStats(dayKeys, hourKeys)];
+      }
+
+      const durationLast24Hours = hourKeys.map((time) => {
+        const durationBucket = modelStats.durationByHour.get(time);
+        return {
+          time,
+          avgDuration:
+            durationBucket && durationBucket.count > 0
+              ? Math.round(durationBucket.total / durationBucket.count)
+              : null,
+        };
+      });
+
+      const durationTotalLastDay = Array.from(modelStats.durationByHour.values()).reduce(
+        (sum, durationBucket) => sum + durationBucket.total,
+        0
+      );
+      const durationCountLastDay = Array.from(modelStats.durationByHour.values()).reduce(
+        (sum, durationBucket) => sum + durationBucket.count,
+        0
+      );
+
+      const stats: ModelStats = {
+        totalRequests: modelStats.totalRequests,
+        successRate:
+          modelStats.totalRequests > 0
+            ? Math.round((modelStats.successfulRequests / modelStats.totalRequests) * 100)
+            : null,
+        dailyRequests: dayKeys.map((day) => ({
+          date: day,
+          count: modelStats.dailyCounts.get(day) ?? 0,
+        })),
+        avgDurationLastDay:
+          durationCountLastDay > 0
+            ? Math.round(durationTotalLastDay / durationCountLastDay)
+            : null,
+        durationLast24Hours,
+      };
+
+      return [model, stats];
+    })
+  );
+}
+
+async function getModelStatsByModel(
+  userId: string,
+  allModels: string[]
+): Promise<Record<string, ModelStats>> {
+  const cachedPayload = await getCachedModelStats<CachedModelStatsPayload>(userId);
+  if (cachedPayload?.statsByModel) {
+    return cachedPayload.statsByModel;
+  }
+
+  const statsByModel = await computeModelStatsByModel(userId, allModels);
+  await setCachedModelStats<CachedModelStatsPayload>(userId, { statsByModel });
+  return statsByModel;
+}
+
+async function ModelsContent() {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  const allModels = getAllModels();
+
+  const disabledModels = await db
+    .select({ model: disabledModel.model })
+    .from(disabledModel)
+    .where(eq(disabledModel.userId, session.user.id));
+  const disabledModelSet = new Set(
+    disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
+  );
+
+  const statsByModel = await getModelStatsByModel(session.user.id, allModels);
+
   const iflowModels = getModelsForProvider(ProviderName.IFLOW);
   const antigravityModels = getModelsForProvider(ProviderName.ANTIGRAVITY);
   const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
@@ -185,7 +264,6 @@ export default async function ModelsPage() {
   const ollamaCloudModels = getModelsForProvider(ProviderName.OLLAMA_CLOUD);
   const openRouterModels = getModelsForProvider(ProviderName.OPENROUTER);
 
-  // Build available providers list (only those with models)
   const availableProviders: { id: string; label: string }[] = [];
   if (iflowModels.length > 0) {
     availableProviders.push({ id: ProviderName.IFLOW, label: "Iflow" });
@@ -218,54 +296,12 @@ export default async function ModelsPage() {
     availableProviders.push({ id: ProviderName.OPENROUTER, label: "OpenRouter" });
   }
 
-  // Create models with provider info
+  const fallbackDayKeys = buildDayKeys(MODEL_STATS_DAYS);
+  const fallbackHourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
+
   const modelsWithProviders = allModels.map((model) => {
     const info = MODEL_REGISTRY[model];
     const providers = getProvidersForModel(model);
-    const modelStats = statsByModel.get(model);
-    const totalRequests = modelStats?.totalRequests ?? 0;
-    const successfulRequests = modelStats?.successfulRequests ?? 0;
-    const durationLast24Hours = hourKeys.map((time) => {
-      const durationBucket = modelStats?.durationByHour.get(time);
-
-      return {
-        time,
-        avgDuration:
-          durationBucket && durationBucket.count > 0
-            ? Math.round(durationBucket.total / durationBucket.count)
-            : null,
-      };
-    });
-    const durationTotalLastDay =
-      modelStats
-        ? Array.from(modelStats.durationByHour.values()).reduce(
-            (sum, durationBucket) => sum + durationBucket.total,
-            0
-          )
-        : 0;
-    const durationCountLastDay =
-      modelStats
-        ? Array.from(modelStats.durationByHour.values()).reduce(
-            (sum, durationBucket) => sum + durationBucket.count,
-            0
-          )
-        : 0;
-    const stats: ModelStats = {
-      totalRequests,
-      successRate:
-        totalRequests > 0
-          ? Math.round((successfulRequests / totalRequests) * 100)
-          : null,
-      dailyRequests: dayKeys.map((day) => ({
-        date: day,
-        count: modelStats?.dailyCounts.get(day) ?? 0,
-      })),
-      avgDurationLastDay:
-        durationCountLastDay > 0
-          ? Math.round(durationTotalLastDay / durationCountLastDay)
-          : null,
-      durationLast24Hours,
-    };
 
     return {
       id: model,
@@ -273,7 +309,7 @@ export default async function ModelsPage() {
       providerLabels: providers.map(getProviderLabel),
       meta: info?.meta,
       isEnabled: !disabledModelSet.has(model),
-      stats,
+      stats: statsByModel[model] ?? buildEmptyModelStats(fallbackDayKeys, fallbackHourKeys),
     };
   });
 
@@ -282,13 +318,19 @@ export default async function ModelsPage() {
       <div className="pb-4 border-b border-border">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-xl font-semibold">Available Models</h2>
-          <span className="text-sm text-muted-foreground">
-            {allModels.length} models
-          </span>
+          <span className="text-sm text-muted-foreground">{allModels.length} models</span>
         </div>
       </div>
 
       <ModelsList models={modelsWithProviders} availableProviders={availableProviders} />
     </div>
+  );
+}
+
+export default function ModelsPage() {
+  return (
+    <Suspense fallback={<ModelsLoading />}>
+      <ModelsContent />
+    </Suspense>
   );
 }
