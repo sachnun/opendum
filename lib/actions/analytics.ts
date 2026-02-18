@@ -1,7 +1,9 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { proxyApiKey, usageLog } from "@/lib/db/schema";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { buildAnalyticsCacheKey, getAnalyticsCacheVersion } from "@/lib/cache/analytics-cache";
 import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 
@@ -310,7 +312,7 @@ export async function getAnalyticsData(
   apiKeyId?: string,
   options: GetAnalyticsOptions = {}
 ): Promise<ActionResult<AnalyticsData>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -327,13 +329,11 @@ export async function getAnalyticsData(
 
   try {
     if (apiKeyId) {
-      const ownedApiKey = await prisma.proxyApiKey.findFirst({
-        where: {
-          id: apiKeyId,
-          userId,
-        },
-        select: { id: true },
-      });
+      const [ownedApiKey] = await db
+        .select({ id: proxyApiKey.id })
+        .from(proxyApiKey)
+        .where(and(eq(proxyApiKey.id, apiKeyId), eq(proxyApiKey.userId, userId)))
+        .limit(1);
 
       if (!ownedApiKey) {
         return { success: false, error: "API key not found" };
@@ -362,21 +362,25 @@ export async function getAnalyticsData(
     }
 
     // Fetch all logs in the period
-    const logs = await prisma.usageLog.findMany({
-      where: {
-        userId,
-        createdAt: { gte: startDate, lte: endDate },
-        ...(apiKeyId ? { proxyApiKeyId: apiKeyId } : {}),
-      },
-      select: {
-        model: true,
-        inputTokens: true,
-        outputTokens: true,
-        statusCode: true,
-        duration: true,
-        createdAt: true,
-      },
-    });
+    const conditions = [
+      eq(usageLog.userId, userId),
+      gte(usageLog.createdAt, startDate),
+      lte(usageLog.createdAt, endDate),
+    ];
+    if (apiKeyId) {
+      conditions.push(eq(usageLog.proxyApiKeyId, apiKeyId));
+    }
+    const logs = await db
+      .select({
+        model: usageLog.model,
+        inputTokens: usageLog.inputTokens,
+        outputTokens: usageLog.outputTokens,
+        statusCode: usageLog.statusCode,
+        duration: usageLog.duration,
+        createdAt: usageLog.createdAt,
+      })
+      .from(usageLog)
+      .where(and(...conditions));
 
     // Generate time slots for filling gaps based on granularity
     const timeSlots = generateTimeSlots(startDate, endDate, config);

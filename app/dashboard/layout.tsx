@@ -1,5 +1,7 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -72,21 +74,21 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     redirect("/");
   }
 
-  const providerAccounts = await prisma.providerAccount.findMany({
-    where: { userId: session.user.id },
-    select: {
-      provider: true,
-      isActive: true,
-      lastErrorAt: true,
-      lastSuccessAt: true,
-    },
-  });
+  const providerAccounts = await db
+    .select({
+      provider: providerAccount.provider,
+      isActive: providerAccount.isActive,
+      lastErrorAt: providerAccount.lastErrorAt,
+      lastSuccessAt: providerAccount.lastSuccessAt,
+    })
+    .from(providerAccount)
+    .where(eq(providerAccount.userId, session.user.id));
 
   const accountCounts: ProviderAccountCounts = {
     antigravity: 0,

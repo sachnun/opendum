@@ -1,8 +1,10 @@
 // Antigravity Provider Implementation
 
-import type { ProviderAccount } from "@prisma/client";
+import type { ProviderAccount } from "@/lib/db/schema";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
@@ -124,7 +126,7 @@ export const antigravityProvider: Provider = {
     // Or use a simpler approach - store verifier and generate challenge inline
     const params = new URLSearchParams({
       client_id: ANTIGRAVITY_CLIENT_ID,
-      redirect_uri: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/oauth/antigravity/callback`,
+      redirect_uri: `${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/api/oauth/antigravity/callback`,
       response_type: "code",
       scope: ANTIGRAVITY_SCOPES.join(" "),
       access_type: "offline",
@@ -229,17 +231,17 @@ export const antigravityProvider: Provider = {
         const newTokens = await this.refreshToken(refreshTokenValue);
 
         // Update database
-        await prisma.providerAccount.update({
-          where: { id: account.id },
-          data: {
+        await db
+          .update(providerAccount)
+          .set({
             accessToken: encrypt(newTokens.accessToken),
             refreshToken: encrypt(newTokens.refreshToken),
             expiresAt: newTokens.expiresAt,
             projectId: newTokens.projectId,
             tier: newTokens.tier,
             email: newTokens.email || account.email,
-          },
-        });
+          })
+          .where(eq(providerAccount.id, account.id));
 
         accessToken = newTokens.accessToken;
       } catch (error) {

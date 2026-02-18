@@ -1,5 +1,7 @@
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { providerAccount, usageLog } from "@/lib/db/schema";
+import { eq, and, gte, inArray, desc } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
@@ -24,17 +26,18 @@ export default async function AccountsPage({
 }: {
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   const params = await searchParams;
 
   if (!session?.user?.id) {
     return null;
   }
 
-  const accounts = await prisma.providerAccount.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const accounts = await db
+    .select()
+    .from(providerAccount)
+    .where(eq(providerAccount.userId, session.user.id))
+    .orderBy(desc(providerAccount.createdAt));
 
   const dayKeys = buildDayKeys(ACCOUNT_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
@@ -42,18 +45,20 @@ export default async function AccountsPage({
   const accountIds = accounts.map((account) => account.id);
 
   const usageLogs = accountIds.length
-    ? await prisma.usageLog.findMany({
-        where: {
-          userId: session.user.id,
-          providerAccountId: { in: accountIds },
-          createdAt: { gte: statsStartDate },
-        },
-        select: {
-          providerAccountId: true,
-          statusCode: true,
-          createdAt: true,
-        },
-      })
+    ? await db
+        .select({
+          providerAccountId: usageLog.providerAccountId,
+          statusCode: usageLog.statusCode,
+          createdAt: usageLog.createdAt,
+        })
+        .from(usageLog)
+        .where(
+          and(
+            eq(usageLog.userId, session.user.id),
+            inArray(usageLog.providerAccountId, accountIds),
+            gte(usageLog.createdAt, statsStartDate),
+          ),
+        )
     : [];
 
   const statsByAccountId = new Map<

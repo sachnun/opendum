@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { disabledModel } from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { invalidateDisabledModelsCache } from "@/lib/proxy/auth";
 import {
   getModelLookupKeys,
@@ -21,7 +23,7 @@ export async function setModelEnabled(
   modelId: string,
   enabled: boolean
 ): Promise<ActionResult<{ model: string; enabled: boolean }>> {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized" };
@@ -36,26 +38,24 @@ export async function setModelEnabled(
   try {
     if (enabled) {
       const modelLookupKeys = getModelLookupKeys(normalizedModel);
-      await prisma.disabledModel.deleteMany({
-        where: {
-          userId: session.user.id,
-          model: { in: modelLookupKeys },
-        },
-      });
+      await db
+        .delete(disabledModel)
+        .where(
+          and(
+            eq(disabledModel.userId, session.user.id),
+            inArray(disabledModel.model, modelLookupKeys)
+          )
+        );
     } else {
-      await prisma.disabledModel.upsert({
-        where: {
-          userId_model: {
-            userId: session.user.id,
-            model: normalizedModel,
-          },
-        },
-        update: {},
-        create: {
+      await db
+        .insert(disabledModel)
+        .values({
           userId: session.user.id,
           model: normalizedModel,
-        },
-      });
+        })
+        .onConflictDoNothing({
+          target: [disabledModel.userId, disabledModel.model],
+        });
     }
 
     await invalidateDisabledModelsCache(session.user.id);

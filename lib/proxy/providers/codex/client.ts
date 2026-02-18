@@ -2,9 +2,11 @@
 // Uses Device Code Flow for OAuth via auth.openai.com
 // API uses Responses API format, but we convert to/from Chat Completions format
 
-import type { ProviderAccount } from "@prisma/client";
+import type { ProviderAccount } from "@/lib/db/schema";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
@@ -1388,10 +1390,10 @@ export const codexProvider: Provider = {
     const resolvedAccountId = extractAccountIdFromJwt(accessToken);
     if (resolvedAccountId && resolvedAccountId !== account.accountId) {
       try {
-        await prisma.providerAccount.update({
-          where: { id: account.id },
-          data: { accountId: resolvedAccountId },
-        });
+        await db
+          .update(providerAccount)
+          .set({ accountId: resolvedAccountId })
+          .where(eq(providerAccount.id, account.id));
         account.accountId = resolvedAccountId;
       } catch {
         // Ignore account ID sync failures
@@ -1415,10 +1417,10 @@ export const codexProvider: Provider = {
           account.accountId = newTokens.accountId;
         }
 
-        await prisma.providerAccount.update({
-          where: { id: account.id },
-          data: updateData,
-        });
+        await db
+          .update(providerAccount)
+          .set(updateData)
+          .where(eq(providerAccount.id, account.id));
 
         accessToken = newTokens.accessToken;
       } catch (error) {

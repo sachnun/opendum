@@ -1,4 +1,4 @@
-import type { ProviderAccount } from "@prisma/client";
+import type { ProviderAccount } from "@/lib/db/schema";
 import { decrypt } from "@/lib/encryption";
 import type {
   ChatCompletionRequest,

@@ -3,7 +3,9 @@
 // Note: On-demand token refresh is handled by each provider, so this is just proactive refresh
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { getProvider, isValidProvider } from "@/lib/proxy/providers/registry";
 import { OAUTH_PROVIDER_NAMES, type ProviderNameType } from "@/lib/proxy/providers/types";
@@ -32,23 +34,25 @@ export async function GET() {
 
   try {
     // Get all active provider accounts
-    const accounts = await prisma.providerAccount.findMany({
-      where: {
-        isActive: true,
-        provider: { in: OAUTH_PROVIDER_NAMES },
-      },
-      select: {
-        id: true,
-        provider: true,
-        email: true,
-        refreshToken: true,
-        accessToken: true,
-        expiresAt: true,
-        apiKey: true,
-        projectId: true,
-        tier: true,
-      },
-    });
+    const accounts = await db
+      .select({
+        id: providerAccount.id,
+        provider: providerAccount.provider,
+        email: providerAccount.email,
+        refreshToken: providerAccount.refreshToken,
+        accessToken: providerAccount.accessToken,
+        expiresAt: providerAccount.expiresAt,
+        apiKey: providerAccount.apiKey,
+        projectId: providerAccount.projectId,
+        tier: providerAccount.tier,
+      })
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.isActive, true),
+          inArray(providerAccount.provider, [...OAUTH_PROVIDER_NAMES]),
+        ),
+      );
 
     // Calculate threshold time
     const thresholdTime = new Date(
@@ -119,10 +123,10 @@ export async function GET() {
         }
 
         // Update database
-        await prisma.providerAccount.update({
-          where: { id: account.id },
-          data: updateData,
-        });
+        await db
+          .update(providerAccount)
+          .set(updateData)
+          .where(eq(providerAccount.id, account.id));
 
         results.push({
           accountId: account.id,

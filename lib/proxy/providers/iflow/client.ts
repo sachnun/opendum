@@ -1,9 +1,11 @@
 // Iflow Provider Implementation
 
-import type { ProviderAccount } from "@prisma/client";
+import type { ProviderAccount } from "@/lib/db/schema";
 import { createHmac, randomUUID } from "crypto";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { providerAccount } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
@@ -430,10 +432,10 @@ export const iflowProvider: Provider = {
         }
 
         // Update database IMMEDIATELY (rotating token concern)
-        await prisma.providerAccount.update({
-          where: { id: account.id },
-          data: updateData,
-        });
+        await db
+          .update(providerAccount)
+          .set(updateData)
+          .where(eq(providerAccount.id, account.id));
 
       } catch (error) {
         console.error(

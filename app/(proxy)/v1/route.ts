@@ -15,7 +15,7 @@ const jsonErrorResponse = () =>
   );
 
 // GET request (browser) -> redirect to dashboard
-export const GET = () => NextResponse.redirect(new URL("/dashboard", process.env.NEXTAUTH_URL || "http://localhost:3000"));
+export const GET = () => NextResponse.redirect(new URL("/dashboard", process.env.BETTER_AUTH_URL || "http://localhost:3000"));
 
 // Other methods -> JSON error
 export const POST = jsonErrorResponse;
