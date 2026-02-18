@@ -31,4 +31,5 @@ bun-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/lib/generated/prisma
+# local dev database (PGlite)
+.pglite/
