@@ -14,6 +14,7 @@ import {
   parseRetryAfterMs,
 } from "@/lib/proxy/rate-limit";
 import { isModelSupportedByProvider } from "@/lib/proxy/models";
+import { recordLatency } from "@/lib/proxy/adaptive-timeout";
 import {
   buildAccountErrorMessage,
   getErrorMessage,
@@ -1194,6 +1195,7 @@ export async function POST(request: NextRequest) {
           ? await providerImpl.prepareRequest(account, normalizedOpenAIPayload, "messages")
           : normalizedOpenAIPayload;
 
+        const requestStartTime = Date.now();
         const providerResponse = await providerImpl.makeRequest(
           credentials,
           account,
@@ -1299,6 +1301,7 @@ export async function POST(request: NextRequest) {
           const transformer = createAnthropicStreamTransformer(model, (usage) => {
             // Track success for this account (non-blocking)
             markAccountSuccess(account.id).catch(() => undefined);
+            recordLatency(account.provider, model, true, Date.now() - requestStartTime).catch(() => undefined);
 
             logUsage({
               userId: authenticatedUserId,
@@ -1329,6 +1332,7 @@ export async function POST(request: NextRequest) {
 
         // Track success for this account (non-blocking)
         markAccountSuccess(account.id).catch(() => undefined);
+        recordLatency(account.provider, model, false, Date.now() - requestStartTime).catch(() => undefined);
 
         logUsage({
           userId: authenticatedUserId,

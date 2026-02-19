@@ -26,6 +26,7 @@ import {
   type ProxyErrorType,
   shouldRotateToNextAccount,
 } from "@/lib/proxy/error-utils";
+import { recordLatency } from "@/lib/proxy/adaptive-timeout";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { providerAccount } from "@/lib/db/schema";
@@ -622,6 +623,7 @@ export async function POST(request: NextRequest) {
           ? await providerImpl.prepareRequest(account, baseRequestBody, "responses")
           : baseRequestBody;
 
+        const requestStartTime = Date.now();
         const providerResponse = await providerImpl.makeRequest(
           credentials,
           account,
@@ -741,6 +743,7 @@ export async function POST(request: NextRequest) {
 
           const usageTracker = createUsageTrackingStream((usage) => {
             markAccountSuccess(account.id).catch(() => undefined);
+            recordLatency(account.provider, model, true, Date.now() - requestStartTime).catch(() => undefined);
 
             logUsage({
               userId: authenticatedUserId,
@@ -768,6 +771,7 @@ export async function POST(request: NextRequest) {
         const responseData = await providerResponse.json();
 
         markAccountSuccess(account.id).catch(() => undefined);
+        recordLatency(account.provider, model, false, Date.now() - requestStartTime).catch(() => undefined);
 
         logUsage({
           userId: authenticatedUserId,
