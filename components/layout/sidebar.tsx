@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   type ProviderAccountIndicator,
   type ProviderAccountIndicators,
@@ -45,6 +46,45 @@ export function Sidebar({
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
   const normalizedAccountsSubmenuSearch = accountsSubmenuSearch.trim().toLowerCase();
+
+  const primaryNavRef = useRef<HTMLElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [isBottomMenuExpanded, setIsBottomMenuExpanded] = useState(true);
+
+  const checkOverflow = useCallback(() => {
+    const el = primaryNavRef.current;
+    if (!el) return;
+    const overflowing = el.scrollHeight > el.clientHeight;
+    setIsOverflowing(overflowing);
+    if (overflowing) {
+      setIsBottomMenuExpanded(false);
+    } else {
+      setIsBottomMenuExpanded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = primaryNavRef.current;
+    if (!el) return;
+
+    checkOverflow();
+
+    const resizeObserver = new ResizeObserver(() => {
+      checkOverflow();
+    });
+    resizeObserver.observe(el);
+
+    // Also observe children changes via MutationObserver
+    const mutationObserver = new MutationObserver(() => {
+      checkOverflow();
+    });
+    mutationObserver.observe(el, { childList: true, subtree: true });
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [checkOverflow]);
 
   const renderNavItem = (item: NavItem) => {
     const isActive =
@@ -134,7 +174,7 @@ export function Sidebar({
               </div>
             ) : null}
 
-            <div className={cn(isAccountsItem && "max-h-48 overflow-y-auto pr-1")}>
+            <div>
               {visibleSubItems.length ? (
                 visibleSubItems.map((subItem) => {
                   const isSubActive = isSubItemActive(subItem);
@@ -151,7 +191,7 @@ export function Sidebar({
                       ? accountIndicatorByAnchorId[subItem.anchorId]
                       : undefined;
                   const shouldShowSubItemCount =
-                    typeof subItemCount === "number" && subItemCount > 0;
+                    !isAccountsItem && typeof subItemCount === "number" && subItemCount > 0;
                   const shouldShowIndicator =
                     typeof activeSubItemCount === "number" && activeSubItemCount > 0;
 
@@ -225,12 +265,30 @@ export function Sidebar({
         </Link>
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
-        <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <nav ref={primaryNavRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
         </nav>
-        <nav className="mt-4 shrink-0 space-y-1 border-t border-border/60 pt-4">
-          {supportNavigation.map(renderNavItem)}
-        </nav>
+        <div className="shrink-0">
+          {isOverflowing ? (
+            <button
+              type="button"
+              onClick={() => setIsBottomMenuExpanded((prev) => !prev)}
+              className="flex w-full items-center justify-center border-t border-border/60 pt-2 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={isBottomMenuExpanded ? "Collapse menu" : "Expand menu"}
+            >
+              {isBottomMenuExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </button>
+          ) : null}
+          {isBottomMenuExpanded ? (
+            <nav className={cn("space-y-1", isOverflowing ? "pt-2" : "mt-4 border-t border-border/60 pt-4")}>
+              {supportNavigation.map(renderNavItem)}
+            </nav>
+          ) : null}
+        </div>
       </div>
     </div>
   );
