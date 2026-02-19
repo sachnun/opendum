@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   QWEN_CODE_CLIENT_ID,
   QWEN_CODE_SCOPE,
@@ -342,9 +343,12 @@ export const qwenCodeProvider: Provider = {
       stream
     );
 
-    const timeoutMs = stream
+    const fallbackMs = stream
       ? qwenCodeConfig.timeouts.streamMs
       : qwenCodeConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      qwenCodeConfig.name, body.model, stream, fallbackMs
+    );
     const response = await fetchWithTimeout(`${QWEN_CODE_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {

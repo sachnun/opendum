@@ -13,6 +13,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   ANTIGRAVITY_CLIENT_ID,
   ANTIGRAVITY_CLIENT_SECRET,
@@ -330,9 +331,12 @@ export const antigravityProvider: Provider = {
       const url = `${endpoint}/v1internal:${action}`;
 
       try {
-        const timeoutMs = actualStream
+        const fallbackMs = actualStream
           ? antigravityConfig.timeouts.streamMs
           : antigravityConfig.timeouts.nonStreamMs;
+        const timeoutMs = await getAdaptiveTimeout(
+          antigravityConfig.name, body.model, actualStream, fallbackMs
+        );
         const response = await fetchWithTimeout(url, {
           method: "POST",
           headers,

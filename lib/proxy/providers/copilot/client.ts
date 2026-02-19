@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   COPILOT_CLIENT_ID,
   COPILOT_DEVICE_CODE_ENDPOINT,
@@ -369,9 +370,12 @@ export const copilotProvider: Provider = {
       stream
     );
 
-    const timeoutMs = stream
+    const fallbackMs = stream
       ? copilotConfig.timeouts.streamMs
       : copilotConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      copilotConfig.name, body.model, stream, fallbackMs
+    );
     return fetchWithTimeout(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),

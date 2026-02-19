@@ -28,6 +28,7 @@ import {
 } from "./constants";
 
 import type { ReasoningConfig } from "../types";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 
 interface TokenResponse {
   access_token: string;
@@ -509,9 +510,12 @@ export const iflowProvider: Provider = {
       headers["x-iflow-timestamp"] = timestamp.toString();
     }
 
-    const timeoutMs = stream
+    const fallbackMs = stream
       ? iflowConfig.timeouts.streamMs
       : iflowConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      iflowConfig.name, body.model, stream, fallbackMs
+    );
     const response = await fetchWithTimeout(`${IFLOW_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers,

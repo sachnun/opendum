@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   OLLAMA_CLOUD_API_BASE_URL,
   OLLAMA_CLOUD_MODELS,
@@ -105,9 +106,12 @@ export const ollamaCloudProvider: Provider = {
       stream
     );
 
-    const timeoutMs = stream
+    const fallbackMs = stream
       ? ollamaCloudConfig.timeouts.streamMs
       : ollamaCloudConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      ollamaCloudConfig.name, body.model, stream, fallbackMs
+    );
     return fetchWithTimeout(`${OLLAMA_CLOUD_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {

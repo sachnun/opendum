@@ -15,6 +15,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   CODEX_CLIENT_ID,
   CODEX_DEVICE_CODE_ENDPOINT,
@@ -1483,11 +1484,14 @@ export const codexProvider: Provider = {
     }
 
     // Codex always streams upstream, so use the stream timeout
+    const timeoutMs = await getAdaptiveTimeout(
+      codexConfig.name, body.model, true, codexConfig.timeouts.streamMs
+    );
     const response = await fetchWithTimeout(CODEX_API_BASE_URL, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
-    }, codexConfig.timeouts.streamMs);
+    }, timeoutMs);
 
     try {
       updateCodexQuotaFromHeaders(account.id, response.headers);

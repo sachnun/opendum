@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   NVIDIA_NIM_API_BASE_URL,
   NVIDIA_NIM_MODELS,
@@ -105,9 +106,12 @@ export const nvidiaNimProvider: Provider = {
       stream
     );
 
-    const timeoutMs = stream
+    const fallbackMs = stream
       ? nvidiaNimConfig.timeouts.streamMs
       : nvidiaNimConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      nvidiaNimConfig.name, body.model, stream, fallbackMs
+    );
     return fetchWithTimeout(`${NVIDIA_NIM_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {

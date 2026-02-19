@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   OPENROUTER_API_BASE_URL,
   OPENROUTER_MODELS,
@@ -105,9 +106,12 @@ export const openRouterProvider: Provider = {
       stream
     );
 
-    const timeoutMs = stream
+    const fallbackMs = stream
       ? openRouterConfig.timeouts.streamMs
       : openRouterConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      openRouterConfig.name, body.model, stream, fallbackMs
+    );
     return fetchWithTimeout(`${OPENROUTER_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {

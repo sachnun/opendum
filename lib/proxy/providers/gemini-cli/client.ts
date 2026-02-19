@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
+import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   GEMINI_CLI_CLIENT_ID,
   GEMINI_CLI_CLIENT_SECRET,
@@ -428,9 +429,12 @@ export const geminiCliProvider: Provider = {
     });
 
     // Make the request
-    const timeoutMs = stream
+    const fallbackMs = stream
       ? geminiCliConfig.timeouts.streamMs
       : geminiCliConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      geminiCliConfig.name, body.model, stream, fallbackMs
+    );
     const response = await fetchWithTimeout(
       stream ? `${url}?alt=sse` : url,
       {
