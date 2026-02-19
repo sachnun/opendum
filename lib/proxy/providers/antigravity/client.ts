@@ -11,6 +11,8 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   ANTIGRAVITY_CLIENT_ID,
   ANTIGRAVITY_CLIENT_SECRET,
@@ -111,6 +113,7 @@ export const antigravityConfig: ProviderConfig = {
   name: "antigravity",
   displayName: "Antigravity (Google)",
   supportedModels: ANTIGRAVITY_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const antigravityProvider: Provider = {
@@ -327,11 +330,14 @@ export const antigravityProvider: Provider = {
       const url = `${endpoint}/v1internal:${action}`;
 
       try {
-        const response = await fetch(url, {
+        const timeoutMs = actualStream
+          ? antigravityConfig.timeouts.streamMs
+          : antigravityConfig.timeouts.nonStreamMs;
+        const response = await fetchWithTimeout(url, {
           method: "POST",
           headers,
           body: result.body,
-        });
+        }, timeoutMs);
 
         // Check if error is retryable (account/server related) vs parameter error
         // Retryable: 5xx (server), 429 (rate limit), 401 (auth), 403 (permission), 404 (endpoint)

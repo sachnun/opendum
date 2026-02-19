@@ -178,9 +178,9 @@ const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
 ];
 
 const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
-  "nvidia_nim",
   "ollama_cloud",
   "openrouter",
+  "nvidia_nim",
 ];
 
 

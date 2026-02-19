@@ -6,6 +6,8 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   OLLAMA_CLOUD_API_BASE_URL,
   OLLAMA_CLOUD_MODELS,
@@ -48,6 +50,7 @@ export const ollamaCloudConfig: ProviderConfig = {
   name: "ollama_cloud",
   displayName: "Ollama Cloud",
   supportedModels: OLLAMA_CLOUD_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const ollamaCloudProvider: Provider = {
@@ -102,7 +105,10 @@ export const ollamaCloudProvider: Provider = {
       stream
     );
 
-    return fetch(`${OLLAMA_CLOUD_API_BASE_URL}/chat/completions`, {
+    const timeoutMs = stream
+      ? ollamaCloudConfig.timeouts.streamMs
+      : ollamaCloudConfig.timeouts.nonStreamMs;
+    return fetchWithTimeout(`${OLLAMA_CLOUD_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -110,6 +116,6 @@ export const ollamaCloudProvider: Provider = {
         Accept: stream ? "text/event-stream" : "application/json",
       },
       body: JSON.stringify(requestPayload),
-    });
+    }, timeoutMs);
   },
 };

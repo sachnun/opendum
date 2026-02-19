@@ -11,6 +11,7 @@ import {
   OPENROUTER_MODEL_MAP,
   OPENROUTER_MODELS,
 } from "./providers/openrouter/constants";
+import { IGNORED_MODELS } from "./ignored-models";
 
 /**
  * Model metadata from models.dev
@@ -1951,6 +1952,11 @@ const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = mergeModelRegistries
   OLLAMA_CLOUD_FALLBACK_REGISTRY,
   OPENROUTER_FALLBACK_REGISTRY,
 ]);
+
+// Filter out ignored models from the effective registry
+for (const model of IGNORED_MODELS) {
+  delete EFFECTIVE_MODEL_REGISTRY[model];
+}
 
 // Build reverse lookup for aliases
 const aliasToCanonical: Record<string, string> = {};

@@ -6,6 +6,8 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   OPENROUTER_API_BASE_URL,
   OPENROUTER_MODELS,
@@ -48,6 +50,7 @@ export const openRouterConfig: ProviderConfig = {
   name: "openrouter",
   displayName: "OpenRouter",
   supportedModels: OPENROUTER_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const openRouterProvider: Provider = {
@@ -102,7 +105,10 @@ export const openRouterProvider: Provider = {
       stream
     );
 
-    return fetch(`${OPENROUTER_API_BASE_URL}/chat/completions`, {
+    const timeoutMs = stream
+      ? openRouterConfig.timeouts.streamMs
+      : openRouterConfig.timeouts.nonStreamMs;
+    return fetchWithTimeout(`${OPENROUTER_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -110,6 +116,6 @@ export const openRouterProvider: Provider = {
         Accept: stream ? "text/event-stream" : "application/json",
       },
       body: JSON.stringify(requestPayload),
-    });
+    }, timeoutMs);
   },
 };

@@ -12,6 +12,8 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   IFLOW_OAUTH_AUTHORIZE_URL,
   IFLOW_OAUTH_TOKEN_URL,
@@ -279,6 +281,7 @@ export const iflowConfig: ProviderConfig = {
   name: "iflow",
   displayName: "Iflow AI",
   supportedModels: IFLOW_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const iflowProvider: Provider = {
@@ -506,11 +509,14 @@ export const iflowProvider: Provider = {
       headers["x-iflow-timestamp"] = timestamp.toString();
     }
 
-    const response = await fetch(`${IFLOW_API_BASE_URL}/chat/completions`, {
+    const timeoutMs = stream
+      ? iflowConfig.timeouts.streamMs
+      : iflowConfig.timeouts.nonStreamMs;
+    const response = await fetchWithTimeout(`${IFLOW_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers,
       body: JSON.stringify(requestPayload),
-    });
+    }, timeoutMs);
 
     return response;
   },

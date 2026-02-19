@@ -99,7 +99,7 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter] = await Promise.all([
+  const [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim] = await Promise.all([
     getProvider(ProviderName.IFLOW),
     getProvider(ProviderName.ANTIGRAVITY),
     getProvider(ProviderName.COPILOT),
@@ -107,11 +107,11 @@ export async function getAllProviders(): Promise<Provider[]> {
     getProvider(ProviderName.GEMINI_CLI),
     getProvider(ProviderName.CODEX),
     getProvider(ProviderName.KIRO),
-    getProvider(ProviderName.NVIDIA_NIM),
     getProvider(ProviderName.OLLAMA_CLOUD),
     getProvider(ProviderName.OPENROUTER),
+    getProvider(ProviderName.NVIDIA_NIM),
   ]);
-  return [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, nvidiaNim, ollamaCloud, openRouter];
+  return [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim];
 }
 
 /**

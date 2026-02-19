@@ -6,6 +6,8 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   NVIDIA_NIM_API_BASE_URL,
   NVIDIA_NIM_MODELS,
@@ -48,6 +50,7 @@ export const nvidiaNimConfig: ProviderConfig = {
   name: "nvidia_nim",
   displayName: "Nvidia",
   supportedModels: NVIDIA_NIM_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const nvidiaNimProvider: Provider = {
@@ -102,7 +105,10 @@ export const nvidiaNimProvider: Provider = {
       stream
     );
 
-    return fetch(`${NVIDIA_NIM_API_BASE_URL}/chat/completions`, {
+    const timeoutMs = stream
+      ? nvidiaNimConfig.timeouts.streamMs
+      : nvidiaNimConfig.timeouts.nonStreamMs;
+    return fetchWithTimeout(`${NVIDIA_NIM_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -110,6 +116,6 @@ export const nvidiaNimProvider: Provider = {
         Accept: stream ? "text/event-stream" : "application/json",
       },
       body: JSON.stringify(requestPayload),
-    });
+    }, timeoutMs);
   },
 };

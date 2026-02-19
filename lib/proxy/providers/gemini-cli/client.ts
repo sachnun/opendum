@@ -12,6 +12,8 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   GEMINI_CLI_CLIENT_ID,
   GEMINI_CLI_CLIENT_SECRET,
@@ -173,6 +175,7 @@ export const geminiCliConfig: ProviderConfig = {
   name: "gemini_cli",
   displayName: "Gemini CLI",
   supportedModels: GEMINI_CLI_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const geminiCliProvider: Provider = {
@@ -425,13 +428,17 @@ export const geminiCliProvider: Provider = {
     });
 
     // Make the request
-    const response = await fetch(
+    const timeoutMs = stream
+      ? geminiCliConfig.timeouts.streamMs
+      : geminiCliConfig.timeouts.nonStreamMs;
+    const response = await fetchWithTimeout(
       stream ? `${url}?alt=sse` : url,
       {
         method: "POST",
         headers,
         body: JSON.stringify(requestPayload),
-      }
+      },
+      timeoutMs
     );
 
     // Transform response back to OpenAI format

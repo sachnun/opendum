@@ -3,12 +3,35 @@
 import type { ProviderAccount } from "@/lib/db/schema";
 
 /**
+ * Per-provider timeout configuration (milliseconds).
+ *
+ * `streamMs`    — TTFB timeout for streaming upstream requests.
+ *                 The server usually sends headers quickly once generation
+ *                 starts, so this can be short (default 5 s).
+ * `nonStreamMs` — TTFB timeout for non-streaming upstream requests.
+ *                 For non-stream the server buffers the full response before
+ *                 sending headers, so TTFB ≈ total processing time.
+ *                 Default 10 s but providers serving heavy models may need more.
+ */
+export interface ProviderTimeouts {
+  streamMs: number;
+  nonStreamMs: number;
+}
+
+/** Sensible defaults — override per-provider when needed. */
+export const DEFAULT_PROVIDER_TIMEOUTS: ProviderTimeouts = {
+  streamMs: 5_000,
+  nonStreamMs: 10_000,
+};
+
+/**
  * Provider configuration metadata
  */
 export interface ProviderConfig {
   name: string;
   displayName: string;
   supportedModels: Set<string>;
+  timeouts: ProviderTimeouts;
 }
 
 /**
@@ -176,9 +199,9 @@ export const ProviderName = {
   GEMINI_CLI: "gemini_cli",
   CODEX: "codex",
   KIRO: "kiro",
-  NVIDIA_NIM: "nvidia_nim",
   OLLAMA_CLOUD: "ollama_cloud",
   OPENROUTER: "openrouter",
+  NVIDIA_NIM: "nvidia_nim",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
@@ -207,7 +230,7 @@ export const OAUTH_PROVIDER_NAMES: ProviderNameType[] = [
 ];
 
 export const API_KEY_PROVIDER_NAMES: ProviderNameType[] = [
-  ProviderName.NVIDIA_NIM,
   ProviderName.OLLAMA_CLOUD,
   ProviderName.OPENROUTER,
+  ProviderName.NVIDIA_NIM,
 ];

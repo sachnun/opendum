@@ -9,6 +9,8 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   KIRO_API_BASE_URL,
   KIRO_BROWSER_REDIRECT_URI,
@@ -432,6 +434,7 @@ export const kiroConfig: ProviderConfig = {
   name: "kiro",
   displayName: "Kiro",
   supportedModels: KIRO_MODELS,
+  timeouts: { streamMs: 5_000, nonStreamMs: 5_000 },
 };
 
 export const kiroProvider: Provider = {
@@ -550,7 +553,8 @@ export const kiroProvider: Provider = {
       payload.profileArn = account.accountId;
     }
 
-    const upstreamResponse = await fetch(KIRO_API_BASE_URL, {
+    // Kiro always streams upstream, so use the stream timeout
+    const upstreamResponse = await fetchWithTimeout(KIRO_API_BASE_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${credentials}`,
@@ -564,7 +568,7 @@ export const kiroProvider: Provider = {
         "amz-sdk-request": "attempt=1; max=3",
       },
       body: JSON.stringify(payload),
-    });
+    }, kiroConfig.timeouts.streamMs);
 
     if (!upstreamResponse.ok) {
       return upstreamResponse;

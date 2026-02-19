@@ -12,6 +12,8 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   QWEN_CODE_CLIENT_ID,
   QWEN_CODE_SCOPE,
@@ -188,6 +190,7 @@ export const qwenCodeConfig: ProviderConfig = {
   name: "qwen_code",
   displayName: "Qwen Code",
   supportedModels: QWEN_CODE_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const qwenCodeProvider: Provider = {
@@ -339,7 +342,10 @@ export const qwenCodeProvider: Provider = {
       stream
     );
 
-    const response = await fetch(`${QWEN_CODE_API_BASE_URL}/chat/completions`, {
+    const timeoutMs = stream
+      ? qwenCodeConfig.timeouts.streamMs
+      : qwenCodeConfig.timeouts.nonStreamMs;
+    const response = await fetchWithTimeout(`${QWEN_CODE_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -351,7 +357,7 @@ export const qwenCodeProvider: Provider = {
           "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI",
       },
       body: JSON.stringify(requestPayload),
-    });
+    }, timeoutMs);
 
     // For streaming responses, transform to handle <think> tags
     if (stream && response.ok && response.body) {

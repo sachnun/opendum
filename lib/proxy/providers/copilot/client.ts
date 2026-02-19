@@ -9,6 +9,8 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
+import { fetchWithTimeout } from "../../timeout";
 import {
   COPILOT_CLIENT_ID,
   COPILOT_DEVICE_CODE_ENDPOINT,
@@ -197,6 +199,7 @@ export const copilotConfig: ProviderConfig = {
   name: "copilot",
   displayName: "GitHub Copilot",
   supportedModels: COPILOT_MODELS,
+  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const copilotProvider: Provider = {
@@ -366,11 +369,14 @@ export const copilotProvider: Provider = {
       stream
     );
 
-    return fetch(`${COPILOT_API_BASE_URL}/chat/completions`, {
+    const timeoutMs = stream
+      ? copilotConfig.timeouts.streamMs
+      : copilotConfig.timeouts.nonStreamMs;
+    return fetchWithTimeout(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
       body: JSON.stringify(requestPayload),
-    });
+    }, timeoutMs);
   },
 };
 
