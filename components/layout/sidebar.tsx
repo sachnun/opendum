@@ -50,16 +50,15 @@ export function Sidebar({
   const primaryNavRef = useRef<HTMLElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isBottomMenuExpanded, setIsBottomMenuExpanded] = useState(true);
+  const userToggledRef = useRef(false);
 
   const checkOverflow = useCallback(() => {
     const el = primaryNavRef.current;
     if (!el) return;
     const overflowing = el.scrollHeight > el.clientHeight;
     setIsOverflowing(overflowing);
-    if (overflowing) {
-      setIsBottomMenuExpanded(false);
-    } else {
-      setIsBottomMenuExpanded(true);
+    if (!userToggledRef.current) {
+      setIsBottomMenuExpanded(!overflowing);
     }
   }, []);
 
@@ -272,7 +271,10 @@ export function Sidebar({
           {isOverflowing ? (
             <button
               type="button"
-              onClick={() => setIsBottomMenuExpanded((prev) => !prev)}
+              onClick={() => {
+                userToggledRef.current = true;
+                setIsBottomMenuExpanded((prev) => !prev);
+              }}
               className="flex w-full items-center justify-center border-t border-border/60 pt-2 text-muted-foreground transition-colors hover:text-foreground"
               aria-label={isBottomMenuExpanded ? "Collapse menu" : "Expand menu"}
             >
