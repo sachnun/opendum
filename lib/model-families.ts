@@ -58,6 +58,7 @@ const _MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
     "gemini-2.5-flash-lite",
     "gemini-3-flash-preview",
     "gemini-3-pro-preview",
+    "gemini-3.1-pro-preview",
     "gemini-3-pro-image-preview",
   ],
   Qwen: [

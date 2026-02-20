@@ -43,6 +43,7 @@ export function applyAntigravitySystemInstruction(
   const needsInjection =
     normalizedModel.includes("claude") ||
     normalizedModel.includes("gemini-3-pro") ||
+    normalizedModel.includes("gemini-3.1-pro") ||
     normalizedModel.includes("gemini-3-flash");
 
   if (!needsInjection) {

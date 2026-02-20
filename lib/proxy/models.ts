@@ -472,13 +472,27 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     },
   },
   "gemini-3-pro-preview": {
-    providers: [ProviderName.ANTIGRAVITY, ProviderName.GEMINI_CLI, ProviderName.COPILOT],
+    providers: [ProviderName.GEMINI_CLI, ProviderName.COPILOT],
     aliases: ["gemini-3-pro", "gemini-3-pro-high", "gemini-3-pro-low"],
     meta: {
       contextLength: 1000000,
       outputLimit: 65000,
       knowledgeCutoff: "2025-11",
       releaseDate: "2025-11-19",
+      reasoning: true,
+      toolCall: true,
+      vision: true,
+      pricing: { input: 2, output: 12 },
+    },
+  },
+  "gemini-3.1-pro-preview": {
+    providers: [ProviderName.ANTIGRAVITY],
+    aliases: ["gemini-3.1-pro", "gemini-3.1-pro-high", "gemini-3.1-pro-low"],
+    meta: {
+      contextLength: 1048576,
+      outputLimit: 65536,
+      knowledgeCutoff: "2026-01",
+      releaseDate: "2026-02-19",
       reasoning: true,
       toolCall: true,
       vision: true,
