@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import {
   AlertTriangle,
   AlertCircle,
@@ -54,6 +54,7 @@ import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
+import type { ProviderAccountKey } from "@/lib/provider-accounts";
 
 type AccountQuotaInfo =
   | AntigravityAccountQuotaInfo
@@ -111,6 +112,7 @@ interface AccountsListProps {
   nvidiaNimAccounts: Account[];
   ollamaCloudAccounts: Account[];
   openRouterAccounts: Account[];
+  visibleProviders?: ProviderAccountKey[];
 }
 
 function formatTierLabel(tier: string): string {
@@ -664,6 +666,7 @@ interface ProviderSectionProps {
   emptyMessage: string;
   quotaByAccountId?: Record<string, AccountQuotaInfo>;
   isQuotaLoading?: boolean;
+  hideHeader?: boolean;
 }
 
 function ProviderSection({
@@ -674,15 +677,18 @@ function ProviderSection({
   emptyMessage,
   quotaByAccountId,
   isQuotaLoading = false,
+  hideHeader = false,
 }: ProviderSectionProps) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="text-base md:text-lg font-semibold">{title}</h3>
-        <Badge variant="outline" className="text-xs">
-          {accounts.length} connected
-        </Badge>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-2">
+          <h3 className="text-base md:text-lg font-semibold">{title}</h3>
+          <Badge variant="outline" className="text-xs">
+            {accounts.length} connected
+          </Badge>
+        </div>
+      )}
 
       <div className="pt-1">
         {accounts.length > 0 ? (
@@ -720,6 +726,7 @@ export function AccountsList({
   nvidiaNimAccounts,
   ollamaCloudAccounts,
   openRouterAccounts,
+  visibleProviders,
 }: AccountsListProps) {
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
@@ -932,6 +939,157 @@ export function AccountsList({
     fetchOpenRouterQuota,
   ]);
 
+  const visibleProviderSet =
+    visibleProviders && visibleProviders.length > 0
+      ? new Set<ProviderAccountKey>(visibleProviders)
+      : null;
+  const hasProviderFilter = visibleProviderSet !== null;
+  const shouldRenderProvider = (provider: ProviderAccountKey) =>
+    visibleProviderSet === null || visibleProviderSet.has(provider);
+
+  const oauthProviderSections: ReactNode[] = [];
+  if (shouldRenderProvider("antigravity")) {
+    oauthProviderSections.push(
+      <ProviderSection
+        key="antigravity"
+        id="antigravity-accounts"
+        title="Antigravity Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={antigravityAccounts}
+        showTier
+        emptyMessage="No Antigravity accounts connected yet."
+        quotaByAccountId={antigravityQuotaByAccountId}
+        isQuotaLoading={isAntigravityQuotaLoading}
+      />
+    );
+  }
+  if (shouldRenderProvider("codex")) {
+    oauthProviderSections.push(
+      <ProviderSection
+        key="codex"
+        id="codex-accounts"
+        title="Codex Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={codexAccounts}
+        showTier
+        emptyMessage="No Codex accounts connected yet."
+        quotaByAccountId={codexQuotaByAccountId}
+        isQuotaLoading={isCodexQuotaLoading}
+      />
+    );
+  }
+  if (shouldRenderProvider("iflow")) {
+    oauthProviderSections.push(
+      <ProviderSection
+        key="iflow"
+        id="iflow-accounts"
+        title="Iflow Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={iflowAccounts}
+        emptyMessage="No Iflow accounts connected yet."
+      />
+    );
+  }
+  if (shouldRenderProvider("kiro")) {
+    oauthProviderSections.push(
+      <ProviderSection
+        key="kiro"
+        id="kiro-accounts"
+        title="Kiro Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={kiroAccounts}
+        emptyMessage="No Kiro accounts connected yet."
+        quotaByAccountId={kiroQuotaByAccountId}
+        isQuotaLoading={isKiroQuotaLoading}
+      />
+    );
+  }
+  if (shouldRenderProvider("gemini_cli")) {
+    oauthProviderSections.push(
+      <ProviderSection
+        key="gemini-cli"
+        id="gemini-cli-accounts"
+        title="Gemini CLI Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={geminiCliAccounts}
+        showTier
+        emptyMessage="No Gemini CLI accounts connected yet."
+        quotaByAccountId={geminiCliQuotaByAccountId}
+        isQuotaLoading={isGeminiCliQuotaLoading}
+      />
+    );
+  }
+  if (shouldRenderProvider("qwen_code")) {
+    oauthProviderSections.push(
+      <ProviderSection
+        key="qwen-code"
+        id="qwen-code-accounts"
+        title="Qwen Code Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={qwenCodeAccounts}
+        emptyMessage="No Qwen Code accounts connected yet."
+      />
+    );
+  }
+  if (shouldRenderProvider("copilot")) {
+    oauthProviderSections.push(
+      <ProviderSection
+        key="copilot"
+        id="copilot-accounts"
+        title="Copilot Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={copilotAccounts}
+        emptyMessage="No Copilot accounts connected yet."
+        quotaByAccountId={copilotQuotaByAccountId}
+        isQuotaLoading={isCopilotQuotaLoading}
+      />
+    );
+  }
+
+  const apiKeyProviderSections: ReactNode[] = [];
+  if (shouldRenderProvider("nvidia_nim")) {
+    apiKeyProviderSections.push(
+      <ProviderSection
+        key="nvidia-nim"
+        id="nvidia-nim-accounts"
+        title="Nvidia Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={nvidiaNimAccounts}
+        emptyMessage="No Nvidia accounts connected yet."
+      />
+    );
+  }
+  if (shouldRenderProvider("ollama_cloud")) {
+    apiKeyProviderSections.push(
+      <ProviderSection
+        key="ollama-cloud"
+        id="ollama-cloud-accounts"
+        title="Ollama Cloud Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={ollamaCloudAccounts}
+        emptyMessage="No Ollama Cloud accounts connected yet."
+      />
+    );
+  }
+  if (shouldRenderProvider("openrouter")) {
+    apiKeyProviderSections.push(
+      <ProviderSection
+        key="openrouter"
+        id="openrouter-accounts"
+        title="OpenRouter Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={openRouterAccounts}
+        emptyMessage="No OpenRouter accounts connected yet."
+        quotaByAccountId={openRouterQuotaByAccountId}
+        isQuotaLoading={isOpenRouterQuotaLoading}
+      />
+    );
+  }
+
+  if (hasProviderFilter) {
+    return <div className="space-y-6">{[...oauthProviderSections, ...apiKeyProviderSections]}</div>;
+  }
+
   return (
     <div className="space-y-8">
       <section id="oauth-provider-accounts" className="space-y-5">
@@ -942,76 +1100,7 @@ export function AccountsList({
           </p>
         </div>
 
-        <div className="space-y-6">
-          {/* Antigravity Section */}
-          <ProviderSection
-            id="antigravity-accounts"
-            title="Antigravity Accounts"
-            accounts={antigravityAccounts}
-            showTier
-            emptyMessage="No Antigravity accounts connected yet."
-            quotaByAccountId={antigravityQuotaByAccountId}
-            isQuotaLoading={isAntigravityQuotaLoading}
-          />
-
-          {/* Codex Section */}
-          <ProviderSection
-            id="codex-accounts"
-            title="Codex Accounts"
-            accounts={codexAccounts}
-            showTier
-            emptyMessage="No Codex accounts connected yet."
-            quotaByAccountId={codexQuotaByAccountId}
-            isQuotaLoading={isCodexQuotaLoading}
-          />
-
-          {/* Iflow Section */}
-          <ProviderSection
-            id="iflow-accounts"
-            title="Iflow Accounts"
-            accounts={iflowAccounts}
-            emptyMessage="No Iflow accounts connected yet."
-          />
-
-          {/* Kiro Section */}
-          <ProviderSection
-            id="kiro-accounts"
-            title="Kiro Accounts"
-            accounts={kiroAccounts}
-            emptyMessage="No Kiro accounts connected yet."
-            quotaByAccountId={kiroQuotaByAccountId}
-            isQuotaLoading={isKiroQuotaLoading}
-          />
-
-          {/* Gemini CLI Section */}
-          <ProviderSection
-            id="gemini-cli-accounts"
-            title="Gemini CLI Accounts"
-            accounts={geminiCliAccounts}
-            showTier
-            emptyMessage="No Gemini CLI accounts connected yet."
-            quotaByAccountId={geminiCliQuotaByAccountId}
-            isQuotaLoading={isGeminiCliQuotaLoading}
-          />
-
-          {/* Qwen Code Section */}
-          <ProviderSection
-            id="qwen-code-accounts"
-            title="Qwen Code Accounts"
-            accounts={qwenCodeAccounts}
-            emptyMessage="No Qwen Code accounts connected yet."
-          />
-
-          {/* Copilot Section */}
-          <ProviderSection
-            id="copilot-accounts"
-            title="Copilot Accounts"
-            accounts={copilotAccounts}
-            emptyMessage="No Copilot accounts connected yet."
-            quotaByAccountId={copilotQuotaByAccountId}
-            isQuotaLoading={isCopilotQuotaLoading}
-          />
-        </div>
+        <div className="space-y-6">{oauthProviderSections}</div>
       </section>
 
       <section id="api-key-provider-accounts" className="space-y-5">
@@ -1022,33 +1111,7 @@ export function AccountsList({
           </p>
         </div>
 
-        <div className="space-y-6">
-          {/* Nvidia Section */}
-          <ProviderSection
-            id="nvidia-nim-accounts"
-            title="Nvidia Accounts"
-            accounts={nvidiaNimAccounts}
-            emptyMessage="No Nvidia accounts connected yet."
-          />
-
-          {/* Ollama Cloud Section */}
-          <ProviderSection
-            id="ollama-cloud-accounts"
-            title="Ollama Cloud Accounts"
-            accounts={ollamaCloudAccounts}
-            emptyMessage="No Ollama Cloud accounts connected yet."
-          />
-
-          {/* OpenRouter Section */}
-          <ProviderSection
-            id="openrouter-accounts"
-            title="OpenRouter Accounts"
-            accounts={openRouterAccounts}
-            emptyMessage="No OpenRouter accounts connected yet."
-            quotaByAccountId={openRouterQuotaByAccountId}
-            isQuotaLoading={isOpenRouterQuotaLoading}
-          />
-        </div>
+        <div className="space-y-6">{apiKeyProviderSections}</div>
       </section>
     </div>
   );

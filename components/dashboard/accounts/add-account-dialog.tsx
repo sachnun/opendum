@@ -45,20 +45,10 @@ import {
   connectOllamaCloudApiKey,
   connectOpenRouterApiKey,
 } from "@/lib/actions/accounts";
+import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { cn } from "@/lib/utils";
 
-type Provider =
-  | "iflow"
-  | "antigravity"
-  | "qwen_code"
-  | "copilot"
-  | "gemini_cli"
-  | "codex"
-  | "kiro"
-  | "nvidia_nim"
-  | "ollama_cloud"
-  | "openrouter"
-  | null;
+type Provider = ProviderAccountKey | null;
 
 interface OAuthRedirectConfig {
   flowType: "oauth_redirect";
@@ -187,13 +177,18 @@ const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
 
 interface AddAccountDialogProps {
   triggerClassName?: string;
+  initialProvider?: ProviderAccountKey;
 }
 
-export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
+export function AddAccountDialog({
+  triggerClassName,
+  initialProvider,
+}: AddAccountDialogProps) {
   const router = useRouter();
+  const minimumStep = initialProvider ? 2 : 1;
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState(1);
-  const [provider, setProvider] = useState<Provider>(null);
+  const [step, setStep] = useState(minimumStep);
+  const [provider, setProvider] = useState<Provider>(initialProvider ?? null);
   const [callbackUrl, setCallbackUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
@@ -236,7 +231,7 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
 
   // Fetch auth URL or initiate device code when entering step 2
   useEffect(() => {
-    if (step === 2 && provider && providerConfig) {
+    if (open && step === 2 && provider && providerConfig) {
       if (providerConfig.flowType === "oauth_redirect") {
         setIsFetchingUrl(true);
         setAuthUrl("");
@@ -286,11 +281,11 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
         setDeviceCodeInfo(null);
       }
     }
-  }, [step, provider, providerConfig]);
+  }, [open, step, provider, providerConfig]);
 
   const resetForm = useCallback(() => {
-    setStep(1);
-    setProvider(null);
+    setStep(minimumStep);
+    setProvider(initialProvider ?? null);
     setCallbackUrl("");
     setApiKey("");
     setIsApiKeyVisible(false);
@@ -305,10 +300,15 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-  }, []);
+  }, [initialProvider, minimumStep]);
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isLoading && !isPolling) {
+      if (isOpen) {
+        setStep(minimumStep);
+        setProvider(initialProvider ?? null);
+      }
+
       setOpen(isOpen);
       if (!isOpen) {
         resetForm();
@@ -601,15 +601,19 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Provider Account</DialogTitle>
+          <DialogTitle>
+            {providerConfig ? `Add ${providerConfig.name} Account` : "Add Provider Account"}
+          </DialogTitle>
           <DialogDescription>
-            Connect a new AI provider account for load balancing
+            {providerConfig
+              ? `Connect a new ${providerConfig.name} account for load balancing`
+              : "Connect a new AI provider account for load balancing"}
           </DialogDescription>
         </DialogHeader>
 
         {/* Step Indicator */}
         <div className="flex items-center justify-center gap-2">
-          {[1, 2, 3].map((s) => (
+          {(initialProvider ? [2, 3] : [1, 2, 3]).map((s, index, steps) => (
             <div key={s} className="flex items-center">
               <div
                 className={cn(
@@ -621,9 +625,9 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
                       : "bg-muted text-muted-foreground"
                 )}
               >
-                {step > s ? <Check className="h-4 w-4" /> : s}
+                {step > s ? <Check className="h-4 w-4" /> : index + 1}
               </div>
-              {s < 3 && (
+              {index < steps.length - 1 && (
                 <div
                   className={cn(
                     "h-px w-8 transition-colors",
@@ -985,11 +989,11 @@ export function AddAccountDialog({ triggerClassName }: AddAccountDialogProps) {
         </div>
 
         <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between">
-          {step > 1 && !isPolling && (
+          {step > minimumStep && !isPolling && (
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setStep(step - 1)}
+              onClick={() => setStep((currentStep) => Math.max(minimumStep, currentStep - 1))}
               disabled={isLoading}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
