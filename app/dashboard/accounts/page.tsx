@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
-import { RefreshAccountsButton } from "@/components/dashboard/accounts/refresh-accounts-button";
 import type { ProviderAccountIndicator } from "@/lib/navigation";
 import {
   API_KEY_PROVIDER_ACCOUNT_DEFINITIONS,
@@ -157,7 +156,6 @@ export default async function AccountsPage({
                     </p>
                   </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
-                    <RefreshAccountsButton />
                     <AddAccountDialog triggerClassName="flex-1 sm:w-auto sm:flex-none" />
                   </div>
                 </div>

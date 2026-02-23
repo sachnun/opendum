@@ -113,6 +113,16 @@ export function ModelCard({
                 ${meta.pricing.input} · ${meta.pricing.output}
               </div>
             )}
+            <Button
+              variant={copied ? "secondary" : "ghost"}
+              size="xs"
+              className="h-6 px-2 text-[11px]"
+              onClick={handleCopy}
+              title="Copy model ID"
+            >
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copied" : "Copy ID"}
+            </Button>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-muted-foreground">
                 {isEnabled ? "Enabled" : "Disabled"}
@@ -229,25 +239,6 @@ export function ModelCard({
             />
           </div>
         </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={handleCopy}
-        >
-          {copied ? (
-            <>
-              <Check className="h-4 w-4 mr-2" />
-              Copied!
-            </>
-          ) : (
-            <>
-              <Copy className="h-4 w-4 mr-2" />
-              Copy Model ID
-            </>
-          )}
-        </Button>
       </CardContent>
     </Card>
   );

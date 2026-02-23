@@ -7,7 +7,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
-import { RefreshAccountsButton } from "@/components/dashboard/accounts/refresh-accounts-button";
 import {
   type ProviderAccountKey,
   PROVIDER_ACCOUNT_BY_KEY,
@@ -196,7 +195,6 @@ export default async function ProviderAccountsPage({
                     <p className="text-sm text-muted-foreground">{providerMeta.description}</p>
                   </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
-                    <RefreshAccountsButton />
                     <AddAccountDialog
                       initialProvider={selectedProvider}
                       triggerClassName="flex-1 sm:w-auto sm:flex-none"
