@@ -3,7 +3,7 @@
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { proxyApiKey, usageLog } from "@/lib/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { buildAnalyticsCacheKey, getAnalyticsCacheVersion } from "@/lib/cache/analytics-cache";
 import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 
@@ -129,10 +129,6 @@ export interface AnalyticsData {
   durationOverTime: DurationOverTimeData[];
   granularity: Granularity;
   totals: AnalyticsTotals;
-}
-
-function normalizeModelName(model: string): string {
-  return model.replace("iflow/", "");
 }
 
 function getStartDate(period: Period): Date {
@@ -275,36 +271,66 @@ function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig)
   return slots;
 }
 
-function calculatePercentile(sortedValues: number[], percentile: number): number {
-  if (sortedValues.length === 0) {
-    return 0;
+function getGranularityBucketSeconds(granularity: Granularity): number {
+  switch (granularity) {
+    case "10s":
+      return 10;
+    case "1m":
+      return 60;
+    case "5m":
+      return 5 * 60;
+    case "15m":
+      return 15 * 60;
+    case "1h":
+      return 60 * 60;
+    case "1d":
+      return 24 * 60 * 60;
   }
-
-  const position = (percentile / 100) * (sortedValues.length - 1);
-  const lowerIndex = Math.floor(position);
-  const upperIndex = Math.ceil(position);
-
-  if (lowerIndex === upperIndex) {
-    return sortedValues[lowerIndex] ?? 0;
-  }
-
-  const lowerValue = sortedValues[lowerIndex] ?? 0;
-  const upperValue = sortedValues[upperIndex] ?? lowerValue;
-  const interpolationFactor = position - lowerIndex;
-
-  return Math.round(lowerValue + (upperValue - lowerValue) * interpolationFactor);
 }
 
-function calculateDurationPercentiles(sortedDurations: number[]): DurationPercentiles {
-  return {
-    p30: calculatePercentile(sortedDurations, 30),
-    p50: calculatePercentile(sortedDurations, 50),
-    p60: calculatePercentile(sortedDurations, 60),
-    p75: calculatePercentile(sortedDurations, 75),
-    p90: calculatePercentile(sortedDurations, 90),
-    p95: calculatePercentile(sortedDurations, 95),
-    p99: calculatePercentile(sortedDurations, 99),
-  };
+function getTimeBucketExpression(granularity: Granularity) {
+  const bucketSeconds = getGranularityBucketSeconds(granularity);
+  return sql<Date>`to_timestamp(floor(extract(epoch from ${usageLog.createdAt}) / ${bucketSeconds}) * ${bucketSeconds})`;
+}
+
+function toNumericValue(value: number | string | null | undefined): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function toRoundedValue(value: number | string | null | undefined): number {
+  return Math.round(toNumericValue(value));
+}
+
+function toRoundedNullableValue(
+  value: number | string | null | undefined
+): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "string" && value.length === 0) {
+    return null;
+  }
+
+  return Math.round(toNumericValue(value));
+}
+
+function toDateValue(value: Date | string | null): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export async function getAnalyticsData(
@@ -361,167 +387,179 @@ export async function getAnalyticsData(
       }
     }
 
-    // Fetch all logs in the period
     const conditions = [
       eq(usageLog.userId, userId),
       gte(usageLog.createdAt, startDate),
       lte(usageLog.createdAt, endDate),
     ];
+
     if (apiKeyId) {
       conditions.push(eq(usageLog.proxyApiKeyId, apiKeyId));
     }
-    const logs = await db
-      .select({
-        model: usageLog.model,
-        inputTokens: usageLog.inputTokens,
-        outputTokens: usageLog.outputTokens,
-        statusCode: usageLog.statusCode,
-        duration: usageLog.duration,
-        createdAt: usageLog.createdAt,
-      })
-      .from(usageLog)
-      .where(and(...conditions));
+
+    const whereCondition = and(...conditions);
+    const bucketExpression = getTimeBucketExpression(config.granularity);
+    const normalizedModelExpression = sql<string>`replace(${usageLog.model}, 'iflow/', '')`;
+
+    const [timeSeriesRows, topModelRows, totalsRow] = await Promise.all([
+      db
+        .select({
+          bucket: bucketExpression,
+          requestCount: sql<number>`count(*)`,
+          inputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`,
+          outputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`,
+          successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+          errorCount: sql<number>`count(*) filter (where ${usageLog.statusCode} is null or ${usageLog.statusCode} < 200 or ${usageLog.statusCode} >= 400)`,
+          avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+        })
+        .from(usageLog)
+        .where(whereCondition)
+        .groupBy(bucketExpression)
+        .orderBy(bucketExpression),
+      db
+        .select({
+          model: normalizedModelExpression,
+          count: sql<number>`count(*)`,
+        })
+        .from(usageLog)
+        .where(whereCondition)
+        .groupBy(normalizedModelExpression)
+        .orderBy(sql`count(*) desc`)
+        .limit(10),
+      db
+        .select({
+          totalRequests: sql<number>`count(*)`,
+          totalInputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`,
+          totalOutputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`,
+          avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          successfulRequests: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+        })
+        .from(usageLog)
+        .where(whereCondition)
+        .then((rows) => rows[0]),
+    ]);
 
     // Generate time slots for filling gaps based on granularity
     const timeSlots = generateTimeSlots(startDate, endDate, config);
 
-    // Process requests over time
-    const requestsBySlot = new Map<string, number>();
-    timeSlots.forEach((slot) => requestsBySlot.set(slot, 0));
-    logs.forEach((log) => {
-      const slot = formatTimeSlot(log.createdAt, config.granularity);
-      requestsBySlot.set(slot, (requestsBySlot.get(slot) || 0) + 1);
-    });
-    const requestsOverTime: RequestsOverTimeData[] = Array.from(
-      requestsBySlot.entries()
-    ).map(([date, count]) => ({ date, count }));
+    const timeSeriesBySlot = new Map<
+      string,
+      {
+        requestCount: number;
+        inputTokens: number;
+        outputTokens: number;
+        successCount: number;
+        errorCount: number;
+        avgDuration: number | null;
+        p30: number | null;
+        p50: number | null;
+        p60: number | null;
+        p75: number | null;
+        p90: number | null;
+        p95: number | null;
+        p99: number | null;
+      }
+    >();
 
-    // Process token usage over time
-    const tokensBySlot = new Map<string, { input: number; output: number }>();
-    timeSlots.forEach((slot) => tokensBySlot.set(slot, { input: 0, output: 0 }));
-    logs.forEach((log) => {
-      const slot = formatTimeSlot(log.createdAt, config.granularity);
-      const current = tokensBySlot.get(slot) || { input: 0, output: 0 };
-      tokensBySlot.set(slot, {
-        input: current.input + log.inputTokens,
-        output: current.output + log.outputTokens,
-      });
-    });
-    const tokenUsage: TokenUsageData[] = Array.from(tokensBySlot.entries()).map(
-      ([date, tokens]) => ({
-        date,
-        input: tokens.input,
-        output: tokens.output,
-      })
-    );
-
-    // Process duration stats over time (avg on chart, pXX in tooltip)
-    const durationsBySlot = new Map<string, number[]>();
-    timeSlots.forEach((slot) => durationsBySlot.set(slot, []));
-    logs.forEach((log) => {
-      if (log.duration === null) {
-        return;
+    for (const row of timeSeriesRows) {
+      const bucketDate = toDateValue(row.bucket);
+      if (!bucketDate) {
+        continue;
       }
 
-      const slot = formatTimeSlot(log.createdAt, config.granularity);
-      const current = durationsBySlot.get(slot) || [];
-      current.push(log.duration);
-      durationsBySlot.set(slot, current);
-    });
-
-    const durationOverTime: DurationOverTimeData[] = Array.from(durationsBySlot.entries()).map(
-      ([date, durations]) => {
-        if (durations.length === 0) {
-          return {
-            date,
-            avg: null,
-            p30: null,
-            p50: null,
-            p60: null,
-            p75: null,
-            p90: null,
-            p95: null,
-            p99: null,
-          };
-        }
-
-        const sortedDurations = [...durations].sort((a, b) => a - b);
-        const avg = Math.round(
-          sortedDurations.reduce((sum, duration) => sum + duration, 0) / sortedDurations.length
-        );
-
-        return {
-          date,
-          avg,
-          ...calculateDurationPercentiles(sortedDurations),
-        };
-      }
-    );
-
-    // Process requests by model
-    const modelCounts = new Map<string, number>();
-    logs.forEach((log) => {
-      const model = normalizeModelName(log.model);
-      modelCounts.set(model, (modelCounts.get(model) || 0) + 1);
-    });
-    const allModelsByCount = Array.from(modelCounts.entries())
-      .map(([model, count]) => ({ model, count }))
-      .sort((a, b) => b.count - a.count);
-
-    const requestsByModel: RequestsByModelData[] = allModelsByCount.slice(0, 10); // Top 10 models
-
-    // Process model distribution (for pie chart)
-    const totalRequests = logs.length;
-    const modelDistribution: ModelDistributionData[] = requestsByModel.map(
-      ({ model, count }) => ({
-        model,
-        value: count,
-        percentage: totalRequests > 0 ? Math.round((count / totalRequests) * 100) : 0,
-      })
-    );
-
-    // Process success/error rate over time
-    const successBySlot = new Map<string, { success: number; error: number }>();
-    timeSlots.forEach((slot) =>
-      successBySlot.set(slot, { success: 0, error: 0 })
-    );
-    logs.forEach((log) => {
-      const slot = formatTimeSlot(log.createdAt, config.granularity);
-      const current = successBySlot.get(slot) || { success: 0, error: 0 };
-      const isSuccess = log.statusCode !== null && log.statusCode >= 200 && log.statusCode < 400;
-      successBySlot.set(slot, {
-        success: current.success + (isSuccess ? 1 : 0),
-        error: current.error + (isSuccess ? 0 : 1),
+      const slot = formatTimeSlot(bucketDate, config.granularity);
+      timeSeriesBySlot.set(slot, {
+        requestCount: toRoundedValue(row.requestCount),
+        inputTokens: toRoundedValue(row.inputTokens),
+        outputTokens: toRoundedValue(row.outputTokens),
+        successCount: toRoundedValue(row.successCount),
+        errorCount: toRoundedValue(row.errorCount),
+        avgDuration: toRoundedNullableValue(row.avgDuration),
+        p30: toRoundedNullableValue(row.p30),
+        p50: toRoundedNullableValue(row.p50),
+        p60: toRoundedNullableValue(row.p60),
+        p75: toRoundedNullableValue(row.p75),
+        p90: toRoundedNullableValue(row.p90),
+        p95: toRoundedNullableValue(row.p95),
+        p99: toRoundedNullableValue(row.p99),
       });
-    });
-    const successRate: SuccessRateData[] = Array.from(
-      successBySlot.entries()
-    ).map(([date, counts]) => ({
+    }
+
+    const requestsOverTime: RequestsOverTimeData[] = timeSlots.map((date) => ({
       date,
-      success: counts.success,
-      error: counts.error,
+      count: timeSeriesBySlot.get(date)?.requestCount ?? 0,
     }));
 
-    // Calculate totals
-    const totalInputTokens = logs.reduce((sum, log) => sum + log.inputTokens, 0);
-    const totalOutputTokens = logs.reduce((sum, log) => sum + log.outputTokens, 0);
-    const durationValues = logs
-      .map((log) => log.duration)
-      .filter((duration): duration is number => duration !== null)
-      .sort((a, b) => a - b);
-    const avgDuration =
-      durationValues.length > 0
-        ? Math.round(
-            durationValues.reduce((sum, duration) => sum + duration, 0) /
-              durationValues.length
-          )
-        : 0;
-    const durationPercentiles = calculateDurationPercentiles(durationValues);
-    const successfulRequests = logs.filter(
-      (log) => log.statusCode !== null && log.statusCode >= 200 && log.statusCode < 400
-    ).length;
+    const tokenUsage: TokenUsageData[] = timeSlots.map((date) => ({
+      date,
+      input: timeSeriesBySlot.get(date)?.inputTokens ?? 0,
+      output: timeSeriesBySlot.get(date)?.outputTokens ?? 0,
+    }));
+
+    const successRate: SuccessRateData[] = timeSlots.map((date) => ({
+      date,
+      success: timeSeriesBySlot.get(date)?.successCount ?? 0,
+      error: timeSeriesBySlot.get(date)?.errorCount ?? 0,
+    }));
+
+    const durationOverTime: DurationOverTimeData[] = timeSlots.map((date) => {
+      const entry = timeSeriesBySlot.get(date);
+      return {
+        date,
+        avg: entry?.avgDuration ?? null,
+        p30: entry?.p30 ?? null,
+        p50: entry?.p50 ?? null,
+        p60: entry?.p60 ?? null,
+        p75: entry?.p75 ?? null,
+        p90: entry?.p90 ?? null,
+        p95: entry?.p95 ?? null,
+        p99: entry?.p99 ?? null,
+      };
+    });
+
+    const requestsByModel: RequestsByModelData[] = topModelRows.map((row) => ({
+      model: row.model,
+      count: toRoundedValue(row.count),
+    }));
+
+    const totalRequests = toRoundedValue(totalsRow?.totalRequests);
+    const totalInputTokens = toRoundedValue(totalsRow?.totalInputTokens);
+    const totalOutputTokens = toRoundedValue(totalsRow?.totalOutputTokens);
+    const successfulRequests = toRoundedValue(totalsRow?.successfulRequests);
     const successRatePercent =
       totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0;
+
+    const durationPercentiles: DurationPercentiles = {
+      p30: toRoundedValue(totalsRow?.p30),
+      p50: toRoundedValue(totalsRow?.p50),
+      p60: toRoundedValue(totalsRow?.p60),
+      p75: toRoundedValue(totalsRow?.p75),
+      p90: toRoundedValue(totalsRow?.p90),
+      p95: toRoundedValue(totalsRow?.p95),
+      p99: toRoundedValue(totalsRow?.p99),
+    };
+
+    const modelDistribution: ModelDistributionData[] = requestsByModel.map(({ model, count }) => ({
+      model,
+      value: count,
+      percentage: totalRequests > 0 ? Math.round((count / totalRequests) * 100) : 0,
+    }));
+
+    const avgDuration = toRoundedNullableValue(totalsRow?.avgDuration) ?? 0;
 
     const totals: AnalyticsTotals = {
       totalRequests,

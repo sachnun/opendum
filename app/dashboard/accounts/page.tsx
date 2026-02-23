@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { providerAccount, usageLog } from "@/lib/db/schema";
-import { eq, and, gte, inArray, desc } from "drizzle-orm";
+import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
@@ -34,7 +34,26 @@ export default async function AccountsPage({
   }
 
   const accounts = await db
-    .select()
+    .select({
+      id: providerAccount.id,
+      name: providerAccount.name,
+      provider: providerAccount.provider,
+      email: providerAccount.email,
+      isActive: providerAccount.isActive,
+      requestCount: providerAccount.requestCount,
+      lastUsedAt: providerAccount.lastUsedAt,
+      expiresAt: providerAccount.expiresAt,
+      tier: providerAccount.tier,
+      status: providerAccount.status,
+      errorCount: providerAccount.errorCount,
+      consecutiveErrors: providerAccount.consecutiveErrors,
+      lastErrorAt: providerAccount.lastErrorAt,
+      lastErrorMessage: providerAccount.lastErrorMessage,
+      lastErrorCode: providerAccount.lastErrorCode,
+      successCount: providerAccount.successCount,
+      lastSuccessAt: providerAccount.lastSuccessAt,
+      createdAt: providerAccount.createdAt,
+    })
     .from(providerAccount)
     .where(eq(providerAccount.userId, session.user.id))
     .orderBy(desc(providerAccount.createdAt));
@@ -43,13 +62,15 @@ export default async function AccountsPage({
   const dayKeySet = new Set(dayKeys);
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
   const accountIds = accounts.map((account) => account.id);
+  const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
 
-  const usageLogs = accountIds.length
+  const dailyUsageRows = accountIds.length
     ? await db
         .select({
           providerAccountId: usageLog.providerAccountId,
-          statusCode: usageLog.statusCode,
-          createdAt: usageLog.createdAt,
+          dayBucket: dayBucketExpression,
+          requestCount: sql<number>`count(*)`,
+          successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
         })
         .from(usageLog)
         .where(
@@ -59,6 +80,7 @@ export default async function AccountsPage({
             gte(usageLog.createdAt, statsStartDate),
           ),
         )
+        .groupBy(usageLog.providerAccountId, dayBucketExpression)
     : [];
 
   const statsByAccountId = new Map<
@@ -70,32 +92,36 @@ export default async function AccountsPage({
     }
   >();
 
-  for (const log of usageLogs) {
-    if (!log.providerAccountId) {
+  for (const row of dailyUsageRows) {
+    if (!row.providerAccountId) {
       continue;
     }
 
-    const dayKey = log.createdAt.toISOString().split("T")[0];
+    const dayDate = row.dayBucket instanceof Date ? row.dayBucket : new Date(row.dayBucket);
+    if (Number.isNaN(dayDate.getTime())) {
+      continue;
+    }
+
+    const dayKey = dayDate.toISOString().split("T")[0];
     if (!dayKeySet.has(dayKey)) {
       continue;
     }
 
     const current =
-      statsByAccountId.get(log.providerAccountId) ??
+      statsByAccountId.get(row.providerAccountId) ??
       {
         totalRequests: 0,
         successfulRequests: 0,
         dailyCounts: new Map<string, number>(),
       };
 
-    current.totalRequests += 1;
+    const requestCount = Number(row.requestCount) || 0;
+    const successCount = Number(row.successCount) || 0;
 
-    if (log.statusCode !== null && log.statusCode >= 200 && log.statusCode < 400) {
-      current.successfulRequests += 1;
-    }
-
-    current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + 1);
-    statsByAccountId.set(log.providerAccountId, current);
+    current.totalRequests += requestCount;
+    current.successfulRequests += successCount;
+    current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + requestCount);
+    statsByAccountId.set(row.providerAccountId, current);
   }
 
   const accountsWithStats = accounts.map((account) => {

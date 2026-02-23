@@ -40,7 +40,17 @@ export default async function ApiKeysPage() {
   }
 
   const apiKeys = await db
-    .select()
+    .select({
+      id: proxyApiKey.id,
+      name: proxyApiKey.name,
+      keyPreview: proxyApiKey.keyPreview,
+      isActive: proxyApiKey.isActive,
+      createdAt: proxyApiKey.createdAt,
+      expiresAt: proxyApiKey.expiresAt,
+      lastUsedAt: proxyApiKey.lastUsedAt,
+      modelAccessMode: proxyApiKey.modelAccessMode,
+      modelAccessList: proxyApiKey.modelAccessList,
+    })
     .from(proxyApiKey)
     .where(eq(proxyApiKey.userId, session.user.id))
     .orderBy(desc(proxyApiKey.createdAt));

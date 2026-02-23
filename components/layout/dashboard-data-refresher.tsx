@@ -3,11 +3,38 @@
 import { useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-const DEFAULT_REFRESH_INTERVAL_MS = 30_000;
+const ANALYTICS_REFRESH_INTERVAL_MS = 30_000;
+const STANDARD_REFRESH_INTERVAL_MS = 60_000;
+const DEFAULT_REFRESH_INTERVAL_MS = STANDARD_REFRESH_INTERVAL_MS;
 const MIN_REFRESH_GAP_MS = 5_000;
 
 interface DashboardDataRefresherProps {
   intervalMs?: number;
+}
+
+function getRefreshIntervalForPath(pathname: string, fallbackIntervalMs: number): number {
+  if (!pathname.startsWith("/dashboard")) {
+    return 0;
+  }
+
+  if (pathname === "/dashboard") {
+    return ANALYTICS_REFRESH_INTERVAL_MS;
+  }
+
+  if (pathname === "/dashboard/playground") {
+    return 0;
+  }
+
+  if (
+    pathname === "/dashboard/accounts" ||
+    pathname === "/dashboard/models" ||
+    pathname === "/dashboard/api-keys" ||
+    pathname === "/dashboard/usage"
+  ) {
+    return STANDARD_REFRESH_INTERVAL_MS;
+  }
+
+  return fallbackIntervalMs;
 }
 
 export function DashboardDataRefresher({
@@ -17,6 +44,7 @@ export function DashboardDataRefresher({
   const router = useRouter();
   const previousPathnameRef = useRef(pathname);
   const lastRefreshAtRef = useRef(0);
+  const activeIntervalMs = getRefreshIntervalForPath(pathname, intervalMs);
 
   const refresh = useCallback(() => {
     const now = Date.now();
@@ -38,7 +66,7 @@ export function DashboardDataRefresher({
   }, [pathname, refresh]);
 
   useEffect(() => {
-    if (intervalMs <= 0) {
+    if (activeIntervalMs <= 0) {
       return;
     }
 
@@ -50,7 +78,7 @@ export function DashboardDataRefresher({
       refresh();
     };
 
-    const intervalId = window.setInterval(handleVisibilityAwareRefresh, intervalMs);
+    const intervalId = window.setInterval(handleVisibilityAwareRefresh, activeIntervalMs);
     window.addEventListener("focus", handleVisibilityAwareRefresh);
     document.addEventListener("visibilitychange", handleVisibilityAwareRefresh);
 
@@ -59,7 +87,7 @@ export function DashboardDataRefresher({
       window.removeEventListener("focus", handleVisibilityAwareRefresh);
       document.removeEventListener("visibilitychange", handleVisibilityAwareRefresh);
     };
-  }, [intervalMs, refresh]);
+  }, [activeIntervalMs, refresh]);
 
   return null;
 }
