@@ -64,7 +64,7 @@ const _MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
   Qwen: [
     "qwen3-coder-plus",
     "qwen3-coder-flash",
-    "qwen3.5-plus",
+    "qwen3.5",
     "qwen3-max-2026-01-23",
     "qwen3-max",
     "qwen3-235b-a22b-thinking-2507",

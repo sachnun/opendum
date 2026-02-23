@@ -46,7 +46,7 @@ export const IFLOW_MODELS = new Set([
   "minimax-m2.1",
   "minimax-m2",
   "qwen3-coder-plus",
-  "qwen3.5-plus",
+  "qwen3.5",
   "kimi-k2",
   "kimi-k2.5",
   "kimi-k2-0905",

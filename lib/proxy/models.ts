@@ -163,7 +163,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
       pricing: { input: 0.144, output: 0.574 },
     },
   },
-  "qwen3.5-plus": {
+  "qwen3.5": {
     providers: [ProviderName.IFLOW, ProviderName.QWEN_CODE],
     meta: {
       contextLength: 1000000,
