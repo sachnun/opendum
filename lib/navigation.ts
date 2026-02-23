@@ -62,7 +62,6 @@ export const primaryNavigation: NavItem[] = [
     href: "/dashboard/accounts",
     icon: User,
     children: [
-      { name: "All Providers", href: "/dashboard/accounts" },
       {
         name: "Antigravity",
         href: getProviderAccountPath("antigravity"),
