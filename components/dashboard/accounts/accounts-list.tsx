@@ -49,6 +49,10 @@ import {
   type OpenRouterAccountQuotaInfo,
   type OpenRouterQuotaGroupDisplay,
 } from "@/lib/actions/openrouter-quota";
+import {
+  getProviderAccountErrorHistory,
+  type ProviderAccountErrorHistoryEntry,
+} from "@/lib/actions/accounts";
 import { formatRelativeTime } from "@/lib/date";
 import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
@@ -264,11 +268,13 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
 }
 
 function LastErrorMessageDialog({
+  accountId,
   message,
   code,
   occurredAt,
   tone = "error",
 }: {
+  accountId: string;
   message: string;
   code: number | null;
   occurredAt: Date | null;
@@ -369,10 +375,60 @@ function LastErrorMessageDialog({
   };
 
   const [copied, setCopied] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<ProviderAccountErrorHistoryEntry[] | null>(null);
+  const historyRequestIdRef = useRef(0);
   const preview = message.length > 150 ? `${message.slice(0, 150)}...` : message;
   const previewColorClass =
     tone === "warning" ? "text-amber-600 dark:text-amber-400" : "text-red-500";
   const details = parseStoredErrorMessage(message);
+
+  useEffect(() => {
+    if (!isOpen || historyEntries !== null) {
+      return;
+    }
+
+    const requestId = ++historyRequestIdRef.current;
+
+    void getProviderAccountErrorHistory(accountId)
+      .then((result) => {
+        if (requestId !== historyRequestIdRef.current) {
+          return;
+        }
+
+        if (!result.success) {
+          setHistoryError(result.error);
+          setHistoryEntries([]);
+          return;
+        }
+
+        setHistoryEntries(result.data.entries);
+      })
+      .catch(() => {
+        if (requestId !== historyRequestIdRef.current) {
+          return;
+        }
+
+        setHistoryError("Failed to load error history");
+        setHistoryEntries([]);
+      })
+      .finally(() => {
+        if (requestId === historyRequestIdRef.current) {
+          setIsHistoryLoading(false);
+        }
+      });
+  }, [accountId, historyEntries, isOpen]);
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsOpen(open);
+
+    if (open && historyEntries === null) {
+      setIsHistoryLoading(true);
+      setHistoryError(null);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -386,7 +442,7 @@ function LastErrorMessageDialog({
   };
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
          <button
           type="button"
@@ -477,6 +533,53 @@ function LastErrorMessageDialog({
               {message}
             </p>
           )}
+
+          <div className="border-t pt-3">
+            <p className="mb-2 text-xs text-muted-foreground">Recent Error History (up to 200)</p>
+
+            {isHistoryLoading && (
+              <p className="text-xs text-muted-foreground">Loading error history...</p>
+            )}
+
+            {!isHistoryLoading && historyError && (
+              <p className="text-xs text-red-500">{historyError}</p>
+            )}
+
+            {!isHistoryLoading && !historyError && historyEntries && historyEntries.length > 0 && (
+              <div className="space-y-2">
+                {historyEntries.map((entry) => {
+                  const createdAt = new Date(entry.createdAt);
+                  const relativeTime = Number.isNaN(createdAt.getTime())
+                    ? "Unknown time"
+                    : formatRelativeTime(createdAt);
+                  const codeLabel = `HTTP ${entry.errorCode}`;
+                  const previewText =
+                    entry.errorMessage.length > 120
+                      ? `${entry.errorMessage.slice(0, 120)}...`
+                      : entry.errorMessage;
+
+                  return (
+                    <details key={entry.id} className="rounded-md border bg-background/70 p-2">
+                      <summary className="cursor-pointer text-xs text-foreground">
+                        <span className="font-medium">{relativeTime}</span>
+                        <span className="mx-1 text-muted-foreground">-</span>
+                        <span className="font-mono text-[11px] text-muted-foreground">{codeLabel}</span>
+                        <span className="mx-1 text-muted-foreground">-</span>
+                        <span className="text-muted-foreground">{previewText}</span>
+                      </summary>
+                      <p className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+                        {entry.errorMessage}
+                      </p>
+                    </details>
+                  );
+                })}
+              </div>
+            )}
+
+            {!isHistoryLoading && !historyError && historyEntries && historyEntries.length === 0 && (
+              <p className="text-xs text-muted-foreground">No stored error history for this account yet.</p>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -603,6 +706,7 @@ function AccountCard({
           <div className="min-h-14 border-t">
             {account.lastErrorMessage ? (
               <LastErrorMessageDialog
+                accountId={account.id}
                 message={account.lastErrorMessage}
                 code={account.lastErrorCode}
                 occurredAt={account.lastErrorAt}

@@ -1,12 +1,13 @@
 import { db } from "@/lib/db";
-import { providerAccount } from "@/lib/db/schema";
-import { eq, and, inArray, notInArray, asc, sql } from "drizzle-orm";
+import { providerAccount, providerAccountErrorHistory } from "@/lib/db/schema";
+import { eq, and, inArray, notInArray, asc, desc, sql } from "drizzle-orm";
 import type { ProviderAccount } from "@/lib/db/schema";
 import { getProvidersForModel } from "./models";
 import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit";
 
 const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 const MAX_STORED_ERROR_MESSAGE_LENGTH = 10000;
+const MAX_ERROR_HISTORY_PER_ACCOUNT = 200;
 
 /**
  * Get the next active provider account for a user and model using LRU (Least Recently Used)
@@ -217,6 +218,8 @@ export async function markAccountFailed(
   errorCode: number,
   errorMessage: string
 ): Promise<void> {
+  const normalizedErrorMessage = errorMessage.slice(0, MAX_STORED_ERROR_MESSAGE_LENGTH);
+
   // Update error tracking fields
   const [account] = await db
     .update(providerAccount)
@@ -224,11 +227,43 @@ export async function markAccountFailed(
       errorCount: sql`${providerAccount.errorCount} + 1`,
       consecutiveErrors: sql`${providerAccount.consecutiveErrors} + 1`,
       lastErrorAt: new Date(),
-      lastErrorMessage: errorMessage.slice(0, MAX_STORED_ERROR_MESSAGE_LENGTH),
+      lastErrorMessage: normalizedErrorMessage,
       lastErrorCode: errorCode,
     })
     .where(eq(providerAccount.id, accountId))
     .returning();
+
+  if (!account) {
+    return;
+  }
+
+  await db.insert(providerAccountErrorHistory).values({
+    providerAccountId: accountId,
+    userId: account.userId,
+    errorCode,
+    errorMessage: normalizedErrorMessage,
+  });
+
+  const staleHistoryEntries = await db
+    .select({ id: providerAccountErrorHistory.id })
+    .from(providerAccountErrorHistory)
+    .where(eq(providerAccountErrorHistory.providerAccountId, accountId))
+    .orderBy(
+      desc(providerAccountErrorHistory.createdAt),
+      desc(providerAccountErrorHistory.id)
+    )
+    .offset(MAX_ERROR_HISTORY_PER_ACCOUNT);
+
+  if (staleHistoryEntries.length > 0) {
+    await db
+      .delete(providerAccountErrorHistory)
+      .where(
+        inArray(
+          providerAccountErrorHistory.id,
+          staleHistoryEntries.map((entry) => entry.id)
+        )
+      );
+  }
 
   // Auto-degradation based on consecutive errors
   const newConsecutiveErrors = account.consecutiveErrors;

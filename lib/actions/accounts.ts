@@ -2,8 +2,8 @@
 
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { providerAccount } from "@/lib/db/schema";
-import { eq, and, count as countFn, asc } from "drizzle-orm";
+import { providerAccount, providerAccountErrorHistory } from "@/lib/db/schema";
+import { eq, and, count as countFn, asc, desc } from "drizzle-orm";
 import { encrypt, decrypt, hashString } from "@/lib/encryption";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -67,6 +67,13 @@ import {
 export type ActionResult<T = void> = 
   | { success: true; data: T }
   | { success: false; error: string };
+
+export interface ProviderAccountErrorHistoryEntry {
+  id: string;
+  errorCode: number;
+  errorMessage: string;
+  createdAt: string;
+}
 
 const CODEX_OAUTH_COOKIE_NAME = "codex_oauth_ctx";
 const KIRO_OAUTH_COOKIE_NAME = "kiro_oauth_ctx";
@@ -352,6 +359,74 @@ export async function updateProviderAccount(
   } catch (error) {
     console.error("Failed to update account:", error);
     return { success: false, error: "Failed to update account" };
+  }
+}
+
+/**
+ * Get error history for a provider account
+ */
+export async function getProviderAccountErrorHistory(
+  accountId: string,
+  limit = 200
+): Promise<ActionResult<{ entries: ProviderAccountErrorHistoryEntry[] }>> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const parsedLimit = Number.isFinite(limit) ? limit : 200;
+  const normalizedLimit = Math.max(1, Math.min(200, Math.floor(parsedLimit)));
+
+  try {
+    const [account] = await db
+      .select({ id: providerAccount.id })
+      .from(providerAccount)
+      .where(and(eq(providerAccount.id, accountId), eq(providerAccount.userId, session.user.id)))
+      .limit(1);
+
+    if (!account) {
+      return { success: false, error: "Account not found" };
+    }
+
+    const entries = await db
+      .select({
+        id: providerAccountErrorHistory.id,
+        errorCode: providerAccountErrorHistory.errorCode,
+        errorMessage: providerAccountErrorHistory.errorMessage,
+        createdAt: providerAccountErrorHistory.createdAt,
+      })
+      .from(providerAccountErrorHistory)
+      .where(eq(providerAccountErrorHistory.providerAccountId, accountId))
+      .orderBy(
+        desc(providerAccountErrorHistory.createdAt),
+        desc(providerAccountErrorHistory.id)
+      )
+      .limit(normalizedLimit);
+
+    return {
+      success: true,
+      data: {
+        entries: entries.map((entry) => {
+          const createdAt =
+            entry.createdAt instanceof Date
+              ? entry.createdAt
+              : new Date(entry.createdAt);
+
+          return {
+            id: entry.id,
+            errorCode: entry.errorCode,
+            errorMessage: entry.errorMessage,
+            createdAt: Number.isNaN(createdAt.getTime())
+              ? new Date(0).toISOString()
+              : createdAt.toISOString(),
+          };
+        }),
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get provider account error history:", error);
+    return { success: false, error: "Failed to fetch account error history" };
   }
 }
 

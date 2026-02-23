@@ -4,6 +4,7 @@ import {
   session,
   account,
   providerAccount,
+  providerAccountErrorHistory,
   proxyApiKey,
   usageLog,
   disabledModel,
@@ -17,6 +18,7 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   sessions: many(session),
   providerAccounts: many(providerAccount),
+  providerAccountErrorHistoryEntries: many(providerAccountErrorHistory),
   proxyApiKeys: many(proxyApiKey),
   usageLogs: many(usageLog),
   disabledModels: many(disabledModel),
@@ -51,7 +53,22 @@ export const providerAccountRelations = relations(
       fields: [providerAccount.userId],
       references: [user.id],
     }),
+    errorHistory: many(providerAccountErrorHistory),
     usageLogs: many(usageLog),
+  }),
+);
+
+export const providerAccountErrorHistoryRelations = relations(
+  providerAccountErrorHistory,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [providerAccountErrorHistory.userId],
+      references: [user.id],
+    }),
+    providerAccount: one(providerAccount, {
+      fields: [providerAccountErrorHistory.providerAccountId],
+      references: [providerAccount.id],
+    }),
   }),
 );
 

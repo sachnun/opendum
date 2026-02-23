@@ -175,6 +175,37 @@ export const providerAccount = pgTable(
   ],
 );
 
+export const providerAccountErrorHistory = pgTable(
+  "provider_account_error_history",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    providerAccountId: text("providerAccountId")
+      .notNull()
+      .references(() => providerAccount.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    errorCode: integer("errorCode").notNull(),
+    errorMessage: text("errorMessage").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => [
+    index("provider_account_error_history_providerAccountId_idx").on(
+      table.providerAccountId,
+    ),
+    index("provider_account_error_history_providerAccountId_createdAt_idx").on(
+      table.providerAccountId,
+      table.createdAt,
+    ),
+    index("provider_account_error_history_userId_createdAt_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const disabledModel = pgTable(
   "disabled_model",
   {
