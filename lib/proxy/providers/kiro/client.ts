@@ -9,7 +9,6 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
 import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
