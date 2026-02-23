@@ -1,25 +1,93 @@
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { providerAccount, usageLog } from "@/lib/db/schema";
-import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
+import { providerAccount } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
-import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
 import { RefreshAccountsButton } from "@/components/dashboard/accounts/refresh-accounts-button";
+import type { ProviderAccountIndicator } from "@/lib/navigation";
+import {
+  API_KEY_PROVIDER_ACCOUNT_DEFINITIONS,
+  OAUTH_PROVIDER_ACCOUNT_DEFINITIONS,
+  PROVIDER_ACCOUNT_DEFINITIONS,
+  type ProviderAccountKey,
+  getProviderAccountPath,
+  getProviderSuccessMessage,
+} from "@/lib/provider-accounts";
 
-const ACCOUNT_STATS_DAYS = 30;
+const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
 
-function buildDayKeys(days: number): string[] {
-  const now = new Date();
-  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+const INDICATOR_WEIGHT: Record<ProviderAccountIndicator, number> = {
+  normal: 0,
+  warning: 1,
+  error: 2,
+};
 
-  return Array.from({ length: days }, (_, index) => {
-    const date = new Date(todayUtc);
-    date.setUTCDate(todayUtc.getUTCDate() - (days - 1 - index));
-    return date.toISOString().split("T")[0];
-  });
+const KNOWN_PROVIDER_KEYS = new Set<ProviderAccountKey>(
+  PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => provider.key)
+);
+
+function isKnownProvider(provider: string): provider is ProviderAccountKey {
+  return KNOWN_PROVIDER_KEYS.has(provider as ProviderAccountKey);
 }
+
+function getAccountIndicator(
+  lastErrorAt: Date | null,
+  lastSuccessAt: Date | null
+): ProviderAccountIndicator {
+  if (!lastErrorAt) {
+    return "normal";
+  }
+
+  const nowMs = Date.now();
+  const errorTimeMs = lastErrorAt.getTime();
+  const successTimeMs = lastSuccessAt?.getTime() ?? 0;
+  const hasRecoveredAfterError = Boolean(lastSuccessAt && successTimeMs > errorTimeMs);
+
+  if (!hasRecoveredAfterError) {
+    return "error";
+  }
+
+  if (nowMs - errorTimeMs > WARNING_INDICATOR_STALE_WINDOW_MS) {
+    return "normal";
+  }
+
+  return "warning";
+}
+
+function getIndicatorBadge(indicator: ProviderAccountIndicator, connectedAccounts: number) {
+  if (connectedAccounts === 0) {
+    return <Badge variant="outline">No Accounts</Badge>;
+  }
+
+  if (indicator === "error") {
+    return <Badge variant="destructive">Needs Attention</Badge>;
+  }
+
+  if (indicator === "warning") {
+    return (
+      <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+        Recovering
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="outline" className="border-green-500 text-green-600">
+      Healthy
+    </Badge>
+  );
+}
+
+type ProviderSummary = {
+  connected: number;
+  active: number;
+  indicator: ProviderAccountIndicator;
+};
 
 export default async function AccountsPage({
   searchParams,
@@ -35,125 +103,44 @@ export default async function AccountsPage({
 
   const accounts = await db
     .select({
-      id: providerAccount.id,
-      name: providerAccount.name,
       provider: providerAccount.provider,
-      email: providerAccount.email,
       isActive: providerAccount.isActive,
-      requestCount: providerAccount.requestCount,
-      lastUsedAt: providerAccount.lastUsedAt,
-      expiresAt: providerAccount.expiresAt,
-      tier: providerAccount.tier,
-      status: providerAccount.status,
-      errorCount: providerAccount.errorCount,
-      consecutiveErrors: providerAccount.consecutiveErrors,
       lastErrorAt: providerAccount.lastErrorAt,
-      lastErrorMessage: providerAccount.lastErrorMessage,
-      lastErrorCode: providerAccount.lastErrorCode,
-      successCount: providerAccount.successCount,
       lastSuccessAt: providerAccount.lastSuccessAt,
-      createdAt: providerAccount.createdAt,
     })
     .from(providerAccount)
-    .where(eq(providerAccount.userId, session.user.id))
-    .orderBy(desc(providerAccount.createdAt));
+    .where(eq(providerAccount.userId, session.user.id));
 
-  const dayKeys = buildDayKeys(ACCOUNT_STATS_DAYS);
-  const dayKeySet = new Set(dayKeys);
-  const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
-  const accountIds = accounts.map((account) => account.id);
-  const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
+  const summaryByProvider: Record<ProviderAccountKey, ProviderSummary> =
+    Object.fromEntries(
+      PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => [
+        provider.key,
+        {
+          connected: 0,
+          active: 0,
+          indicator: "normal" as ProviderAccountIndicator,
+        },
+      ])
+    ) as Record<ProviderAccountKey, ProviderSummary>;
 
-  const dailyUsageRows = accountIds.length
-    ? await db
-        .select({
-          providerAccountId: usageLog.providerAccountId,
-          dayBucket: dayBucketExpression,
-          requestCount: sql<number>`count(*)`,
-          successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
-        })
-        .from(usageLog)
-        .where(
-          and(
-            eq(usageLog.userId, session.user.id),
-            inArray(usageLog.providerAccountId, accountIds),
-            gte(usageLog.createdAt, statsStartDate),
-          ),
-        )
-        .groupBy(usageLog.providerAccountId, dayBucketExpression)
-    : [];
-
-  const statsByAccountId = new Map<
-    string,
-    {
-      totalRequests: number;
-      successfulRequests: number;
-      dailyCounts: Map<string, number>;
-    }
-  >();
-
-  for (const row of dailyUsageRows) {
-    if (!row.providerAccountId) {
+  for (const account of accounts) {
+    if (!isKnownProvider(account.provider)) {
       continue;
     }
 
-    const dayDate = row.dayBucket instanceof Date ? row.dayBucket : new Date(row.dayBucket);
-    if (Number.isNaN(dayDate.getTime())) {
+    const providerSummary = summaryByProvider[account.provider];
+    providerSummary.connected += 1;
+
+    if (!account.isActive) {
       continue;
     }
 
-    const dayKey = dayDate.toISOString().split("T")[0];
-    if (!dayKeySet.has(dayKey)) {
-      continue;
+    providerSummary.active += 1;
+    const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt);
+    if (INDICATOR_WEIGHT[indicator] > INDICATOR_WEIGHT[providerSummary.indicator]) {
+      providerSummary.indicator = indicator;
     }
-
-    const current =
-      statsByAccountId.get(row.providerAccountId) ??
-      {
-        totalRequests: 0,
-        successfulRequests: 0,
-        dailyCounts: new Map<string, number>(),
-      };
-
-    const requestCount = Number(row.requestCount) || 0;
-    const successCount = Number(row.successCount) || 0;
-
-    current.totalRequests += requestCount;
-    current.successfulRequests += successCount;
-    current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + requestCount);
-    statsByAccountId.set(row.providerAccountId, current);
   }
-
-  const accountsWithStats = accounts.map((account) => {
-    const accountStats = statsByAccountId.get(account.id);
-    const totalRequests = accountStats?.totalRequests ?? 0;
-    const successfulRequests = accountStats?.successfulRequests ?? 0;
-
-    return {
-      ...account,
-      stats: {
-        totalRequests,
-        successRate:
-          totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : null,
-        dailyRequests: dayKeys.map((day) => ({
-          date: day,
-          count: accountStats?.dailyCounts.get(day) ?? 0,
-        })),
-      },
-    };
-  });
-
-  // Group accounts by provider
-  const iflowAccounts = accountsWithStats.filter((a) => a.provider === "iflow");
-  const antigravityAccounts = accountsWithStats.filter((a) => a.provider === "antigravity");
-  const qwenCodeAccounts = accountsWithStats.filter((a) => a.provider === "qwen_code");
-  const copilotAccounts = accountsWithStats.filter((a) => a.provider === "copilot");
-  const geminiCliAccounts = accountsWithStats.filter((a) => a.provider === "gemini_cli");
-  const codexAccounts = accountsWithStats.filter((a) => a.provider === "codex");
-  const kiroAccounts = accountsWithStats.filter((a) => a.provider === "kiro");
-  const nvidiaNimAccounts = accountsWithStats.filter((a) => a.provider === "nvidia_nim");
-  const ollamaCloudAccounts = accountsWithStats.filter((a) => a.provider === "ollama_cloud");
-  const openRouterAccounts = accountsWithStats.filter((a) => a.provider === "openrouter");
 
   return (
     <div className="space-y-6">
@@ -161,9 +148,14 @@ export default async function AccountsPage({
         <div className="fixed inset-x-0 top-16 z-20 bg-background md:left-60 md:pt-5">
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
             <div className="bg-background">
-              <div className="pb-4 border-b border-border">
+              <div className="border-b border-border pb-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h2 className="text-xl font-semibold">Provider Accounts</h2>
+                  <div>
+                    <h2 className="text-xl font-semibold">Provider Accounts</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a provider to manage accounts on dedicated pages.
+                    </p>
+                  </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <RefreshAccountsButton />
                     <AddAccountDialog triggerClassName="flex-1 sm:w-auto sm:flex-none" />
@@ -173,27 +165,13 @@ export default async function AccountsPage({
             </div>
           </div>
         </div>
-        <div className="h-[104px] sm:h-[76px]" />
+        <div className="h-[124px] sm:h-[96px]" />
       </div>
 
       {params.success && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
-          <AlertDescription>
-            {params.success === "antigravity_added"
-              ? "Antigravity account connected successfully!"
-              : params.success === "qwen_code_added"
-                ? "Qwen Code account connected successfully!"
-                : params.success === "copilot_added"
-                  ? "Copilot account connected successfully!"
-                : params.success === "gemini_cli_added"
-                  ? "Gemini CLI account connected successfully!"
-                  : params.success === "codex_added"
-                    ? "Codex account connected successfully!"
-                    : params.success === "kiro_added"
-                      ? "Kiro account connected successfully!"
-                    : "Account connected successfully!"}
-          </AlertDescription>
+          <AlertDescription>{getProviderSuccessMessage(params.success)}</AlertDescription>
         </Alert>
       )}
 
@@ -206,18 +184,83 @@ export default async function AccountsPage({
         </Alert>
       )}
 
-      <AccountsList
-        antigravityAccounts={antigravityAccounts}
-        iflowAccounts={iflowAccounts}
-        geminiCliAccounts={geminiCliAccounts}
-        qwenCodeAccounts={qwenCodeAccounts}
-        copilotAccounts={copilotAccounts}
-        codexAccounts={codexAccounts}
-        kiroAccounts={kiroAccounts}
-        nvidiaNimAccounts={nvidiaNimAccounts}
-        ollamaCloudAccounts={ollamaCloudAccounts}
-        openRouterAccounts={openRouterAccounts}
-      />
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
+          <p className="text-sm text-muted-foreground">
+            Connected via OAuth and device authorization flows.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {OAUTH_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {
+            const summary = summaryByProvider[provider.key];
+
+            return (
+              <Link
+                key={provider.key}
+                href={getProviderAccountPath(provider.key)}
+                className="group block"
+              >
+                <Card className="h-full transition-colors group-hover:border-primary/40">
+                  <CardHeader className="space-y-1 pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-base">{provider.label}</CardTitle>
+                      {getIndicatorBadge(summary.indicator, summary.connected)}
+                    </div>
+                    <CardDescription>{provider.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{summary.connected} connected</Badge>
+                      <Badge variant="outline">{summary.active} active</Badge>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
+          <p className="text-sm text-muted-foreground">
+            Connected directly using provider API keys.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {API_KEY_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {
+            const summary = summaryByProvider[provider.key];
+
+            return (
+              <Link
+                key={provider.key}
+                href={getProviderAccountPath(provider.key)}
+                className="group block"
+              >
+                <Card className="h-full transition-colors group-hover:border-primary/40">
+                  <CardHeader className="space-y-1 pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-base">{provider.label}</CardTitle>
+                      {getIndicatorBadge(summary.indicator, summary.connected)}
+                    </div>
+                    <CardDescription>{provider.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{summary.connected} connected</Badge>
+                      <Badge variant="outline">{summary.active} active</Badge>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

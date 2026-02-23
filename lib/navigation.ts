@@ -8,6 +8,7 @@ import {
   LucideIcon,
 } from "lucide-react";
 import { MODEL_FAMILY_NAV_ITEMS } from "@/lib/model-families";
+import { getProviderAccountPath } from "@/lib/provider-accounts";
 
 export interface NavItem {
   name: string;
@@ -61,35 +62,31 @@ export const primaryNavigation: NavItem[] = [
     href: "/dashboard/accounts",
     icon: User,
     children: [
+      { name: "All Providers", href: "/dashboard/accounts" },
       {
         name: "Antigravity",
-        href: "/dashboard/accounts",
-        anchorId: "antigravity-accounts",
+        href: getProviderAccountPath("antigravity"),
       },
-      { name: "Codex", href: "/dashboard/accounts", anchorId: "codex-accounts" },
-      { name: "Copilot", href: "/dashboard/accounts", anchorId: "copilot-accounts" },
-      { name: "Kiro", href: "/dashboard/accounts", anchorId: "kiro-accounts" },
-      { name: "Iflow", href: "/dashboard/accounts", anchorId: "iflow-accounts" },
+      { name: "Codex", href: getProviderAccountPath("codex") },
+      { name: "Copilot", href: getProviderAccountPath("copilot") },
+      { name: "Kiro", href: getProviderAccountPath("kiro") },
+      { name: "Iflow", href: getProviderAccountPath("iflow") },
       {
         name: "Gemini CLI",
-        href: "/dashboard/accounts",
-        anchorId: "gemini-cli-accounts",
+        href: getProviderAccountPath("gemini_cli"),
       },
-      { name: "Qwen Code", href: "/dashboard/accounts", anchorId: "qwen-code-accounts" },
+      { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
       {
         name: "Nvidia",
-        href: "/dashboard/accounts",
-        anchorId: "nvidia-nim-accounts",
+        href: getProviderAccountPath("nvidia_nim"),
       },
       {
         name: "Ollama Cloud",
-        href: "/dashboard/accounts",
-        anchorId: "ollama-cloud-accounts",
+        href: getProviderAccountPath("ollama_cloud"),
       },
       {
         name: "OpenRouter",
-        href: "/dashboard/accounts",
-        anchorId: "openrouter-accounts",
+        href: getProviderAccountPath("openrouter"),
       },
     ],
   },

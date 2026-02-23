@@ -27,6 +27,7 @@ function getRefreshIntervalForPath(pathname: string, fallbackIntervalMs: number)
 
   if (
     pathname === "/dashboard/accounts" ||
+    pathname.startsWith("/dashboard/accounts/") ||
     pathname === "/dashboard/models" ||
     pathname === "/dashboard/api-keys" ||
     pathname === "/dashboard/usage"

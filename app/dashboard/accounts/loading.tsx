@@ -11,7 +11,10 @@ export default function Loading() {
             <div className="bg-background">
               <div className="pb-4 border-b border-border">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Skeleton className="h-6 w-44" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-6 w-44" />
+                    <Skeleton className="h-4 w-72" />
+                  </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <Skeleton className="h-9 w-9 rounded-md" />
                     <Skeleton className="h-9 flex-1 rounded-md sm:w-32 sm:flex-none" />
@@ -21,7 +24,7 @@ export default function Loading() {
             </div>
           </div>
         </div>
-        <div className="h-[104px] sm:h-[76px]" />
+        <div className="h-[124px] sm:h-[96px]" />
       </div>
 
       <div className="space-y-8">

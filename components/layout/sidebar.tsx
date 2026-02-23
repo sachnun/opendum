@@ -14,6 +14,7 @@ import {
   primaryNavigation,
   supportNavigation,
 } from "@/lib/navigation";
+import { getProviderAccountPath } from "@/lib/provider-accounts";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 import { Input } from "@/components/ui/input";
 
@@ -91,47 +92,43 @@ export function Sidebar({
       (item.href !== "/dashboard" && pathname.startsWith(item.href));
     const isAccountsItem = item.href === "/dashboard/accounts";
     const isModelsItem = item.href === "/dashboard/models";
-    const accountCountByAnchorId: Record<string, number> = {
-      "antigravity-accounts": accountCounts.antigravity,
-      "nvidia-nim-accounts": accountCounts.nvidia_nim,
-      "ollama-cloud-accounts": accountCounts.ollama_cloud,
-      "openrouter-accounts": accountCounts.openrouter,
-      "codex-accounts": accountCounts.codex,
-      "copilot-accounts": accountCounts.copilot,
-      "kiro-accounts": accountCounts.kiro,
-      "iflow-accounts": accountCounts.iflow,
-      "gemini-cli-accounts": accountCounts.gemini_cli,
-      "qwen-code-accounts": accountCounts.qwen_code,
+    const accountCountByHref: Record<string, number> = {
+      [getProviderAccountPath("antigravity")]: accountCounts.antigravity,
+      [getProviderAccountPath("nvidia_nim")]: accountCounts.nvidia_nim,
+      [getProviderAccountPath("ollama_cloud")]: accountCounts.ollama_cloud,
+      [getProviderAccountPath("openrouter")]: accountCounts.openrouter,
+      [getProviderAccountPath("codex")]: accountCounts.codex,
+      [getProviderAccountPath("copilot")]: accountCounts.copilot,
+      [getProviderAccountPath("kiro")]: accountCounts.kiro,
+      [getProviderAccountPath("iflow")]: accountCounts.iflow,
+      [getProviderAccountPath("gemini_cli")]: accountCounts.gemini_cli,
+      [getProviderAccountPath("qwen_code")]: accountCounts.qwen_code,
     };
-    const activeAccountCountByAnchorId: Record<string, number> = {
-      "antigravity-accounts": activeAccountCounts.antigravity,
-      "nvidia-nim-accounts": activeAccountCounts.nvidia_nim,
-      "ollama-cloud-accounts": activeAccountCounts.ollama_cloud,
-      "openrouter-accounts": activeAccountCounts.openrouter,
-      "codex-accounts": activeAccountCounts.codex,
-      "copilot-accounts": activeAccountCounts.copilot,
-      "kiro-accounts": activeAccountCounts.kiro,
-      "iflow-accounts": activeAccountCounts.iflow,
-      "gemini-cli-accounts": activeAccountCounts.gemini_cli,
-      "qwen-code-accounts": activeAccountCounts.qwen_code,
+    const activeAccountCountByHref: Record<string, number> = {
+      [getProviderAccountPath("antigravity")]: activeAccountCounts.antigravity,
+      [getProviderAccountPath("nvidia_nim")]: activeAccountCounts.nvidia_nim,
+      [getProviderAccountPath("ollama_cloud")]: activeAccountCounts.ollama_cloud,
+      [getProviderAccountPath("openrouter")]: activeAccountCounts.openrouter,
+      [getProviderAccountPath("codex")]: activeAccountCounts.codex,
+      [getProviderAccountPath("copilot")]: activeAccountCounts.copilot,
+      [getProviderAccountPath("kiro")]: activeAccountCounts.kiro,
+      [getProviderAccountPath("iflow")]: activeAccountCounts.iflow,
+      [getProviderAccountPath("gemini_cli")]: activeAccountCounts.gemini_cli,
+      [getProviderAccountPath("qwen_code")]: activeAccountCounts.qwen_code,
     };
-    const accountIndicatorByAnchorId: Record<string, ProviderAccountIndicator> = {
-      "antigravity-accounts": accountIndicators.antigravity,
-      "nvidia-nim-accounts": accountIndicators.nvidia_nim,
-      "ollama-cloud-accounts": accountIndicators.ollama_cloud,
-      "openrouter-accounts": accountIndicators.openrouter,
-      "codex-accounts": accountIndicators.codex,
-      "copilot-accounts": accountIndicators.copilot,
-      "kiro-accounts": accountIndicators.kiro,
-      "iflow-accounts": accountIndicators.iflow,
-      "gemini-cli-accounts": accountIndicators.gemini_cli,
-      "qwen-code-accounts": accountIndicators.qwen_code,
+    const accountIndicatorByHref: Record<string, ProviderAccountIndicator> = {
+      [getProviderAccountPath("antigravity")]: accountIndicators.antigravity,
+      [getProviderAccountPath("nvidia_nim")]: accountIndicators.nvidia_nim,
+      [getProviderAccountPath("ollama_cloud")]: accountIndicators.ollama_cloud,
+      [getProviderAccountPath("openrouter")]: accountIndicators.openrouter,
+      [getProviderAccountPath("codex")]: accountIndicators.codex,
+      [getProviderAccountPath("copilot")]: accountIndicators.copilot,
+      [getProviderAccountPath("kiro")]: accountIndicators.kiro,
+      [getProviderAccountPath("iflow")]: accountIndicators.iflow,
+      [getProviderAccountPath("gemini_cli")]: accountIndicators.gemini_cli,
+      [getProviderAccountPath("qwen_code")]: accountIndicators.qwen_code,
     };
-    const countByAnchorId = isAccountsItem
-      ? accountCountByAnchorId
-      : isModelsItem
-        ? modelFamilyCounts
-        : null;
+    const modelCountByAnchorId = isModelsItem ? modelFamilyCounts : null;
     const visibleSubItems =
       isAccountsItem && item.children
         ? item.children.filter((subItem) =>
@@ -178,17 +175,15 @@ export function Sidebar({
                 visibleSubItems.map((subItem) => {
                   const isSubActive = isSubItemActive(subItem);
                   const subItemCount =
-                    countByAnchorId && subItem.anchorId
-                      ? countByAnchorId[subItem.anchorId]
-                      : undefined;
+                    isAccountsItem
+                      ? accountCountByHref[subItem.href]
+                      : modelCountByAnchorId && subItem.anchorId
+                        ? modelCountByAnchorId[subItem.anchorId]
+                        : undefined;
                   const activeSubItemCount =
-                    isAccountsItem && subItem.anchorId
-                      ? activeAccountCountByAnchorId[subItem.anchorId]
-                      : undefined;
+                    isAccountsItem ? activeAccountCountByHref[subItem.href] : undefined;
                   const subItemIndicator =
-                    isAccountsItem && subItem.anchorId
-                      ? accountIndicatorByAnchorId[subItem.anchorId]
-                      : undefined;
+                    isAccountsItem ? accountIndicatorByHref[subItem.href] : undefined;
                   const shouldShowSubItemCount =
                     !isAccountsItem && typeof subItemCount === "number" && subItemCount > 0;
                   const shouldShowIndicator =
