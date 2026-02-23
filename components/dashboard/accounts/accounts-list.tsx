@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   AlertCircle,
@@ -740,20 +740,38 @@ export function AccountsList({
     useState<Record<string, AccountQuotaInfo>>({});
   const [openRouterQuotaByAccountId, setOpenRouterQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
-  const [isAntigravityQuotaLoading, startAntigravityQuotaTransition] = useTransition();
-  const [isCodexQuotaLoading, startCodexQuotaTransition] = useTransition();
-  const [isCopilotQuotaLoading, startCopilotQuotaTransition] = useTransition();
-  const [isGeminiCliQuotaLoading, startGeminiCliQuotaTransition] = useTransition();
-  const [isKiroQuotaLoading, startKiroQuotaTransition] = useTransition();
-  const [isOpenRouterQuotaLoading, startOpenRouterQuotaTransition] = useTransition();
+  const [isAntigravityQuotaLoading, setIsAntigravityQuotaLoading] = useState(false);
+  const [isCodexQuotaLoading, setIsCodexQuotaLoading] = useState(false);
+  const [isCopilotQuotaLoading, setIsCopilotQuotaLoading] = useState(false);
+  const [isGeminiCliQuotaLoading, setIsGeminiCliQuotaLoading] = useState(false);
+  const [isKiroQuotaLoading, setIsKiroQuotaLoading] = useState(false);
+  const [isOpenRouterQuotaLoading, setIsOpenRouterQuotaLoading] = useState(false);
+  const quotaRequestIdsRef = useRef({
+    antigravity: 0,
+    codex: 0,
+    copilot: 0,
+    geminiCli: 0,
+    kiro: 0,
+    openRouter: 0,
+  });
 
-  const fetchAntigravityQuota = useCallback((forceRefresh = false) => {
+  const fetchAntigravityQuota = useCallback(async (forceRefresh = false) => {
     if (antigravityAccounts.length === 0) {
+      quotaRequestIdsRef.current.antigravity += 1;
+      setAntigravityQuotaByAccountId({});
+      setIsAntigravityQuotaLoading(false);
       return;
     }
 
-    startAntigravityQuotaTransition(async () => {
+    const requestId = ++quotaRequestIdsRef.current.antigravity;
+    setIsAntigravityQuotaLoading(true);
+
+    try {
       const result = await getAntigravityQuota({ forceRefresh });
+      if (requestId !== quotaRequestIdsRef.current.antigravity) {
+        return;
+      }
+
       if (!result.success) {
         setAntigravityQuotaByAccountId({});
         return;
@@ -768,16 +786,30 @@ export function AccountsList({
       );
 
       setAntigravityQuotaByAccountId(quotaMap);
-    });
+    } finally {
+      if (requestId === quotaRequestIdsRef.current.antigravity) {
+        setIsAntigravityQuotaLoading(false);
+      }
+    }
   }, [antigravityAccounts.length]);
 
-  const fetchCodexQuota = useCallback((forceRefresh = false) => {
+  const fetchCodexQuota = useCallback(async (forceRefresh = false) => {
     if (codexAccounts.length === 0) {
+      quotaRequestIdsRef.current.codex += 1;
+      setCodexQuotaByAccountId({});
+      setIsCodexQuotaLoading(false);
       return;
     }
 
-    startCodexQuotaTransition(async () => {
+    const requestId = ++quotaRequestIdsRef.current.codex;
+    setIsCodexQuotaLoading(true);
+
+    try {
       const result = await getCodexQuota({ forceRefresh });
+      if (requestId !== quotaRequestIdsRef.current.codex) {
+        return;
+      }
+
       if (!result.success) {
         setCodexQuotaByAccountId({});
         return;
@@ -792,16 +824,30 @@ export function AccountsList({
       );
 
       setCodexQuotaByAccountId(quotaMap);
-    });
+    } finally {
+      if (requestId === quotaRequestIdsRef.current.codex) {
+        setIsCodexQuotaLoading(false);
+      }
+    }
   }, [codexAccounts.length]);
 
-  const fetchCopilotQuota = useCallback((forceRefresh = false) => {
+  const fetchCopilotQuota = useCallback(async (forceRefresh = false) => {
     if (copilotAccounts.length === 0) {
+      quotaRequestIdsRef.current.copilot += 1;
+      setCopilotQuotaByAccountId({});
+      setIsCopilotQuotaLoading(false);
       return;
     }
 
-    startCopilotQuotaTransition(async () => {
+    const requestId = ++quotaRequestIdsRef.current.copilot;
+    setIsCopilotQuotaLoading(true);
+
+    try {
       const result = await getCopilotQuota({ forceRefresh });
+      if (requestId !== quotaRequestIdsRef.current.copilot) {
+        return;
+      }
+
       if (!result.success) {
         setCopilotQuotaByAccountId({});
         return;
@@ -816,16 +862,30 @@ export function AccountsList({
       );
 
       setCopilotQuotaByAccountId(quotaMap);
-    });
+    } finally {
+      if (requestId === quotaRequestIdsRef.current.copilot) {
+        setIsCopilotQuotaLoading(false);
+      }
+    }
   }, [copilotAccounts.length]);
 
-  const fetchGeminiCliQuota = useCallback((forceRefresh = false) => {
+  const fetchGeminiCliQuota = useCallback(async (forceRefresh = false) => {
     if (geminiCliAccounts.length === 0) {
+      quotaRequestIdsRef.current.geminiCli += 1;
+      setGeminiCliQuotaByAccountId({});
+      setIsGeminiCliQuotaLoading(false);
       return;
     }
 
-    startGeminiCliQuotaTransition(async () => {
+    const requestId = ++quotaRequestIdsRef.current.geminiCli;
+    setIsGeminiCliQuotaLoading(true);
+
+    try {
       const result = await getGeminiCliQuota({ forceRefresh });
+      if (requestId !== quotaRequestIdsRef.current.geminiCli) {
+        return;
+      }
+
       if (!result.success) {
         setGeminiCliQuotaByAccountId({});
         return;
@@ -840,16 +900,30 @@ export function AccountsList({
       );
 
       setGeminiCliQuotaByAccountId(quotaMap);
-    });
+    } finally {
+      if (requestId === quotaRequestIdsRef.current.geminiCli) {
+        setIsGeminiCliQuotaLoading(false);
+      }
+    }
   }, [geminiCliAccounts.length]);
 
-  const fetchOpenRouterQuota = useCallback((forceRefresh = false) => {
+  const fetchOpenRouterQuota = useCallback(async (forceRefresh = false) => {
     if (openRouterAccounts.length === 0) {
+      quotaRequestIdsRef.current.openRouter += 1;
+      setOpenRouterQuotaByAccountId({});
+      setIsOpenRouterQuotaLoading(false);
       return;
     }
 
-    startOpenRouterQuotaTransition(async () => {
+    const requestId = ++quotaRequestIdsRef.current.openRouter;
+    setIsOpenRouterQuotaLoading(true);
+
+    try {
       const result = await getOpenRouterQuota({ forceRefresh });
+      if (requestId !== quotaRequestIdsRef.current.openRouter) {
+        return;
+      }
+
       if (!result.success) {
         setOpenRouterQuotaByAccountId({});
         return;
@@ -864,16 +938,30 @@ export function AccountsList({
       );
 
       setOpenRouterQuotaByAccountId(quotaMap);
-    });
+    } finally {
+      if (requestId === quotaRequestIdsRef.current.openRouter) {
+        setIsOpenRouterQuotaLoading(false);
+      }
+    }
   }, [openRouterAccounts.length]);
 
-  const fetchKiroQuota = useCallback((forceRefresh = false) => {
+  const fetchKiroQuota = useCallback(async (forceRefresh = false) => {
     if (kiroAccounts.length === 0) {
+      quotaRequestIdsRef.current.kiro += 1;
+      setKiroQuotaByAccountId({});
+      setIsKiroQuotaLoading(false);
       return;
     }
 
-    startKiroQuotaTransition(async () => {
+    const requestId = ++quotaRequestIdsRef.current.kiro;
+    setIsKiroQuotaLoading(true);
+
+    try {
       const result = await getKiroQuota({ forceRefresh });
+      if (requestId !== quotaRequestIdsRef.current.kiro) {
+        return;
+      }
+
       if (!result.success) {
         setKiroQuotaByAccountId({});
         return;
@@ -888,41 +976,45 @@ export function AccountsList({
       );
 
       setKiroQuotaByAccountId(quotaMap);
-    });
+    } finally {
+      if (requestId === quotaRequestIdsRef.current.kiro) {
+        setIsKiroQuotaLoading(false);
+      }
+    }
   }, [kiroAccounts.length]);
 
   useEffect(() => {
-    fetchAntigravityQuota();
+    void fetchAntigravityQuota();
   }, [fetchAntigravityQuota]);
 
   useEffect(() => {
-    fetchCodexQuota();
+    void fetchCodexQuota();
   }, [fetchCodexQuota]);
 
   useEffect(() => {
-    fetchCopilotQuota();
+    void fetchCopilotQuota();
   }, [fetchCopilotQuota]);
 
   useEffect(() => {
-    fetchGeminiCliQuota();
+    void fetchGeminiCliQuota();
   }, [fetchGeminiCliQuota]);
 
   useEffect(() => {
-    fetchOpenRouterQuota();
+    void fetchOpenRouterQuota();
   }, [fetchOpenRouterQuota]);
 
   useEffect(() => {
-    fetchKiroQuota();
+    void fetchKiroQuota();
   }, [fetchKiroQuota]);
 
   useEffect(() => {
     const handleProviderAccountsRefresh = () => {
-      fetchAntigravityQuota(true);
-      fetchCodexQuota(true);
-      fetchCopilotQuota(true);
-      fetchGeminiCliQuota(true);
-      fetchKiroQuota(true);
-      fetchOpenRouterQuota(true);
+      void fetchAntigravityQuota(true);
+      void fetchCodexQuota(true);
+      void fetchCopilotQuota(true);
+      void fetchGeminiCliQuota(true);
+      void fetchKiroQuota(true);
+      void fetchOpenRouterQuota(true);
     };
 
     window.addEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
