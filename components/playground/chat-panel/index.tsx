@@ -188,7 +188,17 @@ export function ChatPanel({
     if (!nextOpen) {
       setSelectionStep("model");
       setPendingModelId(null);
+      return;
     }
+
+    if (selectedModelData) {
+      setSelectionStep("routing");
+      setPendingModelId(selectedModelData.id);
+      return;
+    }
+
+    setSelectionStep("model");
+    setPendingModelId(null);
   };
 
   const handleSelectModel = (modelId: string) => {
