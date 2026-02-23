@@ -21,6 +21,7 @@ import {
   QWEN_CODE_TOKEN_ENDPOINT,
   QWEN_CODE_DEVICE_CODE_ENDPOINT,
   QWEN_CODE_API_BASE_URL,
+  QWEN_CODE_MODEL_MAP,
   QWEN_CODE_SUPPORTED_PARAMS,
   QWEN_CODE_MODELS,
   QWEN_CODE_REFRESH_BUFFER_SECONDS,
@@ -133,6 +134,14 @@ function cleanSchemaProperties(properties: Record<string, unknown>): void {
       );
     }
   }
+}
+
+function resolveQwenCodeModel(model: string): string {
+  const normalizedModel = model.startsWith("qwen_code/")
+    ? model.split("/", 2)[1] || model
+    : model;
+
+  return QWEN_CODE_MODEL_MAP[normalizedModel] ?? normalizedModel;
 }
 
 /**
@@ -334,11 +343,12 @@ export const qwenCodeProvider: Provider = {
     const modelName = body.model.includes("/")
       ? body.model.split("/").pop()!
       : body.model;
+    const upstreamModel = resolveQwenCodeModel(modelName);
 
     const requestPayload = buildRequestPayload(
       {
         ...body,
-        model: modelName,
+        model: upstreamModel,
       },
       stream
     );
