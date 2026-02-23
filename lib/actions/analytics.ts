@@ -290,7 +290,8 @@ function getGranularityBucketSeconds(granularity: Granularity): number {
 
 function getTimeBucketExpression(granularity: Granularity) {
   const bucketSeconds = getGranularityBucketSeconds(granularity);
-  return sql<Date>`to_timestamp(floor(extract(epoch from ${usageLog.createdAt}) / ${bucketSeconds}) * ${bucketSeconds})`;
+  const bucketSecondsLiteral = sql.raw(String(bucketSeconds));
+  return sql<Date>`to_timestamp(floor(extract(epoch from ${usageLog.createdAt}) / ${bucketSecondsLiteral}) * ${bucketSecondsLiteral})`;
 }
 
 function toNumericValue(value: number | string | null | undefined): number {
