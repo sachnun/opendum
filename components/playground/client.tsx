@@ -18,6 +18,7 @@ import {
 } from "./settings-sheet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { MODEL_FAMILY_SORT_ORDER, getModelFamily } from "@/lib/model-families";
 
 interface PlaygroundClientProps {
   models: ModelOption[];
@@ -28,6 +29,58 @@ interface PanelState {
   id: string;
   modelId: string | null;
   accountId: string | null;
+}
+
+interface FamilyPreset {
+  family: string;
+  models: ModelOption[];
+}
+
+function buildFamilyPresets(
+  models: ModelOption[],
+  providerAccounts: ProviderAccountOption[]
+): FamilyPreset[] {
+  const availableProviders = new Set(providerAccounts.map((account) => account.provider));
+  const grouped = new Map<string, ModelOption[]>();
+
+  for (const model of models) {
+    const hasAvailableProvider = model.providers.some((provider) =>
+      availableProviders.has(provider)
+    );
+
+    if (!hasAvailableProvider) {
+      continue;
+    }
+
+    const family = getModelFamily(model.id);
+    const familyModels = grouped.get(family) ?? [];
+    familyModels.push(model);
+    grouped.set(family, familyModels);
+  }
+
+  for (const familyModels of grouped.values()) {
+    familyModels.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const familyOrder = new Map<string, number>(
+    MODEL_FAMILY_SORT_ORDER.map((family, index) => [family, index])
+  );
+
+  return Array.from(grouped.entries())
+    .sort(([familyA], [familyB]) => {
+      const orderA = familyOrder.get(familyA) ?? Number.MAX_SAFE_INTEGER;
+      const orderB = familyOrder.get(familyB) ?? Number.MAX_SAFE_INTEGER;
+
+      if (orderA === orderB) {
+        return familyA.localeCompare(familyB);
+      }
+
+      return orderA - orderB;
+    })
+    .map(([family, familyModels]) => ({
+      family,
+      models: familyModels,
+    }));
 }
 
 function generateId(): string {
@@ -1273,6 +1326,11 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
     [models]
   );
 
+  const familyPresets = React.useMemo(
+    () => buildFamilyPresets(models, providerAccounts),
+    [models, providerAccounts]
+  );
+
   const getValidAccountIdForPanel = React.useCallback(
     (panel: PanelState): string | null => {
       if (!panel.accountId || !panel.modelId) {
@@ -1324,6 +1382,42 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
     );
   };
 
+  const applyFamilyPreset = React.useCallback(
+    (family: string) => {
+      const preset = familyPresets.find((entry) => entry.family === family);
+      if (!preset || preset.models.length === 0) {
+        return;
+      }
+
+      setPanels((prevPanels) => {
+        const currentAccountByModel = new Map<string, string>();
+
+        for (const panel of prevPanels) {
+          if (!panel.modelId || !panel.accountId || currentAccountByModel.has(panel.modelId)) {
+            continue;
+          }
+
+          const model = modelsById.get(panel.modelId);
+          const account = providerAccountsById.get(panel.accountId);
+          if (!model || !account || !model.providers.includes(account.provider)) {
+            continue;
+          }
+
+          currentAccountByModel.set(panel.modelId, panel.accountId);
+        }
+
+        return preset.models.map((model) => ({
+          id: generateId(),
+          modelId: model.id,
+          accountId: currentAccountByModel.get(model.id) ?? null,
+        }));
+      });
+
+      setResponses({});
+    },
+    [familyPresets, modelsById, providerAccountsById]
+  );
+
   const addPanel = () => {
     setPanels((prev) => {
       if (prev.length >= maxPanels) {
@@ -1345,6 +1439,37 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
 
   const canAddPanel = panels.length < maxPanels;
   const hasSelectedModel = panels.some((panel) => panel.modelId);
+  const selectedModelIds = React.useMemo(
+    () =>
+      panels
+        .map((panel) => panel.modelId)
+        .filter((modelId): modelId is string => typeof modelId === "string"),
+    [panels]
+  );
+
+  const activeFamilyPreset = React.useMemo(() => {
+    if (selectedModelIds.length === 0) {
+      return null;
+    }
+
+    const selectedModelSet = new Set(selectedModelIds);
+
+    for (const preset of familyPresets) {
+      if (preset.models.length !== selectedModelSet.size) {
+        continue;
+      }
+
+      const allPresetModelsSelected = preset.models.every((model) =>
+        selectedModelSet.has(model.id)
+      );
+
+      if (allPresetModelsSelected) {
+        return preset.family;
+      }
+    }
+
+    return null;
+  }, [familyPresets, selectedModelIds]);
 
   const handleScenarioSelect = (scenario: Scenario) => {
     setSelectedScenario(scenario);
@@ -1643,6 +1768,40 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
           onSelect={handleScenarioSelect}
           disabled={isAnyLoading || !hasSelectedModel}
         />
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">Family Preset</h2>
+        {familyPresets.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {familyPresets.map((preset) => (
+              <Button
+                key={preset.family}
+                type="button"
+                variant={activeFamilyPreset === preset.family ? "default" : "outline"}
+                size="sm"
+                onClick={() => applyFamilyPreset(preset.family)}
+                disabled={isAnyLoading}
+                className="h-auto min-w-[92px] flex-col items-center gap-1 px-3 py-2"
+              >
+                <span className="text-xs">{preset.family}</span>
+                <span
+                  className={
+                    activeFamilyPreset === preset.family
+                      ? "text-[10px] text-primary-foreground/85"
+                      : "text-[10px] text-muted-foreground"
+                  }
+                >
+                  {preset.models.length} models
+                </span>
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Connect at least one provider account to use family presets.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
