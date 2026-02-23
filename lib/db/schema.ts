@@ -50,7 +50,6 @@ export const session = pgTable(
   },
   (table) => [
     index("session_userId_idx").on(table.userId),
-    index("session_token_idx").on(table.token),
   ],
 );
 
@@ -225,7 +224,6 @@ export const proxyApiKey = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    index("proxy_api_key_keyHash_idx").on(table.keyHash),
     index("proxy_api_key_userId_idx").on(table.userId),
   ],
 );
@@ -260,6 +258,16 @@ export const usageLog = pgTable(
   (table) => [
     index("usage_log_userId_createdAt_idx").on(
       table.userId,
+      table.createdAt,
+    ),
+    index("usage_log_userId_providerAccountId_createdAt_idx").on(
+      table.userId,
+      table.providerAccountId,
+      table.createdAt,
+    ),
+    index("usage_log_userId_proxyApiKeyId_createdAt_idx").on(
+      table.userId,
+      table.proxyApiKeyId,
       table.createdAt,
     ),
     index("usage_log_providerAccountId_idx").on(table.providerAccountId),
