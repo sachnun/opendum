@@ -310,6 +310,7 @@ export async function deleteProviderAccount(id: string): Promise<ActionResult> {
     await db.delete(providerAccount).where(eq(providerAccount.id, id));
 
     revalidatePath("/dashboard/accounts");
+    revalidatePath("/dashboard/accounts", "layout");
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -345,6 +346,7 @@ export async function updateProviderAccount(
     }).where(eq(providerAccount.id, id));
 
     revalidatePath("/dashboard/accounts");
+    revalidatePath("/dashboard/accounts", "layout");
 
     return { success: true, data: undefined };
   } catch (error) {
