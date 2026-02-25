@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { endOfDay, format, startOfDay } from "date-fns";
 import type { LucideIcon } from "lucide-react";
 import { CheckCircle, ChevronDown, Clock3, KeyRound, RefreshCw, TrendingUp, Zap } from "lucide-react";
@@ -75,6 +76,7 @@ export function AnalyticsCharts({
   initialApiKeyId,
   apiKeys,
 }: AnalyticsChartsProps) {
+  const router = useRouter();
   const [period, setPeriod] = useState<Period>("24h");
   const [selectedApiKeyId, setSelectedApiKeyId] = useState<string>(initialApiKeyId);
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
@@ -157,6 +159,12 @@ export function AnalyticsCharts({
   const handleApiKeyChange = (apiKeyId: string) => {
     setSelectedApiKeyId(apiKeyId);
     setIsApiKeyFilterOpen(false);
+
+    if (apiKeyId === "all") {
+      router.push("/dashboard");
+    } else {
+      router.push(`/dashboard/analistik/${apiKeyId}`);
+    }
   };
 
   const handleApplyCustomRange = () => {

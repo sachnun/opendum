@@ -5,9 +5,14 @@ import { proxyApiKey } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { AnalyticsCharts } from "@/components/dashboard/analytics/analytics-charts";
 import { getAnalyticsData } from "@/lib/actions/analytics";
-import DashboardLoading from "./loading";
+import DashboardLoading from "../../loading";
+import { notFound } from "next/navigation";
 
-async function AnalyticsContent() {
+interface AnalyticsContentProps {
+  apiKeyId: string;
+}
+
+async function AnalyticsContent({ apiKeyId }: AnalyticsContentProps) {
   const session = await getSession();
 
   if (!session?.user?.id) {
@@ -24,22 +29,34 @@ async function AnalyticsContent() {
     .where(eq(proxyApiKey.userId, session.user.id))
     .orderBy(desc(proxyApiKey.createdAt));
 
-  const initialAnalytics = await getAnalyticsData("24h");
+  const validApiKey = apiKeys.some((key) => key.id === apiKeyId);
+
+  if (!validApiKey) {
+    notFound();
+  }
+
+  const initialAnalytics = await getAnalyticsData("24h", apiKeyId);
   const initialData = initialAnalytics.success ? initialAnalytics.data : null;
 
   return (
     <AnalyticsCharts
       initialData={initialData}
       apiKeys={apiKeys}
-      initialApiKeyId="all"
+      initialApiKeyId={apiKeyId}
     />
   );
 }
 
-export default function DashboardPage() {
+export default async function AnalistikApiKeyPage({
+  params,
+}: {
+  params: Promise<{ apiKeyId: string }>;
+}) {
+  const { apiKeyId } = await params;
+
   return (
     <Suspense fallback={<DashboardLoading />}>
-      <AnalyticsContent />
+      <AnalyticsContent apiKeyId={apiKeyId} />
     </Suspense>
   );
 }

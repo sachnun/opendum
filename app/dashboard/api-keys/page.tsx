@@ -135,7 +135,7 @@ export default async function ApiKeysPage() {
                     />
 
                     <Link
-                      href={`/dashboard?apiKey=${apiKey.id}`}
+                      href={`/dashboard/analistik/${apiKey.id}`}
                       className="text-xs font-medium text-primary underline-offset-4 hover:underline"
                     >
                       View analytics
