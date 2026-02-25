@@ -24,7 +24,6 @@ export const OPENROUTER_SUPPORTED_PARAMS = new Set([
 ]);
 
 export const OPENROUTER_MODEL_MAP: Record<string, string> = {
-  "deepseek-r1-0528": "deepseek/deepseek-r1-0528:free",
   "dolphin-mistral-24b-venice-edition": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
   "gemma-3-12b-it": "google/gemma-3-12b-it:free",
   "gemma-3-27b-it": "google/gemma-3-27b-it:free",
