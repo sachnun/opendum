@@ -172,7 +172,7 @@ async function fetchCopilotIdentity(accessToken: string): Promise<string> {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
-        "User-Agent": "opendum",
+        "User-Agent": COPILOT_OPENCODE_USER_AGENT,
       },
       cache: "no-store",
     });
@@ -255,15 +255,16 @@ export const copilotProvider: Provider = {
     const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": "opendum",
+        "Content-Type": "application/json",
+        "User-Agent": COPILOT_OPENCODE_USER_AGENT,
       },
       body: JSON.stringify({
         client_id: COPILOT_CLIENT_ID,
         device_code: code,
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       }),
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -290,15 +291,16 @@ export const copilotProvider: Provider = {
     const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": "opendum",
+        "Content-Type": "application/json",
+        "User-Agent": COPILOT_OPENCODE_USER_AGENT,
       },
       body: JSON.stringify({
         client_id: COPILOT_CLIENT_ID,
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       }),
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -395,14 +397,15 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
   const response = await fetch(COPILOT_DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": "opendum",
+      "Content-Type": "application/json",
+      "User-Agent": COPILOT_OPENCODE_USER_AGENT,
     },
     body: JSON.stringify({
       client_id: COPILOT_CLIENT_ID,
       scope: COPILOT_SCOPE,
     }),
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -428,15 +431,16 @@ export async function pollCopilotDeviceCodeAuthorization(
   const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": "opendum",
+      "Content-Type": "application/json",
+      "User-Agent": COPILOT_OPENCODE_USER_AGENT,
     },
     body: JSON.stringify({
       client_id: COPILOT_CLIENT_ID,
       device_code: deviceCode,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
     }),
+    cache: "no-store",
   });
 
   if (!response.ok) {
