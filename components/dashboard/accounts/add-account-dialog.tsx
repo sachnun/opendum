@@ -375,17 +375,6 @@ export function AddAccountDialog({
     const poll = async () => {
       if (!deviceCodeInfo) return;
 
-      // Check if popup was closed by user
-      if (popup && popup.closed) {
-        setIsPolling(false);
-        setError("");
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
-        return;
-      }
-
       try {
         const result =
           deviceCodeInfo.provider === "copilot"
