@@ -186,8 +186,9 @@ export function Sidebar({
                     isAccountsItem ? accountIndicatorByHref[subItem.href] : undefined;
                   const shouldShowSubItemCount =
                     !isAccountsItem && typeof subItemCount === "number" && subItemCount > 0;
-                  const shouldShowIndicator =
+                  const hasActiveAccounts =
                     typeof activeSubItemCount === "number" && activeSubItemCount > 0;
+                  const shouldShowIndicator = isAccountsItem;
 
                   return (
                     <Link
@@ -204,21 +205,27 @@ export function Sidebar({
                       <span className="truncate">{subItem.name}</span>
                       {shouldShowIndicator || shouldShowSubItemCount ? (
                         <span className="flex items-center gap-2">
-                          {shouldShowIndicator && subItemIndicator ? (
-                            <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-                              <span
-                                className={cn(
-                                  "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-                                  getAccountIndicatorClass(subItemIndicator)
-                                )}
-                              />
-                              <span
-                                className={cn(
-                                  "relative inline-flex h-2.5 w-2.5 rounded-full",
-                                  getAccountIndicatorClass(subItemIndicator)
-                                )}
-                              />
-                            </span>
+                          {shouldShowIndicator ? (
+                            hasActiveAccounts && subItemIndicator ? (
+                              <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+                                <span
+                                  className={cn(
+                                    "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                                    getAccountIndicatorClass(subItemIndicator)
+                                  )}
+                                />
+                                <span
+                                  className={cn(
+                                    "relative inline-flex h-2.5 w-2.5 rounded-full",
+                                    getAccountIndicatorClass(subItemIndicator)
+                                  )}
+                                />
+                              </span>
+                            ) : (
+                              <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+                              </span>
+                            )
                           ) : null}
                           {shouldShowSubItemCount ? (
                             <span
