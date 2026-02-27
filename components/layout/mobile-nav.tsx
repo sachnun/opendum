@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Menu, ChevronDown, ChevronUp } from "lucide-react";
+import { Menu, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -56,6 +56,16 @@ export function MobileNav({
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
   const normalizedAccountsSubmenuSearch = accountsSubmenuSearch.trim().toLowerCase();
+
+  const isModelsActive =
+    pathname === "/dashboard/models" || pathname.startsWith("/dashboard/models/");
+  const [isModelsExpanded, setIsModelsExpanded] = useState(isModelsActive);
+
+  useEffect(() => {
+    if (isModelsActive) {
+      setIsModelsExpanded(true);
+    }
+  }, [isModelsActive]);
 
   const primaryNavRef = useRef<HTMLElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -144,28 +154,68 @@ export function MobileNav({
           )
         : (item.children ?? []);
 
+    const isCollapsible = isModelsItem;
+    const isExpanded = isModelsItem ? isModelsExpanded : true;
+
     return (
       <div key={item.name} className="space-y-1">
-        <Link
-          href={item.href}
-          onClick={() => setOpen(false)}
-          className={cn(
-            "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-            isActive
-              ? "bg-accent text-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-foreground"
-          )}
-        >
-          <item.icon
+        {isCollapsible ? (
+          <div
             className={cn(
-              "h-4 w-4",
-              isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+              "group flex items-center rounded-lg text-sm font-medium transition-all",
+              isActive
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
             )}
-          />
-          {item.name}
-        </Link>
+          >
+            <Link
+              href={item.href}
+              onClick={() => setOpen(false)}
+              className="flex flex-1 items-center gap-3 py-2.5 pl-3"
+            >
+              <item.icon
+                className={cn(
+                  "h-4 w-4",
+                  isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                )}
+              />
+              {item.name}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsModelsExpanded((prev) => !prev)}
+              className="flex items-center px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={isExpanded ? "Collapse models" : "Expand models"}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        ) : (
+          <Link
+            href={item.href}
+            onClick={() => setOpen(false)}
+            className={cn(
+              "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+              isActive
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <item.icon
+              className={cn(
+                "h-4 w-4",
+                isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+              )}
+            />
+            {item.name}
+          </Link>
+        )}
 
-        {item.children?.length ? (
+        {item.children?.length && isExpanded ? (
           <div className="ml-6 space-y-1 border-l border-border/60 pl-3">
             {isAccountsItem ? (
               <div className="px-1 pb-1 pt-2">
