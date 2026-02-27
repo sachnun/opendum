@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 import {
   type ProviderAccountIndicator,
   type ProviderAccountIndicators,
@@ -160,13 +160,25 @@ export function Sidebar({
           <div className="ml-6 space-y-1 border-l border-border/60 pl-3">
             {isAccountsItem ? (
               <div className="px-1 pb-1 pt-2">
-                <Input
-                  value={accountsSubmenuSearch}
-                  onChange={(event) => setAccountsSubmenuSearch(event.target.value)}
-                  placeholder="Search providers..."
-                  aria-label="Search provider accounts"
-                  className="h-7 border-0 bg-transparent px-2 text-xs shadow-none focus-visible:border-transparent focus-visible:ring-0"
-                />
+                <div className="relative">
+                  <Input
+                    value={accountsSubmenuSearch}
+                    onChange={(event) => setAccountsSubmenuSearch(event.target.value)}
+                    placeholder="Search providers..."
+                    aria-label="Search provider accounts"
+                    className="h-7 border-0 bg-transparent px-2 pr-6 text-xs shadow-none focus-visible:border-transparent focus-visible:ring-0"
+                  />
+                  {accountsSubmenuSearch ? (
+                    <button
+                      type="button"
+                      onClick={() => setAccountsSubmenuSearch("")}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : null}
 
