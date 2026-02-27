@@ -255,11 +255,11 @@ export const copilotProvider: Provider = {
     const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
         Accept: "application/json",
         "User-Agent": "opendum",
       },
-      body: new URLSearchParams({
+      body: JSON.stringify({
         client_id: COPILOT_CLIENT_ID,
         device_code: code,
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
@@ -290,11 +290,11 @@ export const copilotProvider: Provider = {
     const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
         Accept: "application/json",
         "User-Agent": "opendum",
       },
-      body: new URLSearchParams({
+      body: JSON.stringify({
         client_id: COPILOT_CLIENT_ID,
         grant_type: "refresh_token",
         refresh_token: refreshToken,
@@ -395,11 +395,11 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
   const response = await fetch(COPILOT_DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
       Accept: "application/json",
       "User-Agent": "opendum",
     },
-    body: new URLSearchParams({
+    body: JSON.stringify({
       client_id: COPILOT_CLIENT_ID,
       scope: COPILOT_SCOPE,
     }),
@@ -428,11 +428,11 @@ export async function pollCopilotDeviceCodeAuthorization(
   const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
       Accept: "application/json",
       "User-Agent": "opendum",
     },
-    body: new URLSearchParams({
+    body: JSON.stringify({
       client_id: COPILOT_CLIENT_ID,
       device_code: deviceCode,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
