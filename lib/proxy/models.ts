@@ -35,82 +35,8 @@ function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Merge logic — combines static TOML registry with dynamic provider maps
+// Provider support index — tracks which providers offer each model
 // ---------------------------------------------------------------------------
-
-const STATIC_MODEL_KEYS = new Set(Object.keys(MODEL_REGISTRY));
-const STATIC_MODEL_ALIASES = new Set<string>();
-for (const info of Object.values(MODEL_REGISTRY)) {
-  if (!info.aliases) {
-    continue;
-  }
-
-  for (const alias of info.aliases) {
-    STATIC_MODEL_ALIASES.add(alias);
-  }
-}
-
-function uniqueValues(values: string[]): string[] {
-  return Array.from(new Set(values));
-}
-
-function mergeModelInfo(existing: ModelInfo | undefined, incoming: ModelInfo): ModelInfo {
-  const providers = uniqueValues([...(existing?.providers ?? []), ...incoming.providers]);
-  const aliases = uniqueValues([...(existing?.aliases ?? []), ...(incoming.aliases ?? [])]);
-
-  return {
-    providers,
-    aliases: aliases.length > 0 ? aliases : undefined,
-    description: existing?.description ?? incoming.description,
-    meta: existing?.meta ?? incoming.meta,
-  };
-}
-
-function mergeModelRegistries(registries: Array<Record<string, ModelInfo>>): Record<string, ModelInfo> {
-  const merged: Record<string, ModelInfo> = {};
-
-  for (const registry of registries) {
-    for (const [model, info] of Object.entries(registry)) {
-      merged[model] = mergeModelInfo(merged[model], info);
-    }
-  }
-
-  return merged;
-}
-
-const NVIDIA_NIM_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
-for (const [model, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
-  if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
-    continue;
-  }
-
-  NVIDIA_NIM_FALLBACK_REGISTRY[model] = {
-    providers: [ProviderName.NVIDIA_NIM],
-    aliases: [upstreamModel],
-  };
-}
-
-const OLLAMA_CLOUD_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
-for (const model of Object.keys(OLLAMA_CLOUD_MODEL_MAP)) {
-  if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
-    continue;
-  }
-
-  OLLAMA_CLOUD_FALLBACK_REGISTRY[model] = {
-    providers: [ProviderName.OLLAMA_CLOUD],
-  };
-}
-
-const OPENROUTER_FALLBACK_REGISTRY: Record<string, ModelInfo> = {};
-for (const model of Object.keys(OPENROUTER_MODEL_MAP)) {
-  if (STATIC_MODEL_KEYS.has(model) || STATIC_MODEL_ALIASES.has(model)) {
-    continue;
-  }
-
-  OPENROUTER_FALLBACK_REGISTRY[model] = {
-    providers: [ProviderName.OPENROUTER],
-  };
-}
 
 const PROVIDER_SUPPORT_INDEX = new Map<string, Set<string>>();
 
@@ -132,12 +58,7 @@ for (const model of Object.keys(OPENROUTER_MODEL_MAP)) {
   addProviderSupport(model, ProviderName.OPENROUTER);
 }
 
-const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = mergeModelRegistries([
-  MODEL_REGISTRY,
-  NVIDIA_NIM_FALLBACK_REGISTRY,
-  OLLAMA_CLOUD_FALLBACK_REGISTRY,
-  OPENROUTER_FALLBACK_REGISTRY,
-]);
+const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = { ...MODEL_REGISTRY };
 
 // Filter out ignored models from the effective registry
 for (const model of IGNORED_MODELS) {
@@ -231,9 +152,13 @@ export function getModelLookupKeys(model: string): string[] {
  */
 export function getProvidersForModel(model: string): string[] {
   const canonical = resolveModelAlias(model);
-  const lookupKeys = getModelLookupKeys(canonical);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
-  const providers = new Set<string>(info?.providers ?? []);
+  if (!info) {
+    return [];
+  }
+
+  const lookupKeys = getModelLookupKeys(canonical);
+  const providers = new Set<string>(info.providers);
 
   for (const lookupKey of lookupKeys) {
     const supportedProviders = PROVIDER_SUPPORT_INDEX.get(lookupKey);
