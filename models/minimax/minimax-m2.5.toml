@@ -1,0 +1,4 @@
+
+[opendum]
+family = "MiniMax"
+providers = ["iflow", "ollama_cloud"]

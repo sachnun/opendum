@@ -1,0 +1,13 @@
+
+[limit]
+context = 131_072
+output = 8192
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+family = "Qwen"
+providers = ["nvidia_nim"]
+aliases = ["qwen-qwen3-235b-a22b", "qwen/qwen3-235b-a22b"]

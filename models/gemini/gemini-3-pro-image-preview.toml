@@ -1,0 +1,18 @@
+release_date = "2025-11-20"
+knowledge = "2025-06"
+reasoning = false
+tool_call = false
+attachment = true
+
+[cost]
+input = 2
+output = 120
+
+[limit]
+context = 32_768
+output = 64_000
+
+[opendum]
+family = "Gemini"
+providers = ["antigravity"]
+aliases = ["gemini-3-pro-image"]

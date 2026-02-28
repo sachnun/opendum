@@ -1,0 +1,12 @@
+release_date = "2025-10-27"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 196_608
+output = 128_000
+
+[opendum]
+family = "MiniMax"
+providers = ["iflow", "ollama_cloud", "nvidia_nim"]

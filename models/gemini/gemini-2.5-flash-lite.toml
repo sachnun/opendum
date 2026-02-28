@@ -1,0 +1,17 @@
+release_date = "2025-06-17"
+knowledge = "2025-01"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.1
+output = 0.4
+
+[limit]
+context = 1_048_576
+output = 65_536
+
+[opendum]
+family = "Gemini"
+providers = ["antigravity", "gemini_cli"]

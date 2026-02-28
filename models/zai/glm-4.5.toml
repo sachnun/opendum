@@ -1,0 +1,13 @@
+release_date = "2025-07-28"
+knowledge = "2025-04"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 131_072
+output = 98_304
+
+[opendum]
+family = "Z.AI"
+providers = ["iflow"]

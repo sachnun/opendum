@@ -1,0 +1,13 @@
+
+[limit]
+context = 128_000
+output = 4096
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+providers = ["nvidia_nim"]
+aliases = ["google-codegemma-1.1-7b", "google/codegemma-1.1-7b"]
+ignored = true

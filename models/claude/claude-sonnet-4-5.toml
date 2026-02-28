@@ -1,0 +1,18 @@
+release_date = "2025-11-18"
+knowledge = "2025-07"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 3
+output = 15
+
+[limit]
+context = 200_000
+output = 64_000
+
+[opendum]
+family = "Claude"
+providers = ["antigravity", "kiro", "copilot"]
+aliases = ["claude-sonnet-4.5", "claude-sonnet4.5"]

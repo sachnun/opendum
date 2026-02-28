@@ -1,0 +1,18 @@
+release_date = "2025-12-17"
+knowledge = "2025-01"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.5
+output = 3
+
+[limit]
+context = 1_048_576
+output = 65_536
+
+[opendum]
+family = "Gemini"
+providers = ["antigravity", "gemini_cli", "ollama_cloud", "copilot"]
+aliases = ["gemini-3-flash", "gemini-3-flash-preview-latest"]

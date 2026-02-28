@@ -1,0 +1,13 @@
+release_date = "2025-07-11"
+knowledge = "2024-10"
+reasoning = false
+tool_call = true
+attachment = false
+
+[limit]
+context = 262_144
+output = 262_144
+
+[opendum]
+family = "Kimi"
+providers = ["ollama_cloud"]

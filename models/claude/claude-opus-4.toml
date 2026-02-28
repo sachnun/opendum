@@ -1,0 +1,5 @@
+
+[opendum]
+family = "Claude"
+providers = ["kiro"]
+aliases = ["claude-opus-4-0", "claude-opus-4.0"]

@@ -1,0 +1,12 @@
+release_date = "2025-09-22"
+reasoning = false
+tool_call = true
+attachment = true
+
+[limit]
+context = 262_144
+output = 131_072
+
+[opendum]
+family = "Qwen"
+providers = ["ollama_cloud"]

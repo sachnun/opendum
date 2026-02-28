@@ -1,0 +1,12 @@
+release_date = "2025-11-19"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 163_840
+output = 32_000
+
+[opendum]
+providers = ["ollama_cloud"]
+ignored = true

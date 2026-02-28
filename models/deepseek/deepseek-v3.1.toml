@@ -1,0 +1,17 @@
+release_date = "2025-08-21"
+knowledge = "2024-07"
+reasoning = true
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.56
+output = 1.68
+
+[limit]
+context = 131_072
+output = 131_072
+
+[opendum]
+family = "DeepSeek"
+providers = ["iflow", "nvidia_nim"]

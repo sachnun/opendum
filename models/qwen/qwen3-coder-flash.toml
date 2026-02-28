@@ -1,0 +1,17 @@
+release_date = "2025-07-28"
+knowledge = "2025-04"
+reasoning = false
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.144
+output = 0.574
+
+[limit]
+context = 1_000_000
+output = 65_536
+
+[opendum]
+family = "Qwen"
+providers = ["qwen_code"]

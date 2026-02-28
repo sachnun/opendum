@@ -1,0 +1,17 @@
+release_date = "2025-08-05"
+reasoning = true
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.25
+output = 0.69
+
+[limit]
+context = 131_072
+output = 32_768
+
+[opendum]
+family = "OpenAI"
+providers = ["antigravity", "ollama_cloud", "nvidia_nim"]
+aliases = ["gpt-oss-120b"]

@@ -1,0 +1,12 @@
+release_date = "2025-03-31"
+reasoning = false
+tool_call = false
+attachment = true
+
+[limit]
+context = 32_768
+output = 32_768
+
+[opendum]
+family = "Qwen"
+providers = ["iflow"]
