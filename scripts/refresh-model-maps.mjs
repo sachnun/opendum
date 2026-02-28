@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ const refreshScripts = [
 ];
 
 // ---------------------------------------------------------------------------
-// Provider constants paths & regex (for TOML sync)
+// Provider constants paths & regex (for TOML sync check)
 // ---------------------------------------------------------------------------
 
 const PROVIDERS = [
@@ -36,36 +36,6 @@ const PROVIDERS = [
     pattern: /export const OPENROUTER_MODEL_MAP: Record<string, string> = \{([\s\S]*?)\n\};/,
   },
 ];
-
-// ---------------------------------------------------------------------------
-// Model key → folder inference
-// ---------------------------------------------------------------------------
-
-const FOLDER_RULES = [
-  { test: /^claude-/, folder: "claude" },
-  { test: /^gpt-|^grok-/, folder: "openai" },
-  { test: /^gemini-/, folder: "gemini" },
-  { test: /^gemma/, folder: "google" },
-  { test: /^llama|^codellama/, folder: "meta" },
-  { test: /^phi-/, folder: "microsoft" },
-  { test: /^qwen|^qwq-/, folder: "qwen" },
-  { test: /^deepseek-/, folder: "deepseek" },
-  { test: /^kimi-/, folder: "kimi" },
-  { test: /^minimax-/, folder: "minimax" },
-  { test: /^glm-/, folder: "zai" },
-  { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral/, folder: "mistral" },
-  { test: /^nemotron-|^nim-/, folder: "nvidia" },
-  { test: /^openrouter-/, folder: "openrouter" },
-];
-
-function inferFolder(modelKey) {
-  for (const rule of FOLDER_RULES) {
-    if (rule.test.test(modelKey)) {
-      return rule.folder;
-    }
-  }
-  return "other";
-}
 
 // ---------------------------------------------------------------------------
 // Run a child script
@@ -96,7 +66,7 @@ function runScript(scriptName) {
 }
 
 // ---------------------------------------------------------------------------
-// TOML sync — create skeleton files for models in provider maps without one
+// Report models in provider maps that have no TOML file
 // ---------------------------------------------------------------------------
 
 function collectExistingModelIds() {
@@ -134,9 +104,9 @@ function extractModelKeys(providerConfig) {
   return entries.map((entry) => entry[1]);
 }
 
-function syncTomlRegistry() {
+function reportMissingTomlFiles() {
   const existingIds = collectExistingModelIds();
-  const missingModels = new Map();
+  const missingByProvider = new Map();
 
   for (const provider of PROVIDERS) {
     let keys;
@@ -152,36 +122,22 @@ function syncTomlRegistry() {
         continue;
       }
 
-      const providers = missingModels.get(key) ?? new Set();
-      providers.add(provider.name);
-      missingModels.set(key, providers);
+      const providers = missingByProvider.get(key) ?? [];
+      providers.push(provider.name);
+      missingByProvider.set(key, providers);
     }
   }
 
-  if (missingModels.size === 0) {
+  if (missingByProvider.size === 0) {
     console.log("TOML registry is in sync with provider model maps.");
     return;
   }
 
-  let created = 0;
+  console.log(`\n${missingByProvider.size} model(s) in provider maps without a TOML file (handled by runtime fallback):`);
 
-  for (const [modelKey, providerSet] of [...missingModels.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const folder = inferFolder(modelKey);
-    const folderPath = join(modelsDir, folder);
-
-    if (!existsSync(folderPath)) {
-      mkdirSync(folderPath, { recursive: true });
-    }
-
-    const providers = [...providerSet].sort();
-    const content = `[opendum]\nproviders = [${providers.map((p) => `"${p}"`).join(", ")}]\n`;
-    const filePath = join(folderPath, `${modelKey}.toml`);
-    writeFileSync(filePath, content);
-    console.log(`  created ${folder}/${modelKey}.toml`);
-    created += 1;
+  for (const [modelKey, providers] of [...missingByProvider.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    console.log(`  ${modelKey}  (${providers.join(", ")})`);
   }
-
-  console.log(`Created ${created} skeleton TOML file(s).`);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +145,6 @@ function syncTomlRegistry() {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // Phase 1: refresh all provider model maps in parallel
   const results = await Promise.allSettled(refreshScripts.map((scriptName) => runScript(scriptName)));
   const failures = results.filter((result) => result.status === "rejected");
 
@@ -202,8 +157,7 @@ async function main() {
     process.exitCode = 1;
   }
 
-  // Phase 2: create skeleton TOML files for any new models
-  syncTomlRegistry();
+  reportMissingTomlFiles();
 }
 
 main().catch((error) => {
