@@ -1,0 +1,12 @@
+release_date = "2025-09-15"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 262_144
+output = 32_768
+
+[opendum]
+family = "Qwen"
+providers = ["ollama_cloud", "nvidia_nim"]

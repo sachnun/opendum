@@ -1,0 +1,12 @@
+release_date = "2025-11-13"
+reasoning = true
+tool_call = true
+attachment = true
+
+[limit]
+context = 128_000
+output = 64_000
+
+[opendum]
+family = "OpenAI"
+providers = ["copilot"]

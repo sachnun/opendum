@@ -1,0 +1,12 @@
+release_date = "2026-01-01"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 192_000
+output = 32_768
+
+[opendum]
+family = "OpenAI"
+providers = ["codex"]

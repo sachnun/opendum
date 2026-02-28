@@ -1,0 +1,6 @@
+
+[opendum]
+family = "Qwen"
+providers = ["nvidia_nim"]
+aliases = ["qwen-qwen2-7b-instruct", "qwen/qwen2-7b-instruct"]
+ignored = true

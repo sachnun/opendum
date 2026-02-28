@@ -1,0 +1,18 @@
+release_date = "2025-09-15"
+knowledge = "2025-04"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.075
+output = 0.3
+
+[limit]
+context = 1_000_000
+output = 65_000
+
+[opendum]
+family = "Gemini"
+providers = ["antigravity", "gemini_cli"]
+aliases = ["gemini-2.5-flash-thinking"]

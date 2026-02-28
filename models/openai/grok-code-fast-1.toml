@@ -1,0 +1,11 @@
+release_date = "2025-08-27"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 128_000
+output = 64_000
+
+[opendum]
+providers = ["copilot"]

@@ -1,0 +1,21 @@
+release_date = "2025-09-23"
+knowledge = "2025-04"
+reasoning = false
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.34
+output = 1.37
+
+[limit]
+context = 262_144
+output = 65_536
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+family = "Qwen"
+providers = ["iflow", "qwen_code"]

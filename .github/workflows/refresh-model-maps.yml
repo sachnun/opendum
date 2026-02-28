@@ -24,19 +24,13 @@ jobs:
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Refresh provider model maps
-        run: bun run models:refresh
+        run: bun run models:refresh -- --summary "$RUNNER_TEMP/pr-body.md"
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "chore: refresh provider model maps"
           title: "chore: refresh provider model maps"
-          body: |
-            This PR was generated automatically by the scheduled model refresh workflow.
-
-            - Source: `https://openrouter.ai/api/v1/models`
-            - Source: `https://integrate.api.nvidia.com/v1/models`
-            - Source: `https://ollama.com/v1/models`
-            - Script: `bun run models:refresh`
+          body-path: ${{ runner.temp }}/pr-body.md
           branch: chore/refresh-provider-model-maps
           delete-branch: true

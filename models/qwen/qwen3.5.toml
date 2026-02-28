@@ -1,0 +1,21 @@
+release_date = "2026-02"
+knowledge = "2025-04"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.4
+output = 2.4
+
+[limit]
+context = 1_000_000
+output = 65_536
+
+[modalities]
+input = ["text", "image", "video"]
+output = ["text"]
+
+[opendum]
+family = "Qwen"
+providers = ["iflow", "qwen_code"]

@@ -1,0 +1,13 @@
+release_date = "2024-12-01"
+reasoning = false
+tool_call = false
+attachment = true
+
+[limit]
+context = 131_072
+output = 131_072
+
+[opendum]
+providers = ["ollama_cloud"]
+aliases = ["gemma-3-4b-it"]
+ignored = true

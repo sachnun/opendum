@@ -1,0 +1,12 @@
+
+[limit]
+context = 128_000
+output = 4096
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+providers = ["nvidia_nim"]
+aliases = ["meta-llama-3.1-405b-instruct", "meta/llama-3.1-405b-instruct"]

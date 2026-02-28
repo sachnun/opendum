@@ -1,0 +1,14 @@
+release_date = "2024-04-08"
+knowledge = "2024-04"
+reasoning = false
+tool_call = true
+attachment = true
+
+[limit]
+context = 131_072
+output = 8192
+
+[opendum]
+family = "Qwen"
+providers = ["iflow"]
+aliases = ["qwen-vl-max-latest"]

@@ -1,0 +1,14 @@
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 0
+output = 0
+
+[limit]
+context = 200_000
+
+[opendum]
+providers = ["openrouter"]
+description = "OpenRouter router that automatically selects a compatible free model."

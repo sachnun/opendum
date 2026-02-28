@@ -1,0 +1,12 @@
+
+[limit]
+context = 131_072
+output = 8192
+
+[modalities]
+input = ["text", "image", "audio"]
+output = ["text"]
+
+[opendum]
+providers = ["nvidia_nim"]
+aliases = ["microsoft-phi-4-mini-instruct", "microsoft/phi-4-mini-instruct"]

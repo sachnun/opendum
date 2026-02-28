@@ -1,0 +1,18 @@
+release_date = "2026-02"
+knowledge = "2025-05"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 5
+output = 25
+
+[limit]
+context = 1_000_000
+output = 128_000
+
+[opendum]
+family = "Claude"
+providers = ["antigravity", "kiro", "copilot"]
+aliases = ["claude-opus-4.6", "claude-opus4.6"]

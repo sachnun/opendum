@@ -1,0 +1,11 @@
+release_date = "2025-12-15"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 1_048_576
+output = 131_072
+
+[opendum]
+providers = ["ollama_cloud", "nvidia_nim"]

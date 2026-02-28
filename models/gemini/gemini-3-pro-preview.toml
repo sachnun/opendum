@@ -1,0 +1,18 @@
+release_date = "2025-11-19"
+knowledge = "2025-11"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 2
+output = 12
+
+[limit]
+context = 1_000_000
+output = 65_000
+
+[opendum]
+family = "Gemini"
+providers = ["gemini_cli", "copilot"]
+aliases = ["gemini-3-pro", "gemini-3-pro-high", "gemini-3-pro-low"]

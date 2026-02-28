@@ -1,0 +1,14 @@
+
+[limit]
+context = 128_000
+output = 4096
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+family = "DeepSeek"
+providers = ["nvidia_nim"]
+aliases = ["deepseek-ai-deepseek-coder-6.7b-instruct", "deepseek-ai/deepseek-coder-6.7b-instruct"]
+ignored = true

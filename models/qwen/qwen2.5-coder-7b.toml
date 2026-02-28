@@ -1,0 +1,14 @@
+
+[limit]
+context = 128_000
+output = 4096
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+family = "Qwen"
+providers = ["nvidia_nim"]
+aliases = ["qwen-qwen2.5-coder-7b-instruct", "qwen/qwen2.5-coder-7b-instruct"]
+ignored = true

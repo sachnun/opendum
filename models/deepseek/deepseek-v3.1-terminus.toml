@@ -1,0 +1,13 @@
+
+[limit]
+context = 128_000
+output = 8192
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+family = "DeepSeek"
+providers = ["nvidia_nim"]
+aliases = ["deepseek-ai-deepseek-v3.1-terminus", "deepseek-ai/deepseek-v3.1-terminus"]

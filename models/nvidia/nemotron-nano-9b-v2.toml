@@ -1,0 +1,13 @@
+
+[limit]
+context = 131_072
+output = 131_072
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+providers = ["nvidia_nim"]
+aliases = ["nvidia-nvidia-nemotron-nano-9b-v2", "nvidia-nemotron-nano-9b-v2", "nvidia/nvidia-nemotron-nano-9b-v2"]
+ignored = true

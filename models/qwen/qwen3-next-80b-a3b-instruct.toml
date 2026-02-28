@@ -1,0 +1,13 @@
+
+[limit]
+context = 262_144
+output = 16_384
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
+[opendum]
+family = "Qwen"
+providers = ["nvidia_nim"]
+aliases = ["qwen-qwen3-next-80b-a3b-instruct", "qwen/qwen3-next-80b-a3b-instruct"]

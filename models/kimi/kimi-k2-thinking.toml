@@ -1,0 +1,17 @@
+release_date = "2025-11-06"
+knowledge = "2024-08"
+reasoning = true
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.6
+output = 2.5
+
+[limit]
+context = 262_144
+output = 262_144
+
+[opendum]
+family = "Kimi"
+providers = ["iflow", "ollama_cloud", "nvidia_nim"]
