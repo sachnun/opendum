@@ -1,5 +1,3 @@
-import { IGNORED_MODELS } from "./proxy/ignored-models";
-
 export const FEATURED_MODEL_FAMILIES = [
   "OpenAI",
   "Claude",
@@ -25,7 +23,7 @@ export const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   "Z.AI": "zai-models",
 };
 
-const _MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
+const MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
   OpenAI: [
     "gpt-5.3-codex",
     "gpt-5.2-codex",
@@ -116,14 +114,6 @@ const _MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
     "glm-4.5",
   ],
 };
-
-// Filter out ignored models from family listings
-const MODELS_BY_FAMILY = Object.fromEntries(
-  Object.entries(_MODELS_BY_FAMILY).map(([family, models]) => [
-    family,
-    models.filter((m) => !IGNORED_MODELS.has(m)),
-  ])
-) as unknown as Record<FeaturedModelFamily, readonly string[]>;
 
 const MODEL_FAMILY_BY_ID = new Map<string, FeaturedModelFamily>();
 
