@@ -134,6 +134,7 @@ function extractModelKeys(providerConfig) {
   return entries.map((entry) => entry[1]);
 }
 
+/** Returns a list of created TOML paths (relative, e.g. "models/meta/llama-4.toml"). */
 function syncTomlRegistry() {
   const existingIds = collectExistingModelIds();
 
@@ -162,10 +163,10 @@ function syncTomlRegistry() {
 
   if (missingModels.size === 0) {
     console.log("TOML registry is in sync with provider model maps.");
-    return;
+    return [];
   }
 
-  let created = 0;
+  const createdPaths = [];
   const skipped = [];
 
   for (const [modelKey, providerSet] of [...missingModels.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -187,16 +188,74 @@ function syncTomlRegistry() {
     const filePath = join(folderPath, `${modelKey}.toml`);
     writeFileSync(filePath, content);
     console.log(`  created ${folder}/${modelKey}.toml`);
-    created += 1;
+    createdPaths.push(`models/${folder}/${modelKey}.toml`);
   }
 
-  if (created > 0) {
-    console.log(`Created ${created} TOML file(s) for mainstream models.`);
+  if (createdPaths.length > 0) {
+    console.log(`Created ${createdPaths.length} TOML file(s) for mainstream models.`);
   }
 
   if (skipped.length > 0) {
     console.log(`Skipped ${skipped.length} obscure model(s): ${skipped.join(", ")}`);
   }
+
+  return createdPaths;
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot & diff helpers — used to generate a dynamic PR summary
+// ---------------------------------------------------------------------------
+
+function snapshotModelKeys() {
+  const snapshot = new Map();
+  for (const provider of PROVIDERS) {
+    try {
+      snapshot.set(provider.name, new Set(extractModelKeys(provider)));
+    } catch {
+      snapshot.set(provider.name, new Set());
+    }
+  }
+  return snapshot;
+}
+
+function generateSummary(before, after, createdTomls) {
+  const added = [];
+  const removed = [];
+
+  for (const { name } of PROVIDERS) {
+    const oldKeys = before.get(name) ?? new Set();
+    const newKeys = after.get(name) ?? new Set();
+
+    for (const key of newKeys) {
+      if (!oldKeys.has(key)) added.push({ model: key, provider: name });
+    }
+    for (const key of oldKeys) {
+      if (!newKeys.has(key)) removed.push({ model: key, provider: name });
+    }
+  }
+
+  const sections = [];
+
+  if (added.length) {
+    const lines = added
+      .sort((a, b) => a.model.localeCompare(b.model))
+      .map((e) => `- \`${e.model}\` *(${e.provider})*`);
+    sections.push(`### Added Models (${added.length})\n\n${lines.join("\n")}`);
+  }
+
+  if (removed.length) {
+    const lines = removed
+      .sort((a, b) => a.model.localeCompare(b.model))
+      .map((e) => `- \`${e.model}\` *(${e.provider})*`);
+    sections.push(`### Removed Models (${removed.length})\n\n${lines.join("\n")}`);
+  }
+
+  if (createdTomls.length) {
+    const lines = createdTomls.map((t) => `- \`${t}\``);
+    sections.push(`### New TOML Definitions (${createdTomls.length})\n\n${lines.join("\n")}`);
+  }
+
+  return sections.length > 0 ? sections.join("\n\n") + "\n" : "_No model changes detected._\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +263,8 @@ function syncTomlRegistry() {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  const before = snapshotModelKeys();
+
   const results = await Promise.allSettled(refreshScripts.map((scriptName) => runScript(scriptName)));
   const failures = results.filter((result) => result.status === "rejected");
 
@@ -216,7 +277,17 @@ async function main() {
     process.exitCode = 1;
   }
 
-  syncTomlRegistry();
+  const createdTomls = syncTomlRegistry();
+
+  const after = snapshotModelKeys();
+
+  // Write PR summary when --summary <path> is passed
+  const summaryIdx = process.argv.indexOf("--summary");
+  if (summaryIdx !== -1 && process.argv[summaryIdx + 1]) {
+    const summary = generateSummary(before, after, createdTomls);
+    writeFileSync(process.argv[summaryIdx + 1], summary);
+    console.log(`PR summary written to ${process.argv[summaryIdx + 1]}`);
+  }
 }
 
 main().catch((error) => {
