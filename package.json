@@ -36,6 +36,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
+    "effect": "^3.19.19",
     "flags": "^4.0.3",
     "ioredis": "^5.10.0",
     "ioredis-mock": "^8.13.1",

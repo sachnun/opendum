@@ -1,4 +1,7 @@
-import { getRedisClient } from "@/lib/redis";
+import { Effect } from "effect";
+import { RedisService } from "@/lib/effect/services";
+import { RedisError } from "@/lib/effect/errors";
+import { runWithInfra } from "@/lib/effect/runtime";
 
 interface RateLimitEntry {
   resetTime: number; // Unix timestamp (ms) when rate limit expires
@@ -57,108 +60,110 @@ function toTtlSeconds(ms: number): number {
   return Math.max(1, Math.ceil(ms / 1000));
 }
 
-async function getRateLimitEntry(
+// ---------------------------------------------------------------------------
+// Effect-based internal operations
+// ---------------------------------------------------------------------------
+
+const getRateLimitEntryEffect = (
   accountId: string,
   scope: RateLimitScope
-): Promise<RateLimitEntry | null> {
-  const redis = await getRedisClient();
-
-  try {
+): Effect.Effect<RateLimitEntry | null, RedisError, RedisService> =>
+  Effect.gen(function* () {
+    const redis = yield* RedisService;
     const key = getRateLimitKey(accountId, scope);
-    const rawEntry = await redis.get(key);
-    const entry = parseRateLimitEntry(rawEntry);
+
+    const rawEntry = yield* Effect.tryPromise({
+      try: () => redis.get(key),
+      catch: (cause) => new RedisError({ cause }),
+    });
 
     if (!rawEntry) {
       return null;
     }
 
+    const entry = parseRateLimitEntry(rawEntry);
+
     if (!entry) {
-      await redis.del(key);
+      yield* Effect.tryPromise({
+        try: () => redis.del(key),
+        catch: (cause) => new RedisError({ cause }),
+      });
       return null;
     }
 
     if (Date.now() >= entry.resetTime) {
-      await redis.del(key);
+      yield* Effect.tryPromise({
+        try: () => redis.del(key),
+        catch: (cause) => new RedisError({ cause }),
+      });
       return null;
     }
 
     return entry;
-  } catch {
-    return null;
-  }
-}
+  });
 
-/**
- * Mark an account as rate limited for a specific scope
- */
-export async function markRateLimited(
+const markRateLimitedEffect = (
   accountId: string,
   scope: RateLimitScope,
   retryAfterMs: number,
   model?: string,
   message?: string
-): Promise<void> {
-  const normalizedRetryAfterMs = normalizeRetryAfterMs(retryAfterMs);
-  const entry: RateLimitEntry = {
-    resetTime: Date.now() + normalizedRetryAfterMs,
-    model,
-    message,
-  };
+): Effect.Effect<void, RedisError, RedisService> =>
+  Effect.gen(function* () {
+    const normalizedRetryAfterMs = normalizeRetryAfterMs(retryAfterMs);
+    const entry: RateLimitEntry = {
+      resetTime: Date.now() + normalizedRetryAfterMs,
+      model,
+      message,
+    };
 
-  const redis = await getRedisClient();
+    const redis = yield* RedisService;
 
-  try {
-    await redis.set(
-      getRateLimitKey(accountId, scope),
-      JSON.stringify(entry),
-      "EX",
-      toTtlSeconds(normalizedRetryAfterMs)
-    );
-  } catch {
-    // Ignore Redis write errors
-  }
-}
+    yield* Effect.tryPromise({
+      try: () =>
+        redis.set(
+          getRateLimitKey(accountId, scope),
+          JSON.stringify(entry),
+          "EX",
+          toTtlSeconds(normalizedRetryAfterMs)
+        ),
+      catch: (cause) => new RedisError({ cause }),
+    });
+  });
 
-/**
- * Check if an account is currently rate limited for a scope
- */
-export async function isRateLimited(
+const isRateLimitedEffect = (
   accountId: string,
   scope: RateLimitScope
-): Promise<boolean> {
-  const entry = await getRateLimitEntry(accountId, scope);
-  return entry !== null;
-}
+): Effect.Effect<boolean, RedisError, RedisService> =>
+  getRateLimitEntryEffect(accountId, scope).pipe(
+    Effect.map((entry) => entry !== null)
+  );
 
-/**
- * Get rate limit info for an account + scope
- */
-export async function getRateLimitInfo(
+const getRateLimitInfoEffect = (
   accountId: string,
   scope: RateLimitScope
-): Promise<RateLimitEntry | null> {
-  return getRateLimitEntry(accountId, scope);
-}
+): Effect.Effect<RateLimitEntry | null, RedisError, RedisService> =>
+  getRateLimitEntryEffect(accountId, scope);
 
-/**
- * Get set of currently rate-limited account IDs for a scope.
- */
-export async function getRateLimitedAccountIds(
+const getRateLimitedAccountIdsEffect = (
   accountIds: string[],
   scope: RateLimitScope
-): Promise<Set<string>> {
-  const limitedAccountIds = new Set<string>();
+): Effect.Effect<Set<string>, RedisError, RedisService> =>
+  Effect.gen(function* () {
+    const limitedAccountIds = new Set<string>();
 
-  if (accountIds.length === 0) {
-    return limitedAccountIds;
-  }
+    if (accountIds.length === 0) {
+      return limitedAccountIds;
+    }
 
-  const redis = await getRedisClient();
-  const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
-  const now = Date.now();
+    const redis = yield* RedisService;
+    const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
+    const now = Date.now();
 
-  try {
-    const entries = await redis.mget(...keys);
+    const entries = yield* Effect.tryPromise({
+      try: () => redis.mget(...keys),
+      catch: (cause) => new RedisError({ cause }),
+    });
 
     for (let index = 0; index < entries.length; index++) {
       const rawEntry = entries[index];
@@ -172,45 +177,48 @@ export async function getRateLimitedAccountIds(
       const entry = parseRateLimitEntry(rawEntry);
       if (!entry) {
         if (key) {
-          await redis.del(key);
+          yield* Effect.tryPromise({
+            try: () => redis.del(key),
+            catch: (cause) => new RedisError({ cause }),
+          });
         }
         continue;
       }
 
       if (now >= entry.resetTime) {
         if (key) {
-          await redis.del(key);
+          yield* Effect.tryPromise({
+            try: () => redis.del(key),
+            catch: (cause) => new RedisError({ cause }),
+          });
         }
         continue;
       }
 
       limitedAccountIds.add(accountId);
     }
-  } catch {
-    // Ignore Redis read errors
-  }
 
-  return limitedAccountIds;
-}
+    return limitedAccountIds;
+  });
 
-/**
- * Get minimum wait time across multiple accounts for a scope
- * Returns 0 if at least one account is not rate limited
- */
-export async function getMinWaitTime(
+const getMinWaitTimeEffect = (
   accountIds: string[],
   scope: RateLimitScope
-): Promise<number> {
-  if (accountIds.length === 0) {
-    return 0;
-  }
+): Effect.Effect<number, RedisError, RedisService> =>
+  Effect.gen(function* () {
+    if (accountIds.length === 0) {
+      return 0;
+    }
 
-  const redis = await getRedisClient();
-  const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
-  const now = Date.now();
+    const redis = yield* RedisService;
+    const keys = accountIds.map((accountId) => getRateLimitKey(accountId, scope));
+    const now = Date.now();
 
-  try {
-    const entries = await redis.mget(...keys);
+    const entries = yield* Effect.tryPromise({
+      try: () => redis.mget(...keys),
+      catch: (cause) => new RedisError({ cause }),
+    });
+
     let minWait = Infinity;
 
     for (let index = 0; index < entries.length; index++) {
@@ -224,14 +232,20 @@ export async function getMinWaitTime(
 
       if (!entry) {
         if (key) {
-          await redis.del(key);
+          yield* Effect.tryPromise({
+            try: () => redis.del(key),
+            catch: (cause) => new RedisError({ cause }),
+          });
         }
         return 0;
       }
 
       if (now >= entry.resetTime) {
         if (key) {
-          await redis.del(key);
+          yield* Effect.tryPromise({
+            try: () => redis.del(key),
+            catch: (cause) => new RedisError({ cause }),
+          });
         }
         return 0;
       }
@@ -243,10 +257,90 @@ export async function getMinWaitTime(
     }
 
     return minWait === Infinity ? 0 : minWait;
-  } catch {
-    return 0;
-  }
+  });
+
+// ---------------------------------------------------------------------------
+// Public API — signatures unchanged, Effect used internally
+// Redis failures are caught and handled as fail-open (return safe defaults)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mark an account as rate limited for a specific scope
+ */
+export async function markRateLimited(
+  accountId: string,
+  scope: RateLimitScope,
+  retryAfterMs: number,
+  model?: string,
+  message?: string
+): Promise<void> {
+  return runWithInfra(
+    markRateLimitedEffect(accountId, scope, retryAfterMs, model, message).pipe(
+      Effect.catchTag("RedisError", () => Effect.void)
+    )
+  );
 }
+
+/**
+ * Check if an account is currently rate limited for a scope
+ */
+export async function isRateLimited(
+  accountId: string,
+  scope: RateLimitScope
+): Promise<boolean> {
+  return runWithInfra(
+    isRateLimitedEffect(accountId, scope).pipe(
+      Effect.catchTag("RedisError", () => Effect.succeed(false))
+    )
+  );
+}
+
+/**
+ * Get rate limit info for an account + scope
+ */
+export async function getRateLimitInfo(
+  accountId: string,
+  scope: RateLimitScope
+): Promise<RateLimitEntry | null> {
+  return runWithInfra(
+    getRateLimitInfoEffect(accountId, scope).pipe(
+      Effect.catchTag("RedisError", () => Effect.succeed(null))
+    )
+  );
+}
+
+/**
+ * Get set of currently rate-limited account IDs for a scope.
+ */
+export async function getRateLimitedAccountIds(
+  accountIds: string[],
+  scope: RateLimitScope
+): Promise<Set<string>> {
+  return runWithInfra(
+    getRateLimitedAccountIdsEffect(accountIds, scope).pipe(
+      Effect.catchTag("RedisError", () => Effect.succeed(new Set<string>()))
+    )
+  );
+}
+
+/**
+ * Get minimum wait time across multiple accounts for a scope
+ * Returns 0 if at least one account is not rate limited
+ */
+export async function getMinWaitTime(
+  accountIds: string[],
+  scope: RateLimitScope
+): Promise<number> {
+  return runWithInfra(
+    getMinWaitTimeEffect(accountIds, scope).pipe(
+      Effect.catchTag("RedisError", () => Effect.succeed(0))
+    )
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pure utility functions (unchanged — no async, no Effect needed)
+// ---------------------------------------------------------------------------
 
 /**
  * Parse duration string like "128h12m18.724039275s" to milliseconds
@@ -254,22 +348,18 @@ export async function getMinWaitTime(
 function parseDurationToMs(duration: string): number | null {
   if (!duration) return null;
 
-  // Match patterns like "128h12m18.724039275s" or "461538.724039275s"
   let totalMs = 0;
 
-  // Extract hours
   const hoursMatch = duration.match(/(\d+)h/);
   if (hoursMatch) {
     totalMs += parseInt(hoursMatch[1], 10) * 60 * 60 * 1000;
   }
 
-  // Extract minutes
   const minutesMatch = duration.match(/(\d+)m(?!s)/);
   if (minutesMatch) {
     totalMs += parseInt(minutesMatch[1], 10) * 60 * 1000;
   }
 
-  // Extract seconds (with optional decimal)
   const secondsMatch = duration.match(/([\d.]+)s/);
   if (secondsMatch) {
     totalMs += parseFloat(secondsMatch[1]) * 1000;
@@ -370,7 +460,6 @@ export function parseRateLimitError(errorBody: unknown): {
   const details = error?.details as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(details)) {
     for (const detail of details) {
-      // Look for ErrorInfo with quota metadata
       if (detail["@type"]?.toString().includes("ErrorInfo")) {
         const metadata = detail.metadata as Record<string, unknown> | undefined;
         if (metadata) {
@@ -381,7 +470,6 @@ export function parseRateLimitError(errorBody: unknown): {
           }
         }
       }
-      // Look for RetryInfo
       if (detail["@type"]?.toString().includes("RetryInfo")) {
         const retryDelay = detail.retryDelay as string | undefined;
         if (retryDelay && retryAfterMs === null) {
@@ -414,10 +502,6 @@ export function parseRateLimitError(errorBody: unknown): {
 
 /**
  * Compute exponential backoff delay in milliseconds
- * @param attempt - The attempt number (1-based)
- * @param baseMs - Base delay in ms (default: 1000)
- * @param maxMs - Maximum delay in ms (default: 1 hour)
- * @returns Delay in milliseconds
  */
 export function computeExponentialBackoffMs(
   attempt: number,
@@ -431,9 +515,6 @@ export function computeExponentialBackoffMs(
 
 /**
  * Format wait time in human-readable format
- * Examples: "2h30m", "5m12s", "45s"
- * @param ms - Wait time in milliseconds
- * @returns Formatted string
  */
 export function formatWaitTimeMs(ms: number): string {
   const totalSeconds = Math.max(1, Math.ceil(ms / 1000));
@@ -452,9 +533,6 @@ export function formatWaitTimeMs(ms: number): string {
 
 /**
  * Parse retry-after from HTTP response headers
- * Supports both retry-after-ms and retry-after (seconds) headers
- * @param response - HTTP response
- * @returns Retry delay in milliseconds, or null if not found
  */
 export function parseRetryAfterMs(response: Response): number | null {
   const retryAfterMsHeader = response.headers.get("retry-after-ms");
@@ -463,14 +541,14 @@ export function parseRetryAfterMs(response: Response): number | null {
   if (retryAfterMsHeader) {
     const parsed = parseInt(retryAfterMsHeader, 10);
     if (!Number.isNaN(parsed) && parsed >= 0) {
-      return Math.min(parsed, 86400000); // Cap at 24 hours
+      return Math.min(parsed, 86400000);
     }
   }
 
   if (retryAfterSecondsHeader) {
     const parsed = parseInt(retryAfterSecondsHeader, 10);
     if (!Number.isNaN(parsed) && parsed >= 0) {
-      return Math.min(parsed * 1000, 86400000); // Cap at 24 hours
+      return Math.min(parsed * 1000, 86400000);
     }
   }
 

@@ -1,11 +1,12 @@
 "use server";
 
+import { Effect } from "effect";
+import { DatabaseService, RedisService, requireUserId } from "@/lib/effect/services";
+import { DatabaseError, RedisError } from "@/lib/effect/errors";
+import { runServerAction, MainLayer, type ActionResult } from "@/lib/effect/runtime";
 import type { ProviderAccount } from "@/lib/db/schema";
-import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
 import { providerAccount } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import { copilotProvider } from "@/lib/proxy/providers/copilot";
 import {
   fetchCopilotUsageFromApi,
@@ -50,15 +51,10 @@ export interface CopilotQuotaSummary {
   totalGroups: number;
 }
 
-export type CopilotQuotaActionResult =
-  | {
-      success: true;
-      data: {
-        accounts: CopilotAccountQuotaInfo[];
-        summary: CopilotQuotaSummary;
-      };
-    }
-  | { success: false; error: string };
+export type CopilotQuotaActionResult = ActionResult<{
+  accounts: CopilotAccountQuotaInfo[];
+  summary: CopilotQuotaSummary;
+}>;
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
@@ -181,107 +177,150 @@ function toCopilotGroupDisplay(
 export async function getCopilotQuota(
   options: QuotaRequestOptions = {}
 ): Promise<CopilotQuotaActionResult> {
-  const session = await getSession();
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
+      const redis = yield* RedisService;
 
-  const cacheKey = getCopilotQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
-    const cachedResult = await getRedisJson<CopilotQuotaActionResult>(cacheKey);
-    if (cachedResult?.success) {
-      return cachedResult;
-    }
-  }
+      const cacheKey = getCopilotQuotaCacheKey(userId);
 
-  try {
-    const accounts = await db
-      .select({
-        id: providerAccount.id,
-        name: providerAccount.name,
-        email: providerAccount.email,
-        tier: providerAccount.tier,
-        isActive: providerAccount.isActive,
-        accessToken: providerAccount.accessToken,
-        refreshToken: providerAccount.refreshToken,
-        expiresAt: providerAccount.expiresAt,
-        lastUsedAt: providerAccount.lastUsedAt,
-      })
-      .from(providerAccount)
-      .where(
-        and(
-          eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "copilot")
-        )
-      )
-      .orderBy(desc(providerAccount.lastUsedAt));
+      // Cache check (fail-open)
+      if (!options.forceRefresh) {
+        const cached = yield* Effect.tryPromise({
+          try: () => redis.get(cacheKey),
+          catch: (cause) => new RedisError({ cause }),
+        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(null)));
 
-    if (accounts.length === 0) {
-      const emptyResult: CopilotQuotaActionResult = {
-        success: true,
-        data: {
-          accounts: [],
-          summary: {
-            totalAccounts: 0,
-            activeAccounts: 0,
-            byTier: {},
-            exhaustedGroups: 0,
-            totalGroups: 0,
-          },
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached) as CopilotQuotaActionResult;
+            if (parsed?.success) {
+              return parsed.data;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              id: providerAccount.id,
+              name: providerAccount.name,
+              email: providerAccount.email,
+              tier: providerAccount.tier,
+              isActive: providerAccount.isActive,
+              accessToken: providerAccount.accessToken,
+              refreshToken: providerAccount.refreshToken,
+              expiresAt: providerAccount.expiresAt,
+              lastUsedAt: providerAccount.lastUsedAt,
+            })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "copilot")
+              )
+            )
+            .orderBy(desc(providerAccount.lastUsedAt)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      const emptyData = {
+        accounts: [] as CopilotAccountQuotaInfo[],
+        summary: {
+          totalAccounts: 0,
+          activeAccounts: 0,
+          byTier: {} as Record<string, number>,
+          exhaustedGroups: 0,
+          totalGroups: 0,
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, COPILOT_QUOTA_CACHE_TTL_SECONDS);
-      return emptyResult;
-    }
+      if (accounts.length === 0) {
+        yield* Effect.tryPromise({
+          try: () =>
+            redis.set(
+              cacheKey,
+              JSON.stringify({ success: true, data: emptyData } satisfies CopilotQuotaActionResult),
+              "EX",
+              COPILOT_QUOTA_CACHE_TTL_SECONDS
+            ),
+          catch: (cause) => new RedisError({ cause }),
+        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
 
-    const { limit: monthlyLimit, estimated: limitEstimated } =
-      resolveCopilotMonthlyLimit();
-
-    const results: CopilotAccountQuotaInfo[] = [];
-    let exhaustedGroups = 0;
-    let totalGroups = 0;
-    const byTier: Record<string, number> = {};
-
-    for (const account of accounts) {
-      const tier = account.tier ?? "unknown";
-      byTier[tier] = (byTier[tier] ?? 0) + 1;
-
-      let accessToken: string;
-      try {
-        accessToken = await copilotProvider.getValidCredentials(
-          account as unknown as ProviderAccount
-        );
-      } catch {
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier,
-          isActive: account.isActive,
-          status: "expired",
-          error: "Token expired - please re-authenticate",
-          groups: [],
-          fetchedAt: Date.now(),
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
-        continue;
+        return emptyData;
       }
 
-      const usageSnapshot = await fetchCopilotUsageFromApi(accessToken);
+      const { limit: monthlyLimit, estimated: limitEstimated } =
+        resolveCopilotMonthlyLimit();
 
-      if (usageSnapshot.status === "success") {
-        const groups = toCopilotGroupDisplay(
-          usageSnapshot,
-          monthlyLimit,
-          limitEstimated
+      const results: CopilotAccountQuotaInfo[] = [];
+      let exhaustedGroups = 0;
+      let totalGroups = 0;
+      const byTier: Record<string, number> = {};
+
+      for (const account of accounts) {
+        const tier = account.tier ?? "unknown";
+        byTier[tier] = (byTier[tier] ?? 0) + 1;
+
+        const accessToken = yield* Effect.tryPromise({
+          try: () =>
+            copilotProvider.getValidCredentials(
+              account as unknown as ProviderAccount
+            ),
+          catch: () => null,
+        }).pipe(Effect.merge);
+
+        if (accessToken === null) {
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "expired",
+            error: "Token expired - please re-authenticate",
+            groups: [],
+            fetchedAt: Date.now(),
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
+
+        const usageSnapshot = yield* Effect.promise(() =>
+          fetchCopilotUsageFromApi(accessToken)
         );
 
-        for (const group of groups) {
-          totalGroups += 1;
-          if (group.isExhausted) {
-            exhaustedGroups += 1;
+        if (usageSnapshot.status === "success") {
+          const groups = toCopilotGroupDisplay(
+            usageSnapshot,
+            monthlyLimit,
+            limitEstimated
+          );
+
+          for (const group of groups) {
+            totalGroups += 1;
+            if (group.isExhausted) {
+              exhaustedGroups += 1;
+            }
           }
+
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "success",
+            groups,
+            fetchedAt: usageSnapshot.fetchedAt,
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
         }
 
         results.push({
@@ -290,33 +329,17 @@ export async function getCopilotQuota(
           email: account.email,
           tier,
           isActive: account.isActive,
-          status: "success",
-          groups,
+          status: "error",
+          error: usageSnapshot.error,
+          groups: [],
           fetchedAt: usageSnapshot.fetchedAt,
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
         });
-        continue;
       }
 
-      results.push({
-        accountId: account.id,
-        accountName: account.name,
-        email: account.email,
-        tier,
-        isActive: account.isActive,
-        status: "error",
-        error: usageSnapshot.error,
-        groups: [],
-        fetchedAt: usageSnapshot.fetchedAt,
-        lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-      });
-    }
+      const activeAccountCount = results.filter((account) => account.isActive).length;
 
-    const activeAccountCount = results.filter((account) => account.isActive).length;
-
-    const result: CopilotQuotaActionResult = {
-      success: true,
-      data: {
+      const data = {
         accounts: results,
         summary: {
           totalAccounts: results.length,
@@ -325,16 +348,22 @@ export async function getCopilotQuota(
           exhaustedGroups,
           totalGroups,
         },
-      },
-    };
+      };
 
-    await setRedisJson(cacheKey, result, COPILOT_QUOTA_CACHE_TTL_SECONDS);
-    return result;
-  } catch (error) {
-    return {
-      success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to fetch Copilot quota",
-    };
-  }
+      // Cache result (fail-open)
+      yield* Effect.tryPromise({
+        try: () =>
+          redis.set(
+            cacheKey,
+            JSON.stringify({ success: true, data } satisfies CopilotQuotaActionResult),
+            "EX",
+            COPILOT_QUOTA_CACHE_TTL_SECONDS
+          ),
+        catch: (cause) => new RedisError({ cause }),
+      }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
+
+      return data;
+    }),
+    MainLayer
+  );
 }

@@ -1,11 +1,12 @@
 "use server";
 
+import { Effect } from "effect";
+import { DatabaseService, RedisService, requireUserId } from "@/lib/effect/services";
+import { DatabaseError, RedisError } from "@/lib/effect/errors";
+import { runServerAction, MainLayer, type ActionResult } from "@/lib/effect/runtime";
 import type { ProviderAccount } from "@/lib/db/schema";
-import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
 import { providerAccount } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import {
   geminiCliProvider,
   fetchGeminiCliAccountInfo,
@@ -53,15 +54,10 @@ export interface GeminiCliQuotaSummary {
   totalGroups: number;
 }
 
-export type GeminiCliQuotaActionResult =
-  | {
-      success: true;
-      data: {
-        accounts: GeminiCliAccountQuotaInfo[];
-        summary: GeminiCliQuotaSummary;
-      };
-    }
-  | { success: false; error: string };
+export type GeminiCliQuotaActionResult = ActionResult<{
+  accounts: GeminiCliAccountQuotaInfo[];
+  summary: GeminiCliQuotaSummary;
+}>;
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
@@ -141,128 +137,215 @@ function snapshotToGroups(
 export async function getGeminiCliQuota(
   options: QuotaRequestOptions = {}
 ): Promise<GeminiCliQuotaActionResult> {
-  const session = await getSession();
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
+      const redis = yield* RedisService;
 
-  const cacheKey = getGeminiCliQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
-    const cachedResult = await getRedisJson<GeminiCliQuotaActionResult>(cacheKey);
-    if (cachedResult?.success) {
-      return cachedResult;
-    }
-  }
+      const cacheKey = getGeminiCliQuotaCacheKey(userId);
 
-  try {
-    const accounts = await db
-      .select({
-        id: providerAccount.id,
-        name: providerAccount.name,
-        email: providerAccount.email,
-        projectId: providerAccount.projectId,
-        tier: providerAccount.tier,
-        isActive: providerAccount.isActive,
-        accessToken: providerAccount.accessToken,
-        refreshToken: providerAccount.refreshToken,
-        expiresAt: providerAccount.expiresAt,
-        lastUsedAt: providerAccount.lastUsedAt,
-      })
-      .from(providerAccount)
-      .where(
-        and(
-          eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "gemini_cli")
-        )
-      )
-      .orderBy(desc(providerAccount.lastUsedAt));
+      // Cache check (fail-open)
+      if (!options.forceRefresh) {
+        const cached = yield* Effect.tryPromise({
+          try: () => redis.get(cacheKey),
+          catch: (cause) => new RedisError({ cause }),
+        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(null)));
 
-    if (accounts.length === 0) {
-      const emptyResult: GeminiCliQuotaActionResult = {
-        success: true,
-        data: {
-          accounts: [],
-          summary: {
-            totalAccounts: 0,
-            activeAccounts: 0,
-            byTier: {},
-            exhaustedGroups: 0,
-            totalGroups: 0,
-          },
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached) as GeminiCliQuotaActionResult;
+            if (parsed?.success) {
+              return parsed.data;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              id: providerAccount.id,
+              name: providerAccount.name,
+              email: providerAccount.email,
+              projectId: providerAccount.projectId,
+              tier: providerAccount.tier,
+              isActive: providerAccount.isActive,
+              accessToken: providerAccount.accessToken,
+              refreshToken: providerAccount.refreshToken,
+              expiresAt: providerAccount.expiresAt,
+              lastUsedAt: providerAccount.lastUsedAt,
+            })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "gemini_cli")
+              )
+            )
+            .orderBy(desc(providerAccount.lastUsedAt)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      const emptyData = {
+        accounts: [] as GeminiCliAccountQuotaInfo[],
+        summary: {
+          totalAccounts: 0,
+          activeAccounts: 0,
+          byTier: {} as Record<string, number>,
+          exhaustedGroups: 0,
+          totalGroups: 0,
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
-      return emptyResult;
-    }
+      if (accounts.length === 0) {
+        yield* Effect.tryPromise({
+          try: () =>
+            redis.set(
+              cacheKey,
+              JSON.stringify({ success: true, data: emptyData } satisfies GeminiCliQuotaActionResult),
+              "EX",
+              GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS
+            ),
+          catch: (cause) => new RedisError({ cause }),
+        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
 
-    const results: GeminiCliAccountQuotaInfo[] = [];
-    let exhaustedGroups = 0;
-    let totalGroups = 0;
-    const byTier: Record<string, number> = {};
-
-    for (const account of accounts) {
-      let accessToken: string;
-      try {
-        accessToken = await geminiCliProvider.getValidCredentials(
-          account as unknown as ProviderAccount
-        );
-      } catch {
-        const tier = account.tier ?? "free-tier";
-        byTier[tier] = (byTier[tier] ?? 0) + 1;
-
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier,
-          isActive: account.isActive,
-          status: "expired",
-          error: "Token expired - please re-authenticate",
-          groups: [],
-          fetchedAt: Date.now(),
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
-        continue;
+        return emptyData;
       }
 
-      const [refreshedMeta] = await db
-        .select({
-          projectId: providerAccount.projectId,
-          tier: providerAccount.tier,
-        })
-        .from(providerAccount)
-        .where(eq(providerAccount.id, account.id))
-        .limit(1);
+      const results: GeminiCliAccountQuotaInfo[] = [];
+      let exhaustedGroups = 0;
+      let totalGroups = 0;
+      const byTier: Record<string, number> = {};
 
-      let projectId = refreshedMeta?.projectId ?? account.projectId;
-      let tier = refreshedMeta?.tier ?? account.tier ?? "free-tier";
-      let projectDiscoveryError: string | undefined;
+      for (const account of accounts) {
+        const accessToken = yield* Effect.tryPromise({
+          try: () =>
+            geminiCliProvider.getValidCredentials(
+              account as unknown as ProviderAccount
+            ),
+          catch: () => null,
+        }).pipe(Effect.merge);
 
-      if (!projectId) {
-        try {
-          const accountInfo = await fetchGeminiCliAccountInfo(accessToken);
-          projectDiscoveryError = accountInfo.error;
+        if (accessToken === null) {
+          const tier = account.tier ?? "free-tier";
+          byTier[tier] = (byTier[tier] ?? 0) + 1;
+
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "expired",
+            error: "Token expired - please re-authenticate",
+            groups: [],
+            fetchedAt: Date.now(),
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
+
+        // Re-fetch metadata in case it was updated by a concurrent refresh
+        const [refreshedMeta] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select({
+                projectId: providerAccount.projectId,
+                tier: providerAccount.tier,
+              })
+              .from(providerAccount)
+              .where(eq(providerAccount.id, account.id))
+              .limit(1),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+
+        let projectId = refreshedMeta?.projectId ?? account.projectId;
+        let tier = refreshedMeta?.tier ?? account.tier ?? "free-tier";
+        let projectDiscoveryError: string | undefined;
+
+        // Attempt project discovery if missing
+        if (!projectId) {
+          const accountInfo = yield* Effect.tryPromise({
+            try: () => fetchGeminiCliAccountInfo(accessToken),
+            catch: () => ({ projectId: null, tier: null, email: null, error: "Failed to discover project" }),
+          }).pipe(Effect.merge);
+
+          if ("error" in accountInfo && typeof accountInfo.error === "string") {
+            projectDiscoveryError = accountInfo.error;
+          }
 
           if (accountInfo.projectId) {
             projectId = accountInfo.projectId;
             tier = accountInfo.tier || tier;
             projectDiscoveryError = undefined;
 
-            await db
-              .update(providerAccount)
-              .set({
-                projectId: accountInfo.projectId,
-                tier,
-                email: accountInfo.email || account.email,
-              })
-              .where(eq(providerAccount.id, account.id));
+            yield* Effect.tryPromise({
+              try: () =>
+                db
+                  .update(providerAccount)
+                  .set({
+                    projectId: accountInfo.projectId,
+                    tier,
+                    email: accountInfo.email || account.email,
+                  })
+                  .where(eq(providerAccount.id, account.id)),
+              catch: (cause) => new DatabaseError({ cause }),
+            });
           }
-        } catch {
         }
-      }
 
-      if (!projectId) {
+        if (!projectId) {
+          byTier[tier] = (byTier[tier] ?? 0) + 1;
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "error",
+            error:
+              projectDiscoveryError ??
+              "Gemini CLI account is missing projectId. Re-authenticate this account or set GEMINI_CLI_PROJECT_ID.",
+            groups: [],
+            fetchedAt: Date.now(),
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
+
+        const liveQuota = yield* Effect.promise(() =>
+          fetchGeminiCliQuotaFromApi(accessToken, projectId!, tier)
+        );
+
+        if (liveQuota.status === "success") {
+          byTier[liveQuota.tier] = (byTier[liveQuota.tier] ?? 0) + 1;
+          const groups = snapshotToGroups(liveQuota, false, "high");
+
+          for (const group of groups) {
+            totalGroups++;
+            if (group.isExhausted) {
+              exhaustedGroups++;
+            }
+          }
+
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier: liveQuota.tier,
+            isActive: account.isActive,
+            status: "success",
+            groups,
+            fetchedAt: liveQuota.fetchedAt,
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
+
         byTier[tier] = (byTier[tier] ?? 0) + 1;
         results.push({
           accountId: account.id,
@@ -271,63 +354,16 @@ export async function getGeminiCliQuota(
           tier,
           isActive: account.isActive,
           status: "error",
-          error:
-            projectDiscoveryError ??
-            "Gemini CLI account is missing projectId. Re-authenticate this account or set GEMINI_CLI_PROJECT_ID.",
+          error: liveQuota.error ?? "Failed to fetch Gemini CLI quota data",
           groups: [],
           fetchedAt: Date.now(),
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
         });
-        continue;
       }
 
-      const liveQuota = await fetchGeminiCliQuotaFromApi(accessToken, projectId, tier);
+      const activeAccountCount = results.filter((account) => account.isActive).length;
 
-      if (liveQuota.status === "success") {
-        byTier[liveQuota.tier] = (byTier[liveQuota.tier] ?? 0) + 1;
-        const groups = snapshotToGroups(liveQuota, false, "high");
-
-        for (const group of groups) {
-          totalGroups++;
-          if (group.isExhausted) {
-            exhaustedGroups++;
-          }
-        }
-
-        results.push({
-          accountId: account.id,
-          accountName: account.name,
-          email: account.email,
-          tier: liveQuota.tier,
-          isActive: account.isActive,
-          status: "success",
-          groups,
-          fetchedAt: liveQuota.fetchedAt,
-          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-        });
-        continue;
-      }
-
-      byTier[tier] = (byTier[tier] ?? 0) + 1;
-      results.push({
-        accountId: account.id,
-        accountName: account.name,
-        email: account.email,
-        tier,
-        isActive: account.isActive,
-        status: "error",
-        error: liveQuota.error ?? "Failed to fetch Gemini CLI quota data",
-        groups: [],
-        fetchedAt: Date.now(),
-        lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-      });
-    }
-
-    const activeAccountCount = results.filter((account) => account.isActive).length;
-
-    const result: GeminiCliQuotaActionResult = {
-      success: true,
-      data: {
+      const data = {
         accounts: results,
         summary: {
           totalAccounts: results.length,
@@ -336,18 +372,22 @@ export async function getGeminiCliQuota(
           exhaustedGroups,
           totalGroups,
         },
-      },
-    };
+      };
 
-    await setRedisJson(cacheKey, result, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
-    return result;
-  } catch (error) {
-    return {
-      success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch Gemini CLI quota",
-    };
-  }
+      // Cache result (fail-open)
+      yield* Effect.tryPromise({
+        try: () =>
+          redis.set(
+            cacheKey,
+            JSON.stringify({ success: true, data } satisfies GeminiCliQuotaActionResult),
+            "EX",
+            GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS
+          ),
+        catch: (cause) => new RedisError({ cause }),
+      }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
+
+      return data;
+    }),
+    MainLayer
+  );
 }

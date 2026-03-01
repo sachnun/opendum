@@ -10,7 +10,10 @@
  * cold-start behaviour.
  */
 
-import { getRedisClient } from "@/lib/redis";
+import { Effect } from "effect";
+import { RedisService } from "@/lib/effect/services";
+import { RedisError } from "@/lib/effect/errors";
+import { runWithInfra } from "@/lib/effect/runtime";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -71,68 +74,61 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Effect-based internal operations
 // ---------------------------------------------------------------------------
 
-/**
- * Record a successful TTFB latency sample.
- *
- * The sample is stored in a Redis Sorted Set keyed by provider+model+mode.
- * The set is trimmed to {@link MAX_SAMPLES} entries and given a sliding TTL.
- *
- * Failures are silently ignored so this never impacts the request path.
- */
-export async function recordLatency(
+const recordLatencyEffect = (
   provider: string,
   model: string,
   isStream: boolean,
   latencyMs: number,
-): Promise<void> {
-  if (!Number.isFinite(latencyMs) || latencyMs <= 0) return;
+): Effect.Effect<void, RedisError, RedisService> =>
+  Effect.gen(function* () {
+    if (!Number.isFinite(latencyMs) || latencyMs <= 0) return;
 
-  try {
-    const redis = await getRedisClient();
+    const redis = yield* RedisService;
     const key = buildKey(provider, model, isStream);
 
-    // Use timestamp as score so we can trim oldest entries.
-    // The member encodes the latency value to avoid collisions.
     const now = Date.now();
     const member = `${latencyMs}:${now}`;
 
-    await redis.zadd(key, now, member);
+    yield* Effect.tryPromise({
+      try: () => redis.zadd(key, now, member),
+      catch: (cause) => new RedisError({ cause }),
+    });
 
-    // Trim to keep only the most recent MAX_SAMPLES entries (by score = timestamp).
-    const count = await redis.zcard(key);
+    const count = yield* Effect.tryPromise({
+      try: () => redis.zcard(key),
+      catch: (cause) => new RedisError({ cause }),
+    });
+
     if (count > MAX_SAMPLES) {
-      await redis.zremrangebyrank(key, 0, count - MAX_SAMPLES - 1);
+      yield* Effect.tryPromise({
+        try: () => redis.zremrangebyrank(key, 0, count - MAX_SAMPLES - 1),
+        catch: (cause) => new RedisError({ cause }),
+      });
     }
 
-    // Refresh TTL so the key doesn't expire while still actively used.
-    await redis.expire(key, LATENCY_TTL_SECONDS);
-  } catch {
-    // Swallow – latency tracking must never break the request path.
-  }
-}
+    yield* Effect.tryPromise({
+      try: () => redis.expire(key, LATENCY_TTL_SECONDS),
+      catch: (cause) => new RedisError({ cause }),
+    });
+  });
 
-/**
- * Compute an adaptive timeout for a given provider+model+mode.
- *
- * Returns `fallbackMs` when there are fewer than {@link MIN_SAMPLES_FOR_ADAPTIVE}
- * samples available (cold-start / low-traffic routes).
- *
- * Otherwise returns `clamp(P99 * MULTIPLIER, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)`.
- */
-export async function getAdaptiveTimeout(
+const getAdaptiveTimeoutEffect = (
   provider: string,
   model: string,
   isStream: boolean,
   fallbackMs: number,
-): Promise<number> {
-  try {
-    const redis = await getRedisClient();
+): Effect.Effect<number, RedisError, RedisService> =>
+  Effect.gen(function* () {
+    const redis = yield* RedisService;
     const key = buildKey(provider, model, isStream);
 
-    const members = await redis.zrange(key, 0, -1);
+    const members = yield* Effect.tryPromise({
+      try: () => redis.zrange(key, 0, -1),
+      catch: (cause) => new RedisError({ cause }),
+    });
 
     if (members.length < MIN_SAMPLES_FOR_ADAPTIVE) {
       return fallbackMs;
@@ -160,8 +156,53 @@ export async function getAdaptiveTimeout(
     const adaptive = Math.round(p99 * MULTIPLIER);
 
     return clamp(adaptive, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS);
-  } catch {
-    // On any Redis failure fall back to the static value.
-    return fallbackMs;
-  }
+  });
+
+// ---------------------------------------------------------------------------
+// Public API — signatures unchanged
+// Redis failures are caught and handled as fail-open
+// ---------------------------------------------------------------------------
+
+/**
+ * Record a successful TTFB latency sample.
+ *
+ * The sample is stored in a Redis Sorted Set keyed by provider+model+mode.
+ * The set is trimmed to {@link MAX_SAMPLES} entries and given a sliding TTL.
+ *
+ * Failures are silently ignored so this never impacts the request path.
+ */
+export async function recordLatency(
+  provider: string,
+  model: string,
+  isStream: boolean,
+  latencyMs: number,
+): Promise<void> {
+  return runWithInfra(
+    recordLatencyEffect(provider, model, isStream, latencyMs).pipe(
+      // Swallow Redis errors — latency tracking must never break the request path.
+      Effect.catchTag("RedisError", () => Effect.void)
+    )
+  );
+}
+
+/**
+ * Compute an adaptive timeout for a given provider+model+mode.
+ *
+ * Returns `fallbackMs` when there are fewer than {@link MIN_SAMPLES_FOR_ADAPTIVE}
+ * samples available (cold-start / low-traffic routes).
+ *
+ * Otherwise returns `clamp(P99 * MULTIPLIER, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)`.
+ */
+export async function getAdaptiveTimeout(
+  provider: string,
+  model: string,
+  isStream: boolean,
+  fallbackMs: number,
+): Promise<number> {
+  return runWithInfra(
+    getAdaptiveTimeoutEffect(provider, model, isStream, fallbackMs).pipe(
+      // On any Redis failure fall back to the static value.
+      Effect.catchTag("RedisError", () => Effect.succeed(fallbackMs))
+    )
+  );
 }

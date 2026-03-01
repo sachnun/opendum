@@ -1,7 +1,10 @@
 "use server";
 
-import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { Effect } from "effect";
+import { DatabaseService, SessionService, requireUserId } from "@/lib/effect/services";
+import { DatabaseError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/effect/errors";
+import { runServerAction, MainLayer } from "@/lib/effect/runtime";
+import type { ActionResult } from "@/lib/effect/runtime";
 import { providerAccount, providerAccountErrorHistory } from "@/lib/db/schema";
 import { eq, and, count as countFn, asc, desc } from "drizzle-orm";
 import { encrypt, decrypt, hashString } from "@/lib/encryption";
@@ -64,9 +67,7 @@ import {
   OPENROUTER_MODEL_MAP,
 } from "@/lib/proxy/providers/openrouter/constants";
 
-export type ActionResult<T = void> = 
-  | { success: true; data: T }
-  | { success: false; error: string };
+export type { ActionResult };
 
 export interface ProviderAccountErrorHistoryEntry {
   id: string;
@@ -127,64 +128,90 @@ const API_KEY_PROVIDER_SETTINGS = {
 
 type ApiKeyProvider = keyof typeof API_KEY_PROVIDER_SETTINGS;
 
-async function validateProviderApiKey(
+// ---------------------------------------------------------------------------
+// Helper Effects
+// ---------------------------------------------------------------------------
+
+/**
+ * Revalidate all dashboard account-related paths.
+ */
+const revalidateAccountPaths = Effect.sync(() => {
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/accounts");
+  revalidatePath("/dashboard/playground");
+});
+
+/**
+ * Validate a provider API key by making a test request.
+ */
+const validateProviderApiKeyEffect = (
   provider: ApiKeyProvider,
   apiKey: string
-): Promise<ActionResult<void>> {
-  const {
-    label,
-    baseUrl,
-    modelMap,
-    validationPath = "/chat/completions",
-    requireSuccessfulStatus = false,
-  } = API_KEY_PROVIDER_SETTINGS[provider];
-  const validationModel = Object.values(modelMap)[0];
+): Effect.Effect<void, ValidationError, never> =>
+  Effect.gen(function* () {
+    const {
+      label,
+      baseUrl,
+      modelMap,
+      validationPath = "/chat/completions",
+      requireSuccessfulStatus = false,
+    } = API_KEY_PROVIDER_SETTINGS[provider];
+    const validationModel = Object.values(modelMap)[0];
 
-  if (validationPath === "/chat/completions" && !validationModel) {
-    return {
-      success: false,
-      error: `${label} API key validation model is not configured.`,
-    };
-  }
+    if (validationPath === "/chat/completions" && !validationModel) {
+      return yield* new ValidationError({
+        message: `${label} API key validation model is not configured.`,
+      });
+    }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
 
-  try {
-    const response = await fetch(`${baseUrl}${validationPath}`, {
-      method: validationPath === "/chat/completions" ? "POST" : "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch(`${baseUrl}${validationPath}`, {
+          method: validationPath === "/chat/completions" ? "POST" : "GET",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          signal: controller.signal,
+          cache: "no-store",
+          body:
+            validationPath === "/chat/completions"
+              ? JSON.stringify({
+                  model: validationModel,
+                  messages: [{ role: "user", content: "ping" }],
+                  max_tokens: 1,
+                  stream: false,
+                })
+              : undefined,
+        }),
+      catch: (error) => {
+        clearTimeout(timeout);
+        if (error instanceof Error && error.name === "AbortError") {
+          return new ValidationError({
+            message: `${label} API key validation timed out. Please try again.`,
+          });
+        }
+        return new ValidationError({
+          message: `Unable to validate ${label} API key. Please check your network and try again.`,
+        });
       },
-      signal: controller.signal,
-      cache: "no-store",
-      body:
-        validationPath === "/chat/completions"
-          ? JSON.stringify({
-              model: validationModel,
-              messages: [{ role: "user", content: "ping" }],
-              max_tokens: 1,
-              stream: false,
-            })
-          : undefined,
-    });
+    }).pipe(Effect.tap(() => Effect.sync(() => clearTimeout(timeout))));
 
     if (response.status === 401 || response.status === 403) {
-      return {
-        success: false,
-        error: `${label} API key is invalid.`,
-      };
+      return yield* new ValidationError({
+        message: `${label} API key is invalid.`,
+      });
     }
 
     if (requireSuccessfulStatus && !response.ok) {
-      let responseText = "";
-      try {
-        responseText = await response.text();
-      } catch {
-        responseText = "";
-      }
+      const responseText = yield* Effect.tryPromise({
+        try: () => response.text(),
+        catch: () => "",
+      }).pipe(Effect.catchAll(() => Effect.succeed("")));
 
       const normalizedBody = responseText.toLowerCase();
       const looksLikeAuthFailure =
@@ -194,172 +221,339 @@ async function validateProviderApiKey(
         normalizedBody.includes("user not found");
 
       if (looksLikeAuthFailure) {
-        return {
-          success: false,
-          error: `${label} API key is invalid.`,
-        };
+        return yield* new ValidationError({
+          message: `${label} API key is invalid.`,
+        });
       }
 
-      return {
-        success: false,
-        error: `Unable to validate ${label} API key right now (HTTP ${response.status}). Please try again.`,
-      };
+      return yield* new ValidationError({
+        message: `Unable to validate ${label} API key right now (HTTP ${response.status}). Please try again.`,
+      });
     }
+  });
 
-    // Any non-auth response means the key is accepted by provider auth layer.
-    return { success: true, data: undefined };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return {
-        success: false,
-        error: `${label} API key validation timed out. Please try again.`,
-      };
-    }
-
-    return {
-      success: false,
-      error: `Unable to validate ${label} API key. Please check your network and try again.`,
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function connectApiKeyProviderAccount(
+/**
+ * Connect/update a provider account using an API key.
+ */
+const connectApiKeyProviderAccountEffect = (
   userId: string,
   provider: ApiKeyProvider,
   providerLabel: string,
   apiKey: string,
   accountName?: string
-): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const normalizedApiKey = apiKey.trim();
-  if (!normalizedApiKey) {
-    return { success: false, error: "API key is required" };
-  }
+): Effect.Effect<{ email: string; isUpdate: boolean }, ValidationError | DatabaseError, DatabaseService> =>
+  Effect.gen(function* () {
+    const normalizedApiKey = apiKey.trim();
+    if (!normalizedApiKey) {
+      return yield* new ValidationError({ message: "API key is required" });
+    }
 
-  const validationResult = await validateProviderApiKey(provider, normalizedApiKey);
-  if (!validationResult.success) {
-    return validationResult;
-  }
+    yield* validateProviderApiKeyEffect(provider, normalizedApiKey);
 
-  const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
-  const normalizedAccountName = accountName?.trim();
+    const db = yield* DatabaseService;
+    const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
+    const normalizedAccountName = accountName?.trim();
 
-  const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
+    const existingAccounts = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(providerAccount)
+          .where(
+            and(
+              eq(providerAccount.userId, userId),
+              eq(providerAccount.provider, provider),
+              eq(providerAccount.email, identifier)
+            )
+          )
+          .limit(1),
+      catch: (cause) => new DatabaseError({ cause }),
+    });
 
-  if (existingAccount) {
-    await db.update(providerAccount).set({
-      accessToken: encrypt(normalizedApiKey),
-      refreshToken: encrypt(normalizedApiKey),
-      expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
-      ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
-      isActive: true,
-    }).where(eq(providerAccount.id, existingAccount.id));
+    const existingAccount = existingAccounts[0];
 
-    revalidatePath("/dashboard", "layout");
-    revalidatePath("/dashboard/accounts");
-    revalidatePath("/dashboard/playground");
+    if (existingAccount) {
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(providerAccount)
+            .set({
+              accessToken: encrypt(normalizedApiKey),
+              refreshToken: encrypt(normalizedApiKey),
+              expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+              ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
+              isActive: true,
+            })
+            .where(eq(providerAccount.id, existingAccount.id)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    return {
-      success: true,
-      data: {
-        email: identifier,
-        isUpdate: true,
-      },
-    };
-  }
+      yield* revalidateAccountPaths;
 
-  const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
-  const accountCount = countResult.value;
+      return { email: identifier, isUpdate: true };
+    }
 
-  await db.insert(providerAccount).values({
-    userId,
-    provider,
-    name: normalizedAccountName || `${providerLabel} ${accountCount + 1}`,
-    accessToken: encrypt(normalizedApiKey),
-    refreshToken: encrypt(normalizedApiKey),
-    expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
-    email: identifier,
-    isActive: true,
+    const countResults = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ value: countFn() })
+          .from(providerAccount)
+          .where(
+            and(
+              eq(providerAccount.userId, userId),
+              eq(providerAccount.provider, provider)
+            )
+          ),
+      catch: (cause) => new DatabaseError({ cause }),
+    });
+    const accountCount = countResults[0].value;
+
+    yield* Effect.tryPromise({
+      try: () =>
+        db.insert(providerAccount).values({
+          userId,
+          provider,
+          name: normalizedAccountName || `${providerLabel} ${accountCount + 1}`,
+          accessToken: encrypt(normalizedApiKey),
+          refreshToken: encrypt(normalizedApiKey),
+          expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+          email: identifier,
+          isActive: true,
+        }),
+      catch: (cause) => new DatabaseError({ cause }),
+    });
+
+    yield* revalidateAccountPaths;
+
+    return { email: identifier, isUpdate: false };
   });
 
-  revalidatePath("/dashboard", "layout");
-  revalidatePath("/dashboard/accounts");
-  revalidatePath("/dashboard/playground");
+/**
+ * Upsert an OAuth-based provider account.
+ */
+const upsertOAuthAccountEffect = (
+  userId: string,
+  provider: string,
+  providerLabel: string,
+  oauthResult: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+    email: string;
+    apiKey?: string | null;
+    projectId?: string | null;
+    tier?: string | null;
+    accountId?: string | null;
+  }
+): Effect.Effect<{ email: string; isUpdate: boolean }, DatabaseError, DatabaseService> =>
+  Effect.gen(function* () {
+    const db = yield* DatabaseService;
 
-  return {
-    success: true,
-    data: {
-      email: identifier,
-      isUpdate: false,
-    },
-  };
-}
+    const existingAccounts = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(providerAccount)
+          .where(
+            and(
+              eq(providerAccount.userId, userId),
+              eq(providerAccount.provider, provider),
+              eq(providerAccount.email, oauthResult.email)
+            )
+          )
+          .limit(1),
+      catch: (cause) => new DatabaseError({ cause }),
+    });
+
+    const existingAccount = existingAccounts[0];
+
+    if (existingAccount) {
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(providerAccount)
+            .set({
+              accessToken: encrypt(oauthResult.accessToken),
+              refreshToken: encrypt(oauthResult.refreshToken),
+              ...(oauthResult.apiKey !== undefined && {
+                apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
+              }),
+              expiresAt: oauthResult.expiresAt,
+              ...(oauthResult.projectId !== undefined && { projectId: oauthResult.projectId }),
+              ...(oauthResult.tier !== undefined && { tier: oauthResult.tier }),
+              isActive: true,
+            })
+            .where(eq(providerAccount.id, existingAccount.id)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+
+      return { email: oauthResult.email, isUpdate: true };
+    }
+
+    const countResults = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ value: countFn() })
+          .from(providerAccount)
+          .where(
+            and(
+              eq(providerAccount.userId, userId),
+              eq(providerAccount.provider, provider)
+            )
+          ),
+      catch: (cause) => new DatabaseError({ cause }),
+    });
+    const accountCount = countResults[0].value;
+
+    yield* Effect.tryPromise({
+      try: () =>
+        db.insert(providerAccount).values({
+          userId,
+          provider,
+          name: `${providerLabel} ${accountCount + 1}`,
+          accessToken: encrypt(oauthResult.accessToken),
+          refreshToken: encrypt(oauthResult.refreshToken),
+          ...(oauthResult.apiKey !== undefined && {
+            apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
+          }),
+          expiresAt: oauthResult.expiresAt,
+          email: oauthResult.email,
+          ...(oauthResult.projectId !== undefined && { projectId: oauthResult.projectId }),
+          ...(oauthResult.tier !== undefined && { tier: oauthResult.tier }),
+          isActive: true,
+        }),
+      catch: (cause) => new DatabaseError({ cause }),
+    });
+
+    yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+
+    return { email: oauthResult.email, isUpdate: false };
+  });
+
+/**
+ * Parse an OAuth callback URL and extract the authorization code.
+ */
+const extractOAuthCodeEffect = (
+  callbackUrl: string,
+  providerLabel: string
+): Effect.Effect<string, ValidationError, never> =>
+  Effect.gen(function* () {
+    if (!callbackUrl || typeof callbackUrl !== "string") {
+      return yield* new ValidationError({ message: "Callback URL is required" });
+    }
+
+    let url: URL;
+    try {
+      url = new URL(callbackUrl);
+    } catch {
+      return yield* new ValidationError({ message: "Invalid URL format" });
+    }
+
+    const error = url.searchParams.get("error");
+    if (error) {
+      return yield* new ValidationError({
+        message: `${providerLabel} OAuth error: ${error}`,
+      });
+    }
+
+    const code = url.searchParams.get("code");
+    if (!code) {
+      return yield* new ValidationError({
+        message: "No authorization code found in URL. Make sure you copied the complete URL from your browser.",
+      });
+    }
+
+    return code;
+  });
+
+// ---------------------------------------------------------------------------
+// Public API — server actions with unchanged signatures
+// ---------------------------------------------------------------------------
 
 /**
  * Delete a provider account
  */
 export async function deleteProviderAccount(id: string): Promise<ActionResult> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select()
+            .from(providerAccount)
+            .where(and(eq(providerAccount.id, id), eq(providerAccount.userId, userId)))
+            .limit(1),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    // Verify ownership
-    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, id), eq(providerAccount.userId, session.user.id))).limit(1);
+      if (!accounts[0]) {
+        return yield* new NotFoundError({ message: "Account not found" });
+      }
 
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
+      yield* Effect.tryPromise({
+        try: () => db.delete(providerAccount).where(eq(providerAccount.id, id)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    await db.delete(providerAccount).where(eq(providerAccount.id, id));
-
-    revalidatePath("/dashboard/accounts");
-    revalidatePath("/dashboard/accounts", "layout");
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error("Failed to delete account:", error);
-    return { success: false, error: "Failed to delete account" };
-  }
+      yield* Effect.sync(() => {
+        revalidatePath("/dashboard/accounts");
+        revalidatePath("/dashboard/accounts", "layout");
+      });
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Update a provider account
  */
 export async function updateProviderAccount(
-  id: string, 
+  id: string,
   data: { name?: string; isActive?: boolean }
 ): Promise<ActionResult> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select()
+            .from(providerAccount)
+            .where(and(eq(providerAccount.id, id), eq(providerAccount.userId, userId)))
+            .limit(1),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    // Verify ownership
-    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, id), eq(providerAccount.userId, session.user.id))).limit(1);
+      if (!accounts[0]) {
+        return yield* new NotFoundError({ message: "Account not found" });
+      }
 
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(providerAccount)
+            .set({
+              ...(data.name !== undefined && { name: data.name }),
+              ...(data.isActive !== undefined && { isActive: data.isActive }),
+            })
+            .where(eq(providerAccount.id, id)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    await db.update(providerAccount).set({
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.isActive !== undefined && { isActive: data.isActive }),
-    }).where(eq(providerAccount.id, id));
-
-    revalidatePath("/dashboard/accounts");
-    revalidatePath("/dashboard/accounts", "layout");
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error("Failed to update account:", error);
-    return { success: false, error: "Failed to update account" };
-  }
+      yield* Effect.sync(() => {
+        revalidatePath("/dashboard/accounts");
+        revalidatePath("/dashboard/accounts", "layout");
+      });
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -369,44 +563,50 @@ export async function getProviderAccountErrorHistory(
   accountId: string,
   limit = 200
 ): Promise<ActionResult<{ entries: ProviderAccountErrorHistoryEntry[] }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const parsedLimit = Number.isFinite(limit) ? limit : 200;
+      const normalizedLimit = Math.max(1, Math.min(200, Math.floor(parsedLimit)));
 
-  const parsedLimit = Number.isFinite(limit) ? limit : 200;
-  const normalizedLimit = Math.max(1, Math.min(200, Math.floor(parsedLimit)));
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ id: providerAccount.id })
+            .from(providerAccount)
+            .where(
+              and(eq(providerAccount.id, accountId), eq(providerAccount.userId, userId))
+            )
+            .limit(1),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    const [account] = await db
-      .select({ id: providerAccount.id })
-      .from(providerAccount)
-      .where(and(eq(providerAccount.id, accountId), eq(providerAccount.userId, session.user.id)))
-      .limit(1);
+      if (!accounts[0]) {
+        return yield* new NotFoundError({ message: "Account not found" });
+      }
 
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
+      const entries = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              id: providerAccountErrorHistory.id,
+              errorCode: providerAccountErrorHistory.errorCode,
+              errorMessage: providerAccountErrorHistory.errorMessage,
+              createdAt: providerAccountErrorHistory.createdAt,
+            })
+            .from(providerAccountErrorHistory)
+            .where(eq(providerAccountErrorHistory.providerAccountId, accountId))
+            .orderBy(
+              desc(providerAccountErrorHistory.createdAt),
+              desc(providerAccountErrorHistory.id)
+            )
+            .limit(normalizedLimit),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    const entries = await db
-      .select({
-        id: providerAccountErrorHistory.id,
-        errorCode: providerAccountErrorHistory.errorCode,
-        errorMessage: providerAccountErrorHistory.errorMessage,
-        createdAt: providerAccountErrorHistory.createdAt,
-      })
-      .from(providerAccountErrorHistory)
-      .where(eq(providerAccountErrorHistory.providerAccountId, accountId))
-      .orderBy(
-        desc(providerAccountErrorHistory.createdAt),
-        desc(providerAccountErrorHistory.id)
-      )
-      .limit(normalizedLimit);
-
-    return {
-      success: true,
-      data: {
+      return {
         entries: entries.map((entry) => {
           const createdAt =
             entry.createdAt instanceof Date
@@ -422,12 +622,10 @@ export async function getProviderAccountErrorHistory(
               : createdAt.toISOString(),
           };
         }),
-      },
-    };
-  } catch (error) {
-    console.error("Failed to get provider account error history:", error);
-    return { success: false, error: "Failed to fetch account error history" };
-  }
+      };
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -437,24 +635,19 @@ export async function connectNvidiaNimApiKey(
   apiKey: string,
   accountName?: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    return await connectApiKeyProviderAccount(
-      session.user.id,
-      "nvidia_nim",
-      "Nvidia",
-      apiKey,
-      accountName
-    );
-  } catch (error) {
-    console.error("Failed to connect Nvidia account:", error);
-    return { success: false, error: "Failed to connect Nvidia account" };
-  }
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      return yield* connectApiKeyProviderAccountEffect(
+        userId,
+        "nvidia_nim",
+        "Nvidia",
+        apiKey,
+        accountName
+      );
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -464,24 +657,19 @@ export async function connectOllamaCloudApiKey(
   apiKey: string,
   accountName?: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    return await connectApiKeyProviderAccount(
-      session.user.id,
-      "ollama_cloud",
-      "Ollama Cloud",
-      apiKey,
-      accountName
-    );
-  } catch (error) {
-    console.error("Failed to connect Ollama Cloud account:", error);
-    return { success: false, error: "Failed to connect Ollama Cloud account" };
-  }
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      return yield* connectApiKeyProviderAccountEffect(
+        userId,
+        "ollama_cloud",
+        "Ollama Cloud",
+        apiKey,
+        accountName
+      );
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -491,24 +679,19 @@ export async function connectOpenRouterApiKey(
   apiKey: string,
   accountName?: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    return await connectApiKeyProviderAccount(
-      session.user.id,
-      "openrouter",
-      "OpenRouter",
-      apiKey,
-      accountName
-    );
-  } catch (error) {
-    console.error("Failed to connect OpenRouter account:", error);
-    return { success: false, error: "Failed to connect OpenRouter account" };
-  }
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      return yield* connectApiKeyProviderAccountEffect(
+        userId,
+        "openrouter",
+        "OpenRouter",
+        apiKey,
+        accountName
+      );
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -517,96 +700,26 @@ export async function connectOpenRouterApiKey(
 export async function exchangeIflowOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const code = yield* extractOAuthCodeEffect(callbackUrl, "Iflow");
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    return { success: false, error: "Callback URL is required" };
-  }
-
-  try {
-    // Parse the callback URL to extract the code
-    let url: URL;
-    try {
-      url = new URL(callbackUrl);
-    } catch {
-      return { success: false, error: "Invalid URL format" };
-    }
-
-    const code = url.searchParams.get("code");
-    if (!code) {
-      return { 
-        success: false, 
-        error: "No authorization code found in URL. Make sure you copied the complete URL from your browser." 
-      };
-    }
-
-    // Check for error in URL
-    const error = url.searchParams.get("error");
-    if (error) {
-      return { success: false, error: `Iflow OAuth error: ${error}` };
-    }
-
-    // Exchange code for tokens using the provider
-    const oauthResult = await iflowProvider.exchangeCode(code, IFLOW_REDIRECT_URI);
-
-    // Check if account with this email already exists for this user
-    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "iflow"), eq(providerAccount.email, oauthResult.email))).limit(1);
-
-    if (existingAccount) {
-      // Update existing account
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
-        expiresAt: oauthResult.expiresAt,
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: true,
-        },
-      };
-    } else {
-      // Create new account
-      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "iflow")));
-      const accountCount = countResult.value;
-
-      await db.insert(providerAccount).values({
-        userId: session.user.id,
-        provider: "iflow",
-        name: `Iflow ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
-        expiresAt: oauthResult.expiresAt,
-        email: oauthResult.email,
-        isActive: true,
+      const oauthResult = yield* Effect.tryPromise({
+        try: () => iflowProvider.exchangeCode(code, IFLOW_REDIRECT_URI),
+        catch: (cause) => new DatabaseError({ cause }),
       });
 
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: false,
-        },
-      };
-    }
-  } catch (err) {
-    console.error("Failed to exchange OAuth code:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return yield* upsertOAuthAccountEffect(userId, "iflow", "Iflow", {
+        accessToken: oauthResult.accessToken,
+        refreshToken: oauthResult.refreshToken,
+        expiresAt: oauthResult.expiresAt,
+        email: oauthResult.email,
+        apiKey: oauthResult.apiKey,
+      });
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -623,37 +736,42 @@ export async function getAccountsByProvider(): Promise<
     tier: string | null;
   }>>>
 > {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              id: providerAccount.id,
+              provider: providerAccount.provider,
+              name: providerAccount.name,
+              email: providerAccount.email,
+              isActive: providerAccount.isActive,
+              lastUsedAt: providerAccount.lastUsedAt,
+              requestCount: providerAccount.requestCount,
+              tier: providerAccount.tier,
+            })
+            .from(providerAccount)
+            .where(eq(providerAccount.userId, userId))
+            .orderBy(asc(providerAccount.createdAt)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    const accounts = await db.select({
-      id: providerAccount.id,
-      provider: providerAccount.provider,
-      name: providerAccount.name,
-      email: providerAccount.email,
-      isActive: providerAccount.isActive,
-      lastUsedAt: providerAccount.lastUsedAt,
-      requestCount: providerAccount.requestCount,
-      tier: providerAccount.tier,
-    }).from(providerAccount).where(eq(providerAccount.userId, session.user.id)).orderBy(asc(providerAccount.createdAt));
-
-    const grouped: Record<string, typeof accounts> = {};
-    for (const account of accounts) {
-      if (!grouped[account.provider]) {
-        grouped[account.provider] = [];
+      const grouped: Record<string, typeof accounts> = {};
+      for (const account of accounts) {
+        if (!grouped[account.provider]) {
+          grouped[account.provider] = [];
+        }
+        grouped[account.provider].push(account);
       }
-      grouped[account.provider].push(account);
-    }
 
-    return { success: true, data: grouped };
-  } catch (error) {
-    console.error("Failed to get accounts:", error);
-    return { success: false, error: "Failed to get accounts" };
-  }
+      return grouped;
+    }),
+    MainLayer
+  );
 }
 
 // Backwards compatibility aliases
@@ -664,46 +782,44 @@ export const updateIflowAccount = updateProviderAccount;
  * Get Iflow OAuth authorization URL
  */
 export async function getIflowAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const authParams = new URLSearchParams({
+        loginMethod: "phone",
+        type: "phone",
+        redirect: IFLOW_REDIRECT_URI,
+        client_id: IFLOW_CLIENT_ID,
+      });
 
-  const authParams = new URLSearchParams({
-    loginMethod: "phone",
-    type: "phone",
-    redirect: IFLOW_REDIRECT_URI,
-    client_id: IFLOW_CLIENT_ID,
-  });
-
-  const authUrl = `${IFLOW_OAUTH_AUTHORIZE_URL}?${authParams.toString()}`;
-
-  return { success: true, data: { authUrl } };
+      return { authUrl: `${IFLOW_OAUTH_AUTHORIZE_URL}?${authParams.toString()}` };
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Get Antigravity (Google) OAuth authorization URL
  */
 export async function getAntigravityAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const params = new URLSearchParams({
+        client_id: ANTIGRAVITY_CLIENT_ID,
+        redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+        response_type: "code",
+        scope: ANTIGRAVITY_SCOPES.join(" "),
+        access_type: "offline",
+        prompt: "consent",
+      });
 
-  const params = new URLSearchParams({
-    client_id: ANTIGRAVITY_CLIENT_ID,
-    redirect_uri: ANTIGRAVITY_REDIRECT_URI,
-    response_type: "code",
-    scope: ANTIGRAVITY_SCOPES.join(" "),
-    access_type: "offline",
-    prompt: "consent",
-  });
-
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-
-  return { success: true, data: { authUrl } };
+      return { authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -712,106 +828,31 @@ export async function getAntigravityAuthUrl(): Promise<ActionResult<{ authUrl: s
 export async function exchangeAntigravityOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const code = yield* extractOAuthCodeEffect(callbackUrl, "Google");
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const oauthResult = yield* Effect.tryPromise({
+        try: () => antigravityProvider.exchangeCode(code, ANTIGRAVITY_REDIRECT_URI),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    return { success: false, error: "Callback URL is required" };
-  }
-
-  try {
-    // Parse the callback URL to extract the code
-    let url: URL;
-    try {
-      url = new URL(callbackUrl);
-    } catch {
-      return { success: false, error: "Invalid URL format" };
-    }
-
-    const code = url.searchParams.get("code");
-    if (!code) {
-      return { 
-        success: false, 
-        error: "No authorization code found in URL. Make sure you copied the complete URL from your browser." 
-      };
-    }
-
-    // Check for error in URL
-    const error = url.searchParams.get("error");
-    if (error) {
-      return { success: false, error: `Google OAuth error: ${error}` };
-    }
-
-    // Exchange code for tokens using the provider
-    const oauthResult = await antigravityProvider.exchangeCode(
-      code, 
-      ANTIGRAVITY_REDIRECT_URI
-    );
-
-    // Check if account with this email already exists for this user
-    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "antigravity"), eq(providerAccount.email, oauthResult.email))).limit(1);
-
-    if (existingAccount) {
-      // Update existing account
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        projectId: oauthResult.projectId,
-        tier: oauthResult.tier,
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: true,
-        },
-      };
-    } else {
-      // Create new account
-      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "antigravity")));
-      const accountCount = countResult.value;
-
-      await db.insert(providerAccount).values({
-        userId: session.user.id,
-        provider: "antigravity",
-        name: `Antigravity ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
+      return yield* upsertOAuthAccountEffect(userId, "antigravity", "Antigravity", {
+        accessToken: oauthResult.accessToken,
+        refreshToken: oauthResult.refreshToken,
         expiresAt: oauthResult.expiresAt,
         email: oauthResult.email,
         projectId: oauthResult.projectId,
         tier: oauthResult.tier,
-        isActive: true,
       });
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: false,
-        },
-      };
-    }
-  } catch (err) {
-    console.error("Failed to exchange Antigravity OAuth code:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Initiate Qwen Code Device Code Flow
- * Returns device code info including URL for user to visit
  */
 export async function initiateQwenCodeAuth(): Promise<
   ActionResult<{
@@ -824,29 +865,21 @@ export async function initiateQwenCodeAuth(): Promise<
     codeVerifier: string;
   }>
 > {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    const deviceCodeInfo = await initiateDeviceCodeFlow();
-
-    return {
-      success: true,
-      data: deviceCodeInfo,
-    };
-  } catch (err) {
-    console.error("Failed to initiate Qwen Code auth:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return yield* Effect.tryPromise({
+        try: () => initiateDeviceCodeFlow(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Poll Qwen Code device code authorization status
- * Call this periodically until it returns success or error
  */
 export async function pollQwenCodeAuth(
   deviceCode: string,
@@ -858,120 +891,149 @@ export async function pollQwenCodeAuth(
     | { status: "error"; message: string }
   >
 > {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    const result = await pollDeviceCodeAuthorization(deviceCode, codeVerifier);
-
-    if ("pending" in result) {
-      return { success: true, data: { status: "pending" } };
-    }
-
-    if ("error" in result) {
-      return { success: true, data: { status: "error", message: result.error } };
-    }
-
-    // Success - we have tokens, now save them
-    const oauthResult = result;
-
-    // For Qwen Code, email is not automatically provided
-    // We'll use a placeholder and user can update later
-    const email = oauthResult.email || `qwen-${Date.now()}`;
-
-    // Check if account with this email already exists for this user
-    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "qwen_code"), eq(providerAccount.email, email))).limit(1);
-
-    if (existingAccount) {
-      // Update existing account
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          status: "success",
-          email: email,
-          isUpdate: true,
-        },
-      };
-    } else {
-      // Create new account
-      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "qwen_code")));
-      const accountCount = countResult.value;
-
-      await db.insert(providerAccount).values({
-        userId: session.user.id,
-        provider: "qwen_code",
-        name: `Qwen Code ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        email: email,
-        isActive: true,
+      const result = yield* Effect.tryPromise({
+        try: () => pollDeviceCodeAuthorization(deviceCode, codeVerifier),
+        catch: (cause) => new DatabaseError({ cause }),
       });
 
-      revalidatePath("/dashboard/accounts");
+      if ("pending" in result) {
+        return { status: "pending" as const };
+      }
 
-      return {
-        success: true,
-        data: {
-          status: "success",
-          email: email,
-          isUpdate: false,
-        },
-      };
-    }
-  } catch (err) {
-    console.error("Failed to poll Qwen Code auth:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      if ("error" in result) {
+        return { status: "error" as const, message: result.error };
+      }
+
+      const oauthResult = result;
+      const email = oauthResult.email || `qwen-${Date.now()}`;
+
+      const existingAccounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select()
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "qwen_code"),
+                eq(providerAccount.email, email)
+              )
+            )
+            .limit(1),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      if (existingAccounts[0]) {
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(providerAccount)
+              .set({
+                accessToken: encrypt(oauthResult.accessToken),
+                refreshToken: encrypt(oauthResult.refreshToken),
+                expiresAt: oauthResult.expiresAt,
+                isActive: true,
+              })
+              .where(eq(providerAccount.id, existingAccounts[0].id)),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+
+        yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+
+        return { status: "success" as const, email, isUpdate: true };
+      }
+
+      const countResults = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ value: countFn() })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "qwen_code")
+              )
+            ),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+      const accountCount = countResults[0].value;
+
+      yield* Effect.tryPromise({
+        try: () =>
+          db.insert(providerAccount).values({
+            userId,
+            provider: "qwen_code",
+            name: `Qwen Code ${accountCount + 1}`,
+            accessToken: encrypt(oauthResult.accessToken),
+            refreshToken: encrypt(oauthResult.refreshToken),
+            expiresAt: oauthResult.expiresAt,
+            email,
+            isActive: true,
+          }),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+
+      return { status: "success" as const, email, isUpdate: false };
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Complete Qwen Code auth with email identifier
- * Call this after successful auth to set the email/identifier
  */
 export async function setQwenCodeAccountEmail(
   accountId: string,
   email: string
 ): Promise<ActionResult> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select()
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.id, accountId),
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "qwen_code")
+              )
+            )
+            .limit(1),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    // Verify ownership
-    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, accountId), eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "qwen_code"))).limit(1);
+      if (!accounts[0]) {
+        return yield* new NotFoundError({ message: "Account not found" });
+      }
 
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(providerAccount)
+            .set({
+              email: email.trim(),
+              name: `Qwen Code (${email.trim()})`,
+            })
+            .where(eq(providerAccount.id, accountId)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    await db.update(providerAccount).set({
-      email: email.trim(),
-      name: `Qwen Code (${email.trim()})`,
-    }).where(eq(providerAccount.id, accountId));
-
-    revalidatePath("/dashboard/accounts");
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error("Failed to set Qwen Code account email:", error);
-    return { success: false, error: "Failed to update account" };
-  }
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -987,24 +1049,17 @@ export async function initiateCopilotAuth(): Promise<
     interval: number;
   }>
 > {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    const deviceCodeInfo = await initiateCopilotDeviceCodeFlow();
-
-    return {
-      success: true,
-      data: deviceCodeInfo,
-    };
-  } catch (err) {
-    console.error("Failed to initiate Copilot auth:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return yield* Effect.tryPromise({
+        try: () => initiateCopilotDeviceCodeFlow(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -1019,101 +1074,122 @@ export async function pollCopilotAuth(
     | { status: "error"; message: string }
   >
 > {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const result = yield* Effect.tryPromise({
+        try: () => pollCopilotDeviceCodeAuthorization(deviceCode),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    const result = await pollCopilotDeviceCodeAuthorization(deviceCode);
+      if ("pending" in result) {
+        return { status: "pending" as const };
+      }
 
-    if ("pending" in result) {
-      return { success: true, data: { status: "pending" } };
-    }
+      if ("error" in result) {
+        return { status: "error" as const, message: result.error };
+      }
 
-    if ("error" in result) {
-      return { success: true, data: { status: "error", message: result.error } };
-    }
+      const oauthResult = result;
+      const email = oauthResult.email || `copilot-${Date.now()}`;
 
-    const oauthResult = result;
-    const email = oauthResult.email || `copilot-${Date.now()}`;
+      const existingAccounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select()
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "copilot"),
+                eq(providerAccount.email, email)
+              )
+            )
+            .limit(1),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "copilot"), eq(providerAccount.email, email))).limit(1);
+      if (existingAccounts[0]) {
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(providerAccount)
+              .set({
+                accessToken: encrypt(oauthResult.accessToken),
+                refreshToken: encrypt(oauthResult.refreshToken),
+                expiresAt: oauthResult.expiresAt,
+                isActive: true,
+              })
+              .where(eq(providerAccount.id, existingAccounts[0].id)),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
 
-    if (existingAccount) {
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
+        yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
 
-      revalidatePath("/dashboard/accounts");
+        return { status: "success" as const, email, isUpdate: true };
+      }
 
-      return {
-        success: true,
-        data: {
-          status: "success",
-          email,
-          isUpdate: true,
-        },
-      };
-    }
+      const countResults = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ value: countFn() })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "copilot")
+              )
+            ),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+      const accountCount = countResults[0].value;
 
-    const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "copilot")));
-    const accountCount = countResult.value;
+      yield* Effect.tryPromise({
+        try: () =>
+          db.insert(providerAccount).values({
+            userId,
+            provider: "copilot",
+            name: `Copilot ${accountCount + 1}`,
+            accessToken: encrypt(oauthResult.accessToken),
+            refreshToken: encrypt(oauthResult.refreshToken),
+            expiresAt: oauthResult.expiresAt,
+            email,
+            isActive: true,
+          }),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    await db.insert(providerAccount).values({
-      userId: session.user.id,
-      provider: "copilot",
-      name: `Copilot ${accountCount + 1}`,
-      accessToken: encrypt(oauthResult.accessToken),
-      refreshToken: encrypt(oauthResult.refreshToken),
-      expiresAt: oauthResult.expiresAt,
-      email,
-      isActive: true,
-    });
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
 
-    revalidatePath("/dashboard/accounts");
-
-    return {
-      success: true,
-      data: {
-        status: "success",
-        email,
-        isUpdate: false,
-      },
-    };
-  } catch (err) {
-    console.error("Failed to poll Copilot auth:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return { status: "success" as const, email, isUpdate: false };
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Get Gemini CLI (Google) OAuth authorization URL
  */
 export async function getGeminiCliAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const params = new URLSearchParams({
+        client_id: GEMINI_CLI_CLIENT_ID,
+        redirect_uri: GEMINI_CLI_REDIRECT_URI,
+        response_type: "code",
+        scope: GEMINI_CLI_SCOPES.join(" "),
+        access_type: "offline",
+        prompt: "consent",
+      });
 
-  const params = new URLSearchParams({
-    client_id: GEMINI_CLI_CLIENT_ID,
-    redirect_uri: GEMINI_CLI_REDIRECT_URI,
-    response_type: "code",
-    scope: GEMINI_CLI_SCOPES.join(" "),
-    access_type: "offline",
-    prompt: "consent",
-  });
-
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-
-  return { success: true, data: { authUrl } };
+      return { authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -1122,149 +1198,75 @@ export async function getGeminiCliAuthUrl(): Promise<ActionResult<{ authUrl: str
 export async function exchangeGeminiCliOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const code = yield* extractOAuthCodeEffect(callbackUrl, "Google");
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const oauthResult = yield* Effect.tryPromise({
+        try: () => geminiCliProvider.exchangeCode(code, GEMINI_CLI_REDIRECT_URI),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    return { success: false, error: "Callback URL is required" };
-  }
-
-  try {
-    // Parse the callback URL to extract the code
-    let url: URL;
-    try {
-      url = new URL(callbackUrl);
-    } catch {
-      return { success: false, error: "Invalid URL format" };
-    }
-
-    const code = url.searchParams.get("code");
-    if (!code) {
-      return { 
-        success: false, 
-        error: "No authorization code found in URL. Make sure you copied the complete URL from your browser." 
-      };
-    }
-
-    // Check for error in URL
-    const error = url.searchParams.get("error");
-    if (error) {
-      return { success: false, error: `Google OAuth error: ${error}` };
-    }
-
-    // Exchange code for tokens using the provider
-    const oauthResult = await geminiCliProvider.exchangeCode(
-      code, 
-      GEMINI_CLI_REDIRECT_URI
-    );
-
-    // Check if account with this email already exists for this user
-    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "gemini_cli"), eq(providerAccount.email, oauthResult.email))).limit(1);
-
-    if (existingAccount) {
-      // Update existing account
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        projectId: oauthResult.projectId,
-        tier: oauthResult.tier,
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: true,
-        },
-      };
-    } else {
-      // Create new account
-      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "gemini_cli")));
-      const accountCount = countResult.value;
-
-      await db.insert(providerAccount).values({
-        userId: session.user.id,
-        provider: "gemini_cli",
-        name: `Gemini CLI ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
+      return yield* upsertOAuthAccountEffect(userId, "gemini_cli", "Gemini CLI", {
+        accessToken: oauthResult.accessToken,
+        refreshToken: oauthResult.refreshToken,
         expiresAt: oauthResult.expiresAt,
         email: oauthResult.email,
         projectId: oauthResult.projectId,
         tier: oauthResult.tier,
-        isActive: true,
       });
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: false,
-        },
-      };
-    }
-  } catch (err) {
-    console.error("Failed to exchange Gemini CLI OAuth code:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Get Codex OAuth authorization URL (browser flow)
  */
 export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const state = generateCodexState();
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = yield* Effect.tryPromise({
+        try: () => generateCodeChallenge(codeVerifier),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    const state = generateCodexState();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = await generateCodeChallenge(codeVerifier);
+      const cookieStore = yield* Effect.tryPromise({
+        try: () => cookies(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    const cookieStore = await cookies();
-    const context: CodexOAuthContext = { state, codeVerifier };
-    cookieStore.set(CODEX_OAUTH_COOKIE_NAME, encrypt(JSON.stringify(context)), {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: 10 * 60,
-      path: "/",
-    });
+      const context: CodexOAuthContext = { state, codeVerifier };
+      cookieStore.set(CODEX_OAUTH_COOKIE_NAME, encrypt(JSON.stringify(context)), {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        maxAge: 10 * 60,
+        path: "/",
+      });
 
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: CODEX_CLIENT_ID,
-      redirect_uri: CODEX_BROWSER_REDIRECT_URI,
-      scope: CODEX_OAUTH_SCOPE,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-      id_token_add_organizations: "true",
-      codex_cli_simplified_flow: "true",
-      state,
-      originator: CODEX_ORIGINATOR,
-    });
+      const params = new URLSearchParams({
+        response_type: "code",
+        client_id: CODEX_CLIENT_ID,
+        redirect_uri: CODEX_BROWSER_REDIRECT_URI,
+        scope: CODEX_OAUTH_SCOPE,
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+        id_token_add_organizations: "true",
+        codex_cli_simplified_flow: "true",
+        state,
+        originator: CODEX_ORIGINATOR,
+      });
 
-    const authUrl = `${CODEX_OAUTH_AUTHORIZE_ENDPOINT}?${params.toString()}`;
-
-    return { success: true, data: { authUrl } };
-  } catch (err) {
-    console.error("Failed to build Codex auth URL:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return { authUrl: `${CODEX_OAUTH_AUTHORIZE_ENDPOINT}?${params.toString()}` };
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -1273,177 +1275,233 @@ export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string 
 export async function exchangeCodexOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      // Parse URL
+      if (!callbackUrl || typeof callbackUrl !== "string") {
+        return yield* new ValidationError({ message: "Callback URL is required" });
+      }
 
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    return { success: false, error: "Callback URL is required" };
-  }
+      let url: URL;
+      try {
+        url = new URL(callbackUrl);
+      } catch {
+        return yield* new ValidationError({ message: "Invalid URL format" });
+      }
 
-  try {
-    let url: URL;
-    try {
-      url = new URL(callbackUrl);
-    } catch {
-      return { success: false, error: "Invalid URL format" };
-    }
+      const error = url.searchParams.get("error");
+      if (error) {
+        const message = url.searchParams.get("error_description") || error;
+        return yield* new ValidationError({ message: `Codex OAuth error: ${message}` });
+      }
 
-    const error = url.searchParams.get("error");
-    if (error) {
-      const message = url.searchParams.get("error_description") || error;
-      return { success: false, error: `Codex OAuth error: ${message}` };
-    }
+      const code = url.searchParams.get("code");
+      if (!code) {
+        return yield* new ValidationError({
+          message: "No authorization code found in URL. Make sure you copied the complete URL from your browser.",
+        });
+      }
 
-    const code = url.searchParams.get("code");
-    if (!code) {
-      return {
-        success: false,
-        error: "No authorization code found in URL. Make sure you copied the complete URL from your browser.",
-      };
-    }
+      const callbackState = url.searchParams.get("state");
+      if (!callbackState) {
+        return yield* new ValidationError({
+          message: "Missing OAuth state. Please restart authentication.",
+        });
+      }
 
-    const callbackState = url.searchParams.get("state");
-    if (!callbackState) {
-      return { success: false, error: "Missing OAuth state. Please restart authentication." };
-    }
+      // Validate state from cookie
+      const cookieStore = yield* Effect.tryPromise({
+        try: () => cookies(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    const cookieStore = await cookies();
-    const contextCookie = cookieStore.get(CODEX_OAUTH_COOKIE_NAME);
-    if (!contextCookie?.value) {
-      return { success: false, error: "Session expired. Please restart authentication." };
-    }
+      const contextCookie = cookieStore.get(CODEX_OAUTH_COOKIE_NAME);
+      if (!contextCookie?.value) {
+        return yield* new ValidationError({
+          message: "Session expired. Please restart authentication.",
+        });
+      }
 
-    let oauthContext: CodexOAuthContext;
-    try {
-      oauthContext = JSON.parse(decrypt(contextCookie.value)) as CodexOAuthContext;
-    } catch {
+      let oauthContext: CodexOAuthContext;
+      try {
+        oauthContext = JSON.parse(decrypt(contextCookie.value)) as CodexOAuthContext;
+      } catch {
+        cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+        return yield* new ValidationError({
+          message: "Invalid authentication state. Please restart authentication.",
+        });
+      }
+
+      if (!oauthContext.codeVerifier || !oauthContext.state) {
+        cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+        return yield* new ValidationError({
+          message: "Invalid authentication context. Please restart authentication.",
+        });
+      }
+
+      if (oauthContext.state !== callbackState) {
+        cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+        return yield* new ValidationError({
+          message: "Invalid OAuth state. Please restart authentication.",
+        });
+      }
+
+      const oauthResult = yield* Effect.tryPromise({
+        try: () =>
+          codexProvider.exchangeCode(code, CODEX_BROWSER_REDIRECT_URI, oauthContext.codeVerifier),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
       cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
-      return { success: false, error: "Invalid authentication state. Please restart authentication." };
-    }
 
-    if (!oauthContext.codeVerifier || !oauthContext.state) {
-      cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
-      return { success: false, error: "Invalid authentication context. Please restart authentication." };
-    }
+      const chatgptAccountId = oauthResult.accountId || null;
+      const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
+      const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
 
-    if (oauthContext.state !== callbackState) {
-      cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
-      return { success: false, error: "Invalid OAuth state. Please restart authentication." };
-    }
+      let existingAccount = null;
 
-    const oauthResult = await codexProvider.exchangeCode(
-      code,
-      CODEX_BROWSER_REDIRECT_URI,
-      oauthContext.codeVerifier
-    );
+      if (workspaceEmail) {
+        const [found] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(providerAccount)
+              .where(
+                and(
+                  eq(providerAccount.userId, userId),
+                  eq(providerAccount.provider, "codex"),
+                  eq(providerAccount.email, workspaceEmail)
+                )
+              )
+              .limit(1),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+        existingAccount = found || null;
+      }
 
-    cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
+      if (
+        !existingAccount &&
+        chatgptAccountId &&
+        (!workspaceAccountId || workspaceAccountId === chatgptAccountId)
+      ) {
+        const [found] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(providerAccount)
+              .where(
+                and(
+                  eq(providerAccount.userId, userId),
+                  eq(providerAccount.provider, "codex"),
+                  eq(providerAccount.accountId, chatgptAccountId)
+                )
+              )
+              .limit(1),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+        existingAccount = found || null;
+      }
 
-    const chatgptAccountId = oauthResult.accountId || null;
-    const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
-    const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
+      if (existingAccount) {
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(providerAccount)
+              .set({
+                accessToken: encrypt(oauthResult.accessToken),
+                refreshToken: encrypt(oauthResult.refreshToken),
+                expiresAt: oauthResult.expiresAt,
+                ...(chatgptAccountId && { accountId: chatgptAccountId }),
+                isActive: true,
+              })
+              .where(eq(providerAccount.id, existingAccount!.id)),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
 
-    let existingAccount = null;
+        yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
 
-    if (workspaceEmail) {
-      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.email, workspaceEmail))).limit(1);
-      existingAccount = found || null;
-    }
-
-    if (!existingAccount && chatgptAccountId && (!workspaceAccountId || workspaceAccountId === chatgptAccountId)) {
-      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.accountId, chatgptAccountId))).limit(1);
-      existingAccount = found || null;
-    }
-
-    if (existingAccount) {
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        ...(chatgptAccountId && { accountId: chatgptAccountId }),
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
+        return {
           email: existingAccount.email || `codex-${chatgptAccountId || "unknown"}`,
           isUpdate: true,
-        },
-      };
-    }
+        };
+      }
 
-    const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex")));
-    const accountCount = countResult.value;
+      const countResults = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ value: countFn() })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "codex")
+              )
+            ),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+      const accountCount = countResults[0].value;
+      const email = workspaceEmail || `codex-${Date.now()}`;
 
-    const email = workspaceEmail || `codex-${Date.now()}`;
+      yield* Effect.tryPromise({
+        try: () =>
+          db.insert(providerAccount).values({
+            userId,
+            provider: "codex",
+            name: `Codex ${accountCount + 1}`,
+            accessToken: encrypt(oauthResult.accessToken),
+            refreshToken: encrypt(oauthResult.refreshToken),
+            expiresAt: oauthResult.expiresAt,
+            email,
+            accountId: chatgptAccountId,
+            isActive: true,
+          }),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    await db.insert(providerAccount).values({
-      userId: session.user.id,
-      provider: "codex",
-      name: `Codex ${accountCount + 1}`,
-      accessToken: encrypt(oauthResult.accessToken),
-      refreshToken: encrypt(oauthResult.refreshToken),
-      expiresAt: oauthResult.expiresAt,
-      email,
-      accountId: chatgptAccountId,
-      isActive: true,
-    });
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
 
-    revalidatePath("/dashboard/accounts");
-
-    return {
-      success: true,
-      data: {
-        email,
-        isUpdate: false,
-      },
-    };
-  } catch (err) {
-    console.error("Failed to exchange Codex OAuth code:", err);
-    const cookieStore = await cookies();
-    cookieStore.delete(CODEX_OAUTH_COOKIE_NAME);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return { email, isUpdate: false };
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Get Kiro OAuth authorization URL (browser flow)
  */
 export async function getKiroAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const state = generateKiroState();
+      const codeVerifier = generateKiroCodeVerifier();
+      const authUrl = yield* Effect.tryPromise({
+        try: () => buildKiroAuthUrl(state, codeVerifier),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    const state = generateKiroState();
-    const codeVerifier = generateKiroCodeVerifier();
-    const authUrl = await buildKiroAuthUrl(state, codeVerifier);
+      const cookieStore = yield* Effect.tryPromise({
+        try: () => cookies(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    const cookieStore = await cookies();
-    const context: KiroOAuthContext = { state, codeVerifier };
-    cookieStore.set(KIRO_OAUTH_COOKIE_NAME, encrypt(JSON.stringify(context)), {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: 10 * 60,
-      path: "/",
-    });
+      const context: KiroOAuthContext = { state, codeVerifier };
+      cookieStore.set(KIRO_OAUTH_COOKIE_NAME, encrypt(JSON.stringify(context)), {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        maxAge: 10 * 60,
+        path: "/",
+      });
 
-    return { success: true, data: { authUrl } };
-  } catch (err) {
-    console.error("Failed to build Kiro auth URL:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return { authUrl };
+    }),
+    MainLayer
+  );
 }
 
 /**
@@ -1452,151 +1510,195 @@ export async function getKiroAuthUrl(): Promise<ActionResult<{ authUrl: string }
 export async function exchangeKiroOAuthCode(
   callbackUrl: string
 ): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      if (!callbackUrl || typeof callbackUrl !== "string") {
+        return yield* new ValidationError({ message: "Callback URL is required" });
+      }
 
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    return { success: false, error: "Callback URL is required" };
-  }
+      let url: URL;
+      try {
+        url = new URL(callbackUrl);
+      } catch {
+        return yield* new ValidationError({ message: "Invalid URL format" });
+      }
 
-  try {
-    let url: URL;
-    try {
-      url = new URL(callbackUrl);
-    } catch {
-      return { success: false, error: "Invalid URL format" };
-    }
+      const error = url.searchParams.get("error");
+      if (error) {
+        const message = url.searchParams.get("error_description") || error;
+        return yield* new ValidationError({ message: `Kiro OAuth error: ${message}` });
+      }
 
-    const error = url.searchParams.get("error");
-    if (error) {
-      const message = url.searchParams.get("error_description") || error;
-      return { success: false, error: `Kiro OAuth error: ${message}` };
-    }
+      const code = url.searchParams.get("code");
+      if (!code) {
+        return yield* new ValidationError({
+          message:
+            "No authorization code found in URL. Make sure you copied the complete URL from your browser.",
+        });
+      }
 
-    const code = url.searchParams.get("code");
-    if (!code) {
-      return {
-        success: false,
-        error:
-          "No authorization code found in URL. Make sure you copied the complete URL from your browser.",
-      };
-    }
+      const callbackState = url.searchParams.get("state");
+      if (!callbackState) {
+        return yield* new ValidationError({
+          message: "Missing OAuth state. Please restart authentication.",
+        });
+      }
 
-    const callbackState = url.searchParams.get("state");
-    if (!callbackState) {
-      return { success: false, error: "Missing OAuth state. Please restart authentication." };
-    }
+      const cookieStore = yield* Effect.tryPromise({
+        try: () => cookies(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    const cookieStore = await cookies();
-    const contextCookie = cookieStore.get(KIRO_OAUTH_COOKIE_NAME);
-    if (!contextCookie?.value) {
-      return { success: false, error: "Session expired. Please restart authentication." };
-    }
+      const contextCookie = cookieStore.get(KIRO_OAUTH_COOKIE_NAME);
+      if (!contextCookie?.value) {
+        return yield* new ValidationError({
+          message: "Session expired. Please restart authentication.",
+        });
+      }
 
-    let oauthContext: KiroOAuthContext;
-    try {
-      oauthContext = JSON.parse(decrypt(contextCookie.value)) as KiroOAuthContext;
-    } catch {
+      let oauthContext: KiroOAuthContext;
+      try {
+        oauthContext = JSON.parse(decrypt(contextCookie.value)) as KiroOAuthContext;
+      } catch {
+        cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
+        return yield* new ValidationError({
+          message: "Invalid authentication state. Please restart authentication.",
+        });
+      }
+
+      if (!oauthContext.codeVerifier || !oauthContext.state) {
+        cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
+        return yield* new ValidationError({
+          message: "Invalid authentication context. Please restart authentication.",
+        });
+      }
+
+      if (oauthContext.state !== callbackState) {
+        cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
+        return yield* new ValidationError({
+          message: "Invalid OAuth state. Please restart authentication.",
+        });
+      }
+
+      const oauthResult = yield* Effect.tryPromise({
+        try: () => kiroProvider.exchangeCode(code, KIRO_BROWSER_REDIRECT_URI, oauthContext.codeVerifier),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
       cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
-      return {
-        success: false,
-        error: "Invalid authentication state. Please restart authentication.",
-      };
-    }
 
-    if (!oauthContext.codeVerifier || !oauthContext.state) {
-      cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
-      return { success: false, error: "Invalid authentication context. Please restart authentication." };
-    }
+      const accountId = oauthResult.accountId || null;
+      const email = accountId ? `kiro-${accountId}` : `kiro-${Date.now()}`;
 
-    if (oauthContext.state !== callbackState) {
-      cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
-      return { success: false, error: "Invalid OAuth state. Please restart authentication." };
-    }
+      let existingAccount = null;
 
-    const oauthResult = await kiroProvider.exchangeCode(
-      code,
-      KIRO_BROWSER_REDIRECT_URI,
-      oauthContext.codeVerifier
-    );
+      {
+        const [found] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(providerAccount)
+              .where(
+                and(
+                  eq(providerAccount.userId, userId),
+                  eq(providerAccount.provider, "kiro"),
+                  eq(providerAccount.email, email)
+                )
+              )
+              .limit(1),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+        existingAccount = found || null;
+      }
 
-    cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
+      if (!existingAccount && accountId) {
+        const [found] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(providerAccount)
+              .where(
+                and(
+                  eq(providerAccount.userId, userId),
+                  eq(providerAccount.provider, "kiro"),
+                  eq(providerAccount.accountId, accountId)
+                )
+              )
+              .limit(1),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+        existingAccount = found || null;
+      }
 
-    const accountId = oauthResult.accountId || null;
-    const email = accountId ? `kiro-${accountId}` : `kiro-${Date.now()}`;
+      if (existingAccount) {
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(providerAccount)
+              .set({
+                accessToken: encrypt(oauthResult.accessToken),
+                refreshToken: encrypt(oauthResult.refreshToken),
+                expiresAt: oauthResult.expiresAt,
+                ...(accountId ? { accountId } : {}),
+                ...(oauthResult.email ? { email: oauthResult.email } : {}),
+                isActive: true,
+              })
+              .where(eq(providerAccount.id, existingAccount!.id)),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
 
-    let existingAccount = null;
+        yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
 
-    {
-      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "kiro"), eq(providerAccount.email, email))).limit(1);
-      existingAccount = found || null;
-    }
-
-    if (!existingAccount && accountId) {
-      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "kiro"), eq(providerAccount.accountId, accountId))).limit(1);
-      existingAccount = found || null;
-    }
-
-    if (existingAccount) {
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        ...(accountId ? { accountId } : {}),
-        ...(oauthResult.email ? { email: oauthResult.email } : {}),
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
+        return {
           email: existingAccount.email || email,
           isUpdate: true,
-        },
-      };
-    }
+        };
+      }
 
-    const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "kiro")));
-    const accountCount = countResult.value;
+      const countResults = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ value: countFn() })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "kiro")
+              )
+            ),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+      const accountCount = countResults[0].value;
 
-    await db.insert(providerAccount).values({
-      userId: session.user.id,
-      provider: "kiro",
-      name: `Kiro ${accountCount + 1}`,
-      accessToken: encrypt(oauthResult.accessToken),
-      refreshToken: encrypt(oauthResult.refreshToken),
-      expiresAt: oauthResult.expiresAt,
-      email,
-      accountId,
-      isActive: true,
-    });
+      yield* Effect.tryPromise({
+        try: () =>
+          db.insert(providerAccount).values({
+            userId,
+            provider: "kiro",
+            name: `Kiro ${accountCount + 1}`,
+            accessToken: encrypt(oauthResult.accessToken),
+            refreshToken: encrypt(oauthResult.refreshToken),
+            expiresAt: oauthResult.expiresAt,
+            email,
+            accountId,
+            isActive: true,
+          }),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    revalidatePath("/dashboard/accounts");
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
 
-    return {
-      success: true,
-      data: {
-        email,
-        isUpdate: false,
-      },
-    };
-  } catch (err) {
-    console.error("Failed to exchange Kiro OAuth code:", err);
-    const cookieStore = await cookies();
-    cookieStore.delete(KIRO_OAUTH_COOKIE_NAME);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      return { email, isUpdate: false };
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Initiate Codex Device Code Flow
- * Returns device code info including URL and user code for user to enter
  */
 export async function initiateCodexAuth(): Promise<
   ActionResult<{
@@ -1607,44 +1709,42 @@ export async function initiateCodexAuth(): Promise<
     interval: number;
   }>
 > {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      yield* requireUserId;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const deviceCodeInfo = yield* Effect.tryPromise({
+        try: () => initiateCodexDeviceCodeFlow(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    const deviceCodeInfo = await initiateCodexDeviceCodeFlow();
+      const cookieStore = yield* Effect.tryPromise({
+        try: () => cookies(),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    // Store PKCE code verifier server-side in an encrypted HttpOnly cookie
-    // keyed by deviceAuthId so it never leaves the server
-    const cookieStore = await cookies();
-    cookieStore.set(`codex_cv_${deviceCodeInfo.deviceAuthId}`, encrypt(deviceCodeInfo.codeVerifier), {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      maxAge: deviceCodeInfo.expiresIn + 60, // device code TTL + buffer
-      path: "/",
-    });
+      cookieStore.set(
+        `codex_cv_${deviceCodeInfo.deviceAuthId}`,
+        encrypt(deviceCodeInfo.codeVerifier),
+        {
+          httpOnly: true,
+          secure: true,
+          sameSite: "strict",
+          maxAge: deviceCodeInfo.expiresIn + 60,
+          path: "/",
+        }
+      );
 
-    // Return everything except codeVerifier
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { codeVerifier: _cv, ...data } = deviceCodeInfo;
-
-    return {
-      success: true,
-      data,
-    };
-  } catch (err) {
-    console.error("Failed to initiate Codex auth:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { codeVerifier: _cv, ...data } = deviceCodeInfo;
+      return data;
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Poll Codex device code authorization status
- * Call this periodically until it returns success or error
  */
 export async function pollCodexAuth(
   deviceAuthId: string,
@@ -1656,148 +1756,204 @@ export async function pollCodexAuth(
     | { status: "error"; message: string }
   >
 > {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  try {
-    // Retrieve PKCE code verifier from server-side cookie
-    const cookieStore = await cookies();
-    const cvCookie = cookieStore.get(`codex_cv_${deviceAuthId}`);
-    if (!cvCookie?.value) {
-      return { success: false, error: "Session expired. Please restart authentication." };
-    }
-    const codeVerifier = decrypt(cvCookie.value);
-
-    const result = await pollCodexDeviceCodeAuthorization(
-      deviceAuthId,
-      userCode,
-      codeVerifier
-    );
-
-    if ("pending" in result) {
-      return { success: true, data: { status: "pending" } };
-    }
-
-    if ("error" in result) {
-      const errorMsg = typeof result.error === "string"
-        ? result.error
-        : (result.error as Record<string, unknown>)?.message as string || JSON.stringify(result.error);
-      return { success: true, data: { status: "error", message: errorMsg } };
-    }
-
-    // Success - we have tokens, now save them
-    const oauthResult = result;
-    const chatgptAccountId = oauthResult.accountId || null;
-    const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
-    const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
-
-    // Clean up the PKCE cookie
-    cookieStore.delete(`codex_cv_${deviceAuthId}`);
-
-    let existingAccount = null;
-
-    if (workspaceEmail) {
-      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.email, workspaceEmail))).limit(1);
-      existingAccount = found || null;
-    }
-
-    if (!existingAccount && chatgptAccountId && (!workspaceAccountId || workspaceAccountId === chatgptAccountId)) {
-      const [found] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"), eq(providerAccount.accountId, chatgptAccountId))).limit(1);
-      existingAccount = found || null;
-    }
-
-    if (existingAccount) {
-      // Update existing account with fresh tokens
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        ...(chatgptAccountId && { accountId: chatgptAccountId }),
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          status: "success",
-          email: existingAccount.email || `codex-${chatgptAccountId || "unknown"}`,
-          isUpdate: true,
-        },
-      };
-    } else {
-      // Create new account
-      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex")));
-      const accountCount = countResult.value;
-
-      const email = workspaceEmail || `codex-${Date.now()}`;
-
-      await db.insert(providerAccount).values({
-        userId: session.user.id,
-        provider: "codex",
-        name: `Codex ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        expiresAt: oauthResult.expiresAt,
-        email,
-        accountId: chatgptAccountId,
-        isActive: true,
+      const cookieStore = yield* Effect.tryPromise({
+        try: () => cookies(),
+        catch: (cause) => new DatabaseError({ cause }),
       });
 
-      revalidatePath("/dashboard/accounts");
+      const cvCookie = cookieStore.get(`codex_cv_${deviceAuthId}`);
+      if (!cvCookie?.value) {
+        return yield* new ValidationError({
+          message: "Session expired. Please restart authentication.",
+        });
+      }
+      const codeVerifier = decrypt(cvCookie.value);
 
-      return {
-        success: true,
-        data: {
-          status: "success",
-          email,
-          isUpdate: false,
-        },
-      };
-    }
-  } catch (err) {
-    console.error("Failed to poll Codex auth:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
+      const result = yield* Effect.tryPromise({
+        try: () => pollCodexDeviceCodeAuthorization(deviceAuthId, userCode, codeVerifier),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      if ("pending" in result) {
+        return { status: "pending" as const };
+      }
+
+      if ("error" in result) {
+        const errorMsg =
+          typeof result.error === "string"
+            ? result.error
+            : (result.error as Record<string, unknown>)?.message as string ||
+              JSON.stringify(result.error);
+        return { status: "error" as const, message: errorMsg };
+      }
+
+      const oauthResult = result;
+      const chatgptAccountId = oauthResult.accountId || null;
+      const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
+      const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
+
+      cookieStore.delete(`codex_cv_${deviceAuthId}`);
+
+      let existingAccount = null;
+
+      if (workspaceEmail) {
+        const [found] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(providerAccount)
+              .where(
+                and(
+                  eq(providerAccount.userId, userId),
+                  eq(providerAccount.provider, "codex"),
+                  eq(providerAccount.email, workspaceEmail)
+                )
+              )
+              .limit(1),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+        existingAccount = found || null;
+      }
+
+      if (
+        !existingAccount &&
+        chatgptAccountId &&
+        (!workspaceAccountId || workspaceAccountId === chatgptAccountId)
+      ) {
+        const [found] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(providerAccount)
+              .where(
+                and(
+                  eq(providerAccount.userId, userId),
+                  eq(providerAccount.provider, "codex"),
+                  eq(providerAccount.accountId, chatgptAccountId)
+                )
+              )
+              .limit(1),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+        existingAccount = found || null;
+      }
+
+      if (existingAccount) {
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(providerAccount)
+              .set({
+                accessToken: encrypt(oauthResult.accessToken),
+                refreshToken: encrypt(oauthResult.refreshToken),
+                expiresAt: oauthResult.expiresAt,
+                ...(chatgptAccountId && { accountId: chatgptAccountId }),
+                isActive: true,
+              })
+              .where(eq(providerAccount.id, existingAccount!.id)),
+          catch: (cause) => new DatabaseError({ cause }),
+        });
+
+        yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+
+        return {
+          status: "success" as const,
+          email: existingAccount.email || `codex-${chatgptAccountId || "unknown"}`,
+          isUpdate: true,
+        };
+      }
+
+      const countResults = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ value: countFn() })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "codex")
+              )
+            ),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+      const accountCount = countResults[0].value;
+      const email = workspaceEmail || `codex-${Date.now()}`;
+
+      yield* Effect.tryPromise({
+        try: () =>
+          db.insert(providerAccount).values({
+            userId,
+            provider: "codex",
+            name: `Codex ${accountCount + 1}`,
+            accessToken: encrypt(oauthResult.accessToken),
+            refreshToken: encrypt(oauthResult.refreshToken),
+            expiresAt: oauthResult.expiresAt,
+            email,
+            accountId: chatgptAccountId,
+            isActive: true,
+          }),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+
+      return { status: "success" as const, email, isUpdate: false };
+    }),
+    MainLayer
+  );
 }
 
 /**
  * Set the email/identifier for a Codex account
- * Call this after successful auth to set a recognizable name
  */
 export async function setCodexAccountEmail(
   accountId: string,
   email: string
 ): Promise<ActionResult> {
-  const session = await getSession();
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
 
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select()
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.id, accountId),
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "codex")
+              )
+            )
+            .limit(1),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-  try {
-    // Verify ownership
-    const [account] = await db.select().from(providerAccount).where(and(eq(providerAccount.id, accountId), eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "codex"))).limit(1);
+      if (!accounts[0]) {
+        return yield* new NotFoundError({ message: "Account not found" });
+      }
 
-    if (!account) {
-      return { success: false, error: "Account not found" };
-    }
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(providerAccount)
+            .set({
+              email: email.trim(),
+              name: `Codex (${email.trim()})`,
+            })
+            .where(eq(providerAccount.id, accountId)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
 
-    await db.update(providerAccount).set({
-      email: email.trim(),
-      name: `Codex (${email.trim()})`,
-    }).where(eq(providerAccount.id, accountId));
-
-    revalidatePath("/dashboard/accounts");
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error("Failed to set Codex account email:", error);
-    return { success: false, error: "Failed to update account" };
-  }
+      yield* Effect.sync(() => revalidatePath("/dashboard/accounts"));
+    }),
+    MainLayer
+  );
 }
