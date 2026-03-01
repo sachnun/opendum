@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { endOfDay, format, startOfDay } from "date-fns";
 import type { LucideIcon } from "lucide-react";
@@ -12,16 +13,39 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   getAnalyticsData,
   type AnalyticsData,
   type CustomDateRange,
   type Period,
 } from "@/lib/actions/analytics";
-import { RequestsOverTimeChart } from "./charts/requests-over-time";
-import { TokenUsageChart } from "./charts/token-usage";
-import { RequestsByModelChart } from "./charts/requests-by-model";
-import { SuccessRateChart } from "./charts/success-rate";
+
+function ChartSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="mt-4 h-52 w-full rounded-lg" />
+    </div>
+  );
+}
+
+const RequestsOverTimeChart = dynamic(
+  () => import("./charts/requests-over-time").then((mod) => mod.RequestsOverTimeChart),
+  { loading: () => <ChartSkeleton /> }
+);
+const TokenUsageChart = dynamic(
+  () => import("./charts/token-usage").then((mod) => mod.TokenUsageChart),
+  { loading: () => <ChartSkeleton /> }
+);
+const RequestsByModelChart = dynamic(
+  () => import("./charts/requests-by-model").then((mod) => mod.RequestsByModelChart),
+  { loading: () => <ChartSkeleton /> }
+);
+const SuccessRateChart = dynamic(
+  () => import("./charts/success-rate").then((mod) => mod.SuccessRateChart),
+  { loading: () => <ChartSkeleton /> }
+);
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "5m", label: "Last 5 minutes" },
@@ -77,6 +101,7 @@ export function AnalyticsCharts({
   apiKeys,
 }: AnalyticsChartsProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [period, setPeriod] = useState<Period>("24h");
   const [selectedApiKeyId, setSelectedApiKeyId] = useState<string>(initialApiKeyId);
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
@@ -86,8 +111,7 @@ export function AnalyticsCharts({
   const [isApiKeyFilterOpen, setIsApiKeyFilterOpen] = useState(false);
   const [data, setData] = useState<AnalyticsData | null>(initialData);
   const [isLoading, setIsLoading] = useState(!initialData);
-  const [isFetching, setIsFetching] = useState(false);
-  const isFirstLoad = useRef(true);
+  const needsInitialFetch = useRef(!initialData);
   const selectedPeriod = PERIODS.find((item) => item.value === period) ?? PERIODS[5];
   const customRangeLabel =
     customRange?.from && customRange?.to
@@ -98,67 +122,51 @@ export function AnalyticsCharts({
   const selectedApiKeyLabel = selectedApiKey
     ? `${selectedApiKey.name ?? "Unnamed key"} (${selectedApiKey.keyPreview})`
     : "All API keys";
+  const isFetching = isPending;
 
-  const fetchData = async (
-    selectedPeriod: Period,
-    selectedApiKey: string,
-    selectedCustomRange?: CustomDateRange,
+  const fetchData = useCallback(async (
+    targetPeriod: Period,
+    targetApiKey: string,
+    targetCustomRange?: CustomDateRange,
     forceRefresh = false
   ) => {
-    setIsFetching(true);
+    const apiKeyId = targetApiKey === "all" ? undefined : targetApiKey;
+    const result = targetCustomRange
+      ? await getAnalyticsData(targetCustomRange, apiKeyId, { forceRefresh })
+      : await getAnalyticsData(targetPeriod, apiKeyId, { forceRefresh });
 
-    try {
-      const apiKeyId = selectedApiKey === "all" ? undefined : selectedApiKey;
-      const result = selectedCustomRange
-        ? await getAnalyticsData(selectedCustomRange, apiKeyId, { forceRefresh })
-        : await getAnalyticsData(selectedPeriod, apiKeyId, { forceRefresh });
-
-      if (result.success) {
-        setData(result.data);
-        return true;
-      }
-
+    if (result.success) {
+      setData(result.data);
+    } else {
       toast.error(result.error);
-      return false;
-    } finally {
-      setIsLoading(false);
-      setIsFetching(false);
-    }
-  };
-
-  useEffect(() => {
-    const selectedCustomRange = isCustomRangeActive ? toCustomDateRange(customRange) : null;
-
-    if (isCustomRangeActive && !selectedCustomRange) {
-      return;
     }
 
-    if (isFirstLoad.current) {
-      isFirstLoad.current = false;
+    setIsLoading(false);
+  }, []);
 
-      if (initialData) {
-        return;
-      }
-    }
-
-    void fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined);
-  }, [period, customRange, isCustomRangeActive, selectedApiKeyId, initialData]);
-
-  useEffect(() => {
-    if (isFilterOpen) {
-      setDraftCustomRange(customRange);
-    }
-  }, [isFilterOpen, customRange]);
+  // Fetch initial data if server didn't provide it
+  if (needsInitialFetch.current) {
+    needsInitialFetch.current = false;
+    startTransition(async () => {
+      await fetchData(period, selectedApiKeyId);
+    });
+  }
 
   const handlePeriodChange = (newPeriod: Period) => {
     setPeriod(newPeriod);
     setIsCustomRangeActive(false);
     setIsFilterOpen(false);
+    startTransition(async () => {
+      await fetchData(newPeriod, selectedApiKeyId);
+    });
   };
 
   const handleApiKeyChange = (apiKeyId: string) => {
     setSelectedApiKeyId(apiKeyId);
     setIsApiKeyFilterOpen(false);
+    startTransition(async () => {
+      await fetchData(period, apiKeyId, isCustomRangeActive ? toCustomDateRange(customRange) ?? undefined : undefined);
+    });
 
     if (apiKeyId === "all") {
       router.push("/dashboard");
@@ -176,15 +184,25 @@ export function AnalyticsCharts({
     setCustomRange(draftCustomRange);
     setIsCustomRangeActive(true);
     setIsFilterOpen(false);
+
+    const range = toCustomDateRange(draftCustomRange);
+    if (range) {
+      startTransition(async () => {
+        await fetchData(period, selectedApiKeyId, range);
+      });
+    }
   };
 
   const handleClearCustomRange = () => {
     setDraftCustomRange(undefined);
     setCustomRange(undefined);
     setIsCustomRangeActive(false);
+    startTransition(async () => {
+      await fetchData(period, selectedApiKeyId);
+    });
   };
 
-  const handleRefresh = async () => {
+  const handleRefresh = () => {
     const selectedCustomRange = isCustomRangeActive ? toCustomDateRange(customRange) : null;
 
     if (isCustomRangeActive && !selectedCustomRange) {
@@ -192,7 +210,16 @@ export function AnalyticsCharts({
       return;
     }
 
-    await fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined, true);
+    startTransition(async () => {
+      await fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined, true);
+    });
+  };
+
+  const handleFilterOpenChange = (open: boolean) => {
+    setIsFilterOpen(open);
+    if (open) {
+      setDraftCustomRange(customRange);
+    }
   };
 
   const statCards: StatCard[] = data
@@ -272,7 +299,7 @@ export function AnalyticsCharts({
             </PopoverContent>
           </Popover>
 
-          <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <Popover open={isFilterOpen} onOpenChange={handleFilterOpenChange}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
