@@ -3,9 +3,35 @@
 import * as React from "react";
 import { Check, Copy } from "lucide-react";
 import { useTheme } from "next-themes";
-import type { BundledLanguage } from "shiki";
+import type { BundledLanguage, HighlighterGeneric } from "shiki";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+// Module-level cache: create the highlighter once and reuse across renders
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let highlighterPromise: Promise<HighlighterGeneric<any, any>> | null = null;
+const loadedLanguages = new Set<string>();
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getHighlighter(language: BundledLanguage): Promise<HighlighterGeneric<any, any>> {
+  if (!highlighterPromise) {
+    const shiki = await import("shiki");
+    highlighterPromise = shiki.createHighlighter({
+      themes: ["github-light", "github-dark"],
+      langs: [language],
+    });
+    loadedLanguages.add(language);
+  }
+
+  const highlighter = await highlighterPromise;
+
+  if (!loadedLanguages.has(language)) {
+    await highlighter.loadLanguage(language);
+    loadedLanguages.add(language);
+  }
+
+  return highlighter;
+}
 
 interface CodeBlockProps {
   code: string;
@@ -60,12 +86,12 @@ export function CodeBlock({
   }, []);
 
   React.useEffect(() => {
+    let cancelled = false;
+
     const highlightCode = async () => {
-      const shiki = await import("shiki");
-      const highlighter = await shiki.createHighlighter({
-        themes: ["github-light", "github-dark"],
-        langs: [language],
-      });
+      const highlighter = await getHighlighter(language);
+
+      if (cancelled) return;
 
       const theme = resolvedTheme === "dark" ? "github-dark" : "github-light";
       const highlighted = highlighter.codeToHtml(code, {
@@ -78,6 +104,10 @@ export function CodeBlock({
     };
 
     highlightCode().catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
   }, [code, language, resolvedTheme]);
 
   if (loading) {
