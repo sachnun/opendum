@@ -10,9 +10,9 @@ const rootDir = resolve(scriptDir, "..");
 const modelsDir = join(rootDir, "models");
 
 const refreshScripts = [
-  "refresh-openrouter-free-models.mjs",
-  "refresh-nvidia-nim-models.mjs",
-  "refresh-ollama-cloud-models.mjs",
+  "openrouter.mjs",
+  "nvidia.mjs",
+  "ollama.mjs",
 ];
 
 // ---------------------------------------------------------------------------

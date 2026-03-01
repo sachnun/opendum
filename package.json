@@ -9,7 +9,7 @@
     "db:studio": "drizzle-kit studio",
     "start": "next start",
     "lint": "eslint",
-    "models:refresh": "bun scripts/refresh-model-maps.mjs"
+    "models:refresh": "bun scripts/models.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.15",
