@@ -89,7 +89,10 @@ export function ModelCard({
   };
 
   return (
-    <Card className={`flex flex-col bg-card py-4 ${!isEnabled ? "opacity-70" : ""}`}>
+    <Card
+      className={`flex flex-col bg-card py-4 ${!isEnabled ? "opacity-70" : ""}`}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 400px" }}
+    >
       <CardHeader className="px-4 pb-2 sm:px-5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
