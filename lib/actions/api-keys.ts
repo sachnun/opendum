@@ -11,8 +11,6 @@ import { invalidateApiKeyValidationCache } from "@/lib/proxy/auth";
 import { isModelSupported, resolveModelAlias } from "@/lib/proxy/models";
 import { revalidatePath } from "next/cache";
 
-export type { ActionResult };
-
 export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
 
 const API_KEY_MODEL_ACCESS_MODES: ApiKeyModelAccessMode[] = ["all", "whitelist", "blacklist"];

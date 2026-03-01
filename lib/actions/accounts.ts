@@ -67,8 +67,6 @@ import {
   OPENROUTER_MODEL_MAP,
 } from "@/lib/proxy/providers/openrouter/constants";
 
-export type { ActionResult };
-
 export interface ProviderAccountErrorHistoryEntry {
   id: string;
   errorCode: number;

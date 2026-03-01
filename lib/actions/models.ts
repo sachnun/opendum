@@ -14,8 +14,6 @@ import {
 } from "@/lib/proxy/models";
 import { revalidatePath } from "next/cache";
 
-export type { ActionResult };
-
 /**
  * Enable or disable a model for the current user.
  */
