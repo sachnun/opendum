@@ -4,16 +4,17 @@
  * Server Actions for Antigravity Quota Monitoring
  */
 
+import { Effect } from "effect";
+import { DatabaseService, RedisService, requireUserId } from "@/lib/effect/services";
+import { DatabaseError, RedisError } from "@/lib/effect/errors";
+import { runServerAction, MainLayer, type ActionResult } from "@/lib/effect/runtime";
 import type { ProviderAccount } from "@/lib/db/schema";
-import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
 import { providerAccount } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { decrypt } from "@/lib/encryption";
-import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
-import { 
-  fetchQuotaFromApi, 
-  type QuotaGroupInfo 
+import {
+  fetchQuotaFromApi,
+  type QuotaGroupInfo,
 } from "@/lib/proxy/providers/antigravity/quota";
 import { antigravityProvider } from "@/lib/proxy/providers/antigravity/client";
 
@@ -58,9 +59,10 @@ export interface QuotaSummary {
   totalGroups: number;
 }
 
-export type QuotaActionResult =
-  | { success: true; data: { accounts: AccountQuotaInfo[]; summary: QuotaSummary } }
-  | { success: false; error: string };
+export type QuotaActionResult = ActionResult<{
+  accounts: AccountQuotaInfo[];
+  summary: QuotaSummary;
+}>;
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
@@ -82,25 +84,25 @@ function getAntigravityQuotaCacheKey(userId: string): string {
  */
 function formatTimeUntilReset(resetTimestamp: number | null): string | null {
   if (!resetTimestamp) return null;
-  
+
   const now = Date.now();
   const diff = resetTimestamp - now;
-  
+
   if (diff <= 0) return "resetting...";
-  
+
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  
+
   if (hours >= 24) {
     const days = Math.floor(hours / 24);
     const remainingHours = hours % 24;
     return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
   }
-  
+
   if (hours > 0) {
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   }
-  
+
   return `${minutes}m`;
 }
 
@@ -109,8 +111,8 @@ function formatTimeUntilReset(resetTimestamp: number | null): string | null {
  */
 function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
   const usedRequests = group.maxRequests - group.remainingRequests;
-  const percentUsed = group.maxRequests > 0 
-    ? Math.round((usedRequests / group.maxRequests) * 100) 
+  const percentUsed = group.maxRequests > 0
+    ? Math.round((usedRequests / group.maxRequests) * 100)
     : 0;
 
   return {
@@ -140,104 +142,157 @@ function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
 export async function getAntigravityQuota(
   options: QuotaRequestOptions = {}
 ): Promise<QuotaActionResult> {
-  const session = await getSession();
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
+  return runServerAction(
+    Effect.gen(function* () {
+      const userId = yield* requireUserId;
+      const db = yield* DatabaseService;
+      const redis = yield* RedisService;
 
-  const cacheKey = getAntigravityQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
-    const cachedResult = await getRedisJson<QuotaActionResult>(cacheKey);
-    if (cachedResult?.success) {
-      return cachedResult;
-    }
-  }
+      const cacheKey = getAntigravityQuotaCacheKey(userId);
 
-  try {
-    // Get all Antigravity accounts for this user
-    const accounts = await db
-      .select({
-        id: providerAccount.id,
-        name: providerAccount.name,
-        email: providerAccount.email,
-        projectId: providerAccount.projectId,
-        tier: providerAccount.tier,
-        isActive: providerAccount.isActive,
-        accessToken: providerAccount.accessToken,
-        refreshToken: providerAccount.refreshToken,
-        expiresAt: providerAccount.expiresAt,
-        lastUsedAt: providerAccount.lastUsedAt,
-      })
-      .from(providerAccount)
-      .where(
-        and(
-          eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "antigravity")
-        )
-      )
-      .orderBy(desc(providerAccount.lastUsedAt));
+      // Cache check (fail-open)
+      if (!options.forceRefresh) {
+        const cached = yield* Effect.tryPromise({
+          try: () => redis.get(cacheKey),
+          catch: (cause) => new RedisError({ cause }),
+        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(null)));
 
-    if (accounts.length === 0) {
-      const emptyResult: QuotaActionResult = {
-        success: true,
-        data: {
-          accounts: [],
-          summary: {
-            totalAccounts: 0,
-            activeAccounts: 0,
-            byTier: {},
-            exhaustedGroups: 0,
-            totalGroups: 0,
-          },
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached) as QuotaActionResult;
+            if (parsed?.success) {
+              return parsed.data;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      // Get all Antigravity accounts for this user
+      const accounts = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              id: providerAccount.id,
+              name: providerAccount.name,
+              email: providerAccount.email,
+              projectId: providerAccount.projectId,
+              tier: providerAccount.tier,
+              isActive: providerAccount.isActive,
+              accessToken: providerAccount.accessToken,
+              refreshToken: providerAccount.refreshToken,
+              expiresAt: providerAccount.expiresAt,
+              lastUsedAt: providerAccount.lastUsedAt,
+            })
+            .from(providerAccount)
+            .where(
+              and(
+                eq(providerAccount.userId, userId),
+                eq(providerAccount.provider, "antigravity")
+              )
+            )
+            .orderBy(desc(providerAccount.lastUsedAt)),
+        catch: (cause) => new DatabaseError({ cause }),
+      });
+
+      const emptyData = {
+        accounts: [] as AccountQuotaInfo[],
+        summary: {
+          totalAccounts: 0,
+          activeAccounts: 0,
+          byTier: {} as Record<string, number>,
+          exhaustedGroups: 0,
+          totalGroups: 0,
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
-      return emptyResult;
-    }
+      if (accounts.length === 0) {
+        yield* Effect.tryPromise({
+          try: () =>
+            redis.set(
+              cacheKey,
+              JSON.stringify({ success: true, data: emptyData } satisfies QuotaActionResult),
+              "EX",
+              ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS
+            ),
+          catch: (cause) => new RedisError({ cause }),
+        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
 
-    const results: AccountQuotaInfo[] = [];
-    let exhaustedGroups = 0;
-    let totalGroups = 0;
-    const byTier: Record<string, number> = {};
+        return emptyData;
+      }
 
-    for (const account of accounts) {
-      // Count by tier
-      const tier = account.tier ?? "free";
-      byTier[tier] = (byTier[tier] ?? 0) + 1;
+      const results: AccountQuotaInfo[] = [];
+      let exhaustedGroups = 0;
+      let totalGroups = 0;
+      const byTier: Record<string, number> = {};
 
-      // Get valid access token
-      // Only refresh if token is ACTUALLY expired (no buffer, for quota monitor)
-      let accessToken: string;
-      const isActuallyExpired = account.expiresAt && new Date(account.expiresAt) < new Date();
+      for (const account of accounts) {
+        // Count by tier
+        const tier = account.tier ?? "free";
+        byTier[tier] = (byTier[tier] ?? 0) + 1;
 
-      if (isActuallyExpired) {
-        // Token expired - try to refresh
-        try {
-          accessToken = await antigravityProvider.getValidCredentials(
-            account as unknown as ProviderAccount
-          );
-        } catch {
-          // Refresh failed - token is truly dead
-          results.push({
-            accountId: account.id,
-            accountName: account.name,
-            email: account.email,
-            tier,
-            isActive: account.isActive,
-            status: "expired",
-            error: "Token expired - please re-authenticate",
-            groups: [],
-            fetchedAt: Date.now(),
-            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-          });
-          continue;
+        // Get valid access token
+        // Only refresh if token is ACTUALLY expired (no buffer, for quota monitor)
+        let accessToken: string | null = null;
+        const isActuallyExpired = account.expiresAt && new Date(account.expiresAt) < new Date();
+
+        if (isActuallyExpired) {
+          // Token expired - try to refresh
+          accessToken = yield* Effect.tryPromise({
+            try: () =>
+              antigravityProvider.getValidCredentials(
+                account as unknown as ProviderAccount
+              ),
+            catch: () => null,
+          }).pipe(Effect.merge);
+
+          if (accessToken === null) {
+            results.push({
+              accountId: account.id,
+              accountName: account.name,
+              email: account.email,
+              tier,
+              isActive: account.isActive,
+              status: "expired",
+              error: "Token expired - please re-authenticate",
+              groups: [],
+              fetchedAt: Date.now(),
+              lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+            });
+            continue;
+          }
+        } else {
+          // Token still valid - just decrypt (fast path)
+          try {
+            accessToken = decrypt(account.accessToken);
+          } catch {
+            results.push({
+              accountId: account.id,
+              accountName: account.name,
+              email: account.email,
+              tier,
+              isActive: account.isActive,
+              status: "error",
+              error: "Failed to decrypt credentials",
+              groups: [],
+              fetchedAt: Date.now(),
+              lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+            });
+            continue;
+          }
         }
-      } else {
-        // Token still valid - just decrypt (fast path)
-        try {
-          accessToken = decrypt(account.accessToken);
-        } catch {
+
+        // Fetch quota from API
+        const quotaResult = yield* Effect.promise(() =>
+          fetchQuotaFromApi(
+            accessToken!,
+            account.projectId ?? "",
+            tier
+          )
+        );
+
+        if (quotaResult.status === "error") {
           results.push({
             accountId: account.id,
             accountName: account.name,
@@ -245,67 +300,41 @@ export async function getAntigravityQuota(
             tier,
             isActive: account.isActive,
             status: "error",
-            error: "Failed to decrypt credentials",
+            error: quotaResult.error,
             groups: [],
-            fetchedAt: Date.now(),
+            fetchedAt: quotaResult.fetchedAt,
             lastUsedAt: account.lastUsedAt?.getTime() ?? null,
           });
           continue;
         }
-      }
 
-      // Fetch quota from API
-      const quotaResult = await fetchQuotaFromApi(
-        accessToken,
-        account.projectId ?? "",
-        tier
-      );
+        // Convert to display format
+        const groups = quotaResult.groups.map((g) => toQuotaGroupDisplay(g));
 
-      if (quotaResult.status === "error") {
+        // Count exhausted groups
+        for (const group of groups) {
+          totalGroups++;
+          if (group.isExhausted) {
+            exhaustedGroups++;
+          }
+        }
+
         results.push({
           accountId: account.id,
           accountName: account.name,
           email: account.email,
           tier,
           isActive: account.isActive,
-          status: "error",
-          error: quotaResult.error,
-          groups: [],
+          status: "success",
+          groups,
           fetchedAt: quotaResult.fetchedAt,
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
         });
-        continue;
       }
 
-      // Convert to display format
-      const groups = quotaResult.groups.map((g) => toQuotaGroupDisplay(g));
+      const activeAccountCount = results.filter((account) => account.isActive).length;
 
-      // Count exhausted groups
-      for (const group of groups) {
-        totalGroups++;
-        if (group.isExhausted) {
-          exhaustedGroups++;
-        }
-      }
-
-      results.push({
-        accountId: account.id,
-        accountName: account.name,
-        email: account.email,
-        tier,
-        isActive: account.isActive,
-        status: "success",
-        groups,
-        fetchedAt: quotaResult.fetchedAt,
-        lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-      });
-    }
-
-    const activeAccountCount = results.filter((account) => account.isActive).length;
-
-    const result: QuotaActionResult = {
-      success: true,
-      data: {
+      const data = {
         accounts: results,
         summary: {
           totalAccounts: results.length,
@@ -314,15 +343,22 @@ export async function getAntigravityQuota(
           exhaustedGroups,
           totalGroups,
         },
-      },
-    };
+      };
 
-    await setRedisJson(cacheKey, result, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
-    return result;
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch quota data",
-    };
-  }
+      // Cache result (fail-open)
+      yield* Effect.tryPromise({
+        try: () =>
+          redis.set(
+            cacheKey,
+            JSON.stringify({ success: true, data } satisfies QuotaActionResult),
+            "EX",
+            ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS
+          ),
+        catch: (cause) => new RedisError({ cause }),
+      }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
+
+      return data;
+    }),
+    MainLayer
+  );
 }
