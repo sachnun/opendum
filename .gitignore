@@ -40,3 +40,5 @@ openspec/
 
 # agent instructions
 AGENTS.md
+.agents/
+skills-lock.json
