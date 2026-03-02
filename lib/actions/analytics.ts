@@ -1,12 +1,11 @@
 "use server";
 
-import { Effect } from "effect";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { proxyApiKey, usageLog } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { buildAnalyticsCacheKey } from "@/lib/cache/analytics-cache";
-import { DatabaseService, RedisService, requireUserId } from "@/lib/effect/services";
-import { DatabaseError, NotFoundError, RedisError, ValidationError } from "@/lib/effect/errors";
-import { runServerAction, MainLayer, type ActionResult } from "@/lib/effect/runtime";
+import { buildAnalyticsCacheKey, getAnalyticsCacheVersion } from "@/lib/cache/analytics-cache";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 
 export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 
@@ -58,7 +57,9 @@ function getAnalyticsCacheTtlSeconds(durationMs: number): number {
   return 300;
 }
 
-export { type ActionResult };
+export type ActionResult<T = void> =
+  | { success: true; data: T }
+  | { success: false; error: string };
 
 export interface RequestsOverTimeData {
   date: string;
@@ -333,323 +334,266 @@ function toDateValue(value: Date | string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-// ---------------------------------------------------------------------------
-// Effect-based Redis helpers (fail-open: return null / void on RedisError)
-// ---------------------------------------------------------------------------
-
-const getAnalyticsCacheVersionEffect = (userId: string) =>
-  Effect.gen(function* () {
-    const redis = yield* RedisService;
-    const rawVersion = yield* Effect.tryPromise({
-      try: () => redis.get(`opendum:analytics:v1:version:${userId}`),
-      catch: (cause) => new RedisError({ cause }),
-    });
-
-    if (!rawVersion) {
-      return 0;
-    }
-
-    const parsed = Number.parseInt(rawVersion, 10);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-  }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(0)));
-
-const getRedisJsonEffect = <T>(key: string) =>
-  Effect.gen(function* () {
-    const redis = yield* RedisService;
-    const rawValue = yield* Effect.tryPromise({
-      try: () => redis.get(key),
-      catch: (cause) => new RedisError({ cause }),
-    });
-
-    if (!rawValue) {
-      return null as T | null;
-    }
-
-    try {
-      return JSON.parse(rawValue) as T;
-    } catch {
-      return null as T | null;
-    }
-  }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(null as T | null)));
-
-const setRedisJsonEffect = (key: string, value: unknown, ttlSeconds: number) =>
-  Effect.gen(function* () {
-    const redis = yield* RedisService;
-    yield* Effect.tryPromise({
-      try: () =>
-        redis.set(key, JSON.stringify(value), "EX", Math.max(1, Math.floor(ttlSeconds))),
-      catch: (cause) => new RedisError({ cause }),
-    });
-  }).pipe(Effect.catchTag("RedisError", () => Effect.void));
-
-// ---------------------------------------------------------------------------
-// Main analytics server action — Effect-based internally
-// ---------------------------------------------------------------------------
-
 export async function getAnalyticsData(
   filter: AnalyticsFilter,
   apiKeyId?: string,
   options: GetAnalyticsOptions = {}
 ): Promise<ActionResult<AnalyticsData>> {
-  return runServerAction(
-    Effect.gen(function* () {
-      const userId = yield* requireUserId;
-      const db = yield* DatabaseService;
+  const session = await getSession();
 
-      const resolvedFilter = resolveFilterConfig(filter);
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
 
-      if (!resolvedFilter.success) {
-        return yield* new ValidationError({ message: resolvedFilter.error });
+  const userId = session.user.id;
+  const resolvedFilter = resolveFilterConfig(filter);
+
+  if (!resolvedFilter.success) {
+    return resolvedFilter;
+  }
+
+  const { startDate, endDate, config } = resolvedFilter.data;
+
+  try {
+    if (apiKeyId) {
+      const [ownedApiKey] = await db
+        .select({ id: proxyApiKey.id })
+        .from(proxyApiKey)
+        .where(and(eq(proxyApiKey.id, apiKeyId), eq(proxyApiKey.userId, userId)))
+        .limit(1);
+
+      if (!ownedApiKey) {
+        return { success: false, error: "API key not found" };
       }
+    }
 
-      const { startDate, endDate, config } = resolvedFilter.data;
+    const analyticsCacheVersion = await getAnalyticsCacheVersion(userId);
 
-      // Verify API key ownership if provided
-      if (apiKeyId) {
-        const [ownedApiKey] = yield* Effect.tryPromise({
-          try: () =>
-            db
-              .select({ id: proxyApiKey.id })
-              .from(proxyApiKey)
-              .where(and(eq(proxyApiKey.id, apiKeyId), eq(proxyApiKey.userId, userId)))
-              .limit(1),
-          catch: (cause) => new DatabaseError({ cause }),
-        });
+    const cacheKey = buildAnalyticsCacheKey({
+      userId,
+      apiKeyId,
+      startDateMs: startDate.getTime(),
+      endDateMs: endDate.getTime(),
+      granularity: config.granularity,
+      version: analyticsCacheVersion,
+    });
 
-        if (!ownedApiKey) {
-          return yield* new NotFoundError({ message: "API key not found" });
-        }
-      }
-
-      // Get cache version (fail-open: defaults to 0)
-      const analyticsCacheVersion = yield* getAnalyticsCacheVersionEffect(userId);
-
-      const cacheKey = buildAnalyticsCacheKey({
-        userId,
-        apiKeyId,
-        startDateMs: startDate.getTime(),
-        endDateMs: endDate.getTime(),
-        granularity: config.granularity,
-        version: analyticsCacheVersion,
-      });
-
-      // Check cache (fail-open: returns null)
-      if (!options.forceRefresh) {
-        const cachedAnalytics = yield* getRedisJsonEffect<AnalyticsData>(cacheKey);
-        if (cachedAnalytics) {
-          return cachedAnalytics;
-        }
-      }
-
-      // Build query conditions
-      const conditions = [
-        eq(usageLog.userId, userId),
-        gte(usageLog.createdAt, startDate),
-        lte(usageLog.createdAt, endDate),
-      ];
-
-      if (apiKeyId) {
-        conditions.push(eq(usageLog.proxyApiKeyId, apiKeyId));
-      }
-
-      const whereCondition = and(...conditions);
-      const bucketExpression = getTimeBucketExpression(config.granularity);
-      const normalizedModelExpression = sql<string>`replace(${usageLog.model}, 'iflow/', '')`;
-
-      // Run all three queries in parallel
-      const [timeSeriesRows, topModelRows, totalsRow] = yield* Effect.tryPromise({
-        try: () =>
-          Promise.all([
-            db
-              .select({
-                bucket: bucketExpression,
-                requestCount: sql<number>`count(*)`,
-                inputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`,
-                outputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`,
-                successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
-                errorCount: sql<number>`count(*) filter (where ${usageLog.statusCode} is null or ${usageLog.statusCode} < 200 or ${usageLog.statusCode} >= 400)`,
-                avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-              })
-              .from(usageLog)
-              .where(whereCondition)
-              .groupBy(bucketExpression)
-              .orderBy(bucketExpression),
-            db
-              .select({
-                model: normalizedModelExpression,
-                count: sql<number>`count(*)`,
-              })
-              .from(usageLog)
-              .where(whereCondition)
-              .groupBy(normalizedModelExpression)
-              .orderBy(sql`count(*) desc`)
-              .limit(10),
-            db
-              .select({
-                totalRequests: sql<number>`count(*)`,
-                totalInputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`,
-                totalOutputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`,
-                avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
-                successfulRequests: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
-              })
-              .from(usageLog)
-              .where(whereCondition)
-              .then((rows) => rows[0]),
-          ]),
-        catch: (cause) => new DatabaseError({ cause }),
-      });
-
-      // Generate time slots for filling gaps based on granularity
-      const timeSlots = generateTimeSlots(startDate, endDate, config);
-
-      const timeSeriesBySlot = new Map<
-        string,
-        {
-          requestCount: number;
-          inputTokens: number;
-          outputTokens: number;
-          successCount: number;
-          errorCount: number;
-          avgDuration: number | null;
-          p30: number | null;
-          p50: number | null;
-          p60: number | null;
-          p75: number | null;
-          p90: number | null;
-          p95: number | null;
-          p99: number | null;
-        }
-      >();
-
-      for (const row of timeSeriesRows) {
-        const bucketDate = toDateValue(row.bucket);
-        if (!bucketDate) {
-          continue;
-        }
-
-        const slot = formatTimeSlot(bucketDate, config.granularity);
-        timeSeriesBySlot.set(slot, {
-          requestCount: toRoundedValue(row.requestCount),
-          inputTokens: toRoundedValue(row.inputTokens),
-          outputTokens: toRoundedValue(row.outputTokens),
-          successCount: toRoundedValue(row.successCount),
-          errorCount: toRoundedValue(row.errorCount),
-          avgDuration: toRoundedNullableValue(row.avgDuration),
-          p30: toRoundedNullableValue(row.p30),
-          p50: toRoundedNullableValue(row.p50),
-          p60: toRoundedNullableValue(row.p60),
-          p75: toRoundedNullableValue(row.p75),
-          p90: toRoundedNullableValue(row.p90),
-          p95: toRoundedNullableValue(row.p95),
-          p99: toRoundedNullableValue(row.p99),
-        });
-      }
-
-      const requestsOverTime: RequestsOverTimeData[] = timeSlots.map((date) => ({
-        date,
-        count: timeSeriesBySlot.get(date)?.requestCount ?? 0,
-      }));
-
-      const tokenUsage: TokenUsageData[] = timeSlots.map((date) => ({
-        date,
-        input: timeSeriesBySlot.get(date)?.inputTokens ?? 0,
-        output: timeSeriesBySlot.get(date)?.outputTokens ?? 0,
-      }));
-
-      const successRate: SuccessRateData[] = timeSlots.map((date) => ({
-        date,
-        success: timeSeriesBySlot.get(date)?.successCount ?? 0,
-        error: timeSeriesBySlot.get(date)?.errorCount ?? 0,
-      }));
-
-      const durationOverTime: DurationOverTimeData[] = timeSlots.map((date) => {
-        const entry = timeSeriesBySlot.get(date);
+    if (!options.forceRefresh) {
+      const cachedAnalytics = await getRedisJson<AnalyticsData>(cacheKey);
+      if (cachedAnalytics) {
         return {
-          date,
-          avg: entry?.avgDuration ?? null,
-          p30: entry?.p30 ?? null,
-          p50: entry?.p50 ?? null,
-          p60: entry?.p60 ?? null,
-          p75: entry?.p75 ?? null,
-          p90: entry?.p90 ?? null,
-          p95: entry?.p95 ?? null,
-          p99: entry?.p99 ?? null,
+          success: true,
+          data: cachedAnalytics,
         };
+      }
+    }
+
+    const conditions = [
+      eq(usageLog.userId, userId),
+      gte(usageLog.createdAt, startDate),
+      lte(usageLog.createdAt, endDate),
+    ];
+
+    if (apiKeyId) {
+      conditions.push(eq(usageLog.proxyApiKeyId, apiKeyId));
+    }
+
+    const whereCondition = and(...conditions);
+    const bucketExpression = getTimeBucketExpression(config.granularity);
+    const normalizedModelExpression = sql<string>`replace(${usageLog.model}, 'iflow/', '')`;
+
+    const [timeSeriesRows, topModelRows, totalsRow] = await Promise.all([
+      db
+        .select({
+          bucket: bucketExpression,
+          requestCount: sql<number>`count(*)`,
+          inputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`,
+          outputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`,
+          successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+          errorCount: sql<number>`count(*) filter (where ${usageLog.statusCode} is null or ${usageLog.statusCode} < 200 or ${usageLog.statusCode} >= 400)`,
+          avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+        })
+        .from(usageLog)
+        .where(whereCondition)
+        .groupBy(bucketExpression)
+        .orderBy(bucketExpression),
+      db
+        .select({
+          model: normalizedModelExpression,
+          count: sql<number>`count(*)`,
+        })
+        .from(usageLog)
+        .where(whereCondition)
+        .groupBy(normalizedModelExpression)
+        .orderBy(sql`count(*) desc`)
+        .limit(10),
+      db
+        .select({
+          totalRequests: sql<number>`count(*)`,
+          totalInputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`,
+          totalOutputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`,
+          avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`,
+          successfulRequests: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+        })
+        .from(usageLog)
+        .where(whereCondition)
+        .then((rows) => rows[0]),
+    ]);
+
+    // Generate time slots for filling gaps based on granularity
+    const timeSlots = generateTimeSlots(startDate, endDate, config);
+
+    const timeSeriesBySlot = new Map<
+      string,
+      {
+        requestCount: number;
+        inputTokens: number;
+        outputTokens: number;
+        successCount: number;
+        errorCount: number;
+        avgDuration: number | null;
+        p30: number | null;
+        p50: number | null;
+        p60: number | null;
+        p75: number | null;
+        p90: number | null;
+        p95: number | null;
+        p99: number | null;
+      }
+    >();
+
+    for (const row of timeSeriesRows) {
+      const bucketDate = toDateValue(row.bucket);
+      if (!bucketDate) {
+        continue;
+      }
+
+      const slot = formatTimeSlot(bucketDate, config.granularity);
+      timeSeriesBySlot.set(slot, {
+        requestCount: toRoundedValue(row.requestCount),
+        inputTokens: toRoundedValue(row.inputTokens),
+        outputTokens: toRoundedValue(row.outputTokens),
+        successCount: toRoundedValue(row.successCount),
+        errorCount: toRoundedValue(row.errorCount),
+        avgDuration: toRoundedNullableValue(row.avgDuration),
+        p30: toRoundedNullableValue(row.p30),
+        p50: toRoundedNullableValue(row.p50),
+        p60: toRoundedNullableValue(row.p60),
+        p75: toRoundedNullableValue(row.p75),
+        p90: toRoundedNullableValue(row.p90),
+        p95: toRoundedNullableValue(row.p95),
+        p99: toRoundedNullableValue(row.p99),
       });
+    }
 
-      const requestsByModel: RequestsByModelData[] = topModelRows.map((row) => ({
-        model: row.model,
-        count: toRoundedValue(row.count),
-      }));
+    const requestsOverTime: RequestsOverTimeData[] = timeSlots.map((date) => ({
+      date,
+      count: timeSeriesBySlot.get(date)?.requestCount ?? 0,
+    }));
 
-      const totalRequests = toRoundedValue(totalsRow?.totalRequests);
-      const totalInputTokens = toRoundedValue(totalsRow?.totalInputTokens);
-      const totalOutputTokens = toRoundedValue(totalsRow?.totalOutputTokens);
-      const successfulRequests = toRoundedValue(totalsRow?.successfulRequests);
-      const successRatePercent =
-        totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0;
+    const tokenUsage: TokenUsageData[] = timeSlots.map((date) => ({
+      date,
+      input: timeSeriesBySlot.get(date)?.inputTokens ?? 0,
+      output: timeSeriesBySlot.get(date)?.outputTokens ?? 0,
+    }));
 
-      const durationPercentiles: DurationPercentiles = {
-        p30: toRoundedValue(totalsRow?.p30),
-        p50: toRoundedValue(totalsRow?.p50),
-        p60: toRoundedValue(totalsRow?.p60),
-        p75: toRoundedValue(totalsRow?.p75),
-        p90: toRoundedValue(totalsRow?.p90),
-        p95: toRoundedValue(totalsRow?.p95),
-        p99: toRoundedValue(totalsRow?.p99),
+    const successRate: SuccessRateData[] = timeSlots.map((date) => ({
+      date,
+      success: timeSeriesBySlot.get(date)?.successCount ?? 0,
+      error: timeSeriesBySlot.get(date)?.errorCount ?? 0,
+    }));
+
+    const durationOverTime: DurationOverTimeData[] = timeSlots.map((date) => {
+      const entry = timeSeriesBySlot.get(date);
+      return {
+        date,
+        avg: entry?.avgDuration ?? null,
+        p30: entry?.p30 ?? null,
+        p50: entry?.p50 ?? null,
+        p60: entry?.p60 ?? null,
+        p75: entry?.p75 ?? null,
+        p90: entry?.p90 ?? null,
+        p95: entry?.p95 ?? null,
+        p99: entry?.p99 ?? null,
       };
+    });
 
-      const modelDistribution: ModelDistributionData[] = requestsByModel.map(({ model, count }) => ({
-        model,
-        value: count,
-        percentage: totalRequests > 0 ? Math.round((count / totalRequests) * 100) : 0,
-      }));
+    const requestsByModel: RequestsByModelData[] = topModelRows.map((row) => ({
+      model: row.model,
+      count: toRoundedValue(row.count),
+    }));
 
-      const avgDuration = toRoundedNullableValue(totalsRow?.avgDuration) ?? 0;
+    const totalRequests = toRoundedValue(totalsRow?.totalRequests);
+    const totalInputTokens = toRoundedValue(totalsRow?.totalInputTokens);
+    const totalOutputTokens = toRoundedValue(totalsRow?.totalOutputTokens);
+    const successfulRequests = toRoundedValue(totalsRow?.successfulRequests);
+    const successRatePercent =
+      totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0;
 
-      const totals: AnalyticsTotals = {
-        totalRequests,
-        totalInputTokens,
-        totalOutputTokens,
-        avgDuration,
-        durationPercentiles,
-        successRate: successRatePercent,
-      };
+    const durationPercentiles: DurationPercentiles = {
+      p30: toRoundedValue(totalsRow?.p30),
+      p50: toRoundedValue(totalsRow?.p50),
+      p60: toRoundedValue(totalsRow?.p60),
+      p75: toRoundedValue(totalsRow?.p75),
+      p90: toRoundedValue(totalsRow?.p90),
+      p95: toRoundedValue(totalsRow?.p95),
+      p99: toRoundedValue(totalsRow?.p99),
+    };
 
-      const analyticsData: AnalyticsData = {
-        requestsOverTime,
-        tokenUsage,
-        requestsByModel,
-        modelDistribution,
-        successRate,
-        durationOverTime,
-        granularity: config.granularity,
-        totals,
-      };
+    const modelDistribution: ModelDistributionData[] = requestsByModel.map(({ model, count }) => ({
+      model,
+      value: count,
+      percentage: totalRequests > 0 ? Math.round((count / totalRequests) * 100) : 0,
+    }));
 
-      // Write to cache (fail-open: ignores Redis errors)
-      yield* setRedisJsonEffect(
-        cacheKey,
-        analyticsData,
-        getAnalyticsCacheTtlSeconds(config.duration)
-      );
+    const avgDuration = toRoundedNullableValue(totalsRow?.avgDuration) ?? 0;
 
-      return analyticsData;
-    }),
-    MainLayer
-  );
+    const totals: AnalyticsTotals = {
+      totalRequests,
+      totalInputTokens,
+      totalOutputTokens,
+      avgDuration,
+      durationPercentiles,
+      successRate: successRatePercent,
+    };
+
+    const analyticsData: AnalyticsData = {
+      requestsOverTime,
+      tokenUsage,
+      requestsByModel,
+      modelDistribution,
+      successRate,
+      durationOverTime,
+      granularity: config.granularity,
+      totals,
+    };
+
+    await setRedisJson(
+      cacheKey,
+      analyticsData,
+      getAnalyticsCacheTtlSeconds(config.duration)
+    );
+
+    return {
+      success: true,
+      data: analyticsData,
+    };
+  } catch (error) {
+    console.error("Failed to fetch analytics:", error);
+    return { success: false, error: "Failed to fetch analytics data" };
+  }
 }

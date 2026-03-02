@@ -1,12 +1,11 @@
 "use server";
 
-import { Effect } from "effect";
-import { DatabaseService, RedisService, requireUserId } from "@/lib/effect/services";
-import { DatabaseError, RedisError } from "@/lib/effect/errors";
-import { runServerAction, MainLayer, type ActionResult } from "@/lib/effect/runtime";
 import type { ProviderAccount } from "@/lib/db/schema";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { providerAccount } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import { openRouterProvider } from "@/lib/proxy/providers/openrouter";
 import { OPENROUTER_API_BASE_URL } from "@/lib/proxy/providers/openrouter/constants";
 
@@ -69,10 +68,15 @@ export interface OpenRouterQuotaSummary {
   totalGroups: number;
 }
 
-export type OpenRouterQuotaActionResult = ActionResult<{
-  accounts: OpenRouterAccountQuotaInfo[];
-  summary: OpenRouterQuotaSummary;
-}>;
+export type OpenRouterQuotaActionResult =
+  | {
+      success: true;
+      data: {
+        accounts: OpenRouterAccountQuotaInfo[];
+        summary: OpenRouterQuotaSummary;
+      };
+    }
+  | { success: false; error: string };
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
@@ -387,167 +391,140 @@ function buildQuotaGroups(
 export async function getOpenRouterQuota(
   options: QuotaRequestOptions = {}
 ): Promise<OpenRouterQuotaActionResult> {
-  return runServerAction(
-    Effect.gen(function* () {
-      const userId = yield* requireUserId;
-      const db = yield* DatabaseService;
-      const redis = yield* RedisService;
+  const session = await getSession();
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
 
-      const cacheKey = getOpenRouterQuotaCacheKey(userId);
+  const cacheKey = getOpenRouterQuotaCacheKey(session.user.id);
+  if (!options.forceRefresh) {
+    const cachedResult = await getRedisJson<OpenRouterQuotaActionResult>(cacheKey);
+    if (cachedResult?.success) {
+      return cachedResult;
+    }
+  }
 
-      // Cache check (fail-open)
-      if (!options.forceRefresh) {
-        const cached = yield* Effect.tryPromise({
-          try: () => redis.get(cacheKey),
-          catch: (cause) => new RedisError({ cause }),
-        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(null)));
+  try {
+    const accounts = await db
+      .select({
+        id: providerAccount.id,
+        name: providerAccount.name,
+        email: providerAccount.email,
+        isActive: providerAccount.isActive,
+        accessToken: providerAccount.accessToken,
+        refreshToken: providerAccount.refreshToken,
+        expiresAt: providerAccount.expiresAt,
+        lastUsedAt: providerAccount.lastUsedAt,
+      })
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.userId, session.user.id),
+          eq(providerAccount.provider, "openrouter")
+        )
+      )
+      .orderBy(desc(providerAccount.lastUsedAt));
 
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached) as OpenRouterQuotaActionResult;
-            if (parsed?.success) {
-              return parsed.data;
-            }
-          } catch {
-            // Ignore parse errors
-          }
-        }
-      }
-
-      const accounts = yield* Effect.tryPromise({
-        try: () =>
-          db
-            .select({
-              id: providerAccount.id,
-              name: providerAccount.name,
-              email: providerAccount.email,
-              isActive: providerAccount.isActive,
-              accessToken: providerAccount.accessToken,
-              refreshToken: providerAccount.refreshToken,
-              expiresAt: providerAccount.expiresAt,
-              lastUsedAt: providerAccount.lastUsedAt,
-            })
-            .from(providerAccount)
-            .where(
-              and(
-                eq(providerAccount.userId, userId),
-                eq(providerAccount.provider, "openrouter")
-              )
-            )
-            .orderBy(desc(providerAccount.lastUsedAt)),
-        catch: (cause) => new DatabaseError({ cause }),
-      });
-
-      const emptyData = {
-        accounts: [] as OpenRouterAccountQuotaInfo[],
-        summary: {
-          totalAccounts: 0,
-          activeAccounts: 0,
-          byTier: {} as Record<string, number>,
-          exhaustedGroups: 0,
-          totalGroups: 0,
+    if (accounts.length === 0) {
+      const emptyResult: OpenRouterQuotaActionResult = {
+        success: true,
+        data: {
+          accounts: [],
+          summary: {
+            totalAccounts: 0,
+            activeAccounts: 0,
+            byTier: {},
+            exhaustedGroups: 0,
+            totalGroups: 0,
+          },
         },
       };
 
-      if (accounts.length === 0) {
-        yield* Effect.tryPromise({
-          try: () =>
-            redis.set(
-              cacheKey,
-              JSON.stringify({ success: true, data: emptyData } satisfies OpenRouterQuotaActionResult),
-              "EX",
-              OPENROUTER_QUOTA_CACHE_TTL_SECONDS
-            ),
-          catch: (cause) => new RedisError({ cause }),
-        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
+      await setRedisJson(cacheKey, emptyResult, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+      return emptyResult;
+    }
 
-        return emptyData;
-      }
+    const results: OpenRouterAccountQuotaInfo[] = [];
+    let exhaustedGroups = 0;
+    let totalGroups = 0;
+    const byTier: Record<string, number> = {};
 
-      const results: OpenRouterAccountQuotaInfo[] = [];
-      let exhaustedGroups = 0;
-      let totalGroups = 0;
-      const byTier: Record<string, number> = {};
-
-      for (const account of accounts) {
-        const apiKey = yield* Effect.tryPromise({
-          try: () =>
-            openRouterProvider.getValidCredentials(
-              account as unknown as ProviderAccount
-            ),
-          catch: () => null,
-        }).pipe(Effect.merge);
-
-        if (apiKey === null) {
-          byTier.unknown = (byTier.unknown ?? 0) + 1;
-          results.push({
-            accountId: account.id,
-            accountName: account.name,
-            email: account.email,
-            tier: "unknown",
-            isActive: account.isActive,
-            status: "expired",
-            error: "API key is missing or invalid. Please reconnect this account.",
-            groups: [],
-            fetchedAt: Date.now(),
-            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-          });
-          continue;
-        }
-
-        const [keyResponse, creditsResponse] = yield* Effect.promise(() =>
-          Promise.all([
-            fetchOpenRouterJson("/key", apiKey),
-            fetchOpenRouterJson("/credits", apiKey),
-          ])
+    for (const account of accounts) {
+      let apiKey: string;
+      try {
+        apiKey = await openRouterProvider.getValidCredentials(
+          account as unknown as ProviderAccount
         );
-
-        if (!keyResponse.ok && !creditsResponse.ok) {
-          byTier.unknown = (byTier.unknown ?? 0) + 1;
-          results.push({
-            accountId: account.id,
-            accountName: account.name,
-            email: account.email,
-            tier: "unknown",
-            isActive: account.isActive,
-            status: "error",
-            error: keyResponse.error,
-            groups: [],
-            fetchedAt: Date.now(),
-            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-          });
-          continue;
-        }
-
-        const keyInfo = keyResponse.ok ? parseKeyInfo(keyResponse.data) : null;
-        const creditsInfo = creditsResponse.ok ? parseCreditsInfo(creditsResponse.data) : null;
-        const tier = keyInfo?.isFreeTier ? "free" : "paid";
-        byTier[tier] = (byTier[tier] ?? 0) + 1;
-
-        const groups = buildQuotaGroups(keyInfo, creditsInfo);
-        for (const group of groups) {
-          totalGroups++;
-          if (group.isExhausted) {
-            exhaustedGroups++;
-          }
-        }
-
+      } catch {
+        byTier.unknown = (byTier.unknown ?? 0) + 1;
         results.push({
           accountId: account.id,
           accountName: account.name,
           email: account.email,
-          tier,
+          tier: "unknown",
           isActive: account.isActive,
-          status: "success",
-          groups,
+          status: "expired",
+          error: "API key is missing or invalid. Please reconnect this account.",
+          groups: [],
           fetchedAt: Date.now(),
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
         });
+        continue;
       }
 
-      const activeAccountCount = results.filter((account) => account.isActive).length;
+      const [keyResponse, creditsResponse] = await Promise.all([
+        fetchOpenRouterJson("/key", apiKey),
+        fetchOpenRouterJson("/credits", apiKey),
+      ]);
 
-      const data = {
+      if (!keyResponse.ok && !creditsResponse.ok) {
+        byTier.unknown = (byTier.unknown ?? 0) + 1;
+        results.push({
+          accountId: account.id,
+          accountName: account.name,
+          email: account.email,
+          tier: "unknown",
+          isActive: account.isActive,
+          status: "error",
+          error: keyResponse.error,
+          groups: [],
+          fetchedAt: Date.now(),
+          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+        });
+        continue;
+      }
+
+      const keyInfo = keyResponse.ok ? parseKeyInfo(keyResponse.data) : null;
+      const creditsInfo = creditsResponse.ok ? parseCreditsInfo(creditsResponse.data) : null;
+      const tier = keyInfo?.isFreeTier ? "free" : "paid";
+      byTier[tier] = (byTier[tier] ?? 0) + 1;
+
+      const groups = buildQuotaGroups(keyInfo, creditsInfo);
+      for (const group of groups) {
+        totalGroups++;
+        if (group.isExhausted) {
+          exhaustedGroups++;
+        }
+      }
+
+      results.push({
+        accountId: account.id,
+        accountName: account.name,
+        email: account.email,
+        tier,
+        isActive: account.isActive,
+        status: "success",
+        groups,
+        fetchedAt: Date.now(),
+        lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+      });
+    }
+
+    const activeAccountCount = results.filter((account) => account.isActive).length;
+
+    const result: OpenRouterQuotaActionResult = {
+      success: true,
+      data: {
         accounts: results,
         summary: {
           totalAccounts: results.length,
@@ -556,22 +533,15 @@ export async function getOpenRouterQuota(
           exhaustedGroups,
           totalGroups,
         },
-      };
+      },
+    };
 
-      // Cache result (fail-open)
-      yield* Effect.tryPromise({
-        try: () =>
-          redis.set(
-            cacheKey,
-            JSON.stringify({ success: true, data } satisfies OpenRouterQuotaActionResult),
-            "EX",
-            OPENROUTER_QUOTA_CACHE_TTL_SECONDS
-          ),
-        catch: (cause) => new RedisError({ cause }),
-      }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
-
-      return data;
-    }),
-    MainLayer
-  );
+    await setRedisJson(cacheKey, result, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch OpenRouter quota",
+    };
+  }
 }

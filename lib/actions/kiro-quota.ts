@@ -1,12 +1,11 @@
 "use server";
 
-import { Effect } from "effect";
-import { DatabaseService, RedisService, requireUserId } from "@/lib/effect/services";
-import { DatabaseError, RedisError } from "@/lib/effect/errors";
-import { runServerAction, MainLayer, type ActionResult } from "@/lib/effect/runtime";
 import type { ProviderAccount } from "@/lib/db/schema";
+import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { providerAccount } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { getRedisJson, setRedisJson } from "@/lib/redis-cache";
 import { kiroProvider } from "@/lib/proxy/providers/kiro";
 import {
   fetchKiroQuotaFromApi,
@@ -50,10 +49,15 @@ export interface KiroQuotaSummary {
   totalGroups: number;
 }
 
-export type KiroQuotaActionResult = ActionResult<{
-  accounts: KiroAccountQuotaInfo[];
-  summary: KiroQuotaSummary;
-}>;
+export type KiroQuotaActionResult =
+  | {
+      success: true;
+      data: {
+        accounts: KiroAccountQuotaInfo[];
+        summary: KiroQuotaSummary;
+      };
+    }
+  | { success: false; error: string };
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
@@ -139,148 +143,105 @@ function toQuotaGroupDisplay(metric: KiroQuotaMetric): KiroQuotaGroupDisplay {
 export async function getKiroQuota(
   options: QuotaRequestOptions = {}
 ): Promise<KiroQuotaActionResult> {
-  return runServerAction(
-    Effect.gen(function* () {
-      const userId = yield* requireUserId;
-      const db = yield* DatabaseService;
-      const redis = yield* RedisService;
+  const session = await getSession();
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
 
-      const cacheKey = getKiroQuotaCacheKey(userId);
+  const cacheKey = getKiroQuotaCacheKey(session.user.id);
+  if (!options.forceRefresh) {
+    const cachedResult = await getRedisJson<KiroQuotaActionResult>(cacheKey);
+    if (cachedResult?.success) {
+      return cachedResult;
+    }
+  }
 
-      // Cache check (fail-open)
-      if (!options.forceRefresh) {
-        const cached = yield* Effect.tryPromise({
-          try: () => redis.get(cacheKey),
-          catch: (cause) => new RedisError({ cause }),
-        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(null)));
+  try {
+    const accounts = await db
+      .select({
+        id: providerAccount.id,
+        name: providerAccount.name,
+        email: providerAccount.email,
+        accountId: providerAccount.accountId,
+        tier: providerAccount.tier,
+        isActive: providerAccount.isActive,
+        accessToken: providerAccount.accessToken,
+        refreshToken: providerAccount.refreshToken,
+        expiresAt: providerAccount.expiresAt,
+        lastUsedAt: providerAccount.lastUsedAt,
+      })
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.userId, session.user.id),
+          eq(providerAccount.provider, "kiro")
+        )
+      )
+      .orderBy(desc(providerAccount.lastUsedAt));
 
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached) as KiroQuotaActionResult;
-            if (parsed?.success) {
-              return parsed.data;
-            }
-          } catch {
-            // Ignore parse errors
-          }
-        }
-      }
-
-      const accounts = yield* Effect.tryPromise({
-        try: () =>
-          db
-            .select({
-              id: providerAccount.id,
-              name: providerAccount.name,
-              email: providerAccount.email,
-              accountId: providerAccount.accountId,
-              tier: providerAccount.tier,
-              isActive: providerAccount.isActive,
-              accessToken: providerAccount.accessToken,
-              refreshToken: providerAccount.refreshToken,
-              expiresAt: providerAccount.expiresAt,
-              lastUsedAt: providerAccount.lastUsedAt,
-            })
-            .from(providerAccount)
-            .where(
-              and(
-                eq(providerAccount.userId, userId),
-                eq(providerAccount.provider, "kiro")
-              )
-            )
-            .orderBy(desc(providerAccount.lastUsedAt)),
-        catch: (cause) => new DatabaseError({ cause }),
-      });
-
-      const emptyData = {
-        accounts: [] as KiroAccountQuotaInfo[],
-        summary: {
-          totalAccounts: 0,
-          activeAccounts: 0,
-          byTier: {} as Record<string, number>,
-          exhaustedGroups: 0,
-          totalGroups: 0,
+    if (accounts.length === 0) {
+      const emptyResult: KiroQuotaActionResult = {
+        success: true,
+        data: {
+          accounts: [],
+          summary: {
+            totalAccounts: 0,
+            activeAccounts: 0,
+            byTier: {},
+            exhaustedGroups: 0,
+            totalGroups: 0,
+          },
         },
       };
 
-      if (accounts.length === 0) {
-        yield* Effect.tryPromise({
-          try: () =>
-            redis.set(
-              cacheKey,
-              JSON.stringify({ success: true, data: emptyData } satisfies KiroQuotaActionResult),
-              "EX",
-              KIRO_QUOTA_CACHE_TTL_SECONDS
-            ),
-          catch: (cause) => new RedisError({ cause }),
-        }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
+      await setRedisJson(cacheKey, emptyResult, KIRO_QUOTA_CACHE_TTL_SECONDS);
+      return emptyResult;
+    }
 
-        return emptyData;
-      }
+    const results: KiroAccountQuotaInfo[] = [];
+    let exhaustedGroups = 0;
+    let totalGroups = 0;
+    const byTier: Record<string, number> = {};
 
-      const results: KiroAccountQuotaInfo[] = [];
-      let exhaustedGroups = 0;
-      let totalGroups = 0;
-      const byTier: Record<string, number> = {};
-
-      for (const account of accounts) {
-        const accessToken = yield* Effect.tryPromise({
-          try: () =>
-            kiroProvider.getValidCredentials(
-              account as unknown as ProviderAccount
-            ),
-          catch: () => null,
-        }).pipe(Effect.merge);
-
-        if (accessToken === null) {
-          const tier = account.tier ?? "unknown";
-          byTier[tier] = (byTier[tier] ?? 0) + 1;
-
-          results.push({
-            accountId: account.id,
-            accountName: account.name,
-            email: account.email,
-            tier,
-            isActive: account.isActive,
-            status: "expired",
-            error: "Token expired - please re-authenticate",
-            groups: [],
-            fetchedAt: Date.now(),
-            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-          });
-          continue;
-        }
-
-        const liveQuota = yield* Effect.promise(() =>
-          fetchKiroQuotaFromApi(accessToken, account.accountId)
+    for (const account of accounts) {
+      let accessToken: string;
+      try {
+        accessToken = await kiroProvider.getValidCredentials(
+          account as unknown as ProviderAccount
         );
-        const tier = liveQuota.tier ?? account.tier ?? "unknown";
+      } catch {
+        const tier = account.tier ?? "unknown";
         byTier[tier] = (byTier[tier] ?? 0) + 1;
 
-        if (liveQuota.status === "success") {
-          const groups = liveQuota.metrics.map((metric) =>
-            toQuotaGroupDisplay(metric)
-          );
+        results.push({
+          accountId: account.id,
+          accountName: account.name,
+          email: account.email,
+          tier,
+          isActive: account.isActive,
+          status: "expired",
+          error: "Token expired - please re-authenticate",
+          groups: [],
+          fetchedAt: Date.now(),
+          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+        });
+        continue;
+      }
 
-          for (const group of groups) {
-            totalGroups += 1;
-            if (group.isExhausted) {
-              exhaustedGroups += 1;
-            }
+      const liveQuota = await fetchKiroQuotaFromApi(accessToken, account.accountId);
+      const tier = liveQuota.tier ?? account.tier ?? "unknown";
+      byTier[tier] = (byTier[tier] ?? 0) + 1;
+
+      if (liveQuota.status === "success") {
+        const groups = liveQuota.metrics.map((metric) =>
+          toQuotaGroupDisplay(metric)
+        );
+
+        for (const group of groups) {
+          totalGroups += 1;
+          if (group.isExhausted) {
+            exhaustedGroups += 1;
           }
-
-          results.push({
-            accountId: account.id,
-            accountName: account.name,
-            email: account.email,
-            tier,
-            isActive: account.isActive,
-            status: "success",
-            groups,
-            fetchedAt: liveQuota.fetchedAt,
-            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
-          });
-          continue;
         }
 
         results.push({
@@ -289,17 +250,33 @@ export async function getKiroQuota(
           email: account.email,
           tier,
           isActive: account.isActive,
-          status: "error",
-          error: liveQuota.error ?? "Failed to fetch Kiro quota data",
-          groups: [],
+          status: "success",
+          groups,
           fetchedAt: liveQuota.fetchedAt,
           lastUsedAt: account.lastUsedAt?.getTime() ?? null,
         });
+        continue;
       }
 
-      const activeAccountCount = results.filter((account) => account.isActive).length;
+      results.push({
+        accountId: account.id,
+        accountName: account.name,
+        email: account.email,
+        tier,
+        isActive: account.isActive,
+        status: "error",
+        error: liveQuota.error ?? "Failed to fetch Kiro quota data",
+        groups: [],
+        fetchedAt: liveQuota.fetchedAt,
+        lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+      });
+    }
 
-      const data = {
+    const activeAccountCount = results.filter((account) => account.isActive).length;
+
+    const result: KiroQuotaActionResult = {
+      success: true,
+      data: {
         accounts: results,
         summary: {
           totalAccounts: results.length,
@@ -308,22 +285,15 @@ export async function getKiroQuota(
           exhaustedGroups,
           totalGroups,
         },
-      };
+      },
+    };
 
-      // Cache result (fail-open)
-      yield* Effect.tryPromise({
-        try: () =>
-          redis.set(
-            cacheKey,
-            JSON.stringify({ success: true, data } satisfies KiroQuotaActionResult),
-            "EX",
-            KIRO_QUOTA_CACHE_TTL_SECONDS
-          ),
-        catch: (cause) => new RedisError({ cause }),
-      }).pipe(Effect.catchTag("RedisError", () => Effect.succeed(void 0)));
-
-      return data;
-    }),
-    MainLayer
-  );
+    await setRedisJson(cacheKey, result, KIRO_QUOTA_CACHE_TTL_SECONDS);
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch Kiro quota",
+    };
+  }
 }
