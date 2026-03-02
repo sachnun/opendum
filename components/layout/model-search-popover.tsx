@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, Copy, Search } from "lucide-react";
 import { toast } from "sonner";
+import { formatForDisplay } from "@tanstack/react-hotkeys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,7 +95,9 @@ export function ModelSearchPopover({ models, className }: ModelSearchPopoverProp
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <span className="truncate text-muted-foreground">Search models...</span>
               </span>
-              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <kbd className="bg-muted text-muted-foreground pointer-events-none ml-auto hidden h-5 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium sm:inline-flex">
+                {formatForDisplay("Mod+K")}
+              </kbd>
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-[min(92vw,30rem)] p-0">

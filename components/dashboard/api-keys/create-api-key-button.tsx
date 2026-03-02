@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,13 @@ export function CreateApiKeyButton() {
   const [isCreating, setIsCreating] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Listen for hotkey-triggered create event
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener("opendum:create-api-key", handler);
+    return () => window.removeEventListener("opendum:create-api-key", handler);
+  }, []);
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -97,6 +104,7 @@ export function CreateApiKeyButton() {
         <Button>
           <Plus className="mr-2 h-4 w-4" />
           Create API Key
+          <kbd className="bg-primary-foreground/20 ml-2 hidden rounded px-1.5 py-0.5 font-mono text-[10px] sm:inline-block">C</kbd>
         </Button>
       </DialogTrigger>
       <DialogContent>
