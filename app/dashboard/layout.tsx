@@ -20,6 +20,8 @@ import type {
   ProviderAccountCounts,
 } from "@/lib/navigation";
 import { Toaster } from "@/components/ui/sonner";
+import { CommandPalette } from "@/components/layout/command-palette";
+import { DashboardHotkeys } from "@/components/layout/dashboard-hotkeys";
 
 const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
 
@@ -208,6 +210,8 @@ export default async function DashboardLayout({
         </main>
       </div>
       <DashboardDataRefresher />
+      <CommandPalette />
+      <DashboardHotkeys />
       <Toaster />
     </div>
   );
