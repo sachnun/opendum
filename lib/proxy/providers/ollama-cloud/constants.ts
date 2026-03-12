@@ -47,6 +47,7 @@ export const OLLAMA_CLOUD_MODEL_MAP: Record<string, string> = {
   "ministral-3-8b": "ministral-3:8b",
   "mistral-large-3-675b": "mistral-large-3:675b",
   "nemotron-3-nano-30b": "nemotron-3-nano:30b",
+  "nemotron-3-super": "nemotron-3-super",
   "qwen3-coder-480b": "qwen3-coder:480b",
   "qwen3-coder-next": "qwen3-coder-next",
   "qwen3-next-80b": "qwen3-next:80b",
