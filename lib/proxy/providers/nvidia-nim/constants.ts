@@ -101,6 +101,7 @@ export const NVIDIA_NIM_MODEL_MAP: Record<string, string> = {
   "mistral-nemotron": "mistralai/mistral-nemotron",
   "mistral-small-24b-instruct": "mistralai/mistral-small-24b-instruct",
   "mistral-small-3.1-24b-instruct-2503": "mistralai/mistral-small-3.1-24b-instruct-2503",
+  "mistral-small-4-119b-2603": "mistralai/mistral-small-4-119b-2603",
   "mixtral-8x22b-instruct-v0.1": "mistralai/mixtral-8x22b-instruct-v0.1",
   "mixtral-8x7b-instruct-v0.1": "mistralai/mixtral-8x7b-instruct-v0.1",
   "nemotron-3-nano-30b": "nvidia/nemotron-3-nano-30b-a3b",
