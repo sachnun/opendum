@@ -17,7 +17,6 @@ export interface ProviderAccountDefinition {
   slug: string;
   label: string;
   category: ProviderAccountCategory;
-  description: string;
   emptyMessage: string;
   showTier: boolean;
 }
@@ -28,7 +27,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "antigravity",
     label: "Antigravity",
     category: "oauth",
-    description: "OAuth provider for Gemini and Claude access.",
     emptyMessage: "No Antigravity accounts connected yet.",
     showTier: true,
   },
@@ -37,7 +35,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "codex",
     label: "Codex",
     category: "oauth",
-    description: "OAuth provider for GPT-5 Codex accounts.",
     emptyMessage: "No Codex accounts connected yet.",
     showTier: true,
   },
@@ -46,7 +43,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "copilot",
     label: "Copilot",
     category: "oauth",
-    description: "Device-code provider for GitHub Copilot models.",
     emptyMessage: "No Copilot accounts connected yet.",
     showTier: false,
   },
@@ -55,7 +51,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "kiro",
     label: "Kiro",
     category: "oauth",
-    description: "OAuth provider for Claude access via Kiro.",
     emptyMessage: "No Kiro accounts connected yet.",
     showTier: false,
   },
@@ -64,7 +59,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "iflow",
     label: "Iflow",
     category: "oauth",
-    description: "OAuth provider for OpenAI-compatible endpoints.",
     emptyMessage: "No Iflow accounts connected yet.",
     showTier: false,
   },
@@ -73,7 +67,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "gemini-cli",
     label: "Gemini CLI",
     category: "oauth",
-    description: "OAuth provider for Gemini CLI account access.",
     emptyMessage: "No Gemini CLI accounts connected yet.",
     showTier: true,
   },
@@ -82,7 +75,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "qwen-code",
     label: "Qwen Code",
     category: "oauth",
-    description: "Device-code provider for Qwen Coder models.",
     emptyMessage: "No Qwen Code accounts connected yet.",
     showTier: false,
   },
@@ -91,7 +83,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "nvidia-nim",
     label: "Nvidia",
     category: "api_key",
-    description: "API key provider for Nvidia NIM models.",
     emptyMessage: "No Nvidia accounts connected yet.",
     showTier: false,
   },
@@ -100,7 +91,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "ollama-cloud",
     label: "Ollama Cloud",
     category: "api_key",
-    description: "API key provider for Ollama Cloud endpoints.",
     emptyMessage: "No Ollama Cloud accounts connected yet.",
     showTier: false,
   },
@@ -109,7 +99,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "openrouter",
     label: "OpenRouter",
     category: "api_key",
-    description: "API key provider for OpenRouter free and paid routes.",
     emptyMessage: "No OpenRouter accounts connected yet.",
     showTier: false,
   },

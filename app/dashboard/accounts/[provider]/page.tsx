@@ -192,7 +192,6 @@ export default async function ProviderAccountsPage({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold">{providerMeta.label} Accounts</h2>
-                    <p className="text-sm text-muted-foreground">{providerMeta.description}</p>
                   </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <AddAccountDialog

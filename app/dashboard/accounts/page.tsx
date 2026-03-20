@@ -5,7 +5,7 @@ import { providerAccount } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import type { ProviderAccountIndicator } from "@/lib/navigation";
@@ -205,7 +205,6 @@ export default async function AccountsPage({
                       <CardTitle className="text-base">{provider.label}</CardTitle>
                       {getIndicatorBadge(summary.indicator, summary.connected)}
                     </div>
-                    <CardDescription>{provider.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex items-center justify-between">
                     <div className="flex flex-wrap gap-2">
@@ -244,7 +243,6 @@ export default async function AccountsPage({
                       <CardTitle className="text-base">{provider.label}</CardTitle>
                       {getIndicatorBadge(summary.indicator, summary.connected)}
                     </div>
-                    <CardDescription>{provider.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex items-center justify-between">
                     <div className="flex flex-wrap gap-2">
