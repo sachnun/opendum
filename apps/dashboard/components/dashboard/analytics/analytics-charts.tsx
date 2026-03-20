@@ -142,7 +142,8 @@ export function AnalyticsCharts({
     }
 
     void fetchData(period, selectedApiKeyId, selectedCustomRange ?? undefined);
-  }, [period, customRange, isCustomRangeActive, selectedApiKeyId, initialData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initialData is only used on first render via useState, not as a reactive dependency
+  }, [period, customRange, isCustomRangeActive, selectedApiKeyId]);
 
   useEffect(() => {
     if (isFilterOpen) {
