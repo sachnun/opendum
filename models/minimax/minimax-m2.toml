@@ -9,4 +9,4 @@ output = 128_000
 
 [opendum]
 family = "MiniMax"
-providers = ["iflow", "ollama_cloud", "nvidia_nim"]
+providers = ["iflow", "ollama_cloud"]
