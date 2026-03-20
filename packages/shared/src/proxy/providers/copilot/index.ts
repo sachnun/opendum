@@ -1,8 +1,8 @@
 // GitHub Copilot provider exports
 
-export { copilotProvider, copilotConfig } from "./client";
+export { copilotProvider, copilotConfig } from "./client.js";
 export {
   initiateCopilotDeviceCodeFlow,
   pollCopilotDeviceCodeAuthorization,
-} from "./client";
-export * from "./constants";
+} from "./client.js";
+export * from "./constants.js";

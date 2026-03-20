@@ -1,7 +1,7 @@
 import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import * as schema from "./schema";
-import * as relations from "./relations";
+import * as schema from "./schema.js";
+import * as relations from "./relations.js";
 
 const fullSchema = { ...schema, ...relations };
 

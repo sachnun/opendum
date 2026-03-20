@@ -8,7 +8,7 @@ import {
   proxyApiKey,
   usageLog,
   disabledModel,
-} from "./schema";
+} from "./schema.js";
 
 // ---------------------------------------------------------------------------
 // User relations

@@ -1,8 +1,8 @@
 // OpenAI <-> Gemini format converter
 
-import type { ChatCompletionRequest } from "../types";
-import type { RequestPayload, ModelFamily } from "./transform/types";
-import { normalizeToolCallArgs } from "./request-helpers";
+import type { ChatCompletionRequest } from "../types.js";
+import type { RequestPayload, ModelFamily } from "./transform/types.js";
+import { normalizeToolCallArgs } from "./request-helpers.js";
 
 /**
  * Effort to budget_tokens mapping for Anthropic/Claude

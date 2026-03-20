@@ -1,19 +1,19 @@
 // Iflow Provider Implementation
 
-import type { ProviderAccount } from "../../../db/schema";
+import type { ProviderAccount } from "../../../db/schema.js";
 import { createHmac, randomUUID } from "crypto";
-import { encrypt, decrypt } from "../../../encryption";
-import { db } from "../../../db";
-import { providerAccount } from "../../../db/schema";
+import { encrypt, decrypt } from "../../../encryption.js";
+import { db } from "../../../db/index.js";
+import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
   OAuthResult,
   ChatCompletionRequest,
-} from "../types";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
-import { fetchWithTimeout } from "../../timeout";
+} from "../types.js";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
+import { fetchWithTimeout } from "../../timeout.js";
 import {
   IFLOW_OAUTH_AUTHORIZE_URL,
   IFLOW_OAUTH_TOKEN_URL,
@@ -24,11 +24,11 @@ import {
   IFLOW_REDIRECT_URI,
   IFLOW_SUPPORTED_PARAMS,
   IFLOW_REFRESH_BUFFER_SECONDS,
-} from "./constants";
-import { getProviderModelSet } from "../../models";
+} from "./constants.js";
+import { getProviderModelSet } from "../../models.js";
 
-import type { ReasoningConfig } from "../types";
-import { getAdaptiveTimeout } from "../../adaptive-timeout";
+import type { ReasoningConfig } from "../types.js";
+import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 
 interface TokenResponse {
   access_token: string;

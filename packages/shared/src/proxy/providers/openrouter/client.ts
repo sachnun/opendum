@@ -1,19 +1,19 @@
-import type { ProviderAccount } from "../../../db/schema";
-import { decrypt } from "../../../encryption";
+import type { ProviderAccount } from "../../../db/schema.js";
+import { decrypt } from "../../../encryption.js";
 import type {
   ChatCompletionRequest,
   OAuthResult,
   Provider,
   ProviderConfig,
-} from "../types";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
-import { fetchWithTimeout } from "../../timeout";
-import { getAdaptiveTimeout } from "../../adaptive-timeout";
-import { getUpstreamModelName, getProviderModelSet } from "../../models";
+} from "../types.js";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
+import { fetchWithTimeout } from "../../timeout.js";
+import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
+import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import {
   OPENROUTER_API_BASE_URL,
   OPENROUTER_SUPPORTED_PARAMS,
-} from "./constants";
+} from "./constants.js";
 
 const API_KEY_ACCOUNT_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000;
 

@@ -1,20 +1,20 @@
 // Qwen Code Provider Implementation
 // Uses Device Code Flow for OAuth (similar to TV/device authentication)
 
-import type { ProviderAccount } from "../../../db/schema";
-import { encrypt, decrypt } from "../../../encryption";
-import { db } from "../../../db";
-import { providerAccount } from "../../../db/schema";
+import type { ProviderAccount } from "../../../db/schema.js";
+import { encrypt, decrypt } from "../../../encryption.js";
+import { db } from "../../../db/index.js";
+import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
   OAuthResult,
   ChatCompletionRequest,
-} from "../types";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
-import { fetchWithTimeout } from "../../timeout";
-import { getAdaptiveTimeout } from "../../adaptive-timeout";
+} from "../types.js";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
+import { fetchWithTimeout } from "../../timeout.js";
+import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   QWEN_CODE_CLIENT_ID,
   QWEN_CODE_SCOPE,
@@ -23,8 +23,8 @@ import {
   QWEN_CODE_API_BASE_URL,
   QWEN_CODE_SUPPORTED_PARAMS,
   QWEN_CODE_REFRESH_BUFFER_SECONDS,
-} from "./constants";
-import { getUpstreamModelName, getProviderModelSet } from "../../models";
+} from "./constants.js";
+import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 
 /**
  * Device code response from Qwen API

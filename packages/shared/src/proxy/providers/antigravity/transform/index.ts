@@ -1,4 +1,4 @@
 // Transform exports
-export * from "./types";
-export { transformGeminiRequest } from "./gemini";
-export { transformClaudeRequest } from "./claude";
+export * from "./types.js";
+export { transformGeminiRequest } from "./gemini.js";
+export { transformClaudeRequest } from "./claude.js";

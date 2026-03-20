@@ -1,4 +1,4 @@
-import { KIRO_REGION } from "./constants";
+import { KIRO_REGION } from "./constants.js";
 
 const KIRO_USAGE_LIMITS_URL =
   process.env.KIRO_USAGE_LIMITS_URL ||

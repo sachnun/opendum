@@ -2,19 +2,19 @@
 // Uses Device Code Flow for OAuth via auth.openai.com
 // API uses Responses API format, but we convert to/from Chat Completions format
 
-import type { ProviderAccount } from "../../../db/schema";
-import { encrypt, decrypt } from "../../../encryption";
-import { db } from "../../../db";
-import { providerAccount } from "../../../db/schema";
+import type { ProviderAccount } from "../../../db/schema.js";
+import { encrypt, decrypt } from "../../../encryption.js";
+import { db } from "../../../db/index.js";
+import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
   OAuthResult,
   ChatCompletionRequest,
-} from "../types";
-import { fetchWithTimeout } from "../../timeout";
-import { getAdaptiveTimeout } from "../../adaptive-timeout";
+} from "../types.js";
+import { fetchWithTimeout } from "../../timeout.js";
+import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   CODEX_CLIENT_ID,
   CODEX_DEVICE_CODE_ENDPOINT,
@@ -26,9 +26,9 @@ import {
   CODEX_SUPPORTED_PARAMS,
   CODEX_REFRESH_BUFFER_SECONDS,
   CODEX_ORIGINATOR,
-} from "./constants";
-import { getProviderModelSet } from "../../models";
-import { updateCodexQuotaFromHeaders } from "./quota";
+} from "./constants.js";
+import { getProviderModelSet } from "../../models.js";
+import { updateCodexQuotaFromHeaders } from "./quota.js";
 
 // ============================================================
 // Types

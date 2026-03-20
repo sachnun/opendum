@@ -1,2 +1,2 @@
-export { nvidiaNimProvider, nvidiaNimConfig } from "./client";
-export * from "./constants";
+export { nvidiaNimProvider, nvidiaNimConfig } from "./client.js";
+export * from "./constants.js";

@@ -1,2 +1,2 @@
-export { ollamaCloudProvider, ollamaCloudConfig } from "./client";
-export * from "./constants";
+export { ollamaCloudProvider, ollamaCloudConfig } from "./client.js";
+export * from "./constants.js";

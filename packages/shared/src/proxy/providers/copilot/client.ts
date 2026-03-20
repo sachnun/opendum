@@ -1,17 +1,17 @@
-import type { ProviderAccount } from "../../../db/schema";
-import { encrypt, decrypt } from "../../../encryption";
-import { db } from "../../../db";
-import { providerAccount } from "../../../db/schema";
+import type { ProviderAccount } from "../../../db/schema.js";
+import { encrypt, decrypt } from "../../../encryption.js";
+import { db } from "../../../db/index.js";
+import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
   OAuthResult,
   ChatCompletionRequest,
-} from "../types";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
-import { fetchWithTimeout } from "../../timeout";
-import { getAdaptiveTimeout } from "../../adaptive-timeout";
+} from "../types.js";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
+import { fetchWithTimeout } from "../../timeout.js";
+import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   COPILOT_CLIENT_ID,
   COPILOT_DEVICE_CODE_ENDPOINT,
@@ -25,14 +25,14 @@ import {
   COPILOT_POLLING_INTERVAL,
   COPILOT_DEVICE_CODE_EXPIRY,
   COPILOT_REFRESH_BUFFER_SECONDS,
-} from "./constants";
-import { getUpstreamModelName, getProviderModelSet } from "../../models";
+} from "./constants.js";
+import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import {
   convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
   injectCopilotChatSystemTool,
   injectCopilotResponsesSystemTool,
-} from "./injection";
+} from "./injection.js";
 
 interface CopilotDeviceCodeResponse {
   device_code: string;

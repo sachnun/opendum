@@ -10,7 +10,7 @@
  * cold-start behaviour.
  */
 
-import { getRedisClient } from "../redis";
+import { getRedisClient } from "../redis.js";
 
 // ---------------------------------------------------------------------------
 // Configuration

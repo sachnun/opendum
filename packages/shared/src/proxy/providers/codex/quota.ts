@@ -6,7 +6,7 @@
  * - x-codex-* response headers from regular requests
  */
 
-import { CODEX_ORIGINATOR } from "./constants";
+import { CODEX_ORIGINATOR } from "./constants.js";
 
 const CODEX_USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
 const CODEX_DEFAULT_USER_AGENT = "codex-cli";

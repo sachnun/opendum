@@ -1,8 +1,8 @@
 // Request helpers for Antigravity
 // Includes system instruction injection and thinking config normalization
 
-import type { RequestPayload, ThinkingConfig } from "./transform/types";
-import { getParamType } from "./tool-schema-cache";
+import type { RequestPayload, ThinkingConfig } from "./transform/types.js";
+import { getParamType } from "./tool-schema-cache.js";
 
 const SESSION_ID = `-${Math.floor(Math.random() * 9_000_000_000_000_000)}`;
 

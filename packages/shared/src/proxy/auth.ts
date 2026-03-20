@@ -1,17 +1,17 @@
-import { db } from "../db";
-import { proxyApiKey, disabledModel, usageLog } from "../db/schema";
+import { db } from "../db/index.js";
+import { proxyApiKey, disabledModel, usageLog } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { hashString } from "../encryption";
-import { bumpAnalyticsCacheVersionThrottled } from "../cache/analytics-cache";
-import { getRedisClient } from "../redis";
+import { hashString } from "../encryption.js";
+import { bumpAnalyticsCacheVersionThrottled } from "../cache/analytics-cache.js";
+import { getRedisClient } from "../redis.js";
 import {
   isModelSupported,
   isModelSupportedByProvider,
   getAllModelsWithAliases,
   getProvidersForModel,
   resolveModelAlias,
-} from "./models";
-import { normalizeProviderAlias } from "./providers/types";
+} from "./models.js";
+import { normalizeProviderAlias } from "./providers/types.js";
 
 /**
  * Parsed model parameter

@@ -1,5 +1,5 @@
-import { getRedisClient } from "../../../redis";
-import { COPILOT_X_INITIATOR_WINDOW_MS } from "./constants";
+import { getRedisClient } from "../../../redis.js";
+import { COPILOT_X_INITIATOR_WINDOW_MS } from "./constants.js";
 
 export type CopilotInitiator = "user" | "agent";
 

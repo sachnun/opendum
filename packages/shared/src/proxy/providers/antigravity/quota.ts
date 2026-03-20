@@ -5,7 +5,7 @@
  * Based on empirical testing from LLM-API-Key-Proxy reference implementation.
  */
 
-import { CODE_ASSIST_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants";
+import { CODE_ASSIST_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants.js";
 
 /**
  * Max requests per model per tier (source of truth)

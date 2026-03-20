@@ -1,7 +1,7 @@
 // Thought signature cache for Antigravity
 // Caches thought block signatures for multi-turn conversations
 
-import type { ModelFamily } from "./transform/types";
+import type { ModelFamily } from "./transform/types.js";
 
 const signatureCache = new Map<string, string>();
 

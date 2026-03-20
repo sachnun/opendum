@@ -3,7 +3,7 @@ import {
   IGNORED_MODELS,
   type ModelMeta,
   type ModelInfo,
-} from "./model-loader";
+} from "./model-loader.js";
 
 // Re-export types and registry so existing consumers keep working
 export { MODEL_REGISTRY, IGNORED_MODELS };

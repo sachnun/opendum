@@ -1,20 +1,20 @@
 // Gemini CLI Provider Implementation
 // Based on: https://github.com/Mirrowel/LLM-API-Key-Proxy/blob/main/src/rotator_library/providers/gemini_cli_provider.py
 
-import type { ProviderAccount } from "../../../db/schema";
-import { encrypt, decrypt } from "../../../encryption";
-import { db } from "../../../db";
-import { providerAccount } from "../../../db/schema";
+import type { ProviderAccount } from "../../../db/schema.js";
+import { encrypt, decrypt } from "../../../encryption.js";
+import { db } from "../../../db/index.js";
+import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type {
   Provider,
   ProviderConfig,
   OAuthResult,
   ChatCompletionRequest,
-} from "../types";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
-import { fetchWithTimeout } from "../../timeout";
-import { getAdaptiveTimeout } from "../../adaptive-timeout";
+} from "../types.js";
+import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
+import { fetchWithTimeout } from "../../timeout.js";
+import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   GEMINI_CLI_CLIENT_ID,
   GEMINI_CLI_CLIENT_SECRET,
@@ -28,15 +28,15 @@ import {
   THINKING_BUDGET_MAP,
   GEMINI3_THINKING_LEVELS,
   DEFAULT_SAFETY_SETTINGS,
-} from "./constants";
+} from "./constants.js";
 import {
   convertOpenAIToGemini,
   convertGeminiToOpenAI,
   createGeminiToOpenAISseTransform,
   createAntigravityUnwrapTransform,
-} from "../antigravity/converter";
-import { cacheSignature } from "../antigravity/cache";
-import { getProviderModelSet } from "../../models";
+} from "../antigravity/converter.js";
+import { cacheSignature } from "../antigravity/cache.js";
+import { getProviderModelSet } from "../../models.js";
 
 /**
  * Generate PKCE code verifier

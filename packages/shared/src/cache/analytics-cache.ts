@@ -1,4 +1,4 @@
-import { getRedisClient } from "../redis";
+import { getRedisClient } from "../redis.js";
 
 const ANALYTICS_CACHE_PREFIX = "opendum:analytics:v1";
 const ANALYTICS_VERSION_PREFIX = `${ANALYTICS_CACHE_PREFIX}:version`;

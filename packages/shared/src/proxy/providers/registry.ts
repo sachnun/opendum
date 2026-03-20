@@ -1,7 +1,7 @@
 // Provider registry - factory for getting provider instances
 
-import type { Provider, ProviderNameType } from "./types";
-import { ProviderName } from "./types";
+import type { Provider, ProviderNameType } from "./types.js";
+import { ProviderName } from "./types.js";
 
 // Provider instances will be lazily imported
 let iflowProvider: Provider | null = null;

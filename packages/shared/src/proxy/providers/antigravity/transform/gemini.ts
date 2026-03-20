@@ -1,13 +1,13 @@
 // Gemini transform for Antigravity
 // Transforms request payload for native Gemini models
 
-import { getCachedSignature } from "../cache";
+import { getCachedSignature } from "../cache.js";
 import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
-} from "../request-helpers";
-import { cacheToolSchemas } from "../tool-schema-cache";
-import type { RequestPayload, TransformContext, TransformResult } from "./types";
+} from "../request-helpers.js";
+import { cacheToolSchemas } from "../tool-schema-cache.js";
+import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
 const THOUGHT_SIGNATURE_BYPASS = "skip_thought_signature_validator";
 

@@ -1,13 +1,13 @@
 // Claude transform for Antigravity
 // Transforms request payload for Claude proxy models
 
-import { cacheSignature, getCachedSignature } from "../cache";
+import { cacheSignature, getCachedSignature } from "../cache.js";
 import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
-} from "../request-helpers";
-import { cacheToolSchemas } from "../tool-schema-cache";
-import type { RequestPayload, TransformContext, TransformResult } from "./types";
+} from "../request-helpers.js";
+import { cacheToolSchemas } from "../tool-schema-cache.js";
+import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
 /**
  * Final sanitization for Claude: ensure all functionCall/functionResponse blocks are properly paired.

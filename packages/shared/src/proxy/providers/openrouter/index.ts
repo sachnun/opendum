@@ -1,2 +1,2 @@
-export { openRouterProvider, openRouterConfig } from "./client";
-export * from "./constants";
+export { openRouterProvider, openRouterConfig } from "./client.js";
+export * from "./constants.js";

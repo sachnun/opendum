@@ -1,6 +1,6 @@
 // Provider abstraction types for multi-provider support
 
-import type { ProviderAccount } from "../../db/schema";
+import type { ProviderAccount } from "../../db/schema.js";
 
 /**
  * Per-provider timeout configuration (milliseconds).

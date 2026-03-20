@@ -1,7 +1,7 @@
 import {
   CODE_ASSIST_ENDPOINT_FALLBACKS,
   GEMINI_CLI_AUTH_HEADERS,
-} from "./constants";
+} from "./constants.js";
 
 export const GEMINI_CLI_QUOTA_STALE_THRESHOLD_MS = 15 * 60 * 1000;
 

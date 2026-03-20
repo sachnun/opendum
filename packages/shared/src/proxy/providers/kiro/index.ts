@@ -6,5 +6,5 @@ export {
   generateCodeVerifier,
   generateCodeChallenge,
   buildKiroAuthUrl,
-} from "./client";
-export * from "./constants";
+} from "./client.js";
+export * from "./constants.js";

@@ -1,4 +1,4 @@
-import { getRedisClient } from "./redis";
+import { getRedisClient } from "./redis.js";
 
 function parseJsonValue<T>(rawValue: string | null): T | null {
   if (!rawValue) {

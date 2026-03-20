@@ -5,7 +5,7 @@
  * Allows estimation of remaining quota between API fetches.
  */
 
-import { getQuotaCostPercent, getQuotaGroupForModel, QUOTA_GROUPS } from "./quota";
+import { getQuotaCostPercent, getQuotaGroupForModel, QUOTA_GROUPS } from "./quota.js";
 
 // =============================================================================
 // TYPES

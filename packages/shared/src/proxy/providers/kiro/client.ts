@@ -1,16 +1,16 @@
-import type { ProviderAccount } from "../../../db/schema";
-import { encrypt, decrypt } from "../../../encryption";
-import { db } from "../../../db";
-import { providerAccount } from "../../../db/schema";
+import type { ProviderAccount } from "../../../db/schema.js";
+import { encrypt, decrypt } from "../../../encryption.js";
+import { db } from "../../../db/index.js";
+import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import type {
   ChatCompletionRequest,
   OAuthResult,
   Provider,
   ProviderConfig,
-} from "../types";
-import { fetchWithTimeout } from "../../timeout";
-import { getAdaptiveTimeout } from "../../adaptive-timeout";
+} from "../types.js";
+import { fetchWithTimeout } from "../../timeout.js";
+import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   KIRO_API_BASE_URL,
   KIRO_BROWSER_REDIRECT_URI,
@@ -20,8 +20,8 @@ import {
   KIRO_OAUTH_REFRESH_ENDPOINT,
   KIRO_OAUTH_TOKEN_ENDPOINT,
   KIRO_REFRESH_BUFFER_SECONDS,
-} from "./constants";
-import { getUpstreamModelName, getProviderModelSet } from "../../models";
+} from "./constants.js";
+import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 
 interface KiroTokenExchangeResponse {
   accessToken: string;
