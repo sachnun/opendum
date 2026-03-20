@@ -86,7 +86,7 @@ export function Header({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center justify-center rounded-full transition-opacity hover:opacity-80"
+                className="flex items-center justify-center rounded-full transition-opacity cursor-pointer hover:opacity-80"
               >
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.image ?? undefined} />

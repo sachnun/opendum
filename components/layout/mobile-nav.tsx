@@ -184,7 +184,7 @@ export function MobileNav({
             <button
               type="button"
               onClick={() => setIsModelsExpanded((prev) => !prev)}
-              className="flex items-center px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center px-3 py-2.5 text-muted-foreground transition-colors cursor-pointer hover:text-foreground"
               aria-label={isExpanded ? "Collapse models" : "Expand models"}
             >
               {isExpanded ? (
@@ -357,7 +357,7 @@ export function MobileNav({
                   userToggledRef.current = true;
                   setIsBottomMenuExpanded((prev) => !prev);
                 }}
-                className="flex w-full items-center justify-center border-t border-border/60 pt-2 text-muted-foreground transition-colors hover:text-foreground"
+                className="flex w-full items-center justify-center border-t border-border/60 pt-2 text-muted-foreground transition-colors cursor-pointer hover:text-foreground"
                 aria-label={isBottomMenuExpanded ? "Collapse menu" : "Expand menu"}
               >
                 {isBottomMenuExpanded ? (

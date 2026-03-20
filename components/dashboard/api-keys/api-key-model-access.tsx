@@ -248,7 +248,7 @@ export function ApiKeyModelAccess({
                         <span className="font-mono text-[11px]">{modelId}</span>
                         <button
                           type="button"
-                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-muted-foreground cursor-pointer hover:text-foreground"
                           onClick={() => toggleModel(modelId)}
                           aria-label={`Remove ${modelId}`}
                         >

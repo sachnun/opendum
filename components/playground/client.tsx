@@ -1833,7 +1833,7 @@ export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientP
               onClick={addPanel}
               disabled={isAnyLoading}
               aria-label="Add comparison card"
-              className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground transition-colors cursor-pointer hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-muted-foreground/30 transition-colors group-hover:border-muted-foreground/45">
                 <Plus className="h-4 w-4 transition-colors group-hover:text-foreground/80" />

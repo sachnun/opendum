@@ -642,7 +642,7 @@ export function AddAccountDialog({
                       type="button"
                       onClick={() => handleSelectProvider(key)}
                       className={cn(
-                        "flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent",
+                        "flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all cursor-pointer hover:border-primary hover:bg-accent",
                         provider === key
                           ? "border-primary bg-accent"
                           : "border-border"
@@ -663,7 +663,7 @@ export function AddAccountDialog({
                       type="button"
                       onClick={() => handleSelectProvider(key)}
                       className={cn(
-                        "flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent",
+                        "flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all cursor-pointer hover:border-primary hover:bg-accent",
                         provider === key
                           ? "border-primary bg-accent"
                           : "border-border"

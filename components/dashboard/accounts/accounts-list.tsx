@@ -446,7 +446,7 @@ function LastErrorMessageDialog({
       <DialogTrigger asChild>
          <button
           type="button"
-          className="w-full min-h-[3.25rem] rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full min-h-[3.25rem] rounded-sm pt-2 text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="text-muted-foreground text-xs">Last Error Message:</span>
           <span className={`mt-1 block text-xs line-clamp-2 break-all ${previewColorClass}`}>

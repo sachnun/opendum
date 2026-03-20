@@ -175,7 +175,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => setIsModelsExpanded((prev) => !prev)}
-              className="flex items-center px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center px-3 py-2.5 text-muted-foreground transition-colors cursor-pointer hover:text-foreground"
               aria-label={isExpanded ? "Collapse models" : "Expand models"}
             >
               {isExpanded ? (
@@ -221,7 +221,7 @@ export function Sidebar({
                     <button
                       type="button"
                       onClick={() => setAccountsSubmenuSearch("")}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors cursor-pointer hover:text-foreground"
                       aria-label="Clear search"
                     >
                       <X className="h-3 w-3" />
@@ -338,7 +338,7 @@ export function Sidebar({
                 userToggledRef.current = true;
                 setIsBottomMenuExpanded((prev) => !prev);
               }}
-              className="flex w-full items-center justify-center border-t border-border/60 pt-2 text-muted-foreground transition-colors hover:text-foreground"
+              className="flex w-full items-center justify-center border-t border-border/60 pt-2 text-muted-foreground transition-colors cursor-pointer hover:text-foreground"
               aria-label={isBottomMenuExpanded ? "Collapse menu" : "Expand menu"}
             >
               {isBottomMenuExpanded ? (
