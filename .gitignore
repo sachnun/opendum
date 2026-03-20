@@ -18,7 +18,7 @@
 *.pem
 
 # debug
-bun-debug.log*
+pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
 .env*
