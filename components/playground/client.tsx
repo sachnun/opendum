@@ -1564,6 +1564,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId }: P
 
     const requestStartedAt = Date.now();
     let waitMs: number | null = null;
+    let usedAccountId: string | null = null;
 
     try {
       const scenarioMessages = getScenarioMessages(scenario);
@@ -1603,7 +1604,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId }: P
       });
 
       waitMs = Date.now() - requestStartedAt;
-      const usedAccountId = response.headers.get("x-provider-account-id") || null;
+      usedAccountId = response.headers.get("x-provider-account-id") || null;
 
       if (!response.ok) {
         const clonedResponse = response.clone();
@@ -1728,6 +1729,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId }: P
           isLoading: false,
           error: error instanceof Error ? error.message : "Unknown error",
           metrics: buildResponseMetrics(waitMs, null, null),
+          usedAccountId,
         },
       }));
     } finally {
