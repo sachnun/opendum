@@ -1,0 +1,100 @@
+{
+  "name": "@opendum/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./db": {
+      "types": "./dist/db/index.d.ts",
+      "default": "./dist/db/index.js"
+    },
+    "./db/schema": {
+      "types": "./dist/db/schema.d.ts",
+      "default": "./dist/db/schema.js"
+    },
+    "./encryption": {
+      "types": "./dist/encryption.d.ts",
+      "default": "./dist/encryption.js"
+    },
+    "./redis": {
+      "types": "./dist/redis.d.ts",
+      "default": "./dist/redis.js"
+    },
+    "./redis-cache": {
+      "types": "./dist/redis-cache.d.ts",
+      "default": "./dist/redis-cache.js"
+    },
+    "./cache/analytics-cache": {
+      "types": "./dist/cache/analytics-cache.d.ts",
+      "default": "./dist/cache/analytics-cache.js"
+    },
+    "./proxy/models": {
+      "types": "./dist/proxy/models.d.ts",
+      "default": "./dist/proxy/models.js"
+    },
+    "./proxy/auth": {
+      "types": "./dist/proxy/auth.d.ts",
+      "default": "./dist/proxy/auth.js"
+    },
+    "./proxy/adaptive-timeout": {
+      "types": "./dist/proxy/adaptive-timeout.d.ts",
+      "default": "./dist/proxy/adaptive-timeout.js"
+    },
+    "./proxy/timeout": {
+      "types": "./dist/proxy/timeout.d.ts",
+      "default": "./dist/proxy/timeout.js"
+    },
+    "./proxy/providers": {
+      "types": "./dist/proxy/providers/index.d.ts",
+      "default": "./dist/proxy/providers/index.js"
+    },
+    "./proxy/providers/types": {
+      "types": "./dist/proxy/providers/types.d.ts",
+      "default": "./dist/proxy/providers/types.js"
+    },
+    "./proxy/providers/registry": {
+      "types": "./dist/proxy/providers/registry.d.ts",
+      "default": "./dist/proxy/providers/registry.js"
+    },
+    "./proxy/providers/*": {
+      "types": "./dist/proxy/providers/*/index.d.ts",
+      "default": "./dist/proxy/providers/*/index.js"
+    },
+    "./proxy/providers/*/client": {
+      "types": "./dist/proxy/providers/*/client.d.ts",
+      "default": "./dist/proxy/providers/*/client.js"
+    },
+    "./proxy/providers/*/constants": {
+      "types": "./dist/proxy/providers/*/constants.d.ts",
+      "default": "./dist/proxy/providers/*/constants.js"
+    },
+    "./proxy/providers/*/quota": {
+      "types": "./dist/proxy/providers/*/quota.d.ts",
+      "default": "./dist/proxy/providers/*/quota.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.4.1",
+    "@neondatabase/serverless": "^1.0.2",
+    "@paralleldrive/cuid2": "^3.3.0",
+    "crypto-js": "^4.2.0",
+    "drizzle-orm": "^0.45.1",
+    "ioredis": "^5.10.1",
+    "ioredis-mock": "^8.13.1",
+    "smol-toml": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/ioredis-mock": "^8.2.7",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  }
+}
