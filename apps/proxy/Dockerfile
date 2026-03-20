@@ -23,7 +23,7 @@ RUN pnpm --filter @opendum/shared build
 RUN pnpm --filter @opendum/proxy build
 
 # Prune dev dependencies
-RUN pnpm --filter @opendum/proxy deploy --prod /app/pruned
+RUN pnpm --filter @opendum/proxy deploy --prod --legacy /app/pruned
 
 FROM base AS production
 WORKDIR /app
