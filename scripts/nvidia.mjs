@@ -178,7 +178,7 @@ async function fetchNvidiaModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/shared/models");
 
   // Build existing model map from TOML files to preserve existing keys
   const { buildTomlIndex } = await import("./toml-utils.mjs");

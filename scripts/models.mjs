@@ -8,7 +8,7 @@ import { buildTomlIndex } from "./toml-utils.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "models");
+const modelsDir = resolve(rootDir, "packages/shared/models");
 
 const refreshScripts = [
   "openrouter.mjs",
