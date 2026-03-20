@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { syncProviderToToml } from "./toml-utils.mjs";
 
 const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
-const MODEL_MAP_EXPORT_PATTERN =
-  /export const NVIDIA_NIM_MODEL_MAP: Record<string, string> = \{[\s\S]*?\n\};/;
 
 const MODEL_KEY_OVERRIDES = {
   "baichuan-inc/baichuan2-13b-chat": "baichuan2-13b-chat",
@@ -90,17 +88,7 @@ function isLikelyChatModel(modelId) {
   return CHAT_MODEL_PATTERNS.some((pattern) => pattern.test(modelId));
 }
 
-function parseExistingModelMap(fileContent) {
-  const blockMatch = fileContent.match(MODEL_MAP_EXPORT_PATTERN);
-  if (!blockMatch) {
-    throw new Error("Could not locate NVIDIA_NIM_MODEL_MAP export block");
-  }
-
-  const entries = [...blockMatch[0].matchAll(/"([^"]+)":\s*"([^"]+)",/g)];
-  return new Map(entries.map((entry) => [entry[1], entry[2]]));
-}
-
-function buildModelMap(modelIds, existingMap) {
+function buildModelMap(modelIds, existingKeys) {
   const allAvailableModels = [...new Set(modelIds)].sort((a, b) => a.localeCompare(b));
   const availableChatCandidateSet = new Set(
     allAvailableModels.filter((modelId) => !isNonChatModel(modelId))
@@ -111,7 +99,8 @@ function buildModelMap(modelIds, existingMap) {
 
   const nextMap = new Map();
 
-  for (const [modelKey, upstreamModel] of existingMap.entries()) {
+  // Retain existing models that are still available
+  for (const [modelKey, upstreamModel] of existingKeys.entries()) {
     if (!availableChatCandidateSet.has(upstreamModel)) {
       continue;
     }
@@ -121,6 +110,7 @@ function buildModelMap(modelIds, existingMap) {
 
   const mappedValues = new Set(nextMap.values());
 
+  // Add new chat models
   for (const upstreamModel of allAvailableModels) {
     if (mappedValues.has(upstreamModel)) {
       continue;
@@ -144,19 +134,6 @@ function buildModelMap(modelIds, existingMap) {
   }
 
   return new Map([...nextMap.entries()].sort(([a], [b]) => a.localeCompare(b)));
-}
-
-function renderModelMap(modelMap) {
-  const lines = [...modelMap.entries()].map(
-    ([modelKey, upstreamModel]) =>
-      `  ${JSON.stringify(modelKey)}: ${JSON.stringify(upstreamModel)},`
-  );
-
-  return [
-    "export const NVIDIA_NIM_MODEL_MAP: Record<string, string> = {",
-    ...lines,
-    "};",
-  ].join("\n");
 }
 
 async function fetchNvidiaModelIds() {
@@ -201,23 +178,30 @@ async function fetchNvidiaModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const constantsPath = resolve(scriptDir, "../lib/proxy/providers/nvidia-nim/constants.ts");
+  const modelsDir = resolve(scriptDir, "../models");
 
-  const currentFile = readFileSync(constantsPath, "utf8");
-  const existingMap = parseExistingModelMap(currentFile);
-  const modelIds = await fetchNvidiaModelIds();
-  const nextMap = buildModelMap(modelIds, existingMap);
-  const nextExportBlock = renderModelMap(nextMap);
-
-  const nextFile = currentFile.replace(MODEL_MAP_EXPORT_PATTERN, nextExportBlock);
-
-  if (nextFile === currentFile) {
-    console.log(`Nvidia NIM model map is already up to date (${nextMap.size} keys).`);
-    return;
+  // Build existing model map from TOML files to preserve existing keys
+  const { buildTomlIndex } = await import("./toml-utils.mjs");
+  const index = buildTomlIndex(modelsDir);
+  const existingKeys = new Map();
+  for (const [modelId, entry] of Object.entries(index)) {
+    const providers = entry.data.opendum?.providers || [];
+    if (providers.includes("nvidia_nim")) {
+      const upstream = entry.data.opendum?.upstream?.nvidia_nim || modelId;
+      existingKeys.set(modelId, upstream);
+    }
   }
 
-  writeFileSync(constantsPath, nextFile);
-  console.log(`Updated Nvidia NIM model map with ${nextMap.size} keys.`);
+  const modelIds = await fetchNvidiaModelIds();
+  const nextMap = buildModelMap(modelIds, existingKeys);
+
+  const result = syncProviderToToml(modelsDir, "nvidia_nim", nextMap);
+
+  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
+    console.log(`Nvidia NIM models are already up to date (${nextMap.size} models).`);
+  } else {
+    console.log(`Nvidia NIM: ${nextMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
+  }
 }
 
 main().catch((error) => {

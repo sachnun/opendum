@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { syncProviderToToml } from "./toml-utils.mjs";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
-const MODEL_MAP_EXPORT_PATTERN =
-  /export const OPENROUTER_MODEL_MAP: Record<string, string> = \{[\s\S]*?\n\};/;
 
 function toModelKey(modelId) {
   const normalizedModelId = modelId.replace(/^library\//, "");
@@ -98,19 +96,6 @@ function buildModelMap(modelIds) {
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-function renderModelMap(modelMap) {
-  const lines = [...modelMap.entries()].map(
-    ([modelKey, upstreamModel]) =>
-      `  ${JSON.stringify(modelKey)}: ${JSON.stringify(upstreamModel)},`
-  );
-
-  return [
-    "export const OPENROUTER_MODEL_MAP: Record<string, string> = {",
-    ...lines,
-    "};",
-  ].join("\n");
-}
-
 function sleep(ms) {
   return new Promise((resolvePromise) => {
     setTimeout(resolvePromise, ms);
@@ -162,29 +147,18 @@ async function fetchOpenRouterFreeModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const constantsPath = resolve(
-    scriptDir,
-    "../lib/proxy/providers/openrouter/constants.ts"
-  );
+  const modelsDir = resolve(scriptDir, "../models");
 
   const modelIds = await fetchOpenRouterFreeModelIds();
   const modelMap = buildModelMap(modelIds);
-  const nextExportBlock = renderModelMap(modelMap);
 
-  const currentFile = readFileSync(constantsPath, "utf8");
-  if (!MODEL_MAP_EXPORT_PATTERN.test(currentFile)) {
-    throw new Error("Could not locate OPENROUTER_MODEL_MAP export block");
+  const result = syncProviderToToml(modelsDir, "openrouter", modelMap);
+
+  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
+    console.log(`OpenRouter free models are already up to date (${modelMap.size} models).`);
+  } else {
+    console.log(`OpenRouter: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
   }
-
-  const nextFile = currentFile.replace(MODEL_MAP_EXPORT_PATTERN, nextExportBlock);
-
-  if (nextFile === currentFile) {
-    console.log(`OpenRouter free model map is already up to date (${modelMap.size} keys).`);
-    return;
-  }
-
-  writeFileSync(constantsPath, nextFile);
-  console.log(`Updated OpenRouter free model map with ${modelMap.size} keys.`);
 }
 
 main().catch((error) => {

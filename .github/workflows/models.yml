@@ -1,4 +1,4 @@
-name: Refresh Provider Model Maps
+name: Refresh Provider Models
 
 on:
   workflow_dispatch:
@@ -10,8 +10,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  refresh-model-maps:
-    name: Refresh Provider Model Maps
+  refresh-models:
+    name: Refresh Provider Models
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -29,14 +29,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Refresh provider model maps
+      - name: Refresh provider models
         run: pnpm run models:refresh -- --summary "$RUNNER_TEMP/pr-body.md"
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v7
         with:
-          commit-message: "chore: refresh provider model maps"
-          title: "chore: refresh provider model maps"
+          commit-message: "chore: refresh provider model registry"
+          title: "chore: refresh provider model registry"
           body-path: ${{ runner.temp }}/pr-body.md
-          branch: chore/refresh-provider-model-maps
+          branch: chore/refresh-provider-models
           delete-branch: true
