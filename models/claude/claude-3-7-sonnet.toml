@@ -1,5 +1,5 @@
 
 [opendum]
 family = "Claude"
-providers = ["kiro"]
+providers = []
 aliases = ["claude-3.7-sonnet", "claude-3-7-sonnet-latest", "claude-3.7-sonnet-latest"]
