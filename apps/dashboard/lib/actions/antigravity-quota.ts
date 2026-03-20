@@ -1,0 +1,328 @@
+"use server";
+
+/**
+ * Server Actions for Antigravity Quota Monitoring
+ */
+
+import type { ProviderAccount } from "@opendum/shared/db/schema";
+import { getSession } from "@/lib/auth";
+import { db } from "@opendum/shared/db";
+import { providerAccount } from "@opendum/shared/db/schema";
+import { eq, and, desc } from "drizzle-orm";
+import { decrypt } from "@opendum/shared/encryption";
+import { getRedisJson, setRedisJson } from "@opendum/shared/redis-cache";
+import { 
+  fetchQuotaFromApi, 
+  type QuotaGroupInfo 
+} from "@opendum/shared/proxy/providers/antigravity/quota";
+import { antigravityProvider } from "@opendum/shared/proxy/providers/antigravity/client";
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export interface AccountQuotaInfo {
+  accountId: string;
+  accountName: string;
+  email: string | null;
+  tier: string;
+  isActive: boolean;
+  status: "success" | "error" | "expired";
+  error?: string;
+  groups: QuotaGroupDisplay[];
+  fetchedAt: number;
+  lastUsedAt: number | null;
+}
+
+export interface QuotaGroupDisplay {
+  name: string;
+  displayName: string;
+  models: string[];
+  remainingFraction: number;
+  remainingRequests: number;
+  maxRequests: number;
+  usedRequests: number;
+  percentUsed: number;
+  isExhausted: boolean;
+  isEstimated: boolean;
+  confidence: "high" | "medium" | "low";
+  resetTimeIso: string | null;
+  resetInHuman: string | null; // e.g., "4h 32m"
+}
+
+export interface QuotaSummary {
+  totalAccounts: number;
+  activeAccounts: number;
+  byTier: Record<string, number>;
+  exhaustedGroups: number;
+  totalGroups: number;
+}
+
+export type QuotaActionResult =
+  | { success: true; data: { accounts: AccountQuotaInfo[]; summary: QuotaSummary } }
+  | { success: false; error: string };
+
+interface QuotaRequestOptions {
+  forceRefresh?: boolean;
+}
+
+const ANTIGRAVITY_QUOTA_CACHE_PREFIX = "opendum:quota:antigravity";
+const ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS = 45;
+
+function getAntigravityQuotaCacheKey(userId: string): string {
+  return `${ANTIGRAVITY_QUOTA_CACHE_PREFIX}:${userId}`;
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+/**
+ * Format time remaining until reset in human-readable format
+ */
+function formatTimeUntilReset(resetTimestamp: number | null): string | null {
+  if (!resetTimestamp) return null;
+  
+  const now = Date.now();
+  const diff = resetTimestamp - now;
+  
+  if (diff <= 0) return "resetting...";
+  
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+  }
+  
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  
+  return `${minutes}m`;
+}
+
+/**
+ * Convert QuotaGroupInfo to display format
+ */
+function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
+  const usedRequests = group.maxRequests - group.remainingRequests;
+  const percentUsed = group.maxRequests > 0 
+    ? Math.round((usedRequests / group.maxRequests) * 100) 
+    : 0;
+
+  return {
+    name: group.name,
+    displayName: group.displayName,
+    models: group.models,
+    remainingFraction: group.remainingFraction,
+    remainingRequests: group.remainingRequests,
+    maxRequests: group.maxRequests,
+    usedRequests,
+    percentUsed,
+    isExhausted: group.remainingFraction <= 0,
+    isEstimated: false,
+    confidence: "high",
+    resetTimeIso: group.resetTimeIso,
+    resetInHuman: formatTimeUntilReset(group.resetTimestamp),
+  };
+}
+
+// =============================================================================
+// SERVER ACTIONS
+// =============================================================================
+
+/**
+ * Get Antigravity quota for all user's accounts
+ */
+export async function getAntigravityQuota(
+  options: QuotaRequestOptions = {}
+): Promise<QuotaActionResult> {
+  const session = await getSession();
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const cacheKey = getAntigravityQuotaCacheKey(session.user.id);
+  if (!options.forceRefresh) {
+    const cachedResult = await getRedisJson<QuotaActionResult>(cacheKey);
+    if (cachedResult?.success) {
+      return cachedResult;
+    }
+  }
+
+  try {
+    // Get all Antigravity accounts for this user
+    const accounts = await db
+      .select({
+        id: providerAccount.id,
+        name: providerAccount.name,
+        email: providerAccount.email,
+        projectId: providerAccount.projectId,
+        tier: providerAccount.tier,
+        isActive: providerAccount.isActive,
+        accessToken: providerAccount.accessToken,
+        refreshToken: providerAccount.refreshToken,
+        expiresAt: providerAccount.expiresAt,
+        lastUsedAt: providerAccount.lastUsedAt,
+      })
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.userId, session.user.id),
+          eq(providerAccount.provider, "antigravity")
+        )
+      )
+      .orderBy(desc(providerAccount.lastUsedAt));
+
+    if (accounts.length === 0) {
+      const emptyResult: QuotaActionResult = {
+        success: true,
+        data: {
+          accounts: [],
+          summary: {
+            totalAccounts: 0,
+            activeAccounts: 0,
+            byTier: {},
+            exhaustedGroups: 0,
+            totalGroups: 0,
+          },
+        },
+      };
+
+      await setRedisJson(cacheKey, emptyResult, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+      return emptyResult;
+    }
+
+    const results: AccountQuotaInfo[] = [];
+    let exhaustedGroups = 0;
+    let totalGroups = 0;
+    const byTier: Record<string, number> = {};
+
+    for (const account of accounts) {
+      // Count by tier
+      const tier = account.tier ?? "free";
+      byTier[tier] = (byTier[tier] ?? 0) + 1;
+
+      // Get valid access token
+      // Only refresh if token is ACTUALLY expired (no buffer, for quota monitor)
+      let accessToken: string;
+      const isActuallyExpired = account.expiresAt && new Date(account.expiresAt) < new Date();
+
+      if (isActuallyExpired) {
+        // Token expired - try to refresh
+        try {
+          accessToken = await antigravityProvider.getValidCredentials(
+            account as unknown as ProviderAccount
+          );
+        } catch {
+          // Refresh failed - token is truly dead
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "expired",
+            error: "Token expired - please re-authenticate",
+            groups: [],
+            fetchedAt: Date.now(),
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
+      } else {
+        // Token still valid - just decrypt (fast path)
+        try {
+          accessToken = decrypt(account.accessToken);
+        } catch {
+          results.push({
+            accountId: account.id,
+            accountName: account.name,
+            email: account.email,
+            tier,
+            isActive: account.isActive,
+            status: "error",
+            error: "Failed to decrypt credentials",
+            groups: [],
+            fetchedAt: Date.now(),
+            lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+          });
+          continue;
+        }
+      }
+
+      // Fetch quota from API
+      const quotaResult = await fetchQuotaFromApi(
+        accessToken,
+        account.projectId ?? "",
+        tier
+      );
+
+      if (quotaResult.status === "error") {
+        results.push({
+          accountId: account.id,
+          accountName: account.name,
+          email: account.email,
+          tier,
+          isActive: account.isActive,
+          status: "error",
+          error: quotaResult.error,
+          groups: [],
+          fetchedAt: quotaResult.fetchedAt,
+          lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+        });
+        continue;
+      }
+
+      // Convert to display format
+      const groups = quotaResult.groups.map((g) => toQuotaGroupDisplay(g));
+
+      // Count exhausted groups
+      for (const group of groups) {
+        totalGroups++;
+        if (group.isExhausted) {
+          exhaustedGroups++;
+        }
+      }
+
+      results.push({
+        accountId: account.id,
+        accountName: account.name,
+        email: account.email,
+        tier,
+        isActive: account.isActive,
+        status: "success",
+        groups,
+        fetchedAt: quotaResult.fetchedAt,
+        lastUsedAt: account.lastUsedAt?.getTime() ?? null,
+      });
+    }
+
+    const activeAccountCount = results.filter((account) => account.isActive).length;
+
+    const result: QuotaActionResult = {
+      success: true,
+      data: {
+        accounts: results,
+        summary: {
+          totalAccounts: results.length,
+          activeAccounts: activeAccountCount,
+          byTier,
+          exhaustedGroups,
+          totalGroups,
+        },
+      },
+    };
+
+    await setRedisJson(cacheKey, result, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch quota data",
+    };
+  }
+}
