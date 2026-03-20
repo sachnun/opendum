@@ -36,7 +36,6 @@ export const QWEN_CODE_MODEL_MAP: Record<string, string> = {
   "qwen3-coder-plus": "qwen3-coder-plus",
   "qwen3-coder-flash": "qwen3-coder-flash",
   "qwen3.5": "qwen3.5",
-  "qwen3-max-2026-01-23": "qwen3-max-2026-01-23",
 };
 
 // Available Qwen Code models
