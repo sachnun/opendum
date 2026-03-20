@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "pnpm --filter @opendum/shared build && next build",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../../packages/shared/",
   "crons": [
     {
       "path": "/api/cron/refresh-tokens",
