@@ -3,20 +3,11 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { headers } from "next/headers";
+
+const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL;
 
 export default async function UsagePage() {
-  const headersList = await headers();
-  const forwardedHost = headersList.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || headersList.get("host") || "localhost:3000";
-  const forwardedProto = headersList.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const protocol =
-    forwardedProto === "http" || forwardedProto === "https"
-      ? forwardedProto
-      : host.includes("localhost")
-        ? "http"
-        : "https";
-  const baseUrl = `${protocol}://${host}`;
+  const baseUrl = PROXY_URL ? PROXY_URL.replace(/\/$/, "") : "http://localhost:4000";
 
   return (
     <div className="space-y-6">
@@ -86,14 +77,14 @@ export default async function UsagePage() {
       <Card className="bg-card">
         <CardHeader>
           <CardTitle>Compatibility reference</CardTitle>
-          <CardDescription>Use the same base URL and pick the endpoint style you need.</CardDescription>
+          <CardDescription>All requests go to the proxy. Pick the endpoint style you need.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
             <Badge variant="outline">OpenAI-compatible</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST /v1/chat/completions</code>
+              <code className="text-sm">POST {baseUrl}/v1/chat/completions</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth header</p>
@@ -105,7 +96,7 @@ export default async function UsagePage() {
             <Badge variant="outline">Anthropic</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST /v1/messages</code>
+              <code className="text-sm">POST {baseUrl}/v1/messages</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth headers</p>
@@ -120,7 +111,7 @@ export default async function UsagePage() {
             <Badge variant="outline">OpenAI Responses</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST /v1/responses</code>
+              <code className="text-sm">POST {baseUrl}/v1/responses</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth header</p>
