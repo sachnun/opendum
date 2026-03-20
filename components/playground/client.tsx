@@ -1603,6 +1603,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId }: P
       });
 
       waitMs = Date.now() - requestStartedAt;
+      const usedAccountId = response.headers.get("x-provider-account-id") || null;
 
       if (!response.ok) {
         const clonedResponse = response.clone();
@@ -1650,6 +1651,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId }: P
               reasoning: streamedReasoning,
               isLoading: true,
               metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
+              usedAccountId,
             },
           }));
         };
@@ -1669,6 +1671,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId }: P
             reasoning: streamedReasoning,
             isLoading: false,
             metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
+            usedAccountId,
           },
         }));
 
@@ -1694,6 +1697,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId }: P
           reasoning: parsedData.reasoning,
           isLoading: false,
           metrics: buildResponseMetrics(waitMs, firstResponseMs, parsedData.usage),
+          usedAccountId,
         },
       }));
     } catch (error) {
