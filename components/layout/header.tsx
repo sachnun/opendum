@@ -17,7 +17,7 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "@/lib/navigation";
-import { getAllModels, getProvidersForModel, resolveModelAlias } from "@/lib/proxy/models";
+import { MODEL_REGISTRY, getAllModels, getProvidersForModel, resolveModelAlias } from "@/lib/proxy/models";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -63,6 +63,7 @@ export function Header({
     .map((id) => ({
       id,
       providers: getProvidersForModel(id).map((provider) => PROVIDER_LABELS[provider] ?? provider),
+      meta: MODEL_REGISTRY[id]?.meta,
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
 
