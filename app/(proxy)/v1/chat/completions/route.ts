@@ -586,6 +586,7 @@ export async function POST(request: NextRequest) {
               "Cache-Control": "no-cache",
               Connection: "keep-alive",
               "X-Accel-Buffering": "no",
+              "X-Provider-Account-Id": account.id,
             },
           });
         }
@@ -608,7 +609,9 @@ export async function POST(request: NextRequest) {
           provider: account.provider,
         });
 
-        return NextResponse.json(responseData);
+        return NextResponse.json(responseData, {
+          headers: { "X-Provider-Account-Id": account.id },
+        });
       } catch (error) {
         const errorMessage = getErrorMessage(error);
         const statusCode = getErrorStatusCode(error);

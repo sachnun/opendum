@@ -56,6 +56,7 @@ export interface ResponseData {
   isLoading: boolean;
   error?: string;
   metrics?: ResponseMetrics;
+  usedAccountId?: string | null;
 }
 
 interface ChatPanelProps {
@@ -169,6 +170,9 @@ export function ChatPanel({
 
   const selectedModelData = models.find((m) => m.id === selectedModel);
   const selectedAccountData = accountOptions.find((account) => account.id === selectedAccountId);
+  const usedAccountData = response?.usedAccountId
+    ? accountOptions.find((account) => account.id === response.usedAccountId) ?? null
+    : null;
   const pendingModelData = models.find((model) => model.id === pendingModelId) ?? null;
   const pendingModelAccounts = pendingModelData
     ? accountOptions.filter((account) =>
@@ -176,10 +180,13 @@ export function ChatPanel({
       )
     : [];
 
+  const isAutoMode = selectedModelData && !selectedAccountId;
   const selectedRouteLabel = selectedAccountData
     ? `${getAccountLabel(selectedAccountData)} (${formatProviderName(selectedAccountData.provider)})`
-    : selectedModelData
-      ? "Auto (load balancer)"
+    : isAutoMode
+      ? usedAccountData
+        ? `Auto (${getAccountLabel(usedAccountData)} — ${formatProviderName(usedAccountData.provider)})`
+        : "Auto (load balancer)"
       : "-";
 
   const handlePopoverOpenChange = (nextOpen: boolean) => {
@@ -295,7 +302,9 @@ export function ChatPanel({
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                       {selectedAccountData
                         ? formatProviderName(selectedAccountData.provider)
-                        : "Auto"}
+                        : usedAccountData
+                          ? `Auto · ${formatProviderName(usedAccountData.provider)}`
+                          : "Auto"}
                     </Badge>
                   </div>
                 ) : (
