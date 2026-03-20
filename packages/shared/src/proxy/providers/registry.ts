@@ -22,70 +22,70 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
   switch (name) {
     case ProviderName.IFLOW:
       if (!iflowProvider) {
-        const { iflowProvider: provider } = await import("./iflow");
+        const { iflowProvider: provider } = await import("./iflow/index.js");
         iflowProvider = provider;
       }
       return iflowProvider;
 
     case ProviderName.ANTIGRAVITY:
       if (!antigravityProvider) {
-        const { antigravityProvider: provider } = await import("./antigravity");
+        const { antigravityProvider: provider } = await import("./antigravity/index.js");
         antigravityProvider = provider;
       }
       return antigravityProvider;
 
     case ProviderName.COPILOT:
       if (!copilotProvider) {
-        const { copilotProvider: provider } = await import("./copilot");
+        const { copilotProvider: provider } = await import("./copilot/index.js");
         copilotProvider = provider;
       }
       return copilotProvider;
 
     case ProviderName.QWEN_CODE:
       if (!qwenCodeProvider) {
-        const { qwenCodeProvider: provider } = await import("./qwen-code");
+        const { qwenCodeProvider: provider } = await import("./qwen-code/index.js");
         qwenCodeProvider = provider;
       }
       return qwenCodeProvider;
 
     case ProviderName.GEMINI_CLI:
       if (!geminiCliProvider) {
-        const { geminiCliProvider: provider } = await import("./gemini-cli");
+        const { geminiCliProvider: provider } = await import("./gemini-cli/index.js");
         geminiCliProvider = provider;
       }
       return geminiCliProvider;
 
     case ProviderName.CODEX:
       if (!codexProvider) {
-        const { codexProvider: provider } = await import("./codex");
+        const { codexProvider: provider } = await import("./codex/index.js");
         codexProvider = provider;
       }
       return codexProvider;
 
     case ProviderName.KIRO:
       if (!kiroProvider) {
-        const { kiroProvider: provider } = await import("./kiro");
+        const { kiroProvider: provider } = await import("./kiro/index.js");
         kiroProvider = provider;
       }
       return kiroProvider;
 
     case ProviderName.NVIDIA_NIM:
       if (!nvidiaNimProvider) {
-        const { nvidiaNimProvider: provider } = await import("./nvidia-nim");
+        const { nvidiaNimProvider: provider } = await import("./nvidia-nim/index.js");
         nvidiaNimProvider = provider;
       }
       return nvidiaNimProvider;
 
     case ProviderName.OLLAMA_CLOUD:
       if (!ollamaCloudProvider) {
-        const { ollamaCloudProvider: provider } = await import("./ollama-cloud");
+        const { ollamaCloudProvider: provider } = await import("./ollama-cloud/index.js");
         ollamaCloudProvider = provider;
       }
       return ollamaCloudProvider;
 
     case ProviderName.OPENROUTER:
       if (!openRouterProvider) {
-        const { openRouterProvider: provider } = await import("./openrouter");
+        const { openRouterProvider: provider } = await import("./openrouter/index.js");
         openRouterProvider = provider;
       }
       return openRouterProvider;
