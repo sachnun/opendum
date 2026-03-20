@@ -23,6 +23,7 @@ import { MODEL_FAMILY_SORT_ORDER, getModelFamily } from "@/lib/model-families";
 interface PlaygroundClientProps {
   models: ModelOption[];
   providerAccounts: ProviderAccountOption[];
+  initialModelId?: string;
 }
 
 interface PanelState {
@@ -1300,14 +1301,20 @@ async function consumeResponsesStream(
   }
 }
 
-export function PlaygroundClient({ models, providerAccounts }: PlaygroundClientProps) {
-  const [panels, setPanels] = React.useState<PanelState[]>(() => [
-    {
-      id: generateId(),
-      modelId: null,
-      accountId: null,
-    },
-  ]);
+export function PlaygroundClient({ models, providerAccounts, initialModelId }: PlaygroundClientProps) {
+  const [panels, setPanels] = React.useState<PanelState[]>(() => {
+    const validInitialModel = initialModelId && models.some((m) => m.id === initialModelId)
+      ? initialModelId
+      : null;
+
+    return [
+      {
+        id: generateId(),
+        modelId: validInitialModel,
+        accountId: null,
+      },
+    ];
+  });
 
   const [selectedScenario, setSelectedScenario] = React.useState<Scenario | null>(null);
   const [settings, setSettings] = React.useState<PlaygroundSettings>(DEFAULT_SETTINGS);

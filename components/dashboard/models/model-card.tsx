@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3 } from "lucide-react";
+import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3, Play } from "lucide-react";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import type { ModelMeta } from "@/lib/proxy/models";
 
@@ -122,6 +123,18 @@ export function ModelCard({
             >
               {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               {copied ? "Copied" : "Copy ID"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-6 px-2 text-[11px]"
+              asChild
+              title="Try in Playground"
+            >
+              <Link href={`/dashboard/playground?model=${encodeURIComponent(id)}`}>
+                <Play className="h-3 w-3" />
+                Playground
+              </Link>
             </Button>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-muted-foreground">

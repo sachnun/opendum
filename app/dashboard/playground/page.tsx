@@ -46,12 +46,18 @@ function getProviderAccounts(accounts: Array<{
   }));
 }
 
-export default async function PlaygroundPage() {
+export default async function PlaygroundPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ model?: string }>;
+}) {
   const session = await getSession();
 
   if (!session?.user?.id) {
     return null;
   }
+
+  const { model: initialModelId } = await searchParams;
 
   const disabledModels = await db
     .select({ model: disabledModel.model })
@@ -82,6 +88,7 @@ export default async function PlaygroundPage() {
     <PlaygroundClient
       models={models}
       providerAccounts={getProviderAccounts(providerAccounts)}
+      initialModelId={initialModelId}
     />
   );
 }
