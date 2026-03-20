@@ -1,0 +1,5 @@
+[opendum]
+providers = ["openrouter"]
+
+[opendum.upstream]
+openrouter = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"

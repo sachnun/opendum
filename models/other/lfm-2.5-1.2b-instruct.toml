@@ -1,0 +1,5 @@
+[opendum]
+providers = ["openrouter"]
+
+[opendum.upstream]
+openrouter = "liquid/lfm-2.5-1.2b-instruct:free"

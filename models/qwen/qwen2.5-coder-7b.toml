@@ -1,7 +1,6 @@
-
 [limit]
 context = 128_000
-output = 4096
+output = 4_096
 
 [modalities]
 input = ["text"]
@@ -12,3 +11,6 @@ family = "Qwen"
 providers = ["nvidia_nim"]
 aliases = ["qwen-qwen2.5-coder-7b-instruct", "qwen/qwen2.5-coder-7b-instruct"]
 ignored = true
+
+[opendum.upstream]
+nvidia_nim = "qwen/qwen2.5-coder-7b-instruct"

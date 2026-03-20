@@ -15,3 +15,6 @@ output = 262_144
 [opendum]
 family = "Kimi"
 providers = ["iflow", "nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "moonshotai/kimi-k2-instruct-0905"

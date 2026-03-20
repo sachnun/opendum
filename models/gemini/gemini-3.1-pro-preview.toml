@@ -16,3 +16,6 @@ output = 65_536
 family = "Gemini"
 providers = ["antigravity"]
 aliases = ["gemini-3.1-pro", "gemini-3.1-pro-high", "gemini-3.1-pro-low"]
+
+[opendum.upstream]
+antigravity = "gemini-3.1-pro-high"

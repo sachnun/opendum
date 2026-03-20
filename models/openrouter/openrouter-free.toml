@@ -12,3 +12,6 @@ context = 200_000
 [opendum]
 providers = ["openrouter"]
 description = "OpenRouter router that automatically selects a compatible free model."
+
+[opendum.upstream]
+openrouter = "openrouter/free"

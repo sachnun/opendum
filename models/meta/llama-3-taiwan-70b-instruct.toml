@@ -1,2 +1,5 @@
 [opendum]
-providers = ["nvidia-nim"]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "yentinglin/llama-3-taiwan-70b-instruct"

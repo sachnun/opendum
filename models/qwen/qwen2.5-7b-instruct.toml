@@ -1,6 +1,8 @@
-
 [opendum]
 family = "Qwen"
 providers = ["nvidia_nim"]
 aliases = ["qwen-qwen2.5-7b-instruct", "qwen/qwen2.5-7b-instruct"]
 ignored = true
+
+[opendum.upstream]
+nvidia_nim = "qwen/qwen2.5-7b-instruct"

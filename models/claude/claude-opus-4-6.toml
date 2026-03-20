@@ -14,5 +14,9 @@ output = 128_000
 
 [opendum]
 family = "Claude"
-providers = ["antigravity", "kiro", "copilot"]
+providers = ["antigravity", "copilot", "kiro"]
 aliases = ["claude-opus-4.6", "claude-opus4.6"]
+
+[opendum.upstream]
+copilot = "claude-opus-4.6"
+kiro = "claude-opus-4.6"

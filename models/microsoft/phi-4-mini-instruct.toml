@@ -1,12 +1,14 @@
-
 [limit]
 context = 131_072
-output = 8192
+output = 8_192
 
 [modalities]
-input = ["text", "image", "audio"]
+input = ["text","image","audio"]
 output = ["text"]
 
 [opendum]
 providers = ["nvidia_nim"]
 aliases = ["microsoft-phi-4-mini-instruct", "microsoft/phi-4-mini-instruct"]
+
+[opendum.upstream]
+nvidia_nim = "microsoft/phi-4-mini-instruct"

@@ -1,2 +1,5 @@
 [opendum]
-providers = ["ollama-cloud"]
+providers = ["ollama_cloud"]
+
+[opendum.upstream]
+ollama_cloud = "qwen3.5:397b"

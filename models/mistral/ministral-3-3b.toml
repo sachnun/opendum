@@ -10,3 +10,6 @@ output = 128_000
 [opendum]
 providers = ["ollama_cloud"]
 ignored = true
+
+[opendum.upstream]
+ollama_cloud = "ministral-3:3b"

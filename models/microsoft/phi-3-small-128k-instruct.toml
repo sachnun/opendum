@@ -1,13 +1,15 @@
-
 [limit]
 context = 128_000
-output = 4096
+output = 4_096
 
 [modalities]
-input = ["text", "image"]
+input = ["text","image"]
 output = ["text"]
 
 [opendum]
 providers = ["nvidia_nim"]
 aliases = ["microsoft-phi-3-small-128k-instruct", "microsoft/phi-3-small-128k-instruct"]
 ignored = true
+
+[opendum.upstream]
+nvidia_nim = "microsoft/phi-3-small-128k-instruct"

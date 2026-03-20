@@ -8,5 +8,9 @@ context = 262_144
 output = 128_000
 
 [opendum]
-providers = ["ollama_cloud", "nvidia_nim"]
+providers = ["nvidia_nim", "ollama_cloud"]
 ignored = true
+
+[opendum.upstream]
+nvidia_nim = "mistralai/ministral-14b-instruct-2512"
+ollama_cloud = "ministral-3:14b"

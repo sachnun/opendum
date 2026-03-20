@@ -11,3 +11,6 @@ output = 131_072
 providers = ["ollama_cloud"]
 aliases = ["gemma-3-4b-it"]
 ignored = true
+
+[opendum.upstream]
+ollama_cloud = "gemma3:4b"

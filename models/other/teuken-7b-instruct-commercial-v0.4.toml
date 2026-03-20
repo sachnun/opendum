@@ -1,0 +1,5 @@
+[opendum]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "opengpt-x/teuken-7b-instruct-commercial-v0.4"

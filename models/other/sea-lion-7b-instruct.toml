@@ -1,0 +1,5 @@
+[opendum]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "aisingapore/sea-lion-7b-instruct"

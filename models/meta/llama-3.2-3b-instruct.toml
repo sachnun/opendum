@@ -1,2 +1,6 @@
 [opendum]
-providers = ["nvidia-nim", "openrouter"]
+providers = ["nvidia_nim", "openrouter"]
+
+[opendum.upstream]
+nvidia_nim = "meta/llama-3.2-3b-instruct"
+openrouter = "meta-llama/llama-3.2-3b-instruct:free"

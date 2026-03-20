@@ -1,0 +1,5 @@
+[opendum]
+providers = ["openrouter"]
+
+[opendum.upstream]
+openrouter = "arcee-ai/trinity-mini:free"

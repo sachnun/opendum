@@ -1,2 +1,5 @@
 [opendum]
 providers = ["openrouter"]
+
+[opendum.upstream]
+openrouter = "z-ai/glm-4.5-air:free"

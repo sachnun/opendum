@@ -1,7 +1,6 @@
-
 [limit]
 context = 128_000
-output = 4096
+output = 4_096
 
 [modalities]
 input = ["text"]
@@ -11,3 +10,6 @@ output = ["text"]
 providers = ["nvidia_nim"]
 aliases = ["mistralai-mamba-codestral-7b-v0.1", "mistralai/mamba-codestral-7b-v0.1"]
 ignored = true
+
+[opendum.upstream]
+nvidia_nim = "mistralai/mamba-codestral-7b-v0.1"

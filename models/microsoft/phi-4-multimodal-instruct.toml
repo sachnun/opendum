@@ -1,2 +1,5 @@
 [opendum]
-providers = ["nvidia-nim"]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "microsoft/phi-4-multimodal-instruct"

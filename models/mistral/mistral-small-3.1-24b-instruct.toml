@@ -1,2 +1,5 @@
 [opendum]
 providers = ["openrouter"]
+
+[opendum.upstream]
+openrouter = "mistralai/mistral-small-3.1-24b-instruct:free"

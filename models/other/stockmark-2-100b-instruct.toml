@@ -1,0 +1,5 @@
+[opendum]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "stockmark/stockmark-2-100b-instruct"

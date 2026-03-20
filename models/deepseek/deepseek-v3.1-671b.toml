@@ -10,3 +10,6 @@ output = 163_840
 [opendum]
 family = "DeepSeek"
 providers = ["ollama_cloud"]
+
+[opendum.upstream]
+ollama_cloud = "deepseek-v3.1:671b"

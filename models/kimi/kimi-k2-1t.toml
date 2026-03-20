@@ -11,3 +11,6 @@ output = 262_144
 [opendum]
 family = "Kimi"
 providers = ["ollama_cloud"]
+
+[opendum.upstream]
+ollama_cloud = "kimi-k2:1t"

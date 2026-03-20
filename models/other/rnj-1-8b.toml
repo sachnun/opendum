@@ -5,8 +5,11 @@ attachment = false
 
 [limit]
 context = 32_768
-output = 4096
+output = 4_096
 
 [opendum]
 providers = ["ollama_cloud"]
 ignored = true
+
+[opendum.upstream]
+ollama_cloud = "rnj-1:8b"

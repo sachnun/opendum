@@ -1,0 +1,5 @@
+[opendum]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "ibm/granite-8b-code-instruct"

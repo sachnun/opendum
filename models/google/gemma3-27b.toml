@@ -8,4 +8,8 @@ context = 131_072
 output = 131_072
 
 [opendum]
-providers = ["ollama_cloud", "nvidia_nim"]
+providers = ["nvidia_nim", "ollama_cloud"]
+
+[opendum.upstream]
+nvidia_nim = "google/gemma-3-27b-it"
+ollama_cloud = "gemma3:27b"

@@ -1,4 +1,3 @@
-
 [limit]
 context = 131_072
 output = 131_072
@@ -8,6 +7,10 @@ input = ["text"]
 output = ["text"]
 
 [opendum]
-providers = ["nvidia_nim"]
+providers = ["nvidia_nim", "openrouter"]
 aliases = ["nvidia-nvidia-nemotron-nano-9b-v2", "nvidia-nemotron-nano-9b-v2", "nvidia/nvidia-nemotron-nano-9b-v2"]
 ignored = true
+
+[opendum.upstream]
+nvidia_nim = "nvidia/nvidia-nemotron-nano-9b-v2"
+openrouter = "nvidia/nemotron-nano-9b-v2:free"

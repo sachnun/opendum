@@ -10,3 +10,6 @@ output = 32_000
 [opendum]
 providers = ["ollama_cloud"]
 ignored = true
+
+[opendum.upstream]
+ollama_cloud = "cogito-2.1:671b"

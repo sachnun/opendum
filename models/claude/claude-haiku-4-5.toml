@@ -1,5 +1,8 @@
-
 [opendum]
 family = "Claude"
-providers = ["kiro", "copilot"]
+providers = ["copilot", "kiro"]
 aliases = ["claude-haiku-4.5", "claude-haiku4.5"]
+
+[opendum.upstream]
+copilot = "claude-haiku-4.5"
+kiro = "claude-haiku-4.5"

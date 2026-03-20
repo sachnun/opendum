@@ -14,5 +14,8 @@ output = 65_536
 
 [opendum]
 family = "Gemini"
-providers = ["antigravity", "gemini_cli", "ollama_cloud", "copilot"]
+providers = ["antigravity", "copilot", "gemini_cli", "ollama_cloud"]
 aliases = ["gemini-3-flash", "gemini-3-flash-preview-latest"]
+
+[opendum.upstream]
+antigravity = "gemini-3-flash"

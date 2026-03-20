@@ -8,4 +8,8 @@ context = 1_048_576
 output = 131_072
 
 [opendum]
-providers = ["ollama_cloud", "nvidia_nim"]
+providers = ["nvidia_nim", "ollama_cloud"]
+
+[opendum.upstream]
+nvidia_nim = "nvidia/nemotron-3-nano-30b-a3b"
+ollama_cloud = "nemotron-3-nano:30b"

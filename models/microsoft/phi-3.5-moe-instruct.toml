@@ -1,7 +1,6 @@
-
 [limit]
 context = 128_000
-output = 4096
+output = 4_096
 
 [modalities]
 input = ["text"]
@@ -11,3 +10,6 @@ output = ["text"]
 providers = ["nvidia_nim"]
 aliases = ["microsoft-phi-3.5-moe-instruct", "microsoft/phi-3.5-moe-instruct"]
 ignored = true
+
+[opendum.upstream]
+nvidia_nim = "microsoft/phi-3.5-moe-instruct"

@@ -1,4 +1,7 @@
-
 [opendum]
 family = "MiniMax"
-providers = ["iflow", "ollama_cloud"]
+providers = ["iflow", "nvidia_nim", "ollama_cloud", "openrouter"]
+
+[opendum.upstream]
+nvidia_nim = "minimaxai/minimax-m2.5"
+openrouter = "minimax/minimax-m2.5:free"

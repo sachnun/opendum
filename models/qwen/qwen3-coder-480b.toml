@@ -9,4 +9,8 @@ output = 65_536
 
 [opendum]
 family = "Qwen"
-providers = ["ollama_cloud", "nvidia_nim"]
+providers = ["nvidia_nim", "ollama_cloud"]
+
+[opendum.upstream]
+nvidia_nim = "qwen/qwen3-coder-480b-a35b-instruct"
+ollama_cloud = "qwen3-coder:480b"

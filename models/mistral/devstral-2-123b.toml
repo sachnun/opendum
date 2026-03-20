@@ -8,4 +8,8 @@ context = 262_144
 output = 262_144
 
 [opendum]
-providers = ["ollama_cloud", "nvidia_nim"]
+providers = ["nvidia_nim", "ollama_cloud"]
+
+[opendum.upstream]
+nvidia_nim = "mistralai/devstral-2-123b-instruct-2512"
+ollama_cloud = "devstral-2:123b"

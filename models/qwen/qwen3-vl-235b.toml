@@ -10,3 +10,6 @@ output = 32_768
 [opendum]
 family = "Qwen"
 providers = ["ollama_cloud"]
+
+[opendum.upstream]
+ollama_cloud = "qwen3-vl:235b"

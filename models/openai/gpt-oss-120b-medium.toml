@@ -13,5 +13,9 @@ output = 32_768
 
 [opendum]
 family = "OpenAI"
-providers = ["antigravity", "ollama_cloud", "nvidia_nim"]
+providers = ["antigravity", "nvidia_nim", "ollama_cloud"]
 aliases = ["gpt-oss-120b"]
+
+[opendum.upstream]
+nvidia_nim = "openai/gpt-oss-120b"
+ollama_cloud = "gpt-oss:120b"

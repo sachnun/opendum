@@ -1,0 +1,5 @@
+[opendum]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "nvidia/cosmos-reason2-8b"

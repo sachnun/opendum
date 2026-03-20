@@ -1,7 +1,6 @@
-
 [limit]
 context = 128_000
-output = 8192
+output = 8_192
 
 [modalities]
 input = ["text"]
@@ -11,3 +10,6 @@ output = ["text"]
 family = "DeepSeek"
 providers = ["nvidia_nim"]
 aliases = ["deepseek-ai-deepseek-v3.1-terminus", "deepseek-ai/deepseek-v3.1-terminus"]
+
+[opendum.upstream]
+nvidia_nim = "deepseek-ai/deepseek-v3.1-terminus"

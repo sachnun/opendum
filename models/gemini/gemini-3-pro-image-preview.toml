@@ -16,3 +16,6 @@ output = 64_000
 family = "Gemini"
 providers = ["antigravity"]
 aliases = ["gemini-3-pro-image"]
+
+[opendum.upstream]
+antigravity = "gemini-3-pro-image"

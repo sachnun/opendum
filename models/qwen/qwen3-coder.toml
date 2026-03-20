@@ -1,2 +1,5 @@
 [opendum]
 providers = ["openrouter"]
+
+[opendum.upstream]
+openrouter = "qwen/qwen3-coder:free"

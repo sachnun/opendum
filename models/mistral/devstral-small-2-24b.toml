@@ -10,3 +10,6 @@ output = 262_144
 [opendum]
 providers = ["ollama_cloud"]
 ignored = true
+
+[opendum.upstream]
+ollama_cloud = "devstral-small-2:24b"

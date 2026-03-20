@@ -1,2 +1,5 @@
 [opendum]
-providers = ["nvidia-nim"]
+providers = ["nvidia_nim"]
+
+[opendum.upstream]
+nvidia_nim = "nvidia/nemotron-4-mini-hindi-4b-instruct"
