@@ -12,7 +12,7 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/proxy/package.json apps/proxy/
 
 # Install all dependencies
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY packages/shared/ packages/shared/
