@@ -1,4 +1,4 @@
-import { getRedisClient } from "@/lib/redis";
+import { getRedisClient } from "@opendum/shared/redis";
 
 interface RateLimitEntry {
   resetTime: number; // Unix timestamp (ms) when rate limit expires

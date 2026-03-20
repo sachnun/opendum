@@ -1,9 +1,9 @@
-import { db } from "@/lib/db";
-import { providerAccount, providerAccountErrorHistory } from "@/lib/db/schema";
+import { db } from "@opendum/shared/db";
+import { providerAccount, providerAccountErrorHistory } from "@opendum/shared/db/schema";
 import { eq, and, inArray, notInArray, asc, desc, sql } from "drizzle-orm";
-import type { ProviderAccount } from "@/lib/db/schema";
-import { getProvidersForModel } from "./models";
-import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit";
+import type { ProviderAccount } from "@opendum/shared/db/schema";
+import { getProvidersForModel } from "@opendum/shared/proxy/models";
+import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit.js";
 
 const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 const MAX_STORED_ERROR_MESSAGE_LENGTH = 10000;

@@ -1,0 +1,24 @@
+{
+  "name": "@opendum/proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opendum/shared": "workspace:*",
+    "fastify": "^5.3.3",
+    "@fastify/cors": "^11.0.1",
+    "drizzle-orm": "^0.45.1",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}
