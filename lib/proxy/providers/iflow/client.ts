@@ -23,9 +23,9 @@ import {
   IFLOW_CLIENT_SECRET,
   IFLOW_REDIRECT_URI,
   IFLOW_SUPPORTED_PARAMS,
-  IFLOW_MODELS,
   IFLOW_REFRESH_BUFFER_SECONDS,
 } from "./constants";
+import { getProviderModelSet } from "../../models";
 
 import type { ReasoningConfig } from "../types";
 import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
@@ -281,7 +281,7 @@ function buildRequestPayload(
 export const iflowConfig: ProviderConfig = {
   name: "iflow",
   displayName: "Iflow AI",
-  supportedModels: IFLOW_MODELS,
+  supportedModels: getProviderModelSet("iflow"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

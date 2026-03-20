@@ -15,14 +15,13 @@ import {
   KIRO_API_BASE_URL,
   KIRO_BROWSER_REDIRECT_URI,
   KIRO_DEFAULT_MODEL,
-  KIRO_MODEL_MAP,
-  KIRO_MODELS,
   KIRO_OAUTH_AUTHORIZE_ENDPOINT,
   KIRO_OAUTH_IDP,
   KIRO_OAUTH_REFRESH_ENDPOINT,
   KIRO_OAUTH_TOKEN_ENDPOINT,
   KIRO_REFRESH_BUFFER_SECONDS,
 } from "./constants";
+import { getUpstreamModelName, getProviderModelSet } from "../../models";
 
 interface KiroTokenExchangeResponse {
   accessToken: string;
@@ -71,7 +70,12 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 
 function normalizeModel(model: string): string {
   const rawModel = model.includes("/") ? model.split("/").pop() || model : model;
-  return KIRO_MODEL_MAP[rawModel] || KIRO_MODEL_MAP[KIRO_DEFAULT_MODEL] || rawModel;
+  const upstream = getUpstreamModelName(rawModel, "kiro");
+  // If model was not found in TOML, fall back to default model's upstream name
+  if (upstream === rawModel && !getProviderModelSet("kiro").has(rawModel)) {
+    return getUpstreamModelName(KIRO_DEFAULT_MODEL, "kiro");
+  }
+  return upstream;
 }
 
 function contentToText(
@@ -433,7 +437,7 @@ function convertKiroEventsToCompletion(events: Array<JsonObject>, model: string)
 export const kiroConfig: ProviderConfig = {
   name: "kiro",
   displayName: "Kiro",
-  supportedModels: KIRO_MODELS,
+  supportedModels: getProviderModelSet("kiro"),
   timeouts: { streamMs: 5_000, nonStreamMs: 5_000 },
 };
 

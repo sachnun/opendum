@@ -1,16 +1,3 @@
-import { ProviderName } from "./providers/types";
-import {
-  NVIDIA_NIM_MODEL_MAP,
-  NVIDIA_NIM_MODELS,
-} from "./providers/nvidia-nim/constants";
-import {
-  OLLAMA_CLOUD_MODEL_MAP,
-  OLLAMA_CLOUD_MODELS,
-} from "./providers/ollama-cloud/constants";
-import {
-  OPENROUTER_MODEL_MAP,
-  OPENROUTER_MODELS,
-} from "./providers/openrouter/constants";
 import {
   MODEL_REGISTRY,
   IGNORED_MODELS,
@@ -35,28 +22,8 @@ function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Provider support index — tracks which providers offer each model
+// Effective registry — all non-ignored models
 // ---------------------------------------------------------------------------
-
-const PROVIDER_SUPPORT_INDEX = new Map<string, Set<string>>();
-
-function addProviderSupport(model: string, provider: string): void {
-  const providers = PROVIDER_SUPPORT_INDEX.get(model) ?? new Set<string>();
-  providers.add(provider);
-  PROVIDER_SUPPORT_INDEX.set(model, providers);
-}
-
-for (const model of Object.keys(NVIDIA_NIM_MODEL_MAP)) {
-  addProviderSupport(model, ProviderName.NVIDIA_NIM);
-}
-
-for (const model of Object.keys(OLLAMA_CLOUD_MODEL_MAP)) {
-  addProviderSupport(model, ProviderName.OLLAMA_CLOUD);
-}
-
-for (const model of Object.keys(OPENROUTER_MODEL_MAP)) {
-  addProviderSupport(model, ProviderName.OPENROUTER);
-}
 
 const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = { ...MODEL_REGISTRY };
 
@@ -65,52 +32,34 @@ for (const model of IGNORED_MODELS) {
   delete EFFECTIVE_MODEL_REGISTRY[model];
 }
 
-// Build reverse lookup for aliases
+// ---------------------------------------------------------------------------
+// Alias lookup — built entirely from TOML data
+// ---------------------------------------------------------------------------
+
 const aliasToCanonical: Record<string, string> = {};
+
 for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
+  // Register TOML-declared aliases
   if (info.aliases) {
     for (const alias of info.aliases) {
       aliasToCanonical[alias] = canonical;
     }
   }
-}
 
-function resolveKnownCanonical(model: string): string | null {
-  const canonical = aliasToCanonical[model] ?? model;
-  return EFFECTIVE_MODEL_REGISTRY[canonical] ? canonical : null;
-}
+  // Register upstream names as reverse aliases so that a response
+  // referencing an upstream name can be resolved back to canonical.
+  if (info.upstream) {
+    for (const upstreamName of Object.values(info.upstream)) {
+      if (!aliasToCanonical[upstreamName]) {
+        aliasToCanonical[upstreamName] = canonical;
+      }
 
-for (const [modelKey, upstreamModel] of Object.entries(OLLAMA_CLOUD_MODEL_MAP)) {
-  const canonical = resolveKnownCanonical(modelKey);
-  if (!canonical) {
-    continue;
-  }
-
-  if (!aliasToCanonical[upstreamModel]) {
-    aliasToCanonical[upstreamModel] = canonical;
-  }
-}
-
-for (const [modelKey, upstreamModel] of Object.entries(NVIDIA_NIM_MODEL_MAP)) {
-  const canonical = resolveKnownCanonical(modelKey);
-  if (!canonical) {
-    continue;
-  }
-
-  aliasToCanonical[upstreamModel] = canonical;
-
-  const legacyAlias = getLegacyNvidiaNimModelAlias(upstreamModel);
-  aliasToCanonical[legacyAlias] = canonical;
-}
-
-for (const [modelKey, upstreamModel] of Object.entries(OPENROUTER_MODEL_MAP)) {
-  const canonical = resolveKnownCanonical(modelKey);
-  if (!canonical) {
-    continue;
-  }
-
-  if (!aliasToCanonical[upstreamModel]) {
-    aliasToCanonical[upstreamModel] = canonical;
+      // NVIDIA NIM legacy alias (e.g. "meta-llama-3.3-70b-instruct")
+      const legacyAlias = getLegacyNvidiaNimModelAlias(upstreamName);
+      if (legacyAlias !== upstreamName && !aliasToCanonical[legacyAlias]) {
+        aliasToCanonical[legacyAlias] = canonical;
+      }
+    }
   }
 }
 
@@ -119,16 +68,67 @@ for (const [alias, canonical] of Object.entries(aliasToCanonical)) {
   if (!canonicalToAliases[canonical]) {
     canonicalToAliases[canonical] = [];
   }
-
   canonicalToAliases[canonical].push(alias);
 }
 
 for (const [canonical, aliases] of Object.entries(canonicalToAliases)) {
-  canonicalToAliases[canonical] = Array.from(new Set(aliases)).sort((a, b) => a.localeCompare(b));
+  canonicalToAliases[canonical] = Array.from(new Set(aliases)).sort((a, b) =>
+    a.localeCompare(b)
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Public API — all signatures unchanged from the previous implementation
+// Per-provider model maps — built from TOML [opendum.upstream]
+// ---------------------------------------------------------------------------
+
+/** Cached per-provider model map: canonical → upstream name. */
+const providerModelMapCache = new Map<string, Record<string, string>>();
+
+/**
+ * Build (and cache) the full model map for a provider from the TOML registry.
+ * Keys are canonical model IDs, values are upstream model names.
+ */
+export function getProviderModelMap(provider: string): Record<string, string> {
+  const cached = providerModelMapCache.get(provider);
+  if (cached) return cached;
+
+  const map: Record<string, string> = {};
+  for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
+    if (!info.providers.includes(provider)) continue;
+    map[canonical] = info.upstream?.[provider] ?? canonical;
+  }
+
+  providerModelMapCache.set(provider, map);
+  return map;
+}
+
+/** Cached per-provider model set. */
+const providerModelSetCache = new Map<string, Set<string>>();
+
+/**
+ * Get the set of canonical model IDs supported by a provider.
+ */
+export function getProviderModelSet(provider: string): Set<string> {
+  const cached = providerModelSetCache.get(provider);
+  if (cached) return cached;
+
+  const modelSet = new Set(Object.keys(getProviderModelMap(provider)));
+  providerModelSetCache.set(provider, modelSet);
+  return modelSet;
+}
+
+/**
+ * Resolve a canonical model id to the upstream name for a specific provider.
+ * Falls back to the canonical name when no upstream mapping exists.
+ */
+export function getUpstreamModelName(model: string, provider: string): string {
+  const canonical = resolveModelAlias(model);
+  const info = EFFECTIVE_MODEL_REGISTRY[canonical];
+  return info?.upstream?.[provider] ?? canonical;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
 // ---------------------------------------------------------------------------
 
 /**
@@ -157,39 +157,7 @@ export function getProvidersForModel(model: string): string[] {
     return [];
   }
 
-  const lookupKeys = getModelLookupKeys(canonical);
-  const providers = new Set<string>(info.providers);
-
-  for (const lookupKey of lookupKeys) {
-    const supportedProviders = PROVIDER_SUPPORT_INDEX.get(lookupKey);
-    if (!supportedProviders) {
-      continue;
-    }
-
-    for (const provider of supportedProviders) {
-      providers.add(provider);
-    }
-  }
-
-  if (providers.size === 0) {
-    return [];
-  }
-
-  return [...providers].filter((provider) => {
-    if (provider === ProviderName.OLLAMA_CLOUD) {
-      return lookupKeys.some((lookupKey) => OLLAMA_CLOUD_MODELS.has(lookupKey));
-    }
-
-    if (provider === ProviderName.NVIDIA_NIM) {
-      return lookupKeys.some((lookupKey) => NVIDIA_NIM_MODELS.has(lookupKey));
-    }
-
-    if (provider === ProviderName.OPENROUTER) {
-      return lookupKeys.some((lookupKey) => OPENROUTER_MODELS.has(lookupKey));
-    }
-
-    return true;
-  });
+  return [...info.providers];
 }
 
 /**
@@ -202,7 +170,10 @@ export function isModelSupported(model: string): boolean {
 /**
  * Check if a model is supported by a specific provider
  */
-export function isModelSupportedByProvider(model: string, provider: string): boolean {
+export function isModelSupportedByProvider(
+  model: string,
+  provider: string
+): boolean {
   const providers = getProvidersForModel(model);
   return providers.includes(provider);
 }
@@ -240,7 +211,7 @@ export function getAllModelsWithAliases(): string[] {
 export function getModelsForProvider(provider: string): string[] {
   const models: string[] = [];
   for (const [model, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
-    if (getProvidersForModel(model).includes(provider)) {
+    if (info.providers.includes(provider)) {
       models.push(model);
       if (info.aliases) {
         models.push(...info.aliases);

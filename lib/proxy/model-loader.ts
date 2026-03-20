@@ -40,6 +40,8 @@ export interface ModelInfo {
   aliases?: string[];
   description?: string;
   meta?: ModelMeta;
+  /** Per-provider upstream model name. When absent, the canonical id is used. */
+  upstream?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +74,7 @@ interface TomlModel {
     aliases?: string[];
     ignored?: boolean;
     description?: string;
+    upstream?: Record<string, string>;
   };
 }
 
@@ -109,6 +112,7 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
   const providers = opendum.providers ?? [];
   const aliases = opendum.aliases;
   const description = opendum.description;
+  const upstream = opendum.upstream;
 
   const hasMeta =
     raw.release_date !== undefined ||
@@ -146,6 +150,7 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
     aliases: aliases && aliases.length > 0 ? aliases : undefined,
     description,
     meta,
+    upstream: upstream && Object.keys(upstream).length > 0 ? upstream : undefined,
   };
 }
 

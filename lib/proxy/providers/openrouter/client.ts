@@ -9,11 +9,9 @@ import type {
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
 import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
-import { getModelLookupKeys } from "../../models";
+import { getUpstreamModelName, getProviderModelSet } from "../../models";
 import {
   OPENROUTER_API_BASE_URL,
-  OPENROUTER_MODELS,
-  OPENROUTER_MODEL_MAP,
   OPENROUTER_SUPPORTED_PARAMS,
 } from "./constants";
 
@@ -24,21 +22,7 @@ function resolveOpenRouterModel(model: string): string {
     ? model.split("/", 2)[1] || model
     : model;
 
-  const directMatch = OPENROUTER_MODEL_MAP[normalizedModel];
-  if (directMatch) {
-    return directMatch;
-  }
-
-  // Try all lookup keys (canonical name + aliases) to handle cases where
-  // the model map uses an alias key but the canonical name was passed in
-  for (const key of getModelLookupKeys(normalizedModel)) {
-    const match = OPENROUTER_MODEL_MAP[key];
-    if (match) {
-      return match;
-    }
-  }
-
-  return normalizedModel;
+  return getUpstreamModelName(normalizedModel, "openrouter");
 }
 
 function buildRequestPayload(
@@ -65,7 +49,7 @@ function buildRequestPayload(
 export const openRouterConfig: ProviderConfig = {
   name: "openrouter",
   displayName: "OpenRouter",
-  supportedModels: OPENROUTER_MODELS,
+  supportedModels: getProviderModelSet("openrouter"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

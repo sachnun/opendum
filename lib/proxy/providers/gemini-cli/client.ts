@@ -22,7 +22,6 @@ import {
   CODE_ASSIST_ENDPOINT,
   GEMINI_CLI_LOAD_CODE_ASSIST_ENDPOINTS,
   GEMINI_CLI_ONBOARD_USER_ENDPOINTS,
-  GEMINI_CLI_MODELS,
   GEMINI_CLI_REFRESH_BUFFER_SECONDS,
   GEMINI_CLI_AUTH_HEADERS,
   buildGeminiCliUserAgent,
@@ -37,6 +36,7 @@ import {
   createAntigravityUnwrapTransform,
 } from "../antigravity/converter";
 import { cacheSignature } from "../antigravity/cache";
+import { getProviderModelSet } from "../../models";
 
 /**
  * Generate PKCE code verifier
@@ -175,7 +175,7 @@ function getThinkingConfig(
 export const geminiCliConfig: ProviderConfig = {
   name: "gemini_cli",
   displayName: "Gemini CLI",
-  supportedModels: GEMINI_CLI_MODELS,
+  supportedModels: getProviderModelSet("gemini_cli"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

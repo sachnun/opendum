@@ -53,16 +53,14 @@ import {
 } from "@/lib/proxy/providers/kiro";
 import {
   NVIDIA_NIM_API_BASE_URL,
-  NVIDIA_NIM_MODEL_MAP,
 } from "@/lib/proxy/providers/nvidia-nim/constants";
 import {
   OLLAMA_CLOUD_API_BASE_URL,
-  OLLAMA_CLOUD_MODEL_MAP,
 } from "@/lib/proxy/providers/ollama-cloud/constants";
 import {
   OPENROUTER_API_BASE_URL,
-  OPENROUTER_MODEL_MAP,
 } from "@/lib/proxy/providers/openrouter/constants";
+import { getProviderModelMap } from "@/lib/proxy/models";
 
 export type ActionResult<T = void> = 
   | { success: true; data: T }
@@ -104,25 +102,25 @@ const API_KEY_PROVIDER_SETTINGS = {
   nvidia_nim: {
     label: "Nvidia",
     baseUrl: NVIDIA_NIM_API_BASE_URL,
-    modelMap: NVIDIA_NIM_MODEL_MAP,
+    modelMap: getProviderModelMap("nvidia_nim"),
     validationPath: "/chat/completions",
     requireSuccessfulStatus: false,
   },
   ollama_cloud: {
     label: "Ollama Cloud",
     baseUrl: OLLAMA_CLOUD_API_BASE_URL,
-    modelMap: OLLAMA_CLOUD_MODEL_MAP,
+    modelMap: getProviderModelMap("ollama_cloud"),
     validationPath: "/chat/completions",
     requireSuccessfulStatus: false,
   },
   openrouter: {
     label: "OpenRouter",
     baseUrl: OPENROUTER_API_BASE_URL,
-    modelMap: OPENROUTER_MODEL_MAP,
+    modelMap: getProviderModelMap("openrouter"),
     validationPath: "/models",
     requireSuccessfulStatus: true,
   },
-} as const;
+};
 
 type ApiKeyProvider = keyof typeof API_KEY_PROVIDER_SETTINGS;
 

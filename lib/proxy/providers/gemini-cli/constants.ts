@@ -60,17 +60,6 @@ export const GEMINI_CLI_AUTH_HEADERS = {
   "User-Agent": `${GEMINI_CLI_USER_AGENT_BASE} (win32; x64)`,
 } as const;
 
-// Available Gemini CLI models
-export const GEMINI_CLI_MODELS = new Set([
-  // Gemini 2.5 models
-  "gemini-2.5-pro",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  // Gemini 3 preview models
-  "gemini-3-pro-preview",
-  "gemini-3-flash-preview",
-]);
-
 // Model aliases (map public names to internal names if different)
 export const MODEL_ALIASES: Record<string, string> = {
   // Currently no aliases needed - names are same as Antigravity

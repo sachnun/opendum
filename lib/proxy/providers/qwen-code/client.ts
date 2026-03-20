@@ -21,11 +21,10 @@ import {
   QWEN_CODE_TOKEN_ENDPOINT,
   QWEN_CODE_DEVICE_CODE_ENDPOINT,
   QWEN_CODE_API_BASE_URL,
-  QWEN_CODE_MODEL_MAP,
   QWEN_CODE_SUPPORTED_PARAMS,
-  QWEN_CODE_MODELS,
   QWEN_CODE_REFRESH_BUFFER_SECONDS,
 } from "./constants";
+import { getUpstreamModelName, getProviderModelSet } from "../../models";
 
 /**
  * Device code response from Qwen API
@@ -141,7 +140,7 @@ function resolveQwenCodeModel(model: string): string {
     ? model.split("/", 2)[1] || model
     : model;
 
-  return QWEN_CODE_MODEL_MAP[normalizedModel] ?? normalizedModel;
+  return getUpstreamModelName(normalizedModel, "qwen_code");
 }
 
 /**
@@ -199,7 +198,7 @@ function buildRequestPayload(
 export const qwenCodeConfig: ProviderConfig = {
   name: "qwen_code",
   displayName: "Qwen Code",
-  supportedModels: QWEN_CODE_MODELS,
+  supportedModels: getProviderModelSet("qwen_code"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

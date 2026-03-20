@@ -22,12 +22,11 @@ import {
   COPILOT_SUPPORTED_PARAMS,
   COPILOT_OPENCODE_USER_AGENT,
   COPILOT_OPENCODE_INTENT,
-  COPILOT_MODELS,
-  COPILOT_MODEL_MAP,
   COPILOT_POLLING_INTERVAL,
   COPILOT_DEVICE_CODE_EXPIRY,
   COPILOT_REFRESH_BUFFER_SECONDS,
 } from "./constants";
+import { getUpstreamModelName, getProviderModelSet } from "../../models";
 import {
   convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
@@ -89,7 +88,7 @@ function resolveCopilotModel(model: string): string {
     ? model.split("/", 2)[1] || model
     : model;
 
-  return COPILOT_MODEL_MAP[normalizedModel] ?? normalizedModel;
+  return getUpstreamModelName(normalizedModel, "copilot");
 }
 
 function hasVisionInResponsesInput(
@@ -199,7 +198,7 @@ function normalizeTokenExpiry(expiresIn?: number): Date {
 export const copilotConfig: ProviderConfig = {
   name: "copilot",
   displayName: "GitHub Copilot",
-  supportedModels: COPILOT_MODELS,
+  supportedModels: getProviderModelSet("copilot"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

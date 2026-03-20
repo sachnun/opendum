@@ -31,16 +31,6 @@ export const QWEN_CODE_SUPPORTED_PARAMS = new Set([
   "response_format",
 ]);
 
-// Canonical model ids -> Qwen Code upstream model ids
-export const QWEN_CODE_MODEL_MAP: Record<string, string> = {
-  "qwen3-coder-plus": "qwen3-coder-plus",
-  "qwen3-coder-flash": "qwen3-coder-flash",
-  "qwen3.5": "qwen3.5",
-};
-
-// Available Qwen Code models
-export const QWEN_CODE_MODELS = new Set(Object.keys(QWEN_CODE_MODEL_MAP));
-
 // Token refresh buffer (3 hours before expiry)
 export const QWEN_CODE_REFRESH_BUFFER_SECONDS = 3 * 60 * 60;
 

@@ -23,11 +23,11 @@ import {
   CODEX_REDIRECT_URI,
   CODEX_DEVICE_VERIFICATION_URL,
   CODEX_API_BASE_URL,
-  CODEX_MODELS,
   CODEX_SUPPORTED_PARAMS,
   CODEX_REFRESH_BUFFER_SECONDS,
   CODEX_ORIGINATOR,
 } from "./constants";
+import { getProviderModelSet } from "../../models";
 import { updateCodexQuotaFromHeaders } from "./quota";
 
 // ============================================================
@@ -1264,7 +1264,7 @@ function isTokenExpired(expiresAt: Date): boolean {
 export const codexConfig: ProviderConfig = {
   name: "codex",
   displayName: "Codex",
-  supportedModels: CODEX_MODELS,
+  supportedModels: getProviderModelSet("codex"),
   timeouts: { streamMs: 5_000, nonStreamMs: 5_000 },
 };
 

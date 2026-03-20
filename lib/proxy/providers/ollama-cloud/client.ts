@@ -11,10 +11,9 @@ import { fetchWithTimeout } from "../../timeout";
 import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   OLLAMA_CLOUD_API_BASE_URL,
-  OLLAMA_CLOUD_MODELS,
-  OLLAMA_CLOUD_MODEL_MAP,
   OLLAMA_CLOUD_SUPPORTED_PARAMS,
 } from "./constants";
+import { getUpstreamModelName, getProviderModelSet } from "../../models";
 
 const API_KEY_ACCOUNT_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -23,7 +22,7 @@ function resolveOllamaCloudModel(model: string): string {
     ? model.split("/", 2)[1] || model
     : model;
 
-  return OLLAMA_CLOUD_MODEL_MAP[normalizedModel] ?? normalizedModel;
+  return getUpstreamModelName(normalizedModel, "ollama_cloud");
 }
 
 function buildRequestPayload(
@@ -50,7 +49,7 @@ function buildRequestPayload(
 export const ollamaCloudConfig: ProviderConfig = {
   name: "ollama_cloud",
   displayName: "Ollama Cloud",
-  supportedModels: OLLAMA_CLOUD_MODELS,
+  supportedModels: getProviderModelSet("ollama_cloud"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

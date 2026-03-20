@@ -20,14 +20,13 @@ import {
   ANTIGRAVITY_SCOPES,
   CODE_ASSIST_ENDPOINT_FALLBACKS,
   CODE_ASSIST_HEADERS,
-  ANTIGRAVITY_MODELS,
-  MODEL_ALIASES,
   ANTIGRAVITY_REFRESH_BUFFER_SECONDS,
   LOAD_CODE_ASSIST_ENDPOINTS,
   ONBOARD_USER_ENDPOINTS,
   ANTIGRAVITY_AUTH_HEADERS,
   DEFAULT_PROJECT_ID,
 } from "./constants";
+import { getUpstreamModelName, getProviderModelSet } from "../../models";
 import { generateRequestId } from "./request-helpers";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform";
 import type { TransformContext } from "./transform/types";
@@ -74,7 +73,7 @@ function isTokenExpired(expiresAt: Date): boolean {
  * Resolve model name using aliases and apply model-specific rules
  */
 function resolveModelName(rawModel: string): string {
-  let model = MODEL_ALIASES[rawModel] ?? rawModel;
+  let model = getUpstreamModelName(rawModel, "antigravity");
   
   // Claude Opus models only exist as -thinking variants in Antigravity API
   if (model === "claude-opus-4-5") {
@@ -113,7 +112,7 @@ function normalizeRequestForModel(
 export const antigravityConfig: ProviderConfig = {
   name: "antigravity",
   displayName: "Antigravity (Google)",
-  supportedModels: ANTIGRAVITY_MODELS,
+  supportedModels: getProviderModelSet("antigravity"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

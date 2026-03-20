@@ -11,10 +11,9 @@ import { fetchWithTimeout } from "../../timeout";
 import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
 import {
   NVIDIA_NIM_API_BASE_URL,
-  NVIDIA_NIM_MODELS,
-  NVIDIA_NIM_MODEL_MAP,
   NVIDIA_NIM_SUPPORTED_PARAMS,
 } from "./constants";
+import { getUpstreamModelName, getProviderModelSet } from "../../models";
 
 const API_KEY_ACCOUNT_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -23,7 +22,7 @@ function resolveNvidiaNimModel(model: string): string {
     ? model.split("/", 2)[1] || model
     : model;
 
-  return NVIDIA_NIM_MODEL_MAP[normalizedModel] ?? normalizedModel;
+  return getUpstreamModelName(normalizedModel, "nvidia_nim");
 }
 
 function buildRequestPayload(
@@ -50,7 +49,7 @@ function buildRequestPayload(
 export const nvidiaNimConfig: ProviderConfig = {
   name: "nvidia_nim",
   displayName: "Nvidia",
-  supportedModels: NVIDIA_NIM_MODELS,
+  supportedModels: getProviderModelSet("nvidia_nim"),
   timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 

@@ -35,38 +35,5 @@ export const IFLOW_SUPPORTED_PARAMS = new Set([
   "reasoning",
 ]);
 
-// Available Iflow models
-export const IFLOW_MODELS = new Set([
-  "glm-4.7",
-  "glm-5",
-  "glm-4.6",
-  "glm-4.5",
-  "iflow-rome-30ba3b",
-  "minimax-m2.5",
-  "minimax-m2.1",
-  "minimax-m2",
-  "qwen3-coder-plus",
-  "qwen3.5",
-  "kimi-k2",
-  "kimi-k2.5",
-  "kimi-k2-0905",
-  "kimi-k2-thinking",
-  "qwen3-max-2026-01-23",
-  "qwen3-max",
-  "qwen3-235b-a22b-thinking-2507",
-  "deepseek-v3.2-chat",
-  "deepseek-v3.2-reasoner",
-  "deepseek-v3.2",
-  "deepseek-v3.1",
-  "deepseek-v3",
-  "deepseek-r1",
-  "qwen3-vl-plus",
-  "qwen2.5-vl-72b-instruct",
-  "qwen-vl-max",
-  "qwen-vl-max-latest",
-  "qwen3-235b-a22b-instruct",
-  "qwen3-235b",
-]);
-
 // Token refresh buffer (24 hours before expiry)
 export const IFLOW_REFRESH_BUFFER_SECONDS = 24 * 60 * 60;

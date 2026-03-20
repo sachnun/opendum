@@ -85,35 +85,6 @@ export const CODE_ASSIST_HEADERS = {
   "Client-Metadata": ANTIGRAVITY_CLIENT_METADATA,
 } as const;
 
-// Model aliases (map public names to internal names)
-export const MODEL_ALIASES: Record<string, string> = {
-  "gemini-2.5-computer-use-preview-10-2025": "rev19-uic3-1p",
-  "gemini-3-pro-image-preview": "gemini-3-pro-image",
-  "gemini-3.1-pro-preview": "gemini-3.1-pro-high",
-  "gemini-3-flash-preview": "gemini-3-flash",
-  "claude-opus-4.6": "claude-opus-4-6",
-};
-
-export const MODEL_FALLBACKS: Record<string, string> = {
-  "gemini-2.5-flash-image": "gemini-2.5-flash",
-};
-
-// Available Antigravity models
-export const ANTIGRAVITY_MODELS = new Set([
-  // Gemini models
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview",
-  "gemini-3-pro-image-preview",
-  // Claude models (via Antigravity)
-  "claude-sonnet-4-5",
-  "claude-opus-4-5",
-  "claude-opus-4-6",
-  // Other models
-  "gpt-oss-120b-medium",
-]);
-
 // Token refresh buffer (1 hour before expiry)
 export const ANTIGRAVITY_REFRESH_BUFFER_SECONDS = 60 * 60;
 

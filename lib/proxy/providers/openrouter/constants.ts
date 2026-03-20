@@ -22,35 +22,3 @@ export const OPENROUTER_SUPPORTED_PARAMS = new Set([
   "reasoning",
   "reasoning_effort",
 ]);
-
-export const OPENROUTER_MODEL_MAP: Record<string, string> = {
-  "dolphin-mistral-24b-venice-edition": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-  "gemma-3-12b-it": "google/gemma-3-12b-it:free",
-  "gemma-3-27b-it": "google/gemma-3-27b-it:free",
-  "gemma-3-4b-it": "google/gemma-3-4b-it:free",
-  "gemma-3n-e2b-it": "google/gemma-3n-e2b-it:free",
-  "gemma-3n-e4b-it": "google/gemma-3n-e4b-it:free",
-  "glm-4.5-air": "z-ai/glm-4.5-air:free",
-  "gpt-oss-120b": "openai/gpt-oss-120b:free",
-  "gpt-oss-20b": "openai/gpt-oss-20b:free",
-  "hermes-3-llama-3.1-405b": "nousresearch/hermes-3-llama-3.1-405b:free",
-  "lfm-2.5-1.2b-instruct": "liquid/lfm-2.5-1.2b-instruct:free",
-  "lfm-2.5-1.2b-thinking": "liquid/lfm-2.5-1.2b-thinking:free",
-  "llama-3.2-3b-instruct": "meta-llama/llama-3.2-3b-instruct:free",
-  "llama-3.3-70b-instruct": "meta-llama/llama-3.3-70b-instruct:free",
-  "minimax-m2.5": "minimax/minimax-m2.5:free",
-  "mistral-small-3.1-24b-instruct": "mistralai/mistral-small-3.1-24b-instruct:free",
-  "nemotron-3-nano-30b-a3b": "nvidia/nemotron-3-nano-30b-a3b:free",
-  "nemotron-3-super-120b-a12b": "nvidia/nemotron-3-super-120b-a12b:free",
-  "nemotron-nano-12b-v2-vl": "nvidia/nemotron-nano-12b-v2-vl:free",
-  "nemotron-nano-9b-v2": "nvidia/nemotron-nano-9b-v2:free",
-  "openrouter-free": "openrouter/free",
-  "qwen3-4b": "qwen/qwen3-4b:free",
-  "qwen3-coder": "qwen/qwen3-coder:free",
-  "qwen3-next-80b-a3b-instruct": "qwen/qwen3-next-80b-a3b-instruct:free",
-  "step-3.5-flash": "stepfun/step-3.5-flash:free",
-  "trinity-large-preview": "arcee-ai/trinity-large-preview:free",
-  "trinity-mini": "arcee-ai/trinity-mini:free",
-};
-
-export const OPENROUTER_MODELS = new Set(Object.keys(OPENROUTER_MODEL_MAP));

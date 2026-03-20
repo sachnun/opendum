@@ -39,16 +39,6 @@ export const CODEX_SUPPORTED_PARAMS = new Set([
   "previous_response_id",
 ]);
 
-// Available Codex models (from codex-rs/core/models.json)
-export const CODEX_MODELS = new Set([
-  "gpt-5.3-codex",
-  "gpt-5.2-codex",
-  "gpt-5.2",
-  "gpt-5.1-codex-max",
-  "gpt-5.1-codex",
-  "gpt-5.1-codex-mini",
-]);
-
 // Token refresh buffer (5 minutes before expiry)
 export const CODEX_REFRESH_BUFFER_SECONDS = 5 * 60;
 
