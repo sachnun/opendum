@@ -9,6 +9,7 @@ import type {
 import { DEFAULT_PROVIDER_TIMEOUTS } from "../types";
 import { fetchWithTimeout } from "../../timeout";
 import { getAdaptiveTimeout } from "@/lib/proxy/adaptive-timeout";
+import { getModelLookupKeys } from "../../models";
 import {
   OPENROUTER_API_BASE_URL,
   OPENROUTER_MODELS,
@@ -23,7 +24,21 @@ function resolveOpenRouterModel(model: string): string {
     ? model.split("/", 2)[1] || model
     : model;
 
-  return OPENROUTER_MODEL_MAP[normalizedModel] ?? normalizedModel;
+  const directMatch = OPENROUTER_MODEL_MAP[normalizedModel];
+  if (directMatch) {
+    return directMatch;
+  }
+
+  // Try all lookup keys (canonical name + aliases) to handle cases where
+  // the model map uses an alias key but the canonical name was passed in
+  for (const key of getModelLookupKeys(normalizedModel)) {
+    const match = OPENROUTER_MODEL_MAP[key];
+    if (match) {
+      return match;
+    }
+  }
+
+  return normalizedModel;
 }
 
 function buildRequestPayload(
