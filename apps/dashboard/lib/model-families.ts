@@ -25,6 +25,7 @@ export const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
 
 const MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
   OpenAI: [
+    "gpt-5.4",
     "gpt-5.3-codex",
     "gpt-5.2-codex",
     "gpt-5.2",
