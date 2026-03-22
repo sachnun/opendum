@@ -190,7 +190,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     if (typeof system === "string") {
       openaiMessages.push({ role: "system", content: system });
     } else if (Array.isArray(system)) {
-      // System can be array of content blocks
       const systemContent = system
         .map((block: AnthropicContentBlock | string) => {
           if (typeof block === "string") return block;
@@ -205,7 +204,6 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
   for (const msg of messages || []) {
     const role = msg.role;
 
-    // Handle content that can be string or array of content blocks
     if (typeof msg.content === "string") {
       openaiMessages.push({ role, content: msg.content });
     } else if (Array.isArray(msg.content)) {
@@ -565,37 +563,31 @@ function createAnthropicStreamTracker(
           const data = line.slice(5).trim();
           if (!data || data === "[DONE]") {
             if (data === "[DONE]") {
-              // Close any open thinking block
-              if (thinkingBlockStarted) {
+                  if (thinkingBlockStarted) {
                 output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
                 currentBlockIndex++;
                 thinkingBlockStarted = false;
               }
 
-              // Close any open text block
               if (contentBlockStarted) {
                 output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
                 currentBlockIndex++;
                 contentBlockStarted = false;
               }
 
-              // Close all open tool_use blocks
               for (const tcIndex of Object.keys(toolBlockIndices).map(Number).sort((a, b) => a - b)) {
                 const blockIdx = toolBlockIndices[tcIndex];
                 output += formatSSE("content_block_stop", { type: "content_block_stop", index: blockIdx });
               }
 
-              // Determine stop_reason based on whether we had tool calls
               const stopReason = Object.keys(toolCallsByIndex).length > 0 ? "tool_use" : "end_turn";
 
-              // Send message_delta with final info
               output += formatSSE("message_delta", {
                 type: "message_delta",
                 delta: { stop_reason: stopReason, stop_sequence: null },
                 usage: { input_tokens: inputTokens, output_tokens: outputTokens },
               });
 
-              // Send message_stop
               output += formatSSE("message_stop", { type: "message_stop" });
             }
             continue;
@@ -719,20 +711,17 @@ function createAnthropicStreamTracker(
                 thinkingBlockStarted = false;
               }
 
-              // Close any open text block
               if (contentBlockStarted) {
                 output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
                 currentBlockIndex++;
                 contentBlockStarted = false;
               }
 
-              // Close all open tool_use blocks
               for (const tcIdx of Object.keys(toolBlockIndices).map(Number).sort((a, b) => a - b)) {
                 const blockIdx = toolBlockIndices[tcIdx];
                 output += formatSSE("content_block_stop", { type: "content_block_stop", index: blockIdx });
               }
 
-              // Map finish_reason to Anthropic stop_reason
               let stopReason = "end_turn";
               if (finishReason === "tool_calls" || Object.keys(toolCallsByIndex).length > 0) {
                 stopReason = "tool_use";
@@ -1049,7 +1038,6 @@ export const messagesRoute: RouteHandlerMethod = async (
 
         const openaiPayload = transformAnthropicToOpenAI(body as AnthropicRequestBody);
 
-        // Override model with validated model (without provider prefix)
         openaiPayload.model = model;
         openaiPayload.stream = streamEnabled;
 
@@ -1161,7 +1149,6 @@ export const messagesRoute: RouteHandlerMethod = async (
           });
         }
 
-        // Success — streaming
         if (streamEnabled && providerResponse.body) {
           const origin = request.headers.origin;
           reply.raw.writeHead(200, {
@@ -1197,7 +1184,6 @@ export const messagesRoute: RouteHandlerMethod = async (
             });
           }, includeThinking);
 
-          // Send the message_start event
           const startEvent = tracker.getStartEvent();
           if (startEvent) {
             reply.raw.write(startEvent);
@@ -1229,11 +1215,9 @@ export const messagesRoute: RouteHandlerMethod = async (
           return;
         }
 
-        // Success — non-streaming
         const openaiResponse = await providerResponse.json() as OpenAIResponse;
         const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model, includeThinking);
 
-        // Track success for this account (non-blocking)
         markAccountSuccess(account.id).catch(() => undefined);
         recordLatency(account.provider, model, false, Date.now() - requestStartTime).catch(() => undefined);
 
