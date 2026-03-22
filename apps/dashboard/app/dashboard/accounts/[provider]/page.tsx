@@ -13,6 +13,7 @@ import {
   getProviderFromSlug,
   getProviderSuccessMessage,
 } from "@/lib/provider-accounts";
+import { getProviderModelSet } from "@opendum/shared/proxy/models";
 
 const ACCOUNT_STATS_DAYS = 30;
 
@@ -182,6 +183,8 @@ export default async function ProviderAccountsPage({
   const groupedAccounts = createEmptyProviderAccountMap<typeof accountsWithStats>(() => []);
   groupedAccounts[selectedProvider] = accountsWithStats;
 
+  const providerModels = Array.from(getProviderModelSet(selectedProvider)).sort();
+
   return (
     <div className="space-y-6">
       <div className="relative">
@@ -235,6 +238,7 @@ export default async function ProviderAccountsPage({
         ollamaCloudAccounts={groupedAccounts.ollama_cloud}
         openRouterAccounts={groupedAccounts.openrouter}
         visibleProviders={[selectedProvider]}
+        supportedModelsByProvider={{ [selectedProvider]: providerModels }}
       />
     </div>
   );

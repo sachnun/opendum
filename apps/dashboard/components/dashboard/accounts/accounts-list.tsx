@@ -119,6 +119,7 @@ interface AccountsListProps {
   ollamaCloudAccounts: Account[];
   openRouterAccounts: Account[];
   visibleProviders?: ProviderAccountKey[];
+  supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
 }
 
 function formatTierLabel(tier: string): string {
@@ -796,11 +797,12 @@ function AccountCard({
 // =============================================================================
 
 interface ProviderSectionProps {
-  id?: string;
+  id: string;
   title: string;
   accounts: Account[];
   showTier?: boolean;
   emptyMessage: string;
+  supportedModels?: string[];
   quotaByAccountId?: Record<string, AccountQuotaInfo>;
   isQuotaLoading?: boolean;
   hideHeader?: boolean;
@@ -812,6 +814,7 @@ function ProviderSection({
   accounts,
   showTier = false,
   emptyMessage,
+  supportedModels,
   quotaByAccountId,
   isQuotaLoading = false,
   hideHeader = false,
@@ -841,7 +844,23 @@ function ProviderSection({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+            {supportedModels && supportedModels.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Supported models ({supportedModels.length}):
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {supportedModels.map((model) => (
+                    <Badge key={model} variant="secondary" className="text-xs font-normal">
+                      {model}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </section>
@@ -864,6 +883,7 @@ export function AccountsList({
   ollamaCloudAccounts,
   openRouterAccounts,
   visibleProviders,
+  supportedModelsByProvider,
 }: AccountsListProps) {
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
@@ -1187,6 +1207,7 @@ export function AccountsList({
         accounts={antigravityAccounts}
         showTier
         emptyMessage="No Antigravity accounts connected yet."
+        supportedModels={supportedModelsByProvider?.antigravity}
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
       />
@@ -1202,6 +1223,7 @@ export function AccountsList({
         accounts={codexAccounts}
         showTier
         emptyMessage="No Codex accounts connected yet."
+        supportedModels={supportedModelsByProvider?.codex}
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
       />
@@ -1216,6 +1238,7 @@ export function AccountsList({
         hideHeader={hasProviderFilter}
         accounts={iflowAccounts}
         emptyMessage="No Iflow accounts connected yet."
+        supportedModels={supportedModelsByProvider?.iflow}
       />
     );
   }
@@ -1228,6 +1251,7 @@ export function AccountsList({
         hideHeader={hasProviderFilter}
         accounts={kiroAccounts}
         emptyMessage="No Kiro accounts connected yet."
+        supportedModels={supportedModelsByProvider?.kiro}
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
       />
@@ -1243,6 +1267,7 @@ export function AccountsList({
         accounts={geminiCliAccounts}
         showTier
         emptyMessage="No Gemini CLI accounts connected yet."
+        supportedModels={supportedModelsByProvider?.gemini_cli}
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
       />
@@ -1257,6 +1282,7 @@ export function AccountsList({
         hideHeader={hasProviderFilter}
         accounts={qwenCodeAccounts}
         emptyMessage="No Qwen Code accounts connected yet."
+        supportedModels={supportedModelsByProvider?.qwen_code}
       />
     );
   }
@@ -1269,6 +1295,7 @@ export function AccountsList({
         hideHeader={hasProviderFilter}
         accounts={copilotAccounts}
         emptyMessage="No Copilot accounts connected yet."
+        supportedModels={supportedModelsByProvider?.copilot}
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
       />
@@ -1285,6 +1312,7 @@ export function AccountsList({
         hideHeader={hasProviderFilter}
         accounts={nvidiaNimAccounts}
         emptyMessage="No Nvidia accounts connected yet."
+        supportedModels={supportedModelsByProvider?.nvidia_nim}
       />
     );
   }
@@ -1297,6 +1325,7 @@ export function AccountsList({
         hideHeader={hasProviderFilter}
         accounts={ollamaCloudAccounts}
         emptyMessage="No Ollama Cloud accounts connected yet."
+        supportedModels={supportedModelsByProvider?.ollama_cloud}
       />
     );
   }
@@ -1309,6 +1338,7 @@ export function AccountsList({
         hideHeader={hasProviderFilter}
         accounts={openRouterAccounts}
         emptyMessage="No OpenRouter accounts connected yet."
+        supportedModels={supportedModelsByProvider?.openrouter}
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
       />
