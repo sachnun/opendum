@@ -6,6 +6,7 @@ import {
   AlertCircle,
   BarChart3,
   Check,
+  CheckCircle,
   Copy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,7 @@ import {
 } from "@/lib/actions/openrouter-quota";
 import {
   getProviderAccountErrorHistory,
+  resolveProviderAccountErrors,
   type ProviderAccountErrorHistoryEntry,
 } from "@/lib/actions/accounts";
 import { formatRelativeTime } from "@/lib/date";
@@ -376,6 +378,7 @@ function LastErrorMessageDialog({
 
   const [copied, setCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<ProviderAccountErrorHistoryEntry[] | null>(null);
@@ -441,6 +444,23 @@ function LastErrorMessageDialog({
     }
   };
 
+  const handleResolve = async () => {
+    setIsResolving(true);
+    try {
+      const result = await resolveProviderAccountErrors(accountId);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      toast.success("Account errors resolved");
+      setIsOpen(false);
+      window.dispatchEvent(new CustomEvent(PROVIDER_ACCOUNTS_REFRESH_EVENT));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to resolve errors");
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
@@ -465,16 +485,29 @@ function LastErrorMessageDialog({
                 {occurredAt ? ` - ${formatRelativeTime(occurredAt)}` : ""}
               </DialogDescription>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              aria-label="Copy error details"
-              onClick={handleCopy}
-              title="Copy error details"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Copy error details"
+                onClick={handleCopy}
+                title="Copy error details"
+              >
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Resolve errors"
+                onClick={handleResolve}
+                disabled={isResolving}
+                title="Resolve — clear all errors and error history for this account"
+              >
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              </Button>
+            </div>
           </div>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/20 p-3">
