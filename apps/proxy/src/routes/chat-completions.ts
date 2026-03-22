@@ -401,15 +401,19 @@ export const chatCompletionsRoute: RouteHandlerMethod = async (
         // Handle non-OK response
         if (!providerResponse.ok) {
           const errorText = await providerResponse.text();
-          const detailedError = buildAccountErrorMessage(errorText, {
-            model,
-            provider: account.provider,
-            endpoint: "/v1/chat/completions",
-            messages,
-            parameters: requestParamsForError,
-          });
 
-          await markAccountFailed(account.id, providerResponse.status, detailedError);
+          // Timeouts (408) are transient — don't count them as account errors
+          if (providerResponse.status !== 408) {
+            const detailedError = buildAccountErrorMessage(errorText, {
+              model,
+              provider: account.provider,
+              endpoint: "/v1/chat/completions",
+              messages,
+              parameters: requestParamsForError,
+            });
+
+            await markAccountFailed(account.id, providerResponse.status, detailedError);
+          }
 
           await logUsage({
             userId,

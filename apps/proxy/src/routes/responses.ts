@@ -564,19 +564,22 @@ export const responsesRoute: RouteHandlerMethod = async (
         if (!providerResponse.ok) {
           const errorText = await providerResponse.text();
 
-          const detailedError = buildAccountErrorMessage(errorText, {
-            model,
-            provider: account.provider,
-            endpoint: "/v1/responses",
-            messages,
-            parameters: requestParamsForError,
-          });
+          // Timeouts (408) are transient — don't count them as account errors
+          if (providerResponse.status !== 408) {
+            const detailedError = buildAccountErrorMessage(errorText, {
+              model,
+              provider: account.provider,
+              endpoint: "/v1/responses",
+              messages,
+              parameters: requestParamsForError,
+            });
 
-          await markAccountFailed(
-            account.id,
-            providerResponse.status,
-            detailedError
-          );
+            await markAccountFailed(
+              account.id,
+              providerResponse.status,
+              detailedError
+            );
+          }
 
           await logUsage({
             userId,
