@@ -204,7 +204,7 @@ export default async function ProviderAccountsPage({
             </div>
           </div>
         </div>
-        <div className="h-[112px] sm:h-[72px] md:h-[96px]" />
+        <div className="h-[96px] sm:h-[72px] md:h-[96px]" />
       </div>
 
       {queryParams.success && (
