@@ -9,4 +9,7 @@ output = 65_536
 
 [opendum]
 family = "Qwen"
-providers = ["ollama_cloud"]
+providers = ["kiro", "ollama_cloud"]
+
+[opendum.upstream]
+kiro = "qwen3-coder-next"

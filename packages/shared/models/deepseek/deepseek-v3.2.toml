@@ -14,7 +14,8 @@ output = 128_000
 
 [opendum]
 family = "DeepSeek"
-providers = ["iflow", "nvidia_nim", "ollama_cloud"]
+providers = ["iflow", "kiro", "nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]
+kiro = "deepseek-3.2"
 nvidia_nim = "deepseek-ai/deepseek-v3.2"
