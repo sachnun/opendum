@@ -1,0 +1,11 @@
+reasoning = true
+tool_call = true
+attachment = true
+
+[limit]
+context = 1_048_576
+output = 65_536
+
+[opendum]
+family = "Gemini"
+providers = ["gemini_cli"]
