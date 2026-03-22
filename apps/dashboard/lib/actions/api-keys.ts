@@ -42,7 +42,6 @@ export async function createApiKey(
   }
 
   try {
-    // Generate API key
     const key = generateApiKey();
     const keyHash = hashString(key);
     const keyPreview = getKeyPreview(key);
@@ -50,7 +49,6 @@ export async function createApiKey(
 
     const trimmedName = name?.trim() || null;
 
-    // Create in database
     const [apiKey] = await db.insert(proxyApiKey).values({
       userId: session.user.id,
       keyHash,
@@ -89,14 +87,12 @@ export async function toggleApiKey(id: string): Promise<ActionResult> {
   }
 
   try {
-    // Find and verify ownership
     const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };
     }
 
-    // Toggle isActive
     await db.update(proxyApiKey).set({ isActive: !apiKey.isActive }).where(eq(proxyApiKey.id, id));
 
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
@@ -121,14 +117,12 @@ export async function deleteApiKey(id: string): Promise<ActionResult> {
   }
 
   try {
-    // Find and verify ownership
     const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
       return { success: false, error: "API key not found" };
     }
 
-    // Delete permanently
     await db.delete(proxyApiKey).where(eq(proxyApiKey.id, id));
 
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
@@ -153,7 +147,6 @@ export async function updateApiKeyName(id: string, name: string): Promise<Action
   }
 
   try {
-    // Find and verify ownership
     const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
 
     if (!apiKey) {
@@ -162,7 +155,6 @@ export async function updateApiKeyName(id: string, name: string): Promise<Action
 
     const trimmedName = name?.trim() || null;
 
-    // Update the name
     const [updatedKey] = await db.update(proxyApiKey).set({ name: trimmedName }).where(eq(proxyApiKey.id, id)).returning({ name: proxyApiKey.name });
 
     revalidatePath("/dashboard/api-keys");
@@ -252,7 +244,6 @@ export async function revealApiKey(id: string): Promise<ActionResult<{ key: stri
   }
 
   try {
-    // Find API key and verify ownership
     const [apiKey] = await db.select({
       id: proxyApiKey.id,
       encryptedKey: proxyApiKey.encryptedKey,
@@ -271,7 +262,6 @@ export async function revealApiKey(id: string): Promise<ActionResult<{ key: stri
       };
     }
 
-    // Decrypt and return the key
     const key = decrypt(apiKey.encryptedKey);
 
     return { success: true, data: { key } };

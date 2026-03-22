@@ -130,7 +130,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
 
   return (
     <div className="flex items-center gap-2">
-      {/* Key display with reveal/copy */}
       <div className="flex items-center gap-1">
         <code className={cn(
           "text-xs bg-muted px-2 py-1 rounded font-mono",
@@ -168,7 +167,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         </Button>
       </div>
 
-      {/* Enable/Disable toggle */}
       <Switch
         checked={apiKey.isActive}
         onCheckedChange={handleToggle}
@@ -176,7 +174,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         title={apiKey.isActive ? "Disable key" : "Enable key"}
       />
 
-      {/* Delete dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">

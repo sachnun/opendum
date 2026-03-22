@@ -285,10 +285,8 @@ export function ChatPanel({
         </Button>
       )}
 
-      {/* Header with Model Selector */}
       <CardHeader className="flex-none gap-0 border-b py-2 pl-3 pr-11">
         <div className="flex items-center gap-1">
-          {/* Model Selector */}
           <Popover open={open} onOpenChange={handlePopoverOpenChange}>
             <PopoverTrigger asChild>
               <Button
@@ -430,18 +428,15 @@ export function ChatPanel({
         </div>
       </CardHeader>
 
-      {/* Content */}
       <CardContent className="flex min-h-0 flex-1 flex-col p-0 overflow-hidden">
         <ScrollArea ref={scrollRef} className="min-h-0 flex-1">
           <div className="p-4">
-            {/* No model selected */}
             {!selectedModel && !isLoading && !content && !reasoning && !error && (
               <p className="text-muted-foreground text-sm text-center py-8">
                 Select a model to start
               </p>
             )}
 
-            {/* Loading state - initial */}
             {isLoading && !content && !reasoning && (
               <div className="space-y-2">
                 <Skeleton className="h-4 w-full" />
@@ -450,7 +445,6 @@ export function ChatPanel({
               </div>
             )}
 
-            {/* Error state */}
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -459,7 +453,6 @@ export function ChatPanel({
               </Alert>
             )}
 
-            {/* Content with streaming cursor */}
             {(content || reasoning) && (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 {reasoning && (
@@ -487,7 +480,6 @@ export function ChatPanel({
               </div>
             )}
 
-            {/* Empty state - model selected but no response yet */}
             {selectedModel && !isLoading && !content && !reasoning && !error && (
               <p className="text-muted-foreground text-sm text-center py-8">
                 Response will appear here

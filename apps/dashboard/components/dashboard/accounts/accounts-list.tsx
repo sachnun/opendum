@@ -77,10 +77,6 @@ type QuotaGroupDisplay =
   | KiroQuotaGroupDisplay
   | OpenRouterQuotaGroupDisplay;
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
 interface Account {
   id: string;
   name: string;
@@ -188,10 +184,6 @@ function getAccountHeader(account: Account): { title: string; subtitle: string |
 
   return { title, subtitle: rawEmail };
 }
-
-// =============================================================================
-// STATUS BADGE COMPONENT
-// =============================================================================
 
 function StatusBadge({ status, consecutiveErrors }: { status: string; consecutiveErrors: number }) {
   if (status === "failed") {
@@ -620,10 +612,6 @@ function LastErrorMessageDialog({
   );
 }
 
-// =============================================================================
-// ACCOUNT CARD COMPONENT
-// =============================================================================
-
 function AccountCard({ 
   account, 
   showTier = false,
@@ -792,10 +780,6 @@ function AccountCard({
   );
 }
 
-// =============================================================================
-// PROVIDER SECTION COMPONENT
-// =============================================================================
-
 interface ProviderSectionProps {
   id: string;
   title: string;
@@ -866,10 +850,6 @@ function ProviderSection({
     </section>
   );
 }
-
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
 
 export function AccountsList({
   antigravityAccounts,

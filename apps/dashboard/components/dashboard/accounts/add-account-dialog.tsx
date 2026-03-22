@@ -600,7 +600,6 @@ export function AddAccountDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step Indicator */}
         <div className="flex items-center justify-center gap-2">
           {(initialProvider ? [2, 3] : [1, 2, 3]).map((s, index, steps) => (
             <div key={s} className="flex items-center">
@@ -628,9 +627,7 @@ export function AddAccountDialog({
           ))}
         </div>
 
-        {/* Step Content */}
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
-          {/* Step 1: Select Provider */}
           {step === 1 && (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -677,7 +674,6 @@ export function AddAccountDialog({
             </div>
           )}
 
-          {/* Step 2: OAuth Login / Device Code */}
           {step === 2 && providerConfig && (
             <div className="space-y-4">
               {providerConfig.flowType === "oauth_redirect" ? (
@@ -849,7 +845,6 @@ export function AddAccountDialog({
             </div>
           )}
 
-          {/* Step 3: Paste URL (OAuth Redirect only) */}
           {step === 3 && providerConfig && providerConfig.flowType === "oauth_redirect" && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -887,7 +882,6 @@ export function AddAccountDialog({
             </form>
           )}
 
-          {/* Step 3: Paste API key (API key providers only) */}
           {step === 3 && providerConfig && providerConfig.flowType === "api_key" && (
             <form
               onSubmit={handleConnectWithApiKey}

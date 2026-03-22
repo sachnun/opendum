@@ -155,13 +155,11 @@ export function SettingsSheet({
 
           <Separator />
 
-          {/* Generation Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Generation
             </h3>
 
-            {/* Stream Responses */}
             <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
               <div className="space-y-1">
                 <Label htmlFor="stream-responses">Stream Responses</Label>
@@ -179,7 +177,6 @@ export function SettingsSheet({
               />
             </div>
 
-            {/* Temperature */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="temperature">Temperature</Label>
@@ -201,7 +198,6 @@ export function SettingsSheet({
               </p>
             </div>
 
-            {/* Top P */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="top-p">Top P</Label>
@@ -223,7 +219,6 @@ export function SettingsSheet({
               </p>
             </div>
 
-            {/* Max Tokens */}
             <div className="space-y-2">
               <Label htmlFor="max-tokens">Max Tokens</Label>
               <Input
@@ -245,13 +240,11 @@ export function SettingsSheet({
 
           <Separator />
 
-          {/* Penalties Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Penalties
             </h3>
 
-            {/* Presence Penalty */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="presence-penalty">Presence Penalty</Label>
@@ -275,7 +268,6 @@ export function SettingsSheet({
               </p>
             </div>
 
-            {/* Frequency Penalty */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="frequency-penalty">Frequency Penalty</Label>
@@ -302,13 +294,11 @@ export function SettingsSheet({
 
           <Separator />
 
-          {/* Reasoning Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Reasoning
             </h3>
 
-            {/* Reasoning Effort */}
             <div className="space-y-2">
               <Label>Reasoning Effort</Label>
               <div className="overflow-x-auto">

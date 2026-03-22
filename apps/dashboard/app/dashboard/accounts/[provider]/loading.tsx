@@ -5,7 +5,6 @@ const ACCOUNT_CARDS = Array.from({ length: 3 });
 function AccountCardSkeleton() {
   return (
     <div className="rounded-xl border border-border bg-card flex flex-col h-full">
-      {/* CardHeader: title + badges */}
       <div className="p-6 pb-2 space-y-1.5">
         <div className="flex items-center justify-between">
           <Skeleton className="h-6 w-36" />
@@ -14,10 +13,8 @@ function AccountCardSkeleton() {
         <Skeleton className="h-4 w-48" />
       </div>
 
-      {/* CardContent */}
       <div className="p-6 pt-0 flex flex-1 flex-col">
         <div className="space-y-2 text-sm flex-1">
-          {/* Stats box */}
           <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5 space-y-2">
             <div className="flex items-center justify-between">
               <Skeleton className="h-3 w-20" />
@@ -33,11 +30,9 @@ function AccountCardSkeleton() {
                 <Skeleton className="h-4 w-10" />
               </div>
             </div>
-            {/* Sparkline placeholder */}
             <Skeleton className="h-8 w-full rounded" />
           </div>
 
-          {/* Last used / Total Errors / Last Error rows */}
           <div className="flex justify-between">
             <Skeleton className="h-3.5 w-16" />
             <Skeleton className="h-3.5 w-20" />
@@ -51,13 +46,11 @@ function AccountCardSkeleton() {
             <Skeleton className="h-3.5 w-12" />
           </div>
 
-          {/* Last error message section */}
           <div className="min-h-14 border-t pt-2 space-y-1">
             <Skeleton className="h-3 w-28" />
             <Skeleton className="h-3 w-16" />
           </div>
 
-          {/* Quota section */}
           <div className="pt-3 mt-3 border-t space-y-2">
             <Skeleton className="h-3 w-12" />
             <Skeleton className="h-1.5 w-full rounded-full" />
@@ -65,7 +58,6 @@ function AccountCardSkeleton() {
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="mt-4 flex gap-2">
           <Skeleton className="h-8 w-8 rounded-md" />
           <Skeleton className="h-8 w-8 rounded-md" />

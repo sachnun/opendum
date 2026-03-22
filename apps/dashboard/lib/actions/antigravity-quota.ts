@@ -1,9 +1,5 @@
 "use server";
 
-/**
- * Server Actions for Antigravity Quota Monitoring
- */
-
 import type { ProviderAccount } from "@opendum/shared/db/schema";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
@@ -16,10 +12,6 @@ import {
   type QuotaGroupInfo 
 } from "@opendum/shared/proxy/providers/antigravity/quota";
 import { antigravityProvider } from "@opendum/shared/proxy/providers/antigravity/client";
-
-// =============================================================================
-// TYPES
-// =============================================================================
 
 export interface AccountQuotaInfo {
   accountId: string;
@@ -73,13 +65,6 @@ function getAntigravityQuotaCacheKey(userId: string): string {
   return `${ANTIGRAVITY_QUOTA_CACHE_PREFIX}:${userId}`;
 }
 
-// =============================================================================
-// HELPERS
-// =============================================================================
-
-/**
- * Format time remaining until reset in human-readable format
- */
 function formatTimeUntilReset(resetTimestamp: number | null): string | null {
   if (!resetTimestamp) return null;
   
@@ -130,13 +115,6 @@ function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
   };
 }
 
-// =============================================================================
-// SERVER ACTIONS
-// =============================================================================
-
-/**
- * Get Antigravity quota for all user's accounts
- */
 export async function getAntigravityQuota(
   options: QuotaRequestOptions = {}
 ): Promise<QuotaActionResult> {
