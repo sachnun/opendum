@@ -25,30 +25,30 @@ export interface NavSubItem {
 
 export interface ProviderAccountCounts {
   antigravity: number;
-  copilot: number;
   codex: number;
+  copilot: number;
+  gemini_cli: number;
   iflow: number;
   kiro: number;
-  gemini_cli: number;
-  qwen_code: number;
   nvidia_nim: number;
   ollama_cloud: number;
   openrouter: number;
+  qwen_code: number;
 }
 
 export type ProviderAccountIndicator = "normal" | "warning" | "error";
 
 export interface ProviderAccountIndicators {
   antigravity: ProviderAccountIndicator;
-  copilot: ProviderAccountIndicator;
   codex: ProviderAccountIndicator;
+  copilot: ProviderAccountIndicator;
+  gemini_cli: ProviderAccountIndicator;
   iflow: ProviderAccountIndicator;
   kiro: ProviderAccountIndicator;
-  gemini_cli: ProviderAccountIndicator;
-  qwen_code: ProviderAccountIndicator;
   nvidia_nim: ProviderAccountIndicator;
   ollama_cloud: ProviderAccountIndicator;
   openrouter: ProviderAccountIndicator;
+  qwen_code: ProviderAccountIndicator;
 }
 
 export interface ModelFamilyCounts {
@@ -68,13 +68,12 @@ export const primaryNavigation: NavItem[] = [
       },
       { name: "Codex", href: getProviderAccountPath("codex") },
       { name: "Copilot", href: getProviderAccountPath("copilot") },
-      { name: "Kiro", href: getProviderAccountPath("kiro") },
-      { name: "Iflow", href: getProviderAccountPath("iflow") },
       {
         name: "Gemini CLI",
         href: getProviderAccountPath("gemini_cli"),
       },
-      { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
+      { name: "Iflow", href: getProviderAccountPath("iflow") },
+      { name: "Kiro", href: getProviderAccountPath("kiro") },
       {
         name: "Nvidia",
         href: getProviderAccountPath("nvidia_nim"),
@@ -87,6 +86,7 @@ export const primaryNavigation: NavItem[] = [
         name: "OpenRouter",
         href: getProviderAccountPath("openrouter"),
       },
+      { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],
   },
   { name: "API Keys", href: "/dashboard/api-keys", icon: Key },

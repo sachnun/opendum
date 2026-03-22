@@ -2,13 +2,13 @@ export type ProviderAccountKey =
   | "antigravity"
   | "codex"
   | "copilot"
-  | "kiro"
-  | "iflow"
   | "gemini_cli"
-  | "qwen_code"
+  | "iflow"
+  | "kiro"
   | "nvidia_nim"
   | "ollama_cloud"
-  | "openrouter";
+  | "openrouter"
+  | "qwen_code";
 
 export type ProviderAccountCategory = "oauth" | "api_key";
 
@@ -47,12 +47,12 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     showTier: false,
   },
   {
-    key: "kiro",
-    slug: "kiro",
-    label: "Kiro",
+    key: "gemini_cli",
+    slug: "gemini-cli",
+    label: "Gemini CLI",
     category: "oauth",
-    emptyMessage: "No Kiro accounts connected yet.",
-    showTier: false,
+    emptyMessage: "No Gemini CLI accounts connected yet.",
+    showTier: true,
   },
   {
     key: "iflow",
@@ -63,12 +63,12 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     showTier: false,
   },
   {
-    key: "gemini_cli",
-    slug: "gemini-cli",
-    label: "Gemini CLI",
+    key: "kiro",
+    slug: "kiro",
+    label: "Kiro",
     category: "oauth",
-    emptyMessage: "No Gemini CLI accounts connected yet.",
-    showTier: true,
+    emptyMessage: "No Kiro accounts connected yet.",
+    showTier: false,
   },
   {
     key: "qwen_code",
