@@ -160,7 +160,7 @@ export default async function AccountsPage({
             </div>
           </div>
         </div>
-        <div className="h-[136px] sm:h-[108px]" />
+        <div className="h-[88px] sm:h-[84px] md:h-[96px]" />
       </div>
 
       {params.success && (
