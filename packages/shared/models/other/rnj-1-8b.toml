@@ -8,6 +8,7 @@ context = 32_768
 output = 4_096
 
 [opendum]
+family = "RNJ"
 providers = ["ollama_cloud"]
 ignored = true
 

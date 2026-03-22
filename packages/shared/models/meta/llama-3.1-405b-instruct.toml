@@ -7,6 +7,7 @@ input = ["text"]
 output = ["text"]
 
 [opendum]
+family = "Meta"
 providers = ["nvidia_nim"]
 aliases = ["meta-llama-3.1-405b-instruct", "meta/llama-3.1-405b-instruct"]
 

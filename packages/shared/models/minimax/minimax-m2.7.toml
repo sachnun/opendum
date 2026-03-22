@@ -1,2 +1,3 @@
 [opendum]
+family = "MiniMax"
 providers = ["ollama_cloud"]

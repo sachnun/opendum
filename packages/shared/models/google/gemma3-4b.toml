@@ -8,6 +8,7 @@ context = 131_072
 output = 131_072
 
 [opendum]
+family = "Google"
 providers = ["ollama_cloud"]
 aliases = ["gemma-3-4b-it"]
 ignored = true

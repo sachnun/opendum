@@ -1,4 +1,5 @@
 [opendum]
+family = "Zyphra"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

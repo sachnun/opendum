@@ -8,6 +8,7 @@ context = 1_048_576
 output = 131_072
 
 [opendum]
+family = "NVIDIA"
 providers = ["nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]

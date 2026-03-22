@@ -1,4 +1,5 @@
 [opendum]
+family = "Nous Research"
 providers = ["openrouter"]
 
 [opendum.upstream]

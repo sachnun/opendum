@@ -8,6 +8,7 @@ context = 131_072
 output = 131_072
 
 [opendum]
+family = "Google"
 providers = ["nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]

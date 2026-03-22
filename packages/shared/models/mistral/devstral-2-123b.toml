@@ -8,6 +8,7 @@ context = 262_144
 output = 262_144
 
 [opendum]
+family = "Mistral"
 providers = ["nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]

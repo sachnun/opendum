@@ -1,4 +1,5 @@
 [opendum]
+family = "Abacus.AI"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

@@ -7,6 +7,7 @@ input = ["text","image"]
 output = ["text"]
 
 [opendum]
+family = "Google"
 providers = ["nvidia_nim", "openrouter"]
 aliases = ["google-gemma-3n-e4b-it", "google/gemma-3n-e4b-it"]
 ignored = true

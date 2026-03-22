@@ -1,4 +1,5 @@
 [opendum]
+family = "ByteDance"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

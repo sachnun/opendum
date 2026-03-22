@@ -1,4 +1,5 @@
 [opendum]
+family = "OpenAI"
 providers = ["ollama_cloud", "openrouter"]
 
 [opendum.upstream]

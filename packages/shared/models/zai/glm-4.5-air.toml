@@ -1,4 +1,5 @@
 [opendum]
+family = "Z.AI"
 providers = ["openrouter"]
 
 [opendum.upstream]

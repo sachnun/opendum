@@ -7,6 +7,7 @@ input = ["text"]
 output = ["text"]
 
 [opendum]
+family = "Google"
 providers = ["nvidia_nim"]
 aliases = ["google-codegemma-1.1-7b", "google/codegemma-1.1-7b"]
 ignored = true

@@ -1,4 +1,5 @@
 [opendum]
+family = "Stockmark"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

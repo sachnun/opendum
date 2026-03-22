@@ -1,4 +1,5 @@
 [opendum]
+family = "Qwen"
 providers = ["openrouter"]
 
 [opendum.upstream]

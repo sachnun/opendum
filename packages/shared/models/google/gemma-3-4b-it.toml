@@ -1,4 +1,5 @@
 [opendum]
+family = "Google"
 providers = ["nvidia_nim", "openrouter"]
 
 [opendum.upstream]

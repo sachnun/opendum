@@ -1,4 +1,5 @@
 [opendum]
+family = "Trinity"
 providers = ["openrouter"]
 
 [opendum.upstream]

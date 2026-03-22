@@ -8,4 +8,5 @@ context = 128_000
 output = 64_000
 
 [opendum]
+family = "OpenAI"
 providers = ["copilot"]

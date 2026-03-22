@@ -1,4 +1,5 @@
 [opendum]
+family = "AI Singapore"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

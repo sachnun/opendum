@@ -1,4 +1,5 @@
 [opendum]
+family = "Databricks"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

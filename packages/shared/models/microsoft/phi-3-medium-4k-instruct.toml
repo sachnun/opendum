@@ -7,6 +7,7 @@ input = ["text","image"]
 output = ["text"]
 
 [opendum]
+family = "Microsoft"
 providers = ["nvidia_nim"]
 aliases = ["microsoft-phi-3-medium-4k-instruct", "microsoft/phi-3-medium-4k-instruct"]
 ignored = true

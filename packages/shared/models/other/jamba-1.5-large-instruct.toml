@@ -1,4 +1,5 @@
 [opendum]
+family = "AI21"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

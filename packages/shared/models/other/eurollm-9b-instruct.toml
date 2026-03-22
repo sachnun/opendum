@@ -1,4 +1,5 @@
 [opendum]
+family = "EuroLLM"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

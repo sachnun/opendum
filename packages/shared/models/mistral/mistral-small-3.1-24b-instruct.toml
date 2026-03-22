@@ -1,4 +1,5 @@
 [opendum]
+family = "Mistral"
 providers = ["openrouter"]
 
 [opendum.upstream]

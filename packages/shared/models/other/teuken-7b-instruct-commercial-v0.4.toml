@@ -1,4 +1,5 @@
 [opendum]
+family = "OpenGPT-X"
 providers = ["nvidia_nim"]
 
 [opendum.upstream]

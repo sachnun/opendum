@@ -1,4 +1,5 @@
 [opendum]
+family = "Liquid AI"
 providers = ["openrouter"]
 
 [opendum.upstream]

@@ -1,4 +1,5 @@
 [opendum]
+family = "Baichuan"
 providers = ["nvidia_nim"]
 aliases = ["baichuan-inc-baichuan2-13b-chat", "baichuan-inc/baichuan2-13b-chat"]
 ignored = true

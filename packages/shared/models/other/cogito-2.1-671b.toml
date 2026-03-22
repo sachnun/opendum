@@ -8,6 +8,7 @@ context = 163_840
 output = 32_000
 
 [opendum]
+family = "Deep Cogito"
 providers = ["ollama_cloud"]
 ignored = true
 

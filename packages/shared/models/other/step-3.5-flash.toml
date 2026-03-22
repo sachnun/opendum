@@ -1,4 +1,5 @@
 [opendum]
+family = "StepFun"
 providers = ["openrouter"]
 
 [opendum.upstream]
