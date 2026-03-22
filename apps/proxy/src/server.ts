@@ -16,12 +16,13 @@ const app = Fastify({
   bodyLimit: 10 * 1024 * 1024, // 10 MB
 });
 
-// CORS
+// CORS — allow all
 await app.register(cors, {
-  origin: process.env.CORS_ORIGIN ?? true,
+  origin: true,
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Api-Key"],
-  exposedHeaders: ["X-Provider-Account-Id"],
+  allowedHeaders: "*",
+  exposedHeaders: "*",
+  credentials: true,
 });
 
 // Health check
