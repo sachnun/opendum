@@ -428,6 +428,72 @@ export async function getProviderAccountErrorHistory(
 }
 
 /**
+ * Resolve (clear) all errors for a provider account.
+ * Resets error tracking fields, restores status to "active", and deletes error history.
+ */
+export async function resolveProviderAccountErrors(
+  accountId: string
+): Promise<ActionResult> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Verify ownership
+    const [account] = await db
+      .select({ id: providerAccount.id, status: providerAccount.status })
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.id, accountId),
+          eq(providerAccount.userId, session.user.id)
+        )
+      )
+      .limit(1);
+
+    if (!account) {
+      return { success: false, error: "Account not found" };
+    }
+
+    // Reset error tracking fields on the account
+    const updates: Record<string, unknown> = {
+      errorCount: 0,
+      consecutiveErrors: 0,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+      lastErrorCode: null,
+    };
+
+    // Restore status to active if it was auto-degraded
+    if (account.status === "degraded" || account.status === "failed") {
+      updates.status = "active";
+      updates.statusReason = null;
+      updates.statusChangedAt = new Date();
+    }
+
+    await db
+      .update(providerAccount)
+      .set(updates)
+      .where(eq(providerAccount.id, accountId));
+
+    // Delete all error history entries for this account
+    await db
+      .delete(providerAccountErrorHistory)
+      .where(eq(providerAccountErrorHistory.providerAccountId, accountId));
+
+    revalidatePath("/dashboard/accounts");
+    revalidatePath("/dashboard/accounts", "layout");
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("Failed to resolve provider account errors:", error);
+    return { success: false, error: "Failed to resolve account errors" };
+  }
+}
+
+/**
  * Connect Nvidia account using API key
  */
 export async function connectNvidiaNimApiKey(
