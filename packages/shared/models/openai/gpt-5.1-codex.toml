@@ -9,4 +9,4 @@ output = 32_768
 
 [opendum]
 family = "OpenAI"
-providers = ["codex", "copilot"]
+providers = ["copilot"]
