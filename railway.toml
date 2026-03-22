@@ -1,6 +1,13 @@
 [build]
 builder = "railpack"
 buildCommand = "pnpm --filter @opendum/shared build && pnpm --filter @opendum/proxy build"
+ignoredPaths = [
+  "apps/dashboard/**",
+  "scripts/**",
+  ".github/**",
+  "*.md",
+  ".env.example",
+]
 
 [deploy]
 startCommand = "node apps/proxy/dist/server.js"
