@@ -4,6 +4,7 @@
 import { getCachedSignature } from "../cache.js";
 import {
   applyAntigravitySystemInstruction,
+  isImageGenerationModel,
   normalizeThinkingConfig,
 } from "../request-helpers.js";
 import { cacheToolSchemas } from "../tool-schema-cache.js";
@@ -469,39 +470,58 @@ export function transformGeminiRequest(
   parsedBody: RequestPayload
 ): TransformResult {
   const requestPayload: RequestPayload = { ...parsedBody };
+  const isImageModel = isImageGenerationModel(context.model);
 
   delete requestPayload.safetySettings;
 
-  if (!requestPayload.toolConfig) {
-    requestPayload.toolConfig = {};
-  }
-  if (typeof requestPayload.toolConfig === "object") {
-    const toolConfig = requestPayload.toolConfig as Record<string, unknown>;
-    if (!toolConfig.functionCallingConfig) {
-      toolConfig.functionCallingConfig = {};
+  // Image generation models do NOT support function calling / tool use.
+  // Injecting toolConfig causes issues with the upstream API.
+  if (!isImageModel) {
+    if (!requestPayload.toolConfig) {
+      requestPayload.toolConfig = {};
     }
-    if (typeof toolConfig.functionCallingConfig === "object") {
-      (toolConfig.functionCallingConfig as Record<string, unknown>).mode =
-        "VALIDATED";
+    if (typeof requestPayload.toolConfig === "object") {
+      const toolConfig = requestPayload.toolConfig as Record<string, unknown>;
+      if (!toolConfig.functionCallingConfig) {
+        toolConfig.functionCallingConfig = {};
+      }
+      if (typeof toolConfig.functionCallingConfig === "object") {
+        (toolConfig.functionCallingConfig as Record<string, unknown>).mode =
+          "VALIDATED";
+      }
     }
+  } else {
+    // Strip any tools/toolConfig for image models
+    delete requestPayload.toolConfig;
+    delete requestPayload.tools;
   }
 
   const rawGenerationConfig = requestPayload.generationConfig as
     | Record<string, unknown>
     | undefined;
-  const normalizedThinking = normalizeThinkingConfig(
-    rawGenerationConfig?.thinkingConfig
-  );
-  if (normalizedThinking) {
-    if (rawGenerationConfig) {
-      rawGenerationConfig.thinkingConfig = normalizedThinking;
+
+  // Image generation models do NOT support thinking/reasoning.
+  // Strip thinkingConfig entirely for image models to avoid API errors.
+  if (isImageModel) {
+    if (rawGenerationConfig?.thinkingConfig) {
+      delete rawGenerationConfig.thinkingConfig;
       requestPayload.generationConfig = rawGenerationConfig;
-    } else {
-      requestPayload.generationConfig = { thinkingConfig: normalizedThinking };
     }
-  } else if (rawGenerationConfig?.thinkingConfig) {
-    delete rawGenerationConfig.thinkingConfig;
-    requestPayload.generationConfig = rawGenerationConfig;
+  } else {
+    const normalizedThinking = normalizeThinkingConfig(
+      rawGenerationConfig?.thinkingConfig
+    );
+    if (normalizedThinking) {
+      if (rawGenerationConfig) {
+        rawGenerationConfig.thinkingConfig = normalizedThinking;
+        requestPayload.generationConfig = rawGenerationConfig;
+      } else {
+        requestPayload.generationConfig = { thinkingConfig: normalizedThinking };
+      }
+    } else if (rawGenerationConfig?.thinkingConfig) {
+      delete rawGenerationConfig.thinkingConfig;
+      requestPayload.generationConfig = rawGenerationConfig;
+    }
   }
 
   if ("system_instruction" in requestPayload) {
@@ -542,19 +562,22 @@ export function transformGeminiRequest(
     delete requestPayload.model;
   }
 
-  // Sanitize tool names to ensure Gemini API compatibility
-  sanitizeToolNames(requestPayload);
+  // Skip tool-related processing for image models (no function calling support)
+  if (!isImageModel) {
+    // Sanitize tool names to ensure Gemini API compatibility
+    sanitizeToolNames(requestPayload);
 
-  // Cache tool schemas for response normalization
-  cacheToolSchemas(
-    requestPayload.tools as Array<Record<string, unknown>> | undefined
-  );
+    // Cache tool schemas for response normalization
+    cacheToolSchemas(
+      requestPayload.tools as Array<Record<string, unknown>> | undefined
+    );
 
-  // Augment tool descriptions with STRICT PARAMETERS hints
-  augmentToolDescriptionsWithStrictParams(requestPayload);
+    // Augment tool descriptions with STRICT PARAMETERS hints
+    augmentToolDescriptionsWithStrictParams(requestPayload);
 
-  // Inject system instruction for tools if needed
-  injectSystemInstructionIfNeeded(requestPayload);
+    // Inject system instruction for tools if needed
+    injectSystemInstructionIfNeeded(requestPayload);
+  }
 
   // Scrub conversation artifacts from model history
   scrubConversationArtifactsFromModelHistory(requestPayload);

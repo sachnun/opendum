@@ -14,6 +14,19 @@ export function getSessionId(): string {
 }
 
 /**
+ * Check if a model is an image generation model (e.g. Nano Banana / Nano Banana Pro).
+ * Image generation models have fundamentally different capabilities:
+ * - No tool/function calling support
+ * - No reasoning/thinking support
+ * - Should NOT receive the Antigravity coding system instruction
+ * - Should NOT receive toolConfig/functionCallingConfig
+ */
+export function isImageGenerationModel(model: string): boolean {
+  const normalized = model.toLowerCase();
+  return normalized.includes("image");
+}
+
+/**
  * Generate a unique request ID
  */
 export function generateRequestId(): string {
@@ -40,6 +53,12 @@ export function applyAntigravitySystemInstruction(
   model: string
 ): void {
   const normalizedModel = model.toLowerCase();
+
+  // Image generation models should NOT receive the coding system instruction
+  if (isImageGenerationModel(normalizedModel)) {
+    return;
+  }
+
   const needsInjection =
     normalizedModel.includes("claude") ||
     normalizedModel.includes("gemini-3-pro") ||

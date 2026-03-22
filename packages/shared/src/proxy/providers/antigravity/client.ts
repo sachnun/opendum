@@ -27,7 +27,7 @@ import {
   DEFAULT_PROJECT_ID,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
-import { generateRequestId } from "./request-helpers.js";
+import { generateRequestId, isImageGenerationModel } from "./request-helpers.js";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform/index.js";
 import type { TransformContext } from "./transform/types.js";
 import {
@@ -104,6 +104,21 @@ function normalizeRequestForModel(
     normalizedBody.top_p < 0.95
   ) {
     delete normalizedBody.top_p;
+  }
+
+  // Image generation models (e.g. gemini-3-pro-image, gemini-3.1-flash-image)
+  // do NOT support reasoning/thinking, tool calling, or presence/frequency penalties.
+  // Strip these params to avoid upstream API errors.
+  if (isImageGenerationModel(effectiveModel)) {
+    delete normalizedBody.reasoning;
+    delete normalizedBody.reasoning_effort;
+    delete normalizedBody.thinking_budget;
+    delete normalizedBody.include_thoughts;
+    delete normalizedBody.presence_penalty;
+    delete normalizedBody.frequency_penalty;
+    delete normalizedBody.tools;
+    delete normalizedBody.tool_choice;
+    delete normalizedBody._includeReasoning;
   }
 
   return normalizedBody;
@@ -405,7 +420,19 @@ export const antigravityProvider: Provider = {
       }
     }
 
-    // All endpoints failed
+    // All endpoints failed — provide actionable error for image models
+    if (isImageGenerationModel(effectiveModel)) {
+      const baseMsg = lastError?.message ?? "All Antigravity endpoints failed";
+      const is404 = baseMsg.includes("404") || baseMsg.includes("NOT_FOUND") || baseMsg.includes("not found");
+      if (is404) {
+        throw new Error(
+          `Model "${effectiveModel}" returned 404 (NOT_FOUND) from all Code Assist endpoints. ` +
+          `This image generation model requires a paid Google account (Google AI Pro/Ultra or Gemini Code Assist subscription). ` +
+          `Free-tier accounts do not have access to image generation models. ` +
+          `Original error: ${baseMsg}`
+        );
+      }
+    }
     throw lastError || new Error("All Antigravity endpoints failed");
   },
 };
