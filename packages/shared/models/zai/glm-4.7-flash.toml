@@ -1,0 +1,15 @@
+release_date = "2025-12-22"
+reasoning = false
+tool_call = true
+attachment = false
+
+[limit]
+context = 128_000
+output = 8_192
+
+[opendum]
+family = "Z.AI"
+providers = ["kiro"]
+
+[opendum.upstream]
+kiro = "glm-4.7-flash"

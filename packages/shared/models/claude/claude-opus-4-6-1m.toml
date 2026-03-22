@@ -1,0 +1,17 @@
+release_date = "2026-02"
+knowledge = "2025-05"
+reasoning = true
+tool_call = true
+attachment = true
+
+[limit]
+context = 1_000_000
+output = 128_000
+
+[opendum]
+family = "Claude"
+providers = ["kiro"]
+aliases = ["claude-opus-4.6-1m", "claude-opus-4-6-1m"]
+
+[opendum.upstream]
+kiro = "claude-opus-4.6-1m"

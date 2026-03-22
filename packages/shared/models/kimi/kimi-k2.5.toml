@@ -14,7 +14,8 @@ output = 262_144
 
 [opendum]
 family = "Kimi"
-providers = ["iflow", "nvidia_nim", "ollama_cloud"]
+providers = ["iflow", "kiro", "nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]
+kiro = "kimi-k2.5"
 nvidia_nim = "moonshotai/kimi-k2.5"

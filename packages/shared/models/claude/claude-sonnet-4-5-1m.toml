@@ -1,0 +1,17 @@
+release_date = "2025-11-18"
+knowledge = "2025-07"
+reasoning = true
+tool_call = true
+attachment = true
+
+[limit]
+context = 1_000_000
+output = 64_000
+
+[opendum]
+family = "Claude"
+providers = ["kiro"]
+aliases = ["claude-sonnet-4.5-1m", "claude-sonnet-4-5-1m"]
+
+[opendum.upstream]
+kiro = "claude-sonnet-4.5-1m"
