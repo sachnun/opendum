@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL;
 
 export default async function UsagePage() {
-  const baseUrl = PROXY_URL ? PROXY_URL.replace(/\/$/, "") : "http://localhost:4000";
+  const baseUrl = PROXY_URL ? PROXY_URL.replace(/\/$/, "") + "/v1" : "http://localhost:4000/v1";
 
   return (
     <div className="space-y-6">
@@ -84,7 +84,7 @@ export default async function UsagePage() {
             <Badge variant="outline">OpenAI-compatible</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST {baseUrl}/v1/chat/completions</code>
+              <code className="text-sm">POST {baseUrl}/chat/completions</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth header</p>
@@ -96,7 +96,7 @@ export default async function UsagePage() {
             <Badge variant="outline">Anthropic</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST {baseUrl}/v1/messages</code>
+              <code className="text-sm">POST {baseUrl}/messages</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth headers</p>
@@ -111,7 +111,7 @@ export default async function UsagePage() {
             <Badge variant="outline">OpenAI Responses</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST {baseUrl}/v1/responses</code>
+              <code className="text-sm">POST {baseUrl}/responses</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth header</p>

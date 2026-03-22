@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL;
 
 const handler = () => {
-  const proxy = PROXY_URL ? ` New base URL: ${PROXY_URL}` : "";
+  const proxyBaseUrl = PROXY_URL ? PROXY_URL.replace(/\/$/, "") + "/v1" : "";
+  const proxy = proxyBaseUrl ? ` New base URL: ${proxyBaseUrl}` : "";
 
   return NextResponse.json(
     {
@@ -11,7 +12,7 @@ const handler = () => {
         message: `The proxy API has moved to a dedicated server. Please update your base URL.${proxy}`,
         type: "invalid_request_error",
         code: "endpoint_moved",
-        ...(PROXY_URL && { proxy_url: PROXY_URL }),
+        ...(proxyBaseUrl && { proxy_url: proxyBaseUrl }),
       },
     },
     { status: 410 },
