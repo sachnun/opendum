@@ -144,7 +144,7 @@ export default async function AccountsPage({
   return (
     <div className="space-y-6">
       <div className="relative">
-        <div className="fixed inset-x-0 top-16 z-20 bg-background md:left-60 md:pt-5">
+        <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-5">
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
             <div className="bg-background">
               <div className="border-b border-border pb-4">
@@ -163,7 +163,7 @@ export default async function AccountsPage({
             </div>
           </div>
         </div>
-        <div className="h-[124px] sm:h-[96px]" />
+        <div className="h-[136px] sm:h-[108px]" />
       </div>
 
       {params.success && (
