@@ -11,6 +11,7 @@ const rootDir = resolve(scriptDir, "..");
 const modelsDir = resolve(rootDir, "packages/shared/models");
 
 const refreshScripts = [
+  "antigravity-version.mjs",
   "codex.mjs",
   "openrouter.mjs",
   "nvidia.mjs",
