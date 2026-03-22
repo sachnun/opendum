@@ -1,12 +1,12 @@
-release_date = "2025-11-20"
+release_date = "2026-02-20"
 knowledge = "2025-06"
 reasoning = false
 tool_call = false
 attachment = true
 
 [cost]
-input = 2
-output = 120
+input = 0.5
+output = 30
 
 [limit]
 context = 32_768
@@ -15,8 +15,8 @@ output = 64_000
 [opendum]
 family = "Gemini"
 providers = ["antigravity", "gemini_cli"]
-aliases = ["gemini-3-pro-image"]
+aliases = ["gemini-3.1-flash-image", "gemini-3-flash-image"]
 
 [opendum.upstream]
-antigravity = "gemini-3-pro-image"
-gemini_cli = "gemini-3-pro-image"
+antigravity = "gemini-3.1-flash-image"
+gemini_cli = "gemini-3.1-flash-image"
