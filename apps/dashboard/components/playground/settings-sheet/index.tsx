@@ -105,7 +105,7 @@ export function SettingsSheet({
           <span className="sr-only">Settings</span>
         </Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent className="overflow-y-auto overflow-x-hidden">
         <SheetHeader>
           <SheetTitle>Settings</SheetTitle>
           <SheetDescription>
@@ -311,28 +311,30 @@ export function SettingsSheet({
             {/* Reasoning Effort */}
             <div className="space-y-2">
               <Label>Reasoning Effort</Label>
-              <div className="flex gap-1">
-                {REASONING_OPTIONS.map((option) => (
-                  <Button
-                    key={option.value}
-                    variant={
-                      settings.reasoningEffort === option.value
-                        ? "default"
-                        : "outline"
-                    }
-                    size="sm"
-                    onClick={() => updateSetting("reasoningEffort", option.value)}
-                    disabled={disabled}
-                    className={cn(
-                      "flex-1",
-                      settings.reasoningEffort === option.value &&
-                        option.value !== "none" &&
-                        "bg-amber-600 hover:bg-amber-700"
-                    )}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
+              <div className="overflow-x-auto">
+                <div className="flex gap-1">
+                  {REASONING_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={
+                        settings.reasoningEffort === option.value
+                          ? "default"
+                          : "outline"
+                      }
+                      size="sm"
+                      onClick={() => updateSetting("reasoningEffort", option.value)}
+                      disabled={disabled}
+                      className={cn(
+                        "flex-1",
+                        settings.reasoningEffort === option.value &&
+                          option.value !== "none" &&
+                          "bg-amber-600 hover:bg-amber-700"
+                      )}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 Enable extended thinking for reasoning models (DeepSeek-R1, Qwen-thinking, etc.)
