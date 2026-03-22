@@ -29,14 +29,32 @@ app.get("/health", async () => {
   return { status: "ok", timestamp: new Date().toISOString() };
 });
 
-// Root redirect
-app.get("/", async (_request, reply) => {
-  return reply.redirect(process.env.DASHBOARD_URL ?? "https://opendum.app");
+// Root
+app.get("/", async () => {
+  return {
+    name: "Opendum Proxy",
+    version: "1.0.0",
+    status: "operational",
+    endpoints: {
+      chat_completions: "/v1/chat/completions",
+      messages: "/v1/messages",
+      responses: "/v1/responses",
+      models: "/v1/models",
+      health: "/health",
+    },
+  };
 });
 
-// V1 root redirect
-app.get("/v1", async (_request, reply) => {
-  return reply.redirect(process.env.DASHBOARD_URL ?? "https://opendum.app");
+// V1 root
+app.get("/v1", async () => {
+  return {
+    endpoints: {
+      chat_completions: "/v1/chat/completions",
+      messages: "/v1/messages",
+      responses: "/v1/responses",
+      models: "/v1/models",
+    },
+  };
 });
 
 // Proxy routes
@@ -49,9 +67,33 @@ app.get("/v1/models", modelsRoute);
 app.all("/v1/*", async (_request, reply) => {
   return reply.code(404).send({
     error: {
-      message: "Unknown API endpoint. See https://opendum.app/docs for API reference.",
+      message: "Unknown API endpoint.",
       type: "invalid_request_error",
       code: "unknown_endpoint",
+    },
+  });
+});
+
+// Global 404
+app.setNotFoundHandler(async (_request, reply) => {
+  return reply.code(404).send({
+    error: {
+      message: "Not found.",
+      type: "invalid_request_error",
+      code: "not_found",
+    },
+  });
+});
+
+// Global error handler
+app.setErrorHandler(async (error, _request, reply) => {
+  const err = error as { statusCode?: number; message?: string; code?: string };
+  const statusCode = err.statusCode ?? 500;
+  reply.code(statusCode).send({
+    error: {
+      message: statusCode >= 500 ? "Internal server error." : (err.message ?? "Unknown error."),
+      type: statusCode >= 500 ? "api_error" : "invalid_request_error",
+      code: err.code ?? "unknown_error",
     },
   });
 });
