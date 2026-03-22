@@ -63,6 +63,9 @@ export {
   getUpstreamModelName,
   getModelLookupKeys,
   formatModelsForOpenAI,
+  getModelFamily,
+  getAllFamilies,
+  getModelsByFamily,
 } from "./proxy/models.js";
 
 // Proxy - Auth (API key validation)

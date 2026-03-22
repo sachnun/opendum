@@ -40,6 +40,8 @@ export interface ModelInfo {
   providers: string[];
   aliases?: string[];
   description?: string;
+  /** Model family name (e.g. "Claude", "OpenAI"). Read from [opendum].family in TOML. */
+  family?: string;
   meta?: ModelMeta;
   /** Per-provider upstream model name. When absent, the canonical id is used. */
   upstream?: Record<string, string>;
@@ -125,6 +127,7 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
   const providers = opendum.providers ?? [];
   const aliases = opendum.aliases;
   const description = opendum.description;
+  const family = opendum.family;
   const upstream = opendum.upstream;
 
   const hasMeta =
@@ -162,6 +165,7 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
     providers,
     aliases: aliases && aliases.length > 0 ? aliases : undefined,
     description,
+    family,
     meta,
     upstream: upstream && Object.keys(upstream).length > 0 ? upstream : undefined,
   };

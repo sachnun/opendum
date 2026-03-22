@@ -256,3 +256,42 @@ export function formatModelsForOpenAI(): Array<{
 
   return models;
 }
+
+// ---------------------------------------------------------------------------
+// Family helpers — derived from TOML [opendum].family
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the family of a model from the TOML registry.
+ * Returns undefined if the model is not found or has no family set.
+ */
+export function getModelFamily(modelId: string): string | undefined {
+  const canonical = resolveModelAlias(modelId);
+  return EFFECTIVE_MODEL_REGISTRY[canonical]?.family;
+}
+
+/**
+ * Get all unique family names present in the registry.
+ */
+export function getAllFamilies(): string[] {
+  const families = new Set<string>();
+  for (const info of Object.values(EFFECTIVE_MODEL_REGISTRY)) {
+    if (info.family) families.add(info.family);
+  }
+  return Array.from(families).sort();
+}
+
+/**
+ * Build a mapping of family name → array of canonical model IDs.
+ * Models without a family are grouped under the key "Others".
+ */
+export function getModelsByFamily(): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  for (const [modelId, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
+    if (getProvidersForModel(modelId).length === 0) continue;
+    const family = info.family ?? "Others";
+    if (!result[family]) result[family] = [];
+    result[family].push(modelId);
+  }
+  return result;
+}
