@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Command as CommandPrimitive } from "cmdk"
-import { SearchIcon } from "lucide-react"
+import { SearchIcon, XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import {
@@ -64,6 +64,9 @@ function CommandInput({
   className,
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const [hasValue, setHasValue] = React.useState(false)
+
   return (
     <div
       data-slot="command-input-wrapper"
@@ -71,13 +74,39 @@ function CommandInput({
     >
       <SearchIcon className="size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
+        ref={inputRef}
         data-slot="command-input"
         className={cn(
           "placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
+        onValueChange={(value) => {
+          setHasValue(value.length > 0)
+          props.onValueChange?.(value)
+        }}
         {...props}
       />
+      {hasValue && (
+        <button
+          type="button"
+          onClick={() => {
+            if (inputRef.current) {
+              inputRef.current.value = ""
+              inputRef.current.focus()
+              const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype,
+                "value"
+              )?.set
+              nativeInputValueSetter?.call(inputRef.current, "")
+              inputRef.current.dispatchEvent(new Event("input", { bubbles: true }))
+            }
+            setHasValue(false)
+          }}
+          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+        >
+          <XIcon className="size-4" />
+        </button>
+      )}
     </div>
   )
 }
