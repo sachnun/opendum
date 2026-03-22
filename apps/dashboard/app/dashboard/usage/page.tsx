@@ -80,42 +80,42 @@ export default async function UsagePage() {
           <CardDescription>All requests go to the proxy. Pick the endpoint style you need.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+          <div className="min-w-0 space-y-3 rounded-lg border border-border bg-muted/30 p-4">
             <Badge variant="outline">OpenAI-compatible</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST {baseUrl}/chat/completions</code>
+              <code className="break-all text-sm">POST {baseUrl}/chat/completions</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth header</p>
-              <code className="text-sm">Authorization: Bearer &lt;api_key&gt;</code>
+              <code className="break-all text-sm">Authorization: Bearer &lt;api_key&gt;</code>
             </div>
           </div>
 
-          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+          <div className="min-w-0 space-y-3 rounded-lg border border-border bg-muted/30 p-4">
             <Badge variant="outline">Anthropic</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST {baseUrl}/messages</code>
+              <code className="break-all text-sm">POST {baseUrl}/messages</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth headers</p>
               <div className="space-y-1">
-                <code className="block text-sm">x-api-key: &lt;api_key&gt;</code>
-                <code className="block text-sm">anthropic-version: 2023-06-01</code>
+                <code className="block break-all text-sm">x-api-key: &lt;api_key&gt;</code>
+                <code className="block break-all text-sm">anthropic-version: 2023-06-01</code>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+          <div className="min-w-0 space-y-3 rounded-lg border border-border bg-muted/30 p-4">
             <Badge variant="outline">OpenAI Responses</Badge>
             <div>
               <p className="text-xs text-muted-foreground">Endpoint</p>
-              <code className="text-sm">POST {baseUrl}/responses</code>
+              <code className="break-all text-sm">POST {baseUrl}/responses</code>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth header</p>
-              <code className="text-sm">Authorization: Bearer &lt;api_key&gt;</code>
+              <code className="break-all text-sm">Authorization: Bearer &lt;api_key&gt;</code>
             </div>
           </div>
         </CardContent>
