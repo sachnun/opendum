@@ -11,13 +11,14 @@ const rootDir = resolve(scriptDir, "..");
 const modelsDir = resolve(rootDir, "packages/shared/models");
 
 const refreshScripts = [
+  "codex.mjs",
   "openrouter.mjs",
   "nvidia.mjs",
   "ollama.mjs",
 ];
 
 // Providers whose models are refreshed by the scripts above
-const REFRESHED_PROVIDERS = ["nvidia_nim", "ollama_cloud", "openrouter"];
+const REFRESHED_PROVIDERS = ["codex", "nvidia_nim", "ollama_cloud", "openrouter"];
 
 // ---------------------------------------------------------------------------
 // Run a child script
