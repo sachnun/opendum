@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   FEATURED_MODEL_FAMILIES,
   MODEL_FAMILY_ANCHOR_IDS,
-  getModelFamily,
+  categorizeModelFamily,
   type ModelFamily,
 } from "@/lib/model-families";
 import {
@@ -20,6 +20,8 @@ interface ModelWithStats {
   id: string;
   providers: string[];
   providerLabels: string[];
+  /** Model family from TOML (e.g. "Claude", "OpenAI"). */
+  family?: string;
   meta?: ModelMeta;
   isEnabled: boolean;
   stats: {
@@ -143,7 +145,7 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
     const groupedModels = new Map<ModelFamily, ModelWithStats[]>();
 
     for (const model of filteredModels) {
-      const family = getModelFamily(model.id);
+      const family = categorizeModelFamily(model.family);
       const familyModels = groupedModels.get(family) ?? [];
       familyModels.push(model);
       groupedModels.set(family, familyModels);

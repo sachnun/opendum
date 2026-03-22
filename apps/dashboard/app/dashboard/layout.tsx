@@ -10,9 +10,9 @@ import { HeaderSkeleton } from "@/components/layout/header-skeleton";
 import { DashboardDataRefresher } from "@/components/layout/dashboard-data-refresher";
 import {
   MODEL_FAMILY_NAV_ITEMS,
-  getModelFamily,
+  categorizeModelFamily,
 } from "@/lib/model-families";
-import { getAllModels } from "@opendum/shared/proxy/models";
+import { getAllModels, getModelFamily as getModelFamilyFromRegistry } from "@opendum/shared/proxy/models";
 import type {
   ModelFamilyCounts,
   ProviderAccountIndicator,
@@ -173,7 +173,8 @@ export default async function DashboardLayout({
   }
 
   for (const modelId of getAllModels()) {
-    const family = getModelFamily(modelId);
+    const rawFamily = getModelFamilyFromRegistry(modelId);
+    const family = categorizeModelFamily(rawFamily);
     const anchorId = familyAnchorByName.get(family);
     if (!anchorId) {
       continue;

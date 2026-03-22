@@ -1,3 +1,14 @@
+/**
+ * UI-specific model family configuration.
+ *
+ * The actual model → family mapping lives in each TOML file under
+ * [opendum].family and is exposed via ModelInfo.family from
+ * @opendum/shared/proxy/models. This module only defines:
+ *   - which families are "featured" (shown as dedicated sections)
+ *   - their display order
+ *   - anchor IDs for navigation
+ */
+
 export const FEATURED_MODEL_FAMILIES = [
   "OpenAI",
   "Claude",
@@ -23,113 +34,17 @@ export const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   "Z.AI": "zai-models",
 };
 
-const MODELS_BY_FAMILY: Record<FeaturedModelFamily, readonly string[]> = {
-  OpenAI: [
-    "gpt-5.4",
-    "gpt-5.3-codex",
-    "gpt-5.2-codex",
-    "gpt-5.2",
-    "gpt-5.1",
-    "gpt-5.1-codex-max",
-    "gpt-5.1-codex",
-    "gpt-5.1-codex-mini",
-    "gpt-5",
-    "gpt-5-mini",
-    "gpt-4.1",
-    "gpt-4o",
-    "gpt-oss-120b-medium",
-    "gpt-oss-20b",
-  ],
-  Claude: [
-    "claude-3-haiku",
-    "claude-3-7-sonnet",
-    "claude-haiku-4-5",
-    "claude-sonnet-4",
-    "claude-sonnet-4-5",
-    "claude-opus-4",
-    "claude-opus-4-1",
-    "claude-opus-4-5",
-    "claude-opus-4-6",
-  ],
-  Gemini: [
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-3-flash-preview",
-    "gemini-3-pro-preview",
-    "gemini-3.1-pro-preview",
-    "gemini-3-pro-image-preview",
-  ],
-  Qwen: [
-    "qwen3-coder-plus",
-    "qwen3-coder-flash",
-    "qwen3.5",
-    "qwen3-max-2026-01-23",
-    "qwen3-max",
-    "qwen3-235b-a22b-thinking-2507",
-    "qwen3-235b-a22b-instruct",
-    "qwen3-235b",
-    "qwen3-vl-plus",
-    "qwen2.5-vl-72b-instruct",
-    "qwen-vl-max",
-    "qwen2-7b-instruct",
-    "qwen2.5-7b-instruct",
-    "qwen2.5-coder-32b",
-    "qwen2.5-coder-7b",
-    "qwen3-235b-a22b",
-    "qwen3-next-80b-a3b-instruct",
-    "qwq-32b",
-    "qwen3-coder-480b",
-    "qwen3-coder-next",
-    "qwen3-next-80b",
-    "qwen3-vl-235b",
-    "qwen3-vl-235b-instruct",
-  ],
-  DeepSeek: [
-    "deepseek-v3.2-chat",
-    "deepseek-v3.2-reasoner",
-    "deepseek-v3.2",
-    "deepseek-v3.1",
-    "deepseek-v3",
-    "deepseek-r1",
-    "deepseek-coder-6.7b-instruct",
-    "deepseek-v3.1-terminus",
-    "deepseek-v3.1-671b",
-  ],
-  Kimi: [
-    "kimi-k2",
-    "kimi-k2.5",
-    "kimi-k2-0905",
-    "kimi-k2-thinking",
-    "kimi-k2-1t",
-  ],
-  MiniMax: [
-    "minimax-m2.5",
-    "minimax-m2.1",
-    "minimax-m2",
-  ],
-  "Z.AI": [
-    "glm-4.7",
-    "glm-5",
-    "glm-4.6",
-    "glm-4.5",
-  ],
-};
+const FEATURED_SET: ReadonlySet<string> = new Set<string>(FEATURED_MODEL_FAMILIES);
 
-const MODEL_FAMILY_BY_ID = new Map<string, FeaturedModelFamily>();
-
-for (const [family, modelIds] of Object.entries(MODELS_BY_FAMILY) as Array<[
-  FeaturedModelFamily,
-  readonly string[],
-]>) {
-  for (const modelId of modelIds) {
-    MODEL_FAMILY_BY_ID.set(modelId, family);
+/**
+ * Categorize a raw family string (from TOML) into a ModelFamily.
+ * Returns the family as-is when it is a featured family, otherwise "Others".
+ */
+export function categorizeModelFamily(family: string | undefined): ModelFamily {
+  if (family && FEATURED_SET.has(family)) {
+    return family as FeaturedModelFamily;
   }
-}
-
-export function getModelFamily(modelId: string): ModelFamily {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  return MODEL_FAMILY_BY_ID.get(normalizedModelId) ?? "Others";
+  return "Others";
 }
 
 export const MODEL_FAMILY_SORT_ORDER: readonly ModelFamily[] = [

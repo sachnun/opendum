@@ -8,6 +8,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import {
   MODEL_REGISTRY,
   getAllModels,
+  getModelFamily,
   getModelsForProvider,
   getProvidersForModel,
   resolveModelAlias,
@@ -356,6 +357,7 @@ async function ModelsContent() {
       id: model,
       providers,
       providerLabels: providers.map(getProviderLabel),
+      family: getModelFamily(model),
       meta: info?.meta,
       isEnabled: !disabledModelSet.has(model),
       stats: statsByModel[model] ?? buildEmptyModelStats(fallbackDayKeys, fallbackHourKeys),

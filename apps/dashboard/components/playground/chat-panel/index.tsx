@@ -27,12 +27,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { MODEL_FAMILY_SORT_ORDER, getModelFamily } from "@/lib/model-families";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@/lib/model-families";
 
 export interface ModelOption {
   id: string; // unique: "model"
   name: string;
   providers: string[];
+  /** Model family from TOML (e.g. "Claude", "OpenAI"). */
+  family?: string;
 }
 
 export interface ProviderAccountOption {
@@ -77,7 +79,7 @@ function groupModelsByFamily(models: ModelOption[]) {
   const groups: Record<string, ModelOption[]> = {};
 
   for (const model of models) {
-    const family = getModelFamily(model.id);
+    const family = categorizeModelFamily(model.family);
     if (!groups[family]) {
       groups[family] = [];
     }

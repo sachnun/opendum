@@ -3,7 +3,7 @@ import { db } from "@opendum/shared/db";
 import { disabledModel, providerAccount, proxyApiKey } from "@opendum/shared/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { decrypt } from "@opendum/shared/encryption";
-import { getAllModels, getProvidersForModel, resolveModelAlias } from "@opendum/shared/proxy/models";
+import { getAllModels, getProvidersForModel, resolveModelAlias, getModelFamily } from "@opendum/shared/proxy/models";
 import { PlaygroundClient } from "@/components/playground/client";
 import type {
   ModelOption,
@@ -25,6 +25,7 @@ function getModels(disabledModels: Set<string>): ModelOption[] {
       id: modelName,
       name: modelName,
       providers,
+      family: getModelFamily(modelName),
     });
   }
 

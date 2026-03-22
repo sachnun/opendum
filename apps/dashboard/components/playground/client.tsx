@@ -18,7 +18,7 @@ import {
 } from "./settings-sheet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MODEL_FAMILY_SORT_ORDER, getModelFamily } from "@/lib/model-families";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@/lib/model-families";
 
 interface PlaygroundClientProps {
   models: ModelOption[];
@@ -54,7 +54,7 @@ function buildFamilyPresets(
       continue;
     }
 
-    const family = getModelFamily(model.id);
+    const family = categorizeModelFamily(model.family);
     const familyModels = grouped.get(family) ?? [];
     familyModels.push(model);
     grouped.set(family, familyModels);
