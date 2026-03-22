@@ -629,7 +629,7 @@ export function AddAccountDialog({
         </div>
 
         {/* Step Content */}
-        <div className="min-h-[200px] space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
           {/* Step 1: Select Provider */}
           {step === 1 && (
             <div className="space-y-4">

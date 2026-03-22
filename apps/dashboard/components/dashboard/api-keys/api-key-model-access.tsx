@@ -154,7 +154,7 @@ export function ApiKeyModelAccess({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
           <div className="space-y-2">
             <p className="text-sm font-medium">Mode</p>
             <ToggleGroup

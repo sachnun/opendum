@@ -145,7 +145,7 @@ export function CreateApiKeyButton() {
                 Create a new API key for accessing Opendum.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4">
               <div>
                 <Label htmlFor="keyName">Name (optional)</Label>
                 <Input
