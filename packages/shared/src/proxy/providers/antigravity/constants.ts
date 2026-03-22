@@ -1,5 +1,3 @@
-// Antigravity OAuth and API Constants
-
 // OAuth Configuration (Google OAuth)
 export const ANTIGRAVITY_CLIENT_ID =
   process.env.ANTIGRAVITY_CLIENT_ID ||

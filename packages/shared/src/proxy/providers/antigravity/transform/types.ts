@@ -1,5 +1,3 @@
-// Transform types for Antigravity
-
 export type ModelFamily = "claude" | "gemini-flash" | "gemini-pro";
 
 export interface TransformContext {

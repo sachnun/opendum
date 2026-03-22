@@ -1,4 +1,3 @@
-// Gemini CLI Provider Implementation
 // Based on: https://github.com/Mirrowel/LLM-API-Key-Proxy/blob/main/src/rotator_library/providers/gemini_cli_provider.py
 
 import type { ProviderAccount } from "../../../db/schema.js";
@@ -93,7 +92,6 @@ function generateUserPromptId(): string {
 async function generateStableSessionId(
   contents: Array<Record<string, unknown>>
 ): Promise<string> {
-  // Find first user message text
   for (const content of contents) {
     if (content.role === "user") {
       const parts = content.parts as Array<Record<string, unknown>> | undefined;
@@ -101,12 +99,10 @@ async function generateStableSessionId(
         for (const part of parts) {
           const text = part.text as string | undefined;
           if (text) {
-            // SHA256 hash and format as UUID
             const encoder = new TextEncoder();
             const data = encoder.encode(text);
             const hashBuffer = await crypto.subtle.digest("SHA-256", data);
             const hashArray = new Uint8Array(hashBuffer);
-            // Format as UUID (8-4-4-4-12 hex chars)
             const hex = Array.from(hashArray.slice(0, 16), (b) =>
               b.toString(16).padStart(2, "0")
             ).join("");
@@ -116,7 +112,6 @@ async function generateStableSessionId(
       }
     }
   }
-  // Fallback to random UUID
   return crypto.randomUUID();
 }
 
@@ -234,7 +229,6 @@ export const geminiCliProvider: Provider = {
       expires_in: number;
     };
 
-    // Fetch account info (projectId, email, tier)
     const accountInfo = await fetchGeminiCliAccountInfo(tokens.access_token);
 
     if (!accountInfo.projectId) {
@@ -277,7 +271,6 @@ export const geminiCliProvider: Provider = {
       expires_in: number;
     };
 
-    // Fetch updated account info
     const accountInfo = await fetchGeminiCliAccountInfo(tokens.access_token);
 
     return {
@@ -294,12 +287,10 @@ export const geminiCliProvider: Provider = {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
 
-    // Check if token needs refresh
     if (isTokenExpired(account.expiresAt)) {
       try {
         const newTokens = await this.refreshToken(refreshTokenValue);
 
-        // Update database
         await db
           .update(providerAccount)
           .set({
@@ -369,7 +360,6 @@ export const geminiCliProvider: Provider = {
       ? upstreamName
       : model.split("/").pop()?.replace(":thinking", "") ?? model;
 
-    // Determine if reasoning output should be included in response
     const includeReasoning =
       body._includeReasoning ??
       !!(
@@ -379,13 +369,11 @@ export const geminiCliProvider: Provider = {
         body.include_thoughts
       );
 
-    // Convert OpenAI format to Gemini format
     const geminiPayload = convertOpenAIToGemini(body);
 
     // Image generation models don't support thinking/reasoning
     const isImageModel = modelName.includes("image");
 
-    // Add thinking config if reasoning is requested (skip for image models)
     if (!isImageModel) {
       const reasoningEffort = body.reasoning?.effort || body.reasoning_effort;
       const thinkingConfig = getThinkingConfig(
@@ -410,17 +398,13 @@ export const geminiCliProvider: Provider = {
       delete (geminiPayload as Record<string, unknown>).tools;
     }
 
-    // Add default safety settings to prevent content filtering
     (geminiPayload as Record<string, unknown>).safetySettings = DEFAULT_SAFETY_SETTINGS;
 
-    // Generate stable session ID based on conversation content
     const contents = geminiPayload.contents as Array<Record<string, unknown>>;
     const sessionId = await generateStableSessionId(contents);
 
-    // Generate unique prompt ID for this request (matches native gemini-cli)
     const userPromptId = generateUserPromptId();
 
-    // Build payload matching native gemini-cli structure
     // Source: gemini-cli/packages/core/src/code_assist/converter.ts
     const requestPayload = {
       model: modelName,
@@ -432,12 +416,10 @@ export const geminiCliProvider: Provider = {
       },
     };
 
-    // Build request URL
     const url = stream
       ? `${CODE_ASSIST_ENDPOINT}/v1internal:streamGenerateContent`
       : `${CODE_ASSIST_ENDPOINT}/v1internal:generateContent`;
 
-    // Build headers with Gemini CLI specific User-Agent
     const headers = new Headers({
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
@@ -445,7 +427,6 @@ export const geminiCliProvider: Provider = {
       "User-Agent": buildGeminiCliUserAgent(model),
     });
 
-    // Make the request
     const fallbackMs = stream
       ? geminiCliConfig.timeouts.streamMs
       : geminiCliConfig.timeouts.nonStreamMs;
@@ -462,7 +443,6 @@ export const geminiCliProvider: Provider = {
       timeoutMs
     );
 
-    // Transform response back to OpenAI format
     return await transformGeminiCliResponse(
       response,
       stream,
@@ -487,7 +467,6 @@ async function transformGeminiCliResponse(
   const isEventStream = contentType.includes("text/event-stream");
 
   if (streaming && response.ok && isEventStream && response.body) {
-    // Stream: unwrap wrapper, cache signatures, convert to OpenAI format
     const transformedBody = response.body
       .pipeThrough(new TextDecoderStream())
       .pipeThrough(createAntigravityUnwrapTransform())
@@ -506,7 +485,6 @@ async function transformGeminiCliResponse(
     });
   }
 
-  // Non-streaming
   const text = await response.text();
 
   if (!response.ok) {
@@ -520,20 +498,16 @@ async function transformGeminiCliResponse(
   try {
     let parsed = JSON.parse(text) as Record<string, unknown>;
 
-    // Handle array-wrapped response
     if (Array.isArray(parsed)) {
       parsed = (parsed.find(
         (item) => typeof item === "object" && item !== null
       ) ?? {}) as Record<string, unknown>;
     }
 
-    // Unwrap response wrapper
     const unwrapped = (parsed.response ?? parsed) as Record<string, unknown>;
 
-    // Cache thought signatures
     cacheSignaturesFromResponse(unwrapped, sessionId);
 
-    // Convert to OpenAI format
     const openaiResponse = convertGeminiToOpenAI(
       unwrapped,
       model,

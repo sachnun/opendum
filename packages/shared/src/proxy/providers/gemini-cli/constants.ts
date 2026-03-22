@@ -55,7 +55,6 @@ export const CODE_ASSIST_ENDPOINT = CODE_ASSIST_ENDPOINT_DAILY;
 export const CODE_ASSIST_API_VERSION = "v1internal";
 
 // Headers for Gemini CLI requests
-// Note: Gemini CLI uses simpler headers than Antigravity
 export const GEMINI_CLI_AUTH_HEADERS = {
   "User-Agent": `${GEMINI_CLI_USER_AGENT_BASE} (win32; x64)`,
 } as const;

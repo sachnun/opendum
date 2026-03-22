@@ -1,7 +1,3 @@
-// Codex Provider Implementation
-// Uses Device Code Flow for OAuth via auth.openai.com
-// API uses Responses API format, but we convert to/from Chat Completions format
-
 import type { ProviderAccount } from "../../../db/schema.js";
 import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
@@ -29,10 +25,6 @@ import {
 } from "./constants.js";
 import { getProviderModelSet } from "../../models.js";
 import { updateCodexQuotaFromHeaders } from "./quota.js";
-
-// ============================================================
-// Types
-// ============================================================
 
 /**
  * Device code initiation response
@@ -79,10 +71,6 @@ interface ResponsesInputItem {
   status?: string;
   [key: string]: unknown;
 }
-
-// ============================================================
-// Responses API ID Normalization
-// ============================================================
 
 /**
  * Convert any tool call ID to a format accepted by the Codex Responses API.
@@ -144,10 +132,6 @@ function filterSupportedCodexPayload(
   return filtered;
 }
 
-// ============================================================
-// PKCE Utilities
-// ============================================================
-
 /**
  * Generate PKCE code verifier
  */
@@ -170,10 +154,6 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
   const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-
-// ============================================================
-// JWT Parsing
-// ============================================================
 
 /**
  * Normalize JWT value into a non-empty string.
@@ -312,10 +292,6 @@ function extractWorkspaceIdFromJwt(token: string): string | null {
   return extractWorkspaceIdFromClaims(decoded);
 }
 
-// ============================================================
-// Chat Completions <-> Responses API Conversion
-// ============================================================
-
 /**
  * Convert Chat Completions content block types to Responses API types.
  * Chat Completions uses "text" while Responses API requires "input_text" or "output_text".
@@ -345,7 +321,6 @@ function convertMessagesToInput(
     switch (msg.role) {
       case "system":
       case "developer":
-        // System/developer messages become input items with role
         input.push({
           type: "message",
           role: "developer",
@@ -610,16 +585,13 @@ function buildResponsesApiPayload(
   setIfCodexParamSupported(payload, "input", responseInput);
   setIfCodexParamSupported(payload, "stream", stream);
 
-  // Convert tools
   const tools = convertTools(body.tools);
   setIfCodexParamSupported(payload, "tools", tools);
 
-  // Map parameters
   // Codex endpoint currently rejects sampling controls
   // like temperature/top_p; omit them to avoid 400 errors.
   setIfCodexParamSupported(payload, "tool_choice", body.tool_choice);
 
-  // Reasoning config
   let reasoningConfig: Record<string, unknown> | undefined;
   if (body.reasoning && typeof body.reasoning === "object") {
     reasoningConfig = { ...body.reasoning };
@@ -667,10 +639,6 @@ function buildResponsesApiPayload(
 
   return filterSupportedCodexPayload(payload);
 }
-
-// ============================================================
-// Streaming Response Conversion (Responses API SSE -> Chat Completions SSE)
-// ============================================================
 
 /**
  * Generate a unique chat completion ID
@@ -1248,18 +1216,10 @@ function convertChatCompletionSseToCompletion(
   };
 }
 
-// ============================================================
-// Token Check
-// ============================================================
-
 function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = CODEX_REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
-
-// ============================================================
-// Provider Implementation
-// ============================================================
 
 export const codexConfig: ProviderConfig = {
   name: "codex",
@@ -1320,7 +1280,6 @@ export const codexProvider: Provider = {
 
     const tokens = await response.json() as CodexTokenResponse;
 
-    // Extract account ID from JWT
     const accountId =
       (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null) ||
       extractAccountIdFromJwt(tokens.access_token);
@@ -1333,7 +1292,7 @@ export const codexProvider: Provider = {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-      email: "", // Codex doesn't provide email
+      email: "",
       accountId: accountId || undefined,
       workspaceId: workspaceId || undefined,
     };
@@ -1461,13 +1420,11 @@ export const codexProvider: Provider = {
     // For non-streaming downstream calls, we aggregate the stream response.
     const upstreamStream = true;
 
-    // Build Responses API payload from Chat Completions format
     const payload = buildResponsesApiPayload(
       { ...body, model: modelName },
       upstreamStream
     );
 
-    // Build headers
     const headers: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
@@ -1477,7 +1434,6 @@ export const codexProvider: Provider = {
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     };
 
-    // Add ChatGPT account ID if available
     if (account.accountId) {
       headers["ChatGPT-Account-Id"] = account.accountId;
     }
@@ -1498,7 +1454,6 @@ export const codexProvider: Provider = {
       // Ignore quota header parsing failures
     }
 
-    // For streaming, convert Responses API SSE to Chat Completions SSE
     if (stream && response.ok && response.body) {
       const converter = createResponsesToChatCompletionsStream(modelName);
 
@@ -1518,7 +1473,6 @@ export const codexProvider: Provider = {
       });
     }
 
-    // For non-streaming, aggregate SSE and convert to Chat Completions JSON
     if (response.ok && !stream) {
       const contentType = response.headers.get("content-type") || "";
       let completionData: Record<string, unknown>;
@@ -1564,13 +1518,8 @@ export const codexProvider: Provider = {
   },
 };
 
-// ============================================================
-// Device Code Flow Functions
-// ============================================================
-
 /**
  * Initiate Codex Device Code Flow
- * Returns device code info including URL and user code for display
  */
 export async function initiateCodexDeviceCodeFlow(): Promise<{
   deviceAuthId: string;
@@ -1658,7 +1607,6 @@ export async function pollCodexDeviceCodeAuthorization(
 ): Promise<
   OAuthResult | { pending: true } | { error: string }
 > {
-  // Step 1: Poll for authorization code
   const pollResponse = await fetch(CODEX_DEVICE_POLL_ENDPOINT, {
     method: "POST",
     headers: {
@@ -1680,7 +1628,6 @@ export async function pollCodexDeviceCodeAuthorization(
 
     const tokenCodeVerifier = pollData.code_verifier || codeVerifier;
 
-    // Step 2: Exchange authorization code for tokens
     const tokenResponse = await fetch(CODEX_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {

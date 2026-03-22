@@ -1,5 +1,3 @@
-// Antigravity Provider Implementation
-
 import type { ProviderAccount } from "../../../db/schema.js";
 import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
@@ -139,9 +137,6 @@ export const antigravityProvider: Provider = {
       throw new Error("Code verifier required for Antigravity OAuth");
     }
 
-    // Generate code challenge synchronously would require async
-    // For now, we'll generate it and expect caller to await separately
-    // Or use a simpler approach - store verifier and generate challenge inline
     const params = new URLSearchParams({
       client_id: ANTIGRAVITY_CLIENT_ID,
       redirect_uri: `${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/api/oauth/antigravity/callback`,
@@ -190,7 +185,6 @@ export const antigravityProvider: Provider = {
       expires_in: number;
     };
 
-    // Fetch account info (projectId, email)
     const accountInfo = await fetchAccountInfo(tokens.access_token);
 
     return {
@@ -226,7 +220,6 @@ export const antigravityProvider: Provider = {
       expires_in: number;
     };
 
-    // Fetch updated account info
     const accountInfo = await fetchAccountInfo(tokens.access_token);
 
     return {
@@ -243,12 +236,10 @@ export const antigravityProvider: Provider = {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
 
-    // Check if token needs refresh
     if (isTokenExpired(account.expiresAt)) {
       try {
         const newTokens = await this.refreshToken(refreshTokenValue);
 
-        // Update database
         await db
           .update(providerAccount)
           .set({
@@ -290,8 +281,6 @@ export const antigravityProvider: Provider = {
     const sessionId = crypto.randomUUID();
     const requestId = generateRequestId();
 
-    // Determine if reasoning output should be included in response
-    // Only include if user explicitly requested reasoning
     const includeReasoning =
       normalizedBody._includeReasoning ??
       !!(
@@ -310,10 +299,8 @@ export const antigravityProvider: Provider = {
       sessionId,
     };
 
-    // Convert OpenAI format to Gemini format
     const geminiPayload = convertOpenAIToGemini(normalizedBody);
 
-    // Transform for Antigravity (inject system prompts, wrap request, etc.)
     const isClaudeModel = effectiveModel.includes("claude");
     const result = isClaudeModel
       ? transformClaudeRequest(context, geminiPayload)
@@ -323,10 +310,8 @@ export const antigravityProvider: Provider = {
     const needsForcedStreaming = isClaudeModel && !stream;
     const actualStream = needsForcedStreaming ? true : stream;
 
-    // Build request action
     const action = actualStream ? "streamGenerateContent?alt=sse" : "generateContent";
 
-    // Build headers
     const headers = new Headers({
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
@@ -334,12 +319,10 @@ export const antigravityProvider: Provider = {
       ...CODE_ASSIST_HEADERS,
     });
 
-    // Add thinking header for Claude thinking models
     if (isClaudeModel && effectiveModel.includes("thinking")) {
       headers.set("anthropic-beta", "interleaved-thinking-2025-05-14");
     }
 
-    // Try each endpoint in fallback order (daily → autopush → prod)
     let lastError: Error | null = null;
     for (const endpoint of CODE_ASSIST_ENDPOINT_FALLBACKS) {
       const url = `${endpoint}/v1internal:${action}`;
@@ -371,7 +354,6 @@ export const antigravityProvider: Provider = {
           const errorBody = await response.text();
 
           if (isRetryableError) {
-            // Capture error and try next endpoint
             lastError = new Error(errorBody);
             continue;
           }
@@ -384,19 +366,15 @@ export const antigravityProvider: Provider = {
           });
         }
 
-        // Success - process response
-        // If we forced streaming for Claude, buffer and convert to non-streaming
         if (needsForcedStreaming && response.body) {
           const bufferedResponse = await bufferStreamingToGeminiResponse(response);
 
-          // Cache signatures from buffered response
           cacheSignaturesFromResponse(
             bufferedResponse,
             family as "claude" | "gemini-flash" | "gemini-pro",
             sessionId
           );
 
-          // Convert to OpenAI format and return as non-streaming
           const openaiResponse = convertGeminiToOpenAI(bufferedResponse, rawModel, includeReasoning);
 
           return new Response(JSON.stringify(openaiResponse), {
@@ -405,7 +383,6 @@ export const antigravityProvider: Provider = {
           });
         }
 
-        // Transform response back to OpenAI format
         return await transformAntigravityResponse(
           response,
           stream,
@@ -420,7 +397,6 @@ export const antigravityProvider: Provider = {
       }
     }
 
-    // All endpoints failed — provide actionable error for image models
     if (isImageGenerationModel(effectiveModel)) {
       const baseMsg = lastError?.message ?? "All Antigravity endpoints failed";
       const is404 = baseMsg.includes("404") || baseMsg.includes("NOT_FOUND") || baseMsg.includes("not found");
@@ -458,7 +434,6 @@ async function transformAntigravityResponse(
   const isEventStream = contentType.includes("text/event-stream");
 
   if (streaming && response.ok && isEventStream && response.body) {
-    // Stream: unwrap Antigravity wrapper, cache signatures, convert to OpenAI format
     const transformedBody = response.body
       .pipeThrough(new TextDecoderStream())
       .pipeThrough(createAntigravityUnwrapTransform())
@@ -479,7 +454,6 @@ async function transformAntigravityResponse(
     });
   }
 
-  // Non-streaming
   const text = await response.text();
 
   if (!response.ok) {
@@ -493,23 +467,19 @@ async function transformAntigravityResponse(
   try {
     let parsed = JSON.parse(text) as Record<string, unknown>;
 
-    // Handle array-wrapped response
     if (Array.isArray(parsed)) {
       parsed = (parsed.find((item) => typeof item === "object" && item !== null) ??
         {}) as Record<string, unknown>;
     }
 
-    // Unwrap Antigravity wrapper
     const unwrapped = (parsed.response ?? parsed) as Record<string, unknown>;
 
-    // Cache thought signatures
     cacheSignaturesFromResponse(
       unwrapped,
       family as "claude" | "gemini-flash" | "gemini-pro",
       sessionId
     );
 
-    // Convert to OpenAI format (conditionally include reasoning)
     const openaiResponse = convertGeminiToOpenAI(unwrapped, model, includeReasoning);
 
     return new Response(JSON.stringify(openaiResponse), {
@@ -538,7 +508,6 @@ async function fetchAccountInfo(
 ): Promise<{ projectId: string; tier: string; email: string }> {
   const errors: string[] = [];
   
-  // Hoist tier to function scope so it accumulates across endpoint attempts
   let detectedTier = "free";
   let projectId = "";
   let currentTier: Record<string, unknown> | null = null;
@@ -550,7 +519,6 @@ async function fetchAccountInfo(
     pluginType: "GEMINI",
   };
 
-  // 1. Try loadCodeAssist with endpoint fallback (prod first for discovery)
   for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
     try {
       const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
@@ -573,14 +541,11 @@ async function fetchAccountInfo(
 
       const data = (await response.json()) as Record<string, unknown>;
 
-      // Extract projectId (handle both string and object format)
       projectId = extractProjectId(data);
 
-      // Store tier info for potential onboarding
       currentTier = (data.currentTier as Record<string, unknown>) ?? null;
       allowedTiers = (data.allowedTiers as Array<Record<string, unknown>>) ?? [];
 
-      // Detect tier from allowedTiers
       if (Array.isArray(data.allowedTiers)) {
         const defaultTier = (data.allowedTiers as Array<Record<string, unknown>>).find(
           (t) => t.isDefault
@@ -603,12 +568,10 @@ async function fetchAccountInfo(
         }
       }
 
-      // If we found a projectId, we're done with discovery
       if (projectId) {
         break;
       }
 
-      // No projectId found at this endpoint, try next
       errors.push(`loadCodeAssist at ${baseEndpoint}: no projectId in response`);
       
     } catch (error) {
@@ -617,7 +580,6 @@ async function fetchAccountInfo(
     }
   }
 
-  // 2. If no projectId and no currentTier, user needs onboarding
   if (!projectId && !currentTier) {
     const onboardResult = await onboardUser(accessToken, allowedTiers, requestMetadata);
     if (onboardResult) {
@@ -628,7 +590,6 @@ async function fetchAccountInfo(
     }
   }
 
-  // 3. Fetch user email from Google
   let email = "";
   try {
     const userInfoResponse = await fetch(
@@ -648,9 +609,7 @@ async function fetchAccountInfo(
     // Ignore email fetch errors
   }
 
-  // Fallback to default project ID if discovery failed
   if (errors.length && !projectId) {
-    // Use default project ID as fallback (like antigravity-claude-proxy)
     projectId = DEFAULT_PROJECT_ID;
   }
 
@@ -696,10 +655,8 @@ async function onboardUser(
   allowedTiers: Array<Record<string, unknown>>,
   requestMetadata: Record<string, string>
 ): Promise<{ projectId: string; tier: string } | null> {
-  // Find default tier for onboarding
   let onboardTier = allowedTiers.find((t) => t.isDefault);
   
-  // Fallback to legacy tier if no default
   if (!onboardTier && allowedTiers.length > 0) {
     onboardTier = allowedTiers.find((t) => t.id === "legacy-tier") ?? allowedTiers[0];
   }
@@ -716,7 +673,6 @@ async function onboardUser(
     metadata: requestMetadata,
   };
 
-  // Try onboarding with endpoint fallback (daily first)
   for (const baseEndpoint of ONBOARD_USER_ENDPOINTS) {
     try {
       const response = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
@@ -735,7 +691,6 @@ async function onboardUser(
 
       let lroData = (await response.json()) as Record<string, unknown>;
 
-      // Poll for onboarding completion (up to 60 seconds)
       for (let i = 0; i < 30 && !lroData.done; i++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -758,7 +713,6 @@ async function onboardUser(
         continue;
       }
 
-      // Extract projectId from LRO response
       const lroResponse = (lroData.response ?? lroData) as Record<string, unknown>;
       const projectId = extractProjectId(lroResponse);
 
@@ -831,7 +785,6 @@ function createSignatureCachingTransform(
   });
 }
 
-// Export utilities for OAuth flow
 export { generateCodeVerifier, generateCodeChallenge };
 
 /**
@@ -863,14 +816,12 @@ async function bufferStreamingToGeminiResponse(
       try {
         let parsed = JSON.parse(json) as Record<string, unknown>;
 
-        // Handle array-wrapped responses
         if (Array.isArray(parsed)) {
           parsed = (parsed.find(
             (item) => typeof item === "object" && item !== null
           ) ?? {}) as Record<string, unknown>;
         }
 
-        // Unwrap Antigravity wrapper
         const unwrapped = (parsed.response ?? parsed) as Record<string, unknown>;
         if (unwrapped.candidates) {
           chunks.push(unwrapped);
@@ -903,7 +854,6 @@ function mergeGeminiChunks(
     };
   }
 
-  // Collect all parts from all chunks
   const allParts: Array<Record<string, unknown>> = [];
   let finishReason = "STOP";
   let usageMetadata: Record<string, unknown> = {};
@@ -920,18 +870,15 @@ function mergeGeminiChunks(
       allParts.push(...parts);
     }
 
-    // Capture finish reason from last chunk that has it
     if (candidate.finishReason) {
       finishReason = candidate.finishReason as string;
     }
 
-    // Capture usage metadata (usually in last chunk)
     if (chunk.usageMetadata) {
       usageMetadata = chunk.usageMetadata as Record<string, unknown>;
     }
   }
 
-  // Merge consecutive text parts
   const mergedParts: Array<Record<string, unknown>> = [];
   let currentText = "";
   let currentThought = "";
@@ -939,15 +886,12 @@ function mergeGeminiChunks(
 
   for (const part of allParts) {
     if (part.thought === true && typeof part.text === "string") {
-      // Thinking block
       currentThought += part.text;
       if (part.thoughtSignature) {
         currentThoughtSignature = part.thoughtSignature as string;
       }
     } else if (typeof part.text === "string" && !part.functionCall) {
-      // Regular text
       if (currentThought) {
-        // Flush thinking block first
         mergedParts.push({
           thought: true,
           text: currentThought,
@@ -958,7 +902,6 @@ function mergeGeminiChunks(
       }
       currentText += part.text;
     } else if (part.functionCall) {
-      // Tool call - flush any pending text first
       if (currentThought) {
         mergedParts.push({
           thought: true,
@@ -976,7 +919,6 @@ function mergeGeminiChunks(
     }
   }
 
-  // Flush remaining text
   if (currentThought) {
     mergedParts.push({
       thought: true,
@@ -988,7 +930,6 @@ function mergeGeminiChunks(
     mergedParts.push({ text: currentText });
   }
 
-  // Ensure at least one part
   if (mergedParts.length === 0) {
     mergedParts.push({ text: "" });
   }

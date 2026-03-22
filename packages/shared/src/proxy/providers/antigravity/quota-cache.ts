@@ -7,10 +7,6 @@
 
 import { getQuotaCostPercent, getQuotaGroupForModel, QUOTA_GROUPS } from "./quota.js";
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
 interface QuotaBaseline {
   remainingFraction: number;
   fetchedAt: number;
@@ -28,19 +24,9 @@ interface QuotaEstimate {
   baselineAgeSeconds: number | null;
 }
 
-// =============================================================================
-// CACHE STORAGE (in-memory)
-// =============================================================================
-
-// Cache: accountId -> groupName -> baseline
 const quotaBaselines = new Map<string, Map<string, QuotaBaseline>>();
 
-// Request counts: accountId -> groupName -> count since baseline
 const requestCounts = new Map<string, Map<string, number>>();
-
-// =============================================================================
-// BASELINE MANAGEMENT
-// =============================================================================
 
 /**
  * Update quota baseline after API fetch
@@ -115,10 +101,6 @@ export function clearQuotaBaseline(accountId: string, groupName?: string): void 
   }
 }
 
-// =============================================================================
-// REQUEST COUNTING
-// =============================================================================
-
 /**
  * Get current request count for an account/group
  */
@@ -160,10 +142,6 @@ export function resetRequestCount(accountId: string, groupName?: string): void {
     requestCounts.delete(accountId);
   }
 }
-
-// =============================================================================
-// QUOTA ESTIMATION
-// =============================================================================
 
 /**
  * Estimate remaining quota based on baseline + request tracking
@@ -248,10 +226,6 @@ export function estimateRemainingQuota(
     baselineAgeSeconds,
   };
 }
-
-// =============================================================================
-// UTILITY
-// =============================================================================
 
 /**
  * Get all cached data for an account (for debugging)
