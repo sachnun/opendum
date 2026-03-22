@@ -65,7 +65,7 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit API Key Name</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               Change the name of your API key for easier identification.
             </DialogDescription>
           </DialogHeader>

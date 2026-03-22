@@ -149,7 +149,7 @@ export function ApiKeyModelAccess({
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Model Access Rules</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             Control which models can be used with this API key.
           </DialogDescription>
         </DialogHeader>

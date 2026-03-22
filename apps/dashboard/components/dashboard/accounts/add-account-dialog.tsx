@@ -593,7 +593,7 @@ export function AddAccountDialog({
           <DialogTitle>
             {providerConfig ? `Add ${providerConfig.name} Account` : "Add Provider Account"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             {providerConfig
               ? `Connect a new ${providerConfig.name} account for load balancing`
               : "Connect a new AI provider account for load balancing"}

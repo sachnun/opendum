@@ -105,7 +105,7 @@ export function CreateApiKeyButton() {
           <>
             <DialogHeader>
               <DialogTitle>API Key Created!</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="sr-only">
                 Your new API key is ready to use.
               </DialogDescription>
             </DialogHeader>
@@ -141,7 +141,7 @@ export function CreateApiKeyButton() {
           <>
             <DialogHeader>
               <DialogTitle>Create API Key</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="sr-only">
                 Create a new API key for accessing Opendum.
               </DialogDescription>
             </DialogHeader>
