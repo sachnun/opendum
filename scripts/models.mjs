@@ -16,10 +16,11 @@ const refreshScripts = [
   "nvidia.mjs",
   "ollama.mjs",
   "qwen-code.mjs",
+  "gemini-cli.mjs",
 ];
 
 // Providers whose models are refreshed by the scripts above
-const REFRESHED_PROVIDERS = ["codex", "nvidia_nim", "ollama_cloud", "openrouter", "qwen_code"];
+const REFRESHED_PROVIDERS = ["codex", "gemini_cli", "nvidia_nim", "ollama_cloud", "openrouter", "qwen_code"];
 
 // ---------------------------------------------------------------------------
 // Run a child script
