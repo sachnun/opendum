@@ -9,7 +9,7 @@ import {
   type ProviderAccountOption,
   type ResponseData,
 } from "./chat-panel";
-import { ScenarioSelector, type Scenario } from "./scenario-selector";
+import { ScenarioSelector, SCENARIOS, type Scenario } from "./scenario-selector";
 import {
   SettingsSheet,
   DEFAULT_SETTINGS,
@@ -1322,7 +1322,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
     ];
   });
 
-  const [selectedScenario, setSelectedScenario] = React.useState<Scenario | null>(null);
+  const [selectedScenario, setSelectedScenario] = React.useState<Scenario | null>(SCENARIOS[0]);
   const [settings, setSettings] = React.useState<PlaygroundSettings>(DEFAULT_SETTINGS);
   const [responses, setResponses] = React.useState<Record<string, ResponseData>>({});
   const [isAnyLoading, setIsAnyLoading] = React.useState(false);
