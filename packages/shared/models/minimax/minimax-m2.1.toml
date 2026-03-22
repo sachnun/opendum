@@ -12,5 +12,5 @@ family = "MiniMax"
 providers = ["iflow", "kiro", "nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]
-kiro = "minimax-2.1"
+kiro = "minimax-m2.1"
 nvidia_nim = "minimaxai/minimax-m2.1"

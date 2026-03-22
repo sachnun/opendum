@@ -9,9 +9,8 @@ output = 131_072
 
 [opendum]
 family = "MiniMax"
-providers = ["iflow", "kiro", "nvidia_nim", "ollama_cloud", "openrouter"]
+providers = ["iflow", "nvidia_nim", "ollama_cloud", "openrouter"]
 
 [opendum.upstream]
-kiro = "minimax-2.5"
 nvidia_nim = "minimaxai/minimax-m2.5"
 openrouter = "minimax/minimax-m2.5:free"
