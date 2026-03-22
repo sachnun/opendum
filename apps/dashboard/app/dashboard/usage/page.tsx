@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL;
 
@@ -21,9 +21,6 @@ export default async function UsagePage() {
       <Card className="bg-card">
         <CardHeader>
           <CardTitle>Start in 3 steps</CardTitle>
-          <CardDescription>
-            Create an API key, set your base URL, then call the compatible endpoint.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <ol className="space-y-3 text-sm">
@@ -77,7 +74,6 @@ export default async function UsagePage() {
       <Card className="bg-card">
         <CardHeader>
           <CardTitle>Compatibility reference</CardTitle>
-          <CardDescription>All requests go to the proxy. Pick the endpoint style you need.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="min-w-0 space-y-3 rounded-lg border border-border bg-muted/30 p-4">

@@ -151,9 +151,6 @@ export default async function AccountsPage({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold">Provider Accounts</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Choose a provider to manage accounts on dedicated pages.
-                    </p>
                   </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <AddAccountDialog triggerClassName="flex-1 sm:w-auto sm:flex-none" />
@@ -185,9 +182,6 @@ export default async function AccountsPage({
       <section className="space-y-4">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
-          <p className="text-sm text-muted-foreground">
-            Connected via OAuth and device authorization flows.
-          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {OAUTH_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {
@@ -223,9 +217,6 @@ export default async function AccountsPage({
       <section className="space-y-4">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
-          <p className="text-sm text-muted-foreground">
-            Connected directly using provider API keys.
-          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {API_KEY_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {

@@ -1324,9 +1324,6 @@ export function AccountsList({
       <section id="oauth-provider-accounts" className="space-y-5">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
-          <p className="text-sm text-muted-foreground">
-            Connected via OAuth/device authorization flows.
-          </p>
         </div>
 
         <div className="space-y-6">{oauthProviderSections}</div>
@@ -1335,9 +1332,6 @@ export function AccountsList({
       <section id="api-key-provider-accounts" className="space-y-5">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
-          <p className="text-sm text-muted-foreground">
-            Connected directly using provider API keys.
-          </p>
         </div>
 
         <div className="space-y-6">{apiKeyProviderSections}</div>
