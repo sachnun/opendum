@@ -10,10 +10,6 @@ import {
 import { createId } from "@paralleldrive/cuid2";
 import type { InferSelectModel } from "drizzle-orm";
 
-// ---------------------------------------------------------------------------
-// Better Auth core tables
-// ---------------------------------------------------------------------------
-
 export const user = pgTable("user", {
   id: text("id")
     .primaryKey()
@@ -96,10 +92,6 @@ export const verification = pgTable(
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
-
-// ---------------------------------------------------------------------------
-// Application-specific tables
-// ---------------------------------------------------------------------------
 
 export const providerAccount = pgTable(
   "provider_account",
@@ -305,9 +297,5 @@ export const usageLog = pgTable(
     index("usage_log_createdAt_idx").on(table.createdAt),
   ],
 );
-
-// ---------------------------------------------------------------------------
-// Inferred types for use across the codebase
-// ---------------------------------------------------------------------------
 
 export type ProviderAccount = InferSelectModel<typeof providerAccount>;

@@ -9,10 +9,6 @@ import {
 export { MODEL_REGISTRY, IGNORED_MODELS };
 export type { ModelMeta, ModelInfo };
 
-// ---------------------------------------------------------------------------
-// Legacy alias helper (NVIDIA NIM)
-// ---------------------------------------------------------------------------
-
 function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
   return upstreamModel
     .replace(/^library\//, "")
@@ -21,20 +17,12 @@ function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
     .replace(/-{2,}/g, "-");
 }
 
-// ---------------------------------------------------------------------------
-// Effective registry — all non-ignored models
-// ---------------------------------------------------------------------------
-
 const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = { ...MODEL_REGISTRY };
 
 // Filter out ignored models from the effective registry
 for (const model of IGNORED_MODELS) {
   delete EFFECTIVE_MODEL_REGISTRY[model];
 }
-
-// ---------------------------------------------------------------------------
-// Alias lookup — built entirely from TOML data
-// ---------------------------------------------------------------------------
 
 const aliasToCanonical: Record<string, string> = {};
 
@@ -76,10 +64,6 @@ for (const [canonical, aliases] of Object.entries(canonicalToAliases)) {
     a.localeCompare(b)
   );
 }
-
-// ---------------------------------------------------------------------------
-// Per-provider model maps — built from TOML [opendum.upstream]
-// ---------------------------------------------------------------------------
 
 /** Cached per-provider model map: canonical → upstream name. */
 const providerModelMapCache = new Map<string, Record<string, string>>();
@@ -126,10 +110,6 @@ export function getUpstreamModelName(model: string, provider: string): string {
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
   return info?.upstream?.[provider] ?? canonical;
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Resolve model alias to canonical name
@@ -256,10 +236,6 @@ export function formatModelsForOpenAI(): Array<{
 
   return models;
 }
-
-// ---------------------------------------------------------------------------
-// Family helpers — derived from TOML [opendum].family
-// ---------------------------------------------------------------------------
 
 /**
  * Get the family of a model from the TOML registry.

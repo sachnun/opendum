@@ -12,10 +12,6 @@
 
 import { getRedisClient } from "../redis.js";
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
 /** Redis key prefix for latency sorted sets. */
 const LATENCY_KEY_PREFIX = "opendum:latency";
 
@@ -39,10 +35,6 @@ const MAX_TIMEOUT_MS = 60_000; // 60 s
 
 /** Minimum sample count before adaptive mode activates. */
 const MIN_SAMPLES_FOR_ADAPTIVE = 10;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function buildKey(
   provider: string,
@@ -69,10 +61,6 @@ function percentile(sorted: number[], p: number): number {
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Record a successful TTFB latency sample.

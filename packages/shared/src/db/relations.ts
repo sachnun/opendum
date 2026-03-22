@@ -10,10 +10,6 @@ import {
   disabledModel,
 } from "./schema.js";
 
-// ---------------------------------------------------------------------------
-// User relations
-// ---------------------------------------------------------------------------
-
 export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   sessions: many(session),
@@ -23,10 +19,6 @@ export const userRelations = relations(user, ({ many }) => ({
   usageLogs: many(usageLog),
   disabledModels: many(disabledModel),
 }));
-
-// ---------------------------------------------------------------------------
-// Better Auth table relations
-// ---------------------------------------------------------------------------
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {
@@ -41,10 +33,6 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
-
-// ---------------------------------------------------------------------------
-// Application table relations
-// ---------------------------------------------------------------------------
 
 export const providerAccountRelations = relations(
   providerAccount,

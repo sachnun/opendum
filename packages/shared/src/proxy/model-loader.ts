@@ -14,10 +14,6 @@ import { join, basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 
-// ---------------------------------------------------------------------------
-// Types (re-exported by models.ts for the rest of the codebase)
-// ---------------------------------------------------------------------------
-
 export interface ModelMeta {
   contextLength?: number;
   outputLimit?: number;
@@ -46,10 +42,6 @@ export interface ModelInfo {
   /** Per-provider upstream model name. When absent, the canonical id is used. */
   upstream?: Record<string, string>;
 }
-
-// ---------------------------------------------------------------------------
-// TOML schema (shape of each .toml file)
-// ---------------------------------------------------------------------------
 
 interface TomlModel {
   // models.dev compatible fields
@@ -80,10 +72,6 @@ interface TomlModel {
     upstream?: Record<string, string>;
   };
 }
-
-// ---------------------------------------------------------------------------
-// Directory scanning
-// ---------------------------------------------------------------------------
 
 function resolveModelsDir(): string {
   // Try to find the models directory relative to this file's location.
@@ -117,10 +105,6 @@ function collectTomlFiles(dir: string): string[] {
 
   return files;
 }
-
-// ---------------------------------------------------------------------------
-// TOML → ModelInfo conversion
-// ---------------------------------------------------------------------------
 
 function tomlToModelInfo(raw: TomlModel): ModelInfo {
   const opendum = raw.opendum ?? {};
@@ -171,10 +155,6 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Load all models from TOML
-// ---------------------------------------------------------------------------
-
 interface LoadResult {
   registry: Record<string, ModelInfo>;
   ignoredModels: Set<string>;
@@ -208,10 +188,6 @@ function loadModels(): LoadResult {
 
   return { registry, ignoredModels };
 }
-
-// ---------------------------------------------------------------------------
-// Module-level initialization — runs once on first import
-// ---------------------------------------------------------------------------
 
 const loaded = loadModels();
 
