@@ -1,5 +1,20 @@
+release_date = "2025-06-25"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 3
+output = 15
+
+[limit]
+context = 200_000
+output = 64_000
 
 [opendum]
 family = "Claude"
 providers = ["kiro", "copilot"]
 aliases = ["claude-sonnet-4-0", "claude-sonnet-4.0", "claude-sonnet4.0"]
+
+[opendum.upstream]
+kiro = "claude-sonnet-4"

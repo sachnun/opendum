@@ -19,4 +19,4 @@ aliases = ["claude-sonnet-4.5", "claude-sonnet4.5"]
 
 [opendum.upstream]
 copilot = "claude-sonnet-4.5"
-kiro = "CLAUDE_SONNET_4_5_20250929_V1_0"
+kiro = "claude-sonnet-4.5"
