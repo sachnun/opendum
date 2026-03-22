@@ -36,7 +36,7 @@ import {
   createAntigravityUnwrapTransform,
 } from "../antigravity/converter.js";
 import { cacheSignature } from "../antigravity/cache.js";
-import { getProviderModelSet } from "../../models.js";
+import { getProviderModelSet, getUpstreamModelName } from "../../models.js";
 
 /**
  * Generate PKCE code verifier
@@ -362,7 +362,12 @@ export const geminiCliProvider: Provider = {
     }
 
     const model = body.model;
-    const modelName = model.split("/").pop()?.replace(":thinking", "") ?? model;
+    // Resolve upstream model name: use TOML [opendum.upstream] mapping if available,
+    // otherwise fall back to the canonical model name (stripping prefixes/suffixes).
+    const upstreamName = getUpstreamModelName(model, "gemini_cli");
+    const modelName = upstreamName !== model
+      ? upstreamName
+      : model.split("/").pop()?.replace(":thinking", "") ?? model;
 
     // Determine if reasoning output should be included in response
     const includeReasoning =
@@ -377,20 +382,32 @@ export const geminiCliProvider: Provider = {
     // Convert OpenAI format to Gemini format
     const geminiPayload = convertOpenAIToGemini(body);
 
-    // Add thinking config if reasoning is requested
-    const reasoningEffort = body.reasoning?.effort || body.reasoning_effort;
-    const thinkingConfig = getThinkingConfig(
-      model,
-      reasoningEffort,
-      body.thinking_budget
-    );
+    // Image generation models don't support thinking/reasoning
+    const isImageModel = modelName.includes("image");
 
-    if (thinkingConfig) {
-      if (!geminiPayload.generationConfig) {
-        geminiPayload.generationConfig = {};
+    // Add thinking config if reasoning is requested (skip for image models)
+    if (!isImageModel) {
+      const reasoningEffort = body.reasoning?.effort || body.reasoning_effort;
+      const thinkingConfig = getThinkingConfig(
+        model,
+        reasoningEffort,
+        body.thinking_budget
+      );
+
+      if (thinkingConfig) {
+        if (!geminiPayload.generationConfig) {
+          geminiPayload.generationConfig = {};
+        }
+        (geminiPayload.generationConfig as Record<string, unknown>).thinkingConfig =
+          thinkingConfig;
       }
-      (geminiPayload.generationConfig as Record<string, unknown>).thinkingConfig =
-        thinkingConfig;
+    } else {
+      // Strip thinkingConfig if it was added by converter for image models
+      if (geminiPayload.generationConfig && typeof geminiPayload.generationConfig === "object") {
+        delete (geminiPayload.generationConfig as Record<string, unknown>).thinkingConfig;
+      }
+      // Strip tools for image models
+      delete (geminiPayload as Record<string, unknown>).tools;
     }
 
     // Add default safety settings to prevent content filtering
