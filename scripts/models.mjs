@@ -15,10 +15,11 @@ const refreshScripts = [
   "openrouter.mjs",
   "nvidia.mjs",
   "ollama.mjs",
+  "qwen-code.mjs",
 ];
 
 // Providers whose models are refreshed by the scripts above
-const REFRESHED_PROVIDERS = ["codex", "nvidia_nim", "ollama_cloud", "openrouter"];
+const REFRESHED_PROVIDERS = ["codex", "nvidia_nim", "ollama_cloud", "openrouter", "qwen_code"];
 
 // ---------------------------------------------------------------------------
 // Run a child script
