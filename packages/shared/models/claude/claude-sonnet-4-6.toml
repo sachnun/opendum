@@ -1,0 +1,22 @@
+release_date = "2026-02"
+knowledge = "2025-07"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 3
+output = 15
+
+[limit]
+context = 200_000
+output = 64_000
+
+[opendum]
+family = "Claude"
+providers = ["antigravity", "copilot", "kiro"]
+aliases = ["claude-sonnet-4.6", "claude-sonnet4.6"]
+
+[opendum.upstream]
+copilot = "claude-sonnet-4.6"
+kiro = "claude-sonnet-4.6"
