@@ -1163,12 +1163,21 @@ export const messagesRoute: RouteHandlerMethod = async (
 
         // Success — streaming
         if (streamEnabled && providerResponse.body) {
+          const origin = request.headers.origin;
           reply.raw.writeHead(200, {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
             "X-Accel-Buffering": "no",
             "X-Provider-Account-Id": account.id,
+            ...(origin
+              ? {
+                  "Access-Control-Allow-Origin": origin,
+                  "Access-Control-Allow-Credentials": "true",
+                  "Access-Control-Expose-Headers": "*",
+                  Vary: "Origin",
+                }
+              : {}),
           });
 
           const tracker = createAnthropicStreamTracker(model, (usage) => {
