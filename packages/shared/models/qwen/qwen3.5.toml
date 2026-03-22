@@ -19,3 +19,6 @@ output = ["text"]
 [opendum]
 family = "Qwen"
 providers = ["iflow", "qwen_code"]
+
+[opendum.upstream]
+qwen_code = "qwen3.5-plus"
