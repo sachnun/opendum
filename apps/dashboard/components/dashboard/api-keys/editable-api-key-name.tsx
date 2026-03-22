@@ -62,7 +62,7 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="top-[38%] sm:top-[50%]">
           <DialogHeader>
             <DialogTitle>Edit API Key Name</DialogTitle>
             <DialogDescription className="sr-only">

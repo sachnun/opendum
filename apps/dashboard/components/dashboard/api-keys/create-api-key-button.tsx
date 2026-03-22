@@ -99,7 +99,7 @@ export function CreateApiKeyButton() {
           Create API Key
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="top-[38%] sm:top-[50%]">
         {createdKey ? (
           // Success state - show the created key
           <>

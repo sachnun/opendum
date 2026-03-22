@@ -588,7 +588,7 @@ export function AddAccountDialog({
           Add Account
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="top-[38%] sm:top-[50%] sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {providerConfig ? `Add ${providerConfig.name} Account` : "Add Provider Account"}

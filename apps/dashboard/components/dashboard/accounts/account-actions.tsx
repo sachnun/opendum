@@ -106,7 +106,7 @@ export function AccountActions({ account }: { account: Account }) {
             <Pencil className="h-3 w-3" />
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="top-[38%] sm:top-[50%]">
           <DialogHeader>
             <DialogTitle>Rename Account</DialogTitle>
             <DialogDescription>
