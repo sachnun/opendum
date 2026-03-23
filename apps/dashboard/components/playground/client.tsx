@@ -1427,6 +1427,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
       });
 
       setResponses({});
+      setActiveFamilyPreset(family);
     },
     [familyPresets, modelsById, providerAccountsById]
   );
@@ -1452,37 +1453,8 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
 
   const canAddPanel = panels.length < maxPanels;
   const hasSelectedModel = panels.some((panel) => panel.modelId);
-  const selectedModelIds = React.useMemo(
-    () =>
-      panels
-        .map((panel) => panel.modelId)
-        .filter((modelId): modelId is string => typeof modelId === "string"),
-    [panels]
-  );
 
-  const activeFamilyPreset = React.useMemo(() => {
-    if (selectedModelIds.length === 0) {
-      return null;
-    }
-
-    const selectedModelSet = new Set(selectedModelIds);
-
-    for (const preset of familyPresets) {
-      if (preset.models.length !== selectedModelSet.size) {
-        continue;
-      }
-
-      const allPresetModelsSelected = preset.models.every((model) =>
-        selectedModelSet.has(model.id)
-      );
-
-      if (allPresetModelsSelected) {
-        return preset.family;
-      }
-    }
-
-    return null;
-  }, [familyPresets, selectedModelIds]);
+  const [activeFamilyPreset, setActiveFamilyPreset] = React.useState<string | null>(null);
 
   const handleScenarioSelect = (scenario: Scenario) => {
     setSelectedScenario(scenario);
@@ -1804,7 +1776,15 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
                 type="button"
                 variant={activeFamilyPreset === preset.family ? "default" : "outline"}
                 size="sm"
-                onClick={() => applyFamilyPreset(preset.family)}
+                onClick={() => {
+                  if (activeFamilyPreset === preset.family) {
+                    setPanels([{ id: generateId(), modelId: null, accountId: null }]);
+                    setResponses({});
+                    setActiveFamilyPreset(null);
+                  } else {
+                    applyFamilyPreset(preset.family);
+                  }
+                }}
                 disabled={isAnyLoading}
                 className="h-auto min-w-[92px] flex-col items-center gap-1 px-3 py-2"
               >
