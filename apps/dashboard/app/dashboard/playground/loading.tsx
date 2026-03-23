@@ -1,14 +1,12 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-const SCENARIO_CHIPS = Array.from({ length: 4 });
-const PANEL_CARDS = Array.from({ length: 3 });
-
 export default function Loading() {
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="pb-4 border-b border-border">
         <div className="flex items-center justify-between gap-4">
-          <Skeleton className="h-6 w-28" />
+          <Skeleton className="h-7 w-28" />
           <div className="flex items-center gap-2">
             <Skeleton className="h-8 w-20 rounded-md" />
             <Skeleton className="h-8 w-8 rounded-md" />
@@ -16,42 +14,51 @@ export default function Loading() {
         </div>
       </div>
 
+      {/* Scenario section */}
       <div className="space-y-3">
-        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-16" />
         <div className="flex flex-wrap gap-2">
-          {SCENARIO_CHIPS.map((_, index) => (
-            <Skeleton key={`scenario-${index}`} className="h-10 w-20 rounded-md" />
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton
+              key={`scenario-${index}`}
+              className="h-[52px] min-w-[72px] rounded-md"
+            />
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {PANEL_CARDS.map((_, index) => (
-          <div
-            key={`panel-${index}`}
-            className="flex h-[400px] flex-col rounded-xl border border-border bg-card p-3"
-          >
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-7 w-36" />
-              <Skeleton className="h-7 w-7 rounded-full" />
-            </div>
-            <div className="mt-4 flex-1 space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-5/6" />
-              <Skeleton className="h-4 w-2/3" />
-            </div>
-            <div className="mt-4 space-y-2 border-t border-border pt-3">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-3 w-12" />
-              </div>
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-3 w-28" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-            </div>
+      {/* Family Preset section */}
+      <div className="space-y-3">
+        <Skeleton className="h-4 w-24" />
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton
+              key={`preset-${index}`}
+              className="h-[52px] min-w-[92px] rounded-md"
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Chat panels: 1 panel + 1 dashed add card */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="flex h-[400px] flex-col rounded-xl border border-border bg-card p-3">
+          {/* Panel header: model selector */}
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton className="h-8 w-48 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
           </div>
-        ))}
+          {/* Panel content area */}
+          <div className="mt-4 flex-1 flex items-center justify-center">
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+
+        {/* Add comparison card (dashed) */}
+        <div className="flex h-[400px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/80 bg-background">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <Skeleton className="mt-2 h-4 w-28" />
+        </div>
       </div>
     </div>
   );
