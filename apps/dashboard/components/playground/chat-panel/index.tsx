@@ -299,7 +299,7 @@ export function ChatPanel({
                 {selectedModelData ? (
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate">{selectedModelData.name}</span>
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    <Badge variant="secondary" className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0">
                       {selectedAccountData
                         ? formatProviderName(selectedAccountData.provider)
                         : usedAccountData
@@ -313,7 +313,7 @@ export function ChatPanel({
                 <ChevronDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[340px] p-0" align="start">
+            <PopoverContent className="w-[340px] max-w-[calc(100vw-2rem)] p-0" align="start">
               {selectionStep === "model" && (
                 <Command>
                   <CommandInput placeholder="Search models..." />
