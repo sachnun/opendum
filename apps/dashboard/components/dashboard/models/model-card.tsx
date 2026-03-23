@@ -92,105 +92,105 @@ export function ModelCard({
   return (
     <Card className={`flex flex-col bg-card py-4 ${!isEnabled ? "opacity-70" : ""}`}>
       <CardHeader className="px-4 pb-2 sm:px-5">
+        {/* Row 1: Model ID + Toggle */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <CardTitle
-              className="overflow-hidden text-sm font-mono leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
-              title={id}
-            >
-              {id}
-            </CardTitle>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {providers.map((provider) => (
-                <Badge key={provider} variant="secondary" className="text-xs">
-                  {provider}
-                </Badge>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            {meta?.pricing && (
-              <div className="text-xs text-muted-foreground whitespace-nowrap">
-                ${meta.pricing.input} · ${meta.pricing.output}
-              </div>
-            )}
-            <Button
-              variant={copied ? "secondary" : "ghost"}
-              size="xs"
-              className="h-6 px-2 text-[11px]"
-              onClick={handleCopy}
-              title="Copy model ID"
-            >
-              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-              {copied ? "Copied" : "Copy ID"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              className="h-6 px-2 text-[11px]"
-              asChild
-              title="Try in Playground"
-            >
-              <Link href={`/dashboard/playground?model=${encodeURIComponent(id)}`}>
-                <Play className="h-3 w-3" />
-                Playground
-              </Link>
-            </Button>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">
-                {isEnabled ? "Enabled" : "Disabled"}
-              </span>
-              <Switch
-                checked={isEnabled}
-                onCheckedChange={(checked) => onEnabledChange(id, checked)}
-                disabled={isUpdating}
-                title={isEnabled ? "Disable model" : "Enable model"}
-              />
-            </div>
+          <CardTitle
+            className="flex-1 min-w-0 overflow-hidden text-sm font-mono leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+            title={id}
+          >
+            {id}
+          </CardTitle>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] text-muted-foreground">
+              {isEnabled ? "On" : "Off"}
+            </span>
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={(checked) => onEnabledChange(id, checked)}
+              disabled={isUpdating}
+              title={isEnabled ? "Disable model" : "Enable model"}
+            />
           </div>
         </div>
+
+        {/* Row 2: Provider badges */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          {providers.map((provider) => (
+            <Badge key={provider} variant="secondary" className="text-xs">
+              {provider}
+            </Badge>
+          ))}
+          <span className="mx-0.5" />
+          <Button
+            variant={copied ? "secondary" : "ghost"}
+            size="xs"
+            className="h-5 px-1.5 text-[11px]"
+            onClick={handleCopy}
+            title="Copy model ID"
+          >
+            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="h-5 px-1.5 text-[11px]"
+            asChild
+            title="Try in Playground"
+          >
+            <Link href={`/dashboard/playground?model=${encodeURIComponent(id)}`}>
+              <Play className="h-3 w-3" />
+              Play
+            </Link>
+          </Button>
+        </div>
       </CardHeader>
+
       <CardContent className="flex flex-1 flex-col px-4 sm:px-5">
-        <div className="mt-auto">
+        <div className="mt-auto space-y-2.5">
+          {/* Model metadata */}
           {meta && (
-            <div className="mb-3 space-y-2 text-xs text-muted-foreground">
-              {(meta.contextLength || meta.outputLimit) && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {meta.contextLength && (
-                    <span>{formatTokens(meta.contextLength)} in</span>
-                  )}
-                  {meta.contextLength && meta.outputLimit && <span>·</span>}
-                  {meta.outputLimit && (
-                    <span>{formatTokens(meta.outputLimit)} out</span>
-                  )}
-                  {meta.knowledgeCutoff && (
-                    <>
-                      <span>·</span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(meta.knowledgeCutoff)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
+            <div className="space-y-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {meta.pricing && (
+                  <Badge variant="outline" className="text-[11px] py-0 h-5 font-normal tabular-nums">
+                    ${meta.pricing.input} / ${meta.pricing.output}
+                  </Badge>
+                )}
+                {meta.contextLength && (
+                  <span className="tabular-nums">{formatTokens(meta.contextLength)} in</span>
+                )}
+                {meta.contextLength && meta.outputLimit && <span>·</span>}
+                {meta.outputLimit && (
+                  <span className="tabular-nums">{formatTokens(meta.outputLimit)} out</span>
+                )}
+                {meta.knowledgeCutoff && (
+                  <>
+                    <span>·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="h-3 w-3 shrink-0" />
+                      {formatDate(meta.knowledgeCutoff)}
+                    </span>
+                  </>
+                )}
+              </div>
 
               {(meta.reasoning || meta.toolCall || meta.vision) && (
                 <div className="flex flex-wrap gap-1">
                   {meta.reasoning && (
-                    <Badge variant="outline" className="text-xs py-0 h-5">
+                    <Badge variant="outline" className="text-[11px] py-0 h-5">
                       <Brain className="h-3 w-3 mr-1" />
                       Reasoning
                     </Badge>
                   )}
                   {meta.toolCall && (
-                    <Badge variant="outline" className="text-xs py-0 h-5">
+                    <Badge variant="outline" className="text-[11px] py-0 h-5">
                       <Wrench className="h-3 w-3 mr-1" />
                       Tools
                     </Badge>
                   )}
                   {meta.vision && (
-                    <Badge variant="outline" className="text-xs py-0 h-5">
+                    <Badge variant="outline" className="text-[11px] py-0 h-5">
                       <Eye className="h-3 w-3 mr-1" />
                       Vision
                     </Badge>
@@ -200,33 +200,34 @@ export function ModelCard({
             </div>
           )}
 
-          <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
-            <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
+          {/* Stats */}
+          <div className="rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5 space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1">
-                <BarChart3 className="h-3 w-3" />
-                Last 30 days
+                <BarChart3 className="h-3 w-3 shrink-0" />
+                30d
               </span>
-              <span>{maxDailyRequests.toLocaleString()} peak/day</span>
+              <span className="tabular-nums">{maxDailyRequests.toLocaleString()} peak</span>
             </div>
 
-            <div className="mb-2 grid grid-cols-2 gap-2">
-              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-                <p className="text-[10px] text-muted-foreground">Requests</p>
-                <p className="text-sm font-semibold text-foreground">{stats.totalRequests.toLocaleString()}</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">Requests</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{stats.totalRequests.toLocaleString()}</p>
               </div>
-              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-                <p className="text-[10px] text-muted-foreground">Success</p>
-                <p className="text-sm font-semibold text-foreground">
+              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">Success</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">
                   {stats.successRate === null ? "-" : `${stats.successRate}%`}
                 </p>
               </div>
+              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">Latency</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{formatDuration(stats.avgDurationLastDay)}</p>
+              </div>
             </div>
 
-            <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-              <div className="mb-1 flex items-center justify-between text-[10px]">
-                <p className="text-muted-foreground">Avg Duration (1d)</p>
-                <p className="font-semibold text-foreground">{formatDuration(stats.avgDurationLastDay)}</p>
-              </div>
+            <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
               <UsageSparkline
                 values={durationValues}
                 color="var(--chart-2)"
@@ -235,9 +236,9 @@ export function ModelCard({
                 className="h-6"
                 height={24}
               />
-              <div className="mt-1 grid grid-cols-3 text-[9px] text-muted-foreground">
+              <div className="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
                 {durationLabelPoints.map((point) => (
-                  <span key={point.time} className="text-center">
+                  <span key={point.time} className="text-center truncate">
                     {formatHourLabel(point.time)}
                   </span>
                 ))}
@@ -248,7 +249,6 @@ export function ModelCard({
               values={dailyValues}
               color="var(--chart-1)"
               ariaLabel={`Requests trend for ${id}`}
-              className="pt-2"
             />
           </div>
         </div>
