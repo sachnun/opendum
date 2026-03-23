@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/sheet";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  type ProviderAccountIndicator,
   type ProviderAccountIndicators,
   type ModelFamilyCounts,
   type NavItem,
@@ -23,26 +22,15 @@ import {
   primaryNavigation,
   supportNavigation,
 } from "@/lib/navigation";
-import { getProviderAccountPath } from "@/lib/provider-accounts";
+import { buildProviderHrefMap } from "@/lib/provider-accounts";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
+import { AccountStatusIndicator } from "@/components/layout/account-status-indicator";
 
 interface MobileNavProps {
   accountCounts: ProviderAccountCounts;
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
-}
-
-function getAccountIndicatorClass(indicator: ProviderAccountIndicator): string {
-  if (indicator === "error") {
-    return "bg-red-500";
-  }
-
-  if (indicator === "warning") {
-    return "bg-yellow-500";
-  }
-
-  return "bg-primary";
 }
 
 export function MobileNav({
@@ -110,42 +98,9 @@ export function MobileNav({
       (item.href !== "/dashboard" && pathname.startsWith(item.href));
     const isAccountsItem = item.href === "/dashboard/accounts";
     const isModelsItem = item.href === "/dashboard/models";
-    const accountCountByHref: Record<string, number> = {
-      [getProviderAccountPath("antigravity")]: accountCounts.antigravity,
-      [getProviderAccountPath("nvidia_nim")]: accountCounts.nvidia_nim,
-      [getProviderAccountPath("ollama_cloud")]: accountCounts.ollama_cloud,
-      [getProviderAccountPath("openrouter")]: accountCounts.openrouter,
-      [getProviderAccountPath("codex")]: accountCounts.codex,
-      [getProviderAccountPath("copilot")]: accountCounts.copilot,
-      [getProviderAccountPath("kiro")]: accountCounts.kiro,
-      [getProviderAccountPath("iflow")]: accountCounts.iflow,
-      [getProviderAccountPath("gemini_cli")]: accountCounts.gemini_cli,
-      [getProviderAccountPath("qwen_code")]: accountCounts.qwen_code,
-    };
-    const activeAccountCountByHref: Record<string, number> = {
-      [getProviderAccountPath("antigravity")]: activeAccountCounts.antigravity,
-      [getProviderAccountPath("nvidia_nim")]: activeAccountCounts.nvidia_nim,
-      [getProviderAccountPath("ollama_cloud")]: activeAccountCounts.ollama_cloud,
-      [getProviderAccountPath("openrouter")]: activeAccountCounts.openrouter,
-      [getProviderAccountPath("codex")]: activeAccountCounts.codex,
-      [getProviderAccountPath("copilot")]: activeAccountCounts.copilot,
-      [getProviderAccountPath("kiro")]: activeAccountCounts.kiro,
-      [getProviderAccountPath("iflow")]: activeAccountCounts.iflow,
-      [getProviderAccountPath("gemini_cli")]: activeAccountCounts.gemini_cli,
-      [getProviderAccountPath("qwen_code")]: activeAccountCounts.qwen_code,
-    };
-    const accountIndicatorByHref: Record<string, ProviderAccountIndicator> = {
-      [getProviderAccountPath("antigravity")]: accountIndicators.antigravity,
-      [getProviderAccountPath("nvidia_nim")]: accountIndicators.nvidia_nim,
-      [getProviderAccountPath("ollama_cloud")]: accountIndicators.ollama_cloud,
-      [getProviderAccountPath("openrouter")]: accountIndicators.openrouter,
-      [getProviderAccountPath("codex")]: accountIndicators.codex,
-      [getProviderAccountPath("copilot")]: accountIndicators.copilot,
-      [getProviderAccountPath("kiro")]: accountIndicators.kiro,
-      [getProviderAccountPath("iflow")]: accountIndicators.iflow,
-      [getProviderAccountPath("gemini_cli")]: accountIndicators.gemini_cli,
-      [getProviderAccountPath("qwen_code")]: accountIndicators.qwen_code,
-    };
+    const accountCountByHref = buildProviderHrefMap(accountCounts);
+    const activeAccountCountByHref = buildProviderHrefMap(activeAccountCounts);
+    const accountIndicatorByHref = buildProviderHrefMap(accountIndicators);
     const modelCountByAnchorId = isModelsItem ? modelFamilyCounts : null;
     const visibleSubItems =
       isAccountsItem && item.children
@@ -245,8 +200,7 @@ export function MobileNav({
                     isAccountsItem ? accountIndicatorByHref[subItem.href] : undefined;
                   const shouldShowSubItemCount =
                     !isAccountsItem && typeof subItemCount === "number" && subItemCount > 0;
-                  const shouldShowIndicator =
-                    typeof activeSubItemCount === "number" && activeSubItemCount > 0;
+                  const shouldShowIndicator = isAccountsItem;
 
                   return (
                     <Link
@@ -266,21 +220,11 @@ export function MobileNav({
                       <span className="truncate">{subItem.name}</span>
                       {shouldShowIndicator || shouldShowSubItemCount ? (
                         <span className="flex items-center gap-2">
-                          {shouldShowIndicator && subItemIndicator ? (
-                            <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-                              <span
-                                className={cn(
-                                  "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-                                  getAccountIndicatorClass(subItemIndicator)
-                                )}
-                              />
-                              <span
-                                className={cn(
-                                  "relative inline-flex h-2.5 w-2.5 rounded-full",
-                                  getAccountIndicatorClass(subItemIndicator)
-                                )}
-                              />
-                            </span>
+                          {shouldShowIndicator ? (
+                            <AccountStatusIndicator
+                              activeAccountCount={activeSubItemCount}
+                              indicator={subItemIndicator}
+                            />
                           ) : null}
                           {shouldShowSubItemCount ? (
                             <span

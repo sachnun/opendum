@@ -124,6 +124,21 @@ export function getProviderAccountPath(provider: ProviderAccountKey): string {
   return `/dashboard/accounts/${PROVIDER_ACCOUNT_BY_KEY[provider].slug}`;
 }
 
+/**
+ * Build a Record mapping provider account paths to values from a keyed data object.
+ * This avoids manually listing every provider when building href-based lookup maps.
+ */
+export function buildProviderHrefMap<V>(
+  data: Record<ProviderAccountKey, V>
+): Record<string, V> {
+  return Object.fromEntries(
+    PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [
+      getProviderAccountPath(definition.key),
+      data[definition.key],
+    ])
+  ) as Record<string, V>;
+}
+
 export function getProviderFromSlug(providerSlug: string): ProviderAccountKey | null {
   const normalizedSlug = providerSlug.trim().toLowerCase();
   const provider = PROVIDER_ACCOUNT_BY_SLUG[normalizedSlug];
