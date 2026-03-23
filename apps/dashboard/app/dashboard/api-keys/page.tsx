@@ -91,9 +91,9 @@ export default async function ApiKeysPage() {
                 className={`bg-card ${isExpiredOrDisabled ? "opacity-65" : ""}`}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Key className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Key className="h-5 w-5 shrink-0 text-muted-foreground" />
                       <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
                     </div>
                     <Badge variant={status.variant}>{status.label}</Badge>

@@ -46,8 +46,8 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
   };
 
   return (
-    <div className="flex items-center gap-1">
-      <span className="text-lg font-semibold">{name ?? "Unnamed Key"}</span>
+    <div className="flex min-w-0 items-center gap-1">
+      <span className="min-w-0 truncate text-lg font-semibold">{name ?? "Unnamed Key"}</span>
       <Dialog open={editDialogOpen} onOpenChange={(open) => {
         setEditDialogOpen(open);
         if (open) setNewName(name ?? "");

@@ -129,11 +129,11 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
     : apiKey.keyPreview.substring(0, 8) + "••••••••";
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1">
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1">
         <code className={cn(
           "text-xs bg-muted px-2 py-1 rounded font-mono",
-          isRevealed ? "" : "max-w-[160px] truncate"
+          isRevealed ? "break-all" : "max-w-[160px] truncate"
         )}>
           {displayKey}
         </code>

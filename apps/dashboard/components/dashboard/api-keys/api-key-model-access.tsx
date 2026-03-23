@@ -244,8 +244,8 @@ export function ApiKeyModelAccess({
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {normalizedDraftModels.map((modelId) => (
-                      <Badge key={modelId} variant="secondary" className="gap-1 pr-1 font-normal">
-                        <span className="font-mono text-[11px]">{modelId}</span>
+                      <Badge key={modelId} variant="secondary" className="max-w-full gap-1 pr-1 font-normal">
+                        <span className="min-w-0 truncate font-mono text-[11px]">{modelId}</span>
                         <button
                           type="button"
                           className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-muted-foreground cursor-pointer hover:text-foreground"
