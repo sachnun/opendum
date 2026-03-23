@@ -303,7 +303,7 @@ export function AddAccountDialog({
   }, [initialProvider, minimumStep]);
 
   const handleOpenChange = (isOpen: boolean) => {
-    if (!isLoading && !isPolling) {
+    if (!isLoading) {
       if (isOpen) {
         setStep(minimumStep);
         setProvider(initialProvider ?? null);
@@ -314,6 +314,11 @@ export function AddAccountDialog({
         resetForm();
       }
     }
+  };
+
+  const handleForceClose = () => {
+    setOpen(false);
+    resetForm();
   };
 
   const handleSelectProvider = (selectedProvider: Provider) => {
@@ -481,6 +486,12 @@ export function AddAccountDialog({
       if (step === 2 && providerConfig?.flowType === "api_key") {
         setStep(3);
       }
+
+      // Start polling for device_code flows when user copies the link
+      // (they may open it manually instead of using the popup button)
+      if (providerConfig?.flowType === "device_code" && !isPolling && deviceCodeInfo) {
+        startPolling(null);
+      }
     }
   };
 
@@ -617,7 +628,15 @@ export function AddAccountDialog({
           Add Account
         </Button>
       </DialogTrigger>
-      <DialogContent className="top-[38%] sm:top-[50%] sm:max-w-md">
+      <DialogContent
+        className="top-[38%] sm:top-[50%] sm:max-w-md"
+        onInteractOutside={(e) => {
+          if (isPolling) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isPolling) e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {providerConfig ? `Add ${providerConfig.name} Account` : "Add Provider Account"}
@@ -1001,6 +1020,16 @@ export function AddAccountDialog({
         </div>
 
         <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between">
+          {isPolling && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleForceClose}
+            >
+              Cancel
+            </Button>
+          )}
+
           {step > minimumStep && !isPolling && (
             <Button
               type="button"
