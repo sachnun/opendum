@@ -3,6 +3,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyInlineCode } from "@/components/ui/copy-inline-code";
 
 const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL;
 
@@ -44,7 +45,7 @@ export default async function UsagePage() {
                 2
               </span>
               <span>
-                Set <code className="rounded bg-muted px-1 py-0.5 text-xs">{baseUrl}</code> as your
+                Set <CopyInlineCode value={baseUrl} /> as your
                 API base URL.
               </span>
             </li>
