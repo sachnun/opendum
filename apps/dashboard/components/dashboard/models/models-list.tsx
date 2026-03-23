@@ -104,9 +104,17 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
         return;
       }
 
-      // All was selected, user unchecked a provider — deselect "all", keep the rest
+      // All were selected, user clicked a specific provider → select ONLY that provider
+      if (allSelected && hasAll) {
+        const clickedProvider = allProviderIds.find((id) => !providers.includes(id));
+        if (clickedProvider) {
+          setActiveProviders([clickedProvider]);
+          return;
+        }
+      }
+
+      // User clicked "All" to deselect it while all were selected
       if (!hasAll && allSelected) {
-        // When all were selected and user deselects one, keep the rest
         if (providers.length > 0) {
           setActiveProviders(providers);
           return;
