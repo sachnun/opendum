@@ -72,20 +72,28 @@ function getCopilotQuotaCacheKey(userId: string): string {
   return `${COPILOT_QUOTA_CACHE_PREFIX}:${userId}`;
 }
 
-function resolveCopilotMonthlyLimit(): { limit: number; estimated: boolean } {
+function resolveCopilotMonthlyLimit(detectedLimit?: number): {
+  limit: number;
+  estimated: boolean;
+} {
+  // Priority 1: Explicit env var override
   const rawValue =
     process.env.COPILOT_PREMIUM_REQUEST_LIMIT ?? process.env.GH_COPILOT_LIMIT;
 
-  if (!rawValue) {
-    return { limit: COPILOT_DEFAULT_MONTHLY_LIMIT, estimated: true };
+  if (rawValue) {
+    const parsed = Number.parseInt(rawValue, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return { limit: parsed, estimated: false };
+    }
   }
 
-  const parsed = Number.parseInt(rawValue, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return { limit: COPILOT_DEFAULT_MONTHLY_LIMIT, estimated: true };
+  // Priority 2: Auto-detected from internal Copilot API (snapshot.planLimit)
+  if (detectedLimit !== undefined && detectedLimit > 0) {
+    return { limit: detectedLimit, estimated: false };
   }
 
-  return { limit: parsed, estimated: false };
+  // Priority 3: Hardcoded default
+  return { limit: COPILOT_DEFAULT_MONTHLY_LIMIT, estimated: true };
 }
 
 function toDisplayNumber(value: number): number {
@@ -158,6 +166,24 @@ function toCopilotGroupDisplay(
       : 0;
   const monthLabel = formatMonthLabel(snapshot.year, snapshot.month);
 
+  // Determine confidence based on data source
+  let confidence: "high" | "medium" | "low";
+  if (!limitEstimated) {
+    // Limit came from env var or was auto-detected from API
+    confidence = "high";
+  } else if (
+    snapshot.source === "internal_api" ||
+    snapshot.source === "both"
+  ) {
+    // We have internal API data but somehow no planLimit was detected —
+    // still better than billing-only
+    confidence = "medium";
+  } else if (snapshot.source === "billing_api") {
+    confidence = "medium";
+  } else {
+    confidence = "low";
+  }
+
   return [
     {
       name: "premium_requests",
@@ -170,7 +196,7 @@ function toCopilotGroupDisplay(
       percentUsed,
       isExhausted: remainingFraction <= 0,
       isEstimated: limitEstimated,
-      confidence: limitEstimated ? "medium" : "high",
+      confidence,
       resetTimeIso: snapshot.resetTimeIso,
       resetInHuman: formatTimeUntilReset(snapshot.resetTimeIso),
       remainingLabel: `${toDisplayNumber(used)}/${toDisplayNumber(monthlyLimit)} used`,
@@ -235,9 +261,6 @@ export async function getCopilotQuota(
       return emptyResult;
     }
 
-    const { limit: monthlyLimit, estimated: limitEstimated } =
-      resolveCopilotMonthlyLimit();
-
     const results: CopilotAccountQuotaInfo[] = [];
     let exhaustedGroups = 0;
     let totalGroups = 0;
@@ -271,10 +294,14 @@ export async function getCopilotQuota(
       const usageSnapshot = await fetchCopilotUsageFromApi(accessToken);
 
       if (usageSnapshot.status === "success") {
+        // Resolve limit per-account: env override > auto-detected > default
+        const { limit: accountLimit, estimated: accountLimitEstimated } =
+          resolveCopilotMonthlyLimit(usageSnapshot.planLimit);
+
         const groups = toCopilotGroupDisplay(
           usageSnapshot,
-          monthlyLimit,
-          limitEstimated
+          accountLimit,
+          accountLimitEstimated
         );
 
         for (const group of groups) {
