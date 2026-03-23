@@ -188,7 +188,7 @@ export function buildTomlIndex(modelsDir) {
 
 const FAMILY_RULES = [
   { test: /^claude-/, folder: "claude" },
-  { test: /^gpt-|^grok-/, folder: "openai" },
+  { test: /^gpt-|^grok-|^o\d/, folder: "openai" },
   { test: /^gemini-/, folder: "gemini" },
   { test: /^gemma/, folder: "google" },
   { test: /^llama|^codellama/, folder: "meta" },
