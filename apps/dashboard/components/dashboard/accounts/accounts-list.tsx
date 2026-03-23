@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -755,8 +756,8 @@ function AccountCard({
 
               {isQuotaLoading && !quotaInfo ? (
                 <div className="space-y-2">
-                  <div className="h-1.5 w-full rounded-full bg-muted animate-pulse" />
-                  <div className="h-1.5 w-full rounded-full bg-muted animate-pulse" />
+                  <Skeleton className="h-1.5 w-full rounded-full" />
+                  <Skeleton className="h-1.5 w-full rounded-full" />
                 </div>
               ) : !quotaInfo ? (
                 <p className="text-xs text-muted-foreground">Quota data is not available yet.</p>
