@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -28,27 +27,9 @@ interface Account {
 export function AccountActions({ account }: { account: Account }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [isToggling, setIsToggling] = useState(false);
   const [editName, setEditName] = useState(account.name);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-
-  const handleToggleActive = async () => {
-    setIsToggling(true);
-    try {
-      const result = await updateProviderAccount(account.id, { isActive: !account.isActive });
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      toast.success(`Account ${account.isActive ? "disabled" : "enabled"}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update account");
-    } finally {
-      setIsToggling(false);
-    }
-  };
 
   const handleRename = async () => {
     if (!editName.trim()) {
@@ -93,13 +74,6 @@ export function AccountActions({ account }: { account: Account }) {
 
   return (
     <div className="flex items-center gap-2">
-      <Switch
-        checked={account.isActive}
-        onCheckedChange={handleToggleActive}
-        disabled={isToggling}
-        title={account.isActive ? "Disable account" : "Enable account"}
-      />
-
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">

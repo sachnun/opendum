@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,7 @@ import {
 import {
   getProviderAccountErrorHistory,
   resolveProviderAccountErrors,
+  updateProviderAccount,
   type ProviderAccountErrorHistoryEntry,
 } from "@/lib/actions/accounts";
 import { formatRelativeTime } from "@/lib/date";
@@ -653,6 +655,22 @@ function AccountCard({
     : "text-red-500";
   const errorCountToneClass = hasErrors ? errorToneClass : "text-muted-foreground";
   const lastErrorToneClass = account.lastErrorAt ? errorToneClass : "text-muted-foreground";
+  const [isToggling, setIsToggling] = useState(false);
+
+  const handleToggleActive = async () => {
+    setIsToggling(true);
+    try {
+      const result = await updateProviderAccount(account.id, { isActive: !account.isActive });
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      toast.success(`Account ${account.isActive ? "disabled" : "enabled"}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update account");
+    } finally {
+      setIsToggling(false);
+    }
+  };
 
   return (
     <Card className={`bg-card h-full flex flex-col ${!account.isActive ? "opacity-65" : ""}`}>
@@ -773,8 +791,19 @@ function AccountCard({
             </div>
           )}
         </div>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex items-center justify-between gap-2">
           <AccountActions account={account} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] text-muted-foreground">
+              {account.isActive ? "On" : "Off"}
+            </span>
+            <Switch
+              checked={account.isActive}
+              onCheckedChange={handleToggleActive}
+              disabled={isToggling}
+              title={account.isActive ? "Disable account" : "Enable account"}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>
