@@ -226,23 +226,23 @@ export function AnalyticsCharts({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h3 className="text-sm font-semibold tracking-tight sm:text-base">Analytics</h3>
-        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
           <Popover open={isApiKeyFilterOpen} onOpenChange={setIsApiKeyFilterOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={isFetching || apiKeys.length === 0}
-                className="h-8 min-w-36 justify-between rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
+                className="h-8 min-w-0 justify-between overflow-hidden rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
               >
                 <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+                  <KeyRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate">{selectedApiKeyLabel}</span>
                 </span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-2">
+            <PopoverContent align="end" className="max-w-[calc(100vw-2rem)] w-80 p-2">
               <div className="space-y-1">
                 <Button
                   variant={selectedApiKeyId === "all" ? "secondary" : "ghost"}
@@ -279,14 +279,14 @@ export function AnalyticsCharts({
                 variant="outline"
                 size="sm"
                 disabled={isFetching}
-                className="h-8 min-w-36 justify-between rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
+                className="h-8 min-w-0 justify-between overflow-hidden rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="hidden sm:inline">{activeFilterLabel}</span>
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="hidden truncate sm:inline">{activeFilterLabel}</span>
                   <span className="sm:hidden">{isCustomRangeActive ? "custom" : selectedPeriod.value}</span>
                 </span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-auto p-0">
