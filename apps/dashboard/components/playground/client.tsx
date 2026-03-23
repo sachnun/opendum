@@ -1456,6 +1456,19 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
 
   const [activeFamilyPreset, setActiveFamilyPreset] = React.useState<string | null>(null);
 
+  const activePresetModelIds = React.useMemo(() => {
+    if (!activeFamilyPreset) {
+      return null;
+    }
+
+    const preset = familyPresets.find((p) => p.family === activeFamilyPreset);
+    if (!preset) {
+      return null;
+    }
+
+    return new Set(preset.models.map((m) => m.id));
+  }, [activeFamilyPreset, familyPresets]);
+
   const handleScenarioSelect = (scenario: Scenario) => {
     setSelectedScenario(scenario);
 
@@ -1826,6 +1839,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
               onRemove={() => removePanel(panel.id)}
               response={responses[panel.id]}
               disabled={isAnyLoading}
+              allowedModelIds={activePresetModelIds}
             />
           );
         })}

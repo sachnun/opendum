@@ -71,6 +71,8 @@ interface ChatPanelProps {
   onRemove?: () => void;
   response?: ResponseData;
   disabled?: boolean;
+  /** When set, only models whose ID is in this set are shown in the model picker. */
+  allowedModelIds?: Set<string> | null;
 }
 
 const FAMILY_ORDER = MODEL_FAMILY_SORT_ORDER;
@@ -159,6 +161,7 @@ export function ChatPanel({
   onRemove,
   response,
   disabled = false,
+  allowedModelIds = null,
 }: ChatPanelProps) {
   const [open, setOpen] = React.useState(false);
   const [selectionStep, setSelectionStep] = React.useState<"model" | "routing">("model");
@@ -167,7 +170,12 @@ export function ChatPanel({
   const [loadingStartedAt, setLoadingStartedAt] = React.useState<number | null>(null);
   const [nowMs, setNowMs] = React.useState<number | null>(null);
 
-  const groupedModels = React.useMemo(() => groupModelsByFamily(models), [models]);
+  const filteredModels = React.useMemo(
+    () => (allowedModelIds ? models.filter((m) => allowedModelIds.has(m.id)) : models),
+    [models, allowedModelIds]
+  );
+
+  const groupedModels = React.useMemo(() => groupModelsByFamily(filteredModels), [filteredModels]);
   const sortedFamilies = React.useMemo(() => getSortedFamilies(groupedModels), [groupedModels]);
 
   const selectedModelData = models.find((m) => m.id === selectedModel);
