@@ -35,7 +35,7 @@ export function CopyInlineCode({ value, className }: CopyInlineCodeProps) {
   return (
     <code
       className={cn(
-        "inline-flex items-center gap-1 rounded bg-muted px-1 py-0.5 text-xs",
+        "inline-flex items-center gap-1 rounded bg-muted px-1 py-0.5 text-xs break-all",
         className,
       )}
     >

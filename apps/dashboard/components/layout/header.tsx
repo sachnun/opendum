@@ -97,11 +97,11 @@ export function Header({
                 </Avatar>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-2rem)]">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span>{user.name}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="truncate">{user.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">
                     {user.email}
                   </span>
                 </div>
