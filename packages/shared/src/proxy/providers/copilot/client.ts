@@ -49,9 +49,13 @@ interface CopilotTokenResponse {
   scope?: string;
   refresh_token?: string;
   expires_in?: number;
+  interval?: number;
   error?: string;
   error_description?: string;
 }
+
+/** Safety margin (seconds) added to every polling interval to prevent clock-skew issues in VMs/WSL. */
+const POLLING_SAFETY_MARGIN_SECONDS = 3;
 
 function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = COPILOT_REFRESH_BUFFER_SECONDS * 1000;
@@ -426,7 +430,7 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
 
 export async function pollCopilotDeviceCodeAuthorization(
   deviceCode: string
-): Promise<OAuthResult | { pending: true } | { error: string }> {
+): Promise<OAuthResult | { pending: true; retryAfterSeconds?: number } | { error: string }> {
   const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
@@ -460,8 +464,19 @@ export async function pollCopilotDeviceCodeAuthorization(
     };
   }
 
-  if (data.error === "authorization_pending" || data.error === "slow_down") {
+  if (data.error === "authorization_pending") {
     return { pending: true };
+  }
+
+  // Per RFC 8628 §3.5, on "slow_down" the client MUST increase the polling
+  // interval by 5 seconds (or use the server-provided interval).  We also add
+  // a safety margin to guard against monotonic-clock drift in VMs/WSL.
+  if (data.error === "slow_down") {
+    const serverInterval = data.interval ?? COPILOT_POLLING_INTERVAL + 5;
+    return {
+      pending: true,
+      retryAfterSeconds: serverInterval + POLLING_SAFETY_MARGIN_SECONDS,
+    };
   }
 
   if (data.error === "expired_token") {

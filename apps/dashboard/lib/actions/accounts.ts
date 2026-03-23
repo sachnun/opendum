@@ -1077,7 +1077,7 @@ export async function pollCopilotAuth(
   deviceCode: string
 ): Promise<
   ActionResult<
-    | { status: "pending" }
+    | { status: "pending"; retryAfterSeconds?: number }
     | { status: "success"; email: string; isUpdate: boolean }
     | { status: "error"; message: string }
   >
@@ -1092,7 +1092,13 @@ export async function pollCopilotAuth(
     const result = await pollCopilotDeviceCodeAuthorization(deviceCode);
 
     if ("pending" in result) {
-      return { success: true, data: { status: "pending" } };
+      const retryAfter = "retryAfterSeconds" in result
+        ? (result as { retryAfterSeconds?: number }).retryAfterSeconds
+        : undefined;
+      return {
+        success: true,
+        data: { status: "pending" as const, retryAfterSeconds: retryAfter },
+      };
     }
 
     if ("error" in result) {
