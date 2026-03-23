@@ -57,9 +57,10 @@ export function ModelDistributionChart({ data }: Props) {
               paddingAngle={2}
               dataKey="value"
               nameKey="model"
+              stroke="none"
             >
               {transformedData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
               ))}
             </Pie>
             <Tooltip

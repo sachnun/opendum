@@ -69,7 +69,7 @@ export function RequestsByModelChart({ data }: Props) {
             <ChartTooltip content={<ChartTooltipContent />} />
             <Bar dataKey="count" radius={[0, 4, 4, 0]}>
               {transformedData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
               ))}
             </Bar>
           </BarChart>
