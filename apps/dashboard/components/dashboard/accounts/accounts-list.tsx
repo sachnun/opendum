@@ -834,7 +834,7 @@ function ProviderSection({
   hideHeader = false,
 }: ProviderSectionProps) {
   return (
-    <section id={id} className="scroll-mt-24 space-y-4">
+    <section id={id} className="scroll-mt-24 space-y-4 md:space-y-2">
       {!hideHeader && (
         <div className="flex items-center gap-2">
           <h3 className="text-base md:text-lg font-semibold">{title}</h3>
@@ -1361,7 +1361,7 @@ export function AccountsList({
 
   return (
     <div className="space-y-8">
-      <section id="oauth-provider-accounts" className="space-y-5">
+      <section id="oauth-provider-accounts" className="space-y-5 md:space-y-3">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
         </div>
@@ -1369,7 +1369,7 @@ export function AccountsList({
         <div className="space-y-6">{oauthProviderSections}</div>
       </section>
 
-      <section id="api-key-provider-accounts" className="space-y-5">
+      <section id="api-key-provider-accounts" className="space-y-5 md:space-y-3">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
         </div>

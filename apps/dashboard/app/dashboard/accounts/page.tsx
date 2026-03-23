@@ -144,7 +144,7 @@ export default async function AccountsPage({
   return (
     <div className="space-y-6">
       <div className="relative">
-        <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-5">
+          <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-3">
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
             <div className="bg-background">
               <div className="border-b border-border pb-4">
@@ -160,7 +160,7 @@ export default async function AccountsPage({
             </div>
           </div>
         </div>
-        <div className="h-[88px] sm:h-[84px] md:h-[96px]" />
+        <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
 
       {params.success && (
@@ -179,7 +179,7 @@ export default async function AccountsPage({
         </Alert>
       )}
 
-      <section className="space-y-4">
+      <section className="space-y-4 md:space-y-2">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
         </div>
@@ -214,7 +214,7 @@ export default async function AccountsPage({
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 md:space-y-2">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
         </div>
