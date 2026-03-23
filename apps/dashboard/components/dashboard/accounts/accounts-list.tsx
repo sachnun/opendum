@@ -245,7 +245,7 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="text-muted-foreground truncate">{group.displayName}</span>
+        <span className="min-w-0 text-muted-foreground truncate">{group.displayName}</span>
         <span className="flex items-center gap-2">
           {group.resetInHuman && (
             <span className="text-[10px] text-muted-foreground" title={resetTitle}>
@@ -589,7 +589,7 @@ function LastErrorMessageDialog({
 
                   return (
                     <details key={entry.id} className="rounded-md border bg-background/70 p-2">
-                      <summary className="cursor-pointer text-xs text-foreground">
+                      <summary className="cursor-pointer break-words text-xs text-foreground">
                         <span className="font-medium">{relativeTime}</span>
                         <span className="mx-1 text-muted-foreground">-</span>
                         <span className="font-mono text-[11px] text-muted-foreground">{codeLabel}</span>
@@ -675,8 +675,8 @@ function AccountCard({
   return (
     <Card className={`bg-card h-full flex flex-col ${!account.isActive ? "opacity-65" : ""}`}>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{title}</CardTitle>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <CardTitle className="min-w-0 truncate text-lg">{title}</CardTitle>
           <div className="flex gap-1 flex-wrap justify-end">
             {showTierBadge && tierLabel && (
               <Badge 
