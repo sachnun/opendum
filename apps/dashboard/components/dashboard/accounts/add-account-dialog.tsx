@@ -223,7 +223,7 @@ export function AddAccountDialog({
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
-        clearInterval(pollingRef.current);
+        clearTimeout(pollingRef.current);
         pollingRef.current = null;
       }
     };
@@ -297,7 +297,7 @@ export function AddAccountDialog({
     setDeviceCodeInfo(null);
     setIsPolling(false);
     if (pollingRef.current) {
-      clearInterval(pollingRef.current);
+      clearTimeout(pollingRef.current);
       pollingRef.current = null;
     }
   }, [initialProvider, minimumStep]);
@@ -372,8 +372,37 @@ export function AddAccountDialog({
     setIsPolling(true);
     setError("");
 
+    // Safety margin (seconds) to prevent clock-skew issues in VMs/WSL.
+    const SAFETY_MARGIN_S = 3;
+    // Base polling interval in seconds (matches GitHub default).
+    const BASE_INTERVAL_S = 5;
+    // Device codes expire after 15 minutes; stop polling after that.
+    const EXPIRY_MS = 900_000;
+    const startTime = Date.now();
+
+    let currentIntervalMs = (BASE_INTERVAL_S + SAFETY_MARGIN_S) * 1000;
+
+    const scheduleNext = () => {
+      pollingRef.current = setTimeout(poll, currentIntervalMs);
+    };
+
+    const stopPolling = () => {
+      setIsPolling(false);
+      if (pollingRef.current) {
+        clearTimeout(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+
     const poll = async () => {
       if (!deviceCodeInfo) return;
+
+      // Stop if device code has expired
+      if (Date.now() - startTime >= EXPIRY_MS) {
+        setError("Device code expired. Please try again.");
+        stopPolling();
+        return;
+      }
 
       try {
         const result =
@@ -386,11 +415,7 @@ export function AddAccountDialog({
 
         if (!result.success) {
           setError(result.error);
-          setIsPolling(false);
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
+          stopPolling();
           return;
         }
 
@@ -415,25 +440,29 @@ export function AddAccountDialog({
             ? result.data.message
             : "An error occurred";
           setError(msg);
-          setIsPolling(false);
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
+          stopPolling();
           return;
         }
 
-        // status === "pending" - continue polling
+        // status === "pending" - adjust interval if server requested slow_down
+        if (result.data.status === "pending" && "retryAfterSeconds" in result.data) {
+          const retryAfter = (result.data as { retryAfterSeconds?: number }).retryAfterSeconds;
+          if (typeof retryAfter === "number" && retryAfter > 0) {
+            currentIntervalMs = retryAfter * 1000;
+          }
+        }
+
+        // Schedule next poll
+        scheduleNext();
       } catch (err) {
         console.error("Polling error:", err);
+        // On transient errors, keep polling
+        scheduleNext();
       }
     };
 
-    // Initial poll
-    poll();
-
-    // Set up interval polling every 5 seconds
-    pollingRef.current = setInterval(poll, 5000);
+    // Initial poll after one interval (give user time to authorize)
+    pollingRef.current = setTimeout(poll, currentIntervalMs);
   }, [deviceCodeInfo, isPolling, resetForm, router, providerConfig?.name]);
 
   const handleCopyLink = async () => {
