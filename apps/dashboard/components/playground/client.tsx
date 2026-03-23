@@ -1844,7 +1844,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
           );
         })}
 
-        {canAddPanel && !activeFamilyPreset && (
+        {canAddPanel && (
           <Card className="group h-[400px] overflow-hidden border-2 border-dashed border-border/80 bg-background p-0 transition-colors hover:border-muted-foreground/45">
             <button
               type="button"
