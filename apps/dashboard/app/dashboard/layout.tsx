@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { HeaderSkeleton } from "@/components/layout/header-skeleton";
-import { DashboardDataRefresher } from "@/components/layout/dashboard-data-refresher";
+
 import {
   MODEL_FAMILY_NAV_ITEMS,
   categorizeModelFamily,
@@ -208,7 +208,7 @@ export default async function DashboardLayout({
           </div>
         </main>
       </div>
-      <DashboardDataRefresher />
+
       <Toaster />
     </div>
   );
