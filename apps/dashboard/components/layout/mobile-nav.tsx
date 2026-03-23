@@ -206,6 +206,7 @@ export function MobileNav({
                     <Link
                       key={`${item.name}-${subItem.name}`}
                       href={subItem.href}
+                      prefetch={false}
                       onClick={(event) => {
                         handleSubItemClick(event, subItem);
                         setOpen(false);

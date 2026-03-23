@@ -208,6 +208,7 @@ export function Sidebar({
                     <Link
                       key={`${item.name}-${subItem.name}`}
                       href={subItem.href}
+                      prefetch={false}
                       onClick={(event) => handleSubItemClick(event, subItem)}
                       className={cn(
                         "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
