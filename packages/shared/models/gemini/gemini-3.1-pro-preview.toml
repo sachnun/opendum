@@ -14,7 +14,7 @@ output = 65_536
 
 [opendum]
 family = "Gemini"
-providers = ["antigravity", "gemini_cli"]
+providers = ["antigravity", "copilot", "gemini_cli"]
 aliases = ["gemini-3.1-pro", "gemini-3.1-pro-high", "gemini-3.1-pro-low"]
 
 [opendum.upstream]
