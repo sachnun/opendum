@@ -95,6 +95,437 @@ function resolveCopilotModel(model: string): string {
   return getUpstreamModelName(normalizedModel, "copilot");
 }
 
+/**
+ * Check if a model requires the Responses API on GitHub Copilot.
+ * Codex models are not accessible via /chat/completions on Copilot's API.
+ */
+function requiresCopilotResponsesApi(model: string): boolean {
+  return model.toLowerCase().includes("codex");
+}
+
+/**
+ * Extract system/developer instructions from Chat Completions messages.
+ */
+function extractInstructionsFromChatMessages(
+  messages: ChatCompletionRequest["messages"]
+): string | undefined {
+  const parts: string[] = [];
+  for (const msg of messages) {
+    if (msg.role !== "system" && msg.role !== "developer") continue;
+    const text = typeof msg.content === "string" ? msg.content.trim() : "";
+    if (text) parts.push(text);
+  }
+  return parts.length > 0 ? parts.join("\n\n") : undefined;
+}
+
+/**
+ * Convert Chat Completions messages[] to Responses API input[] items.
+ */
+function convertChatMessagesToResponsesInput(
+  messages: ChatCompletionRequest["messages"]
+): Array<Record<string, unknown>> {
+  const input: Array<Record<string, unknown>> = [];
+
+  for (const msg of messages) {
+    switch (msg.role) {
+      case "system":
+      case "developer":
+        input.push({ type: "message", role: "developer", content: msg.content });
+        break;
+
+      case "user":
+        input.push({ type: "message", role: "user", content: msg.content });
+        break;
+
+      case "assistant":
+        if (msg.tool_calls && msg.tool_calls.length > 0) {
+          if (msg.content) {
+            input.push({ type: "message", role: "assistant", content: msg.content });
+          }
+          for (const tc of msg.tool_calls) {
+            const toolCall = tc as {
+              id: string;
+              type: string;
+              function: { name: string; arguments: string };
+            };
+            input.push({
+              type: "function_call",
+              call_id: toolCall.id,
+              name: toolCall.function.name,
+              arguments: toolCall.function.arguments,
+            });
+          }
+        } else {
+          input.push({ type: "message", role: "assistant", content: msg.content });
+        }
+        break;
+
+      case "tool":
+        input.push({
+          type: "function_call_output",
+          call_id: msg.tool_call_id || "",
+          output:
+            typeof msg.content === "string"
+              ? msg.content
+              : JSON.stringify(msg.content),
+        });
+        break;
+
+      default:
+        input.push({ type: "message", role: msg.role, content: msg.content });
+    }
+  }
+
+  return input;
+}
+
+/**
+ * Convert Chat Completions tools to Responses API tools format.
+ */
+function convertToolsToResponsesFormat(
+  tools?: ChatCompletionRequest["tools"]
+): Array<Record<string, unknown>> | undefined {
+  if (!tools || tools.length === 0) return undefined;
+  return tools.map((tool) => ({
+    type: "function",
+    name: tool.function.name,
+    description: tool.function.description || "",
+    parameters: tool.function.parameters || { type: "object", properties: {} },
+  }));
+}
+
+/**
+ * Build a Responses API payload from a Chat Completions request body.
+ * Intentionally omits sampling params (temperature, top_p, etc.) that are
+ * unsupported by codex models with reasoning enabled.
+ */
+function buildCopilotResponsesPayload(
+  body: ChatCompletionRequest,
+  stream: boolean
+): Record<string, unknown> {
+  const explicitInstructions =
+    typeof body.instructions === "string" ? body.instructions.trim() : undefined;
+  const derivedInstructions = extractInstructionsFromChatMessages(body.messages);
+  const instructions = explicitInstructions || derivedInstructions;
+
+  const input =
+    Array.isArray(body._responsesInput) && body._responsesInput.length > 0
+      ? body._responsesInput
+      : convertChatMessagesToResponsesInput(body.messages);
+
+  const payload: Record<string, unknown> = {
+    model: body.model,
+    input,
+    stream,
+  };
+
+  if (instructions) {
+    payload.instructions = instructions;
+  }
+
+  const tools = convertToolsToResponsesFormat(body.tools);
+  if (tools) {
+    payload.tools = tools;
+  }
+
+  if (body.tool_choice !== undefined) {
+    payload.tool_choice = body.tool_choice;
+  }
+
+  // Reasoning config
+  if (body.reasoning && typeof body.reasoning === "object") {
+    payload.reasoning = body.reasoning;
+  } else if (body.reasoning_effort) {
+    payload.reasoning = { effort: body.reasoning_effort };
+  }
+
+  // max_output_tokens (Responses API equivalent of max_tokens)
+  if (body.max_tokens !== undefined) {
+    payload.max_output_tokens = body.max_tokens;
+  }
+
+  return payload;
+}
+
+/**
+ * Generate a unique Chat Completions ID.
+ */
+function generateChatCompletionId(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "chatcmpl-";
+  for (let i = 0; i < 24; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Create a TransformStream that converts Responses API SSE events
+ * into Chat Completions SSE format.
+ */
+function createCopilotResponsesToChatCompletionsStream(
+  model: string
+): TransformStream<string, string> {
+  const completionId = generateChatCompletionId();
+  const created = Math.floor(Date.now() / 1000);
+  let buffer = "";
+  let sentRole = false;
+  let sentDone = false;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let currentFunctionCallId: string | null = null;
+  let functionCallIndex = 0;
+
+  function makeChatChunk(
+    delta: Record<string, unknown>,
+    finishReason: string | null = null,
+    usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
+  ): string {
+    const chunk: Record<string, unknown> = {
+      id: completionId,
+      object: "chat.completion.chunk",
+      created,
+      model,
+      choices: [{ index: 0, delta, finish_reason: finishReason }],
+    };
+    if (usage) {
+      chunk.usage = usage;
+    }
+    return `data: ${JSON.stringify(chunk)}\n\n`;
+  }
+
+  return new TransformStream<string, string>({
+    transform(chunk, controller) {
+      buffer += chunk;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(":") || trimmed.startsWith("event:")) continue;
+        if (!trimmed.startsWith("data:")) continue;
+
+        const jsonStr = trimmed.slice(5).trim();
+        if (!jsonStr || jsonStr === "[DONE]") {
+          if (!sentDone) {
+            sentDone = true;
+            controller.enqueue("data: [DONE]\n\n");
+          }
+          continue;
+        }
+
+        try {
+          const event = JSON.parse(jsonStr);
+          const eventType = event.type;
+
+          switch (eventType) {
+            case "response.output_text.delta": {
+              if (!sentRole) {
+                controller.enqueue(makeChatChunk({ role: "assistant", content: "" }));
+                sentRole = true;
+              }
+              if (event.delta) {
+                controller.enqueue(makeChatChunk({ content: event.delta }));
+              }
+              break;
+            }
+
+            case "response.reasoning.delta":
+            case "response.reasoning_summary_text.delta": {
+              if (!sentRole) {
+                controller.enqueue(makeChatChunk({ role: "assistant", content: "" }));
+                sentRole = true;
+              }
+              if (event.delta) {
+                controller.enqueue(makeChatChunk({ reasoning_content: event.delta }));
+              }
+              break;
+            }
+
+            case "response.output_item.added": {
+              if (event.item?.type === "function_call") {
+                if (!sentRole) {
+                  controller.enqueue(makeChatChunk({ role: "assistant" }));
+                  sentRole = true;
+                }
+                const fcName = event.item.name || "";
+                currentFunctionCallId =
+                  event.item.call_id || event.item.id || `call_${Date.now()}`;
+                controller.enqueue(
+                  makeChatChunk({
+                    tool_calls: [
+                      {
+                        index: functionCallIndex,
+                        id: currentFunctionCallId,
+                        type: "function",
+                        function: { name: fcName, arguments: "" },
+                      },
+                    ],
+                  })
+                );
+              }
+              break;
+            }
+
+            case "response.function_call_arguments.delta": {
+              if (event.delta) {
+                controller.enqueue(
+                  makeChatChunk({
+                    tool_calls: [
+                      {
+                        index: functionCallIndex,
+                        function: { arguments: event.delta },
+                      },
+                    ],
+                  })
+                );
+              }
+              break;
+            }
+
+            case "response.function_call_arguments.done":
+            case "response.output_item.done": {
+              if (
+                event.item?.type === "function_call" ||
+                eventType === "response.function_call_arguments.done"
+              ) {
+                functionCallIndex++;
+                currentFunctionCallId = null;
+              }
+              break;
+            }
+
+            case "response.completed":
+            case "response.done": {
+              const resp = event.response || event;
+              if (resp.usage) {
+                inputTokens =
+                  resp.usage.input_tokens || resp.usage.prompt_tokens || 0;
+                outputTokens =
+                  resp.usage.output_tokens || resp.usage.completion_tokens || 0;
+              }
+
+              let finishReason = "stop";
+              if (resp.status === "incomplete") finishReason = "length";
+              if (functionCallIndex > 0) finishReason = "tool_calls";
+
+              controller.enqueue(
+                makeChatChunk({}, finishReason, {
+                  prompt_tokens: inputTokens,
+                  completion_tokens: outputTokens,
+                  total_tokens: inputTokens + outputTokens,
+                })
+              );
+              if (!sentDone) {
+                sentDone = true;
+                controller.enqueue("data: [DONE]\n\n");
+              }
+              break;
+            }
+
+            default:
+              break;
+          }
+        } catch {
+          // Skip unparseable lines
+        }
+      }
+    },
+    flush(controller) {
+      if (buffer.trim()) {
+        const trimmed = buffer.trim();
+        if (trimmed.startsWith("data:")) {
+          const jsonStr = trimmed.slice(5).trim();
+          if (jsonStr === "[DONE]" && !sentDone) {
+            controller.enqueue("data: [DONE]\n\n");
+          }
+        }
+      }
+    },
+  });
+}
+
+/**
+ * Convert a non-streaming Responses API response to Chat Completions format.
+ */
+function convertCopilotResponsesToCompletion(
+  responsesData: Record<string, unknown>,
+  model: string
+): Record<string, unknown> {
+  const completionId = generateChatCompletionId();
+  const created = Math.floor(Date.now() / 1000);
+  const output = (responsesData.output as Array<Record<string, unknown>>) || [];
+  let content = "";
+  let reasoningContent = "";
+  const toolCalls: Array<Record<string, unknown>> = [];
+  let toolCallIndex = 0;
+
+  for (const item of output) {
+    if (item.type === "message") {
+      const itemContent = item.content as Array<Record<string, unknown>>;
+      if (Array.isArray(itemContent)) {
+        for (const part of itemContent) {
+          if (part.type === "output_text") {
+            content += (part.text as string) || "";
+          }
+        }
+      }
+    } else if (item.type === "reasoning") {
+      const summary = item.summary;
+      if (Array.isArray(summary)) {
+        for (const part of summary) {
+          const text =
+            typeof part === "string"
+              ? part
+              : (part as { text?: string })?.text || "";
+          if (text) reasoningContent += (reasoningContent ? "\n" : "") + text;
+        }
+      }
+    } else if (item.type === "function_call") {
+      toolCalls.push({
+        id:
+          (item.call_id as string) ||
+          (item.id as string) ||
+          `call_${toolCallIndex}`,
+        type: "function",
+        function: {
+          name: item.name as string,
+          arguments: (item.arguments as string) || "{}",
+        },
+      });
+      toolCallIndex++;
+    }
+  }
+
+  const usage = responsesData.usage as Record<string, number> | undefined;
+  const promptTokens = usage?.input_tokens || usage?.prompt_tokens || 0;
+  const completionTokens = usage?.output_tokens || usage?.completion_tokens || 0;
+
+  const message: Record<string, unknown> = {
+    role: "assistant",
+    content: content || null,
+  };
+  if (reasoningContent) message.reasoning_content = reasoningContent;
+  if (toolCalls.length > 0) message.tool_calls = toolCalls;
+
+  let finishReason = "stop";
+  if ((responsesData.status as string) === "incomplete") finishReason = "length";
+  if (toolCalls.length > 0) finishReason = "tool_calls";
+
+  return {
+    id: completionId,
+    object: "chat.completion",
+    created,
+    model,
+    choices: [{ index: 0, message, finish_reason: finishReason }],
+    usage: {
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: promptTokens + completionTokens,
+    },
+  };
+}
+
 function hasVisionInResponsesInput(
   input: Array<Record<string, unknown>> | undefined
 ): boolean {
@@ -367,6 +798,67 @@ export const copilotProvider: Provider = {
     const xInitiator = body._copilotXInitiator === "agent" ? "agent" : "user";
     const visionRequest = isCopilotVisionRequest(body);
 
+    const fallbackMs = stream
+      ? copilotConfig.timeouts.streamMs
+      : copilotConfig.timeouts.nonStreamMs;
+    const timeoutMs = await getAdaptiveTimeout(
+      copilotConfig.name, body.model, stream, fallbackMs
+    );
+
+    // Codex models require the Responses API endpoint on GitHub Copilot
+    if (requiresCopilotResponsesApi(upstreamModel)) {
+      const payload = buildCopilotResponsesPayload(
+        { ...body, model: upstreamModel },
+        stream
+      );
+
+      const response = await fetchWithTimeout(
+        `${COPILOT_API_BASE_URL}/responses`,
+        {
+          method: "POST",
+          headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
+          body: JSON.stringify(payload),
+        },
+        timeoutMs
+      );
+
+      // Transform streaming Responses API SSE back to Chat Completions SSE
+      if (stream && response.ok && response.body) {
+        const converter = createCopilotResponsesToChatCompletionsStream(upstreamModel);
+        const transformedBody = response.body
+          .pipeThrough(new TextDecoderStream())
+          .pipeThrough(converter)
+          .pipeThrough(new TextEncoderStream());
+
+        return new Response(transformedBody, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: new Headers({
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          }),
+        });
+      }
+
+      // Transform non-streaming Responses API JSON back to Chat Completions
+      if (!stream && response.ok) {
+        const responsesData = (await response.json()) as Record<string, unknown>;
+        const completionData = convertCopilotResponsesToCompletion(
+          responsesData,
+          upstreamModel
+        );
+        return new Response(JSON.stringify(completionData), {
+          status: 200,
+          headers: new Headers({ "Content-Type": "application/json" }),
+        });
+      }
+
+      // Error responses pass through as-is
+      return response;
+    }
+
+    // Regular models: use Chat Completions endpoint
     const requestPayload = buildRequestPayload(
       {
         ...body,
@@ -375,12 +867,6 @@ export const copilotProvider: Provider = {
       stream
     );
 
-    const fallbackMs = stream
-      ? copilotConfig.timeouts.streamMs
-      : copilotConfig.timeouts.nonStreamMs;
-    const timeoutMs = await getAdaptiveTimeout(
-      copilotConfig.name, body.model, stream, fallbackMs
-    );
     return fetchWithTimeout(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
