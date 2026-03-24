@@ -9,10 +9,11 @@ output = 32_768
 
 [opendum]
 family = "OpenAI"
-providers = ["nvidia_nim", "ollama_cloud", "openrouter"]
+providers = ["nvidia_nim", "ollama_cloud", "openrouter", "groq"]
 aliases = ["openai-gpt-oss-20b"]
 
 [opendum.upstream]
 nvidia_nim = "openai/gpt-oss-20b"
 ollama_cloud = "gpt-oss:20b"
 openrouter = "openai/gpt-oss-20b:free"
+groq = "openai/gpt-oss-20b"

@@ -8,9 +8,10 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim", "openrouter"]
+providers = ["nvidia_nim", "openrouter", "groq"]
 aliases = ["meta-llama-3.3-70b-instruct", "meta/llama-3.3-70b-instruct"]
 
 [opendum.upstream]
 nvidia_nim = "meta/llama-3.3-70b-instruct"
 openrouter = "meta-llama/llama-3.3-70b-instruct:free"
+groq = "llama-3.3-70b-versatile"

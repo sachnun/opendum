@@ -1,6 +1,7 @@
 [opendum]
 family = "Google"
-providers = ["nvidia_nim"]
+providers = ["nvidia_nim", "groq"]
 
 [opendum.upstream]
 nvidia_nim = "google/gemma-2-9b-it"
+groq = "gemma2-9b-it"
