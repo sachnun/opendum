@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Menu, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import { Menu, ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -274,20 +275,26 @@ export function MobileNav({
           <span className="sr-only">Toggle menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="flex w-[78vw] max-w-[18rem] flex-col gap-0 p-0">
-        <SheetHeader className="border-b border-border px-5 py-4">
+      <SheetContent side="left" hideClose className="flex w-[78vw] max-w-[18rem] flex-col gap-0 p-0">
+        <SheetHeader className="h-16 justify-center border-b border-border px-5">
           <SheetTitle className="text-left">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-base font-semibold tracking-tight"
-              onClick={() => setOpen(false)}
-            >
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-              </span>
-              Opendum
-            </Link>
+            <div className="flex items-center justify-between">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-base font-semibold tracking-tight"
+                onClick={() => setOpen(false)}
+              >
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                </span>
+                Opendum
+              </Link>
+              <SheetClose className="opacity-70 transition-opacity cursor-pointer hover:opacity-100 focus:outline-none">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </SheetClose>
+            </div>
           </SheetTitle>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
