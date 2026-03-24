@@ -26,7 +26,7 @@ import {
   COPILOT_DEVICE_CODE_EXPIRY,
   COPILOT_REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
-import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
+import { getUpstreamModelName, getProviderModelSet, MODEL_REGISTRY, resolveModelAlias } from "../../models.js";
 import {
   convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
@@ -93,6 +93,16 @@ function resolveCopilotModel(model: string): string {
     : model;
 
   return getUpstreamModelName(normalizedModel, "copilot");
+}
+
+/**
+ * Check if a model is a reasoning model based on the TOML registry metadata.
+ * Non-reasoning models (e.g. gpt-4.1) do not accept reasoning_effort or reasoning params.
+ */
+function isReasoningModel(model: string): boolean {
+  const canonical = resolveModelAlias(model);
+  const info = MODEL_REGISTRY[canonical];
+  return !!info?.meta?.reasoning;
 }
 
 /**
@@ -859,13 +869,14 @@ export const copilotProvider: Provider = {
     }
 
     // Regular models: use Chat Completions endpoint
-    const requestPayload = buildRequestPayload(
-      {
-        ...body,
-        model: upstreamModel,
-      },
-      stream
-    );
+    // Strip reasoning params for non-reasoning models (e.g. gpt-4.1) to avoid
+    // "Unrecognized request argument" errors from the Copilot API.
+    const chatBody: Record<string, unknown> = { ...body, model: upstreamModel };
+    if (!isReasoningModel(modelName)) {
+      delete chatBody.reasoning_effort;
+      delete chatBody.reasoning;
+    }
+    const requestPayload = buildRequestPayload(chatBody, stream);
 
     return fetchWithTimeout(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",
