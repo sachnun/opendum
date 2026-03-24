@@ -233,29 +233,59 @@ async function setCachedDisabledModels(userId: string, models: string[]): Promis
   }
 }
 
+// In-memory cache for disabled model Sets (avoids recreating Set from array each call)
+const disabledModelSetMemCache = new Map<string, { set: Set<string>; expiresAt: number }>();
+const DISABLED_MODELS_MEM_CACHE_TTL_MS = 10_000; // 10 seconds
+
+function getCachedDisabledModelSet(userId: string): Set<string> | null {
+  const entry = disabledModelSetMemCache.get(userId);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    disabledModelSetMemCache.delete(userId);
+    return null;
+  }
+  return entry.set;
+}
+
+function setCachedDisabledModelSet(userId: string, models: string[]): Set<string> {
+  const set = new Set(models);
+  disabledModelSetMemCache.set(userId, {
+    set,
+    expiresAt: Date.now() + DISABLED_MODELS_MEM_CACHE_TTL_MS,
+  });
+  return set;
+}
+
 async function isModelDisabledForUser(userId: string, model: string): Promise<boolean> {
+  const memCached = getCachedDisabledModelSet(userId);
+  if (memCached) return memCached.has(model);
+
   const cachedModels = await getCachedDisabledModels(userId);
   if (cachedModels) {
-    return new Set(cachedModels).has(model);
+    return setCachedDisabledModelSet(userId, cachedModels).has(model);
   }
 
   const disabledModels = await getDisabledModelsFromDatabase(userId);
   await setCachedDisabledModels(userId, disabledModels);
-  return new Set(disabledModels).has(model);
+  return setCachedDisabledModelSet(userId, disabledModels).has(model);
 }
 
 export async function getDisabledModelSetForUser(userId: string): Promise<Set<string>> {
+  const memCached = getCachedDisabledModelSet(userId);
+  if (memCached) return memCached;
+
   const cachedModels = await getCachedDisabledModels(userId);
   if (cachedModels) {
-    return new Set(cachedModels);
+    return setCachedDisabledModelSet(userId, cachedModels);
   }
 
   const disabledModels = await getDisabledModelsFromDatabase(userId);
   await setCachedDisabledModels(userId, disabledModels);
-  return new Set(disabledModels);
+  return setCachedDisabledModelSet(userId, disabledModels);
 }
 
 export async function invalidateDisabledModelsCache(userId: string): Promise<void> {
+  disabledModelSetMemCache.delete(userId);
   const redis = await getRedisClient();
 
   try {
