@@ -340,12 +340,23 @@ export const antigravityProvider: Provider = {
           body: result.body,
         }, timeoutMs);
 
+        // 429 = quota exhausted (per-account, not per-endpoint).
+        // Return immediately so the proxy rate-limit handler can parse
+        // the quotaResetDelay and mark the account as rate-limited.
+        if (response.status === 429) {
+          const errorBody = await response.text();
+          return new Response(errorBody, {
+            status: 429,
+            statusText: response.statusText,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
         // Check if error is retryable (account/server related) vs parameter error
-        // Retryable: 5xx (server), 429 (rate limit), 401 (auth), 403 (permission), 404 (endpoint)
+        // Retryable: 5xx (server), 401 (auth), 403 (permission), 404 (endpoint)
         // Non-retryable: 400 (bad request), 409 (conflict), 422 (validation), other 4xx
         const isRetryableError =
           response.status >= 500 ||
-          response.status === 429 ||
           response.status === 401 ||
           response.status === 403 ||
           response.status === 404;
