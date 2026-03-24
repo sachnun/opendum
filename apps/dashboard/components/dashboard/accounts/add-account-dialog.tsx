@@ -44,6 +44,7 @@ import {
   connectNvidiaNimApiKey,
   connectOllamaCloudApiKey,
   connectOpenRouterApiKey,
+  connectGroqApiKey,
 } from "@/lib/actions/accounts";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { cn } from "@/lib/utils";
@@ -155,6 +156,15 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     accountNamePlaceholder: "OpenRouter Personal",
     connectAction: connectOpenRouterApiKey,
   },
+  groq: {
+    name: "Groq",
+    description: "Access ultra-fast LLM inference via Groq API",
+    flowType: "api_key",
+    apiKeyPortalUrl: "https://console.groq.com/keys",
+    apiKeyPlaceholder: "gsk_...",
+    accountNamePlaceholder: "Groq Personal",
+    connectAction: connectGroqApiKey,
+  },
 };
 
 const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
@@ -171,6 +181,7 @@ const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
   "ollama_cloud",
   "openrouter",
   "nvidia_nim",
+  "groq",
 ];
 
 

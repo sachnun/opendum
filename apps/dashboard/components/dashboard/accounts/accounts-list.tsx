@@ -117,6 +117,7 @@ interface AccountsListProps {
   nvidiaNimAccounts: Account[];
   ollamaCloudAccounts: Account[];
   openRouterAccounts: Account[];
+  groqAccounts: Account[];
   visibleProviders?: ProviderAccountKey[];
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
 }
@@ -892,6 +893,7 @@ export function AccountsList({
   nvidiaNimAccounts,
   ollamaCloudAccounts,
   openRouterAccounts,
+  groqAccounts,
   visibleProviders,
   supportedModelsByProvider,
 }: AccountsListProps) {
@@ -1351,6 +1353,19 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.openrouter}
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
+      />
+    );
+  }
+  if (shouldRenderProvider("groq")) {
+    apiKeyProviderSections.push(
+      <ProviderSection
+        key="groq"
+        id="groq-accounts"
+        title="Groq Accounts"
+        hideHeader={hasProviderFilter}
+        accounts={groqAccounts}
+        emptyMessage="No Groq accounts connected yet."
+        supportedModels={supportedModelsByProvider?.groq}
       />
     );
   }
