@@ -112,9 +112,9 @@ export default async function ApiKeysPage() {
                 key={apiKey.id}
                 className={`bg-card ${isExpiredOrDisabled ? "opacity-65" : ""}`}
               >
-                <CardContent className="py-4">
+                <CardContent className="px-5 py-4">
                   {/* Row 1: Name + Actions + Badge */}
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                     <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
                     <div className="flex shrink-0 items-center gap-2">
                       <ApiKeyActions apiKey={apiKey} />
@@ -123,7 +123,7 @@ export default async function ApiKeysPage() {
                   </div>
 
                   {/* Row 2: Metadata + Access controls + Analytics */}
-                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                     <span className="text-xs text-muted-foreground">
                       {new Date(apiKey.createdAt).toLocaleDateString()}
                       {" · "}
