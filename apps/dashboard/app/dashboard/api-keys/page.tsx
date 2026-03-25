@@ -3,9 +3,9 @@ import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
 import { proxyApiKey, providerAccount } from "@opendum/shared/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Key } from "lucide-react";
+import { BarChart3, Key } from "lucide-react";
 import { CreateApiKeyButton } from "@/components/dashboard/api-keys/create-api-key-button";
 import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
 import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
@@ -112,44 +112,31 @@ export default async function ApiKeysPage() {
                 key={apiKey.id}
                 className={`bg-card ${isExpiredOrDisabled ? "opacity-65" : ""}`}
               >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <Key className="h-5 w-5 shrink-0 text-muted-foreground" />
-                      <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
+                <CardContent className="py-4">
+                  {/* Row 1: Name + Actions + Badge */}
+                  <div className="flex items-center justify-between gap-3">
+                    <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
+                    <div className="flex shrink-0 items-center gap-2">
+                      <ApiKeyActions apiKey={apiKey} />
+                      <Badge variant={status.variant} className="shrink-0">{status.label}</Badge>
                     </div>
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Created: </span>
-                        <span>{new Date(apiKey.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Expires: </span>
-                        <span>
-                          {apiKey.expiresAt
-                            ? new Date(apiKey.expiresAt).toLocaleDateString()
-                            : "Never"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Last used: </span>
-                        <span>
-                          {apiKey.lastUsedAt
-                            ? formatRelativeTime(apiKey.lastUsedAt)
-                            : "Never"}
-                        </span>
-                      </div>
-                    </div>
-                    <ApiKeyActions apiKey={apiKey} />
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
-                    <div className="flex flex-wrap items-center gap-4">
+                  {/* Row 2: Metadata + Access controls + Analytics */}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(apiKey.createdAt).toLocaleDateString()}
+                      {" · "}
+                      {apiKey.expiresAt
+                        ? `Exp ${new Date(apiKey.expiresAt).toLocaleDateString()}`
+                        : "No expiry"}
+                      {" · "}
+                      {apiKey.lastUsedAt
+                        ? `Used ${formatRelativeTime(apiKey.lastUsedAt)}`
+                        : "Never used"}
+                    </span>
+
+                    <div className="flex flex-wrap items-center gap-2">
                       <ApiKeyModelAccess
                         apiKeyId={apiKey.id}
                         availableModels={availableModels}
@@ -166,9 +153,11 @@ export default async function ApiKeysPage() {
 
                     <Link
                       href={`/dashboard/analistik/${apiKey.id}`}
-                      className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                      className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      title="View analytics"
                     >
-                      View analytics
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Analytics</span>
                     </Link>
                   </div>
                 </CardContent>
