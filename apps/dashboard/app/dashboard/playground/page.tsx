@@ -10,8 +10,8 @@ import type {
   ProviderAccountOption,
 } from "@/components/playground/chat-panel";
 
-// Get all models - one entry per model
-function getModels(disabledModels: Set<string>): ModelOption[] {
+// Get all models - one entry per model, filtered to only include providers the user has accounts for
+function getModels(disabledModels: Set<string>, userProviders: Set<string>): ModelOption[] {
   const models: ModelOption[] = [];
 
   for (const modelName of getAllModels()) {
@@ -19,7 +19,12 @@ function getModels(disabledModels: Set<string>): ModelOption[] {
       continue;
     }
 
-    const providers = getProvidersForModel(modelName);
+    const providers = getProvidersForModel(modelName).filter((p) => userProviders.has(p));
+
+    // Skip models where the user has no provider account
+    if (providers.length === 0) {
+      continue;
+    }
 
     models.push({
       id: modelName,
@@ -69,7 +74,6 @@ export default async function PlaygroundPage({
     disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
 
-  const models = getModels(disabledModelSet);
   const providerAccounts = await db
     .select({
       id: providerAccount.id,
@@ -85,6 +89,9 @@ export default async function PlaygroundPage({
       ),
     )
     .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
+
+  const userProviders = new Set(providerAccounts.map((a) => a.provider));
+  const models = getModels(disabledModelSet, userProviders);
 
   // Get the user's most recently used API key for playground proxy calls
   let playgroundApiKey: string | undefined;
