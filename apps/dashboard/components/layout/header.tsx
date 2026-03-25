@@ -18,6 +18,7 @@ import type {
   ProviderAccountIndicators,
 } from "@/lib/navigation";
 import { MODEL_REGISTRY, getAllModels, getProvidersForModel, resolveModelAlias } from "@opendum/shared/proxy/models";
+import { type ModelStats, buildEmptyModelStats } from "@/lib/model-stats";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -39,6 +40,9 @@ interface HeaderProps {
   accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
   disabledModels: Array<{ model: string }>;
+  statsByModel: Record<string, ModelStats>;
+  fallbackDayKeys: string[];
+  fallbackHourKeys: string[];
   user: {
     name: string | null;
     email: string | null;
@@ -52,6 +56,9 @@ export function Header({
   accountIndicators,
   modelFamilyCounts,
   disabledModels,
+  statsByModel,
+  fallbackDayKeys,
+  fallbackHourKeys,
   user,
 }: HeaderProps) {
   const disabledModelSet = new Set(
@@ -59,13 +66,14 @@ export function Header({
   );
 
   const models = getAllModels()
-    .filter((id) => !disabledModelSet.has(id))
-    .map((id) => ({
+    .map((id: string) => ({
       id,
-      providers: getProvidersForModel(id).map((provider) => PROVIDER_LABELS[provider] ?? provider),
+      providers: getProvidersForModel(id).map((provider: string) => PROVIDER_LABELS[provider] ?? provider),
       meta: MODEL_REGISTRY[id]?.meta,
+      isEnabled: !disabledModelSet.has(id),
+      stats: statsByModel[id] ?? buildEmptyModelStats(fallbackDayKeys, fallbackHourKeys),
     }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id));
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-background px-5 sm:px-6 lg:px-8">

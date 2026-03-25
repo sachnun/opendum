@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronDown, Copy, Check, Search, Play, Brain, Wrench, Eye, Calendar } from "lucide-react";
+import { useState, useCallback } from "react";
+import Link from "next/link";
+import { ChevronDown, Copy, Check, Search, Play, Brain, Wrench, Eye, Calendar, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Command,
   CommandDialog,
@@ -23,13 +25,18 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { cn } from "@/lib/utils";
+import { setModelEnabled } from "@/lib/actions/models";
 import type { ModelMeta } from "@opendum/shared/proxy/models";
+import type { ModelStats } from "@/lib/model-stats";
 
 interface ModelSearchItem {
   id: string;
   providers: string[];
   meta?: ModelMeta;
+  isEnabled: boolean;
+  stats: ModelStats;
 }
 
 interface ModelSearchPopoverProps {
@@ -55,10 +62,44 @@ function formatDate(dateStr: string): string {
   return `${month} ${year}`;
 }
 
-function ModelDetailContent({ model, onClose }: { model: ModelSearchItem; onClose: () => void }) {
-  const router = useRouter();
+function formatDuration(duration: number | null): string {
+  if (duration === null) {
+    return "-";
+  }
+
+  if (duration >= 1000) {
+    return `${(duration / 1000).toFixed(2)}s`;
+  }
+
+  return `${duration}ms`;
+}
+
+function formatHourLabel(time: string): string {
+  const date = new Date(time);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function ModelDetailContent({
+  model,
+  onClose,
+}: {
+  model: ModelSearchItem;
+  onClose: () => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(model.isEnabled);
+  const [isUpdating, setIsUpdating] = useState(false);
   const meta = model.meta;
+  const stats = model.stats;
+
+  const dailyValues = stats.dailyRequests.map((point) => point.count);
+  const durationValues = stats.durationLast24Hours.map((point) => point.avgDuration ?? 0);
+  const durationLabelPoints = [
+    stats.durationLast24Hours[0],
+    stats.durationLast24Hours[Math.floor(stats.durationLast24Hours.length / 2)],
+    stats.durationLast24Hours[stats.durationLast24Hours.length - 1],
+  ].filter((point): point is { time: string; avgDuration: number | null } => Boolean(point));
+  const maxDailyRequests = Math.max(...dailyValues, 0);
 
   const handleCopy = async () => {
     try {
@@ -71,100 +112,192 @@ function ModelDetailContent({ model, onClose }: { model: ModelSearchItem; onClos
     }
   };
 
-  const handlePlayground = () => {
-    onClose();
-    router.push(`/dashboard/playground?model=${encodeURIComponent(model.id)}`);
-  };
+  const handleEnabledChange = useCallback(async (checked: boolean) => {
+    setIsEnabled(checked);
+    setIsUpdating(true);
+
+    try {
+      const result = await setModelEnabled(model.id, checked);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      toast.success(checked ? "Model enabled" : "Model disabled");
+    } catch (error) {
+      setIsEnabled(!checked);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update model status"
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [model.id]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-mono text-sm font-semibold break-all">{model.id}</p>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {model.providers.map((provider) => (
-              <Badge key={provider} variant="secondary" className="text-xs">
-                {provider}
-              </Badge>
-            ))}
+    <Card className={`flex flex-col bg-card py-4 border-0 shadow-none ${!isEnabled ? "opacity-70" : ""}`}>
+      <CardHeader className="px-0 pb-2">
+        {/* Row 1: Model ID + Toggle */}
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle
+            className="flex-1 min-w-0 overflow-hidden text-sm font-mono leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+            title={model.id}
+          >
+            {model.id}
+          </CardTitle>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] text-muted-foreground">
+              {isEnabled ? "On" : "Off"}
+            </span>
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={handleEnabledChange}
+              disabled={isUpdating}
+              title={isEnabled ? "Disable model" : "Enable model"}
+            />
           </div>
         </div>
-        {meta?.pricing && (
-          <div className="text-xs text-muted-foreground whitespace-nowrap text-right">
-            <p>${meta.pricing.input}/in</p>
-            <p>${meta.pricing.output}/out</p>
-          </div>
-        )}
-      </div>
 
-      {meta && (
-        <div className="space-y-3">
-          {(meta.contextLength || meta.outputLimit) && (
-            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-              {meta.contextLength && (
-                <span className="rounded border border-border/60 bg-muted/30 px-2 py-0.5">
-                  {formatTokens(meta.contextLength)} context
-                </span>
-              )}
-              {meta.outputLimit && (
-                <span className="rounded border border-border/60 bg-muted/30 px-2 py-0.5">
-                  {formatTokens(meta.outputLimit)} output
-                </span>
-              )}
-              {meta.knowledgeCutoff && (
-                <span className="flex items-center gap-1 rounded border border-border/60 bg-muted/30 px-2 py-0.5">
-                  <Calendar className="h-3 w-3" />
-                  {formatDate(meta.knowledgeCutoff)}
-                </span>
+        {/* Row 2: Provider badges + Copy/Play */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          {model.providers.map((provider) => (
+            <Badge key={provider} variant="secondary" className="text-xs">
+              {provider}
+            </Badge>
+          ))}
+          <span className="mx-0.5" />
+          <Button
+            variant={copied ? "secondary" : "ghost"}
+            size="xs"
+            className="h-5 px-1.5 text-[11px]"
+            onClick={handleCopy}
+            title="Copy model ID"
+          >
+            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="h-5 px-1.5 text-[11px]"
+            asChild
+            title="Try in Playground"
+            onClick={onClose}
+          >
+            <Link href={`/dashboard/playground?model=${encodeURIComponent(model.id)}`}>
+              <Play className="h-3 w-3" />
+              Play
+            </Link>
+          </Button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="flex flex-1 flex-col px-0">
+        <div className="mt-auto space-y-2.5">
+          {/* Model metadata */}
+          {meta && (
+            <div className="space-y-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {meta.pricing && (
+                  <Badge variant="outline" className="text-[11px] py-0 h-5 font-normal tabular-nums">
+                    ${meta.pricing.input} / ${meta.pricing.output}
+                  </Badge>
+                )}
+                {meta.contextLength && (
+                  <span className="tabular-nums">{formatTokens(meta.contextLength)} in</span>
+                )}
+                {meta.contextLength && meta.outputLimit && <span>·</span>}
+                {meta.outputLimit && (
+                  <span className="tabular-nums">{formatTokens(meta.outputLimit)} out</span>
+                )}
+                {meta.knowledgeCutoff && (
+                  <>
+                    <span>·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="h-3 w-3 shrink-0" />
+                      {formatDate(meta.knowledgeCutoff)}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {(meta.reasoning || meta.toolCall || meta.vision) && (
+                <div className="flex flex-wrap gap-1">
+                  {meta.reasoning && (
+                    <Badge variant="outline" className="text-[11px] py-0 h-5">
+                      <Brain className="h-3 w-3 mr-1" />
+                      Reasoning
+                    </Badge>
+                  )}
+                  {meta.toolCall && (
+                    <Badge variant="outline" className="text-[11px] py-0 h-5">
+                      <Wrench className="h-3 w-3 mr-1" />
+                      Tools
+                    </Badge>
+                  )}
+                  {meta.vision && (
+                    <Badge variant="outline" className="text-[11px] py-0 h-5">
+                      <Eye className="h-3 w-3 mr-1" />
+                      Vision
+                    </Badge>
+                  )}
+                </div>
               )}
             </div>
           )}
 
-          {(meta.reasoning || meta.toolCall || meta.vision) && (
-            <div className="flex flex-wrap gap-1">
-              {meta.reasoning && (
-                <Badge variant="outline" className="text-xs py-0 h-5">
-                  <Brain className="h-3 w-3 mr-1" />
-                  Reasoning
-                </Badge>
-              )}
-              {meta.toolCall && (
-                <Badge variant="outline" className="text-xs py-0 h-5">
-                  <Wrench className="h-3 w-3 mr-1" />
-                  Tools
-                </Badge>
-              )}
-              {meta.vision && (
-                <Badge variant="outline" className="text-xs py-0 h-5">
-                  <Eye className="h-3 w-3 mr-1" />
-                  Vision
-                </Badge>
-              )}
+          {/* Stats */}
+          <div className="rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5 space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <BarChart3 className="h-3 w-3 shrink-0" />
+                30d
+              </span>
+              <span className="tabular-nums">{maxDailyRequests.toLocaleString()} peak</span>
             </div>
-          )}
-        </div>
-      )}
 
-      <div className="flex items-center gap-2 pt-1">
-        <Button
-          variant="default"
-          size="sm"
-          className="flex-1"
-          onClick={handlePlayground}
-        >
-          <Play className="h-3.5 w-3.5" />
-          Try in Playground
-        </Button>
-        <Button
-          variant={copied ? "secondary" : "outline"}
-          size="sm"
-          onClick={handleCopy}
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? "Copied" : "Copy ID"}
-        </Button>
-      </div>
-    </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">Requests</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{stats.totalRequests.toLocaleString()}</p>
+              </div>
+              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">Success</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">
+                  {stats.successRate === null ? "-" : `${stats.successRate}%`}
+                </p>
+              </div>
+              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">Latency</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{formatDuration(stats.avgDurationLastDay)}</p>
+              </div>
+            </div>
+
+            <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+              <UsageSparkline
+                values={durationValues}
+                color="var(--chart-2)"
+                ariaLabel={`Average duration trend for ${model.id} over last 24 hours`}
+                emptyLabel="No duration data"
+                className="h-6"
+                height={24}
+              />
+              <div className="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
+                {durationLabelPoints.map((point) => (
+                  <span key={point.time} className="text-center truncate">
+                    {formatHourLabel(point.time)}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <UsageSparkline
+              values={dailyValues}
+              color="var(--chart-1)"
+              ariaLabel={`Requests trend for ${model.id}`}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

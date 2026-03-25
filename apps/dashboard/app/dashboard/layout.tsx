@@ -19,6 +19,15 @@ import type {
   ProviderAccountIndicators,
   ProviderAccountCounts,
 } from "@/lib/navigation";
+import {
+  type ModelStats,
+  MODEL_STATS_DAYS,
+  MODEL_DURATION_LOOKBACK_HOURS,
+  buildDayKeys,
+  buildHourKeys,
+  buildEmptyModelStats,
+  getModelStatsByModel,
+} from "@/lib/model-stats";
 import { Toaster } from "@/components/ui/sonner";
 
 const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
@@ -172,7 +181,9 @@ export default async function DashboardLayout({
     modelFamilyCounts[item.anchorId] = 0;
   }
 
-  for (const modelId of getAllModels()) {
+  const allModels = getAllModels();
+
+  for (const modelId of allModels) {
     const rawFamily = getModelFamilyFromRegistry(modelId);
     const family = categorizeModelFamily(rawFamily);
     const anchorId = familyAnchorByName.get(family);
@@ -182,6 +193,10 @@ export default async function DashboardLayout({
 
     modelFamilyCounts[anchorId] += 1;
   }
+
+  const statsByModel = await getModelStatsByModel(session.user.id, allModels);
+  const fallbackDayKeys = buildDayKeys(MODEL_STATS_DAYS);
+  const fallbackHourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
 
   return (
     <div className="relative flex min-h-svh bg-background">
@@ -199,6 +214,9 @@ export default async function DashboardLayout({
             accountIndicators={accountIndicators}
             modelFamilyCounts={modelFamilyCounts}
             disabledModels={disabledModels}
+            statsByModel={statsByModel}
+            fallbackDayKeys={fallbackDayKeys}
+            fallbackHourKeys={fallbackHourKeys}
             user={user}
           />
         </Suspense>
