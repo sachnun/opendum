@@ -449,7 +449,7 @@ function LastErrorMessageDialog({
       if (!result.success) {
         throw new Error(result.error);
       }
-      toast.success("Account errors resolved");
+      toast.success("Errors resolved");
       setIsOpen(false);
       window.dispatchEvent(new CustomEvent(PROVIDER_ACCOUNTS_REFRESH_EVENT));
     } catch (error) {
@@ -608,7 +608,7 @@ function LastErrorMessageDialog({
             )}
 
             {!isHistoryLoading && !historyError && historyEntries && historyEntries.length === 0 && (
-              <p className="text-xs text-muted-foreground">No stored error history for this account yet.</p>
+               <p className="text-xs text-muted-foreground">No stored error history yet.</p>
             )}
           </div>
         </div>
@@ -1340,11 +1340,11 @@ export function AccountsList({
       <ProviderSection
         key="antigravity"
         id="antigravity-accounts"
-        title="Antigravity Accounts"
+        title="Antigravity"
         hideHeader={hasProviderFilter}
         accounts={antigravityAccounts}
         showTier
-        emptyMessage="No Antigravity accounts connected yet."
+        emptyMessage="No Antigravity connections yet."
         supportedModels={supportedModelsByProvider?.antigravity}
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
@@ -1357,11 +1357,11 @@ export function AccountsList({
       <ProviderSection
         key="codex"
         id="codex-accounts"
-        title="Codex Accounts"
+        title="Codex"
         hideHeader={hasProviderFilter}
         accounts={codexAccounts}
         showTier
-        emptyMessage="No Codex accounts connected yet."
+        emptyMessage="No Codex connections yet."
         supportedModels={supportedModelsByProvider?.codex}
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
@@ -1374,10 +1374,10 @@ export function AccountsList({
       <ProviderSection
         key="iflow"
         id="iflow-accounts"
-        title="Iflow Accounts"
+        title="Iflow"
         hideHeader={hasProviderFilter}
         accounts={iflowAccounts}
-        emptyMessage="No Iflow accounts connected yet."
+        emptyMessage="No Iflow connections yet."
         supportedModels={supportedModelsByProvider?.iflow}
         disabledModelsByAccountId={disabledModelsByAccountId}
       />
@@ -1388,10 +1388,10 @@ export function AccountsList({
       <ProviderSection
         key="kiro"
         id="kiro-accounts"
-        title="Kiro Accounts"
+        title="Kiro"
         hideHeader={hasProviderFilter}
         accounts={kiroAccounts}
-        emptyMessage="No Kiro accounts connected yet."
+        emptyMessage="No Kiro connections yet."
         supportedModels={supportedModelsByProvider?.kiro}
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
@@ -1404,11 +1404,11 @@ export function AccountsList({
       <ProviderSection
         key="gemini-cli"
         id="gemini-cli-accounts"
-        title="Gemini CLI Accounts"
+        title="Gemini CLI"
         hideHeader={hasProviderFilter}
         accounts={geminiCliAccounts}
         showTier
-        emptyMessage="No Gemini CLI accounts connected yet."
+        emptyMessage="No Gemini CLI connections yet."
         supportedModels={supportedModelsByProvider?.gemini_cli}
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
@@ -1421,10 +1421,10 @@ export function AccountsList({
       <ProviderSection
         key="qwen-code"
         id="qwen-code-accounts"
-        title="Qwen Code Accounts"
+        title="Qwen Code"
         hideHeader={hasProviderFilter}
         accounts={qwenCodeAccounts}
-        emptyMessage="No Qwen Code accounts connected yet."
+        emptyMessage="No Qwen Code connections yet."
         supportedModels={supportedModelsByProvider?.qwen_code}
         disabledModelsByAccountId={disabledModelsByAccountId}
       />
@@ -1435,10 +1435,10 @@ export function AccountsList({
       <ProviderSection
         key="copilot"
         id="copilot-accounts"
-        title="Copilot Accounts"
+        title="Copilot"
         hideHeader={hasProviderFilter}
         accounts={copilotAccounts}
-        emptyMessage="No Copilot accounts connected yet."
+        emptyMessage="No Copilot connections yet."
         supportedModels={supportedModelsByProvider?.copilot}
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
@@ -1453,10 +1453,10 @@ export function AccountsList({
       <ProviderSection
         key="nvidia-nim"
         id="nvidia-nim-accounts"
-        title="Nvidia Accounts"
+        title="Nvidia"
         hideHeader={hasProviderFilter}
         accounts={nvidiaNimAccounts}
-        emptyMessage="No Nvidia accounts connected yet."
+        emptyMessage="No Nvidia connections yet."
         supportedModels={supportedModelsByProvider?.nvidia_nim}
         disabledModelsByAccountId={disabledModelsByAccountId}
       />
@@ -1467,10 +1467,10 @@ export function AccountsList({
       <ProviderSection
         key="ollama-cloud"
         id="ollama-cloud-accounts"
-        title="Ollama Cloud Accounts"
+        title="Ollama Cloud"
         hideHeader={hasProviderFilter}
         accounts={ollamaCloudAccounts}
-        emptyMessage="No Ollama Cloud accounts connected yet."
+        emptyMessage="No Ollama Cloud connections yet."
         supportedModels={supportedModelsByProvider?.ollama_cloud}
         disabledModelsByAccountId={disabledModelsByAccountId}
       />
@@ -1481,10 +1481,10 @@ export function AccountsList({
       <ProviderSection
         key="openrouter"
         id="openrouter-accounts"
-        title="OpenRouter Accounts"
+        title="OpenRouter"
         hideHeader={hasProviderFilter}
         accounts={openRouterAccounts}
-        emptyMessage="No OpenRouter accounts connected yet."
+        emptyMessage="No OpenRouter connections yet."
         supportedModels={supportedModelsByProvider?.openrouter}
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
@@ -1501,7 +1501,7 @@ export function AccountsList({
     <div className="space-y-8">
       <section id="oauth-provider-accounts" className="space-y-5 md:space-y-3">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
+          <h3 className="text-base font-semibold">OAuth Providers</h3>
         </div>
 
         <div className="space-y-6">{oauthProviderSections}</div>
@@ -1509,7 +1509,7 @@ export function AccountsList({
 
       <section id="api-key-provider-accounts" className="space-y-5 md:space-y-3">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
+          <h3 className="text-base font-semibold">API Key Providers</h3>
         </div>
 
         <div className="space-y-6">{apiKeyProviderSections}</div>

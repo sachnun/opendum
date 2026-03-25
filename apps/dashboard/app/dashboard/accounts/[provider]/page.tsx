@@ -213,7 +213,7 @@ export default async function ProviderAccountsPage({
               <div className="border-b border-border pb-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold">{providerMeta.label} Accounts</h2>
+                    <h2 className="text-xl font-semibold">{providerMeta.label}</h2>
                   </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <AddAccountDialog
@@ -240,7 +240,7 @@ export default async function ProviderAccountsPage({
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to connect account: {decodeURIComponent(queryParams.error)}
+            Failed to connect: {decodeURIComponent(queryParams.error)}
           </AlertDescription>
         </Alert>
       )}
