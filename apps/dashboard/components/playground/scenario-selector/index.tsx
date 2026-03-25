@@ -123,7 +123,7 @@ export const SCENARIOS: Scenario[] = [
           {
             type: "image_url",
             image_url: {
-              url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/640px-Fronalpstock_big.jpg",
+              url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=640",
             },
           },
         ],
