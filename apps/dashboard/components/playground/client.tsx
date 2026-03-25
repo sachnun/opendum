@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Play, Plus, Square } from "lucide-react";
+import { ChevronDown, Key, Play, Plus, Square } from "lucide-react";
 
 import {
   ChatPanel,
@@ -19,13 +19,33 @@ import {
 } from "./settings-sheet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@/lib/model-families";
+
+export interface ApiKeyOption {
+  id: string;
+  name: string;
+  keyPreview: string;
+  decryptedKey: string;
+}
 
 interface PlaygroundClientProps {
   models: ModelOption[];
   providerAccounts: ProviderAccountOption[];
   initialModelId?: string;
-  apiKey?: string;
+  apiKeyOptions?: ApiKeyOption[];
 }
 
 interface PanelState {
@@ -1294,8 +1314,22 @@ async function consumeResponsesStream(
   }
 }
 
-export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKey }: PlaygroundClientProps) {
-  const apiKeyRef = React.useRef(apiKey);
+export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKeyOptions = [] }: PlaygroundClientProps) {
+  const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
+    () => apiKeyOptions.length > 0 ? apiKeyOptions[0].id : null
+  );
+  const [apiKeyPickerOpen, setApiKeyPickerOpen] = React.useState(false);
+
+  const selectedApiKey = React.useMemo(
+    () => apiKeyOptions.find((k) => k.id === selectedApiKeyId) ?? null,
+    [apiKeyOptions, selectedApiKeyId]
+  );
+  const apiKeyRef = React.useRef(selectedApiKey?.decryptedKey);
+
+  React.useEffect(() => {
+    apiKeyRef.current = selectedApiKey?.decryptedKey;
+  }, [selectedApiKey]);
+
   const [panels, setPanels] = React.useState<PanelState[]>(() => {
     const validInitialModel = initialModelId && models.some((m) => m.id === initialModelId)
       ? initialModelId
@@ -1732,6 +1766,53 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold">Playground</h1>
           <div className="flex items-center gap-2">
+            {apiKeyOptions.length > 1 && (
+              <Popover open={apiKeyPickerOpen} onOpenChange={setApiKeyPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isAnyLoading}
+                    className="max-w-[200px] gap-1.5"
+                  >
+                    <Key className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {selectedApiKey ? selectedApiKey.name : "Select key"}
+                    </span>
+                    <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[280px] p-0" align="end">
+                  <Command>
+                    <CommandInput placeholder="Search API keys..." />
+                    <CommandList>
+                      <CommandEmpty>No API key found.</CommandEmpty>
+                      <CommandGroup heading="API Keys">
+                        {apiKeyOptions.map((key) => (
+                          <CommandItem
+                            key={key.id}
+                            value={`${key.name} ${key.keyPreview}`}
+                            onSelect={() => {
+                              setSelectedApiKeyId(key.id);
+                              setApiKeyPickerOpen(false);
+                            }}
+                            className={selectedApiKeyId === key.id ? "bg-accent" : ""}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">{key.name}</p>
+                              <p className="truncate text-[10px] text-muted-foreground font-mono">
+                                {key.keyPreview}
+                              </p>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
             {isAnyLoading ? (
               <Button
                 type="button"

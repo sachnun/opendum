@@ -9,6 +9,7 @@ import type {
   ModelOption,
   ProviderAccountOption,
 } from "@/components/playground/chat-panel";
+import type { ApiKeyOption } from "@/components/playground/client";
 
 // Get all models - one entry per model, filtered to only include providers the user has accounts for
 function getModels(disabledModels: Set<string>, userProviders: Set<string>): ModelOption[] {
@@ -93,11 +94,17 @@ export default async function PlaygroundPage({
   const userProviders = new Set(providerAccounts.map((a) => a.provider));
   const models = getModels(disabledModelSet, userProviders);
 
-  // Get the user's most recently used API key for playground proxy calls
-  let playgroundApiKey: string | undefined;
+  // Get all active API keys for the playground key selector
+  let apiKeyOptions: ApiKeyOption[] = [];
   if (process.env.NEXT_PUBLIC_PROXY_URL) {
-    const [apiKey] = await db
-      .select({ encryptedKey: proxyApiKey.encryptedKey })
+    const activeKeys = await db
+      .select({
+        id: proxyApiKey.id,
+        name: proxyApiKey.name,
+        keyPreview: proxyApiKey.keyPreview,
+        encryptedKey: proxyApiKey.encryptedKey,
+        lastUsedAt: proxyApiKey.lastUsedAt,
+      })
       .from(proxyApiKey)
       .where(
         and(
@@ -105,16 +112,23 @@ export default async function PlaygroundPage({
           eq(proxyApiKey.isActive, true),
         ),
       )
-      .orderBy(desc(proxyApiKey.lastUsedAt))
-      .limit(1);
+      .orderBy(desc(proxyApiKey.lastUsedAt));
 
-    if (apiKey?.encryptedKey) {
-      try {
-        playgroundApiKey = decrypt(apiKey.encryptedKey);
-      } catch {
-        // Ignore decryption errors
-      }
-    }
+    apiKeyOptions = activeKeys
+      .map((key) => {
+        if (!key.encryptedKey) return null;
+        try {
+          return {
+            id: key.id,
+            name: key.name,
+            keyPreview: key.keyPreview,
+            decryptedKey: decrypt(key.encryptedKey),
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((k): k is ApiKeyOption => k !== null);
   }
 
   return (
@@ -122,7 +136,7 @@ export default async function PlaygroundPage({
       models={models}
       providerAccounts={getProviderAccounts(providerAccounts)}
       initialModelId={initialModelId}
-      apiKey={playgroundApiKey}
+      apiKeyOptions={apiKeyOptions}
     />
   );
 }
