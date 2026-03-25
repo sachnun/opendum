@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, ChevronDown, ChevronLeft, X } from "lucide-react";
+import { AlertCircle, Bot, ChevronDown, ChevronLeft, ChevronUp, Settings, User, Wrench, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -67,6 +67,11 @@ export interface ResponseData {
   usedAccountId?: string | null;
 }
 
+export interface ScenarioMessage {
+  role: string;
+  content: string | Array<Record<string, unknown>>;
+}
+
 interface ChatPanelProps {
   panelId: string;
   models: ModelOption[];
@@ -79,6 +84,8 @@ interface ChatPanelProps {
   disabled?: boolean;
   /** When set, only models whose ID is in this set are shown in the model picker. */
   allowedModelIds?: Set<string> | null;
+  /** Scenario messages to display as conversation context. */
+  scenarioMessages?: ScenarioMessage[];
 }
 
 const FAMILY_ORDER = MODEL_FAMILY_SORT_ORDER;
@@ -158,6 +165,237 @@ function getAccountLabel(account: ProviderAccountOption): string {
   return `${name} (${email})`;
 }
 
+function extractMessageText(content: ScenarioMessage["content"]): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((part) => {
+      if (!part || typeof part !== "object") {
+        return "";
+      }
+
+      const type = (part as { type?: unknown }).type;
+      if (type === "text") {
+        const text = (part as { text?: unknown }).text;
+        return typeof text === "string" ? text : "";
+      }
+
+      if (type === "image_url") {
+        return "[image]";
+      }
+
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function extractImageUrls(content: ScenarioMessage["content"]): string[] {
+  if (typeof content === "string" || !Array.isArray(content)) {
+    return [];
+  }
+
+  return content
+    .map((part) => {
+      if (!part || typeof part !== "object") {
+        return null;
+      }
+
+      const type = (part as { type?: unknown }).type;
+      if (type !== "image_url") {
+        return null;
+      }
+
+      const imageUrl = (part as { image_url?: unknown }).image_url;
+      if (typeof imageUrl === "string") {
+        return imageUrl;
+      }
+
+      if (imageUrl && typeof imageUrl === "object") {
+        const url = (imageUrl as { url?: unknown }).url;
+        return typeof url === "string" ? url : null;
+      }
+
+      return null;
+    })
+    .filter((url): url is string => typeof url === "string" && url.trim().length > 0);
+}
+
+function formatToolArguments(args: string): string {
+  try {
+    const parsed = JSON.parse(args);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return args;
+  }
+}
+
+function SystemBubble({ content, collapsed, onToggle }: {
+  content: string;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="mb-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/80"
+      >
+        <Settings className="h-3 w-3 shrink-0 text-muted-foreground" />
+        <span className="flex-1 text-[11px] font-medium text-muted-foreground">System</span>
+        {collapsed ? (
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronUp className="h-3 w-3 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+      {!collapsed && (
+        <div className="mt-1 rounded-md bg-muted/30 px-2.5 py-2">
+          <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">
+            {content}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserBubble({ message }: { message: ScenarioMessage }) {
+  const text = extractMessageText(message.content);
+  const images = extractImageUrls(message.content);
+
+  return (
+    <div className="mb-2 flex gap-2">
+      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
+        <User className="h-3 w-3 text-primary" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="mb-1 text-[11px] font-medium text-primary">User</p>
+        <div className="rounded-lg bg-muted px-3 py-2">
+          {text && (
+            <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">
+              {text}
+            </pre>
+          )}
+          {images.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {images.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block overflow-hidden rounded border border-border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Attached image ${i + 1}`}
+                    className="h-16 w-auto object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssistantBubble({
+  content,
+  reasoning,
+  toolCalls,
+  isLoading,
+}: {
+  content: string;
+  reasoning: string;
+  toolCalls: ToolCallData[];
+  isLoading: boolean;
+}) {
+  const hasContent = content.length > 0 || reasoning.length > 0 || toolCalls.length > 0;
+
+  if (!hasContent && !isLoading) {
+    return null;
+  }
+
+  return (
+    <div className="mb-2 flex gap-2">
+      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary mt-0.5">
+        <Bot className="h-3 w-3 text-secondary-foreground" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="mb-1 text-[11px] font-medium text-muted-foreground">Assistant</p>
+        <div className="space-y-2">
+          {reasoning && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-3 py-2">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Reasoning
+              </p>
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">
+                {reasoning}
+                {isLoading && !content && (
+                  <span className="animate-pulse text-primary">▌</span>
+                )}
+              </pre>
+            </div>
+          )}
+
+          {content && (
+            <div className="rounded-lg bg-card border border-border px-3 py-2">
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">
+                {content}
+                {isLoading && (
+                  <span className="animate-pulse text-primary">▌</span>
+                )}
+              </pre>
+            </div>
+          )}
+
+          {!content && !reasoning && isLoading && (
+            <div className="rounded-lg bg-card border border-border px-3 py-2">
+              <div className="space-y-1.5">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-3 w-3/5" />
+              </div>
+            </div>
+          )}
+
+          {toolCalls.length > 0 && (
+            <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Wrench className="h-3 w-3 text-muted-foreground" />
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Tool Calls
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {toolCalls.map((tc, i) => (
+                  <div key={i} className="rounded border border-border bg-background px-2 py-1.5">
+                    <p className="text-[11px] font-semibold text-foreground">{tc.name}</p>
+                    <pre className="mt-0.5 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground">
+                      {formatToolArguments(tc.arguments)}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ChatPanel({
   models,
   accountOptions = [],
@@ -168,6 +406,7 @@ export function ChatPanel({
   response,
   disabled = false,
   allowedModelIds = null,
+  scenarioMessages = [],
 }: ChatPanelProps) {
   const [open, setOpen] = React.useState(false);
   const [selectionStep, setSelectionStep] = React.useState<"model" | "routing">("model");
@@ -175,6 +414,20 @@ export function ChatPanel({
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [loadingStartedAt, setLoadingStartedAt] = React.useState<number | null>(null);
   const [nowMs, setNowMs] = React.useState<number | null>(null);
+  const [systemCollapsed, setSystemCollapsed] = React.useState(true);
+
+  const systemMessages = React.useMemo(
+    () => scenarioMessages.filter((m) => m.role === "system"),
+    [scenarioMessages]
+  );
+  const userMessages = React.useMemo(
+    () => scenarioMessages.filter((m) => m.role !== "system"),
+    [scenarioMessages]
+  );
+  const systemPromptText = React.useMemo(
+    () => systemMessages.map((m) => extractMessageText(m.content)).filter(Boolean).join("\n\n"),
+    [systemMessages]
+  );
 
   const filteredModels = React.useMemo(
     () => (allowedModelIds ? models.filter((m) => allowedModelIds.has(m.id)) : models),
@@ -243,6 +496,7 @@ export function ChatPanel({
   const {
     content = "",
     reasoning = "",
+    toolCalls = [],
     isLoading = false,
     error,
     metrics,
@@ -281,7 +535,7 @@ export function ChatPanel({
         viewport.scrollTop = viewport.scrollHeight;
       }
     }
-  }, [content, reasoning, isLoading]);
+  }, [content, reasoning, toolCalls, isLoading]);
 
   return (
     <Card className="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
@@ -444,19 +698,27 @@ export function ChatPanel({
 
       <CardContent className="flex min-h-0 flex-1 flex-col p-0 overflow-hidden">
         <ScrollArea ref={scrollRef} className="min-h-0 flex-1">
-          <div className="p-4">
+          <div className="p-3">
             {!selectedModel && !isLoading && !content && !reasoning && !error && (
               <p className="text-muted-foreground text-sm text-center py-8">
                 Select a model to start
               </p>
             )}
 
-            {isLoading && !content && !reasoning && (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-4/5" />
-                <Skeleton className="h-4 w-3/5" />
-              </div>
+            {selectedModel && scenarioMessages.length > 0 && (
+              <>
+                {systemPromptText && (
+                  <SystemBubble
+                    content={systemPromptText}
+                    collapsed={systemCollapsed}
+                    onToggle={() => setSystemCollapsed((prev) => !prev)}
+                  />
+                )}
+
+                {userMessages.map((msg, i) => (
+                  <UserBubble key={`user-${i}`} message={msg} />
+                ))}
+              </>
             )}
 
             {error && (
@@ -467,34 +729,16 @@ export function ChatPanel({
               </Alert>
             )}
 
-            {(content || reasoning) && (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                {reasoning && (
-                  <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3">
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                      Reasoning
-                    </p>
-                    <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                      {reasoning}
-                      {isLoading && !content && (
-                        <span className="animate-pulse text-primary">▌</span>
-                      )}
-                    </pre>
-                  </div>
-                )}
-
-                {content && (
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                    {content}
-                    {isLoading && (
-                      <span className="animate-pulse text-primary">▌</span>
-                    )}
-                  </pre>
-                )}
-              </div>
+            {(content || reasoning || toolCalls.length > 0 || isLoading) && selectedModel && (
+              <AssistantBubble
+                content={content}
+                reasoning={reasoning}
+                toolCalls={toolCalls}
+                isLoading={isLoading}
+              />
             )}
 
-            {selectedModel && !isLoading && !content && !reasoning && !error && (
+            {selectedModel && !isLoading && !content && !reasoning && toolCalls.length === 0 && !error && scenarioMessages.length === 0 && (
               <p className="text-muted-foreground text-sm text-center py-8">
                 Response will appear here
               </p>

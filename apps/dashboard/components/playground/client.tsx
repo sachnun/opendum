@@ -1832,6 +1832,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
               response={responses[panel.id]}
               disabled={isAnyLoading}
               allowedModelIds={activePresetModelIds}
+              scenarioMessages={selectedScenario ? getScenarioMessages(selectedScenario) : []}
             />
           );
         })}
