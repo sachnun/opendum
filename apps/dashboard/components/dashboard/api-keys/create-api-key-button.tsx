@@ -94,50 +94,49 @@ export function CreateApiKeyButton() {
       }
     }}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button size="sm">
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
           Create API Key
         </Button>
       </DialogTrigger>
-      <DialogContent className="top-[38%] sm:top-[50%]">
+      <DialogContent className="sm:max-w-[440px]">
         {createdKey ? (
-          // Success state - show the created key
           <>
             <DialogHeader>
-              <DialogTitle>API Key Created!</DialogTitle>
+              <DialogTitle>API Key Created</DialogTitle>
               <DialogDescription className="sr-only">
                 Your new API key is ready to use.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-3">
               <Label>Your API Key</Label>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="flex-1 rounded bg-muted px-3 py-2 text-sm font-mono break-all">
+              <div className="mt-1.5 flex items-center gap-2">
+                <code className="flex-1 rounded bg-muted px-2.5 py-1.5 text-xs font-mono break-all">
                   {createdKey}
                 </code>
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="sm"
+                  className="h-8 w-8 p-0 shrink-0"
                   onClick={handleCopy}
                   title="Copy key"
                 >
                   {copied ? (
-                    <Check className="h-4 w-4 text-green-500" />
+                    <Check className="h-3.5 w-3.5 text-green-500" />
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-3.5 w-3.5" />
                   )}
                 </Button>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 You can reveal and copy this key anytime from the list.
               </p>
             </div>
             <DialogFooter>
-              <Button onClick={handleClose}>Done</Button>
+              <Button size="sm" onClick={handleClose}>Done</Button>
             </DialogFooter>
           </>
         ) : (
-          // Create state - input name and expiration
           <>
             <DialogHeader>
               <DialogTitle>Create API Key</DialogTitle>
@@ -145,7 +144,7 @@ export function CreateApiKeyButton() {
                 Create a new API key for accessing Opendum.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4">
+            <div className="space-y-3 py-3">
               <div>
                 <Label htmlFor="keyName">Name (optional)</Label>
                 <Input
@@ -153,7 +152,7 @@ export function CreateApiKeyButton() {
                   placeholder="e.g., MacBook Pro, Work PC"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="mt-2"
+                  className="mt-1.5"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -164,17 +163,17 @@ export function CreateApiKeyButton() {
               </div>
               <div>
                 <Label>Expiration (optional)</Label>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-1.5 flex items-center gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal",
+                          "w-full justify-start text-left font-normal text-sm",
                           !expiresAt && "text-muted-foreground"
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                         {expiresAt ? format(expiresAt, "PPP") : "No expiration"}
                       </Button>
                     </PopoverTrigger>
@@ -191,11 +190,12 @@ export function CreateApiKeyButton() {
                   {expiresAt && (
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="sm"
+                      className="h-8 w-8 p-0"
                       onClick={() => setExpiresAt(undefined)}
                       title="Clear expiration"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -205,10 +205,10 @@ export function CreateApiKeyButton() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>
+              <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreate} disabled={isCreating}>
+              <Button size="sm" onClick={handleCreate} disabled={isCreating}>
                 {isCreating ? "Creating..." : "Create"}
               </Button>
             </DialogFooter>
