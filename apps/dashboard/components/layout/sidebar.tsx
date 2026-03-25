@@ -16,6 +16,7 @@ import {
 import { buildProviderHrefMap } from "@/lib/provider-accounts";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 import { AccountStatusIndicator } from "@/components/layout/account-status-indicator";
+import { useModelFamilyCounts } from "@/lib/model-family-counts-context";
 import { Input } from "@/components/ui/input";
 
 interface SidebarProps {
@@ -34,6 +35,7 @@ export function Sidebar({
   const pathname = usePathname();
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
+  const { counts: liveModelFamilyCounts } = useModelFamilyCounts();
   const normalizedAccountsSubmenuSearch = accountsSubmenuSearch.trim().toLowerCase();
 
   const isModelsActive =
@@ -93,7 +95,7 @@ export function Sidebar({
     const accountCountByHref = buildProviderHrefMap(accountCounts);
     const activeAccountCountByHref = buildProviderHrefMap(activeAccountCounts);
     const accountIndicatorByHref = buildProviderHrefMap(accountIndicators);
-    const modelCountByAnchorId = isModelsItem ? modelFamilyCounts : null;
+    const modelCountByAnchorId = isModelsItem ? liveModelFamilyCounts : null;
     const visibleSubItems =
       isAccountsItem && item.children
         ? item.children.filter((subItem) =>

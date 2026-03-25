@@ -26,6 +26,7 @@ import {
 import { buildProviderHrefMap } from "@/lib/provider-accounts";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 import { AccountStatusIndicator } from "@/components/layout/account-status-indicator";
+import { useModelFamilyCounts } from "@/lib/model-family-counts-context";
 
 interface MobileNavProps {
   accountCounts: ProviderAccountCounts;
@@ -44,6 +45,7 @@ export function MobileNav({
   const [open, setOpen] = useState(false);
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
+  const { counts: liveModelFamilyCounts } = useModelFamilyCounts();
   const normalizedAccountsSubmenuSearch = accountsSubmenuSearch.trim().toLowerCase();
 
   const isModelsActive =
@@ -102,7 +104,7 @@ export function MobileNav({
     const accountCountByHref = buildProviderHrefMap(accountCounts);
     const activeAccountCountByHref = buildProviderHrefMap(activeAccountCounts);
     const accountIndicatorByHref = buildProviderHrefMap(accountIndicators);
-    const modelCountByAnchorId = isModelsItem ? modelFamilyCounts : null;
+    const modelCountByAnchorId = isModelsItem ? liveModelFamilyCounts : null;
     const visibleSubItems =
       isAccountsItem && item.children
         ? item.children.filter((subItem) =>
