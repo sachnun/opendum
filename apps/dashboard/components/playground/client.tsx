@@ -1459,6 +1459,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
 
   const handleScenarioSelect = (scenario: Scenario) => {
     setSelectedScenario(scenario);
+    setResponses({});
 
     if (scenario.isReasoning && settings.reasoningEffort === "none") {
       setSettings((prev) => ({ ...prev, reasoningEffort: "medium" }));
