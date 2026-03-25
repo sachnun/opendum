@@ -1,6 +1,7 @@
 [opendum]
 family = "NVIDIA"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "nvidia/nemotron-4-mini-hindi-4b-instruct"

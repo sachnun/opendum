@@ -1,6 +1,7 @@
 [opendum]
 family = "AI21"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "ai21labs/jamba-1.5-mini-instruct"
