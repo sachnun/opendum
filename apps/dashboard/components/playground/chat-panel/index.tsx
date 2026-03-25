@@ -52,9 +52,15 @@ export interface ResponseMetrics {
   totalTokens: number | null;
 }
 
+export interface ToolCallData {
+  name: string;
+  arguments: string;
+}
+
 export interface ResponseData {
   content: string;
   reasoning?: string;
+  toolCalls?: ToolCallData[];
   isLoading: boolean;
   error?: string;
   metrics?: ResponseMetrics;
