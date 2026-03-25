@@ -1,11 +1,19 @@
-release_date = "2025-03-31"
+release_date = "2025-08-05"
 reasoning = false
-tool_call = false
+tool_call = true
 attachment = true
 
+[cost]
+input = 1.01
+output = 1.01
+
 [limit]
-context = 32_768
-output = 32_768
+context = 128_000
+output = 8_192
+
+[modalities]
+input = ["text","image","audio","video"]
+output = ["text"]
 
 [opendum]
 family = "Qwen"

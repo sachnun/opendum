@@ -5,12 +5,16 @@ tool_call = true
 attachment = false
 
 [cost]
-input = 0.144
-output = 0.574
+input = 0.3
+output = 1.5
 
 [limit]
 context = 1_000_000
 output = 65_536
+
+[modalities]
+input = ["text"]
+output = ["text"]
 
 [opendum]
 family = "Qwen"

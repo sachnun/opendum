@@ -4,9 +4,17 @@ reasoning = true
 tool_call = true
 attachment = false
 
+[cost]
+input = 0
+output = 0
+
 [limit]
 context = 128_000
 output = 32_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
 
 [opendum]
 family = "Qwen"

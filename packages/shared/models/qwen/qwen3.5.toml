@@ -1,19 +1,19 @@
-release_date = "2026-02"
+release_date = "2026-02-16"
 knowledge = "2025-04"
 reasoning = true
 tool_call = true
-attachment = true
+attachment = false
 
 [cost]
-input = 0.4
-output = 2.4
+input = 0.573
+output = 3.44
 
 [limit]
 context = 1_000_000
 output = 65_536
 
 [modalities]
-input = ["text", "image", "video"]
+input = ["text","image","video"]
 output = ["text"]
 
 [opendum]
