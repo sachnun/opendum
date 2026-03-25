@@ -5,6 +5,57 @@ import type { RequestPayload, ModelFamily } from "./transform/types.js";
 import { normalizeToolCallArgs } from "./request-helpers.js";
 
 /**
+ * Infer MIME type from a URL based on file extension.
+ * Falls back to "image/jpeg" when the type cannot be determined,
+ * since image_url content blocks are expected to be images.
+ */
+function inferMimeTypeFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    const ext = pathname.split(".").pop();
+    switch (ext) {
+      case "png":
+        return "image/png";
+      case "gif":
+        return "image/gif";
+      case "webp":
+        return "image/webp";
+      case "svg":
+        return "image/svg+xml";
+      case "bmp":
+        return "image/bmp";
+      case "ico":
+        return "image/x-icon";
+      case "tiff":
+      case "tif":
+        return "image/tiff";
+      case "pdf":
+        return "application/pdf";
+      case "mp4":
+        return "video/mp4";
+      case "webm":
+        return "video/webm";
+      case "mov":
+        return "video/quicktime";
+      case "avi":
+        return "video/x-msvideo";
+      case "mp3":
+        return "audio/mpeg";
+      case "wav":
+        return "audio/wav";
+      case "ogg":
+        return "audio/ogg";
+      case "jpg":
+      case "jpeg":
+      default:
+        return "image/jpeg";
+    }
+  } catch {
+    return "image/jpeg";
+  }
+}
+
+/**
  * Effort to budget_tokens mapping for Anthropic/Claude
  * Based on Anthropic docs:
  * - Minimum: 1024 tokens
@@ -449,6 +500,7 @@ export function convertOpenAIToGemini(
               parts.push({
                 fileData: {
                   fileUri: imageUrl.url,
+                  mimeType: inferMimeTypeFromUrl(imageUrl.url),
                 },
               });
             }
