@@ -12,7 +12,7 @@ import {
   MODEL_FAMILY_NAV_ITEMS,
   categorizeModelFamily,
 } from "@/lib/model-families";
-import { getAllModels, getModelFamily as getModelFamilyFromRegistry } from "@opendum/shared/proxy/models";
+import { getAllModels, getModelFamily as getModelFamilyFromRegistry, getProvidersForModel } from "@opendum/shared/proxy/models";
 import type {
   ModelFamilyCounts,
   ProviderAccountIndicator,
@@ -172,6 +172,14 @@ export default async function DashboardLayout({
     }
   }
 
+  // Set of providers the user has at least one active account for
+  const activeProviderNames = new Set<string>();
+  for (const account of providerAccounts) {
+    if (account.isActive) {
+      activeProviderNames.add(account.provider);
+    }
+  }
+
   const familyAnchorByName = new Map(
     MODEL_FAMILY_NAV_ITEMS.map((item) => [item.name, item.anchorId] as const)
   );
@@ -181,7 +189,11 @@ export default async function DashboardLayout({
     modelFamilyCounts[item.anchorId] = 0;
   }
 
-  const allModels = getAllModels();
+  // Only count models whose provider(s) the user has an active account for,
+  // so sidebar counts stay in sync with the models page.
+  const allModels = getAllModels().filter((model) =>
+    getProvidersForModel(model).some((p) => activeProviderNames.has(p))
+  );
 
   for (const modelId of allModels) {
     const rawFamily = getModelFamilyFromRegistry(modelId);
@@ -192,14 +204,6 @@ export default async function DashboardLayout({
     }
 
     modelFamilyCounts[anchorId] += 1;
-  }
-
-  // Set of providers the user has at least one active account for
-  const activeProviderNames = new Set<string>();
-  for (const account of providerAccounts) {
-    if (account.isActive) {
-      activeProviderNames.add(account.provider);
-    }
   }
 
   const statsByModel = await getModelStatsByModel(session.user.id, allModels);
