@@ -1,3 +1,13 @@
+release_date = "2025-08-18"
+knowledge = "2024-09"
+reasoning = true
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.17
+output = 0.68
+
 [limit]
 context = 131_072
 output = 131_072

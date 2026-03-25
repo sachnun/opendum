@@ -1,3 +1,17 @@
+release_date = "2026-01-20"
+knowledge = "2025-06"
+reasoning = false
+tool_call = false
+attachment = false
+
+[limit]
+context = 131_072
+output = 32_768
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "Liquid AI"
 providers = ["openrouter"]

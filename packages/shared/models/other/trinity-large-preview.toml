@@ -1,3 +1,21 @@
+release_date = "2025-01"
+knowledge = "2024-10"
+reasoning = false
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.25
+output = 1
+
+[limit]
+context = 131_000
+output = 131_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "Trinity"
 providers = ["openrouter"]

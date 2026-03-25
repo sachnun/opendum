@@ -5,12 +5,16 @@ tool_call = true
 attachment = false
 
 [cost]
-input = 0.27
-output = 1.1
+input = 0.6
+output = 2.2
 
 [limit]
 context = 204_800
 output = 131_072
+
+[modalities]
+input = ["text"]
+output = ["text"]
 
 [opendum]
 family = "Z.AI"

@@ -1,3 +1,21 @@
+release_date = "2026-01-29"
+knowledge = "2025-01"
+reasoning = true
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.096
+output = 0.288
+
+[limit]
+context = 256_000
+output = 256_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "StepFun"
 providers = ["openrouter"]

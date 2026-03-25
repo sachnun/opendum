@@ -1,3 +1,20 @@
+release_date = "2025-09-04"
+reasoning = false
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.21
+output = 0.57
+
+[limit]
+context = 262_000
+output = 262_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "ByteDance"
 providers = ["nvidia_nim"]
