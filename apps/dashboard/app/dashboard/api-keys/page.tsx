@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { proxyApiKey } from "@opendum/shared/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { proxyApiKey, providerAccount } from "@opendum/shared/db/schema";
+import { eq, desc, asc } from "drizzle-orm";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Key } from "lucide-react";
@@ -10,7 +10,8 @@ import { CreateApiKeyButton } from "@/components/dashboard/api-keys/create-api-k
 import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
 import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
 import { ApiKeyModelAccess } from "@/components/dashboard/api-keys/api-key-model-access";
-import type { ApiKeyModelAccessMode } from "@/lib/actions/api-keys";
+import { ApiKeyAccountAccess } from "@/components/dashboard/api-keys/api-key-account-access";
+import type { ApiKeyModelAccessMode, ApiKeyAccountAccessMode } from "@/lib/actions/api-keys";
 import { getAllModels } from "@opendum/shared/proxy/models";
 import { formatRelativeTime } from "@/lib/date";
 
@@ -26,6 +27,13 @@ function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) 
 }
 
 function normalizeModelAccessMode(mode: string): ApiKeyModelAccessMode {
+  if (mode === "whitelist" || mode === "blacklist") {
+    return mode;
+  }
+  return "all";
+}
+
+function normalizeAccountAccessMode(mode: string): ApiKeyAccountAccessMode {
   if (mode === "whitelist" || mode === "blacklist") {
     return mode;
   }
@@ -50,10 +58,23 @@ export default async function ApiKeysPage() {
       lastUsedAt: proxyApiKey.lastUsedAt,
       modelAccessMode: proxyApiKey.modelAccessMode,
       modelAccessList: proxyApiKey.modelAccessList,
+      accountAccessMode: proxyApiKey.accountAccessMode,
+      accountAccessList: proxyApiKey.accountAccessList,
     })
     .from(proxyApiKey)
     .where(eq(proxyApiKey.userId, session.user.id))
     .orderBy(desc(proxyApiKey.createdAt));
+
+  const providerAccounts = await db
+    .select({
+      id: providerAccount.id,
+      provider: providerAccount.provider,
+      name: providerAccount.name,
+      email: providerAccount.email,
+    })
+    .from(providerAccount)
+    .where(eq(providerAccount.userId, session.user.id))
+    .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
 
   const availableModels = getAllModels().sort((a, b) => a.localeCompare(b));
 
@@ -84,6 +105,7 @@ export default async function ApiKeysPage() {
             const status = getApiKeyStatus(apiKey);
             const isExpiredOrDisabled = status.label !== "Active";
             const modelAccessMode = normalizeModelAccessMode(apiKey.modelAccessMode);
+            const accountAccessMode = normalizeAccountAccessMode(apiKey.accountAccessMode);
 
             return (
               <Card
@@ -127,12 +149,20 @@ export default async function ApiKeysPage() {
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
-                    <ApiKeyModelAccess
-                      apiKeyId={apiKey.id}
-                      availableModels={availableModels}
-                      initialMode={modelAccessMode}
-                      initialModels={apiKey.modelAccessList}
-                    />
+                    <div className="flex flex-wrap items-center gap-4">
+                      <ApiKeyModelAccess
+                        apiKeyId={apiKey.id}
+                        availableModels={availableModels}
+                        initialMode={modelAccessMode}
+                        initialModels={apiKey.modelAccessList}
+                      />
+                      <ApiKeyAccountAccess
+                        apiKeyId={apiKey.id}
+                        availableAccounts={providerAccounts}
+                        initialMode={accountAccessMode}
+                        initialAccounts={apiKey.accountAccessList}
+                      />
+                    </div>
 
                     <Link
                       href={`/dashboard/analistik/${apiKey.id}`}

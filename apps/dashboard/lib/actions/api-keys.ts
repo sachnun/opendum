@@ -2,8 +2,8 @@
 
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { proxyApiKey } from "@opendum/shared/db/schema";
-import { eq, and } from "drizzle-orm";
+import { proxyApiKey, providerAccount } from "@opendum/shared/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { generateApiKey, hashString, getKeyPreview, encrypt, decrypt } from "@opendum/shared/encryption";
 import { invalidateApiKeyValidationCache } from "@opendum/shared/proxy/auth";
 import { isModelSupported, resolveModelAlias } from "@opendum/shared/proxy/models";
@@ -13,11 +13,17 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
+export type ApiKeyAccountAccessMode = "all" | "whitelist" | "blacklist";
 
 const API_KEY_MODEL_ACCESS_MODES: ApiKeyModelAccessMode[] = ["all", "whitelist", "blacklist"];
+const API_KEY_ACCOUNT_ACCESS_MODES: ApiKeyAccountAccessMode[] = ["all", "whitelist", "blacklist"];
 
 function isApiKeyModelAccessMode(value: string): value is ApiKeyModelAccessMode {
   return API_KEY_MODEL_ACCESS_MODES.includes(value as ApiKeyModelAccessMode);
+}
+
+function isApiKeyAccountAccessMode(value: string): value is ApiKeyAccountAccessMode {
+  return API_KEY_ACCOUNT_ACCESS_MODES.includes(value as ApiKeyAccountAccessMode);
 }
 
 function normalizeModelList(models: string[]): string[] {
@@ -230,6 +236,90 @@ export async function updateApiKeyModelAccess(
   } catch (error) {
     console.error("Failed to update API key model access:", error);
     return { success: false, error: "Failed to update API key model access" };
+  }
+}
+
+/**
+ * Update per-key provider account access mode and account list
+ */
+export async function updateApiKeyAccountAccess(
+  id: string,
+  mode: ApiKeyAccountAccessMode,
+  accounts: string[]
+): Promise<ActionResult<{ mode: ApiKeyAccountAccessMode; accounts: string[] }>> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (!isApiKeyAccountAccessMode(mode)) {
+    return { success: false, error: "Invalid account access mode" };
+  }
+
+  try {
+    const [apiKey] = await db.select({ id: proxyApiKey.id, keyHash: proxyApiKey.keyHash }).from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id))).limit(1);
+
+    if (!apiKey) {
+      return { success: false, error: "API key not found" };
+    }
+
+    const normalizedAccounts = mode === "all"
+      ? []
+      : Array.from(new Set(accounts.map((a) => a.trim()).filter((a) => a.length > 0))).sort((a, b) => a.localeCompare(b));
+
+    if (mode !== "all" && normalizedAccounts.length === 0) {
+      return { success: false, error: "Select at least one account" };
+    }
+
+    // Validate that all account IDs belong to the current user
+    if (normalizedAccounts.length > 0) {
+      const validAccounts = await db
+        .select({ id: providerAccount.id })
+        .from(providerAccount)
+        .where(
+          and(
+            eq(providerAccount.userId, session.user.id),
+            inArray(providerAccount.id, normalizedAccounts)
+          )
+        );
+
+      const validIds = new Set(validAccounts.map((a) => a.id));
+      const invalidIds = normalizedAccounts.filter((id) => !validIds.has(id));
+
+      if (invalidIds.length > 0) {
+        return {
+          success: false,
+          error: `Unknown account: ${invalidIds[0]}`,
+        };
+      }
+    }
+
+    const [updated] = await db.update(proxyApiKey).set({
+      accountAccessMode: mode,
+      accountAccessList: normalizedAccounts,
+    }).where(eq(proxyApiKey.id, id)).returning({
+      accountAccessMode: proxyApiKey.accountAccessMode,
+      accountAccessList: proxyApiKey.accountAccessList,
+    });
+
+    await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+
+    revalidatePath("/dashboard/api-keys");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: {
+        mode: isApiKeyAccountAccessMode(updated.accountAccessMode)
+          ? updated.accountAccessMode
+          : "all",
+        accounts: updated.accountAccessList,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to update API key account access:", error);
+    return { success: false, error: "Failed to update API key account access" };
   }
 }
 
