@@ -63,6 +63,7 @@ import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
+import { setAccountModelEnabled } from "@/lib/actions/account-models";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 
 type AccountQuotaInfo =
@@ -119,6 +120,7 @@ interface AccountsListProps {
   openRouterAccounts: Account[];
   visibleProviders?: ProviderAccountKey[];
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
+  disabledModelsByAccountId?: Record<string, string[]>;
 }
 
 function formatTierLabel(tier: string): string {
@@ -615,16 +617,129 @@ function LastErrorMessageDialog({
   );
 }
 
+function AccountModelAccess({
+  accountId,
+  supportedModels,
+  initialDisabledModels,
+}: {
+  accountId: string;
+  supportedModels: string[];
+  initialDisabledModels: string[];
+}) {
+  const [disabledModels, setDisabledModels] = useState<Set<string>>(
+    () => new Set(initialDisabledModels)
+  );
+  const [togglingModels, setTogglingModels] = useState<Set<string>>(new Set());
+
+  const enabledCount = supportedModels.length - disabledModels.size;
+
+  const handleToggleModel = async (model: string) => {
+    const currentlyEnabled = !disabledModels.has(model);
+    const newEnabled = !currentlyEnabled;
+
+    setTogglingModels((prev) => new Set(prev).add(model));
+
+    // Optimistic update
+    setDisabledModels((prev) => {
+      const next = new Set(prev);
+      if (newEnabled) {
+        next.delete(model);
+      } else {
+        next.add(model);
+      }
+      return next;
+    });
+
+    try {
+      const result = await setAccountModelEnabled(accountId, model, newEnabled);
+      if (!result.success) {
+        // Revert optimistic update
+        setDisabledModels((prev) => {
+          const reverted = new Set(prev);
+          if (newEnabled) {
+            reverted.add(model);
+          } else {
+            reverted.delete(model);
+          }
+          return reverted;
+        });
+        toast.error(result.error);
+      }
+    } catch {
+      // Revert on network error
+      setDisabledModels((prev) => {
+        const reverted = new Set(prev);
+        if (newEnabled) {
+          reverted.add(model);
+        } else {
+          reverted.delete(model);
+        }
+        return reverted;
+      });
+      toast.error("Failed to update model");
+    } finally {
+      setTogglingModels((prev) => {
+        const next = new Set(prev);
+        next.delete(model);
+        return next;
+      });
+    }
+  };
+
+  if (supportedModels.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="pt-3 mt-3 border-t space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Model Access</span>
+        <span className="text-xs text-muted-foreground">
+          {enabledCount}/{supportedModels.length}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {supportedModels.map((model) => {
+          const isEnabled = !disabledModels.has(model);
+          const isToggling = togglingModels.has(model);
+
+          return (
+            <button
+              key={model}
+              type="button"
+              onClick={() => handleToggleModel(model)}
+              disabled={isToggling}
+              title={isEnabled ? `Disable ${model}` : `Enable ${model}`}
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${
+                isEnabled
+                  ? "border-primary/40 bg-primary/10 text-foreground"
+                  : "border-border bg-transparent text-muted-foreground line-through"
+              }`}
+            >
+              {model}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AccountCard({ 
   account, 
   showTier = false,
   quotaInfo,
   isQuotaLoading = false,
+  supportedModels,
+  disabledModels,
 }: { 
   account: Account;
   showTier?: boolean;
   quotaInfo?: AccountQuotaInfo;
   isQuotaLoading?: boolean;
+  supportedModels?: string[];
+  disabledModels?: string[];
 }) {
   const hasErrors = account.errorCount > 0;
   const supportsQuotaMonitor =
@@ -790,6 +905,14 @@ function AccountCard({
               )}
             </div>
           )}
+
+          {supportedModels && supportedModels.length > 0 && (
+            <AccountModelAccess
+              accountId={account.id}
+              supportedModels={supportedModels}
+              initialDisabledModels={disabledModels ?? []}
+            />
+          )}
         </div>
         <div className="mt-4 flex items-center justify-between gap-2">
           <AccountActions account={account} />
@@ -820,6 +943,7 @@ interface ProviderSectionProps {
   quotaByAccountId?: Record<string, AccountQuotaInfo>;
   isQuotaLoading?: boolean;
   hideHeader?: boolean;
+  disabledModelsByAccountId?: Record<string, string[]>;
 }
 
 function ProviderSection({
@@ -832,6 +956,7 @@ function ProviderSection({
   quotaByAccountId,
   isQuotaLoading = false,
   hideHeader = false,
+  disabledModelsByAccountId,
 }: ProviderSectionProps) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4 md:space-y-2">
@@ -854,6 +979,8 @@ function ProviderSection({
                 showTier={showTier}
                 quotaInfo={quotaByAccountId?.[account.id]}
                 isQuotaLoading={isQuotaLoading}
+                supportedModels={supportedModels}
+                disabledModels={disabledModelsByAccountId?.[account.id]}
               />
             ))}
           </div>
@@ -894,6 +1021,7 @@ export function AccountsList({
   openRouterAccounts,
   visibleProviders,
   supportedModelsByProvider,
+  disabledModelsByAccountId,
 }: AccountsListProps) {
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
@@ -1220,6 +1348,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.antigravity}
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1236,6 +1365,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.codex}
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1249,6 +1379,7 @@ export function AccountsList({
         accounts={iflowAccounts}
         emptyMessage="No Iflow accounts connected yet."
         supportedModels={supportedModelsByProvider?.iflow}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1264,6 +1395,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.kiro}
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1280,6 +1412,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.gemini_cli}
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1293,6 +1426,7 @@ export function AccountsList({
         accounts={qwenCodeAccounts}
         emptyMessage="No Qwen Code accounts connected yet."
         supportedModels={supportedModelsByProvider?.qwen_code}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1308,6 +1442,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.copilot}
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1323,6 +1458,7 @@ export function AccountsList({
         accounts={nvidiaNimAccounts}
         emptyMessage="No Nvidia accounts connected yet."
         supportedModels={supportedModelsByProvider?.nvidia_nim}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1336,6 +1472,7 @@ export function AccountsList({
         accounts={ollamaCloudAccounts}
         emptyMessage="No Ollama Cloud accounts connected yet."
         supportedModels={supportedModelsByProvider?.ollama_cloud}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1351,6 +1488,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.openrouter}
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }

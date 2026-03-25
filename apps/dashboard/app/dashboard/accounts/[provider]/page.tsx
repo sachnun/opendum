@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { providerAccount, usageLog } from "@opendum/shared/db/schema";
+import { providerAccount, providerAccountDisabledModel, usageLog } from "@opendum/shared/db/schema";
 import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle } from "lucide-react";
@@ -185,6 +185,25 @@ export default async function ProviderAccountsPage({
 
   const providerModels = Array.from(getProviderModelSet(selectedProvider)).sort();
 
+  // Query per-account disabled models
+  const disabledModelsByAccountId: Record<string, string[]> = {};
+  if (accountIds.length > 0) {
+    const disabledModelRows = await db
+      .select({
+        providerAccountId: providerAccountDisabledModel.providerAccountId,
+        model: providerAccountDisabledModel.model,
+      })
+      .from(providerAccountDisabledModel)
+      .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds));
+
+    for (const row of disabledModelRows) {
+      if (!disabledModelsByAccountId[row.providerAccountId]) {
+        disabledModelsByAccountId[row.providerAccountId] = [];
+      }
+      disabledModelsByAccountId[row.providerAccountId].push(row.model);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="relative">
@@ -239,6 +258,7 @@ export default async function ProviderAccountsPage({
         openRouterAccounts={groupedAccounts.openrouter}
         visibleProviders={[selectedProvider]}
         supportedModelsByProvider={{ [selectedProvider]: providerModels }}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     </div>
   );
