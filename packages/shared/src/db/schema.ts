@@ -236,6 +236,9 @@ export const proxyApiKey = pgTable(
     modelAccessMode: text("modelAccessMode").notNull().default("all"),
     modelAccessList: text("modelAccessList").array().notNull().default([]),
 
+    accountAccessMode: text("accountAccessMode").notNull().default("all"),
+    accountAccessList: text("accountAccessList").array().notNull().default([]),
+
     isActive: boolean("isActive").notNull().default(true),
     expiresAt: timestamp("expiresAt"),
     lastUsedAt: timestamp("lastUsedAt"),
