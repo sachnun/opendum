@@ -1,6 +1,7 @@
 [opendum]
 family = "NVIDIA"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "nvidia/usdcode-llama-3.1-70b-instruct"

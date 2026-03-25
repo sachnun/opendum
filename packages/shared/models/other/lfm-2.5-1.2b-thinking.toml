@@ -1,6 +1,7 @@
 [opendum]
 family = "Liquid AI"
 providers = ["openrouter"]
+ignored = true
 
 [opendum.upstream]
 openrouter = "liquid/lfm-2.5-1.2b-thinking:free"
