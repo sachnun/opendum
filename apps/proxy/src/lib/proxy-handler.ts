@@ -5,6 +5,7 @@ import type {
   ChatCompletionRequest,
   ProxyEndpointType,
   ApiKeyModelAccess,
+  ApiKeyAccountAccess,
   ProviderNameType,
 } from "@opendum/shared";
 import {
@@ -204,10 +205,14 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
     // 1. Auth
     const auth = await authenticateRequest(request, reply);
     if (!auth) return;
-    const { userId, apiKeyId, modelAccessMode, modelAccessList } = auth;
+    const { userId, apiKeyId, modelAccessMode, modelAccessList, accountAccessMode, accountAccessList } = auth;
     const apiKeyModelAccess: ApiKeyModelAccess = {
       mode: modelAccessMode,
       models: modelAccessList,
+    };
+    const apiKeyAccountAccess: ApiKeyAccountAccess = {
+      mode: accountAccessMode,
+      accounts: accountAccessList,
     };
 
     try {
@@ -318,6 +323,31 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
         );
       }
 
+      // Check account access rules for forced account
+      if (forcedAccount && apiKeyAccountAccess.mode !== "all") {
+        const accountSet = new Set(apiKeyAccountAccess.accounts);
+        if (apiKeyAccountAccess.mode === "whitelist" && !accountSet.has(forcedAccount.id)) {
+          return reply.code(403).send(
+            config.formatError({
+              message: "Selected provider account is not allowed for this API key.",
+              type: "invalid_request_error",
+              param: "provider_account_id",
+              code: "provider_account_not_whitelisted",
+            })
+          );
+        }
+        if (apiKeyAccountAccess.mode === "blacklist" && accountSet.has(forcedAccount.id)) {
+          return reply.code(403).send(
+            config.formatError({
+              message: "Selected provider account is blocked for this API key.",
+              type: "invalid_request_error",
+              param: "provider_account_id",
+              code: "provider_account_blacklisted",
+            })
+          );
+        }
+      }
+
       if (forcedAccount) {
         if (!isModelSupportedByProvider(model, forcedAccount.provider)) {
           return reply.code(400).send(
@@ -372,7 +402,8 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
             userId,
             model,
             provider,
-            triedAccountIds
+            triedAccountIds,
+            apiKeyAccountAccess
           );
         }
 

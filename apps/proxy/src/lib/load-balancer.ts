@@ -2,6 +2,7 @@ import { db } from "@opendum/shared/db";
 import { providerAccount, providerAccountErrorHistory, providerAccountDisabledModel } from "@opendum/shared/db/schema";
 import { eq, and, inArray, notInArray, asc, desc, sql } from "drizzle-orm";
 import type { ProviderAccount } from "@opendum/shared/db/schema";
+import type { ApiKeyAccountAccess } from "@opendum/shared/proxy/auth";
 import { getProvidersForModel, resolveModelAlias, getModelLookupKeys } from "@opendum/shared/proxy/models";
 import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit.js";
 
@@ -77,12 +78,14 @@ export async function getNextAccount(
  * @param model Model name
  * @param provider Optional specific provider
  * @param excludeAccountIds Account IDs to exclude (already tried this request)
+ * @param accountAccess Optional API key account access rules (whitelist/blacklist)
  */
 export async function getNextAvailableAccount(
   userId: string,
   model: string,
   provider: string | null = null,
-  excludeAccountIds: string[] = []
+  excludeAccountIds: string[] = [],
+  accountAccess?: ApiKeyAccountAccess
 ): Promise<ProviderAccount | null> {
   let targetProviders: string[];
 
@@ -105,6 +108,15 @@ export async function getNextAvailableAccount(
 
   if (excludeAccountIds.length > 0) {
     whereConditions.push(notInArray(providerAccount.id, excludeAccountIds));
+  }
+
+  // Apply account access rules (whitelist/blacklist) from API key
+  if (accountAccess && accountAccess.mode !== "all" && accountAccess.accounts.length > 0) {
+    if (accountAccess.mode === "whitelist") {
+      whereConditions.push(inArray(providerAccount.id, accountAccess.accounts));
+    } else if (accountAccess.mode === "blacklist") {
+      whereConditions.push(notInArray(providerAccount.id, accountAccess.accounts));
+    }
   }
 
   const accounts = await db
