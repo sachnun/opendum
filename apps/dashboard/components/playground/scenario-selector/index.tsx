@@ -30,16 +30,16 @@ export const SCENARIOS: Scenario[] = [
     id: "text",
     name: "Text",
     icon: MessageSquareText,
-    prompt: "Simple greeting scenario.",
+    prompt: "Write a short poem about the ocean.",
     isReasoning: false,
     messages: [
       {
         role: "system",
-        content: "You are a helpful assistant. Reply briefly and naturally.",
+        content: "You are a creative writing assistant. Write vivid, expressive text with a poetic tone. Keep responses concise.",
       },
       {
         role: "user",
-        content: "how are you",
+        content: "Write a short poem about the ocean.",
       },
     ],
   },
