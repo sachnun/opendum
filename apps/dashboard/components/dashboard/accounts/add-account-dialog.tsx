@@ -429,11 +429,6 @@ export function AddAccountDialog({
           if (popup && !popup.closed) {
             popup.close();
           }
-          toast.success(
-            result.data.isUpdate
-              ? `${providerConfig?.name || "Provider"} account updated successfully!`
-              : `${providerConfig?.name || "Provider"} account connected successfully!`
-          );
           setOpen(false);
           resetForm();
           router.refresh();
@@ -478,7 +473,6 @@ export function AddAccountDialog({
     if (urlToCopy) {
       try {
         await navigator.clipboard.writeText(urlToCopy);
-        toast.success("Link copied to clipboard");
       } catch {
         toast.error("Failed to copy link");
       }
@@ -500,7 +494,6 @@ export function AddAccountDialog({
 
     try {
       await navigator.clipboard.writeText(deviceCodeInfo.userCode);
-      toast.success("Code copied to clipboard");
     } catch {
       toast.error("Failed to copy code");
     }
@@ -558,11 +551,6 @@ export function AddAccountDialog({
         throw new Error(result.error);
       }
 
-      const message = result.data.isUpdate
-        ? `${providerConfig.name} account updated successfully!`
-        : `${providerConfig.name} account connected successfully!`;
-
-      toast.success(message);
       setOpen(false);
       resetForm();
       router.refresh();
@@ -603,11 +591,6 @@ export function AddAccountDialog({
         throw new Error(result.error);
       }
 
-      const message = result.data.isUpdate
-        ? `${providerConfig.name} account updated successfully!`
-        : `${providerConfig.name} account connected successfully!`;
-
-      toast.success(message);
       setOpen(false);
       resetForm();
       router.refresh();

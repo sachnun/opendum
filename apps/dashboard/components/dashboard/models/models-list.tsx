@@ -79,7 +79,6 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
         throw new Error(result.error);
       }
 
-      toast.success(enabled ? "Model enabled" : "Model disabled");
     } catch (error) {
       setEnabledByModel((prev) => ({ ...prev, [modelId]: !enabled }));
       toast.error(

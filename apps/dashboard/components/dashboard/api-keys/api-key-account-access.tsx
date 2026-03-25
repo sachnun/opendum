@@ -143,7 +143,6 @@ export function ApiKeyAccountAccess({
       setDraftAccounts(nextAccounts);
       setOpen(false);
       setAccountPickerOpen(false);
-      toast.success("Account access updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update account access");
     } finally {

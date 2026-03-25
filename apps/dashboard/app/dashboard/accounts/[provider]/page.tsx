@@ -4,14 +4,13 @@ import { db } from "@opendum/shared/db";
 import { providerAccount, providerAccountDisabledModel, usageLog } from "@opendum/shared/db/schema";
 import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
 import {
   type ProviderAccountKey,
   PROVIDER_ACCOUNT_BY_KEY,
   getProviderFromSlug,
-  getProviderSuccessMessage,
 } from "@/lib/provider-accounts";
 import { getProviderModelSet } from "@opendum/shared/proxy/models";
 
@@ -228,13 +227,6 @@ export default async function ProviderAccountsPage({
         </div>
         <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
-
-      {queryParams.success && (
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>{getProviderSuccessMessage(queryParams.success)}</AlertDescription>
-        </Alert>
-      )}
 
       {queryParams.error && (
         <Alert variant="destructive">

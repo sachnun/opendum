@@ -49,7 +49,6 @@ export function CreateApiKeyButton() {
 
       // Show the created key in the modal
       setCreatedKey(result.data.key);
-      toast.success("API key created!");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create API key");
     } finally {
@@ -63,7 +62,6 @@ export function CreateApiKeyButton() {
     try {
       await navigator.clipboard.writeText(createdKey);
       setCopied(true);
-      toast.success("API key copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Failed to copy to clipboard");

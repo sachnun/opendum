@@ -36,7 +36,6 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
         throw new Error(result.error);
       }
 
-      toast.success("API key name updated");
       setEditDialogOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update API key name");

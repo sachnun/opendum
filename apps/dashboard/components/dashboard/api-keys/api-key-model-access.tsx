@@ -121,7 +121,6 @@ export function ApiKeyModelAccess({
       setDraftModels(nextModels);
       setOpen(false);
       setModelPickerOpen(false);
-      toast.success("Model access updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update model access");
     } finally {

@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyInlineCode } from "@/components/ui/copy-inline-code";
@@ -61,14 +59,6 @@ export default async function UsagePage() {
             </li>
           </ol>
 
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Security tip</AlertTitle>
-            <AlertDescription>
-              Keep API keys in server-side environment variables and avoid exposing them in browser
-              code.
-            </AlertDescription>
-          </Alert>
         </CardContent>
       </Card>
 

@@ -435,7 +435,6 @@ function LastErrorMessageDialog({
     try {
       await navigator.clipboard.writeText(message);
       setCopied(true);
-      toast.success("Error details copied");
       setTimeout(() => setCopied(false), 1500);
     } catch {
       toast.error("Failed to copy error details");
@@ -449,7 +448,6 @@ function LastErrorMessageDialog({
       if (!result.success) {
         throw new Error(result.error);
       }
-      toast.success("Errors resolved");
       setIsOpen(false);
       window.dispatchEvent(new CustomEvent(PROVIDER_ACCOUNTS_REFRESH_EVENT));
     } catch (error) {
@@ -779,7 +777,6 @@ function AccountCard({
       if (!result.success) {
         throw new Error(result.error);
       }
-      toast.success(`Account ${account.isActive ? "disabled" : "enabled"}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update account");
     } finally {

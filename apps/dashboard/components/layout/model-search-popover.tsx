@@ -102,7 +102,6 @@ function ModelDetailContent({
       await navigator.clipboard.writeText(model.id);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      toast.success(`Model copied: ${model.id}`);
     } catch {
       toast.error("Failed to copy model ID");
     }
@@ -117,7 +116,6 @@ function ModelDetailContent({
       if (!result.success) {
         throw new Error(result.error);
       }
-      toast.success(checked ? "Model enabled" : "Model disabled");
     } catch (error) {
       setIsEnabled(!checked);
       toast.error(

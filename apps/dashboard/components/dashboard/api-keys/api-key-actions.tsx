@@ -42,7 +42,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         throw new Error(result.error);
       }
 
-      toast.success(apiKey.isActive ? "API key disabled" : "API key enabled");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to toggle API key");
     } finally {
@@ -86,7 +85,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
 
         await navigator.clipboard.writeText(result.data.key);
         setCopied(true);
-        toast.success("API key copied to clipboard");
         setTimeout(() => setCopied(false), 2000);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to copy API key");
@@ -99,7 +97,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
     try {
       await navigator.clipboard.writeText(revealedKey);
       setCopied(true);
-      toast.success("API key copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Failed to copy to clipboard");
@@ -115,7 +112,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         throw new Error(result.error);
       }
 
-      toast.success("API key deleted");
       setDialogOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete API key");
