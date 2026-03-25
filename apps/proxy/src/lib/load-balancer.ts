@@ -1,8 +1,8 @@
 import { db } from "@opendum/shared/db";
-import { providerAccount, providerAccountErrorHistory } from "@opendum/shared/db/schema";
+import { providerAccount, providerAccountErrorHistory, providerAccountDisabledModel } from "@opendum/shared/db/schema";
 import { eq, and, inArray, notInArray, asc, desc, sql } from "drizzle-orm";
 import type { ProviderAccount } from "@opendum/shared/db/schema";
-import { getProvidersForModel } from "@opendum/shared/proxy/models";
+import { getProvidersForModel, resolveModelAlias, getModelLookupKeys } from "@opendum/shared/proxy/models";
 import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit.js";
 
 const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
@@ -121,11 +121,38 @@ export async function getNextAvailableAccount(
     return null;
   }
 
+  // Filter out accounts that have this model disabled at the per-account level
+  const modelLookupKeys = getModelLookupKeys(resolveModelAlias(model));
+  const disabledEntries = await db
+    .select({ providerAccountId: providerAccountDisabledModel.providerAccountId })
+    .from(providerAccountDisabledModel)
+    .where(
+      and(
+        inArray(
+          providerAccountDisabledModel.providerAccountId,
+          accounts.map((a) => a.id)
+        ),
+        inArray(providerAccountDisabledModel.model, modelLookupKeys)
+      )
+    );
+
+  const modelDisabledAccountIds = new Set(
+    disabledEntries.map((e) => e.providerAccountId)
+  );
+
+  const eligibleAccounts = modelDisabledAccountIds.size > 0
+    ? accounts.filter((a) => !modelDisabledAccountIds.has(a.id))
+    : accounts;
+
+  if (eligibleAccounts.length === 0) {
+    return null;
+  }
+
   const rateLimitScope = getRateLimitScope(model);
 
   // Separate paid and free accounts (both already sorted by status then LRU)
-  const paidAccounts = accounts.filter((a) => a.tier === "paid");
-  const freeAccounts = accounts.filter((a) => a.tier !== "paid");
+  const paidAccounts = eligibleAccounts.filter((a) => a.tier === "paid");
+  const freeAccounts = eligibleAccounts.filter((a) => a.tier !== "paid");
 
   // Prioritize paid accounts first, then free accounts
   let selectedAccount: ProviderAccount | null = null;
