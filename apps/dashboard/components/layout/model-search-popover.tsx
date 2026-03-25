@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Command,
   CommandDialog,
@@ -20,9 +19,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
@@ -133,171 +129,165 @@ function ModelDetailContent({
   }, [model.id]);
 
   return (
-    <Card className={`flex flex-col bg-card py-4 border-0 shadow-none ${!isEnabled ? "opacity-70" : ""}`}>
-      <CardHeader className="px-0 pb-2">
-        {/* Row 1: Model ID + Toggle */}
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle
-            className="flex-1 min-w-0 overflow-hidden text-sm font-mono leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
-            title={model.id}
-          >
-            {model.id}
-          </CardTitle>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[11px] text-muted-foreground">
-              {isEnabled ? "On" : "Off"}
-            </span>
-            <Switch
-              checked={isEnabled}
-              onCheckedChange={handleEnabledChange}
-              disabled={isUpdating}
-              title={isEnabled ? "Disable model" : "Enable model"}
-            />
+    <div className={`space-y-3 ${!isEnabled ? "opacity-70" : ""}`}>
+      {/* Row 1: Model ID + Toggle */}
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className="flex-1 min-w-0 overflow-hidden text-sm font-mono font-semibold leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+          title={model.id}
+        >
+          {model.id}
+        </p>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[11px] text-muted-foreground">
+            {isEnabled ? "On" : "Off"}
+          </span>
+          <Switch
+            checked={isEnabled}
+            onCheckedChange={handleEnabledChange}
+            disabled={isUpdating}
+            title={isEnabled ? "Disable model" : "Enable model"}
+          />
+        </div>
+      </div>
+
+      {/* Row 2: Provider badges + Copy/Play */}
+      <div className="flex flex-wrap items-center gap-1">
+        {model.providers.map((provider) => (
+          <Badge key={provider} variant="secondary" className="text-xs">
+            {provider}
+          </Badge>
+        ))}
+        <span className="mx-0.5" />
+        <Button
+          variant={copied ? "secondary" : "ghost"}
+          size="xs"
+          className="h-5 px-1.5 text-[11px]"
+          onClick={handleCopy}
+          title="Copy model ID"
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="xs"
+          className="h-5 px-1.5 text-[11px]"
+          asChild
+          title="Try in Playground"
+          onClick={onClose}
+        >
+          <Link href={`/dashboard/playground?model=${encodeURIComponent(model.id)}`}>
+            <Play className="h-3 w-3" />
+            Play
+          </Link>
+        </Button>
+      </div>
+
+      {/* Model metadata */}
+      {meta && (
+        <div className="space-y-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {meta.pricing && (
+              <Badge variant="outline" className="text-[11px] py-0 h-5 font-normal tabular-nums">
+                ${meta.pricing.input} / ${meta.pricing.output}
+              </Badge>
+            )}
+            {meta.contextLength && (
+              <span className="tabular-nums">{formatTokens(meta.contextLength)} in</span>
+            )}
+            {meta.contextLength && meta.outputLimit && <span>·</span>}
+            {meta.outputLimit && (
+              <span className="tabular-nums">{formatTokens(meta.outputLimit)} out</span>
+            )}
+            {meta.knowledgeCutoff && (
+              <>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="h-3 w-3 shrink-0" />
+                  {formatDate(meta.knowledgeCutoff)}
+                </span>
+              </>
+            )}
           </div>
-        </div>
 
-        {/* Row 2: Provider badges + Copy/Play */}
-        <div className="mt-1.5 flex flex-wrap items-center gap-1">
-          {model.providers.map((provider) => (
-            <Badge key={provider} variant="secondary" className="text-xs">
-              {provider}
-            </Badge>
-          ))}
-          <span className="mx-0.5" />
-          <Button
-            variant={copied ? "secondary" : "ghost"}
-            size="xs"
-            className="h-5 px-1.5 text-[11px]"
-            onClick={handleCopy}
-            title="Copy model ID"
-          >
-            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-            {copied ? "Copied" : "Copy"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="h-5 px-1.5 text-[11px]"
-            asChild
-            title="Try in Playground"
-            onClick={onClose}
-          >
-            <Link href={`/dashboard/playground?model=${encodeURIComponent(model.id)}`}>
-              <Play className="h-3 w-3" />
-              Play
-            </Link>
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="flex flex-1 flex-col px-0">
-        <div className="mt-auto space-y-2.5">
-          {/* Model metadata */}
-          {meta && (
-            <div className="space-y-1.5 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {meta.pricing && (
-                  <Badge variant="outline" className="text-[11px] py-0 h-5 font-normal tabular-nums">
-                    ${meta.pricing.input} / ${meta.pricing.output}
-                  </Badge>
-                )}
-                {meta.contextLength && (
-                  <span className="tabular-nums">{formatTokens(meta.contextLength)} in</span>
-                )}
-                {meta.contextLength && meta.outputLimit && <span>·</span>}
-                {meta.outputLimit && (
-                  <span className="tabular-nums">{formatTokens(meta.outputLimit)} out</span>
-                )}
-                {meta.knowledgeCutoff && (
-                  <>
-                    <span>·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <Calendar className="h-3 w-3 shrink-0" />
-                      {formatDate(meta.knowledgeCutoff)}
-                    </span>
-                  </>
-                )}
-              </div>
-
-              {(meta.reasoning || meta.toolCall || meta.vision) && (
-                <div className="flex flex-wrap gap-1">
-                  {meta.reasoning && (
-                    <Badge variant="outline" className="text-[11px] py-0 h-5">
-                      <Brain className="h-3 w-3 mr-1" />
-                      Reasoning
-                    </Badge>
-                  )}
-                  {meta.toolCall && (
-                    <Badge variant="outline" className="text-[11px] py-0 h-5">
-                      <Wrench className="h-3 w-3 mr-1" />
-                      Tools
-                    </Badge>
-                  )}
-                  {meta.vision && (
-                    <Badge variant="outline" className="text-[11px] py-0 h-5">
-                      <Eye className="h-3 w-3 mr-1" />
-                      Vision
-                    </Badge>
-                  )}
-                </div>
+          {(meta.reasoning || meta.toolCall || meta.vision) && (
+            <div className="flex flex-wrap gap-1">
+              {meta.reasoning && (
+                <Badge variant="outline" className="text-[11px] py-0 h-5">
+                  <Brain className="h-3 w-3 mr-1" />
+                  Reasoning
+                </Badge>
+              )}
+              {meta.toolCall && (
+                <Badge variant="outline" className="text-[11px] py-0 h-5">
+                  <Wrench className="h-3 w-3 mr-1" />
+                  Tools
+                </Badge>
+              )}
+              {meta.vision && (
+                <Badge variant="outline" className="text-[11px] py-0 h-5">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Vision
+                </Badge>
               )}
             </div>
           )}
+        </div>
+      )}
 
-          {/* Stats */}
-          <div className="rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <BarChart3 className="h-3 w-3 shrink-0" />
-                30d
-              </span>
-              <span className="tabular-nums">{maxDailyRequests.toLocaleString()} peak</span>
-            </div>
+      {/* Stats */}
+      <div className="rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5 space-y-2">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <BarChart3 className="h-3 w-3 shrink-0" />
+            30d
+          </span>
+          <span className="tabular-nums">{maxDailyRequests.toLocaleString()} peak</span>
+        </div>
 
-            <div className="grid grid-cols-3 gap-1.5">
-              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-                <p className="text-[10px] text-muted-foreground truncate">Requests</p>
-                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{stats.totalRequests.toLocaleString()}</p>
-              </div>
-              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-                <p className="text-[10px] text-muted-foreground truncate">Success</p>
-                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">
-                  {stats.successRate === null ? "-" : `${stats.successRate}%`}
-                </p>
-              </div>
-              <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-                <p className="text-[10px] text-muted-foreground truncate">Latency</p>
-                <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{formatDuration(stats.avgDurationLastDay)}</p>
-              </div>
-            </div>
-
-            <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-              <UsageSparkline
-                values={durationValues}
-                color="var(--chart-2)"
-                ariaLabel={`Average duration trend for ${model.id} over last 24 hours`}
-                emptyLabel="No duration data"
-                className="h-6"
-                height={24}
-              />
-              <div className="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
-                {durationLabelPoints.map((point) => (
-                  <span key={point.time} className="text-center truncate">
-                    {formatHourLabel(point.time)}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <UsageSparkline
-              values={dailyValues}
-              color="var(--chart-1)"
-              ariaLabel={`Requests trend for ${model.id}`}
-            />
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+            <p className="text-[10px] text-muted-foreground truncate">Requests</p>
+            <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{stats.totalRequests.toLocaleString()}</p>
+          </div>
+          <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+            <p className="text-[10px] text-muted-foreground truncate">Success</p>
+            <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">
+              {stats.successRate === null ? "-" : `${stats.successRate}%`}
+            </p>
+          </div>
+          <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+            <p className="text-[10px] text-muted-foreground truncate">Latency</p>
+            <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{formatDuration(stats.avgDurationLastDay)}</p>
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+          <UsageSparkline
+            values={durationValues}
+            color="var(--chart-2)"
+            ariaLabel={`Average duration trend for ${model.id} over last 24 hours`}
+            emptyLabel="No duration data"
+            className="h-6"
+            height={24}
+          />
+          <div className="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
+            {durationLabelPoints.map((point) => (
+              <span key={point.time} className="text-center truncate">
+                {formatHourLabel(point.time)}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <UsageSparkline
+          values={dailyValues}
+          color="var(--chart-1)"
+          ariaLabel={`Requests trend for ${model.id}`}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -402,13 +392,7 @@ export function ModelSearchPopover({ models, className }: ModelSearchPopoverProp
       </div>
 
       <Dialog open={detailModel !== null} onOpenChange={(open) => { if (!open) handleDetailClose(); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Model Details</DialogTitle>
-            <DialogDescription>
-              View model information or try it in the playground
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md gap-0">
           {detailModel && (
             <ModelDetailContent model={detailModel} onClose={handleDetailClose} />
           )}
