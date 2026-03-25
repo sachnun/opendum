@@ -37,11 +37,33 @@ export interface ApiKeyModelAccess {
   models: string[];
 }
 
+export type ApiKeyAccountAccessMode = "all" | "whitelist" | "blacklist";
+
+export interface ApiKeyAccountAccess {
+  mode: ApiKeyAccountAccessMode;
+  accounts: string[];
+}
+
 function normalizeApiKeyModelAccessMode(mode: string | null | undefined): ApiKeyModelAccessMode {
   if (mode === "whitelist" || mode === "blacklist") {
     return mode;
   }
   return "all";
+}
+
+function normalizeApiKeyAccountAccessMode(mode: string | null | undefined): ApiKeyAccountAccessMode {
+  if (mode === "whitelist" || mode === "blacklist") {
+    return mode;
+  }
+  return "all";
+}
+
+function normalizeApiKeyAccountList(accounts: string[]): string[] {
+  const normalized = accounts
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+
+  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
 }
 
 function normalizeApiKeyModelList(models: string[]): string[] {
@@ -68,6 +90,8 @@ interface ApiKeyValidationCacheValue {
   apiKeyId?: string;
   modelAccessMode?: ApiKeyModelAccessMode;
   modelAccessList?: string[];
+  accountAccessMode?: ApiKeyAccountAccessMode;
+  accountAccessList?: string[];
   expiresAtMs?: number | null;
   error?: string;
 }
@@ -143,6 +167,10 @@ async function getCachedApiKeyValidation(
       ? parsed.modelAccessList.filter((item): item is string => typeof item === "string")
       : [];
 
+    const accountAccessList = Array.isArray(parsed.accountAccessList)
+      ? parsed.accountAccessList.filter((item): item is string => typeof item === "string")
+      : [];
+
     if (parsed.valid) {
       if (!parsed.userId || !parsed.apiKeyId) {
         return null;
@@ -154,6 +182,8 @@ async function getCachedApiKeyValidation(
         apiKeyId: parsed.apiKeyId,
         modelAccessMode: normalizeApiKeyModelAccessMode(parsed.modelAccessMode),
         modelAccessList,
+        accountAccessMode: normalizeApiKeyAccountAccessMode(parsed.accountAccessMode),
+        accountAccessList,
         expiresAtMs:
           typeof parsed.expiresAtMs === "number" || parsed.expiresAtMs === null
             ? parsed.expiresAtMs
@@ -447,6 +477,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   apiKeyId?: string;
   modelAccessMode?: ApiKeyModelAccessMode;
   modelAccessList?: string[];
+  accountAccessMode?: ApiKeyAccountAccessMode;
+  accountAccessList?: string[];
   error?: string;
 }> {
   if (!authHeader) {
@@ -487,6 +519,12 @@ export async function validateApiKey(authHeader: string | null): Promise<{
         modelAccessList: normalizeApiKeyModelList(
           cachedValidation.modelAccessList ?? []
         ),
+        accountAccessMode: normalizeApiKeyAccountAccessMode(
+          cachedValidation.accountAccessMode
+        ),
+        accountAccessList: normalizeApiKeyAccountList(
+          cachedValidation.accountAccessList ?? []
+        ),
       };
     }
   }
@@ -500,6 +538,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
       expiresAt: proxyApiKey.expiresAt,
       modelAccessMode: proxyApiKey.modelAccessMode,
       modelAccessList: proxyApiKey.modelAccessList,
+      accountAccessMode: proxyApiKey.accountAccessMode,
+      accountAccessList: proxyApiKey.accountAccessList,
     })
     .from(proxyApiKey)
     .where(eq(proxyApiKey.keyHash, keyHash))
@@ -535,6 +575,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
 
   const modelAccessMode = normalizeApiKeyModelAccessMode(apiKey.modelAccessMode);
   const modelAccessList = normalizeApiKeyModelList(apiKey.modelAccessList);
+  const accountAccessMode = normalizeApiKeyAccountAccessMode(apiKey.accountAccessMode);
+  const accountAccessList = normalizeApiKeyAccountList(apiKey.accountAccessList);
   const expiresAtMs = apiKey.expiresAt ? apiKey.expiresAt.getTime() : null;
 
   let cacheTtlSeconds = API_KEY_VALIDATION_POSITIVE_TTL_SECONDS;
@@ -551,6 +593,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
       apiKeyId: apiKey.id,
       modelAccessMode,
       modelAccessList,
+      accountAccessMode,
+      accountAccessList,
       expiresAtMs,
     },
     cacheTtlSeconds
@@ -564,6 +608,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     apiKeyId: apiKey.id,
     modelAccessMode,
     modelAccessList,
+    accountAccessMode,
+    accountAccessList,
   };
 }
 

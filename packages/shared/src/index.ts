@@ -84,6 +84,8 @@ export {
   type ModelValidationResult,
   type ApiKeyModelAccessMode,
   type ApiKeyModelAccess,
+  type ApiKeyAccountAccessMode,
+  type ApiKeyAccountAccess,
 } from "./proxy/auth.js";
 
 // Proxy - Adaptive Timeout
