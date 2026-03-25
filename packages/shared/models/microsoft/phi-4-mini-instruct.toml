@@ -1,9 +1,18 @@
+release_date = "2025-07-26"
+reasoning = false
+tool_call = false
+attachment = false
+
+[cost]
+input = 0.17
+output = 0.68
+
 [limit]
-context = 131_072
-output = 8_192
+context = 128_000
+output = 16_384
 
 [modalities]
-input = ["text","image","audio"]
+input = ["text"]
 output = ["text"]
 
 [opendum]
