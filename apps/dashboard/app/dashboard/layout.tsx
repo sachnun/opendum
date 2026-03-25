@@ -194,6 +194,14 @@ export default async function DashboardLayout({
     modelFamilyCounts[anchorId] += 1;
   }
 
+  // Set of providers the user has at least one active account for
+  const activeProviderNames = new Set<string>();
+  for (const account of providerAccounts) {
+    if (account.isActive) {
+      activeProviderNames.add(account.provider);
+    }
+  }
+
   const statsByModel = await getModelStatsByModel(session.user.id, allModels);
   const fallbackDayKeys = buildDayKeys(MODEL_STATS_DAYS);
   const fallbackHourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
@@ -217,6 +225,7 @@ export default async function DashboardLayout({
             statsByModel={statsByModel}
             fallbackDayKeys={fallbackDayKeys}
             fallbackHourKeys={fallbackHourKeys}
+            activeProviderNames={Array.from(activeProviderNames)}
             user={user}
           />
         </Suspense>

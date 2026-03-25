@@ -43,6 +43,7 @@ interface HeaderProps {
   statsByModel: Record<string, ModelStats>;
   fallbackDayKeys: string[];
   fallbackHourKeys: string[];
+  activeProviderNames: string[];
   user: {
     name: string | null;
     email: string | null;
@@ -59,16 +60,22 @@ export function Header({
   statsByModel,
   fallbackDayKeys,
   fallbackHourKeys,
+  activeProviderNames,
   user,
 }: HeaderProps) {
   const disabledModelSet = new Set(
     disabledModels.map((entry) => resolveModelAlias(entry.model))
   );
 
+  const activeProviderSet = new Set(activeProviderNames);
+
   const models = getAllModels()
+    .filter((id: string) => getProvidersForModel(id).some((p: string) => activeProviderSet.has(p)))
     .map((id: string) => ({
       id,
-      providers: getProvidersForModel(id).map((provider: string) => PROVIDER_LABELS[provider] ?? provider),
+      providers: getProvidersForModel(id)
+        .filter((p: string) => activeProviderSet.has(p))
+        .map((provider: string) => PROVIDER_LABELS[provider] ?? provider),
       meta: MODEL_REGISTRY[id]?.meta,
       isEnabled: !disabledModelSet.has(id),
       stats: statsByModel[id] ?? buildEmptyModelStats(fallbackDayKeys, fallbackHourKeys),

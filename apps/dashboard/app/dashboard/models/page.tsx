@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import { ModelsList } from "@/components/dashboard/models/models-list";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { disabledModel } from "@opendum/shared/db/schema";
-import { eq } from "drizzle-orm";
+import { disabledModel, providerAccount } from "@opendum/shared/db/schema";
+import { eq, and } from "drizzle-orm";
 import {
   MODEL_REGISTRY,
   getAllModels,
@@ -58,7 +58,22 @@ async function ModelsContent() {
     return null;
   }
 
-  const allModels = getAllModels();
+  // Get providers where the user has at least one active account
+  const userAccounts = await db
+    .selectDistinct({ provider: providerAccount.provider })
+    .from(providerAccount)
+    .where(
+      and(
+        eq(providerAccount.userId, session.user.id),
+        eq(providerAccount.isActive, true)
+      )
+    );
+  const userProviders = new Set(userAccounts.map((a) => a.provider));
+
+  // Only include models whose provider(s) the user has an account for
+  const allModels = getAllModels().filter((model) =>
+    getProvidersForModel(model).some((p) => userProviders.has(p))
+  );
 
   const disabledModels = await db
     .select({ model: disabledModel.model })
@@ -70,55 +85,30 @@ async function ModelsContent() {
 
   const statsByModel = await getModelStatsByModel(session.user.id, allModels);
 
-  const iflowModels = getModelsForProvider(ProviderName.IFLOW);
-  const antigravityModels = getModelsForProvider(ProviderName.ANTIGRAVITY);
-  const qwenCodeModels = getModelsForProvider(ProviderName.QWEN_CODE);
-  const geminiCliModels = getModelsForProvider(ProviderName.GEMINI_CLI);
-  const codexModels = getModelsForProvider(ProviderName.CODEX);
-  const copilotModels = getModelsForProvider(ProviderName.COPILOT);
-  const kiroModels = getModelsForProvider(ProviderName.KIRO);
-  const nvidiaNimModels = getModelsForProvider(ProviderName.NVIDIA_NIM);
-  const ollamaCloudModels = getModelsForProvider(ProviderName.OLLAMA_CLOUD);
-  const openRouterModels = getModelsForProvider(ProviderName.OPENROUTER);
+  const providerEntries: { id: string; label: string }[] = [
+    { id: ProviderName.IFLOW, label: "Iflow" },
+    { id: ProviderName.ANTIGRAVITY, label: "Antigravity" },
+    { id: ProviderName.GEMINI_CLI, label: "Gemini CLI" },
+    { id: ProviderName.QWEN_CODE, label: "Qwen Code" },
+    { id: ProviderName.CODEX, label: "Codex" },
+    { id: ProviderName.COPILOT, label: "Copilot" },
+    { id: ProviderName.KIRO, label: "Kiro" },
+    { id: ProviderName.NVIDIA_NIM, label: "Nvidia" },
+    { id: ProviderName.OLLAMA_CLOUD, label: "Ollama Cloud" },
+    { id: ProviderName.OPENROUTER, label: "OpenRouter" },
+  ];
 
-  const availableProviders: { id: string; label: string }[] = [];
-  if (iflowModels.length > 0) {
-    availableProviders.push({ id: ProviderName.IFLOW, label: "Iflow" });
-  }
-  if (antigravityModels.length > 0) {
-    availableProviders.push({ id: ProviderName.ANTIGRAVITY, label: "Antigravity" });
-  }
-  if (geminiCliModels.length > 0) {
-    availableProviders.push({ id: ProviderName.GEMINI_CLI, label: "Gemini CLI" });
-  }
-  if (qwenCodeModels.length > 0) {
-    availableProviders.push({ id: ProviderName.QWEN_CODE, label: "Qwen Code" });
-  }
-  if (codexModels.length > 0) {
-    availableProviders.push({ id: ProviderName.CODEX, label: "Codex" });
-  }
-  if (copilotModels.length > 0) {
-    availableProviders.push({ id: ProviderName.COPILOT, label: "Copilot" });
-  }
-  if (kiroModels.length > 0) {
-    availableProviders.push({ id: ProviderName.KIRO, label: "Kiro" });
-  }
-  if (nvidiaNimModels.length > 0) {
-    availableProviders.push({ id: ProviderName.NVIDIA_NIM, label: "Nvidia" });
-  }
-  if (ollamaCloudModels.length > 0) {
-    availableProviders.push({ id: ProviderName.OLLAMA_CLOUD, label: "Ollama Cloud" });
-  }
-  if (openRouterModels.length > 0) {
-    availableProviders.push({ id: ProviderName.OPENROUTER, label: "OpenRouter" });
-  }
+  // Only show providers the user has an account for
+  const availableProviders = providerEntries.filter(
+    (p) => userProviders.has(p.id) && getModelsForProvider(p.id).length > 0
+  );
 
   const fallbackDayKeys = buildDayKeys(MODEL_STATS_DAYS);
   const fallbackHourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
 
   const modelsWithProviders = allModels.map((model) => {
     const info = MODEL_REGISTRY[model];
-    const providers = getProvidersForModel(model);
+    const providers = getProvidersForModel(model).filter((p) => userProviders.has(p));
 
     return {
       id: model,
