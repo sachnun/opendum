@@ -14,6 +14,8 @@ import {
   isModelSupportedByProvider,
   getProvider,
   recordLatency,
+  isVisionModel,
+  stripImageContent,
 } from "@opendum/shared";
 import { db, providerAccount } from "@opendum/shared";
 import { eq, and, sql } from "drizzle-orm";
@@ -471,7 +473,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
           );
           const credentials = await providerImpl.getValidCredentials(account);
 
-          // Route-specific request building
+           // Route-specific request building
           const requestBody = await config.buildRequest({
             routeData,
             model,
@@ -480,6 +482,17 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
             providerImpl,
             account,
           });
+
+          // Strip image/multimodal content for text-only models.
+          // The `attachment` (vision) and `modalities.input` fields in the
+          // model TOML files drive this check via isVisionModel().
+          if (
+            requestBody.messages &&
+            Array.isArray(requestBody.messages) &&
+            !isVisionModel(model)
+          ) {
+            requestBody.messages = stripImageContent(requestBody.messages);
+          }
 
           const requestStartTime = Date.now();
           const providerResponse = await providerImpl.makeRequest(
