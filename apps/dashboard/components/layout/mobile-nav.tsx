@@ -110,7 +110,11 @@ export function MobileNav({
         ? item.children.filter((subItem) =>
             subItem.name.toLowerCase().includes(normalizedAccountsSubmenuSearch)
           )
-        : (item.children ?? []);
+        : isModelsItem && item.children && modelCountByAnchorId
+          ? item.children.filter((subItem) =>
+              subItem.anchorId ? (modelCountByAnchorId[subItem.anchorId] ?? 0) > 0 : true
+            )
+          : (item.children ?? []);
 
     const isCollapsible = isModelsItem;
     const isExpanded = isModelsItem ? isModelsExpanded : true;
