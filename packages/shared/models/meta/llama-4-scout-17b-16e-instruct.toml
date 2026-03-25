@@ -1,6 +1,16 @@
+release_date = "2025-04-05"
+knowledge = "2024-08"
+reasoning = false
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.2
+output = 0.78
+
 [limit]
 context = 128_000
-output = 4_096
+output = 8_192
 
 [modalities]
 input = ["text","image"]

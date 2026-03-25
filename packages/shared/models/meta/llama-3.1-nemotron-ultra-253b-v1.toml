@@ -1,3 +1,9 @@
+release_date = "2024-07-01"
+knowledge = "2024-07"
+reasoning = true
+tool_call = true
+attachment = false
+
 [limit]
 context = 131_072
 output = 8_192

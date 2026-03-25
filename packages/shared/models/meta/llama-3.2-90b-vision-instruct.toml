@@ -1,3 +1,21 @@
+release_date = "2024-09-25"
+knowledge = "2023-12"
+reasoning = false
+tool_call = true
+attachment = true
+
+[cost]
+input = 2.04
+output = 2.04
+
+[limit]
+context = 128_000
+output = 8_192
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
+
 [opendum]
 family = "Meta"
 providers = ["nvidia_nim"]
