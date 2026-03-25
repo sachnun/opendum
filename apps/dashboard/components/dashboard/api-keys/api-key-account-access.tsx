@@ -153,22 +153,20 @@ export function ApiKeyAccountAccess({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{modeLabel}</Badge>
-        {savedMode !== "all" && (
-          <span className="text-xs text-muted-foreground">
-            {normalizedSavedAccounts.length} account{normalizedSavedAccounts.length > 1 ? "s" : ""}
-          </span>
-        )}
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Account access
-          </Button>
-        </DialogTrigger>
-      </div>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+        >
+          <ShieldCheck className="h-3 w-3" />
+          <span>{modeLabel}</span>
+          {savedMode !== "all" && (
+            <span className="text-muted-foreground/70">({normalizedSavedAccounts.length})</span>
+          )}
+        </button>
+      </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Account Access Rules</DialogTitle>
           <DialogDescription className="sr-only">
@@ -176,9 +174,9 @@ export function ApiKeyAccountAccess({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Mode</p>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium">Mode</p>
             <ToggleGroup
               type="single"
               variant="outline"
@@ -198,14 +196,14 @@ export function ApiKeyAccountAccess({
           </div>
 
           {draftMode !== "all" && (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Accounts</p>
+                <p className="text-xs font-medium">Accounts</p>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className="h-6 px-1.5 text-[11px]"
                   onClick={() => setDraftAccounts([])}
                   disabled={normalizedDraftAccounts.length === 0}
                 >
@@ -217,7 +215,7 @@ export function ApiKeyAccountAccess({
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-9 w-full justify-between px-3 text-xs"
+                    className="h-8 w-full justify-between px-2.5 text-xs"
                     disabled={isSaving}
                   >
                     <span className="truncate">
@@ -225,10 +223,10 @@ export function ApiKeyAccountAccess({
                         ? `${normalizedDraftAccounts.length} account selected`
                         : "Select accounts"}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[min(90vw,30rem)] p-0">
+                <PopoverContent align="start" className="w-[min(90vw,28rem)] p-0">
                   <Command>
                     <CommandInput placeholder="Search account..." />
                     <CommandList>
@@ -236,7 +234,6 @@ export function ApiKeyAccountAccess({
                       <CommandGroup>
                         {availableAccounts.map((account) => {
                           const selected = normalizedDraftAccounts.includes(account.id);
-
                           return (
                             <CommandItem
                               key={account.id}
@@ -246,7 +243,7 @@ export function ApiKeyAccountAccess({
                             >
                               <Check
                                 className={cn(
-                                  "h-3.5 w-3.5",
+                                  "h-3 w-3",
                                   selected ? "opacity-100" : "opacity-0"
                                 )}
                               />
@@ -266,27 +263,26 @@ export function ApiKeyAccountAccess({
                 </PopoverContent>
               </Popover>
 
-              <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/20 p-2">
+              <div className="max-h-28 overflow-y-auto rounded-md border border-border bg-muted/20 p-1.5">
                 {normalizedDraftAccounts.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No accounts selected</p>
+                  <p className="text-[11px] text-muted-foreground px-1">No accounts selected</p>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {normalizedDraftAccounts.map((accountId) => {
                       const account = accountMap.get(accountId);
                       const label = account
                         ? getAccountLabel(account)
                         : accountId;
-
                       return (
-                        <Badge key={accountId} variant="secondary" className="max-w-full gap-1 pr-1 font-normal">
-                          <span className="min-w-0 truncate text-[11px]">{label}</span>
+                        <Badge key={accountId} variant="secondary" className="max-w-full gap-0.5 pr-0.5 font-normal text-[10px] py-0">
+                          <span className="min-w-0 truncate">{label}</span>
                           <button
                             type="button"
                             className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-muted-foreground cursor-pointer hover:text-foreground"
                             onClick={() => toggleAccount(accountId)}
                             aria-label={`Remove ${label}`}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-2.5 w-2.5" />
                           </button>
                         </Badge>
                       );
@@ -299,10 +295,10 @@ export function ApiKeyAccountAccess({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button variant="outline" size="sm" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving || !hasChanges}>
+          <Button size="sm" onClick={handleSave} disabled={isSaving || !hasChanges}>
             {isSaving ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>
