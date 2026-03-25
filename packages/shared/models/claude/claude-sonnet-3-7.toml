@@ -1,3 +1,21 @@
+release_date = "2025-02-19"
+knowledge = "2024-10-31"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 3
+output = 15
+
+[limit]
+context = 200_000
+output = 64_000
+
+[modalities]
+input = ["text","image","pdf"]
+output = ["text"]
+
 [opendum]
 family = "Claude"
 providers = ["copilot"]
