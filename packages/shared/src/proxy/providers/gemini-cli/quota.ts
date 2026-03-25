@@ -11,7 +11,6 @@ const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
   "standard-tier": {
     "gemini-2.5-pro": 250,
     "gemini-3-pro-preview": 250,
-    "gemini-2.0-flash": 1500,
     "gemini-2.5-flash": 1500,
     "gemini-2.5-flash-lite": 1500,
     "gemini-3-flash-preview": 1500,
@@ -19,7 +18,6 @@ const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
   "free-tier": {
     "gemini-2.5-pro": 100,
     "gemini-3-pro-preview": 100,
-    "gemini-2.0-flash": 1000,
     "gemini-2.5-flash": 1000,
     "gemini-2.5-flash-lite": 1000,
     "gemini-3-flash-preview": 1000,
@@ -27,7 +25,6 @@ const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
   "legacy-tier": {
     "gemini-2.5-pro": 100,
     "gemini-3-pro-preview": 100,
-    "gemini-2.0-flash": 1000,
     "gemini-2.5-flash": 1000,
     "gemini-2.5-flash-lite": 1000,
     "gemini-3-flash-preview": 1000,
@@ -44,7 +41,7 @@ export const GEMINI_CLI_QUOTA_GROUPS: Record<
   },
   "25-flash": {
     displayName: "Gemini 2.5 Flash",
-    models: ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    models: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
   },
   "3-flash": {
     displayName: "Gemini 3 Flash",
