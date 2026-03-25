@@ -16,31 +16,26 @@ export default function Loading() {
         {KEY_CARDS.map((_, index) => (
           <div
             key={`key-${index}`}
-            className="rounded-xl border border-border bg-card p-4 sm:p-5"
+            className="rounded-xl border border-border bg-card px-5 py-3"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-5 w-5 rounded-full" />
-                <Skeleton className="h-4 w-32" />
-              </div>
-              <Skeleton className="h-5 w-16 rounded-full" />
-            </div>
-
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap gap-3">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-              <div className="flex gap-2">
+            {/* Row 1: Name + Actions + Badge */}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+              <Skeleton className="h-5 w-36" />
+              <div className="flex shrink-0 items-center gap-2">
                 <Skeleton className="h-8 w-8 rounded-md" />
                 <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-5 w-14 rounded-full" />
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
-              <Skeleton className="h-8 w-40 rounded-md" />
-              <Skeleton className="h-3 w-24" />
+            {/* Row 2: Metadata + Access controls + Analytics */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <Skeleton className="h-3.5 w-52" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Skeleton className="h-7 w-28 rounded-md" />
+                <Skeleton className="h-7 w-28 rounded-md" />
+              </div>
+              <Skeleton className="ml-auto h-3.5 w-16" />
             </div>
           </div>
         ))}
