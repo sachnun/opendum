@@ -298,4 +298,27 @@ export const usageLog = pgTable(
   ],
 );
 
+export const providerAccountDisabledModel = pgTable(
+  "provider_account_disabled_model",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    providerAccountId: text("providerAccountId")
+      .notNull()
+      .references(() => providerAccount.id, { onDelete: "cascade" }),
+    model: text("model").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("provider_account_disabled_model_accountId_model_key").on(
+      table.providerAccountId,
+      table.model,
+    ),
+    index("provider_account_disabled_model_providerAccountId_idx").on(
+      table.providerAccountId,
+    ),
+  ],
+);
+
 export type ProviderAccount = InferSelectModel<typeof providerAccount>;
