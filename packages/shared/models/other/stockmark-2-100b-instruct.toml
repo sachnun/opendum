@@ -1,6 +1,7 @@
 [opendum]
 family = "Stockmark"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "stockmark/stockmark-2-100b-instruct"

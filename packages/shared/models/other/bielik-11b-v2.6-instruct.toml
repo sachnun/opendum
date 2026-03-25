@@ -1,6 +1,7 @@
 [opendum]
 family = "Bielik"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "speakleash/bielik-11b-v2.6-instruct"

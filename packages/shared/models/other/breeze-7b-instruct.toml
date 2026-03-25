@@ -1,6 +1,7 @@
 [opendum]
 family = "MediaTek"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "mediatek/breeze-7b-instruct"

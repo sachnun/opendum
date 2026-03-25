@@ -1,6 +1,7 @@
 [opendum]
 family = "EuroLLM"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "utter-project/eurollm-9b-instruct"
