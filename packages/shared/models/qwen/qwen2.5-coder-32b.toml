@@ -17,7 +17,7 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = ["copilot", "nvidia_nim"]
+providers = ["nvidia_nim"]
 aliases = ["qwen-qwen2.5-coder-32b-instruct", "qwen/qwen2.5-coder-32b-instruct"]
 
 [opendum.upstream]
