@@ -1,2 +1,6 @@
+reasoning = true
+tool_call = true
+
 [opendum]
+family = "OpenAI"
 providers = ["copilot"]
