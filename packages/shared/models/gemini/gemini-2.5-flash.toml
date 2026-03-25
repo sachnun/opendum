@@ -1,16 +1,20 @@
-release_date = "2025-09-15"
-knowledge = "2025-04"
+release_date = "2025-03-20"
+knowledge = "2025-01"
 reasoning = true
 tool_call = true
 attachment = true
 
 [cost]
-input = 0.075
-output = 0.3
+input = 0.3
+output = 2.5
 
 [limit]
-context = 1_000_000
-output = 65_000
+context = 1_048_576
+output = 65_536
+
+[modalities]
+input = ["text","image","audio","video","pdf"]
+output = ["text"]
 
 [opendum]
 family = "Gemini"

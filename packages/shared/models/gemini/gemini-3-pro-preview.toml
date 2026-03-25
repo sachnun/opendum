@@ -1,5 +1,5 @@
-release_date = "2025-11-19"
-knowledge = "2025-11"
+release_date = "2025-11-18"
+knowledge = "2025-01"
 reasoning = true
 tool_call = true
 attachment = true
@@ -10,7 +10,11 @@ output = 12
 
 [limit]
 context = 1_000_000
-output = 65_000
+output = 64_000
+
+[modalities]
+input = ["text","image","video","audio","pdf"]
+output = ["text"]
 
 [opendum]
 family = "Gemini"
