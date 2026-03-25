@@ -112,7 +112,7 @@ export default async function ApiKeysPage() {
                 key={apiKey.id}
                 className={`bg-card ${isExpiredOrDisabled ? "opacity-65" : ""}`}
               >
-                <CardContent className="px-5 py-4">
+                <CardContent className="px-5 py-3">
                   {/* Row 1: Name + Actions + Badge */}
                   <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                     <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
