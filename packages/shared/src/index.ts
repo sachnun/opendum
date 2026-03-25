@@ -65,6 +65,8 @@ export {
   getUpstreamModelName,
   getModelLookupKeys,
   formatModelsForOpenAI,
+  getModelInfo,
+  isVisionModel,
   getModelFamily,
   getAllFamilies,
   getModelsByFamily,
@@ -90,6 +92,9 @@ export {
 
 // Proxy - Adaptive Timeout
 export { getAdaptiveTimeout, recordLatency } from "./proxy/adaptive-timeout.js";
+
+// Proxy - Message Sanitizer
+export { stripImageContent } from "./proxy/message-sanitizer.js";
 
 // Proxy - Timeout
 export { fetchWithTimeout, type OnTTFBCallback } from "./proxy/timeout.js";
