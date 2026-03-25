@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Key, Play, Plus, Square } from "lucide-react";
 
 import {
@@ -1315,6 +1316,7 @@ async function consumeResponsesStream(
 }
 
 export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKeyOptions = [] }: PlaygroundClientProps) {
+  const router = useRouter();
   const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
     () => apiKeyOptions.length > 0 ? apiKeyOptions[0].id : null
   );
@@ -1755,6 +1757,9 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
           usedAccountId,
         },
       }));
+
+      // Refresh server data so sidebar provider indicators reflect the new error state
+      router.refresh();
     } finally {
       controllersRef.current.delete(panelId);
     }
