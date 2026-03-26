@@ -36,6 +36,7 @@ import {
   createGeminiToOpenAISseTransform,
 } from "./converter.js";
 import { cacheSignature } from "./cache.js";
+import { convertImageUrlsToBase64 } from "../../image-utils.js";
 
 /**
  * Generate PKCE code verifier
@@ -299,9 +300,15 @@ export const antigravityProvider: Provider = {
       sessionId,
     };
 
+    const isClaudeModel = effectiveModel.includes("claude");
+
+    // Claude rejects image URLs — convert HTTP(S) URLs to base64 data URIs
+    if (isClaudeModel) {
+      normalizedBody.messages = await convertImageUrlsToBase64(normalizedBody.messages);
+    }
+
     const geminiPayload = convertOpenAIToGemini(normalizedBody);
 
-    const isClaudeModel = effectiveModel.includes("claude");
     const result = isClaudeModel
       ? transformClaudeRequest(context, geminiPayload)
       : transformGeminiRequest(context, geminiPayload);
