@@ -1,6 +1,6 @@
 import { db } from "../db/index.js";
-import { proxyApiKey, disabledModel, usageLog } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { proxyApiKey, disabledModel, usageLog, providerAccount, providerAccountDisabledModel } from "../db/schema.js";
+import { eq, and, inArray } from "drizzle-orm";
 import { hashString } from "../encryption.js";
 import { bumpAnalyticsCacheVersionThrottled } from "../cache/analytics-cache.js";
 import { getRedisClient } from "../redis.js";
@@ -643,4 +643,125 @@ export async function logUsage(params: {
   } catch (error) {
     console.error("Failed to log usage:", error);
   }
+}
+
+/**
+ * Account-level model availability data for a user.
+ */
+export interface AccountModelAvailability {
+  /** Set of provider names where the user has at least one active account. */
+  activeProviders: Set<string>;
+  /**
+   * For each provider, the number of active accounts.
+   * Used together with `disabledCountByProviderModel` to determine whether
+   * ALL accounts for a provider have disabled a particular model.
+   */
+  accountCountByProvider: Map<string, number>;
+  /**
+   * Map of `"provider:model"` → number of active accounts that have disabled that model.
+   */
+  disabledCountByProviderModel: Map<string, number>;
+}
+
+/**
+ * Check whether a model has at least one usable active account across its supporting providers.
+ *
+ * A model is "usable" if there exists at least one provider P such that:
+ *   - P supports the model, AND
+ *   - The user has at least one active account for P that has NOT disabled
+ *     the model at the per-account level.
+ */
+export function isModelUsableByAccounts(
+  model: string,
+  availability: AccountModelAvailability
+): boolean {
+  const canonical = resolveModelAlias(model);
+  const providers = getProvidersForModel(canonical);
+
+  for (const provider of providers) {
+    const totalAccounts = availability.accountCountByProvider.get(provider) ?? 0;
+    if (totalAccounts === 0) continue;
+
+    const key = `${provider}:${canonical}`;
+    const disabledCount = availability.disabledCountByProviderModel.get(key) ?? 0;
+
+    // At least one account for this provider has NOT disabled the model
+    if (disabledCount < totalAccounts) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Fetch account-level model availability data for a user.
+ *
+ * Queries active provider accounts and their per-account disabled models,
+ * then builds a structure that allows efficient per-model availability checks
+ * via `isModelUsableByAccounts()`.
+ */
+export async function getAccountModelAvailability(
+  userId: string
+): Promise<AccountModelAvailability> {
+  // 1. Get all active accounts (id + provider)
+  const activeAccounts = await db
+    .select({
+      id: providerAccount.id,
+      provider: providerAccount.provider,
+    })
+    .from(providerAccount)
+    .where(
+      and(
+        eq(providerAccount.userId, userId),
+        eq(providerAccount.isActive, true)
+      )
+    );
+
+  const activeProviders = new Set<string>();
+  const accountCountByProvider = new Map<string, number>();
+  const accountIdToProvider = new Map<string, string>();
+
+  for (const acc of activeAccounts) {
+    activeProviders.add(acc.provider);
+    accountCountByProvider.set(
+      acc.provider,
+      (accountCountByProvider.get(acc.provider) ?? 0) + 1
+    );
+    accountIdToProvider.set(acc.id, acc.provider);
+  }
+
+  // 2. Get per-account disabled models for all active accounts
+  const disabledCountByProviderModel = new Map<string, number>();
+
+  if (activeAccounts.length > 0) {
+    const accountIds = activeAccounts.map((a) => a.id);
+    const disabledEntries = await db
+      .select({
+        providerAccountId: providerAccountDisabledModel.providerAccountId,
+        model: providerAccountDisabledModel.model,
+      })
+      .from(providerAccountDisabledModel)
+      .where(
+        inArray(providerAccountDisabledModel.providerAccountId, accountIds)
+      );
+
+    for (const entry of disabledEntries) {
+      const provider = accountIdToProvider.get(entry.providerAccountId);
+      if (!provider) continue;
+
+      const canonical = resolveModelAlias(entry.model);
+      const key = `${provider}:${canonical}`;
+      disabledCountByProviderModel.set(
+        key,
+        (disabledCountByProviderModel.get(key) ?? 0) + 1
+      );
+    }
+  }
+
+  return {
+    activeProviders,
+    accountCountByProvider,
+    disabledCountByProviderModel,
+  };
 }

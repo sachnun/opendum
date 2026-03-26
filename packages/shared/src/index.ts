@@ -82,12 +82,15 @@ export {
   getDisabledModelSetForUser,
   invalidateDisabledModelsCache,
   invalidateApiKeyValidationCache,
+  getAccountModelAvailability,
+  isModelUsableByAccounts,
   type ParsedModel,
   type ModelValidationResult,
   type ApiKeyModelAccessMode,
   type ApiKeyModelAccess,
   type ApiKeyAccountAccessMode,
   type ApiKeyAccountAccess,
+  type AccountModelAvailability,
 } from "./proxy/auth.js";
 
 // Proxy - Adaptive Timeout
