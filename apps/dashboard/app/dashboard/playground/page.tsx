@@ -4,6 +4,7 @@ import { disabledModel, providerAccount, proxyApiKey } from "@opendum/shared/db/
 import { eq, and, asc, desc } from "drizzle-orm";
 import { decrypt } from "@opendum/shared/encryption";
 import { getAllModels, getProvidersForModel, resolveModelAlias, getModelFamily } from "@opendum/shared/proxy/models";
+import { getAccountModelAvailability, isModelUsableByAccounts, type AccountModelAvailability } from "@opendum/shared/proxy/auth";
 import { PlaygroundClient } from "@/components/playground/client";
 import type {
   ModelOption,
@@ -11,8 +12,8 @@ import type {
 } from "@/components/playground/chat-panel";
 import type { ApiKeyOption } from "@/components/playground/client";
 
-// Get all models - one entry per model, filtered to only include providers the user has accounts for
-function getModels(disabledModels: Set<string>, userProviders: Set<string>): ModelOption[] {
+// Get all models - one entry per model, filtered to only include models with usable accounts
+function getModels(disabledModels: Set<string>, availability: AccountModelAvailability): ModelOption[] {
   const models: ModelOption[] = [];
 
   for (const modelName of getAllModels()) {
@@ -20,12 +21,12 @@ function getModels(disabledModels: Set<string>, userProviders: Set<string>): Mod
       continue;
     }
 
-    const providers = getProvidersForModel(modelName).filter((p) => userProviders.has(p));
-
-    // Skip models where the user has no provider account
-    if (providers.length === 0) {
+    // Skip models where all accounts have disabled them (or no active account exists)
+    if (!isModelUsableByAccounts(modelName, availability)) {
       continue;
     }
+
+    const providers = getProvidersForModel(modelName).filter((p) => availability.activeProviders.has(p));
 
     models.push({
       id: modelName,
@@ -67,10 +68,13 @@ export default async function PlaygroundPage({
 
   const { model: initialModelId } = await searchParams;
 
-  const disabledModels = await db
-    .select({ model: disabledModel.model })
-    .from(disabledModel)
-    .where(eq(disabledModel.userId, session.user.id));
+  const [disabledModels, availability] = await Promise.all([
+    db
+      .select({ model: disabledModel.model })
+      .from(disabledModel)
+      .where(eq(disabledModel.userId, session.user.id)),
+    getAccountModelAvailability(session.user.id),
+  ]);
   const disabledModelSet = new Set<string>(
     disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
@@ -91,8 +95,7 @@ export default async function PlaygroundPage({
     )
     .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
 
-  const userProviders = new Set(providerAccounts.map((a) => a.provider));
-  const models = getModels(disabledModelSet, userProviders);
+  const models = getModels(disabledModelSet, availability);
 
   // Get all active API keys for the playground key selector
   let apiKeyOptions: ApiKeyOption[] = [];
