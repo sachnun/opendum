@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Cell } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
 import type { RequestsByModelData } from "@/lib/actions/analytics";
@@ -52,9 +52,9 @@ export function RequestsByModelChart({ data }: Props) {
             data={transformedData}
             layout="vertical"
             margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+            barCategoryGap="20%"
           >
-            <CartesianGrid horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+            <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
             <YAxis
               type="category"
               dataKey="model"
@@ -63,13 +63,13 @@ export function RequestsByModelChart({ data }: Props) {
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => {
-                return value.length > 15 ? value.substring(0, 15) + "..." : value;
+                return value.length > 15 ? value.substring(0, 15) + "\u2026" : value;
               }}
             />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+            <Bar dataKey="count" radius={[0, 6, 6, 0]} maxBarSize={28}>
               {transformedData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
+                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.8} stroke="none" />
               ))}
             </Bar>
           </BarChart>
