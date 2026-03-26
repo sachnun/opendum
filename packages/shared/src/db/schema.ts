@@ -254,6 +254,36 @@ export const proxyApiKey = pgTable(
   ],
 );
 
+export const proxyApiKeyRateLimit = pgTable(
+  "proxy_api_key_rate_limit",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    apiKeyId: text("apiKeyId")
+      .notNull()
+      .references(() => proxyApiKey.id, { onDelete: "cascade" }),
+    target: text("target").notNull(),
+    targetType: text("targetType").notNull().default("model"),
+    perMinute: integer("perMinute"),
+    perHour: integer("perHour"),
+    perDay: integer("perDay"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("proxy_api_key_rate_limit_apiKeyId_idx").on(table.apiKeyId),
+    uniqueIndex("proxy_api_key_rate_limit_apiKeyId_target_targetType_idx").on(
+      table.apiKeyId,
+      table.target,
+      table.targetType,
+    ),
+  ],
+);
+
 export const usageLog = pgTable(
   "usage_log",
   {

@@ -12,6 +12,7 @@ export {
   providerAccountDisabledModel,
   disabledModel,
   proxyApiKey,
+  proxyApiKeyRateLimit,
   usageLog,
   type ProviderAccount,
 } from "./db/schema.js";
@@ -23,6 +24,7 @@ export {
   providerAccountErrorHistoryRelations,
   providerAccountDisabledModelRelations,
   proxyApiKeyRelations,
+  proxyApiKeyRateLimitRelations,
   usageLogRelations,
   disabledModelRelations,
 } from "./db/relations.js";
@@ -91,6 +93,7 @@ export {
   type ApiKeyAccountAccessMode,
   type ApiKeyAccountAccess,
   type AccountModelAvailability,
+  type RateLimitRule,
 } from "./proxy/auth.js";
 
 // Proxy - Adaptive Timeout

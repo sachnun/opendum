@@ -7,6 +7,7 @@ import {
   providerAccountErrorHistory,
   providerAccountDisabledModel,
   proxyApiKey,
+  proxyApiKeyRateLimit,
   usageLog,
   disabledModel,
 } from "./schema.js";
@@ -70,6 +71,17 @@ export const proxyApiKeyRelations = relations(
       references: [user.id],
     }),
     usageLogs: many(usageLog),
+    rateLimits: many(proxyApiKeyRateLimit),
+  }),
+);
+
+export const proxyApiKeyRateLimitRelations = relations(
+  proxyApiKeyRateLimit,
+  ({ one }) => ({
+    apiKey: one(proxyApiKey, {
+      fields: [proxyApiKeyRateLimit.apiKeyId],
+      references: [proxyApiKey.id],
+    }),
   }),
 );
 

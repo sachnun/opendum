@@ -1,5 +1,5 @@
 import { db } from "../db/index.js";
-import { proxyApiKey, disabledModel, usageLog, providerAccount, providerAccountDisabledModel } from "../db/schema.js";
+import { proxyApiKey, proxyApiKeyRateLimit, disabledModel, usageLog, providerAccount, providerAccountDisabledModel } from "../db/schema.js";
 import { eq, and, inArray } from "drizzle-orm";
 import { hashString } from "../encryption.js";
 import { bumpAnalyticsCacheVersionThrottled } from "../cache/analytics-cache.js";
@@ -84,6 +84,14 @@ const API_KEY_VALIDATION_NEGATIVE_TTL_SECONDS = 10;
 const API_KEY_LAST_USED_THROTTLE_SECONDS = 60;
 const DISABLED_MODELS_CACHE_TTL_SECONDS = 60;
 
+export interface RateLimitRule {
+  target: string;
+  targetType: "model" | "family";
+  perMinute: number | null;
+  perHour: number | null;
+  perDay: number | null;
+}
+
 interface ApiKeyValidationCacheValue {
   valid: boolean;
   userId?: string;
@@ -93,6 +101,7 @@ interface ApiKeyValidationCacheValue {
   accountAccessMode?: ApiKeyAccountAccessMode;
   accountAccessList?: string[];
   expiresAtMs?: number | null;
+  rateLimitRules?: RateLimitRule[];
   error?: string;
 }
 
@@ -479,6 +488,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   modelAccessList?: string[];
   accountAccessMode?: ApiKeyAccountAccessMode;
   accountAccessList?: string[];
+  rateLimitRules?: RateLimitRule[];
   error?: string;
 }> {
   if (!authHeader) {
@@ -525,6 +535,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
         accountAccessList: normalizeApiKeyAccountList(
           cachedValidation.accountAccessList ?? []
         ),
+        rateLimitRules: cachedValidation.rateLimitRules ?? [],
       };
     }
   }
@@ -565,6 +576,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
 
   // Check if key has expired
   if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    // Auto-disable expired key (fire-and-forget)
+    void db.update(proxyApiKey).set({ isActive: false }).where(eq(proxyApiKey.id, apiKey.id)).catch(() => {});
     await setCachedApiKeyValidation(
       keyHash,
       { valid: false, error: "API key has expired" },
@@ -572,6 +585,26 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     );
     return { valid: false, error: "API key has expired" };
   }
+
+  // Fetch rate limit rules for this API key
+  const rateLimitRows = await db
+    .select({
+      target: proxyApiKeyRateLimit.target,
+      targetType: proxyApiKeyRateLimit.targetType,
+      perMinute: proxyApiKeyRateLimit.perMinute,
+      perHour: proxyApiKeyRateLimit.perHour,
+      perDay: proxyApiKeyRateLimit.perDay,
+    })
+    .from(proxyApiKeyRateLimit)
+    .where(eq(proxyApiKeyRateLimit.apiKeyId, apiKey.id));
+
+  const rateLimitRules: RateLimitRule[] = rateLimitRows.map((row) => ({
+    target: row.target,
+    targetType: row.targetType as "model" | "family",
+    perMinute: row.perMinute,
+    perHour: row.perHour,
+    perDay: row.perDay,
+  }));
 
   const modelAccessMode = normalizeApiKeyModelAccessMode(apiKey.modelAccessMode);
   const modelAccessList = normalizeApiKeyModelList(apiKey.modelAccessList);
@@ -596,6 +629,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
       accountAccessMode,
       accountAccessList,
       expiresAtMs,
+      rateLimitRules,
     },
     cacheTtlSeconds
   );
@@ -610,6 +644,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     modelAccessList,
     accountAccessMode,
     accountAccessList,
+    rateLimitRules,
   };
 }
 
