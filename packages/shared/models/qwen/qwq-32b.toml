@@ -1,6 +1,15 @@
+release_date = "2025-04-15"
+reasoning = false
+tool_call = false
+attachment = false
+
+[cost]
+input = 0.25599999
+output = 0.30499999
+
 [limit]
 context = 128_000
-output = 4_096
+output = 32_768
 
 [modalities]
 input = ["text"]

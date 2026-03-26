@@ -30,16 +30,16 @@ export const SCENARIOS: Scenario[] = [
     id: "text",
     name: "Text",
     icon: MessageSquareText,
-    prompt: "Simple greeting scenario.",
+    prompt: "Write a short poem about the ocean.",
     isReasoning: false,
     messages: [
       {
         role: "system",
-        content: "You are a helpful assistant. Reply briefly and naturally.",
+        content: "You are a creative writing assistant. Write vivid, expressive text with a poetic tone. Keep responses concise.",
       },
       {
         role: "user",
-        content: "how are you",
+        content: "Write a short poem about the ocean.",
       },
     ],
   },
@@ -50,6 +50,18 @@ export const SCENARIOS: Scenario[] = [
     prompt:
       "Use available tools to get weather in Jakarta and convert 120 USD to IDR, then summarize in 3 bullets.",
     isReasoning: false,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant with access to external tools. When the user asks for real-time data such as weather or currency conversion, call the appropriate tool instead of guessing. After receiving tool results, summarize them clearly and concisely.",
+      },
+      {
+        role: "user",
+        content:
+          "Use available tools to get weather in Jakarta and convert 120 USD to IDR, then summarize in 3 bullets.",
+      },
+    ],
     requestOverrides: {
       stream: false,
       tool_choice: "auto",
@@ -97,6 +109,11 @@ export const SCENARIOS: Scenario[] = [
     isReasoning: false,
     messages: [
       {
+        role: "system",
+        content:
+          "You are a visual analysis assistant. When given an image, describe it concisely, identify key visible objects, and infer the likely context or setting of the scene.",
+      },
+      {
         role: "user",
         content: [
           {
@@ -106,7 +123,7 @@ export const SCENARIOS: Scenario[] = [
           {
             type: "image_url",
             image_url: {
-              url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/640px-Fronalpstock_big.jpg",
+              url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=640",
             },
           },
         ],
@@ -119,6 +136,18 @@ export const SCENARIOS: Scenario[] = [
     icon: Brain,
     prompt: "Think step by step: A farmer has 17 sheep. All but 9 run away. How many sheep does the farmer have left? Explain your reasoning.",
     isReasoning: true,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a logical reasoning assistant. Think through problems step by step, showing your chain of thought clearly before giving a final answer. Focus on accuracy and clarity.",
+      },
+      {
+        role: "user",
+        content:
+          "Think step by step: A farmer has 17 sheep. All but 9 run away. How many sheep does the farmer have left? Explain your reasoning.",
+      },
+    ],
   },
 ];
 

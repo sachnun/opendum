@@ -1,6 +1,6 @@
 import { db } from "../db/index.js";
-import { proxyApiKey, disabledModel, usageLog } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { proxyApiKey, proxyApiKeyRateLimit, disabledModel, usageLog, providerAccount, providerAccountDisabledModel } from "../db/schema.js";
+import { eq, and, inArray } from "drizzle-orm";
 import { hashString } from "../encryption.js";
 import { bumpAnalyticsCacheVersionThrottled } from "../cache/analytics-cache.js";
 import { getRedisClient } from "../redis.js";
@@ -37,11 +37,33 @@ export interface ApiKeyModelAccess {
   models: string[];
 }
 
+export type ApiKeyAccountAccessMode = "all" | "whitelist" | "blacklist";
+
+export interface ApiKeyAccountAccess {
+  mode: ApiKeyAccountAccessMode;
+  accounts: string[];
+}
+
 function normalizeApiKeyModelAccessMode(mode: string | null | undefined): ApiKeyModelAccessMode {
   if (mode === "whitelist" || mode === "blacklist") {
     return mode;
   }
   return "all";
+}
+
+function normalizeApiKeyAccountAccessMode(mode: string | null | undefined): ApiKeyAccountAccessMode {
+  if (mode === "whitelist" || mode === "blacklist") {
+    return mode;
+  }
+  return "all";
+}
+
+function normalizeApiKeyAccountList(accounts: string[]): string[] {
+  const normalized = accounts
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+
+  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
 }
 
 function normalizeApiKeyModelList(models: string[]): string[] {
@@ -62,13 +84,24 @@ const API_KEY_VALIDATION_NEGATIVE_TTL_SECONDS = 10;
 const API_KEY_LAST_USED_THROTTLE_SECONDS = 60;
 const DISABLED_MODELS_CACHE_TTL_SECONDS = 60;
 
+export interface RateLimitRule {
+  target: string;
+  targetType: "model" | "family";
+  perMinute: number | null;
+  perHour: number | null;
+  perDay: number | null;
+}
+
 interface ApiKeyValidationCacheValue {
   valid: boolean;
   userId?: string;
   apiKeyId?: string;
   modelAccessMode?: ApiKeyModelAccessMode;
   modelAccessList?: string[];
+  accountAccessMode?: ApiKeyAccountAccessMode;
+  accountAccessList?: string[];
   expiresAtMs?: number | null;
+  rateLimitRules?: RateLimitRule[];
   error?: string;
 }
 
@@ -143,6 +176,10 @@ async function getCachedApiKeyValidation(
       ? parsed.modelAccessList.filter((item): item is string => typeof item === "string")
       : [];
 
+    const accountAccessList = Array.isArray(parsed.accountAccessList)
+      ? parsed.accountAccessList.filter((item): item is string => typeof item === "string")
+      : [];
+
     if (parsed.valid) {
       if (!parsed.userId || !parsed.apiKeyId) {
         return null;
@@ -154,6 +191,8 @@ async function getCachedApiKeyValidation(
         apiKeyId: parsed.apiKeyId,
         modelAccessMode: normalizeApiKeyModelAccessMode(parsed.modelAccessMode),
         modelAccessList,
+        accountAccessMode: normalizeApiKeyAccountAccessMode(parsed.accountAccessMode),
+        accountAccessList,
         expiresAtMs:
           typeof parsed.expiresAtMs === "number" || parsed.expiresAtMs === null
             ? parsed.expiresAtMs
@@ -233,29 +272,59 @@ async function setCachedDisabledModels(userId: string, models: string[]): Promis
   }
 }
 
+// In-memory cache for disabled model Sets (avoids recreating Set from array each call)
+const disabledModelSetMemCache = new Map<string, { set: Set<string>; expiresAt: number }>();
+const DISABLED_MODELS_MEM_CACHE_TTL_MS = 10_000; // 10 seconds
+
+function getCachedDisabledModelSet(userId: string): Set<string> | null {
+  const entry = disabledModelSetMemCache.get(userId);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    disabledModelSetMemCache.delete(userId);
+    return null;
+  }
+  return entry.set;
+}
+
+function setCachedDisabledModelSet(userId: string, models: string[]): Set<string> {
+  const set = new Set(models);
+  disabledModelSetMemCache.set(userId, {
+    set,
+    expiresAt: Date.now() + DISABLED_MODELS_MEM_CACHE_TTL_MS,
+  });
+  return set;
+}
+
 async function isModelDisabledForUser(userId: string, model: string): Promise<boolean> {
+  const memCached = getCachedDisabledModelSet(userId);
+  if (memCached) return memCached.has(model);
+
   const cachedModels = await getCachedDisabledModels(userId);
   if (cachedModels) {
-    return new Set(cachedModels).has(model);
+    return setCachedDisabledModelSet(userId, cachedModels).has(model);
   }
 
   const disabledModels = await getDisabledModelsFromDatabase(userId);
   await setCachedDisabledModels(userId, disabledModels);
-  return new Set(disabledModels).has(model);
+  return setCachedDisabledModelSet(userId, disabledModels).has(model);
 }
 
 export async function getDisabledModelSetForUser(userId: string): Promise<Set<string>> {
+  const memCached = getCachedDisabledModelSet(userId);
+  if (memCached) return memCached;
+
   const cachedModels = await getCachedDisabledModels(userId);
   if (cachedModels) {
-    return new Set(cachedModels);
+    return setCachedDisabledModelSet(userId, cachedModels);
   }
 
   const disabledModels = await getDisabledModelsFromDatabase(userId);
   await setCachedDisabledModels(userId, disabledModels);
-  return new Set(disabledModels);
+  return setCachedDisabledModelSet(userId, disabledModels);
 }
 
 export async function invalidateDisabledModelsCache(userId: string): Promise<void> {
+  disabledModelSetMemCache.delete(userId);
   const redis = await getRedisClient();
 
   try {
@@ -417,6 +486,9 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   apiKeyId?: string;
   modelAccessMode?: ApiKeyModelAccessMode;
   modelAccessList?: string[];
+  accountAccessMode?: ApiKeyAccountAccessMode;
+  accountAccessList?: string[];
+  rateLimitRules?: RateLimitRule[];
   error?: string;
 }> {
   if (!authHeader) {
@@ -457,6 +529,13 @@ export async function validateApiKey(authHeader: string | null): Promise<{
         modelAccessList: normalizeApiKeyModelList(
           cachedValidation.modelAccessList ?? []
         ),
+        accountAccessMode: normalizeApiKeyAccountAccessMode(
+          cachedValidation.accountAccessMode
+        ),
+        accountAccessList: normalizeApiKeyAccountList(
+          cachedValidation.accountAccessList ?? []
+        ),
+        rateLimitRules: cachedValidation.rateLimitRules ?? [],
       };
     }
   }
@@ -470,6 +549,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
       expiresAt: proxyApiKey.expiresAt,
       modelAccessMode: proxyApiKey.modelAccessMode,
       modelAccessList: proxyApiKey.modelAccessList,
+      accountAccessMode: proxyApiKey.accountAccessMode,
+      accountAccessList: proxyApiKey.accountAccessList,
     })
     .from(proxyApiKey)
     .where(eq(proxyApiKey.keyHash, keyHash))
@@ -495,6 +576,8 @@ export async function validateApiKey(authHeader: string | null): Promise<{
 
   // Check if key has expired
   if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    // Auto-disable expired key (fire-and-forget)
+    void db.update(proxyApiKey).set({ isActive: false }).where(eq(proxyApiKey.id, apiKey.id)).catch(() => {});
     await setCachedApiKeyValidation(
       keyHash,
       { valid: false, error: "API key has expired" },
@@ -503,8 +586,30 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     return { valid: false, error: "API key has expired" };
   }
 
+  // Fetch rate limit rules for this API key
+  const rateLimitRows = await db
+    .select({
+      target: proxyApiKeyRateLimit.target,
+      targetType: proxyApiKeyRateLimit.targetType,
+      perMinute: proxyApiKeyRateLimit.perMinute,
+      perHour: proxyApiKeyRateLimit.perHour,
+      perDay: proxyApiKeyRateLimit.perDay,
+    })
+    .from(proxyApiKeyRateLimit)
+    .where(eq(proxyApiKeyRateLimit.apiKeyId, apiKey.id));
+
+  const rateLimitRules: RateLimitRule[] = rateLimitRows.map((row) => ({
+    target: row.target,
+    targetType: row.targetType as "model" | "family",
+    perMinute: row.perMinute,
+    perHour: row.perHour,
+    perDay: row.perDay,
+  }));
+
   const modelAccessMode = normalizeApiKeyModelAccessMode(apiKey.modelAccessMode);
   const modelAccessList = normalizeApiKeyModelList(apiKey.modelAccessList);
+  const accountAccessMode = normalizeApiKeyAccountAccessMode(apiKey.accountAccessMode);
+  const accountAccessList = normalizeApiKeyAccountList(apiKey.accountAccessList);
   const expiresAtMs = apiKey.expiresAt ? apiKey.expiresAt.getTime() : null;
 
   let cacheTtlSeconds = API_KEY_VALIDATION_POSITIVE_TTL_SECONDS;
@@ -521,7 +626,10 @@ export async function validateApiKey(authHeader: string | null): Promise<{
       apiKeyId: apiKey.id,
       modelAccessMode,
       modelAccessList,
+      accountAccessMode,
+      accountAccessList,
       expiresAtMs,
+      rateLimitRules,
     },
     cacheTtlSeconds
   );
@@ -534,6 +642,9 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     apiKeyId: apiKey.id,
     modelAccessMode,
     modelAccessList,
+    accountAccessMode,
+    accountAccessList,
+    rateLimitRules,
   };
 }
 
@@ -567,4 +678,125 @@ export async function logUsage(params: {
   } catch (error) {
     console.error("Failed to log usage:", error);
   }
+}
+
+/**
+ * Account-level model availability data for a user.
+ */
+export interface AccountModelAvailability {
+  /** Set of provider names where the user has at least one active account. */
+  activeProviders: Set<string>;
+  /**
+   * For each provider, the number of active accounts.
+   * Used together with `disabledCountByProviderModel` to determine whether
+   * ALL accounts for a provider have disabled a particular model.
+   */
+  accountCountByProvider: Map<string, number>;
+  /**
+   * Map of `"provider:model"` → number of active accounts that have disabled that model.
+   */
+  disabledCountByProviderModel: Map<string, number>;
+}
+
+/**
+ * Check whether a model has at least one usable active account across its supporting providers.
+ *
+ * A model is "usable" if there exists at least one provider P such that:
+ *   - P supports the model, AND
+ *   - The user has at least one active account for P that has NOT disabled
+ *     the model at the per-account level.
+ */
+export function isModelUsableByAccounts(
+  model: string,
+  availability: AccountModelAvailability
+): boolean {
+  const canonical = resolveModelAlias(model);
+  const providers = getProvidersForModel(canonical);
+
+  for (const provider of providers) {
+    const totalAccounts = availability.accountCountByProvider.get(provider) ?? 0;
+    if (totalAccounts === 0) continue;
+
+    const key = `${provider}:${canonical}`;
+    const disabledCount = availability.disabledCountByProviderModel.get(key) ?? 0;
+
+    // At least one account for this provider has NOT disabled the model
+    if (disabledCount < totalAccounts) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Fetch account-level model availability data for a user.
+ *
+ * Queries active provider accounts and their per-account disabled models,
+ * then builds a structure that allows efficient per-model availability checks
+ * via `isModelUsableByAccounts()`.
+ */
+export async function getAccountModelAvailability(
+  userId: string
+): Promise<AccountModelAvailability> {
+  // 1. Get all active accounts (id + provider)
+  const activeAccounts = await db
+    .select({
+      id: providerAccount.id,
+      provider: providerAccount.provider,
+    })
+    .from(providerAccount)
+    .where(
+      and(
+        eq(providerAccount.userId, userId),
+        eq(providerAccount.isActive, true)
+      )
+    );
+
+  const activeProviders = new Set<string>();
+  const accountCountByProvider = new Map<string, number>();
+  const accountIdToProvider = new Map<string, string>();
+
+  for (const acc of activeAccounts) {
+    activeProviders.add(acc.provider);
+    accountCountByProvider.set(
+      acc.provider,
+      (accountCountByProvider.get(acc.provider) ?? 0) + 1
+    );
+    accountIdToProvider.set(acc.id, acc.provider);
+  }
+
+  // 2. Get per-account disabled models for all active accounts
+  const disabledCountByProviderModel = new Map<string, number>();
+
+  if (activeAccounts.length > 0) {
+    const accountIds = activeAccounts.map((a) => a.id);
+    const disabledEntries = await db
+      .select({
+        providerAccountId: providerAccountDisabledModel.providerAccountId,
+        model: providerAccountDisabledModel.model,
+      })
+      .from(providerAccountDisabledModel)
+      .where(
+        inArray(providerAccountDisabledModel.providerAccountId, accountIds)
+      );
+
+    for (const entry of disabledEntries) {
+      const provider = accountIdToProvider.get(entry.providerAccountId);
+      if (!provider) continue;
+
+      const canonical = resolveModelAlias(entry.model);
+      const key = `${provider}:${canonical}`;
+      disabledCountByProviderModel.set(
+        key,
+        (disabledCountByProviderModel.get(key) ?? 0) + 1
+      );
+    }
+  }
+
+  return {
+    activeProviders,
+    accountCountByProvider,
+    disabledCountByProviderModel,
+  };
 }

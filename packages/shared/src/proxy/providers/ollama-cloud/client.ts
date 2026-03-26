@@ -14,6 +14,7 @@ import {
   OLLAMA_CLOUD_SUPPORTED_PARAMS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
+import { convertImageUrlsToBase64 } from "../../image-utils.js";
 
 const API_KEY_ACCOUNT_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -97,9 +98,13 @@ export const ollamaCloudProvider: Provider = {
   ): Promise<Response> {
     const upstreamModel = resolveOllamaCloudModel(body.model);
 
+    // Ollama Cloud rejects image URLs — convert to base64 data URIs
+    const messages = await convertImageUrlsToBase64(body.messages);
+
     const requestPayload = buildRequestPayload(
       {
         ...body,
+        messages,
         model: upstreamModel,
       },
       stream

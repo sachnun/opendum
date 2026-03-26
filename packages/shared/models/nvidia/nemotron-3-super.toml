@@ -1,3 +1,16 @@
+release_date = "2026-03-11"
+reasoning = true
+tool_call = true
+attachment = false
+
+[limit]
+context = 262_144
+output = 65_536
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "NVIDIA"
 providers = ["ollama_cloud"]

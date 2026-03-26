@@ -293,8 +293,47 @@ function extractWorkspaceIdFromJwt(token: string): string | null {
 }
 
 /**
+ * Convert a Chat Completions `image_url` content block to a Responses API `input_image` block.
+ *
+ * Chat Completions format:
+ *   { type: "image_url", image_url: { url: "...", detail?: "..." } }
+ *
+ * Responses API format:
+ *   { type: "input_image", image_url: "...", detail?: "..." }
+ */
+function convertImageUrlBlock(
+  block: { type: string; [key: string]: unknown }
+): { type: string; [key: string]: unknown } {
+  const imageUrlValue = block.image_url;
+
+  // Already a flat string – just change the type
+  if (typeof imageUrlValue === "string") {
+    const { image_url, ...rest } = block;
+    return { ...rest, type: "input_image", image_url };
+  }
+
+  // Nested object { url: "...", detail?: "..." }
+  if (imageUrlValue && typeof imageUrlValue === "object") {
+    const nested = imageUrlValue as Record<string, unknown>;
+    const url = typeof nested.url === "string" ? nested.url : "";
+    const detail = nested.detail ?? block.detail;
+    const { image_url: _img, detail: _det, ...rest } = block;
+    return {
+      ...rest,
+      type: "input_image",
+      image_url: url,
+      ...(detail !== undefined ? { detail } : {}),
+    };
+  }
+
+  // Fallback – just swap the type
+  return { ...block, type: "input_image" };
+}
+
+/**
  * Convert Chat Completions content block types to Responses API types.
  * Chat Completions uses "text" while Responses API requires "input_text" or "output_text".
+ * Chat Completions uses "image_url" while Responses API requires "input_image".
  */
 function convertContentBlockTypes(
   content: Array<{ type: string; [key: string]: unknown }>,
@@ -304,6 +343,9 @@ function convertContentBlockTypes(
   return content.map((block) => {
     if (block.type === "text") {
       return { ...block, type: targetTextType };
+    }
+    if (block.type === "image_url") {
+      return convertImageUrlBlock(block);
     }
     return block;
   });
@@ -486,6 +528,7 @@ function convertTools(
 /**
  * Normalize content block types within a message's content array.
  * Converts Chat Completions "text" type to Responses API "input_text" or "output_text".
+ * Converts Chat Completions "image_url" type to Responses API "input_image".
  */
 function normalizeContentBlockTypes(
   content: unknown,
@@ -494,8 +537,12 @@ function normalizeContentBlockTypes(
   if (!Array.isArray(content)) return content;
   const targetTextType = role === "assistant" ? "output_text" : "input_text";
   return content.map((block: Record<string, unknown>) => {
-    if (block && typeof block === "object" && block.type === "text") {
+    if (!block || typeof block !== "object") return block;
+    if (block.type === "text") {
       return { ...block, type: targetTextType };
+    }
+    if (block.type === "image_url") {
+      return convertImageUrlBlock(block as { type: string; [key: string]: unknown });
     }
     return block;
   });

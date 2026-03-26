@@ -1,7 +1,7 @@
 "use client";
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { AreaChart, Area, XAxis, YAxis } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
 import type { SuccessRateData, Granularity } from "@/lib/actions/analytics";
 
@@ -58,7 +58,16 @@ export function SuccessRateChart({ data, granularity }: Props) {
       ) : (
         <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[250px]">
           <AreaChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid vertical={false} />
+            <defs>
+              <linearGradient id="fillSuccess" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-success)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--color-success)" stopOpacity={0.01} />
+              </linearGradient>
+              <linearGradient id="fillError" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-error)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--color-error)" stopOpacity={0.01} />
+              </linearGradient>
+            </defs>
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10 }}
@@ -68,31 +77,34 @@ export function SuccessRateChart({ data, granularity }: Props) {
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               tickLine={false}
               axisLine={false}
+              width={40}
             />
             <ChartTooltip
               content={<ChartTooltipContent />}
               labelFormatter={(value) => formatTooltipLabel(value, granularity)}
             />
-            <Legend />
             <Area
-              type="monotone"
+              type="natural"
               dataKey="success"
               stackId="1"
               stroke="var(--color-success)"
-              fill="var(--color-success)"
-              fillOpacity={0.6}
+              strokeWidth={1.5}
+              fill="url(#fillSuccess)"
+              fillOpacity={1}
             />
             <Area
-              type="monotone"
+              type="natural"
               dataKey="error"
               stackId="1"
               stroke="var(--color-error)"
-              fill="var(--color-error)"
-              fillOpacity={0.6}
+              strokeWidth={1.5}
+              fill="url(#fillError)"
+              fillOpacity={1}
             />
+            <ChartLegend content={<ChartLegendContent />} />
           </AreaChart>
         </ChartContainer>
       )}

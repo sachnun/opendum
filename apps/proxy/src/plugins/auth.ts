@@ -2,6 +2,8 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import {
   validateApiKey,
   type ApiKeyModelAccessMode,
+  type ApiKeyAccountAccessMode,
+  type RateLimitRule,
 } from "@opendum/shared";
 
 export interface AuthenticatedUser {
@@ -9,6 +11,9 @@ export interface AuthenticatedUser {
   apiKeyId?: string;
   modelAccessMode: ApiKeyModelAccessMode;
   modelAccessList: string[];
+  accountAccessMode: ApiKeyAccountAccessMode;
+  accountAccessList: string[];
+  rateLimitRules: RateLimitRule[];
 }
 
 /**
@@ -51,5 +56,8 @@ export async function authenticateRequest(
     apiKeyId: authResult.apiKeyId,
     modelAccessMode: authResult.modelAccessMode ?? "all",
     modelAccessList: authResult.modelAccessList ?? [],
+    accountAccessMode: authResult.accountAccessMode ?? "all",
+    accountAccessList: authResult.accountAccessList ?? [],
+    rateLimitRules: authResult.rateLimitRules ?? [],
   };
 }

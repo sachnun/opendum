@@ -1,11 +1,20 @@
-release_date = "2025-09-22"
+release_date = "2025-04"
+knowledge = "2025-04"
 reasoning = true
 tool_call = true
-attachment = true
+attachment = false
+
+[cost]
+input = 0.7
+output = 2.8
 
 [limit]
-context = 262_144
+context = 131_072
 output = 32_768
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
 
 [opendum]
 family = "Qwen"

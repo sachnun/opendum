@@ -1,6 +1,6 @@
 "use client";
 
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
 import type { DurationOverTimeData, Granularity } from "@/lib/actions/analytics";
@@ -80,7 +80,7 @@ function DurationTooltip({ active, payload, label, granularity }: DurationToolti
   }
 
   return (
-    <div className="border-border/50 bg-background grid min-w-[11rem] gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl">
+    <div className="border-border/40 bg-background/80 backdrop-blur-md grid min-w-[11rem] gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-lg">
       <div className="font-medium">{formatTooltipLabel(label || point.date, granularity)}</div>
       <div className="grid gap-1">
         <div className="flex items-center justify-between gap-3">
@@ -111,8 +111,13 @@ export function DurationPercentilesChart({ data, granularity }: Props) {
         <EmptyChart />
       ) : (
         <ChartContainer config={chartConfig} className="h-[230px] w-full sm:h-[250px]">
-          <LineChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid vertical={false} />
+          <AreaChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <defs>
+              <linearGradient id="fillDuration" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-avg)" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="var(--color-avg)" stopOpacity={0.01} />
+              </linearGradient>
+            </defs>
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10 }}
@@ -124,7 +129,8 @@ export function DurationPercentilesChart({ data, granularity }: Props) {
             <YAxis
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
+              width={48}
               tickFormatter={(value) => {
                 if (value >= 1000) {
                   return `${(value / 1000).toFixed(1)}s`;
@@ -134,15 +140,17 @@ export function DurationPercentilesChart({ data, granularity }: Props) {
               }}
             />
             <ChartTooltip content={<DurationTooltip granularity={granularity} />} />
-            <Line
-              type="monotone"
+            <Area
+              type="natural"
               dataKey="avg"
               stroke="var(--color-avg)"
-              strokeWidth={2.5}
+              strokeWidth={1.5}
+              fill="url(#fillDuration)"
+              fillOpacity={1}
               dot={false}
-              activeDot={{ r: 4 }}
+              activeDot={{ r: 3.5, strokeWidth: 0 }}
             />
-          </LineChart>
+          </AreaChart>
         </ChartContainer>
       )}
     </ChartCard>

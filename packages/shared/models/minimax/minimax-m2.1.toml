@@ -3,14 +3,21 @@ reasoning = true
 tool_call = true
 attachment = false
 
+[cost]
+input = 0.34
+output = 1.34
+
 [limit]
 context = 204_800
 output = 131_072
 
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "MiniMax"
-providers = ["iflow", "kiro", "nvidia_nim", "ollama_cloud"]
+providers = ["iflow", "kiro", "ollama_cloud"]
 
 [opendum.upstream]
 kiro = "minimax-m2.1"
-nvidia_nim = "minimaxai/minimax-m2.1"

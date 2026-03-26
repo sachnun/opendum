@@ -1,3 +1,20 @@
+release_date = "2025-08-26"
+reasoning = true
+tool_call = false
+attachment = true
+
+[cost]
+input = 0.5
+output = 6
+
+[limit]
+context = 32_768
+output = 32_768
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
+
 [opendum]
 family = "Qwen"
 providers = []

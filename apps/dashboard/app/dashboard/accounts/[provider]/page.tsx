@@ -1,17 +1,16 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { providerAccount, usageLog } from "@opendum/shared/db/schema";
+import { providerAccount, providerAccountDisabledModel, usageLog } from "@opendum/shared/db/schema";
 import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
 import {
   type ProviderAccountKey,
   PROVIDER_ACCOUNT_BY_KEY,
   getProviderFromSlug,
-  getProviderSuccessMessage,
 } from "@/lib/provider-accounts";
 import { getProviderModelSet } from "@opendum/shared/proxy/models";
 
@@ -186,6 +185,25 @@ export default async function ProviderAccountsPage({
 
   const providerModels = Array.from(getProviderModelSet(selectedProvider)).sort();
 
+  // Query per-account disabled models
+  const disabledModelsByAccountId: Record<string, string[]> = {};
+  if (accountIds.length > 0) {
+    const disabledModelRows = await db
+      .select({
+        providerAccountId: providerAccountDisabledModel.providerAccountId,
+        model: providerAccountDisabledModel.model,
+      })
+      .from(providerAccountDisabledModel)
+      .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds));
+
+    for (const row of disabledModelRows) {
+      if (!disabledModelsByAccountId[row.providerAccountId]) {
+        disabledModelsByAccountId[row.providerAccountId] = [];
+      }
+      disabledModelsByAccountId[row.providerAccountId].push(row.model);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="relative">
@@ -195,7 +213,7 @@ export default async function ProviderAccountsPage({
               <div className="border-b border-border pb-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold">{providerMeta.label} Accounts</h2>
+                    <h2 className="text-xl font-semibold">{providerMeta.label}</h2>
                   </div>
                   <div className="flex w-full items-center gap-2 sm:w-auto">
                     <AddAccountDialog
@@ -211,18 +229,11 @@ export default async function ProviderAccountsPage({
         <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
 
-      {queryParams.success && (
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>{getProviderSuccessMessage(queryParams.success)}</AlertDescription>
-        </Alert>
-      )}
-
       {queryParams.error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to connect account: {decodeURIComponent(queryParams.error)}
+            Failed to connect: {decodeURIComponent(queryParams.error)}
           </AlertDescription>
         </Alert>
       )}
@@ -241,6 +252,7 @@ export default async function ProviderAccountsPage({
         groqAccounts={groupedAccounts.groq}
         visibleProviders={[selectedProvider]}
         supportedModelsByProvider={{ [selectedProvider]: providerModels }}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     </div>
   );

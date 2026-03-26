@@ -131,18 +131,20 @@ export function ModelCard({
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
             {copied ? "Copied" : "Copy"}
           </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="h-5 px-1.5 text-[11px]"
-            asChild
-            title="Try in Playground"
-          >
-            <Link href={`/dashboard/playground?model=${encodeURIComponent(id)}`}>
-              <Play className="h-3 w-3" />
-              Play
-            </Link>
-          </Button>
+          {isEnabled && (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-5 px-1.5 text-[11px]"
+              asChild
+              title="Try in Playground"
+            >
+              <Link href={`/dashboard/playground?model=${encodeURIComponent(id)}`}>
+                <Play className="h-3 w-3" />
+                Play
+              </Link>
+            </Button>
+          )}
         </div>
       </CardHeader>
 

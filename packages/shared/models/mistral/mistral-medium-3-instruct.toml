@@ -1,3 +1,21 @@
+release_date = "2025-08-12"
+knowledge = "2025-05"
+reasoning = false
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.4
+output = 2
+
+[limit]
+context = 262_144
+output = 262_144
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
+
 [opendum]
 family = "Mistral"
 providers = ["nvidia_nim"]

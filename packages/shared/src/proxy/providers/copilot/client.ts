@@ -26,7 +26,8 @@ import {
   COPILOT_DEVICE_CODE_EXPIRY,
   COPILOT_REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
-import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
+import { getUpstreamModelName, getProviderModelSet, MODEL_REGISTRY, resolveModelAlias } from "../../models.js";
+import { convertImageUrlsToBase64, convertResponsesInputImageUrlsToBase64 } from "../../image-utils.js";
 import {
   convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
@@ -96,11 +97,23 @@ function resolveCopilotModel(model: string): string {
 }
 
 /**
+ * Check if a model is a reasoning model based on the TOML registry metadata.
+ * Non-reasoning models (e.g. gpt-4.1) do not accept reasoning_effort or reasoning params.
+ */
+function isReasoningModel(model: string): boolean {
+  const canonical = resolveModelAlias(model);
+  const info = MODEL_REGISTRY[canonical];
+  return !!info?.meta?.reasoning;
+}
+
+/**
  * Check if a model requires the Responses API on GitHub Copilot.
- * Codex models are not accessible via /chat/completions on Copilot's API.
+ * Codex models and gpt-5.4+ are not accessible via /chat/completions
+ * on Copilot's API.
  */
 function requiresCopilotResponsesApi(model: string): boolean {
-  return model.toLowerCase().includes("codex");
+  const lower = model.toLowerCase();
+  return lower.includes("codex") || lower.startsWith("gpt-5.4");
 }
 
 /**
@@ -796,6 +809,22 @@ export const copilotProvider: Provider = {
     const modelName = body.model.includes("/") ? body.model.split("/").pop()! : body.model;
     const upstreamModel = resolveCopilotModel(modelName);
     const xInitiator = body._copilotXInitiator === "agent" ? "agent" : "user";
+
+    // Copilot rejects external image URLs — convert to base64 data URIs.
+    // Must happen before isCopilotVisionRequest() so the vision header is
+    // still set correctly (data URIs are still detected as image content).
+    if (Array.isArray(body.messages)) {
+      body = { ...body, messages: await convertImageUrlsToBase64(body.messages) };
+    }
+    if (Array.isArray(body._responsesInput) && body._responsesInput.length > 0) {
+      body = {
+        ...body,
+        _responsesInput: await convertResponsesInputImageUrlsToBase64(
+          body._responsesInput as Array<Record<string, unknown>>
+        ),
+      };
+    }
+
     const visionRequest = isCopilotVisionRequest(body);
 
     const fallbackMs = stream
@@ -859,13 +888,14 @@ export const copilotProvider: Provider = {
     }
 
     // Regular models: use Chat Completions endpoint
-    const requestPayload = buildRequestPayload(
-      {
-        ...body,
-        model: upstreamModel,
-      },
-      stream
-    );
+    // Strip reasoning params for non-reasoning models (e.g. gpt-4.1) to avoid
+    // "Unrecognized request argument" errors from the Copilot API.
+    const chatBody: Record<string, unknown> = { ...body, model: upstreamModel };
+    if (!isReasoningModel(modelName)) {
+      delete chatBody.reasoning_effort;
+      delete chatBody.reasoning;
+    }
+    const requestPayload = buildRequestPayload(chatBody, stream);
 
     return fetchWithTimeout(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",

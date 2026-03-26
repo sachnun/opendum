@@ -69,6 +69,7 @@ export function ModelDistributionChart({ data }: Props) {
                 const item = data.find((d) => d.model === name);
                 return [`${value} (${item?.percentage}%)`, name];
               }}
+              wrapperClassName="backdrop-blur-md"
             />
             <Legend
               layout="horizontal"

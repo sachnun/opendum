@@ -1,3 +1,17 @@
+release_date = "2025-07-09"
+knowledge = "2025-06"
+reasoning = false
+tool_call = false
+attachment = false
+
+[limit]
+context = 32_768
+output = 32_768
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "Cognitive Computations"
 providers = ["openrouter"]

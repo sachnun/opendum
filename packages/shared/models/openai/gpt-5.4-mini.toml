@@ -1,2 +1,21 @@
+release_date = "2026-03-17"
+knowledge = "2025-08-31"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.75
+output = 4.5
+
+[limit]
+context = 400_000
+output = 128_000
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
+
 [opendum]
+family = "OpenAI"
 providers = ["copilot"]

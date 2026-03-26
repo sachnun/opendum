@@ -1,3 +1,21 @@
+release_date = "2024-07-01"
+knowledge = "2024-07"
+reasoning = false
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.15
+output = 0.15
+
+[limit]
+context = 128_000
+output = 128_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "Mistral"
 providers = ["nvidia_nim"]

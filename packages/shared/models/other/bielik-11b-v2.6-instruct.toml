@@ -1,6 +1,25 @@
+release_date = "2025-03-13"
+knowledge = "2025-03"
+reasoning = false
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.67
+output = 0.67
+
+[limit]
+context = 32_000
+output = 32_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "Bielik"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "speakleash/bielik-11b-v2.6-instruct"

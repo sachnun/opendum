@@ -1,3 +1,20 @@
+release_date = "2025-04-01"
+reasoning = false
+tool_call = false
+attachment = false
+
+[cost]
+input = 0.7
+output = 0.7
+
+[limit]
+context = 32_768
+output = 32_768
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "Mistral"
 providers = ["nvidia_nim", "groq"]

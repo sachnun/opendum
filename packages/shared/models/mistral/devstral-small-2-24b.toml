@@ -1,11 +1,20 @@
-release_date = "2025-12-09"
+release_date = "2025-07-10"
+knowledge = "2025-05"
 reasoning = false
 tool_call = true
-attachment = true
+attachment = false
+
+[cost]
+input = 0.1
+output = 0.3
 
 [limit]
-context = 262_144
-output = 262_144
+context = 128_000
+output = 128_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
 
 [opendum]
 family = "Mistral"

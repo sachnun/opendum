@@ -238,6 +238,32 @@ export function formatModelsForOpenAI(): Array<{
 }
 
 /**
+ * Get the full ModelInfo for a model from the TOML registry.
+ * Returns undefined if the model is not found.
+ */
+export function getModelInfo(modelId: string): ModelInfo | undefined {
+  const canonical = resolveModelAlias(modelId);
+  return EFFECTIVE_MODEL_REGISTRY[canonical];
+}
+
+/**
+ * Check whether a model supports vision (image input).
+ * A model is considered vision-capable if:
+ *   - `meta.vision` is true (from `attachment = true` in TOML), OR
+ *   - `meta.modalities.input` includes "image"
+ */
+export function isVisionModel(modelId: string): boolean {
+  const info = getModelInfo(modelId);
+  if (!info?.meta) return false;
+
+  if (info.meta.vision === true) return true;
+
+  if (info.meta.modalities?.input?.includes("image")) return true;
+
+  return false;
+}
+
+/**
  * Get the family of a model from the TOML registry.
  * Returns undefined if the model is not found or has no family set.
  */

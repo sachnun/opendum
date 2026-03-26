@@ -1,8 +1,9 @@
 import { db } from "@opendum/shared/db";
-import { providerAccount, providerAccountErrorHistory } from "@opendum/shared/db/schema";
+import { providerAccount, providerAccountErrorHistory, providerAccountDisabledModel } from "@opendum/shared/db/schema";
 import { eq, and, inArray, notInArray, asc, desc, sql } from "drizzle-orm";
 import type { ProviderAccount } from "@opendum/shared/db/schema";
-import { getProvidersForModel } from "@opendum/shared/proxy/models";
+import type { ApiKeyAccountAccess } from "@opendum/shared/proxy/auth";
+import { getProvidersForModel, resolveModelAlias, getModelLookupKeys } from "@opendum/shared/proxy/models";
 import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit.js";
 
 const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
@@ -77,12 +78,14 @@ export async function getNextAccount(
  * @param model Model name
  * @param provider Optional specific provider
  * @param excludeAccountIds Account IDs to exclude (already tried this request)
+ * @param accountAccess Optional API key account access rules (whitelist/blacklist)
  */
 export async function getNextAvailableAccount(
   userId: string,
   model: string,
   provider: string | null = null,
-  excludeAccountIds: string[] = []
+  excludeAccountIds: string[] = [],
+  accountAccess?: ApiKeyAccountAccess
 ): Promise<ProviderAccount | null> {
   let targetProviders: string[];
 
@@ -107,6 +110,15 @@ export async function getNextAvailableAccount(
     whereConditions.push(notInArray(providerAccount.id, excludeAccountIds));
   }
 
+  // Apply account access rules (whitelist/blacklist) from API key
+  if (accountAccess && accountAccess.mode !== "all" && accountAccess.accounts.length > 0) {
+    if (accountAccess.mode === "whitelist") {
+      whereConditions.push(inArray(providerAccount.id, accountAccess.accounts));
+    } else if (accountAccess.mode === "blacklist") {
+      whereConditions.push(notInArray(providerAccount.id, accountAccess.accounts));
+    }
+  }
+
   const accounts = await db
     .select()
     .from(providerAccount)
@@ -121,11 +133,38 @@ export async function getNextAvailableAccount(
     return null;
   }
 
+  // Filter out accounts that have this model disabled at the per-account level
+  const modelLookupKeys = getModelLookupKeys(resolveModelAlias(model));
+  const disabledEntries = await db
+    .select({ providerAccountId: providerAccountDisabledModel.providerAccountId })
+    .from(providerAccountDisabledModel)
+    .where(
+      and(
+        inArray(
+          providerAccountDisabledModel.providerAccountId,
+          accounts.map((a) => a.id)
+        ),
+        inArray(providerAccountDisabledModel.model, modelLookupKeys)
+      )
+    );
+
+  const modelDisabledAccountIds = new Set(
+    disabledEntries.map((e) => e.providerAccountId)
+  );
+
+  const eligibleAccounts = modelDisabledAccountIds.size > 0
+    ? accounts.filter((a) => !modelDisabledAccountIds.has(a.id))
+    : accounts;
+
+  if (eligibleAccounts.length === 0) {
+    return null;
+  }
+
   const rateLimitScope = getRateLimitScope(model);
 
   // Separate paid and free accounts (both already sorted by status then LRU)
-  const paidAccounts = accounts.filter((a) => a.tier === "paid");
-  const freeAccounts = accounts.filter((a) => a.tier !== "paid");
+  const paidAccounts = eligibleAccounts.filter((a) => a.tier === "paid");
+  const freeAccounts = eligibleAccounts.filter((a) => a.tier !== "paid");
 
   // Prioritize paid accounts first, then free accounts
   let selectedAccount: ProviderAccount | null = null;

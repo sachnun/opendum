@@ -9,8 +9,10 @@ export {
   verification,
   providerAccount,
   providerAccountErrorHistory,
+  providerAccountDisabledModel,
   disabledModel,
   proxyApiKey,
+  proxyApiKeyRateLimit,
   usageLog,
   type ProviderAccount,
 } from "./db/schema.js";
@@ -20,7 +22,9 @@ export {
   accountRelations,
   providerAccountRelations,
   providerAccountErrorHistoryRelations,
+  providerAccountDisabledModelRelations,
   proxyApiKeyRelations,
+  proxyApiKeyRateLimitRelations,
   usageLogRelations,
   disabledModelRelations,
 } from "./db/relations.js";
@@ -63,6 +67,8 @@ export {
   getUpstreamModelName,
   getModelLookupKeys,
   formatModelsForOpenAI,
+  getModelInfo,
+  isVisionModel,
   getModelFamily,
   getAllFamilies,
   getModelsByFamily,
@@ -78,14 +84,23 @@ export {
   getDisabledModelSetForUser,
   invalidateDisabledModelsCache,
   invalidateApiKeyValidationCache,
+  getAccountModelAvailability,
+  isModelUsableByAccounts,
   type ParsedModel,
   type ModelValidationResult,
   type ApiKeyModelAccessMode,
   type ApiKeyModelAccess,
+  type ApiKeyAccountAccessMode,
+  type ApiKeyAccountAccess,
+  type AccountModelAvailability,
+  type RateLimitRule,
 } from "./proxy/auth.js";
 
 // Proxy - Adaptive Timeout
 export { getAdaptiveTimeout, recordLatency } from "./proxy/adaptive-timeout.js";
+
+// Proxy - Message Sanitizer
+export { stripImageContent } from "./proxy/message-sanitizer.js";
 
 // Proxy - Timeout
 export { fetchWithTimeout, type OnTTFBCallback } from "./proxy/timeout.js";

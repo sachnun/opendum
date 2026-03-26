@@ -63,6 +63,7 @@ import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
+import { setAccountModelEnabled } from "@/lib/actions/account-models";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 
 type AccountQuotaInfo =
@@ -120,6 +121,7 @@ interface AccountsListProps {
   groqAccounts: Account[];
   visibleProviders?: ProviderAccountKey[];
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
+  disabledModelsByAccountId?: Record<string, string[]>;
 }
 
 function formatTierLabel(tier: string): string {
@@ -434,7 +436,6 @@ function LastErrorMessageDialog({
     try {
       await navigator.clipboard.writeText(message);
       setCopied(true);
-      toast.success("Error details copied");
       setTimeout(() => setCopied(false), 1500);
     } catch {
       toast.error("Failed to copy error details");
@@ -448,7 +449,6 @@ function LastErrorMessageDialog({
       if (!result.success) {
         throw new Error(result.error);
       }
-      toast.success("Account errors resolved");
       setIsOpen(false);
       window.dispatchEvent(new CustomEvent(PROVIDER_ACCOUNTS_REFRESH_EVENT));
     } catch (error) {
@@ -589,25 +589,20 @@ function LastErrorMessageDialog({
                       : entry.errorMessage;
 
                   return (
-                    <details key={entry.id} className="rounded-md border bg-background/70 p-2">
-                      <summary className="cursor-pointer break-words text-xs text-foreground">
-                        <span className="font-medium">{relativeTime}</span>
-                        <span className="mx-1 text-muted-foreground">-</span>
-                        <span className="font-mono text-[11px] text-muted-foreground">{codeLabel}</span>
-                        <span className="mx-1 text-muted-foreground">-</span>
-                        <span className="text-muted-foreground">{previewText}</span>
-                      </summary>
-                      <p className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-foreground">
-                        {entry.errorMessage}
-                      </p>
-                    </details>
+                    <ErrorHistoryEntry
+                      key={entry.id}
+                      relativeTime={relativeTime}
+                      codeLabel={codeLabel}
+                      previewText={previewText}
+                      errorMessage={entry.errorMessage}
+                    />
                   );
                 })}
               </div>
             )}
 
             {!isHistoryLoading && !historyError && historyEntries && historyEntries.length === 0 && (
-              <p className="text-xs text-muted-foreground">No stored error history for this account yet.</p>
+               <p className="text-xs text-muted-foreground">No stored error history yet.</p>
             )}
           </div>
         </div>
@@ -616,16 +611,182 @@ function LastErrorMessageDialog({
   );
 }
 
+function ErrorHistoryEntry({
+  relativeTime,
+  codeLabel,
+  previewText,
+  errorMessage,
+}: {
+  relativeTime: string;
+  codeLabel: string;
+  previewText: string;
+  errorMessage: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(errorMessage);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
+  return (
+    <details className="rounded-md border bg-background/70 p-2">
+      <summary className="cursor-pointer break-words text-xs text-foreground">
+        <span className="font-medium">{relativeTime}</span>
+        <span className="mx-1 text-muted-foreground">-</span>
+        <span className="font-mono text-[11px] text-muted-foreground">{codeLabel}</span>
+        <span className="mx-1 text-muted-foreground">-</span>
+        <span className="text-muted-foreground">{previewText}</span>
+      </summary>
+      <div className="mt-2 flex items-start gap-2">
+        <p className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+          {errorMessage}
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          aria-label="Copy error message"
+          onClick={handleCopy}
+          title="Copy error message"
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+    </details>
+  );
+}
+
+function AccountModelAccess({
+  accountId,
+  supportedModels,
+  initialDisabledModels,
+}: {
+  accountId: string;
+  supportedModels: string[];
+  initialDisabledModels: string[];
+}) {
+  const [disabledModels, setDisabledModels] = useState<Set<string>>(
+    () => new Set(initialDisabledModels)
+  );
+  const [togglingModels, setTogglingModels] = useState<Set<string>>(new Set());
+
+  const enabledCount = supportedModels.length - disabledModels.size;
+
+  const handleToggleModel = async (model: string) => {
+    const currentlyEnabled = !disabledModels.has(model);
+    const newEnabled = !currentlyEnabled;
+
+    setTogglingModels((prev) => new Set(prev).add(model));
+
+    // Optimistic update
+    setDisabledModels((prev) => {
+      const next = new Set(prev);
+      if (newEnabled) {
+        next.delete(model);
+      } else {
+        next.add(model);
+      }
+      return next;
+    });
+
+    try {
+      const result = await setAccountModelEnabled(accountId, model, newEnabled);
+      if (!result.success) {
+        // Revert optimistic update
+        setDisabledModels((prev) => {
+          const reverted = new Set(prev);
+          if (newEnabled) {
+            reverted.add(model);
+          } else {
+            reverted.delete(model);
+          }
+          return reverted;
+        });
+        toast.error(result.error);
+      }
+    } catch {
+      // Revert on network error
+      setDisabledModels((prev) => {
+        const reverted = new Set(prev);
+        if (newEnabled) {
+          reverted.add(model);
+        } else {
+          reverted.delete(model);
+        }
+        return reverted;
+      });
+      toast.error("Failed to update model");
+    } finally {
+      setTogglingModels((prev) => {
+        const next = new Set(prev);
+        next.delete(model);
+        return next;
+      });
+    }
+  };
+
+  if (supportedModels.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="pt-3 mt-3 border-t space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Model Access</span>
+        <span className="text-xs text-muted-foreground">
+          {enabledCount}/{supportedModels.length}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {supportedModels.map((model) => {
+          const isEnabled = !disabledModels.has(model);
+          const isToggling = togglingModels.has(model);
+
+          return (
+            <button
+              key={model}
+              type="button"
+              onClick={() => handleToggleModel(model)}
+              disabled={isToggling}
+              title={isEnabled ? `Disable ${model}` : `Enable ${model}`}
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${
+                isEnabled
+                  ? "border-primary/40 bg-primary/10 text-foreground"
+                  : "border-border bg-transparent text-muted-foreground line-through"
+              }`}
+            >
+              {model}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AccountCard({ 
   account, 
   showTier = false,
   quotaInfo,
   isQuotaLoading = false,
+  supportedModels,
+  disabledModels,
 }: { 
   account: Account;
   showTier?: boolean;
   quotaInfo?: AccountQuotaInfo;
   isQuotaLoading?: boolean;
+  supportedModels?: string[];
+  disabledModels?: string[];
 }) {
   const hasErrors = account.errorCount > 0;
   const supportsQuotaMonitor =
@@ -665,7 +826,6 @@ function AccountCard({
       if (!result.success) {
         throw new Error(result.error);
       }
-      toast.success(`Account ${account.isActive ? "disabled" : "enabled"}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update account");
     } finally {
@@ -791,6 +951,14 @@ function AccountCard({
               )}
             </div>
           )}
+
+          {supportedModels && supportedModels.length > 0 && (
+            <AccountModelAccess
+              accountId={account.id}
+              supportedModels={supportedModels}
+              initialDisabledModels={disabledModels ?? []}
+            />
+          )}
         </div>
         <div className="mt-4 flex items-center justify-between gap-2">
           <AccountActions account={account} />
@@ -821,6 +989,7 @@ interface ProviderSectionProps {
   quotaByAccountId?: Record<string, AccountQuotaInfo>;
   isQuotaLoading?: boolean;
   hideHeader?: boolean;
+  disabledModelsByAccountId?: Record<string, string[]>;
 }
 
 function ProviderSection({
@@ -833,6 +1002,7 @@ function ProviderSection({
   quotaByAccountId,
   isQuotaLoading = false,
   hideHeader = false,
+  disabledModelsByAccountId,
 }: ProviderSectionProps) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4 md:space-y-2">
@@ -855,6 +1025,8 @@ function ProviderSection({
                 showTier={showTier}
                 quotaInfo={quotaByAccountId?.[account.id]}
                 isQuotaLoading={isQuotaLoading}
+                supportedModels={supportedModels}
+                disabledModels={disabledModelsByAccountId?.[account.id]}
               />
             ))}
           </div>
@@ -896,6 +1068,7 @@ export function AccountsList({
   groqAccounts,
   visibleProviders,
   supportedModelsByProvider,
+  disabledModelsByAccountId,
 }: AccountsListProps) {
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
@@ -1214,14 +1387,15 @@ export function AccountsList({
       <ProviderSection
         key="antigravity"
         id="antigravity-accounts"
-        title="Antigravity Accounts"
+        title="Antigravity"
         hideHeader={hasProviderFilter}
         accounts={antigravityAccounts}
         showTier
-        emptyMessage="No Antigravity accounts connected yet."
+        emptyMessage="No Antigravity connections yet."
         supportedModels={supportedModelsByProvider?.antigravity}
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1230,14 +1404,15 @@ export function AccountsList({
       <ProviderSection
         key="codex"
         id="codex-accounts"
-        title="Codex Accounts"
+        title="Codex"
         hideHeader={hasProviderFilter}
         accounts={codexAccounts}
         showTier
-        emptyMessage="No Codex accounts connected yet."
+        emptyMessage="No Codex connections yet."
         supportedModels={supportedModelsByProvider?.codex}
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1246,11 +1421,12 @@ export function AccountsList({
       <ProviderSection
         key="iflow"
         id="iflow-accounts"
-        title="Iflow Accounts"
+        title="Iflow"
         hideHeader={hasProviderFilter}
         accounts={iflowAccounts}
-        emptyMessage="No Iflow accounts connected yet."
+        emptyMessage="No Iflow connections yet."
         supportedModels={supportedModelsByProvider?.iflow}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1259,13 +1435,14 @@ export function AccountsList({
       <ProviderSection
         key="kiro"
         id="kiro-accounts"
-        title="Kiro Accounts"
+        title="Kiro"
         hideHeader={hasProviderFilter}
         accounts={kiroAccounts}
-        emptyMessage="No Kiro accounts connected yet."
+        emptyMessage="No Kiro connections yet."
         supportedModels={supportedModelsByProvider?.kiro}
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1274,14 +1451,15 @@ export function AccountsList({
       <ProviderSection
         key="gemini-cli"
         id="gemini-cli-accounts"
-        title="Gemini CLI Accounts"
+        title="Gemini CLI"
         hideHeader={hasProviderFilter}
         accounts={geminiCliAccounts}
         showTier
-        emptyMessage="No Gemini CLI accounts connected yet."
+        emptyMessage="No Gemini CLI connections yet."
         supportedModels={supportedModelsByProvider?.gemini_cli}
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1290,11 +1468,12 @@ export function AccountsList({
       <ProviderSection
         key="qwen-code"
         id="qwen-code-accounts"
-        title="Qwen Code Accounts"
+        title="Qwen Code"
         hideHeader={hasProviderFilter}
         accounts={qwenCodeAccounts}
-        emptyMessage="No Qwen Code accounts connected yet."
+        emptyMessage="No Qwen Code connections yet."
         supportedModels={supportedModelsByProvider?.qwen_code}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1303,13 +1482,14 @@ export function AccountsList({
       <ProviderSection
         key="copilot"
         id="copilot-accounts"
-        title="Copilot Accounts"
+        title="Copilot"
         hideHeader={hasProviderFilter}
         accounts={copilotAccounts}
-        emptyMessage="No Copilot accounts connected yet."
+        emptyMessage="No Copilot connections yet."
         supportedModels={supportedModelsByProvider?.copilot}
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1320,11 +1500,12 @@ export function AccountsList({
       <ProviderSection
         key="nvidia-nim"
         id="nvidia-nim-accounts"
-        title="Nvidia Accounts"
+        title="Nvidia"
         hideHeader={hasProviderFilter}
         accounts={nvidiaNimAccounts}
-        emptyMessage="No Nvidia accounts connected yet."
+        emptyMessage="No Nvidia connections yet."
         supportedModels={supportedModelsByProvider?.nvidia_nim}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1333,11 +1514,12 @@ export function AccountsList({
       <ProviderSection
         key="ollama-cloud"
         id="ollama-cloud-accounts"
-        title="Ollama Cloud Accounts"
+        title="Ollama Cloud"
         hideHeader={hasProviderFilter}
         accounts={ollamaCloudAccounts}
-        emptyMessage="No Ollama Cloud accounts connected yet."
+        emptyMessage="No Ollama Cloud connections yet."
         supportedModels={supportedModelsByProvider?.ollama_cloud}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1346,13 +1528,14 @@ export function AccountsList({
       <ProviderSection
         key="openrouter"
         id="openrouter-accounts"
-        title="OpenRouter Accounts"
+        title="OpenRouter"
         hideHeader={hasProviderFilter}
         accounts={openRouterAccounts}
-        emptyMessage="No OpenRouter accounts connected yet."
+        emptyMessage="No OpenRouter connections yet."
         supportedModels={supportedModelsByProvider?.openrouter}
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
@@ -1378,7 +1561,7 @@ export function AccountsList({
     <div className="space-y-8">
       <section id="oauth-provider-accounts" className="space-y-5 md:space-y-3">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
+          <h3 className="text-base font-semibold">OAuth Providers</h3>
         </div>
 
         <div className="space-y-6">{oauthProviderSections}</div>
@@ -1386,7 +1569,7 @@ export function AccountsList({
 
       <section id="api-key-provider-accounts" className="space-y-5 md:space-y-3">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
+          <h3 className="text-base font-semibold">API Key Providers</h3>
         </div>
 
         <div className="space-y-6">{apiKeyProviderSections}</div>

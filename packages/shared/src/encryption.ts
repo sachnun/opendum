@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import CryptoJS from "crypto-js";
 
 let deprecationWarningLogged = false;
@@ -46,7 +47,7 @@ export function decrypt(ciphertext: string): string {
  * Hash a string using SHA-256
  */
 export function hashString(text: string): string {
-  return CryptoJS.SHA256(text).toString();
+  return createHash("sha256").update(text).digest("hex");
 }
 
 /**
@@ -55,15 +56,11 @@ export function hashString(text: string): string {
  */
 export function generateApiKey(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = randomBytes(16);
   let result = "sk-";
-  const randomValues = CryptoJS.lib.WordArray.random(16);
-  const randomBytes = randomValues.toString();
-  
   for (let i = 0; i < 16; i++) {
-    const index = parseInt(randomBytes.substr(i * 2, 2), 16) % chars.length;
-    result += chars[index];
+    result += chars[bytes[i] % chars.length];
   }
-  
   return result;
 }
 

@@ -20,7 +20,11 @@ function AccountCardSkeleton() {
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-3 w-24" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5 space-y-1">
+                <Skeleton className="h-2.5 w-14" />
+                <Skeleton className="h-4 w-10" />
+              </div>
               <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5 space-y-1">
                 <Skeleton className="h-2.5 w-14" />
                 <Skeleton className="h-4 w-10" />
@@ -72,7 +76,7 @@ export default function Loading() {
   return (
     <div className="space-y-6">
       <div className="relative">
-        <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-5">
+        <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-3">
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
             <div className="bg-background">
               <div className="border-b border-border pb-4">
@@ -84,7 +88,7 @@ export default function Loading() {
             </div>
           </div>
         </div>
-        <div className="h-[88px] sm:h-[84px] md:h-[96px]" />
+        <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
 
       <div className="space-y-6">

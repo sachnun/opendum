@@ -1,6 +1,7 @@
 [opendum]
 family = "IBM"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "ibm/granite-3.0-8b-instruct"

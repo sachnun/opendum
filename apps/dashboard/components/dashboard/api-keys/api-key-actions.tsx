@@ -42,7 +42,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         throw new Error(result.error);
       }
 
-      toast.success(apiKey.isActive ? "API key disabled" : "API key enabled");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to toggle API key");
     } finally {
@@ -86,7 +85,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
 
         await navigator.clipboard.writeText(result.data.key);
         setCopied(true);
-        toast.success("API key copied to clipboard");
         setTimeout(() => setCopied(false), 2000);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to copy API key");
@@ -99,7 +97,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
     try {
       await navigator.clipboard.writeText(revealedKey);
       setCopied(true);
-      toast.success("API key copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Failed to copy to clipboard");
@@ -115,7 +112,6 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         throw new Error(result.error);
       }
 
-      toast.success("API key deleted");
       setDialogOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete API key");
@@ -129,40 +125,41 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
     : apiKey.keyPreview.substring(0, 8) + "••••••••";
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <div className="flex min-w-0 items-center gap-1">
-        <code className={cn(
-          "text-xs bg-muted px-2 py-1 rounded font-mono",
-          isRevealed ? "break-all" : "max-w-[160px] truncate"
-        )}>
-          {displayKey}
-        </code>
+    <div className="flex items-center gap-1.5">
+      <code className={cn(
+        "text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground",
+        isRevealed ? "break-all" : "max-w-[140px] truncate"
+      )}>
+        {displayKey}
+      </code>
+
+      <div className="flex items-center">
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 w-7 p-0"
+          className="h-6 w-6 p-0"
           onClick={handleReveal}
           disabled={isLoading}
           title={isRevealed ? "Hide key" : "Reveal key"}
         >
           {isRevealed ? (
-            <EyeOff className="h-3.5 w-3.5" />
+            <EyeOff className="h-3 w-3" />
           ) : (
-            <Eye className="h-3.5 w-3.5" />
+            <Eye className="h-3 w-3" />
           )}
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 w-7 p-0"
+          className="h-6 w-6 p-0"
           onClick={handleCopy}
           disabled={isLoading}
           title="Copy key"
         >
           {copied ? (
-            <Check className="h-3.5 w-3.5 text-green-500" />
+            <Check className="h-3 w-3 text-green-500" />
           ) : (
-            <Copy className="h-3.5 w-3.5" />
+            <Copy className="h-3 w-3" />
           )}
         </Button>
       </div>
@@ -171,29 +168,30 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
         checked={apiKey.isActive}
         onCheckedChange={handleToggle}
         disabled={isToggling}
+        className="scale-90"
         title={apiKey.isActive ? "Disable key" : "Enable key"}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
-            <Trash2 className="h-3.5 w-3.5" />
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
+            <Trash2 className="h-3 w-3" />
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Delete API Key</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &quot;{apiKey.name ?? "Unnamed Key"}&quot;? This action
-              cannot be undone.
+              Are you sure you want to delete &quot;{apiKey.name ?? "Unnamed Key"}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
             <Button
               variant="destructive"
+              size="sm"
               onClick={handleDelete}
               disabled={isDeleting}
             >

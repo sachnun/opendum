@@ -1,6 +1,6 @@
-release_date = "2025-12-01"
-knowledge = "2024-07"
-reasoning = true
+release_date = "2025-01-01"
+knowledge = "2024-12"
+reasoning = false
 tool_call = true
 attachment = false
 
@@ -10,7 +10,11 @@ output = 1.68
 
 [limit]
 context = 128_000
-output = 128_000
+output = 64_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
 
 [opendum]
 family = "DeepSeek"

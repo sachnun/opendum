@@ -13,7 +13,6 @@ import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -106,11 +105,8 @@ export function SettingsSheet({
         </Button>
       </SheetTrigger>
       <SheetContent className="overflow-y-auto overflow-x-hidden">
-        <SheetHeader>
+        <SheetHeader className="text-left">
           <SheetTitle>Settings</SheetTitle>
-          <SheetDescription>
-            Configure model parameters for generation
-          </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-6 py-6">

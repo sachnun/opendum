@@ -448,8 +448,8 @@ export function transformClaudeRequest(
     request: requestPayload,
   };
 
-  // Remove thinking config for Claude Sonnet 4.5 (non-thinking fallback)
-  if (context.model === "claude-sonnet-4-5") {
+  // Remove thinking config for Claude Sonnet 4.6 (non-thinking fallback)
+  if (context.model === "claude-sonnet-4-6") {
     if (
       requestPayload.generationConfig &&
       (requestPayload.generationConfig as Record<string, unknown>).thinkingConfig

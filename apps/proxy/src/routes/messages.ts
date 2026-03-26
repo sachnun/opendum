@@ -1,35 +1,18 @@
-import type { FastifyRequest, FastifyReply, RouteHandlerMethod } from "fastify";
+import type { RouteHandlerMethod } from "fastify";
 import {
-  validateModelForUser,
   logUsage,
-  isModelSupportedByProvider,
-  getProvider,
   recordLatency,
-  type ApiKeyModelAccess,
-  type ProviderNameType,
   type ChatCompletionRequest,
 } from "@opendum/shared";
-import { db, providerAccount } from "@opendum/shared";
-import { eq, and, sql } from "drizzle-orm";
-import { authenticateRequest } from "../plugins/auth.js";
-import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "../lib/load-balancer.js";
+import { markAccountSuccess } from "../lib/load-balancer.js";
 import {
-  formatWaitTimeMs,
-  getRateLimitScope,
-  getMinWaitTime,
-  isRateLimited,
-  markRateLimited,
-  parseRateLimitError,
-  parseRetryAfterMs,
-} from "../lib/rate-limit.js";
-import {
-  buildAccountErrorMessage,
-  getErrorMessage,
-  getErrorStatusCode,
-  getSanitizedProxyError,
-  shouldRotateToNextAccount,
-  type ProxyErrorType,
-} from "../lib/error-utils.js";
+  createProxyRoute,
+  type ErrorInfo,
+} from "../lib/proxy-handler.js";
+
+// ---------------------------------------------------------------------------
+// Interfaces (route-specific)
+// ---------------------------------------------------------------------------
 
 interface ToolCall {
   id: string;
@@ -114,7 +97,11 @@ interface OpenAIChoice {
     content?: string;
     reasoning_content?: string;
     role?: string;
-    tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
+    tool_calls?: Array<{
+      index: number;
+      id?: string;
+      function?: { name?: string; arguments?: string };
+    }>;
   };
   finish_reason?: string;
 }
@@ -152,11 +139,17 @@ interface AnthropicResponse {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Transform functions (route-specific)
+// ---------------------------------------------------------------------------
+
 /**
  * Transform Anthropic messages format to OpenAI format
  * @returns OpenAI payload with _includeReasoning flag for conditional thinking output
  */
-function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload & { _includeReasoning?: boolean } {
+function transformAnthropicToOpenAI(
+  body: AnthropicRequestBody
+): OpenAIPayload & { _includeReasoning?: boolean } {
   const {
     model,
     messages,
@@ -208,7 +201,10 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
       openaiMessages.push({ role, content: msg.content });
     } else if (Array.isArray(msg.content)) {
       const toolCalls: OpenAIMessage["tool_calls"] = [];
-      const structuredContentParts: Array<{ type: string; [key: string]: unknown }> = [];
+      const structuredContentParts: Array<{
+        type: string;
+        [key: string]: unknown;
+      }> = [];
 
       for (const block of msg.content) {
         if (block.type === "text") {
@@ -241,20 +237,24 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
             type: "function",
             function: {
               name: block.name || "",
-              arguments: typeof block.input === "string"
-                ? block.input
-                : JSON.stringify(block.input || {}),
+              arguments:
+                typeof block.input === "string"
+                  ? block.input
+                  : JSON.stringify(block.input || {}),
             },
           });
         } else if (block.type === "tool_result") {
-          const toolContent = typeof block.content === "string"
-            ? block.content
-            : Array.isArray(block.content)
+          const toolContent =
+            typeof block.content === "string"
               ? block.content
-                  .filter((b: AnthropicContentBlock) => b.type === "text")
-                  .map((b: AnthropicContentBlock) => b.text || "")
-                  .join("\n")
-              : JSON.stringify(block.content);
+              : Array.isArray(block.content)
+                ? block.content
+                    .filter(
+                      (b: AnthropicContentBlock) => b.type === "text"
+                    )
+                    .map((b: AnthropicContentBlock) => b.text || "")
+                    .join("\n")
+                : JSON.stringify(block.content);
 
           openaiMessages.push({
             role: "tool",
@@ -262,7 +262,10 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
             content: toolContent,
           });
           continue;
-        } else if (block.type === "thinking" || block.type === "redacted_thinking") {
+        } else if (
+          block.type === "thinking" ||
+          block.type === "redacted_thinking"
+        ) {
           continue;
         }
       }
@@ -314,7 +317,8 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
     });
 
     if (hasOpenAIToolShape) {
-      openaiPayload.tools = tools as unknown as OpenAIPayload["tools"];
+      openaiPayload.tools =
+        tools as unknown as OpenAIPayload["tools"];
     } else {
       openaiPayload.tools = tools
         .map((tool) => {
@@ -327,14 +331,17 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
             return null;
           }
 
-          const description = (tool as { description?: unknown }).description;
-          const inputSchema = (tool as { input_schema?: unknown }).input_schema;
+          const description = (tool as { description?: unknown })
+            .description;
+          const inputSchema = (tool as { input_schema?: unknown })
+            .input_schema;
 
           return {
             type: "function",
             function: {
               name,
-              description: typeof description === "string" ? description : "",
+              description:
+                typeof description === "string" ? description : "",
               parameters:
                 inputSchema &&
                 typeof inputSchema === "object" &&
@@ -350,33 +357,48 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
 
   if (tool_choice) {
     if (typeof tool_choice === "string") {
-      if (tool_choice === "auto" || tool_choice === "none") {
-        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
-          tool_choice;
+      if (
+        tool_choice === "auto" ||
+        tool_choice === "none"
+      ) {
+        (
+          openaiPayload as OpenAIPayload & { tool_choice?: string }
+        ).tool_choice = tool_choice;
       } else if (tool_choice === "required") {
-        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
-          "required";
+        (
+          openaiPayload as OpenAIPayload & { tool_choice?: string }
+        ).tool_choice = "required";
       }
     } else if (typeof tool_choice === "object") {
       const choiceType = (tool_choice as { type?: unknown }).type;
 
       if (choiceType === "auto") {
-        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
-          "auto";
+        (
+          openaiPayload as OpenAIPayload & { tool_choice?: string }
+        ).tool_choice = "auto";
       } else if (choiceType === "any") {
-        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
-          "required";
+        (
+          openaiPayload as OpenAIPayload & { tool_choice?: string }
+        ).tool_choice = "required";
       } else if (choiceType === "tool") {
         const name = (tool_choice as { name?: unknown }).name;
-        (openaiPayload as OpenAIPayload & {
-          tool_choice?: { type: string; function: { name: string } };
-        }).tool_choice = {
+        (
+          openaiPayload as OpenAIPayload & {
+            tool_choice?: {
+              type: string;
+              function: { name: string };
+            };
+          }
+        ).tool_choice = {
           type: "function",
-          function: { name: typeof name === "string" ? name : "" },
+          function: {
+            name: typeof name === "string" ? name : "",
+          },
         };
       } else if (choiceType === "none") {
-        (openaiPayload as OpenAIPayload & { tool_choice?: string }).tool_choice =
-          "none";
+        (
+          openaiPayload as OpenAIPayload & { tool_choice?: string }
+        ).tool_choice = "none";
       } else if (choiceType === "function") {
         const fn = (tool_choice as { function?: unknown }).function;
         const functionName =
@@ -384,12 +406,20 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
             ? (fn as { name?: unknown }).name
             : null;
 
-        (openaiPayload as OpenAIPayload & {
-          tool_choice?: { type: string; function: { name: string } };
-        }).tool_choice = {
+        (
+          openaiPayload as OpenAIPayload & {
+            tool_choice?: {
+              type: string;
+              function: { name: string };
+            };
+          }
+        ).tool_choice = {
           type: "function",
           function: {
-            name: typeof functionName === "string" ? functionName : "",
+            name:
+              typeof functionName === "string"
+                ? functionName
+                : "",
           },
         };
       }
@@ -397,8 +427,9 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
   }
 
   if (thinkingRequested) {
-    (openaiPayload as OpenAIPayload & { thinking_budget?: number }).thinking_budget = 
-      thinking?.budget_tokens || 10000;
+    (
+      openaiPayload as OpenAIPayload & { thinking_budget?: number }
+    ).thinking_budget = thinking?.budget_tokens || 10000;
   }
 
   return {
@@ -414,12 +445,21 @@ function transformAnthropicToOpenAI(body: AnthropicRequestBody): OpenAIPayload &
  * @param includeThinking - Whether to include thinking blocks in response (default: true)
  */
 function transformOpenAIToAnthropic(
-  openaiResponse: OpenAIResponse, 
+  openaiResponse: OpenAIResponse,
   model: string,
   includeThinking: boolean = true
 ): AnthropicResponse {
   const choice = openaiResponse.choices?.[0];
-  const message = choice as unknown as { message?: { reasoning_content?: string; content?: string; tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }> } };
+  const message = choice as unknown as {
+    message?: {
+      reasoning_content?: string;
+      content?: string;
+      tool_calls?: Array<{
+        id?: string;
+        function?: { name?: string; arguments?: string };
+      }>;
+    };
+  };
   const messageData = message?.message;
   const usage = openaiResponse.usage;
 
@@ -473,7 +513,9 @@ function transformOpenAIToAnthropic(
     content_filter: "end_turn",
     function_call: "tool_use",
   };
-  const stopReason = finishReason ? stopReasonMap[finishReason] : "end_turn";
+  const stopReason = finishReason
+    ? stopReasonMap[finishReason]
+    : "end_turn";
 
   return {
     id: `msg_${openaiResponse.id || Date.now()}`,
@@ -500,7 +542,10 @@ function transformOpenAIToAnthropic(
  */
 function createAnthropicStreamTracker(
   model: string,
-  onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void,
+  onComplete?: (usage: {
+    inputTokens: number;
+    outputTokens: number;
+  }) => void,
   includeThinking: boolean = true
 ) {
   const messageId = `msg_${Date.now()}`;
@@ -563,32 +608,54 @@ function createAnthropicStreamTracker(
           const data = line.slice(5).trim();
           if (!data || data === "[DONE]") {
             if (data === "[DONE]") {
-                  if (thinkingBlockStarted) {
-                output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+              if (thinkingBlockStarted) {
+                output += formatSSE("content_block_stop", {
+                  type: "content_block_stop",
+                  index: currentBlockIndex,
+                });
                 currentBlockIndex++;
                 thinkingBlockStarted = false;
               }
 
               if (contentBlockStarted) {
-                output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+                output += formatSSE("content_block_stop", {
+                  type: "content_block_stop",
+                  index: currentBlockIndex,
+                });
                 currentBlockIndex++;
                 contentBlockStarted = false;
               }
 
-              for (const tcIndex of Object.keys(toolBlockIndices).map(Number).sort((a, b) => a - b)) {
+              for (const tcIndex of Object.keys(toolBlockIndices)
+                .map(Number)
+                .sort((a, b) => a - b)) {
                 const blockIdx = toolBlockIndices[tcIndex];
-                output += formatSSE("content_block_stop", { type: "content_block_stop", index: blockIdx });
+                output += formatSSE("content_block_stop", {
+                  type: "content_block_stop",
+                  index: blockIdx,
+                });
               }
 
-              const stopReason = Object.keys(toolCallsByIndex).length > 0 ? "tool_use" : "end_turn";
+              const stopReason =
+                Object.keys(toolCallsByIndex).length > 0
+                  ? "tool_use"
+                  : "end_turn";
 
               output += formatSSE("message_delta", {
                 type: "message_delta",
-                delta: { stop_reason: stopReason, stop_sequence: null },
-                usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+                delta: {
+                  stop_reason: stopReason,
+                  stop_sequence: null,
+                },
+                usage: {
+                  input_tokens: inputTokens,
+                  output_tokens: outputTokens,
+                },
               });
 
-              output += formatSSE("message_stop", { type: "message_stop" });
+              output += formatSSE("message_stop", {
+                type: "message_stop",
+              });
             }
             continue;
           }
@@ -597,8 +664,10 @@ function createAnthropicStreamTracker(
             const parsed = JSON.parse(data);
 
             if (parsed.usage) {
-              inputTokens = parsed.usage.prompt_tokens || inputTokens;
-              outputTokens = parsed.usage.completion_tokens || outputTokens;
+              inputTokens =
+                parsed.usage.prompt_tokens || inputTokens;
+              outputTokens =
+                parsed.usage.completion_tokens || outputTokens;
             }
 
             const choices = parsed.choices || [];
@@ -612,7 +681,10 @@ function createAnthropicStreamTracker(
                 output += formatSSE("content_block_start", {
                   type: "content_block_start",
                   index: currentBlockIndex,
-                  content_block: { type: "thinking", thinking: "" },
+                  content_block: {
+                    type: "thinking",
+                    thinking: "",
+                  },
                 });
                 thinkingBlockStarted = true;
               }
@@ -620,14 +692,26 @@ function createAnthropicStreamTracker(
               output += formatSSE("content_block_delta", {
                 type: "content_block_delta",
                 index: currentBlockIndex,
-                delta: { type: "thinking_delta", thinking: reasoningContent },
+                delta: {
+                  type: "thinking_delta",
+                  thinking: reasoningContent,
+                },
               });
             }
 
             const content = delta.content;
-            if (content && (content.trim() || contentBlockStarted)) {
-              if (thinkingBlockStarted && !contentBlockStarted) {
-                output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+            if (
+              content &&
+              (content.trim() || contentBlockStarted)
+            ) {
+              if (
+                thinkingBlockStarted &&
+                !contentBlockStarted
+              ) {
+                output += formatSSE("content_block_stop", {
+                  type: "content_block_stop",
+                  index: currentBlockIndex,
+                });
                 currentBlockIndex++;
                 thinkingBlockStarted = false;
               }
@@ -648,25 +732,33 @@ function createAnthropicStreamTracker(
               });
             }
 
-            const toolCalls = delta.tool_calls || [];
-            for (const tc of toolCalls) {
+            const toolCallsDelta = delta.tool_calls || [];
+            for (const tc of toolCallsDelta) {
               const tcIndex = tc.index ?? 0;
 
               if (!(tcIndex in toolCallsByIndex)) {
                 if (thinkingBlockStarted) {
-                  output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+                  output += formatSSE("content_block_stop", {
+                    type: "content_block_stop",
+                    index: currentBlockIndex,
+                  });
                   currentBlockIndex++;
                   thinkingBlockStarted = false;
                 }
 
                 if (contentBlockStarted) {
-                  output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+                  output += formatSSE("content_block_stop", {
+                    type: "content_block_stop",
+                    index: currentBlockIndex,
+                  });
                   currentBlockIndex++;
                   contentBlockStarted = false;
                 }
 
                 toolCallsByIndex[tcIndex] = {
-                  id: tc.id || `toolu_${Date.now()}_${tcIndex}`,
+                  id:
+                    tc.id ||
+                    `toolu_${Date.now()}_${tcIndex}`,
                   name: tc.function?.name || "",
                   arguments: "",
                 };
@@ -690,7 +782,8 @@ function createAnthropicStreamTracker(
                 toolCallsByIndex[tcIndex].name = func.name;
               }
               if (func.arguments) {
-                toolCallsByIndex[tcIndex].arguments += func.arguments;
+                toolCallsByIndex[tcIndex].arguments +=
+                  func.arguments;
 
                 output += formatSSE("content_block_delta", {
                   type: "content_block_delta",
@@ -706,24 +799,38 @@ function createAnthropicStreamTracker(
             const finishReason = choices[0].finish_reason;
             if (finishReason) {
               if (thinkingBlockStarted) {
-                output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+                output += formatSSE("content_block_stop", {
+                  type: "content_block_stop",
+                  index: currentBlockIndex,
+                });
                 currentBlockIndex++;
                 thinkingBlockStarted = false;
               }
 
               if (contentBlockStarted) {
-                output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+                output += formatSSE("content_block_stop", {
+                  type: "content_block_stop",
+                  index: currentBlockIndex,
+                });
                 currentBlockIndex++;
                 contentBlockStarted = false;
               }
 
-              for (const tcIdx of Object.keys(toolBlockIndices).map(Number).sort((a, b) => a - b)) {
+              for (const tcIdx of Object.keys(toolBlockIndices)
+                .map(Number)
+                .sort((a, b) => a - b)) {
                 const blockIdx = toolBlockIndices[tcIdx];
-                output += formatSSE("content_block_stop", { type: "content_block_stop", index: blockIdx });
+                output += formatSSE("content_block_stop", {
+                  type: "content_block_stop",
+                  index: blockIdx,
+                });
               }
 
               let stopReason = "end_turn";
-              if (finishReason === "tool_calls" || Object.keys(toolCallsByIndex).length > 0) {
+              if (
+                finishReason === "tool_calls" ||
+                Object.keys(toolCallsByIndex).length > 0
+              ) {
                 stopReason = "tool_use";
               } else if (finishReason === "length") {
                 stopReason = "max_tokens";
@@ -731,15 +838,22 @@ function createAnthropicStreamTracker(
 
               output += formatSSE("message_delta", {
                 type: "message_delta",
-                delta: { stop_reason: stopReason, stop_sequence: null },
-                usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+                delta: {
+                  stop_reason: stopReason,
+                  stop_sequence: null,
+                },
+                usage: {
+                  input_tokens: inputTokens,
+                  output_tokens: outputTokens,
+                },
               });
 
-              output += formatSSE("message_stop", { type: "message_stop" });
+              output += formatSSE("message_stop", {
+                type: "message_stop",
+              });
 
               reportUsage();
             }
-
           } catch {
             // Ignore parse errors
           }
@@ -755,25 +869,47 @@ function createAnthropicStreamTracker(
       if (buffer.trim()) {
         if (buffer.includes("[DONE]")) {
           if (thinkingBlockStarted) {
-            output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+            output += formatSSE("content_block_stop", {
+              type: "content_block_stop",
+              index: currentBlockIndex,
+            });
           } else if (contentBlockStarted) {
-            output += formatSSE("content_block_stop", { type: "content_block_stop", index: currentBlockIndex });
+            output += formatSSE("content_block_stop", {
+              type: "content_block_stop",
+              index: currentBlockIndex,
+            });
           }
 
-          for (const tcIndex of Object.keys(toolBlockIndices).map(Number).sort((a, b) => a - b)) {
+          for (const tcIndex of Object.keys(toolBlockIndices)
+            .map(Number)
+            .sort((a, b) => a - b)) {
             const blockIdx = toolBlockIndices[tcIndex];
-            output += formatSSE("content_block_stop", { type: "content_block_stop", index: blockIdx });
+            output += formatSSE("content_block_stop", {
+              type: "content_block_stop",
+              index: blockIdx,
+            });
           }
 
-          const stopReason = Object.keys(toolCallsByIndex).length > 0 ? "tool_use" : "end_turn";
+          const stopReason =
+            Object.keys(toolCallsByIndex).length > 0
+              ? "tool_use"
+              : "end_turn";
 
           output += formatSSE("message_delta", {
             type: "message_delta",
-            delta: { stop_reason: stopReason, stop_sequence: null },
-            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+            delta: {
+              stop_reason: stopReason,
+              stop_sequence: null,
+            },
+            usage: {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+            },
           });
 
-          output += formatSSE("message_stop", { type: "message_stop" });
+          output += formatSSE("message_stop", {
+            type: "message_stop",
+          });
 
           reportUsage();
         }
@@ -785,31 +921,37 @@ function createAnthropicStreamTracker(
   };
 }
 
-export const messagesRoute: RouteHandlerMethod = async (
-  request: FastifyRequest,
-  reply: FastifyReply
-) => {
-  const startTime = Date.now();
+// ---------------------------------------------------------------------------
+// Error formatting (Anthropic format)
+// ---------------------------------------------------------------------------
 
-  // Auth — API key only (no session auth in proxy)
-  const auth = await authenticateRequest(request, reply);
-  if (!auth) return; // Response already sent
-
-  const { userId, apiKeyId, modelAccessMode, modelAccessList } = auth;
-  const apiKeyModelAccess: ApiKeyModelAccess = {
-    mode: modelAccessMode,
-    models: modelAccessList,
+function formatAnthropicError(info: ErrorInfo): unknown {
+  return {
+    type: "error",
+    error: {
+      type: info.type,
+      message: info.message,
+      ...(info.retry_after !== undefined
+        ? { retry_after: info.retry_after }
+        : {}),
+      ...(info.retry_after_ms !== undefined
+        ? { retry_after_ms: info.retry_after_ms }
+        : {}),
+    },
   };
+}
 
-  try {
-    const body = request.body as Record<string, unknown> | null;
-    if (!body || typeof body !== "object") {
-      return reply.code(400).send({
-        type: "error",
-        error: { type: "invalid_request_error", message: "Invalid JSON in request body" },
-      });
-    }
+// ---------------------------------------------------------------------------
+// Route export
+// ---------------------------------------------------------------------------
 
+export const messagesRoute: RouteHandlerMethod = createProxyRoute({
+  endpoint: "messages",
+  rateLimitStatusCode: 529,
+  noAccountsStatusCode: 529,
+  formatError: formatAnthropicError,
+
+  parseAndValidate(body, reply) {
     const {
       model: modelParam,
       stream: streamParam,
@@ -820,42 +962,23 @@ export const messagesRoute: RouteHandlerMethod = async (
       provider_account_id?: unknown;
     };
 
-    const streamEnabled = typeof streamParam === "boolean" ? streamParam : true;
-
-    const requestedModel = typeof modelParam === "string" ? (modelParam as string).trim() : "";
+    const streamEnabled =
+      typeof streamParam === "boolean" ? streamParam : true;
+    const requestedModel =
+      typeof modelParam === "string"
+        ? (modelParam as string).trim()
+        : "";
 
     if (!requestedModel) {
-      return reply.code(400).send({
-        type: "error",
-        error: { type: "invalid_request_error", message: "model is required" },
-      });
+      reply.code(400).send(
+        formatAnthropicError({
+          message: "model is required",
+          type: "invalid_request_error",
+        })
+      );
+      return null;
     }
 
-    const modelValidation = await validateModelForUser(
-      userId,
-      requestedModel,
-      apiKeyModelAccess
-    );
-    if (!modelValidation.valid) {
-      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-      return reply.code(400).send({
-        type: "error",
-        error: { type: "invalid_request_error", message: modelValidation.error },
-        request_id: requestId,
-      });
-    }
-
-    const { provider, model } = modelValidation;
-    const rateLimitScope = getRateLimitScope(model);
-    const MAX_ACCOUNT_RETRIES = 5;
-    const triedAccountIds: string[] = [];
-    let lastAccountFailure:
-      | {
-          statusCode: number;
-          message: string;
-          type: ProxyErrorType;
-        }
-      | null = null;
     const rawErrorParams = Object.fromEntries(
       Object.entries(body as Record<string, unknown>).filter(
         ([key]) =>
@@ -865,20 +988,11 @@ export const messagesRoute: RouteHandlerMethod = async (
           key !== "provider_account_id"
       )
     );
-    const hasProviderAccountParam =
-      providerAccountIdParam !== undefined && providerAccountIdParam !== null;
-    const normalizedProviderAccountId =
-      typeof providerAccountIdParam === "string" ? (providerAccountIdParam as string).trim() : "";
 
-    if (hasProviderAccountParam && normalizedProviderAccountId.length === 0) {
-      return reply.code(400).send({
-        type: "error",
-        error: {
-          type: "invalid_request_error",
-          message: "provider_account_id must be a non-empty string",
-        },
-      });
-    }
+    const normalizedProviderAccountId =
+      typeof providerAccountIdParam === "string"
+        ? (providerAccountIdParam as string).trim()
+        : "";
 
     const requestParamsForError: Record<string, unknown> = {
       stream: streamEnabled,
@@ -887,449 +1001,197 @@ export const messagesRoute: RouteHandlerMethod = async (
         ? { provider_account_id: normalizedProviderAccountId }
         : {}),
     };
-    const requestMessagesForError = (body as { messages?: unknown }).messages;
+    const requestMessagesForError = (body as { messages?: unknown })
+      .messages;
 
-    const forcedAccount = normalizedProviderAccountId
-      ? (await db
-          .select()
-          .from(providerAccount)
-          .where(
-            and(
-              eq(providerAccount.id, normalizedProviderAccountId),
-              eq(providerAccount.userId, userId),
-            ),
-          )
-          .limit(1)
-        )[0] ?? null
-      : null;
+    return {
+      modelParam: requestedModel,
+      stream: streamEnabled,
+      providerAccountId:
+        providerAccountIdParam !== undefined &&
+        providerAccountIdParam !== null
+          ? (providerAccountIdParam as string)
+          : null,
+      reasoningRequested: false, // handled inside transformAnthropicToOpenAI
+      messagesForError: requestMessagesForError,
+      paramsForError: requestParamsForError,
+      routeData: { body },
+    };
+  },
 
-    if (normalizedProviderAccountId && !forcedAccount) {
-      return reply.code(400).send({
-        type: "error",
-        error: {
-          type: "invalid_request_error",
-          message: "Selected provider account was not found",
-        },
-      });
-    }
+  async buildRequest({
+    routeData,
+    model,
+    stream,
+    providerImpl,
+    account,
+  }) {
+    const { body } = routeData as {
+      body: Record<string, unknown>;
+    };
 
-    if (forcedAccount && !forcedAccount.isActive) {
-      return reply.code(400).send({
-        type: "error",
-        error: {
-          type: "invalid_request_error",
-          message: "Selected provider account is inactive",
-        },
-      });
-    }
+    const openaiPayload = transformAnthropicToOpenAI(
+      body as AnthropicRequestBody
+    );
 
-    if (forcedAccount) {
-      if (!isModelSupportedByProvider(model, forcedAccount.provider)) {
-        return reply.code(400).send({
-          type: "error",
-          error: {
-            type: "invalid_request_error",
-            message: `Selected account provider "${forcedAccount.provider}" does not support model "${model}"`,
-          },
-        });
-      }
+    openaiPayload.model = model;
+    openaiPayload.stream = stream;
 
-      if (provider !== null && forcedAccount.provider !== provider) {
-        return reply.code(400).send({
-          type: "error",
-          error: {
-            type: "invalid_request_error",
-            message: `Selected account provider "${forcedAccount.provider}" does not match model provider "${provider}"`,
-          },
-        });
-      }
+    const normalizedOpenAIPayload =
+      openaiPayload as unknown as ChatCompletionRequest;
 
-      if (await isRateLimited(forcedAccount.id, rateLimitScope)) {
-        const waitTimeMs = await getMinWaitTime([forcedAccount.id], rateLimitScope);
-        return reply.code(529).send({
-          type: "error",
-          error: {
-            type: "overloaded_error",
-            message:
-              waitTimeMs > 0
-                ? `Selected account is rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`
-                : "Selected account is rate limited.",
-            retry_after: waitTimeMs > 0 ? formatWaitTimeMs(waitTimeMs) : undefined,
-            retry_after_ms: waitTimeMs > 0 ? waitTimeMs : undefined,
-          },
-        });
-      }
-    }
-
-    const accountRetryLimit = forcedAccount ? 1 : MAX_ACCOUNT_RETRIES;
-
-    for (let attempt = 0; attempt < accountRetryLimit; attempt++) {
-      let account = forcedAccount;
-
-      if (!account) {
-        account = await getNextAvailableAccount(
-          userId,
-          model,
-          provider,
-          triedAccountIds
-        );
-      }
-
-      if (!account) {
-        const isFirstAttempt = triedAccountIds.length === 0;
-
-        if (isFirstAttempt) {
-          return reply.code(529).send({
-            type: "error",
-            error: {
-              type: "overloaded_error",
-              message: "No active accounts available for this model. Please add an account in the dashboard.",
-            },
-          });
-        }
-
-        const waitTimeMs = await getMinWaitTime(triedAccountIds, rateLimitScope);
-        if (waitTimeMs > 0) {
-          return reply.code(529).send({
-            type: "error",
-            error: {
-              type: "overloaded_error",
-              message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
-              retry_after: formatWaitTimeMs(waitTimeMs),
-              retry_after_ms: waitTimeMs,
-            },
-          });
-        }
-
-        if (lastAccountFailure) {
-          return reply.code(lastAccountFailure.statusCode).send({
-            type: "error",
-            error: {
-              type: lastAccountFailure.type,
-              message: lastAccountFailure.message,
-            },
-          });
-        }
-
-        return reply.code(503).send({
-          type: "error",
-          error: {
-            type: "api_error",
-            message: "No available accounts for this request.",
-          },
-        });
-      }
-
-      triedAccountIds.push(account.id);
-
-      if (forcedAccount) {
-        await db
-          .update(providerAccount)
-          .set({
-            lastUsedAt: new Date(),
-            requestCount: sql`${providerAccount.requestCount} + 1`,
-          })
-          .where(eq(providerAccount.id, account.id));
-      }
-
-      try {
-        const providerImpl = await getProvider(account.provider as ProviderNameType);
-        const credentials = await providerImpl.getValidCredentials(account);
-
-        const openaiPayload = transformAnthropicToOpenAI(body as AnthropicRequestBody);
-
-        openaiPayload.model = model;
-        openaiPayload.stream = streamEnabled;
-
-        const includeThinking = openaiPayload._includeReasoning ?? false;
-
-        const normalizedOpenAIPayload =
-          openaiPayload as unknown as ChatCompletionRequest;
-
-        const requestBody = providerImpl.prepareRequest
-          ? await providerImpl.prepareRequest(account, normalizedOpenAIPayload, "messages")
-          : normalizedOpenAIPayload;
-
-        const requestStartTime = Date.now();
-        const providerResponse = await providerImpl.makeRequest(
-          credentials,
+    return providerImpl.prepareRequest
+      ? await providerImpl.prepareRequest(
           account,
-          requestBody,
-          streamEnabled
-        );
+          normalizedOpenAIPayload,
+          "messages"
+        )
+      : normalizedOpenAIPayload;
+  },
 
-        if (providerResponse.status === 429) {
-          const retryAfterMsFromHeader = parseRetryAfterMs(providerResponse);
-          const fallbackRetryAfterMs =
-            account.provider === "kiro" ? 60 * 1000 : 60 * 60 * 1000;
-          const clonedResponse = providerResponse.clone();
-          try {
-            const errorBody = await clonedResponse.json();
-            const rateLimitInfo = parseRateLimitError(errorBody);
-            const retryAfterMs =
-              rateLimitInfo?.retryAfterMs ??
-              retryAfterMsFromHeader ??
-              fallbackRetryAfterMs;
+  async handleStream(ctx) {
+    const {
+      response,
+      account,
+      reply,
+      request,
+      requestStartTime,
+      startTime,
+      userId,
+      apiKeyId,
+      model,
+    } = ctx;
 
-            await markRateLimited(
-              account.id,
-              rateLimitScope,
-              retryAfterMs,
-              rateLimitInfo?.model,
-              rateLimitInfo?.message
-            );
+    // Reconstruct includeThinking from the original body stored in routeData
+    // We need the thinking param from the original anthropic body
+    const body = (request.body as Record<string, unknown>) || {};
+    const thinking = body.thinking as
+      | { type?: string }
+      | undefined;
+    const includeThinking = thinking?.type === "enabled";
 
-            await logUsage({
-              userId,
-              providerAccountId: account.id,
-              proxyApiKeyId: apiKeyId,
-              model,
-              inputTokens: 0,
-              outputTokens: 0,
-              statusCode: 429,
-              duration: Date.now() - startTime,
-            });
-
-            continue;
-          } catch {
-            const retryAfterMs = retryAfterMsFromHeader ?? fallbackRetryAfterMs;
-            await markRateLimited(account.id, rateLimitScope, retryAfterMs);
-            continue;
+    const origin = request.headers.origin;
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+      "X-Provider-Account-Id": account.id,
+      ...(origin
+        ? {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Expose-Headers": "*",
+            Vary: "Origin",
           }
-        }
+        : {}),
+    });
 
-        if (!providerResponse.ok) {
-          const errorText = await providerResponse.text();
-
-          // Timeouts (408) are transient — don't count them as account errors
-          if (providerResponse.status !== 408) {
-            const detailedError = buildAccountErrorMessage(errorText, {
-              model,
-              provider: account.provider,
-              endpoint: "/v1/messages",
-              messages: requestMessagesForError,
-              parameters: requestParamsForError,
-            });
-
-            await markAccountFailed(account.id, providerResponse.status, detailedError);
-          }
-
-          await logUsage({
-            userId,
-            providerAccountId: account.id,
-            proxyApiKeyId: apiKeyId,
-            model,
-            inputTokens: 0,
-            outputTokens: 0,
-            statusCode: providerResponse.status,
-            duration: Date.now() - startTime,
-          });
-
-          const sanitizedError = getSanitizedProxyError(
-            providerResponse.status,
-            errorText
-          );
-
-          lastAccountFailure = {
-            statusCode: providerResponse.status,
-            message: sanitizedError.message,
-            type: sanitizedError.type,
-          };
-
-          if (
-            shouldRotateToNextAccount(providerResponse.status) &&
-            attempt < accountRetryLimit - 1
-          ) {
-            continue;
-          }
-
-          return reply.code(lastAccountFailure.statusCode).send({
-            type: "error",
-            error: {
-              type: lastAccountFailure.type,
-              message: lastAccountFailure.message,
-            },
-          });
-        }
-
-        if (streamEnabled && providerResponse.body) {
-          const origin = request.headers.origin;
-          reply.raw.writeHead(200, {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-            "X-Provider-Account-Id": account.id,
-            ...(origin
-              ? {
-                  "Access-Control-Allow-Origin": origin,
-                  "Access-Control-Allow-Credentials": "true",
-                  "Access-Control-Expose-Headers": "*",
-                  Vary: "Origin",
-                }
-              : {}),
-          });
-
-          const tracker = createAnthropicStreamTracker(model, (usage) => {
-            markAccountSuccess(account.id).catch(() => undefined);
-            recordLatency(account.provider, model, true, Date.now() - requestStartTime).catch(() => undefined);
-
-            logUsage({
-              userId,
-              providerAccountId: account.id,
-              proxyApiKeyId: apiKeyId,
-              model,
-              inputTokens: usage.inputTokens,
-              outputTokens: usage.outputTokens,
-              statusCode: 200,
-              duration: Date.now() - startTime,
-              provider: account.provider,
-            });
-          }, includeThinking);
-
-          const startEvent = tracker.getStartEvent();
-          if (startEvent) {
-            reply.raw.write(startEvent);
-          }
-
-          const reader = providerResponse.body.getReader();
-          const decoder = new TextDecoder();
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const text = decoder.decode(value, { stream: true });
-              const transformed = tracker.processChunk(text);
-              if (transformed) {
-                reply.raw.write(transformed);
-              }
-            }
-          } catch {
-            // Stream may have been closed by the client
-          } finally {
-            const flushed = tracker.flush();
-            if (flushed) {
-              reply.raw.write(flushed);
-            }
-            reply.raw.end();
-          }
-
-          return;
-        }
-
-        const openaiResponse = await providerResponse.json() as OpenAIResponse;
-        const anthropicResponse = transformOpenAIToAnthropic(openaiResponse, model, includeThinking);
-
+    const tracker = createAnthropicStreamTracker(
+      model,
+      (usage) => {
         markAccountSuccess(account.id).catch(() => undefined);
-        recordLatency(account.provider, model, false, Date.now() - requestStartTime).catch(() => undefined);
+        recordLatency(
+          account.provider,
+          model,
+          true,
+          Date.now() - requestStartTime
+        ).catch(() => undefined);
 
         logUsage({
           userId,
           providerAccountId: account.id,
           proxyApiKeyId: apiKeyId,
           model,
-          inputTokens: openaiResponse.usage?.prompt_tokens ?? 0,
-          outputTokens: openaiResponse.usage?.completion_tokens ?? 0,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
           statusCode: 200,
           duration: Date.now() - startTime,
           provider: account.provider,
         });
+      },
+      includeThinking
+    );
 
-        return reply
-          .code(200)
-          .header("X-Provider-Account-Id", account.id)
-          .send(anthropicResponse);
-      } catch (error) {
-        const errorMessage = getErrorMessage(error);
-        const statusCode = getErrorStatusCode(error);
-        const detailedError = buildAccountErrorMessage(errorMessage, {
-          model,
-          provider: account.provider,
-          endpoint: "/v1/messages",
-          messages: requestMessagesForError,
-          parameters: requestParamsForError,
-        });
+    const startEvent = tracker.getStartEvent();
+    if (startEvent) {
+      reply.raw.write(startEvent);
+    }
 
-        request.log.error(
-          `[${account.provider}] request failed for account ${account.id}: ${errorMessage}`
-        );
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
 
-        await markAccountFailed(account.id, statusCode, detailedError);
-
-        await logUsage({
-          userId,
-          providerAccountId: account.id,
-          proxyApiKeyId: apiKeyId,
-          model,
-          inputTokens: 0,
-          outputTokens: 0,
-          statusCode,
-          duration: Date.now() - startTime,
-        });
-
-        const sanitizedError = getSanitizedProxyError(statusCode, errorMessage);
-
-        lastAccountFailure = {
-          statusCode,
-          message: sanitizedError.message,
-          type: sanitizedError.type,
-        };
-
-        if (shouldRotateToNextAccount(statusCode) && attempt < accountRetryLimit - 1) {
-          continue;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        const transformed = tracker.processChunk(text);
+        if (transformed) {
+          reply.raw.write(transformed);
         }
-
-        return reply.code(lastAccountFailure.statusCode).send({
-          type: "error",
-          error: {
-            type: lastAccountFailure.type,
-            message: lastAccountFailure.message,
-          },
-        });
       }
+    } catch {
+      // Stream may have been closed by the client
+    } finally {
+      const flushed = tracker.flush();
+      if (flushed) {
+        reply.raw.write(flushed);
+      }
+      reply.raw.end();
     }
+  },
 
-    // All retries exhausted
-    const waitTimeMs = await getMinWaitTime(triedAccountIds, rateLimitScope);
-    if (waitTimeMs > 0) {
-      return reply.code(529).send({
-        type: "error",
-        error: {
-          type: "overloaded_error",
-          message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
-          retry_after: formatWaitTimeMs(waitTimeMs),
-          retry_after_ms: waitTimeMs,
-        },
-      });
-    }
+  async handleNonStream(ctx) {
+    const {
+      response,
+      account,
+      reply,
+      request,
+      requestStartTime,
+      startTime,
+      userId,
+      apiKeyId,
+      model,
+    } = ctx;
 
-    if (lastAccountFailure) {
-      return reply.code(lastAccountFailure.statusCode).send({
-        type: "error",
-        error: {
-          type: lastAccountFailure.type,
-          message: lastAccountFailure.message,
-        },
-      });
-    }
+    const body = (request.body as Record<string, unknown>) || {};
+    const thinking = body.thinking as
+      | { type?: string }
+      | undefined;
+    const includeThinking = thinking?.type === "enabled";
 
-    return reply.code(503).send({
-      type: "error",
-      error: {
-        type: "api_error",
-        message: "No available accounts for this request.",
-      },
+    const openaiResponse =
+      (await response.json()) as OpenAIResponse;
+    const anthropicResponse = transformOpenAIToAnthropic(
+      openaiResponse,
+      model,
+      includeThinking
+    );
+
+    markAccountSuccess(account.id).catch(() => undefined);
+    recordLatency(
+      account.provider,
+      model,
+      false,
+      Date.now() - requestStartTime
+    ).catch(() => undefined);
+
+    logUsage({
+      userId,
+      providerAccountId: account.id,
+      proxyApiKeyId: apiKeyId,
+      model,
+      inputTokens: openaiResponse.usage?.prompt_tokens ?? 0,
+      outputTokens: openaiResponse.usage?.completion_tokens ?? 0,
+      statusCode: 200,
+      duration: Date.now() - startTime,
+      provider: account.provider,
     });
-  } catch (error) {
-    request.log.error(error, "Proxy error");
 
-    return reply.code(500).send({
-      type: "error",
-      error: {
-        type: "api_error",
-        message: "Internal server error",
-      },
-    });
-  }
-};
+    return reply
+      .code(200)
+      .header("X-Provider-Account-Id", account.id)
+      .send(anthropicResponse);
+  },
+});

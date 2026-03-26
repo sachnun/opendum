@@ -1,6 +1,6 @@
 "use client";
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
 import type { RequestsOverTimeData, Granularity } from "@/lib/actions/analytics";
@@ -24,15 +24,12 @@ function formatTick(value: string, granularity: Granularity): string {
   switch (granularity) {
     case "10s":
     case "1m":
-      // HH:mm:ss for short intervals
       return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     case "5m":
     case "15m":
     case "1h":
-      // HH:mm for medium intervals
       return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     case "1d":
-      // MM/DD for daily
       return `${date.getMonth() + 1}/${date.getDate()}`;
   }
 }
@@ -56,8 +53,13 @@ export function RequestsOverTimeChart({ data, granularity }: Props) {
         <EmptyChart />
       ) : (
         <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[250px]">
-          <LineChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid vertical={false} />
+          <AreaChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <defs>
+              <linearGradient id="fillRequests" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.01} />
+              </linearGradient>
+            </defs>
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10 }}
@@ -67,23 +69,26 @@ export function RequestsOverTimeChart({ data, granularity }: Props) {
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               tickLine={false}
               axisLine={false}
+              width={40}
             />
             <ChartTooltip
               content={<ChartTooltipContent />}
               labelFormatter={(value) => formatTooltipLabel(value, granularity)}
             />
-            <Line
-              type="monotone"
+            <Area
+              type="natural"
               dataKey="count"
               stroke="var(--color-count)"
-              strokeWidth={2}
+              strokeWidth={1.5}
+              fill="url(#fillRequests)"
+              fillOpacity={1}
               dot={false}
-              activeDot={{ r: 4 }}
+              activeDot={{ r: 3.5, strokeWidth: 0 }}
             />
-          </LineChart>
+          </AreaChart>
         </ChartContainer>
       )}
     </ChartCard>

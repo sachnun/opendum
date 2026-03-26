@@ -1,6 +1,7 @@
 [opendum]
 family = "Meta"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "yentinglin/llama-3-taiwan-70b-instruct"

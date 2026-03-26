@@ -1,5 +1,0 @@
-[opendum]
-providers = ["copilot"]
-
-[opendum.upstream]
-copilot = "claude-sonnet-3.5"

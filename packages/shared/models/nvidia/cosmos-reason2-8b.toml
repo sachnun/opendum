@@ -1,6 +1,7 @@
 [opendum]
 family = "NVIDIA"
 providers = ["nvidia_nim"]
+ignored = true
 
 [opendum.upstream]
 nvidia_nim = "nvidia/cosmos-reason2-8b"

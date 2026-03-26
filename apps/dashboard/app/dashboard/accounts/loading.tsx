@@ -5,12 +5,14 @@ const API_KEY_CARDS = Array.from({ length: 3 });
 
 function SummaryCardSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <Skeleton className="h-5 w-28" />
-        <Skeleton className="h-5 w-16 rounded-full" />
+    <div className="rounded-xl border border-border bg-card">
+      <div className="space-y-1 p-4 pb-3 sm:p-5 sm:pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
       </div>
-      <div className="flex items-center justify-between">
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5 flex items-center justify-between">
         <div className="flex flex-wrap gap-2">
           <Skeleton className="h-5 w-24 rounded-full" />
           <Skeleton className="h-5 w-20 rounded-full" />
@@ -25,7 +27,7 @@ export default function Loading() {
   return (
     <div className="space-y-6">
       <div className="relative">
-        <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-5">
+        <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-3">
           <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
             <div className="bg-background">
               <div className="border-b border-border pb-4">
@@ -37,11 +39,13 @@ export default function Loading() {
             </div>
           </div>
         </div>
-        <div className="h-[88px] sm:h-[84px] md:h-[96px]" />
+        <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
 
-      <section className="space-y-4">
-        <Skeleton className="h-5 w-48" />
+      <section className="space-y-4 md:space-y-2">
+        <div className="space-y-1">
+          <Skeleton className="h-5 w-48" />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {OAUTH_CARDS.map((_, index) => (
             <SummaryCardSkeleton key={`oauth-${index}`} />
@@ -49,8 +53,10 @@ export default function Loading() {
         </div>
       </section>
 
-      <section className="space-y-4">
-        <Skeleton className="h-5 w-48" />
+      <section className="space-y-4 md:space-y-2">
+        <div className="space-y-1">
+          <Skeleton className="h-5 w-48" />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {API_KEY_CARDS.map((_, index) => (
             <SummaryCardSkeleton key={`api-${index}`} />

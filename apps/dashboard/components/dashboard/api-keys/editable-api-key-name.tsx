@@ -36,7 +36,6 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
         throw new Error(result.error);
       }
 
-      toast.success("API key name updated");
       setEditDialogOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update API key name");
@@ -47,7 +46,7 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
 
   return (
     <div className="flex min-w-0 items-center gap-1">
-      <span className="min-w-0 truncate text-lg font-semibold">{name ?? "Unnamed Key"}</span>
+      <span className="min-w-0 truncate text-sm font-semibold">{name ?? "Unnamed Key"}</span>
       <Dialog open={editDialogOpen} onOpenChange={(open) => {
         setEditDialogOpen(open);
         if (open) setNewName(name ?? "");
@@ -56,34 +55,41 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
           <Button 
             variant="ghost" 
             size="sm" 
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground" 
+            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground" 
             title="Edit name"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-3 w-3" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="top-[38%] sm:top-[50%]">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Edit API Key Name</DialogTitle>
             <DialogDescription className="sr-only">
-              Change the name of your API key for easier identification.
+              Change the name of your API key.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-3">
             <Label htmlFor="apiKeyName">Name</Label>
             <Input
               id="apiKeyName"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="My API Key"
-              className="mt-2"
+              className="mt-1.5"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleUpdateName();
+                }
+              }}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>
             <Button
+              size="sm"
               onClick={handleUpdateName}
               disabled={isUpdating}
             >

@@ -1,3 +1,9 @@
+release_date = "2025-06-12"
+knowledge = "2024-06"
+reasoning = false
+tool_call = true
+attachment = true
+
 [limit]
 context = 128_000
 output = 4_096

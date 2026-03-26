@@ -1,6 +1,16 @@
+release_date = "2025-04"
+knowledge = "2025-04"
+reasoning = true
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.7
+output = 2.8
+
 [limit]
 context = 131_072
-output = 8_192
+output = 16_384
 
 [modalities]
 input = ["text"]

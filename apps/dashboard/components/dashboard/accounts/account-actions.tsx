@@ -45,7 +45,6 @@ export function AccountActions({ account }: { account: Account }) {
         throw new Error(result.error);
       }
 
-      toast.success("Account renamed");
       setEditDialogOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to rename account");
@@ -63,7 +62,6 @@ export function AccountActions({ account }: { account: Account }) {
         throw new Error(result.error);
       }
 
-      toast.success("Account deleted");
       setDeleteDialogOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete account");

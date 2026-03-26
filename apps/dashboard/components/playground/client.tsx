@@ -1,13 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Play, Plus, Square } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, Key, Play, Plus, Square } from "lucide-react";
 
 import {
   ChatPanel,
   type ModelOption,
   type ProviderAccountOption,
   type ResponseData,
+  type ToolCallData,
 } from "./chat-panel";
 import { ScenarioSelector, SCENARIOS, type Scenario } from "./scenario-selector";
 import {
@@ -18,13 +20,37 @@ import {
 } from "./settings-sheet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@/lib/model-families";
+
+export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
+
+export interface ApiKeyOption {
+  id: string;
+  name: string;
+  keyPreview: string;
+  decryptedKey: string;
+  modelAccessMode: ApiKeyModelAccessMode;
+  modelAccessList: string[];
+}
 
 interface PlaygroundClientProps {
   models: ModelOption[];
   providerAccounts: ProviderAccountOption[];
   initialModelId?: string;
-  apiKey?: string;
+  apiKeyOptions?: ApiKeyOption[];
 }
 
 interface PanelState {
@@ -205,24 +231,24 @@ function buildResponseMetrics(
 interface ParsedCompletionData {
   content: string;
   reasoning: string;
-  toolCallsText: string;
+  toolCalls: ToolCallData[];
   usage: ParsedUsageData | null;
 }
 
-function extractToolCallsText(toolCalls: unknown): string {
+function extractToolCallsData(toolCalls: unknown): ToolCallData[] {
   if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
-    return "";
+    return [];
   }
 
-  const lines = toolCalls
+  return toolCalls
     .map((toolCall, index) => {
       if (!toolCall || typeof toolCall !== "object") {
-        return `- tool_${index + 1}()`;
+        return { name: `tool_${index + 1}`, arguments: "{}" };
       }
 
       const fn = (toolCall as { function?: unknown }).function;
       if (!fn || typeof fn !== "object") {
-        return `- tool_${index + 1}()`;
+        return { name: `tool_${index + 1}`, arguments: "{}" };
       }
 
       const name =
@@ -238,20 +264,14 @@ function extractToolCallsText(toolCalls: unknown): string {
             ? "{}"
             : JSON.stringify(args);
 
-      return `- ${name}(${argText})`;
+      return { name, arguments: argText };
     })
-    .filter(Boolean);
-
-  if (lines.length === 0) {
-    return "";
-  }
-
-  return `Tool calls:\n${lines.join("\n")}`;
+    .filter((tc): tc is ToolCallData => tc !== null);
 }
 
 function extractChatCompletionData(payload: unknown): ParsedCompletionData {
   if (!payload || typeof payload !== "object") {
-    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    return { content: "", reasoning: "", toolCalls: [], usage: null };
   }
 
   const choices = (payload as { choices?: unknown }).choices;
@@ -259,7 +279,7 @@ function extractChatCompletionData(payload: unknown): ParsedCompletionData {
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData(payload),
     };
   }
@@ -269,7 +289,7 @@ function extractChatCompletionData(payload: unknown): ParsedCompletionData {
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData(payload),
     };
   }
@@ -279,7 +299,7 @@ function extractChatCompletionData(payload: unknown): ParsedCompletionData {
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData(payload),
     };
   }
@@ -289,7 +309,7 @@ function extractChatCompletionData(payload: unknown): ParsedCompletionData {
     reasoning: extractTextContent(
       (message as { reasoning_content?: unknown }).reasoning_content
     ),
-    toolCallsText: extractToolCallsText(
+    toolCalls: extractToolCallsData(
       (message as { tool_calls?: unknown }).tool_calls
     ),
     usage: extractUsageData(payload),
@@ -298,7 +318,7 @@ function extractChatCompletionData(payload: unknown): ParsedCompletionData {
 
 function extractStreamChunkData(payload: unknown): ParsedCompletionData {
   if (!payload || typeof payload !== "object") {
-    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    return { content: "", reasoning: "", toolCalls: [], usage: null };
   }
 
   const choices = (payload as { choices?: unknown }).choices;
@@ -306,7 +326,7 @@ function extractStreamChunkData(payload: unknown): ParsedCompletionData {
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData(payload),
     };
   }
@@ -316,7 +336,7 @@ function extractStreamChunkData(payload: unknown): ParsedCompletionData {
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData(payload),
     };
   }
@@ -326,7 +346,7 @@ function extractStreamChunkData(payload: unknown): ParsedCompletionData {
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData(payload),
     };
   }
@@ -336,7 +356,7 @@ function extractStreamChunkData(payload: unknown): ParsedCompletionData {
     reasoning: extractTextContent(
       (delta as { reasoning_content?: unknown }).reasoning_content
     ),
-    toolCallsText: "",
+    toolCalls: [],
     usage: extractUsageData(payload),
   };
 }
@@ -387,7 +407,7 @@ function processSseEvents(
       }
 
       const chunk = extractStreamChunkData(parsed);
-      if (chunk.content || chunk.reasoning || chunk.toolCallsText || chunk.usage) {
+      if (chunk.content || chunk.reasoning || chunk.toolCalls.length > 0 || chunk.usage) {
         onChunk(chunk);
       }
     }
@@ -810,12 +830,12 @@ function buildResponsesRequestBody(
   return requestBody;
 }
 
-function extractAnthropicToolCallsText(content: unknown): string {
+function extractAnthropicToolCallsData(content: unknown): ToolCallData[] {
   if (!Array.isArray(content) || content.length === 0) {
-    return "";
+    return [];
   }
 
-  const lines = content
+  return content
     .map((block, index) => {
       if (!block || typeof block !== "object") {
         return null;
@@ -839,20 +859,14 @@ function extractAnthropicToolCallsText(content: unknown): string {
             ? "{}"
             : JSON.stringify(input);
 
-      return `- ${name}(${inputText})`;
+      return { name, arguments: inputText };
     })
-    .filter((line): line is string => typeof line === "string" && line.length > 0);
-
-  if (lines.length === 0) {
-    return "";
-  }
-
-  return `Tool calls:\n${lines.join("\n")}`;
+    .filter((tc): tc is ToolCallData => tc !== null);
 }
 
 function extractAnthropicCompletionData(payload: unknown): ParsedCompletionData {
   if (!payload || typeof payload !== "object") {
-    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    return { content: "", reasoning: "", toolCalls: [], usage: null };
   }
 
   const contentBlocks = (payload as { content?: unknown }).content;
@@ -860,7 +874,7 @@ function extractAnthropicCompletionData(payload: unknown): ParsedCompletionData 
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData(payload),
     };
   }
@@ -894,7 +908,7 @@ function extractAnthropicCompletionData(payload: unknown): ParsedCompletionData 
   return {
     content: textParts.join(""),
     reasoning: reasoningParts.join(""),
-    toolCallsText: extractAnthropicToolCallsText(contentBlocks),
+    toolCalls: extractAnthropicToolCallsData(contentBlocks),
     usage: extractUsageData(payload),
   };
 }
@@ -921,7 +935,7 @@ function extractResponsesUsageData(payload: unknown): ParsedUsageData | null {
 
 function extractResponsesCompletionData(payload: unknown): ParsedCompletionData {
   if (!payload || typeof payload !== "object") {
-    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    return { content: "", reasoning: "", toolCalls: [], usage: null };
   }
 
   const outputItems = (payload as { output?: unknown }).output;
@@ -931,7 +945,7 @@ function extractResponsesCompletionData(payload: unknown): ParsedCompletionData 
 
   const textParts: string[] = [];
   const reasoningParts: string[] = [];
-  const toolCallLines: string[] = [];
+  const toolCallItems: ToolCallData[] = [];
 
   for (const item of outputItems) {
     if (!item || typeof item !== "object") {
@@ -1013,7 +1027,7 @@ function extractResponsesCompletionData(payload: unknown): ParsedCompletionData 
             : argumentsText === undefined
               ? "{}"
               : JSON.stringify(argumentsText);
-        toolCallLines.push(`- ${name.trim()}(${argText})`);
+        toolCallItems.push({ name: name.trim(), arguments: argText });
       }
     }
   }
@@ -1021,15 +1035,14 @@ function extractResponsesCompletionData(payload: unknown): ParsedCompletionData 
   return {
     content: textParts.join(""),
     reasoning: reasoningParts.join(""),
-    toolCallsText:
-      toolCallLines.length > 0 ? `Tool calls:\n${toolCallLines.join("\n")}` : "",
+    toolCalls: toolCallItems,
     usage: extractResponsesUsageData(payload),
   };
 }
 
 function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData {
   if (!payload || typeof payload !== "object") {
-    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    return { content: "", reasoning: "", toolCalls: [], usage: null };
   }
 
   const type = (payload as { type?: unknown }).type;
@@ -1038,7 +1051,7 @@ function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData
       return extractStreamChunkData(payload);
     }
 
-    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    return { content: "", reasoning: "", toolCalls: [], usage: null };
   }
 
   if (type.includes("output_text")) {
@@ -1049,7 +1062,7 @@ function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData
     return {
       content: typeof deltaOrText === "string" ? deltaOrText : "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: null,
     };
   }
@@ -1062,7 +1075,7 @@ function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData
     return {
       content: "",
       reasoning: typeof deltaOrText === "string" ? deltaOrText : "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: null,
     };
   }
@@ -1070,18 +1083,18 @@ function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData
   if (type === "response.output_item.added" || type === "response.output_item.done") {
     const item = (payload as { item?: unknown }).item;
     if (!item || typeof item !== "object") {
-      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+      return { content: "", reasoning: "", toolCalls: [], usage: null };
     }
 
     if ((item as { type?: unknown }).type !== "function_call") {
-      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+      return { content: "", reasoning: "", toolCalls: [], usage: null };
     }
 
     const name = (item as { name?: unknown }).name;
     const argumentsText = (item as { arguments?: unknown }).arguments;
 
     if (typeof name !== "string" || !name.trim()) {
-      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+      return { content: "", reasoning: "", toolCalls: [], usage: null };
     }
 
     const argText =
@@ -1094,7 +1107,7 @@ function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData
     return {
       content: "",
       reasoning: "",
-      toolCallsText: `Tool calls:\n- ${name.trim()}(${argText})`,
+      toolCalls: [{ name: name.trim(), arguments: argText }],
       usage: null,
     };
   }
@@ -1103,12 +1116,12 @@ function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractResponsesUsageData(payload),
     };
   }
 
-  return { content: "", reasoning: "", toolCallsText: "", usage: null };
+  return { content: "", reasoning: "", toolCalls: [], usage: null };
 }
 
 function extractAnthropicStreamChunkData(
@@ -1116,13 +1129,13 @@ function extractAnthropicStreamChunkData(
   payload: unknown
 ): ParsedCompletionData {
   if (!payload || typeof payload !== "object") {
-    return { content: "", reasoning: "", toolCallsText: "", usage: null };
+    return { content: "", reasoning: "", toolCalls: [], usage: null };
   }
 
   if (eventName === "content_block_delta") {
     const delta = (payload as { delta?: unknown }).delta;
     if (!delta || typeof delta !== "object") {
-      return { content: "", reasoning: "", toolCallsText: "", usage: null };
+      return { content: "", reasoning: "", toolCalls: [], usage: null };
     }
 
     const deltaType = (delta as { type?: unknown }).type;
@@ -1131,7 +1144,7 @@ function extractAnthropicStreamChunkData(
       return {
         content: typeof text === "string" ? text : "",
         reasoning: "",
-        toolCallsText: "",
+        toolCalls: [],
         usage: null,
       };
     }
@@ -1141,7 +1154,7 @@ function extractAnthropicStreamChunkData(
       return {
         content: "",
         reasoning: typeof thinking === "string" ? thinking : "",
-        toolCallsText: "",
+        toolCalls: [],
         usage: null,
       };
     }
@@ -1151,14 +1164,14 @@ function extractAnthropicStreamChunkData(
     return {
       content: "",
       reasoning: "",
-      toolCallsText: "",
+      toolCalls: [],
       usage: extractUsageData({
         usage: (payload as { usage?: unknown }).usage,
       }),
     };
   }
 
-  return { content: "", reasoning: "", toolCallsText: "", usage: null };
+  return { content: "", reasoning: "", toolCalls: [], usage: null };
 }
 
 function processAnthropicSseEvents(
@@ -1199,7 +1212,7 @@ function processAnthropicSseEvents(
     }
 
     const chunk = extractAnthropicStreamChunkData(eventName, parsed);
-    if (chunk.content || chunk.reasoning || chunk.toolCallsText || chunk.usage) {
+    if (chunk.content || chunk.reasoning || chunk.toolCalls.length > 0 || chunk.usage) {
       onChunk(chunk);
     }
   }
@@ -1267,7 +1280,7 @@ function processResponsesSseEvents(
       }
 
       const chunk = extractResponsesStreamChunkData(parsed);
-      if (chunk.content || chunk.reasoning || chunk.toolCallsText || chunk.usage) {
+      if (chunk.content || chunk.reasoning || chunk.toolCalls.length > 0 || chunk.usage) {
         onChunk(chunk);
       }
     }
@@ -1306,8 +1319,73 @@ async function consumeResponsesStream(
   }
 }
 
-export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKey }: PlaygroundClientProps) {
-  const apiKeyRef = React.useRef(apiKey);
+function filterModelsByApiKey(
+  models: ModelOption[],
+  apiKey: ApiKeyOption | null
+): ModelOption[] {
+  if (!apiKey || apiKey.modelAccessMode === "all") {
+    return models;
+  }
+
+  const modelSet = new Set(apiKey.modelAccessList);
+
+  if (apiKey.modelAccessMode === "whitelist") {
+    return models.filter((m) => modelSet.has(m.id));
+  }
+
+  // blacklist
+  return models.filter((m) => !modelSet.has(m.id));
+}
+
+function findApiKeyWithMostModels(
+  apiKeys: ApiKeyOption[],
+  models: ModelOption[]
+): string | null {
+  if (apiKeys.length === 0) {
+    return null;
+  }
+
+  let bestId = apiKeys[0].id;
+  let bestCount = -1;
+
+  for (const key of apiKeys) {
+    const count = filterModelsByApiKey(models, key).length;
+    if (count > bestCount) {
+      bestCount = count;
+      bestId = key.id;
+    }
+  }
+
+  return bestId;
+}
+
+export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKeyOptions = [] }: PlaygroundClientProps) {
+  const router = useRouter();
+  const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
+    () => findApiKeyWithMostModels(apiKeyOptions, models)
+  );
+  const [apiKeyPickerOpen, setApiKeyPickerOpen] = React.useState(false);
+
+  const selectedApiKey = React.useMemo(
+    () => apiKeyOptions.find((k) => k.id === selectedApiKeyId) ?? null,
+    [apiKeyOptions, selectedApiKeyId]
+  );
+  const apiKeyRef = React.useRef(selectedApiKey?.decryptedKey);
+
+  React.useEffect(() => {
+    apiKeyRef.current = selectedApiKey?.decryptedKey;
+  }, [selectedApiKey]);
+
+  const filteredModels = React.useMemo(
+    () => filterModelsByApiKey(models, selectedApiKey),
+    [models, selectedApiKey]
+  );
+
+  const filteredModelIds = React.useMemo(
+    () => new Set(filteredModels.map((m) => m.id)),
+    [filteredModels]
+  );
+
   const [panels, setPanels] = React.useState<PanelState[]>(() => {
     const validInitialModel = initialModelId && models.some((m) => m.id === initialModelId)
       ? initialModelId
@@ -1327,7 +1405,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
   const [responses, setResponses] = React.useState<Record<string, ResponseData>>({});
   const [isAnyLoading, setIsAnyLoading] = React.useState(false);
   const controllersRef = React.useRef(new Map<string, AbortController>());
-  const maxPanels = Math.max(models.length, 1);
+  const maxPanels = Math.max(filteredModels.length, 1);
 
   const providerAccountsById = React.useMemo(
     () => new Map(providerAccounts.map((account) => [account.id, account])),
@@ -1340,8 +1418,8 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
   );
 
   const familyPresets = React.useMemo(
-    () => buildFamilyPresets(models, providerAccounts),
-    [models, providerAccounts]
+    () => buildFamilyPresets(filteredModels, providerAccounts),
+    [filteredModels, providerAccounts]
   );
 
   const getValidAccountIdForPanel = React.useCallback(
@@ -1456,6 +1534,33 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
 
   const [activeFamilyPreset, setActiveFamilyPreset] = React.useState<string | null>(null);
 
+  // Reset panel model selections that are no longer available when API key changes
+  React.useEffect(() => {
+    setPanels((prev) => {
+      const needsUpdate = prev.some(
+        (panel) => panel.modelId && !filteredModelIds.has(panel.modelId)
+      );
+
+      if (!needsUpdate) {
+        return prev;
+      }
+
+      return prev.map((panel) => {
+        if (panel.modelId && !filteredModelIds.has(panel.modelId)) {
+          return { ...panel, modelId: null, accountId: null };
+        }
+        return panel;
+      });
+    });
+
+    setActiveFamilyPreset((prev) => {
+      if (!prev) return prev;
+      const preset = familyPresets.find((p) => p.family === prev);
+      if (!preset || preset.models.length === 0) return null;
+      return prev;
+    });
+  }, [filteredModelIds, familyPresets]);
+
   const activePresetModelIds = React.useMemo(() => {
     if (!activeFamilyPreset) {
       return null;
@@ -1471,6 +1576,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
 
   const handleScenarioSelect = (scenario: Scenario) => {
     setSelectedScenario(scenario);
+    setResponses({});
 
     if (scenario.isReasoning && settings.reasoningEffort === "none") {
       setSettings((prev) => ({ ...prev, reasoningEffort: "medium" }));
@@ -1629,6 +1735,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
       if (isStreamingResponse) {
         let streamedContent = "";
         let streamedReasoning = "";
+        let streamedToolCalls: ToolCallData[] = [];
         let firstResponseMs: number | null = null;
         let usage: ParsedUsageData | null = null;
 
@@ -1639,6 +1746,9 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
 
           streamedContent += chunk.content;
           streamedReasoning += chunk.reasoning;
+          if (chunk.toolCalls.length > 0) {
+            streamedToolCalls = [...streamedToolCalls, ...chunk.toolCalls];
+          }
           usage = mergeUsageData(usage, chunk.usage);
 
           setResponses((prev) => ({
@@ -1646,6 +1756,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
             [panelId]: {
               content: streamedContent,
               reasoning: streamedReasoning,
+              toolCalls: streamedToolCalls,
               isLoading: true,
               metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
               usedAccountId,
@@ -1666,6 +1777,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
           [panelId]: {
             content: streamedContent,
             reasoning: streamedReasoning,
+            toolCalls: streamedToolCalls,
             isLoading: false,
             metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
             usedAccountId,
@@ -1683,15 +1795,13 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
             ? extractResponsesCompletionData(data)
             : extractChatCompletionData(data);
       const firstResponseMs = Date.now() - requestStartedAt;
-      const combinedContent = [parsedData.toolCallsText, parsedData.content]
-        .filter((part) => typeof part === "string" && part.trim().length > 0)
-        .join("\n\n");
 
       setResponses((prev) => ({
         ...prev,
         [panelId]: {
-          content: combinedContent,
+          content: parsedData.content,
           reasoning: parsedData.reasoning,
+          toolCalls: parsedData.toolCalls,
           isLoading: false,
           metrics: buildResponseMetrics(waitMs, firstResponseMs, parsedData.usage),
           usedAccountId,
@@ -1728,6 +1838,9 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
           usedAccountId,
         },
       }));
+
+      // Refresh server data so sidebar provider indicators reflect the new error state
+      router.refresh();
     } finally {
       controllersRef.current.delete(panelId);
     }
@@ -1739,6 +1852,53 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold">Playground</h1>
           <div className="flex items-center gap-2">
+            {apiKeyOptions.length > 1 && (
+              <Popover open={apiKeyPickerOpen} onOpenChange={setApiKeyPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isAnyLoading}
+                    className="max-w-[200px] gap-1.5"
+                  >
+                    <Key className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {selectedApiKey ? selectedApiKey.name : "Select key"}
+                    </span>
+                    <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[280px] p-0" align="end">
+                  <Command>
+                    <CommandInput placeholder="Search API keys..." />
+                    <CommandList>
+                      <CommandEmpty>No API key found.</CommandEmpty>
+                      <CommandGroup heading="API Keys">
+                        {apiKeyOptions.map((key) => (
+                          <CommandItem
+                            key={key.id}
+                            value={`${key.name} ${key.keyPreview}`}
+                            onSelect={() => {
+                              setSelectedApiKeyId(key.id);
+                              setApiKeyPickerOpen(false);
+                            }}
+                            className={selectedApiKeyId === key.id ? "bg-accent" : ""}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">{key.name}</p>
+                              <p className="truncate text-[10px] text-muted-foreground font-mono">
+                                {key.keyPreview}
+                              </p>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
             {isAnyLoading ? (
               <Button
                 type="button"
@@ -1829,7 +1989,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
             <ChatPanel
               key={panel.id}
               panelId={panel.id}
-              models={models}
+              models={filteredModels}
               accountOptions={providerAccounts}
               selectedModel={panel.modelId}
               selectedAccountId={selectedAccountId}
@@ -1840,6 +2000,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
               response={responses[panel.id]}
               disabled={isAnyLoading}
               allowedModelIds={activePresetModelIds}
+              scenarioMessages={selectedScenario ? getScenarioMessages(selectedScenario) : []}
             />
           );
         })}

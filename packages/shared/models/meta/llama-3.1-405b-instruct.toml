@@ -1,6 +1,16 @@
+release_date = "2024-07-23"
+knowledge = "2023-12"
+reasoning = false
+tool_call = true
+attachment = false
+
+[cost]
+input = 0
+output = 0
+
 [limit]
 context = 128_000
-output = 4_096
+output = 128_000
 
 [modalities]
 input = ["text"]

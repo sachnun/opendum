@@ -121,7 +121,6 @@ export function ApiKeyModelAccess({
       setDraftModels(nextModels);
       setOpen(false);
       setModelPickerOpen(false);
-      toast.success("Model access updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update model access");
     } finally {
@@ -131,22 +130,20 @@ export function ApiKeyModelAccess({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{modeLabel}</Badge>
-        {savedMode !== "all" && (
-          <span className="text-xs text-muted-foreground">
-            {normalizedSavedModels.length} model{normalizedSavedModels.length > 1 ? "s" : ""}
-          </span>
-        )}
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs">
-            <ListFilter className="h-3.5 w-3.5" />
-            Model access
-          </Button>
-        </DialogTrigger>
-      </div>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+        >
+          <ListFilter className="h-3 w-3" />
+          <span>{modeLabel}</span>
+          {savedMode !== "all" && (
+            <span className="text-muted-foreground/70">({normalizedSavedModels.length})</span>
+          )}
+        </button>
+      </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Model Access Rules</DialogTitle>
           <DialogDescription className="sr-only">
@@ -154,9 +151,9 @@ export function ApiKeyModelAccess({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 py-2">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Mode</p>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium">Mode</p>
             <ToggleGroup
               type="single"
               variant="outline"
@@ -176,14 +173,14 @@ export function ApiKeyModelAccess({
           </div>
 
           {draftMode !== "all" && (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Models</p>
+                <p className="text-xs font-medium">Models</p>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className="h-6 px-1.5 text-[11px]"
                   onClick={() => setDraftModels([])}
                   disabled={normalizedDraftModels.length === 0}
                 >
@@ -195,7 +192,7 @@ export function ApiKeyModelAccess({
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-9 w-full justify-between px-3 text-xs"
+                    className="h-8 w-full justify-between px-2.5 text-xs"
                     disabled={isSaving}
                   >
                     <span className="truncate">
@@ -203,10 +200,10 @@ export function ApiKeyModelAccess({
                         ? `${normalizedDraftModels.length} model selected`
                         : "Select models"}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[min(90vw,30rem)] p-0">
+                <PopoverContent align="start" className="w-[min(90vw,28rem)] p-0">
                   <Command>
                     <CommandInput placeholder="Search model..." />
                     <CommandList>
@@ -214,7 +211,6 @@ export function ApiKeyModelAccess({
                       <CommandGroup>
                         {availableModels.map((modelId) => {
                           const selected = normalizedDraftModels.includes(modelId);
-
                           return (
                             <CommandItem
                               key={modelId}
@@ -224,11 +220,11 @@ export function ApiKeyModelAccess({
                             >
                               <Check
                                 className={cn(
-                                  "h-3.5 w-3.5",
+                                  "h-3 w-3",
                                   selected ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              <span className="truncate font-mono text-xs">{modelId}</span>
+                              <span className="truncate font-mono text-[11px]">{modelId}</span>
                             </CommandItem>
                           );
                         })}
@@ -238,21 +234,21 @@ export function ApiKeyModelAccess({
                 </PopoverContent>
               </Popover>
 
-              <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/20 p-2">
+              <div className="max-h-28 overflow-y-auto rounded-md border border-border bg-muted/20 p-1.5">
                 {normalizedDraftModels.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No models selected</p>
+                  <p className="text-[11px] text-muted-foreground px-1">No models selected</p>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {normalizedDraftModels.map((modelId) => (
-                      <Badge key={modelId} variant="secondary" className="max-w-full gap-1 pr-1 font-normal">
-                        <span className="min-w-0 truncate font-mono text-[11px]">{modelId}</span>
+                      <Badge key={modelId} variant="secondary" className="max-w-full gap-0.5 pr-0.5 font-normal text-[10px] py-0">
+                        <span className="min-w-0 truncate font-mono">{modelId}</span>
                         <button
                           type="button"
                           className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-muted-foreground cursor-pointer hover:text-foreground"
                           onClick={() => toggleModel(modelId)}
                           aria-label={`Remove ${modelId}`}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-2.5 w-2.5" />
                         </button>
                       </Badge>
                     ))}
@@ -264,10 +260,10 @@ export function ApiKeyModelAccess({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button variant="outline" size="sm" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving || !hasChanges}>
+          <Button size="sm" onClick={handleSave} disabled={isSaving || !hasChanges}>
             {isSaving ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

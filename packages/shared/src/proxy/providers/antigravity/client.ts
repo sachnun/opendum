@@ -36,6 +36,7 @@ import {
   createGeminiToOpenAISseTransform,
 } from "./converter.js";
 import { cacheSignature } from "./cache.js";
+import { convertImageUrlsToBase64 } from "../../image-utils.js";
 
 /**
  * Generate PKCE code verifier
@@ -72,11 +73,7 @@ function isTokenExpired(expiresAt: Date): boolean {
  */
 function resolveModelName(rawModel: string): string {
   let model = getUpstreamModelName(rawModel, "antigravity");
-  
   // Claude Opus models only exist as -thinking variants in Antigravity API
-  if (model === "claude-opus-4-5") {
-    model = "claude-opus-4-5-thinking";
-  }
   if (model === "claude-opus-4-6") {
     model = "claude-opus-4-6-thinking";
   }
@@ -299,9 +296,15 @@ export const antigravityProvider: Provider = {
       sessionId,
     };
 
+    const isClaudeModel = effectiveModel.includes("claude");
+
+    // Claude rejects image URLs — convert HTTP(S) URLs to base64 data URIs
+    if (isClaudeModel) {
+      normalizedBody.messages = await convertImageUrlsToBase64(normalizedBody.messages);
+    }
+
     const geminiPayload = convertOpenAIToGemini(normalizedBody);
 
-    const isClaudeModel = effectiveModel.includes("claude");
     const result = isClaudeModel
       ? transformClaudeRequest(context, geminiPayload)
       : transformGeminiRequest(context, geminiPayload);
@@ -340,12 +343,23 @@ export const antigravityProvider: Provider = {
           body: result.body,
         }, timeoutMs);
 
+        // 429 = quota exhausted (per-account, not per-endpoint).
+        // Return immediately so the proxy rate-limit handler can parse
+        // the quotaResetDelay and mark the account as rate-limited.
+        if (response.status === 429) {
+          const errorBody = await response.text();
+          return new Response(errorBody, {
+            status: 429,
+            statusText: response.statusText,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
         // Check if error is retryable (account/server related) vs parameter error
-        // Retryable: 5xx (server), 429 (rate limit), 401 (auth), 403 (permission), 404 (endpoint)
+        // Retryable: 5xx (server), 401 (auth), 403 (permission), 404 (endpoint)
         // Non-retryable: 400 (bad request), 409 (conflict), 422 (validation), other 4xx
         const isRetryableError =
           response.status >= 500 ||
-          response.status === 429 ||
           response.status === 401 ||
           response.status === 403 ||
           response.status === 404;

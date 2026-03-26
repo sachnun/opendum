@@ -1,3 +1,21 @@
+release_date = "2026-03-11"
+knowledge = "2024-04"
+reasoning = true
+tool_call = true
+attachment = false
+
+[cost]
+input = 0.2
+output = 0.8
+
+[limit]
+context = 262_144
+output = 262_144
+
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "NVIDIA"
 providers = ["openrouter"]

@@ -1,12 +1,20 @@
-release_date = "2026-02"
+release_date = "2026-02-05"
 knowledge = "2025-05"
 reasoning = true
 tool_call = true
 attachment = true
 
+[cost]
+input = 5
+output = 25
+
 [limit]
 context = 1_000_000
 output = 128_000
+
+[modalities]
+input = ["text","image","pdf"]
+output = ["text"]
 
 [opendum]
 family = "Claude"

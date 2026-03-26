@@ -1,11 +1,20 @@
-release_date = "2025-04-01"
+release_date = "2025-04-14"
+knowledge = "2024-04"
 reasoning = false
 tool_call = true
 attachment = true
 
+[cost]
+input = 2
+output = 8
+
 [limit]
-context = 128_000
-output = 16_384
+context = 1_047_576
+output = 32_768
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
 
 [opendum]
 family = "OpenAI"

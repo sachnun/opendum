@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
+import { AlertCircle, ArrowRight } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import type { ProviderAccountIndicator } from "@/lib/navigation";
 import {
@@ -15,7 +15,6 @@ import {
   PROVIDER_ACCOUNT_DEFINITIONS,
   type ProviderAccountKey,
   getProviderAccountPath,
-  getProviderSuccessMessage,
 } from "@/lib/provider-accounts";
 
 const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
@@ -162,13 +161,6 @@ export default async function AccountsPage({
         </div>
         <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
-
-      {params.success && (
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>{getProviderSuccessMessage(params.success)}</AlertDescription>
-        </Alert>
-      )}
 
       {params.error && (
         <Alert variant="destructive">

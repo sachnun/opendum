@@ -28,7 +28,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "antigravity",
     label: "Antigravity",
     category: "oauth",
-    emptyMessage: "No Antigravity accounts connected yet.",
+    emptyMessage: "No Antigravity connections yet.",
     showTier: true,
   },
   {
@@ -36,7 +36,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "codex",
     label: "Codex",
     category: "oauth",
-    emptyMessage: "No Codex accounts connected yet.",
+    emptyMessage: "No Codex connections yet.",
     showTier: true,
   },
   {
@@ -44,7 +44,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "copilot",
     label: "Copilot",
     category: "oauth",
-    emptyMessage: "No Copilot accounts connected yet.",
+    emptyMessage: "No Copilot connections yet.",
     showTier: false,
   },
   {
@@ -52,7 +52,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "gemini-cli",
     label: "Gemini CLI",
     category: "oauth",
-    emptyMessage: "No Gemini CLI accounts connected yet.",
+    emptyMessage: "No Gemini CLI connections yet.",
     showTier: true,
   },
   {
@@ -60,7 +60,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "iflow",
     label: "Iflow",
     category: "oauth",
-    emptyMessage: "No Iflow accounts connected yet.",
+    emptyMessage: "No Iflow connections yet.",
     showTier: false,
   },
   {
@@ -68,7 +68,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "kiro",
     label: "Kiro",
     category: "oauth",
-    emptyMessage: "No Kiro accounts connected yet.",
+    emptyMessage: "No Kiro connections yet.",
     showTier: false,
   },
   {
@@ -76,7 +76,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "qwen-code",
     label: "Qwen Code",
     category: "oauth",
-    emptyMessage: "No Qwen Code accounts connected yet.",
+    emptyMessage: "No Qwen Code connections yet.",
     showTier: false,
   },
   {
@@ -84,7 +84,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "nvidia-nim",
     label: "Nvidia",
     category: "api_key",
-    emptyMessage: "No Nvidia accounts connected yet.",
+    emptyMessage: "No Nvidia connections yet.",
     showTier: false,
   },
   {
@@ -92,7 +92,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "ollama-cloud",
     label: "Ollama Cloud",
     category: "api_key",
-    emptyMessage: "No Ollama Cloud accounts connected yet.",
+    emptyMessage: "No Ollama Cloud connections yet.",
     showTier: false,
   },
   {
@@ -100,7 +100,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     slug: "openrouter",
     label: "OpenRouter",
     category: "api_key",
-    emptyMessage: "No OpenRouter accounts connected yet.",
+    emptyMessage: "No OpenRouter connections yet.",
     showTier: false,
   },
   {
@@ -156,48 +156,48 @@ export function getProviderFromSlug(providerSlug: string): ProviderAccountKey | 
 
 export function getProviderSuccessMessage(successParam: string): string {
   if (successParam === "antigravity_added") {
-    return "Antigravity account connected successfully!";
+    return "Antigravity connected successfully!";
   }
 
   if (successParam === "qwen_code_added") {
-    return "Qwen Code account connected successfully!";
+    return "Qwen Code connected successfully!";
   }
 
   if (successParam === "copilot_added") {
-    return "Copilot account connected successfully!";
+    return "Copilot connected successfully!";
   }
 
   if (successParam === "gemini_cli_added") {
-    return "Gemini CLI account connected successfully!";
+    return "Gemini CLI connected successfully!";
   }
 
   if (successParam === "codex_added") {
-    return "Codex account connected successfully!";
+    return "Codex connected successfully!";
   }
 
   if (successParam === "kiro_added") {
-    return "Kiro account connected successfully!";
+    return "Kiro connected successfully!";
   }
 
   if (successParam === "iflow_added") {
-    return "Iflow account connected successfully!";
+    return "Iflow connected successfully!";
   }
 
   if (successParam === "nvidia_nim_added") {
-    return "Nvidia account connected successfully!";
+    return "Nvidia connected successfully!";
   }
 
   if (successParam === "ollama_cloud_added") {
-    return "Ollama Cloud account connected successfully!";
+    return "Ollama Cloud connected successfully!";
   }
 
   if (successParam === "openrouter_added") {
-    return "OpenRouter account connected successfully!";
+    return "OpenRouter connected successfully!";
   }
 
   if (successParam === "groq_added") {
     return "Groq account connected successfully!";
   }
 
-  return "Account connected successfully!";
+  return "Connected successfully!";
 }

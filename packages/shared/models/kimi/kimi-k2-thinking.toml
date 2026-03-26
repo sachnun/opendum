@@ -12,6 +12,10 @@ output = 2.5
 context = 262_144
 output = 262_144
 
+[modalities]
+input = ["text"]
+output = ["text"]
+
 [opendum]
 family = "Kimi"
 providers = ["iflow", "nvidia_nim", "ollama_cloud"]

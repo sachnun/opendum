@@ -236,6 +236,9 @@ export const proxyApiKey = pgTable(
     modelAccessMode: text("modelAccessMode").notNull().default("all"),
     modelAccessList: text("modelAccessList").array().notNull().default([]),
 
+    accountAccessMode: text("accountAccessMode").notNull().default("all"),
+    accountAccessList: text("accountAccessList").array().notNull().default([]),
+
     isActive: boolean("isActive").notNull().default(true),
     expiresAt: timestamp("expiresAt"),
     lastUsedAt: timestamp("lastUsedAt"),
@@ -248,6 +251,36 @@ export const proxyApiKey = pgTable(
   },
   (table) => [
     index("proxy_api_key_userId_idx").on(table.userId),
+  ],
+);
+
+export const proxyApiKeyRateLimit = pgTable(
+  "proxy_api_key_rate_limit",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    apiKeyId: text("apiKeyId")
+      .notNull()
+      .references(() => proxyApiKey.id, { onDelete: "cascade" }),
+    target: text("target").notNull(),
+    targetType: text("targetType").notNull().default("model"),
+    perMinute: integer("perMinute"),
+    perHour: integer("perHour"),
+    perDay: integer("perDay"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("proxy_api_key_rate_limit_apiKeyId_idx").on(table.apiKeyId),
+    uniqueIndex("proxy_api_key_rate_limit_apiKeyId_target_targetType_idx").on(
+      table.apiKeyId,
+      table.target,
+      table.targetType,
+    ),
   ],
 );
 
@@ -295,6 +328,29 @@ export const usageLog = pgTable(
     ),
     index("usage_log_providerAccountId_idx").on(table.providerAccountId),
     index("usage_log_createdAt_idx").on(table.createdAt),
+  ],
+);
+
+export const providerAccountDisabledModel = pgTable(
+  "provider_account_disabled_model",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    providerAccountId: text("providerAccountId")
+      .notNull()
+      .references(() => providerAccount.id, { onDelete: "cascade" }),
+    model: text("model").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("provider_account_disabled_model_accountId_model_key").on(
+      table.providerAccountId,
+      table.model,
+    ),
+    index("provider_account_disabled_model_providerAccountId_idx").on(
+      table.providerAccountId,
+    ),
   ],
 );
 

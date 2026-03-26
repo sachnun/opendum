@@ -1,5 +1,5 @@
-release_date = "2025-11-18"
-knowledge = "2025-07"
+release_date = "2025-09-29"
+knowledge = "2025-07-31"
 reasoning = true
 tool_call = true
 attachment = true
@@ -12,9 +12,13 @@ output = 15
 context = 200_000
 output = 64_000
 
+[modalities]
+input = ["text","image","pdf"]
+output = ["text"]
+
 [opendum]
 family = "Claude"
-providers = ["antigravity", "copilot", "kiro"]
+providers = ["copilot", "kiro"]
 aliases = ["claude-sonnet-4.5", "claude-sonnet4.5"]
 
 [opendum.upstream]

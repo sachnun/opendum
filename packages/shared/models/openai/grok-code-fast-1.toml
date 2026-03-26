@@ -1,11 +1,20 @@
-release_date = "2025-08-27"
-reasoning = true
+release_date = "2025-08-28"
+knowledge = "2023-10"
+reasoning = false
 tool_call = true
 attachment = false
 
+[cost]
+input = 0.2
+output = 1.5
+
 [limit]
-context = 128_000
-output = 64_000
+context = 256_000
+output = 10_000
+
+[modalities]
+input = ["text"]
+output = ["text"]
 
 [opendum]
 family = "OpenAI"

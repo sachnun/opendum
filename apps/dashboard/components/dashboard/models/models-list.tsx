@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { ModelCard } from "./model-card";
 import { toast } from "sonner";
 import {
@@ -14,6 +14,7 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import { setModelEnabled } from "@/lib/actions/models";
+import { useModelFamilyCounts } from "@/lib/model-family-counts-context";
 import type { ModelMeta } from "@opendum/shared/proxy/models";
 
 interface ModelWithStats {
@@ -78,7 +79,6 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
         throw new Error(result.error);
       }
 
-      toast.success(enabled ? "Model enabled" : "Model disabled");
     } catch (error) {
       setEnabledByModel((prev) => ({ ...prev, [modelId]: !enabled }));
       toast.error(
@@ -189,6 +189,20 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
 
     return sections;
   }, [filteredModels]);
+
+  // Keep sidebar family counts in sync with the currently visible sections.
+  const { setCounts, resetCounts } = useModelFamilyCounts();
+
+  useEffect(() => {
+    const next: Record<string, number> = {};
+    for (const section of modelSections) {
+      next[section.anchorId] = section.models.length;
+    }
+    setCounts(next);
+  }, [modelSections, setCounts]);
+
+  // Reset to server defaults when the models page unmounts.
+  useEffect(() => resetCounts, [resetCounts]);
 
   return (
     <div className="space-y-5">

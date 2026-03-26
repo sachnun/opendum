@@ -3,11 +3,15 @@
 /**
  * GitHub Copilot model discovery script.
  *
- * Scrapes the official GitHub docs repo for the LLM model variables defined in
- * copilot.yml and syncs them into the TOML model registry.  No authentication
- * is required — the data is publicly available.
+ * Fetches the official supported-models table from the GitHub docs repo and
+ * syncs it into the TOML model registry.  No authentication is required — the
+ * data is publicly available.
  *
- * Source: https://raw.githubusercontent.com/github/docs/main/data/variables/copilot.yml
+ * Source: https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-release-status.yml
+ *
+ * This file only lists models that are **currently supported** by GitHub
+ * Copilot.  Retired models are tracked separately in model-deprecation-history.yml
+ * and are intentionally excluded.
  *
  * Usage:
  *   node scripts/copilot.mjs
@@ -22,24 +26,16 @@ import { syncProviderToToml } from "./toml-utils.mjs";
 // Configuration
 // ---------------------------------------------------------------------------
 
-const COPILOT_YAML_URL =
-  "https://raw.githubusercontent.com/github/docs/main/data/variables/copilot.yml";
+const MODEL_TABLE_URL =
+  "https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-release-status.yml";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 const PROVIDER_NAME = "copilot";
 
-// Display names from copilot.yml that we intentionally skip (generic labels,
-// not actual deployable model identifiers).
-const IGNORED_DISPLAY_NAMES = new Set([
-  "Claude",
-  "Claude Sonnet",
-  "Gemini",
-]);
-
 // ---------------------------------------------------------------------------
 // Display name → { canonicalKey, upstreamName }
 //
-// The YAML file uses human-readable display names like "Claude Opus 4.6".
+// The YAML table uses human-readable display names like "Claude Opus 4.6".
 // The TOML registry uses dash-separated canonical keys like "claude-opus-4-6".
 // The Copilot API uses upstream names like "claude-opus-4.6" (dots for Claude,
 // identical to the TOML key for most OpenAI/Gemini models).
@@ -53,18 +49,13 @@ const IGNORED_DISPLAY_NAMES = new Set([
  * Only needed when algorithmic derivation would produce the wrong result.
  */
 const DISPLAY_NAME_OVERRIDES = {
-  // Claude Opus 4.1 has a non-standard upstream (no dot): "claude-opus-41"
-  "Claude Opus 4.1": { key: "claude-opus-4-1", upstream: "claude-opus-41" },
   // Gemini models — Copilot naming doesn't match TOML key conventions
-  "Gemini 2.0 Flash": { key: "gemini-2.0-flash", upstream: "gemini-2.0-flash" },
   "Gemini 2.5 Pro": { key: "gemini-2.5-pro", upstream: "gemini-2.5-pro" },
   "Gemini 3 Flash": { key: "gemini-3-flash-preview", upstream: "gemini-3-flash-preview" },
   "Gemini 3 Pro": { key: "gemini-3-pro-preview", upstream: "gemini-3-pro-preview" },
   "Gemini 3.1 Pro": { key: "gemini-3.1-pro-preview", upstream: "gemini-3.1-pro-preview" },
   // xAI
   "Grok Code Fast 1": { key: "grok-code-fast-1", upstream: "grok-code-fast-1" },
-  // Qwen
-  "Qwen2.5": { key: "qwen2.5-coder-32b", upstream: "qwen2.5-coder-32b" },
   // Microsoft fine-tuned — These are proprietary Copilot models without
   // existing TOML counterparts. Use lowercase-dashed keys.
   "Raptor mini": { key: "raptor-mini", upstream: "raptor-mini" },
@@ -82,26 +73,26 @@ function sleep(ms) {
 }
 
 // ---------------------------------------------------------------------------
-// Fetch copilot.yml
+// Fetch model-release-status.yml
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch copilot.yml from the GitHub docs repo.
+ * Fetch the supported-models table YAML from the GitHub docs repo.
  * @returns {Promise<string>} Raw YAML content.
  */
-async function fetchCopilotYaml() {
+async function fetchModelTable() {
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
     try {
-      const response = await fetch(COPILOT_YAML_URL, {
+      const response = await fetch(MODEL_TABLE_URL, {
         headers: { Accept: "text/plain" },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch copilot.yml: ${response.status} ${response.statusText}`
+          `Failed to fetch model-release-status.yml: ${response.status} ${response.statusText}`
         );
       }
 
@@ -119,67 +110,38 @@ async function fetchCopilotYaml() {
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("Failed to fetch copilot.yml");
+    : new Error("Failed to fetch model-release-status.yml");
 }
 
 // ---------------------------------------------------------------------------
-// Parse model display names from the YAML
+// Parse model display names from the YAML table
 // ---------------------------------------------------------------------------
 
 /**
- * Extract model display names from copilot.yml.
+ * Extract model display names from model-release-status.yml.
  *
- * We look for variables in the "## LLM models for Copilot" section.  Each
- * model variable has the form:
- *   copilot_<id>: 'Display Name'
- *
- * We skip generic category labels ("Claude", "Gemini") and comments.
+ * The file is a YAML array of objects, each with a `name` field containing the
+ * display name. We do a simple regex parse to avoid pulling in a full YAML
+ * parser dependency.
  *
  * @param {string} yaml  Raw YAML content
  * @returns {string[]}   Array of display names
  */
 function parseModelDisplayNames(yaml) {
   const names = [];
-  let inModelSection = false;
 
   for (const rawLine of yaml.split("\n")) {
     const line = rawLine.trim();
 
-    // Detect the LLM models section
-    if (line.startsWith("## LLM models for Copilot")) {
-      inModelSection = true;
-      continue;
-    }
-
-    // A new top-level section ends the model block.  Sub-category headers
-    // within the model section (like "## xAI:" or "## Qwen:") end with ":"
-    // so we keep going past those.
-    if (
-      inModelSection &&
-      line.startsWith("## ") &&
-      !line.startsWith("## LLM") &&
-      !line.endsWith(":")
-    ) {
-      break;
-    }
-
-    if (!inModelSection) continue;
-
-    // Skip comments and blank lines
-    if (!line || line.startsWith("#")) continue;
-
-    // Match YAML key-value: copilot_xxx: 'Display Name'
-    const match = line.match(/^copilot_\w+:\s*'(.+)'$/);
+    // Match YAML entries like: - name: 'GPT-4.1' or   name: 'Claude Opus 4.6'
+    const match = line.match(/^-?\s*name:\s*'(.+)'$/);
     if (!match) continue;
 
-    const displayName = match[1];
-    if (IGNORED_DISPLAY_NAMES.has(displayName)) continue;
-
-    names.push(displayName);
+    names.push(match[1]);
   }
 
   if (names.length === 0) {
-    throw new Error("No model display names found in copilot.yml");
+    throw new Error("No model display names found in model-release-status.yml");
   }
 
   return names;
@@ -236,13 +198,13 @@ async function main() {
   const verbose =
     process.argv.includes("--verbose") || process.argv.includes("-v");
 
-  // 1. Fetch copilot.yml
-  console.log(`[copilot] Fetching model list from GitHub docs repo ...`);
-  const yaml = await fetchCopilotYaml();
+  // 1. Fetch model-release-status.yml (only currently supported models)
+  console.log(`[copilot] Fetching supported models from GitHub docs repo ...`);
+  const yaml = await fetchModelTable();
 
   // 2. Parse display names
   const displayNames = parseModelDisplayNames(yaml);
-  console.log(`[copilot] Found ${displayNames.length} model display names.`);
+  console.log(`[copilot] Found ${displayNames.length} supported model display names.`);
 
   // 3. Build model map: canonical key → upstream name
   const modelMap = new Map();

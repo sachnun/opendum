@@ -4,14 +4,16 @@ import { disabledModel, providerAccount, proxyApiKey } from "@opendum/shared/db/
 import { eq, and, asc, desc } from "drizzle-orm";
 import { decrypt } from "@opendum/shared/encryption";
 import { getAllModels, getProvidersForModel, resolveModelAlias, getModelFamily } from "@opendum/shared/proxy/models";
+import { getAccountModelAvailability, isModelUsableByAccounts, type AccountModelAvailability } from "@opendum/shared/proxy/auth";
 import { PlaygroundClient } from "@/components/playground/client";
 import type {
   ModelOption,
   ProviderAccountOption,
 } from "@/components/playground/chat-panel";
+import type { ApiKeyOption, ApiKeyModelAccessMode } from "@/components/playground/client";
 
-// Get all models - one entry per model
-function getModels(disabledModels: Set<string>): ModelOption[] {
+// Get all models - one entry per model, filtered to only include models with usable accounts
+function getModels(disabledModels: Set<string>, availability: AccountModelAvailability): ModelOption[] {
   const models: ModelOption[] = [];
 
   for (const modelName of getAllModels()) {
@@ -19,7 +21,12 @@ function getModels(disabledModels: Set<string>): ModelOption[] {
       continue;
     }
 
-    const providers = getProvidersForModel(modelName);
+    // Skip models where all accounts have disabled them (or no active account exists)
+    if (!isModelUsableByAccounts(modelName, availability)) {
+      continue;
+    }
+
+    const providers = getProvidersForModel(modelName).filter((p) => availability.activeProviders.has(p));
 
     models.push({
       id: modelName,
@@ -61,15 +68,17 @@ export default async function PlaygroundPage({
 
   const { model: initialModelId } = await searchParams;
 
-  const disabledModels = await db
-    .select({ model: disabledModel.model })
-    .from(disabledModel)
-    .where(eq(disabledModel.userId, session.user.id));
+  const [disabledModels, availability] = await Promise.all([
+    db
+      .select({ model: disabledModel.model })
+      .from(disabledModel)
+      .where(eq(disabledModel.userId, session.user.id)),
+    getAccountModelAvailability(session.user.id),
+  ]);
   const disabledModelSet = new Set<string>(
     disabledModels.map((entry: { model: string }) => resolveModelAlias(entry.model))
   );
 
-  const models = getModels(disabledModelSet);
   const providerAccounts = await db
     .select({
       id: providerAccount.id,
@@ -86,11 +95,21 @@ export default async function PlaygroundPage({
     )
     .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
 
-  // Get the user's most recently used API key for playground proxy calls
-  let playgroundApiKey: string | undefined;
+  const models = getModels(disabledModelSet, availability);
+
+  // Get all active API keys for the playground key selector
+  let apiKeyOptions: ApiKeyOption[] = [];
   if (process.env.NEXT_PUBLIC_PROXY_URL) {
-    const [apiKey] = await db
-      .select({ encryptedKey: proxyApiKey.encryptedKey })
+    const activeKeys = await db
+      .select({
+        id: proxyApiKey.id,
+        name: proxyApiKey.name,
+        keyPreview: proxyApiKey.keyPreview,
+        encryptedKey: proxyApiKey.encryptedKey,
+        lastUsedAt: proxyApiKey.lastUsedAt,
+        modelAccessMode: proxyApiKey.modelAccessMode,
+        modelAccessList: proxyApiKey.modelAccessList,
+      })
       .from(proxyApiKey)
       .where(
         and(
@@ -98,16 +117,28 @@ export default async function PlaygroundPage({
           eq(proxyApiKey.isActive, true),
         ),
       )
-      .orderBy(desc(proxyApiKey.lastUsedAt))
-      .limit(1);
+      .orderBy(desc(proxyApiKey.lastUsedAt));
 
-    if (apiKey?.encryptedKey) {
-      try {
-        playgroundApiKey = decrypt(apiKey.encryptedKey);
-      } catch {
-        // Ignore decryption errors
-      }
-    }
+    apiKeyOptions = activeKeys
+      .map((key) => {
+        if (!key.encryptedKey) return null;
+        try {
+          const mode = key.modelAccessMode;
+          const validMode: ApiKeyModelAccessMode =
+            mode === "whitelist" || mode === "blacklist" ? mode : "all";
+          return {
+            id: key.id,
+            name: key.name,
+            keyPreview: key.keyPreview,
+            decryptedKey: decrypt(key.encryptedKey),
+            modelAccessMode: validMode,
+            modelAccessList: key.modelAccessList ?? [],
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((k): k is ApiKeyOption => k !== null);
   }
 
   return (
@@ -115,7 +146,7 @@ export default async function PlaygroundPage({
       models={models}
       providerAccounts={getProviderAccounts(providerAccounts)}
       initialModelId={initialModelId}
-      apiKey={playgroundApiKey}
+      apiKeyOptions={apiKeyOptions}
     />
   );
 }

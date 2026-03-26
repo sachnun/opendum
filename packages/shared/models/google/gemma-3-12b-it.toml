@@ -1,3 +1,21 @@
+release_date = "2024-12-01"
+knowledge = "2024-12"
+reasoning = false
+tool_call = false
+attachment = false
+
+[cost]
+input = 0.049999999999999996
+output = 0.09999999999999999
+
+[limit]
+context = 131_072
+output = 8_192
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
+
 [opendum]
 family = "Google"
 providers = ["openrouter"]
