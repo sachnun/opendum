@@ -50,27 +50,68 @@ function findMatchingRule(
   return null;
 }
 
-function getWindowKey(
-  apiKeyId: string,
-  target: string,
-  window: Window
-): string {
-  return `${RATE_LIMIT_KEY_PREFIX}:${apiKeyId}:${target}:${window}`;
-}
-
 /**
- * Get the current window bucket timestamp (floored to window boundary).
- * This is used as part of the sliding window approach:
- * we use a fixed window with the key expiring after the window duration.
+ * Get the current fixed-window bucket timestamp (floored to window boundary).
+ * Including the bucket in the Redis key ensures counters reset at window
+ * boundaries without relying on TTL resets.
  */
 function getWindowBucket(window: Window): number {
   const now = Math.floor(Date.now() / 1000);
   return now - (now % WINDOW_SECONDS[window]);
 }
 
+function getWindowKey(
+  apiKeyId: string,
+  target: string,
+  window: Window
+): string {
+  const bucket = getWindowBucket(window);
+  return `${RATE_LIMIT_KEY_PREFIX}:${apiKeyId}:${target}:${window}:${bucket}`;
+}
+
+/**
+ * Lua script for atomic check-and-increment across multiple windows.
+ *
+ * KEYS: one Redis key per window
+ * ARGV: [numWindows, limit1, ttl1, label1, limit2, ttl2, label2, ...]
+ *
+ * Returns an array:
+ *   [1]            -- 1 = allowed, 0 = denied
+ *   [2] (if denied) -- index (1-based) of the exceeded window
+ *   [3] (if denied) -- current count in the exceeded window
+ */
+const RATE_LIMIT_LUA = `
+local n = tonumber(ARGV[1])
+
+-- Phase 1: check all windows
+for i = 1, n do
+  local offset = (i - 1) * 3
+  local limit = tonumber(ARGV[2 + offset])
+  local current = tonumber(redis.call('GET', KEYS[i]) or '0') or 0
+  if current >= limit then
+    return {0, i, current}
+  end
+end
+
+-- Phase 2: all windows OK, increment all counters
+for i = 1, n do
+  local offset = (i - 1) * 3
+  local ttl = tonumber(ARGV[3 + offset])
+  local count = redis.call('INCR', KEYS[i])
+  -- Only set expiry when the key is first created (count == 1)
+  -- so the window boundary stays fixed.
+  if count == 1 then
+    redis.call('EXPIRE', KEYS[i], ttl)
+  end
+end
+
+return {1}
+`;
+
 /**
  * Check rate limits for an API key + model combination.
- * If allowed, increments the counters atomically.
+ * Uses a Lua script for atomic check-and-increment to prevent race conditions.
+ * Keys include a bucket timestamp for fixed-window semantics.
  * Returns whether the request is allowed.
  */
 export async function checkAndIncrementRateLimit(
@@ -105,37 +146,46 @@ export async function checkAndIncrementRateLimit(
   const redis = await getRedisClient();
   const target = rule.target;
 
-  // Check all windows first
+  // Build KEYS and ARGV for the Lua script
   const keys = limits.map((l) => getWindowKey(apiKeyId, target, l.window));
-  const counts = await redis.mget(...keys);
 
-  for (let i = 0; i < limits.length; i++) {
-    const current = counts[i] ? parseInt(counts[i]!, 10) : 0;
-    if (current >= limits[i].limit) {
-      const bucket = getWindowBucket(limits[i].window);
-      const windowEnd = bucket + WINDOW_SECONDS[limits[i].window];
-      const now = Math.floor(Date.now() / 1000);
-      const retryAfterSeconds = Math.max(1, windowEnd - now);
-
-      return {
-        allowed: false,
-        retryAfterSeconds,
-        exceededWindow: limits[i].label,
-        limit: limits[i].limit,
-        current,
-      };
-    }
-  }
-
-  // All windows OK -- increment all counters atomically via pipeline
-  const pipeline = redis.pipeline();
+  // ARGV: [numWindows, limit1, ttl1, label1, limit2, ttl2, label2, ...]
+  // Labels are not used inside Lua but we keep the structure aligned;
+  // Lua only reads limit and ttl.  We add +1 to the TTL so the key
+  // stays around briefly past the window boundary (avoids edge-case
+  // where the key expires a tick before the window ends).
+  const argv: (string | number)[] = [limits.length];
   for (const l of limits) {
-    const key = getWindowKey(apiKeyId, target, l.window);
-    const ttl = WINDOW_SECONDS[l.window];
-    pipeline.incr(key);
-    pipeline.expire(key, ttl);
+    argv.push(l.limit, WINDOW_SECONDS[l.window] + 1, l.label);
   }
-  await pipeline.exec();
 
-  return { allowed: true };
+  const result = (await redis.eval(
+    RATE_LIMIT_LUA,
+    keys.length,
+    ...keys,
+    ...argv
+  )) as number[];
+
+  if (result[0] === 1) {
+    return { allowed: true };
+  }
+
+  // Denied -- result = [0, windowIndex (1-based), currentCount]
+  const exceededIdx = result[1] - 1;
+  const current = result[2];
+  const exceeded = limits[exceededIdx];
+
+  // Calculate retry time based on the fixed window boundary
+  const bucket = getWindowBucket(exceeded.window);
+  const windowEnd = bucket + WINDOW_SECONDS[exceeded.window];
+  const now = Math.floor(Date.now() / 1000);
+  const retryAfterSeconds = Math.max(1, windowEnd - now);
+
+  return {
+    allowed: false,
+    retryAfterSeconds,
+    exceededWindow: exceeded.label,
+    limit: exceeded.limit,
+    current,
+  };
 }
