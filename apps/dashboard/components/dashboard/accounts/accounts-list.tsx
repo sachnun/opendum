@@ -588,18 +588,13 @@ function LastErrorMessageDialog({
                       : entry.errorMessage;
 
                   return (
-                    <details key={entry.id} className="rounded-md border bg-background/70 p-2">
-                      <summary className="cursor-pointer break-words text-xs text-foreground">
-                        <span className="font-medium">{relativeTime}</span>
-                        <span className="mx-1 text-muted-foreground">-</span>
-                        <span className="font-mono text-[11px] text-muted-foreground">{codeLabel}</span>
-                        <span className="mx-1 text-muted-foreground">-</span>
-                        <span className="text-muted-foreground">{previewText}</span>
-                      </summary>
-                      <p className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-foreground">
-                        {entry.errorMessage}
-                      </p>
-                    </details>
+                    <ErrorHistoryEntry
+                      key={entry.id}
+                      relativeTime={relativeTime}
+                      codeLabel={codeLabel}
+                      previewText={previewText}
+                      errorMessage={entry.errorMessage}
+                    />
                   );
                 })}
               </div>
@@ -612,6 +607,59 @@ function LastErrorMessageDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ErrorHistoryEntry({
+  relativeTime,
+  codeLabel,
+  previewText,
+  errorMessage,
+}: {
+  relativeTime: string;
+  codeLabel: string;
+  previewText: string;
+  errorMessage: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(errorMessage);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
+  return (
+    <details className="rounded-md border bg-background/70 p-2">
+      <summary className="cursor-pointer break-words text-xs text-foreground">
+        <span className="font-medium">{relativeTime}</span>
+        <span className="mx-1 text-muted-foreground">-</span>
+        <span className="font-mono text-[11px] text-muted-foreground">{codeLabel}</span>
+        <span className="mx-1 text-muted-foreground">-</span>
+        <span className="text-muted-foreground">{previewText}</span>
+      </summary>
+      <div className="mt-2 flex items-start gap-2">
+        <p className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+          {errorMessage}
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          aria-label="Copy error message"
+          onClick={handleCopy}
+          title="Copy error message"
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+    </details>
   );
 }
 
