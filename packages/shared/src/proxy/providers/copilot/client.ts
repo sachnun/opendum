@@ -108,10 +108,12 @@ function isReasoningModel(model: string): boolean {
 
 /**
  * Check if a model requires the Responses API on GitHub Copilot.
- * Codex models are not accessible via /chat/completions on Copilot's API.
+ * Codex models and gpt-5.4+ are not accessible via /chat/completions
+ * on Copilot's API.
  */
 function requiresCopilotResponsesApi(model: string): boolean {
-  return model.toLowerCase().includes("codex");
+  const lower = model.toLowerCase();
+  return lower.includes("codex") || lower.startsWith("gpt-5.4");
 }
 
 /**
