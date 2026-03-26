@@ -971,7 +971,7 @@ function AccountCard({
           )}
         </div>
         <div className="mt-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <AccountActions account={account} />
             {account.isActive && (
               <Button
