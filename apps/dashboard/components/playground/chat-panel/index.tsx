@@ -42,6 +42,7 @@ export interface ProviderAccountOption {
   provider: string;
   name: string;
   email: string | null;
+  disabledModels?: string[];
 }
 
 export interface ResponseMetrics {

@@ -1400,7 +1400,10 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
       // Preset from account card: create panels for all compatible models for this account's provider
       const account = providerAccounts.find((a) => a.id === preset.accountId);
       if (account) {
-        const compatibleModels = models.filter((m) => m.providers.includes(account.provider));
+        const accountDisabledSet = new Set(account.disabledModels ?? []);
+        const compatibleModels = models.filter(
+          (m) => m.providers.includes(account.provider) && !accountDisabledSet.has(m.id)
+        );
         if (compatibleModels.length > 0) {
           return compatibleModels.map((model) => ({
             id: generateId(),

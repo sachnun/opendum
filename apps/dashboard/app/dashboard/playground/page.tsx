@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { disabledModel, providerAccount, proxyApiKey } from "@opendum/shared/db/schema";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { disabledModel, providerAccount, providerAccountDisabledModel, proxyApiKey } from "@opendum/shared/db/schema";
+import { eq, and, asc, desc, inArray } from "drizzle-orm";
 import { decrypt } from "@opendum/shared/encryption";
 import { getAllModels, getProvidersForModel, resolveModelAlias, getModelFamily } from "@opendum/shared/proxy/models";
 import { getAccountModelAvailability, isModelUsableByAccounts, type AccountModelAvailability } from "@opendum/shared/proxy/auth";
@@ -41,17 +41,21 @@ function getModels(disabledModels: Set<string>, availability: AccountModelAvaila
   return models;
 }
 
-function getProviderAccounts(accounts: Array<{
-  id: string;
-  provider: string;
-  name: string;
-  email: string | null;
-}>): ProviderAccountOption[] {
+function getProviderAccounts(
+  accounts: Array<{
+    id: string;
+    provider: string;
+    name: string;
+    email: string | null;
+  }>,
+  disabledModelsByAccount: Map<string, string[]>
+): ProviderAccountOption[] {
   return accounts.map((account) => ({
     id: account.id,
     provider: account.provider,
     name: account.name,
     email: account.email,
+    disabledModels: disabledModelsByAccount.get(account.id),
   }));
 }
 
@@ -88,6 +92,30 @@ export default async function PlaygroundPage() {
       ),
     )
     .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
+
+  // Fetch per-account disabled models so the playground can exclude them when
+  // opening from a specific account preset.
+  const disabledModelsByAccount = new Map<string, string[]>();
+  if (providerAccounts.length > 0) {
+    const accountIds = providerAccounts.map((a) => a.id);
+    const perAccountDisabled = await db
+      .select({
+        providerAccountId: providerAccountDisabledModel.providerAccountId,
+        model: providerAccountDisabledModel.model,
+      })
+      .from(providerAccountDisabledModel)
+      .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds));
+
+    for (const entry of perAccountDisabled) {
+      const canonical = resolveModelAlias(entry.model);
+      const list = disabledModelsByAccount.get(entry.providerAccountId);
+      if (list) {
+        list.push(canonical);
+      } else {
+        disabledModelsByAccount.set(entry.providerAccountId, [canonical]);
+      }
+    }
+  }
 
   const models = getModels(disabledModelSet, availability);
 
@@ -138,7 +166,7 @@ export default async function PlaygroundPage() {
   return (
     <PlaygroundClient
       models={models}
-      providerAccounts={getProviderAccounts(providerAccounts)}
+      providerAccounts={getProviderAccounts(providerAccounts, disabledModelsByAccount)}
       apiKeyOptions={apiKeyOptions}
     />
   );
