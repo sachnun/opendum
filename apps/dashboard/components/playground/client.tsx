@@ -35,11 +35,15 @@ import {
 } from "@/components/ui/command";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@/lib/model-families";
 
+export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
+
 export interface ApiKeyOption {
   id: string;
   name: string;
   keyPreview: string;
   decryptedKey: string;
+  modelAccessMode: ApiKeyModelAccessMode;
+  modelAccessList: string[];
 }
 
 interface PlaygroundClientProps {
@@ -1315,6 +1319,24 @@ async function consumeResponsesStream(
   }
 }
 
+function filterModelsByApiKey(
+  models: ModelOption[],
+  apiKey: ApiKeyOption | null
+): ModelOption[] {
+  if (!apiKey || apiKey.modelAccessMode === "all") {
+    return models;
+  }
+
+  const modelSet = new Set(apiKey.modelAccessList);
+
+  if (apiKey.modelAccessMode === "whitelist") {
+    return models.filter((m) => modelSet.has(m.id));
+  }
+
+  // blacklist
+  return models.filter((m) => !modelSet.has(m.id));
+}
+
 export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKeyOptions = [] }: PlaygroundClientProps) {
   const router = useRouter();
   const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
@@ -1331,6 +1353,16 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
   React.useEffect(() => {
     apiKeyRef.current = selectedApiKey?.decryptedKey;
   }, [selectedApiKey]);
+
+  const filteredModels = React.useMemo(
+    () => filterModelsByApiKey(models, selectedApiKey),
+    [models, selectedApiKey]
+  );
+
+  const filteredModelIds = React.useMemo(
+    () => new Set(filteredModels.map((m) => m.id)),
+    [filteredModels]
+  );
 
   const [panels, setPanels] = React.useState<PanelState[]>(() => {
     const validInitialModel = initialModelId && models.some((m) => m.id === initialModelId)
@@ -1351,7 +1383,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
   const [responses, setResponses] = React.useState<Record<string, ResponseData>>({});
   const [isAnyLoading, setIsAnyLoading] = React.useState(false);
   const controllersRef = React.useRef(new Map<string, AbortController>());
-  const maxPanels = Math.max(models.length, 1);
+  const maxPanels = Math.max(filteredModels.length, 1);
 
   const providerAccountsById = React.useMemo(
     () => new Map(providerAccounts.map((account) => [account.id, account])),
@@ -1364,8 +1396,8 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
   );
 
   const familyPresets = React.useMemo(
-    () => buildFamilyPresets(models, providerAccounts),
-    [models, providerAccounts]
+    () => buildFamilyPresets(filteredModels, providerAccounts),
+    [filteredModels, providerAccounts]
   );
 
   const getValidAccountIdForPanel = React.useCallback(
@@ -1479,6 +1511,33 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
   const hasSelectedModel = panels.some((panel) => panel.modelId);
 
   const [activeFamilyPreset, setActiveFamilyPreset] = React.useState<string | null>(null);
+
+  // Reset panel model selections that are no longer available when API key changes
+  React.useEffect(() => {
+    setPanels((prev) => {
+      const needsUpdate = prev.some(
+        (panel) => panel.modelId && !filteredModelIds.has(panel.modelId)
+      );
+
+      if (!needsUpdate) {
+        return prev;
+      }
+
+      return prev.map((panel) => {
+        if (panel.modelId && !filteredModelIds.has(panel.modelId)) {
+          return { ...panel, modelId: null, accountId: null };
+        }
+        return panel;
+      });
+    });
+
+    setActiveFamilyPreset((prev) => {
+      if (!prev) return prev;
+      const preset = familyPresets.find((p) => p.family === prev);
+      if (!preset || preset.models.length === 0) return null;
+      return prev;
+    });
+  }, [filteredModelIds, familyPresets]);
 
   const activePresetModelIds = React.useMemo(() => {
     if (!activeFamilyPreset) {
@@ -1908,7 +1967,7 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
             <ChatPanel
               key={panel.id}
               panelId={panel.id}
-              models={models}
+              models={filteredModels}
               accountOptions={providerAccounts}
               selectedModel={panel.modelId}
               selectedAccountId={selectedAccountId}

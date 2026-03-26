@@ -10,7 +10,7 @@ import type {
   ModelOption,
   ProviderAccountOption,
 } from "@/components/playground/chat-panel";
-import type { ApiKeyOption } from "@/components/playground/client";
+import type { ApiKeyOption, ApiKeyModelAccessMode } from "@/components/playground/client";
 
 // Get all models - one entry per model, filtered to only include models with usable accounts
 function getModels(disabledModels: Set<string>, availability: AccountModelAvailability): ModelOption[] {
@@ -107,6 +107,8 @@ export default async function PlaygroundPage({
         keyPreview: proxyApiKey.keyPreview,
         encryptedKey: proxyApiKey.encryptedKey,
         lastUsedAt: proxyApiKey.lastUsedAt,
+        modelAccessMode: proxyApiKey.modelAccessMode,
+        modelAccessList: proxyApiKey.modelAccessList,
       })
       .from(proxyApiKey)
       .where(
@@ -121,11 +123,16 @@ export default async function PlaygroundPage({
       .map((key) => {
         if (!key.encryptedKey) return null;
         try {
+          const mode = key.modelAccessMode;
+          const validMode: ApiKeyModelAccessMode =
+            mode === "whitelist" || mode === "blacklist" ? mode : "all";
           return {
             id: key.id,
             name: key.name,
             keyPreview: key.keyPreview,
             decryptedKey: decrypt(key.encryptedKey),
+            modelAccessMode: validMode,
+            modelAccessList: key.modelAccessList ?? [],
           };
         } catch {
           return null;
