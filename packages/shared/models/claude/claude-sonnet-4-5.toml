@@ -18,7 +18,7 @@ output = ["text"]
 
 [opendum]
 family = "Claude"
-providers = ["antigravity", "copilot", "kiro"]
+providers = ["copilot", "kiro"]
 aliases = ["claude-sonnet-4.5", "claude-sonnet4.5"]
 
 [opendum.upstream]
