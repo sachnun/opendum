@@ -976,12 +976,12 @@ function AccountCard({
             {account.isActive && (
               <Button
                 type="button"
-                variant="ghost"
-                size="icon-sm"
+                variant="outline"
+                size="sm"
                 title="Open in Playground"
                 onClick={handleOpenPlayground}
               >
-                <FlaskConical className="h-4 w-4" />
+                <FlaskConical className="h-3 w-3" />
               </Button>
             )}
           </div>

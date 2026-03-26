@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3, Play } from "lucide-react";
+import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3, FlaskConical } from "lucide-react";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { usePlaygroundPreset } from "@/lib/playground-preset-context";
 import type { ModelMeta } from "@opendum/shared/proxy/models";
@@ -145,8 +145,7 @@ export function ModelCard({
                 router.push("/dashboard/playground");
               }}
             >
-              <Play className="h-3 w-3" />
-              Play
+              <FlaskConical className="h-3 w-3" />
             </Button>
           )}
         </div>

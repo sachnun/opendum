@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { ChevronDown, Copy, Check, Search, Play, Brain, Wrench, Eye, Calendar, BarChart3 } from "lucide-react";
+import { ChevronDown, Copy, Check, Search, FlaskConical, Brain, Wrench, Eye, Calendar, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -177,8 +177,7 @@ function ModelDetailContent({
             onClick={onClose}
           >
             <Link href={`/dashboard/playground?model=${encodeURIComponent(model.id)}`}>
-              <Play className="h-3 w-3" />
-              Play
+              <FlaskConical className="h-3 w-3" />
             </Link>
           </Button>
         )}
