@@ -18,9 +18,8 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = ["kiro", "nvidia_nim", "ollama_cloud"]
+providers = ["nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]
-kiro = "qwen3-coder-480b"
 nvidia_nim = "qwen/qwen3-coder-480b-a35b-instruct"
 ollama_cloud = "qwen3-coder:480b"

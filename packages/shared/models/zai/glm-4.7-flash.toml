@@ -18,7 +18,4 @@ output = ["text"]
 
 [opendum]
 family = "Z.AI"
-providers = ["kiro"]
-
-[opendum.upstream]
-kiro = "glm-4.7-flash"
+providers = []
