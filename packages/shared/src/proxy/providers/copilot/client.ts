@@ -27,6 +27,7 @@ import {
   COPILOT_REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet, MODEL_REGISTRY, resolveModelAlias } from "../../models.js";
+import { convertImageUrlsToBase64, convertResponsesInputImageUrlsToBase64 } from "../../image-utils.js";
 import {
   convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
@@ -806,6 +807,22 @@ export const copilotProvider: Provider = {
     const modelName = body.model.includes("/") ? body.model.split("/").pop()! : body.model;
     const upstreamModel = resolveCopilotModel(modelName);
     const xInitiator = body._copilotXInitiator === "agent" ? "agent" : "user";
+
+    // Copilot rejects external image URLs — convert to base64 data URIs.
+    // Must happen before isCopilotVisionRequest() so the vision header is
+    // still set correctly (data URIs are still detected as image content).
+    if (Array.isArray(body.messages)) {
+      body = { ...body, messages: await convertImageUrlsToBase64(body.messages) };
+    }
+    if (Array.isArray(body._responsesInput) && body._responsesInput.length > 0) {
+      body = {
+        ...body,
+        _responsesInput: await convertResponsesInputImageUrlsToBase64(
+          body._responsesInput as Array<Record<string, unknown>>
+        ),
+      };
+    }
+
     const visionRequest = isCopilotVisionRequest(body);
 
     const fallbackMs = stream
