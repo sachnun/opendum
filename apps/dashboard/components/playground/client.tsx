@@ -1337,10 +1337,32 @@ function filterModelsByApiKey(
   return models.filter((m) => !modelSet.has(m.id));
 }
 
+function findApiKeyWithMostModels(
+  apiKeys: ApiKeyOption[],
+  models: ModelOption[]
+): string | null {
+  if (apiKeys.length === 0) {
+    return null;
+  }
+
+  let bestId = apiKeys[0].id;
+  let bestCount = -1;
+
+  for (const key of apiKeys) {
+    const count = filterModelsByApiKey(models, key).length;
+    if (count > bestCount) {
+      bestCount = count;
+      bestId = key.id;
+    }
+  }
+
+  return bestId;
+}
+
 export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKeyOptions = [] }: PlaygroundClientProps) {
   const router = useRouter();
   const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
-    () => apiKeyOptions.length > 0 ? apiKeyOptions[0].id : null
+    () => findApiKeyWithMostModels(apiKeyOptions, models)
   );
   const [apiKeyPickerOpen, setApiKeyPickerOpen] = React.useState(false);
 
