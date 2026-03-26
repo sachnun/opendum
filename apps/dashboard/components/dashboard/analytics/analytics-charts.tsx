@@ -57,6 +57,19 @@ interface StatCard {
   title: string;
   value: string;
   detail?: string;
+  detailClassName?: string;
+}
+
+function compactNumber(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
+function formatDuration(ms: number): string {
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.round(ms)}ms`;
 }
 
 interface AnalyticsChartsProps {
@@ -195,25 +208,62 @@ export function AnalyticsCharts({
   };
 
   const statCards: StatCard[] = data
-    ? [
-        {
-          title: "Total Requests",
-          value: data.totals.totalRequests.toLocaleString(),
-        },
-        {
-          title: "Total Tokens",
-          value: (data.totals.totalInputTokens + data.totals.totalOutputTokens).toLocaleString(),
-          detail: `${data.totals.totalInputTokens.toLocaleString()} in / ${data.totals.totalOutputTokens.toLocaleString()} out`,
-        },
-        {
-          title: "Avg Duration",
-          value: data.totals.avgDuration > 0 ? `${data.totals.avgDuration}ms` : "-",
-        },
-        {
-          title: "Success Rate",
-          value: data.totals.totalRequests > 0 ? `${data.totals.successRate}%` : "-",
-        },
-      ]
+    ? (() => {
+        const { totals, requestsByModel } = data;
+        const totalTokens = totals.totalInputTokens + totals.totalOutputTokens;
+        const failedRequests = totals.totalRequests - Math.round((totals.successRate / 100) * totals.totalRequests);
+        const avgTokensPerReq = totals.totalRequests > 0 ? Math.round(totalTokens / totals.totalRequests) : 0;
+        const avgInPerReq = totals.totalRequests > 0 ? Math.round(totals.totalInputTokens / totals.totalRequests) : 0;
+        const avgOutPerReq = totals.totalRequests > 0 ? Math.round(totals.totalOutputTokens / totals.totalRequests) : 0;
+        const topModel = requestsByModel[0];
+        const topModelPct = topModel && totals.totalRequests > 0
+          ? Math.round((topModel.count / totals.totalRequests) * 100)
+          : 0;
+
+        return [
+          {
+            title: "Total Requests",
+            value: compactNumber(totals.totalRequests),
+            detail: failedRequests > 0 ? `${failedRequests.toLocaleString()} failed` : "0 failed",
+            detailClassName: failedRequests > 0 ? "text-red-500" : undefined,
+          },
+          {
+            title: "Total Tokens",
+            value: compactNumber(totalTokens),
+            detail: `${compactNumber(totals.totalInputTokens)} in / ${compactNumber(totals.totalOutputTokens)} out`,
+          },
+          {
+            title: "Models Used",
+            value: requestsByModel.length.toString(),
+            detail: topModel
+              ? `Top: ${topModel.model.split("/").pop()} (${topModelPct}%)`
+              : undefined,
+          },
+          {
+            title: "P50 Latency",
+            value: totals.durationPercentiles
+              ? formatDuration(totals.durationPercentiles.p50)
+              : "-",
+            detail: totals.durationPercentiles
+              ? `p95 ${formatDuration(totals.durationPercentiles.p95)} · p99 ${formatDuration(totals.durationPercentiles.p99)}`
+              : undefined,
+          },
+          {
+            title: "Success Rate",
+            value: totals.totalRequests > 0 ? `${totals.successRate}%` : "-",
+            detail: totals.totalRequests > 0
+              ? `${Math.round((totals.successRate / 100) * totals.totalRequests).toLocaleString()} / ${totals.totalRequests.toLocaleString()}`
+              : undefined,
+          },
+          {
+            title: "Avg Tokens/Req",
+            value: totals.totalRequests > 0 ? compactNumber(avgTokensPerReq) : "-",
+            detail: totals.totalRequests > 0
+              ? `${compactNumber(avgInPerReq)} in / ${compactNumber(avgOutPerReq)} out`
+              : undefined,
+          },
+        ];
+      })()
     : [];
 
   return (
@@ -350,14 +400,14 @@ export function AnalyticsCharts({
       </div>
 
       {data && (
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          {statCards.map((item, index) => (
-            <div key={item.title} className={`rounded-xl bg-muted/40 px-4 py-4 sm:px-5 ${index < 2 ? "col-span-2 sm:col-span-1" : ""}`}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          {statCards.map((item) => (
+            <div key={item.title} className="rounded-xl bg-muted/40 px-4 py-4 sm:px-5">
               <p className="text-xs font-medium text-muted-foreground">
                 {item.title}
               </p>
               <p className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{item.value}</p>
-              {item.detail && <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>}
+              {item.detail && <p className={`mt-1 text-xs text-muted-foreground ${item.detailClassName ?? ""}`}>{item.detail}</p>}
             </div>
           ))}
         </div>
