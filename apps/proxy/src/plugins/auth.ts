@@ -3,6 +3,7 @@ import {
   validateApiKey,
   type ApiKeyModelAccessMode,
   type ApiKeyAccountAccessMode,
+  type RateLimitRule,
 } from "@opendum/shared";
 
 export interface AuthenticatedUser {
@@ -12,6 +13,7 @@ export interface AuthenticatedUser {
   modelAccessList: string[];
   accountAccessMode: ApiKeyAccountAccessMode;
   accountAccessList: string[];
+  rateLimitRules: RateLimitRule[];
 }
 
 /**
@@ -56,5 +58,6 @@ export async function authenticateRequest(
     modelAccessList: authResult.modelAccessList ?? [],
     accountAccessMode: authResult.accountAccessMode ?? "all",
     accountAccessList: authResult.accountAccessList ?? [],
+    rateLimitRules: authResult.rateLimitRules ?? [],
   };
 }

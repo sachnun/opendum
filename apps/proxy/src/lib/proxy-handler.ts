@@ -38,6 +38,7 @@ import {
   shouldRotateToNextAccount,
   type ProxyErrorType,
 } from "./error-utils.js";
+import { checkAndIncrementRateLimit } from "./api-key-rate-limit.js";
 
 // ---------------------------------------------------------------------------
 // Shared passthrough usage tracker (for chat-completions and responses routes)
@@ -207,7 +208,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
     // 1. Auth
     const auth = await authenticateRequest(request, reply);
     if (!auth) return;
-    const { userId, apiKeyId, modelAccessMode, modelAccessList, accountAccessMode, accountAccessList } = auth;
+    const { userId, apiKeyId, modelAccessMode, modelAccessList, accountAccessMode, accountAccessList, rateLimitRules } = auth;
     const apiKeyModelAccess: ApiKeyModelAccess = {
       mode: modelAccessMode,
       models: modelAccessList,
@@ -260,6 +261,21 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
       }
 
       const { provider, model } = modelValidation;
+
+      // 3b. Per-API-key rate limit check
+      if (apiKeyId && rateLimitRules.length > 0) {
+        const rlResult = await checkAndIncrementRateLimit(apiKeyId, model, rateLimitRules);
+        if (!rlResult.allowed) {
+          reply.header("Retry-After", String(rlResult.retryAfterSeconds ?? 60));
+          return reply.code(config.rateLimitStatusCode).send(
+            config.formatError({
+              message: `Rate limit exceeded for ${model}: ${rlResult.current}/${rlResult.limit} requests per ${rlResult.exceededWindow}. Retry after ${rlResult.retryAfterSeconds}s.`,
+              type: "rate_limit_error",
+            })
+          );
+        }
+      }
+
       const rateLimitScope = getRateLimitScope(model);
       const MAX_ACCOUNT_RETRIES = 5;
       const triedAccountIds: string[] = [];
