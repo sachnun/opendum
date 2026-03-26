@@ -14,6 +14,7 @@ let kiroProvider: Provider | null = null;
 let nvidiaNimProvider: Provider | null = null;
 let ollamaCloudProvider: Provider | null = null;
 let openRouterProvider: Provider | null = null;
+let groqProvider: Provider | null = null;
 
 /**
  * Get a provider instance by name
@@ -90,6 +91,13 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
       }
       return openRouterProvider;
 
+    case ProviderName.GROQ:
+      if (!groqProvider) {
+        const { groqProvider: provider } = await import("./groq/index.js");
+        groqProvider = provider;
+      }
+      return groqProvider;
+
     default:
       throw new Error(`Unknown provider: ${name}`);
   }
@@ -99,7 +107,7 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim] = await Promise.all([
+  const [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq] = await Promise.all([
     getProvider(ProviderName.IFLOW),
     getProvider(ProviderName.ANTIGRAVITY),
     getProvider(ProviderName.COPILOT),
@@ -110,8 +118,9 @@ export async function getAllProviders(): Promise<Provider[]> {
     getProvider(ProviderName.OLLAMA_CLOUD),
     getProvider(ProviderName.OPENROUTER),
     getProvider(ProviderName.NVIDIA_NIM),
+    getProvider(ProviderName.GROQ),
   ]);
-  return [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim];
+  return [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq];
 }
 
 /**

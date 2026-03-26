@@ -60,6 +60,9 @@ import {
 import {
   OPENROUTER_API_BASE_URL,
 } from "@opendum/shared/proxy/providers/openrouter/constants";
+import {
+  GROQ_API_BASE_URL,
+} from "@opendum/shared/proxy/providers/groq/constants";
 import { getProviderModelMap } from "@opendum/shared/proxy/models";
 
 export type ActionResult<T = void> = 
@@ -117,6 +120,13 @@ const API_KEY_PROVIDER_SETTINGS = {
     label: "OpenRouter",
     baseUrl: OPENROUTER_API_BASE_URL,
     modelMap: getProviderModelMap("openrouter"),
+    validationPath: "/models",
+    requireSuccessfulStatus: true,
+  },
+  groq: {
+    label: "Groq",
+    baseUrl: GROQ_API_BASE_URL,
+    modelMap: getProviderModelMap("groq"),
     validationPath: "/models",
     requireSuccessfulStatus: true,
   },
@@ -571,6 +581,33 @@ export async function connectOpenRouterApiKey(
   } catch (error) {
     console.error("Failed to connect OpenRouter account:", error);
     return { success: false, error: "Failed to connect OpenRouter account" };
+  }
+}
+
+/**
+ * Connect Groq account using API key
+ */
+export async function connectGroqApiKey(
+  apiKey: string,
+  accountName?: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    return await connectApiKeyProviderAccount(
+      session.user.id,
+      "groq",
+      "Groq",
+      apiKey,
+      accountName
+    );
+  } catch (error) {
+    console.error("Failed to connect Groq account:", error);
+    return { success: false, error: "Failed to connect Groq account" };
   }
 }
 

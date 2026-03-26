@@ -35,6 +35,7 @@ function createEmptyProviderAccountMap<T>(createValue: () => T): Record<Provider
     kiro: createValue(),
     iflow: createValue(),
     gemini_cli: createValue(),
+    groq: createValue(),
     qwen_code: createValue(),
     nvidia_nim: createValue(),
     ollama_cloud: createValue(),
@@ -248,6 +249,7 @@ export default async function ProviderAccountsPage({
         nvidiaNimAccounts={groupedAccounts.nvidia_nim}
         ollamaCloudAccounts={groupedAccounts.ollama_cloud}
         openRouterAccounts={groupedAccounts.openrouter}
+        groqAccounts={groupedAccounts.groq}
         visibleProviders={[selectedProvider]}
         supportedModelsByProvider={{ [selectedProvider]: providerModels }}
         disabledModelsByAccountId={disabledModelsByAccountId}

@@ -18,7 +18,8 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim"]
+providers = ["nvidia_nim", "groq"]
 
 [opendum.upstream]
 nvidia_nim = "meta/llama-3.1-8b-instruct"
+groq = "llama-3.1-8b-instant"

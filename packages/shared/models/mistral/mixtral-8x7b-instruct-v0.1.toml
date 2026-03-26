@@ -17,7 +17,8 @@ output = ["text"]
 
 [opendum]
 family = "Mistral"
-providers = ["nvidia_nim"]
+providers = ["nvidia_nim", "groq"]
 
 [opendum.upstream]
 nvidia_nim = "mistralai/mixtral-8x7b-instruct-v0.1"
+groq = "mixtral-8x7b-32768"

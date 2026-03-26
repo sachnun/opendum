@@ -202,6 +202,7 @@ export const ProviderName = {
   OLLAMA_CLOUD: "ollama_cloud",
   OPENROUTER: "openrouter",
   NVIDIA_NIM: "nvidia_nim",
+  GROQ: "groq",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
@@ -233,4 +234,5 @@ export const API_KEY_PROVIDER_NAMES: ProviderNameType[] = [
   ProviderName.OLLAMA_CLOUD,
   ProviderName.OPENROUTER,
   ProviderName.NVIDIA_NIM,
+  ProviderName.GROQ,
 ];

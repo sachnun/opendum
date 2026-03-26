@@ -3,6 +3,7 @@ export type ProviderAccountKey =
   | "codex"
   | "copilot"
   | "gemini_cli"
+  | "groq"
   | "iflow"
   | "kiro"
   | "nvidia_nim"
@@ -102,6 +103,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     emptyMessage: "No OpenRouter connections yet.",
     showTier: false,
   },
+  {
+    key: "groq",
+    slug: "groq",
+    label: "Groq",
+    category: "api_key",
+    emptyMessage: "No Groq accounts connected yet.",
+    showTier: false,
+  },
 ];
 
 export const PROVIDER_ACCOUNT_BY_KEY: Record<ProviderAccountKey, ProviderAccountDefinition> =
@@ -184,6 +193,10 @@ export function getProviderSuccessMessage(successParam: string): string {
 
   if (successParam === "openrouter_added") {
     return "OpenRouter connected successfully!";
+  }
+
+  if (successParam === "groq_added") {
+    return "Groq account connected successfully!";
   }
 
   return "Connected successfully!";

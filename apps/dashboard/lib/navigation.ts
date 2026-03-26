@@ -28,6 +28,7 @@ export interface ProviderAccountCounts {
   codex: number;
   copilot: number;
   gemini_cli: number;
+  groq: number;
   iflow: number;
   kiro: number;
   nvidia_nim: number;
@@ -43,6 +44,7 @@ export interface ProviderAccountIndicators {
   codex: ProviderAccountIndicator;
   copilot: ProviderAccountIndicator;
   gemini_cli: ProviderAccountIndicator;
+  groq: ProviderAccountIndicator;
   iflow: ProviderAccountIndicator;
   kiro: ProviderAccountIndicator;
   nvidia_nim: ProviderAccountIndicator;
@@ -86,6 +88,7 @@ export const primaryNavigation: NavItem[] = [
         name: "OpenRouter",
         href: getProviderAccountPath("openrouter"),
       },
+      { name: "Groq", href: getProviderAccountPath("groq") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],
   },

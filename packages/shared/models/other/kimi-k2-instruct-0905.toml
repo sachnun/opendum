@@ -1,0 +1,14 @@
+tool_call = true
+attachment = false
+
+[limit]
+context = 262_144
+output = 16_384
+
+[opendum]
+family = "Moonshot"
+providers = ["groq"]
+aliases = ["kimi-k2"]
+
+[opendum.upstream]
+groq = "moonshotai/kimi-k2-instruct-0905"
