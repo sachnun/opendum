@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { endOfDay, format, startOfDay } from "date-fns";
-import type { LucideIcon } from "lucide-react";
-import { CheckCircle, ChevronDown, Clock3, KeyRound, RefreshCw, TrendingUp, Zap } from "lucide-react";
+import { ChevronDown, Clock3, KeyRound, RefreshCw } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -58,7 +57,6 @@ interface StatCard {
   title: string;
   value: string;
   detail?: string;
-  icon: LucideIcon;
 }
 
 interface AnalyticsChartsProps {
@@ -201,23 +199,19 @@ export function AnalyticsCharts({
         {
           title: "Total Requests",
           value: data.totals.totalRequests.toLocaleString(),
-          icon: TrendingUp,
         },
         {
           title: "Total Tokens",
           value: (data.totals.totalInputTokens + data.totals.totalOutputTokens).toLocaleString(),
           detail: `${data.totals.totalInputTokens.toLocaleString()} in / ${data.totals.totalOutputTokens.toLocaleString()} out`,
-          icon: Zap,
         },
         {
           title: "Avg Duration",
           value: data.totals.avgDuration > 0 ? `${data.totals.avgDuration}ms` : "-",
-          icon: Clock3,
         },
         {
           title: "Success Rate",
           value: data.totals.totalRequests > 0 ? `${data.totals.successRate}%` : "-",
-          icon: CheckCircle,
         },
       ]
     : [];
@@ -356,20 +350,15 @@ export function AnalyticsCharts({
       </div>
 
       {data && (
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {statCards.map((item, index) => (
-            <Card key={item.title} className={`border-border bg-card py-4 ${index < 2 ? "col-span-2 sm:col-span-1" : ""}`}>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 pb-2 sm:px-5">
-                <CardTitle className="text-sm text-muted-foreground">
-                  {item.title}
-                </CardTitle>
-                <item.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="space-y-1 px-4 sm:px-5">
-                <p className="text-2xl font-semibold tracking-tight sm:text-3xl">{item.value}</p>
-                {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
-              </CardContent>
-            </Card>
+            <div key={item.title} className={`rounded-xl bg-muted/40 px-4 py-4 sm:px-5 ${index < 2 ? "col-span-2 sm:col-span-1" : ""}`}>
+              <p className="text-xs font-medium text-muted-foreground">
+                {item.title}
+              </p>
+              <p className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{item.value}</p>
+              {item.detail && <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>}
+            </div>
           ))}
         </div>
       )}
@@ -383,7 +372,7 @@ export function AnalyticsCharts({
             <SuccessRateChart data={data.successRate} granularity={data.granularity} />
           </div>
         ) : (
-          <Card className="border-border bg-card py-8">
+          <Card className="border-border/50 bg-card/50 py-8">
             <CardContent className="px-5 text-sm text-muted-foreground sm:text-base">
               No data in the selected time range.
             </CardContent>
