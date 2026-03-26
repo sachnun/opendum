@@ -1,6 +1,6 @@
 release_date = "2025-08-28"
 knowledge = "2023-10"
-reasoning = true
+reasoning = false
 tool_call = true
 attachment = false
 
