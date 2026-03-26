@@ -10,7 +10,7 @@ function getAccountIndicatorClass(indicator: ProviderAccountIndicator): string {
     return "bg-yellow-500";
   }
 
-  return "bg-primary";
+  return "bg-green-500 dark:bg-primary";
 }
 
 interface AccountStatusIndicatorProps {
