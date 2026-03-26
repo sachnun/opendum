@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   AlertCircle,
@@ -8,6 +9,7 @@ import {
   Check,
   CheckCircle,
   Copy,
+  FlaskConical,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,6 +67,7 @@ import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
 import { setAccountModelEnabled } from "@/lib/actions/account-models";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
+import { usePlaygroundPreset } from "@/lib/playground-preset-context";
 
 type AccountQuotaInfo =
   | AntigravityAccountQuotaInfo
@@ -818,6 +821,13 @@ function AccountCard({
   const errorCountToneClass = hasErrors ? errorToneClass : "text-muted-foreground";
   const lastErrorToneClass = account.lastErrorAt ? errorToneClass : "text-muted-foreground";
   const [isToggling, setIsToggling] = useState(false);
+  const router = useRouter();
+  const { setPreset } = usePlaygroundPreset();
+
+  const handleOpenPlayground = () => {
+    setPreset({ accountId: account.id });
+    router.push("/dashboard/playground");
+  };
 
   const handleToggleActive = async () => {
     setIsToggling(true);
@@ -961,7 +971,20 @@ function AccountCard({
           )}
         </div>
         <div className="mt-4 flex items-center justify-between gap-2">
-          <AccountActions account={account} />
+          <div className="flex items-center gap-1">
+            <AccountActions account={account} />
+            {account.isActive && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="Open in Playground"
+                onClick={handleOpenPlayground}
+              >
+                <FlaskConical className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-[11px] text-muted-foreground">
               {account.isActive ? "On" : "Off"}
