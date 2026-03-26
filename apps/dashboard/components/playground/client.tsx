@@ -1397,17 +1397,18 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
     }
 
     if (preset?.accountId) {
-      // Preset from account card: find first compatible model for this account's provider
+      // Preset from account card: create panels for all compatible models for this account's provider
       const account = providerAccounts.find((a) => a.id === preset.accountId);
       if (account) {
-        const firstModel = models.find((m) => m.providers.includes(account.provider));
-        return [
-          {
+        const compatibleModels = models.filter((m) => m.providers.includes(account.provider));
+        if (compatibleModels.length > 0) {
+          return compatibleModels.map((model) => ({
             id: generateId(),
-            modelId: firstModel?.id ?? null,
+            modelId: model.id,
             accountId: account.id,
-          },
-        ];
+          }));
+        }
+        return [{ id: generateId(), modelId: null, accountId: account.id }];
       }
     }
 
