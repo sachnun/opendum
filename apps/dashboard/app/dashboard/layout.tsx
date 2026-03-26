@@ -12,7 +12,8 @@ import {
   MODEL_FAMILY_NAV_ITEMS,
   categorizeModelFamily,
 } from "@/lib/model-families";
-import { getAllModels, getModelFamily as getModelFamilyFromRegistry, getProvidersForModel } from "@opendum/shared/proxy/models";
+import { getAllModels, getModelFamily as getModelFamilyFromRegistry } from "@opendum/shared/proxy/models";
+import { getAccountModelAvailability, isModelUsableByAccounts } from "@opendum/shared/proxy/auth";
 import type {
   ModelFamilyCounts,
   ProviderAccountIndicator,
@@ -181,6 +182,9 @@ export default async function DashboardLayout({
     }
   }
 
+  // Get account-level model availability (considers per-account disabled models)
+  const availability = await getAccountModelAvailability(session.user.id);
+
   const familyAnchorByName = new Map(
     MODEL_FAMILY_NAV_ITEMS.map((item) => [item.name, item.anchorId] as const)
   );
@@ -190,10 +194,10 @@ export default async function DashboardLayout({
     modelFamilyCounts[item.anchorId] = 0;
   }
 
-  // Only count models whose provider(s) the user has an active account for,
+  // Only count models that have at least one usable active account,
   // so sidebar counts stay in sync with the models page.
   const allModels = getAllModels().filter((model) =>
-    getProvidersForModel(model).some((p) => activeProviderNames.has(p))
+    isModelUsableByAccounts(model, availability)
   );
 
   for (const modelId of allModels) {
@@ -231,6 +235,7 @@ export default async function DashboardLayout({
               statsByModel={statsByModel}
               fallbackDayKeys={fallbackDayKeys}
               fallbackHourKeys={fallbackHourKeys}
+              availableModelIds={allModels}
               activeProviderNames={Array.from(activeProviderNames)}
               user={user}
             />

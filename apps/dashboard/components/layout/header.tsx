@@ -17,7 +17,7 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "@/lib/navigation";
-import { MODEL_REGISTRY, getAllModels, getProvidersForModel, resolveModelAlias } from "@opendum/shared/proxy/models";
+import { MODEL_REGISTRY, getProvidersForModel, resolveModelAlias } from "@opendum/shared/proxy/models";
 import { type ModelStats, buildEmptyModelStats } from "@/lib/model-stats";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
@@ -43,6 +43,7 @@ interface HeaderProps {
   statsByModel: Record<string, ModelStats>;
   fallbackDayKeys: string[];
   fallbackHourKeys: string[];
+  availableModelIds: string[];
   activeProviderNames: string[];
   user: {
     name: string | null;
@@ -60,6 +61,7 @@ export function Header({
   statsByModel,
   fallbackDayKeys,
   fallbackHourKeys,
+  availableModelIds,
   activeProviderNames,
   user,
 }: HeaderProps) {
@@ -69,8 +71,7 @@ export function Header({
 
   const activeProviderSet = new Set(activeProviderNames);
 
-  const models = getAllModels()
-    .filter((id: string) => getProvidersForModel(id).some((p: string) => activeProviderSet.has(p)))
+  const models = availableModelIds
     .map((id: string) => ({
       id,
       providers: getProvidersForModel(id)
