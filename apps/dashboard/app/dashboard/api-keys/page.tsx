@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { proxyApiKey, providerAccount } from "@opendum/shared/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { proxyApiKey, proxyApiKeyRateLimit, providerAccount } from "@opendum/shared/db/schema";
+import { eq, desc, asc, inArray } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, Key } from "lucide-react";
@@ -11,8 +11,10 @@ import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
 import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
 import { ApiKeyModelAccess } from "@/components/dashboard/api-keys/api-key-model-access";
 import { ApiKeyAccountAccess } from "@/components/dashboard/api-keys/api-key-account-access";
-import type { ApiKeyModelAccessMode, ApiKeyAccountAccessMode } from "@/lib/actions/api-keys";
-import { getAllModels } from "@opendum/shared/proxy/models";
+import { ApiKeyExpiration } from "@/components/dashboard/api-keys/api-key-expiration";
+import { ApiKeyRateLimit } from "@/components/dashboard/api-keys/api-key-rate-limit";
+import type { ApiKeyModelAccessMode, ApiKeyAccountAccessMode, RateLimitRuleInput } from "@/lib/actions/api-keys";
+import { getAllModels, getAllFamilies } from "@opendum/shared/proxy/models";
 import { formatRelativeTime } from "@/lib/date";
 
 function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) {
@@ -65,6 +67,37 @@ export default async function ApiKeysPage() {
     .where(eq(proxyApiKey.userId, session.user.id))
     .orderBy(desc(proxyApiKey.createdAt));
 
+  // Fetch rate limit rules for all user's API keys
+  const apiKeyIds = apiKeys.map((k) => k.id);
+  const rateLimitRulesData =
+    apiKeyIds.length > 0
+      ? await db
+          .select({
+            apiKeyId: proxyApiKeyRateLimit.apiKeyId,
+            target: proxyApiKeyRateLimit.target,
+            targetType: proxyApiKeyRateLimit.targetType,
+            perMinute: proxyApiKeyRateLimit.perMinute,
+            perHour: proxyApiKeyRateLimit.perHour,
+            perDay: proxyApiKeyRateLimit.perDay,
+          })
+          .from(proxyApiKeyRateLimit)
+          .where(inArray(proxyApiKeyRateLimit.apiKeyId, apiKeyIds))
+      : [];
+
+  // Group rate limit rules by API key ID
+  const rateLimitsByKeyId = new Map<string, RateLimitRuleInput[]>();
+  for (const row of rateLimitRulesData) {
+    const rules = rateLimitsByKeyId.get(row.apiKeyId) ?? [];
+    rules.push({
+      target: row.target,
+      targetType: row.targetType as "model" | "family",
+      perMinute: row.perMinute,
+      perHour: row.perHour,
+      perDay: row.perDay,
+    });
+    rateLimitsByKeyId.set(row.apiKeyId, rules);
+  }
+
   const providerAccounts = await db
     .select({
       id: providerAccount.id,
@@ -77,6 +110,7 @@ export default async function ApiKeysPage() {
     .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
 
   const availableModels = getAllModels().sort((a, b) => a.localeCompare(b));
+  const availableFamilies = getAllFamilies();
 
   return (
     <div className="space-y-6">
@@ -106,6 +140,7 @@ export default async function ApiKeysPage() {
             const isExpiredOrDisabled = status.label !== "Active";
             const modelAccessMode = normalizeModelAccessMode(apiKey.modelAccessMode);
             const accountAccessMode = normalizeAccountAccessMode(apiKey.accountAccessMode);
+            const keyRateLimits = rateLimitsByKeyId.get(apiKey.id) ?? [];
 
             return (
               <Card
@@ -124,12 +159,13 @@ export default async function ApiKeysPage() {
 
                   {/* Row 2: Metadata + Access controls + Analytics */}
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                       {new Date(apiKey.createdAt).toLocaleDateString()}
                       {" · "}
-                      {apiKey.expiresAt
-                        ? `Exp ${new Date(apiKey.expiresAt).toLocaleDateString()}`
-                        : "No expiry"}
+                      <ApiKeyExpiration
+                        apiKeyId={apiKey.id}
+                        initialExpiresAt={apiKey.expiresAt}
+                      />
                       {" · "}
                       {apiKey.lastUsedAt
                         ? `Used ${formatRelativeTime(apiKey.lastUsedAt)}`
@@ -148,6 +184,12 @@ export default async function ApiKeysPage() {
                         availableAccounts={providerAccounts}
                         initialMode={accountAccessMode}
                         initialAccounts={apiKey.accountAccessList}
+                      />
+                      <ApiKeyRateLimit
+                        apiKeyId={apiKey.id}
+                        availableModels={availableModels}
+                        availableFamilies={availableFamilies}
+                        initialRules={keyRateLimits}
                       />
                     </div>
 

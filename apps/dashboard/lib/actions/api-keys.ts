@@ -2,11 +2,11 @@
 
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { proxyApiKey, providerAccount } from "@opendum/shared/db/schema";
+import { proxyApiKey, proxyApiKeyRateLimit, providerAccount } from "@opendum/shared/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { generateApiKey, hashString, getKeyPreview, encrypt, decrypt } from "@opendum/shared/encryption";
 import { invalidateApiKeyValidationCache } from "@opendum/shared/proxy/auth";
-import { isModelSupported, resolveModelAlias } from "@opendum/shared/proxy/models";
+import { isModelSupported, resolveModelAlias, getAllFamilies } from "@opendum/shared/proxy/models";
 import { revalidatePath } from "next/cache";
 
 export type ActionResult<T = void> = 
@@ -358,5 +358,156 @@ export async function revealApiKey(id: string): Promise<ActionResult<{ key: stri
   } catch (error) {
     console.error("Failed to reveal API key:", error);
     return { success: false, error: "Failed to reveal API key" };
+  }
+}
+
+/**
+ * Update API key expiration date
+ */
+export async function updateApiKeyExpiration(
+  id: string,
+  expiresAt: Date | null
+): Promise<ActionResult<{ expiresAt: Date | null }>> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  // If a date is provided, it must be in the future
+  if (expiresAt && expiresAt <= new Date()) {
+    return { success: false, error: "Expiration date must be in the future" };
+  }
+
+  try {
+    const [apiKey] = await db
+      .select({ id: proxyApiKey.id, keyHash: proxyApiKey.keyHash })
+      .from(proxyApiKey)
+      .where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id)))
+      .limit(1);
+
+    if (!apiKey) {
+      return { success: false, error: "API key not found" };
+    }
+
+    const [updated] = await db
+      .update(proxyApiKey)
+      .set({ expiresAt: expiresAt ?? null })
+      .where(eq(proxyApiKey.id, id))
+      .returning({ expiresAt: proxyApiKey.expiresAt });
+
+    await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+
+    revalidatePath("/dashboard/api-keys");
+
+    return { success: true, data: { expiresAt: updated.expiresAt } };
+  } catch (error) {
+    console.error("Failed to update API key expiration:", error);
+    return { success: false, error: "Failed to update API key expiration" };
+  }
+}
+
+/**
+ * Rate limit rule input type
+ */
+export interface RateLimitRuleInput {
+  target: string;
+  targetType: "model" | "family";
+  perMinute: number | null;
+  perHour: number | null;
+  perDay: number | null;
+}
+
+/**
+ * Update per-key rate limit rules (replaces all existing rules)
+ */
+export async function updateApiKeyRateLimits(
+  id: string,
+  rules: RateLimitRuleInput[]
+): Promise<ActionResult<{ rules: RateLimitRuleInput[] }>> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    const [apiKey] = await db
+      .select({ id: proxyApiKey.id, keyHash: proxyApiKey.keyHash })
+      .from(proxyApiKey)
+      .where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, session.user.id)))
+      .limit(1);
+
+    if (!apiKey) {
+      return { success: false, error: "API key not found" };
+    }
+
+    // Validate rules
+    const validFamilies = new Set(getAllFamilies());
+    const seenTargets = new Set<string>();
+
+    for (const rule of rules) {
+      const key = `${rule.targetType}:${rule.target}`;
+      if (seenTargets.has(key)) {
+        return { success: false, error: `Duplicate rate limit rule for ${rule.target}` };
+      }
+      seenTargets.add(key);
+
+      if (rule.targetType === "model") {
+        const resolved = resolveModelAlias(rule.target.trim());
+        if (!isModelSupported(resolved)) {
+          return { success: false, error: `Unknown model: ${rule.target}` };
+        }
+      } else if (rule.targetType === "family") {
+        if (!validFamilies.has(rule.target)) {
+          return { success: false, error: `Unknown model family: ${rule.target}` };
+        }
+      } else {
+        return { success: false, error: `Invalid target type: ${rule.targetType}` };
+      }
+
+      // At least one limit must be set
+      if (rule.perMinute == null && rule.perHour == null && rule.perDay == null) {
+        return { success: false, error: `At least one rate limit must be set for ${rule.target}` };
+      }
+
+      // Limits must be positive
+      if ((rule.perMinute != null && rule.perMinute <= 0) ||
+          (rule.perHour != null && rule.perHour <= 0) ||
+          (rule.perDay != null && rule.perDay <= 0)) {
+        return { success: false, error: `Rate limits must be positive numbers` };
+      }
+    }
+
+    // Normalize model targets
+    const normalizedRules = rules.map((rule) => ({
+      ...rule,
+      target: rule.targetType === "model" ? resolveModelAlias(rule.target.trim()) : rule.target,
+    }));
+
+    // Replace all existing rules: delete then insert
+    await db.delete(proxyApiKeyRateLimit).where(eq(proxyApiKeyRateLimit.apiKeyId, apiKey.id));
+
+    if (normalizedRules.length > 0) {
+      await db.insert(proxyApiKeyRateLimit).values(
+        normalizedRules.map((rule) => ({
+          apiKeyId: apiKey.id,
+          target: rule.target,
+          targetType: rule.targetType,
+          perMinute: rule.perMinute,
+          perHour: rule.perHour,
+          perDay: rule.perDay,
+        }))
+      );
+    }
+
+    await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+
+    revalidatePath("/dashboard/api-keys");
+
+    return { success: true, data: { rules: normalizedRules } };
+  } catch (error) {
+    console.error("Failed to update API key rate limits:", error);
+    return { success: false, error: "Failed to update API key rate limits" };
   }
 }
