@@ -197,6 +197,9 @@ async function getCachedApiKeyValidation(
           typeof parsed.expiresAtMs === "number" || parsed.expiresAtMs === null
             ? parsed.expiresAtMs
             : null,
+        rateLimitRules: Array.isArray(parsed.rateLimitRules)
+          ? parsed.rateLimitRules
+          : [],
       };
     }
 
