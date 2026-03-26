@@ -225,7 +225,7 @@ export function AnalyticsCharts({
             title: "Total Requests",
             value: compactNumber(totals.totalRequests),
             detail: failedRequests > 0 ? `${failedRequests.toLocaleString()} failed` : "0 failed",
-            detailClassName: failedRequests > 0 ? "text-red-500" : undefined,
+            detailClassName: failedRequests > 0 ? "text-muted-foreground" : undefined,
           },
           {
             title: "Total Tokens",
