@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import { ModelsList } from "@/components/dashboard/models/models-list";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { disabledModel, providerAccount } from "@opendum/shared/db/schema";
-import { eq, and } from "drizzle-orm";
+import { disabledModel } from "@opendum/shared/db/schema";
+import { eq } from "drizzle-orm";
 import {
   MODEL_REGISTRY,
   getAllModels,
@@ -12,9 +12,9 @@ import {
   getProvidersForModel,
   resolveModelAlias,
 } from "@opendum/shared/proxy/models";
+import { getAccountModelAvailability, isModelUsableByAccounts } from "@opendum/shared/proxy/auth";
 import { ProviderName } from "@opendum/shared/proxy/providers/types";
 import {
-  type ModelStats,
   MODEL_STATS_DAYS,
   MODEL_DURATION_LOOKBACK_HOURS,
   buildDayKeys,
@@ -58,21 +58,14 @@ async function ModelsContent() {
     return null;
   }
 
-  // Get providers where the user has at least one active account
-  const userAccounts = await db
-    .selectDistinct({ provider: providerAccount.provider })
-    .from(providerAccount)
-    .where(
-      and(
-        eq(providerAccount.userId, session.user.id),
-        eq(providerAccount.isActive, true)
-      )
-    );
-  const userProviders = new Set(userAccounts.map((a) => a.provider));
+  // Get account-level model availability (active accounts + per-account disabled models)
+  const availability = await getAccountModelAvailability(session.user.id);
+  const userProviders = availability.activeProviders;
 
-  // Only include models whose provider(s) the user has an account for
+  // Only include models that have at least one usable active account
+  // (i.e. an active account from a supporting provider that hasn't disabled the model)
   const allModels = getAllModels().filter((model) =>
-    getProvidersForModel(model).some((p) => userProviders.has(p))
+    isModelUsableByAccounts(model, availability)
   );
 
   const disabledModels = await db

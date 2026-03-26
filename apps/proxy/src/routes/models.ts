@@ -2,6 +2,8 @@ import type { FastifyRequest, FastifyReply, RouteHandlerMethod } from "fastify";
 import {
   validateApiKey,
   getDisabledModelSetForUser,
+  getAccountModelAvailability,
+  isModelUsableByAccounts,
   formatModelsForOpenAI,
   resolveModelAlias,
 } from "@opendum/shared";
@@ -44,14 +46,25 @@ export const modelsRoute: RouteHandlerMethod = async (
     });
   }
 
-  const disabledModelSet = await getDisabledModelSetForUser(userId);
+  const [disabledModelSet, availability] = await Promise.all([
+    getDisabledModelSetForUser(userId),
+    getAccountModelAvailability(userId),
+  ]);
+
   const enabledModels = allModels.filter((model) => {
     const canonicalModel = resolveModelAlias(model.id);
 
+    // Filter out models disabled at the user level
     if (disabledModelSet.has(canonicalModel)) {
       return false;
     }
 
+    // Filter out models where all active accounts have disabled them
+    if (!isModelUsableByAccounts(canonicalModel, availability)) {
+      return false;
+    }
+
+    // Apply API key model access rules
     if (apiKeyModelAccessMode === "whitelist") {
       return apiKeyModelSet.has(canonicalModel);
     }
