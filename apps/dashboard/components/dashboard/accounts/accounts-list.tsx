@@ -761,10 +761,10 @@ function AccountModelAccess({
               onClick={() => handleToggleModel(model)}
               disabled={isToggling}
               title={isEnabled ? `Disable ${model}` : `Enable ${model}`}
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-mono transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${
                 isEnabled
-                  ? "border-primary/40 bg-primary/10 text-foreground"
-                  : "border-border bg-transparent text-muted-foreground line-through"
+                  ? "bg-muted text-foreground"
+                  : "bg-transparent text-muted-foreground/60 line-through"
               }`}
             >
               {model}
