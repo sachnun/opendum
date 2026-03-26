@@ -55,18 +55,12 @@ function getProviderAccounts(accounts: Array<{
   }));
 }
 
-export default async function PlaygroundPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ model?: string }>;
-}) {
+export default async function PlaygroundPage() {
   const session = await getSession();
 
   if (!session?.user?.id) {
     return null;
   }
-
-  const { model: initialModelId } = await searchParams;
 
   const [disabledModels, availability] = await Promise.all([
     db
@@ -145,7 +139,6 @@ export default async function PlaygroundPage({
     <PlaygroundClient
       models={models}
       providerAccounts={getProviderAccounts(providerAccounts)}
-      initialModelId={initialModelId}
       apiKeyOptions={apiKeyOptions}
     />
   );

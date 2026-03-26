@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3, Play } from "lucide-react";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
+import { usePlaygroundPreset } from "@/lib/playground-preset-context";
 import type { ModelMeta } from "@opendum/shared/proxy/models";
 
 interface ModelStats {
@@ -74,6 +75,8 @@ export function ModelCard({
   onEnabledChange,
 }: ModelCardProps) {
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
+  const { setPreset } = usePlaygroundPreset();
   const dailyValues = stats.dailyRequests.map((point) => point.count);
   const durationValues = stats.durationLast24Hours.map((point) => point.avgDuration ?? 0);
   const durationLabelPoints = [
@@ -136,13 +139,14 @@ export function ModelCard({
               variant="ghost"
               size="xs"
               className="h-5 px-1.5 text-[11px]"
-              asChild
               title="Try in Playground"
+              onClick={() => {
+                setPreset({ modelId: id });
+                router.push("/dashboard/playground");
+              }}
             >
-              <Link href={`/dashboard/playground?model=${encodeURIComponent(id)}`}>
-                <Play className="h-3 w-3" />
-                Play
-              </Link>
+              <Play className="h-3 w-3" />
+              Play
             </Button>
           )}
         </div>

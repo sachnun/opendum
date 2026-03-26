@@ -18,6 +18,7 @@ import {
   type PlaygroundEndpoint,
   type PlaygroundSettings,
 } from "./settings-sheet";
+import { usePlaygroundPreset } from "@/lib/playground-preset-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,7 +50,6 @@ export interface ApiKeyOption {
 interface PlaygroundClientProps {
   models: ModelOption[];
   providerAccounts: ProviderAccountOption[];
-  initialModelId?: string;
   apiKeyOptions?: ApiKeyOption[];
 }
 
@@ -1359,8 +1359,9 @@ function findApiKeyWithMostModels(
   return bestId;
 }
 
-export function PlaygroundClient({ models, providerAccounts, initialModelId, apiKeyOptions = [] }: PlaygroundClientProps) {
+export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] }: PlaygroundClientProps) {
   const router = useRouter();
+  const { consumePreset } = usePlaygroundPreset();
   const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
     () => findApiKeyWithMostModels(apiKeyOptions, models)
   );
@@ -1387,17 +1388,30 @@ export function PlaygroundClient({ models, providerAccounts, initialModelId, api
   );
 
   const [panels, setPanels] = React.useState<PanelState[]>(() => {
-    const validInitialModel = initialModelId && models.some((m) => m.id === initialModelId)
-      ? initialModelId
-      : null;
+    const preset = consumePreset();
 
-    return [
-      {
-        id: generateId(),
-        modelId: validInitialModel,
-        accountId: null,
-      },
-    ];
+    if (preset?.modelId) {
+      // Preset from model card: set model, auto routing
+      const validModel = models.some((m) => m.id === preset.modelId) ? preset.modelId : null;
+      return [{ id: generateId(), modelId: validModel, accountId: null }];
+    }
+
+    if (preset?.accountId) {
+      // Preset from account card: find first compatible model for this account's provider
+      const account = providerAccounts.find((a) => a.id === preset.accountId);
+      if (account) {
+        const firstModel = models.find((m) => m.providers.includes(account.provider));
+        return [
+          {
+            id: generateId(),
+            modelId: firstModel?.id ?? null,
+            accountId: account.id,
+          },
+        ];
+      }
+    }
+
+    return [{ id: generateId(), modelId: null, accountId: null }];
   });
 
   const [selectedScenario, setSelectedScenario] = React.useState<Scenario | null>(SCENARIOS[0]);

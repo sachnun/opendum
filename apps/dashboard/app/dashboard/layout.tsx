@@ -31,6 +31,7 @@ import {
 } from "@/lib/model-stats";
 import { Toaster } from "@/components/ui/sonner";
 import { ModelFamilyCountsProvider } from "@/lib/model-family-counts-context";
+import { PlaygroundPresetProvider } from "@/lib/playground-preset-context";
 
 const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
 
@@ -221,38 +222,40 @@ export default async function DashboardLayout({
 
   return (
     <ModelFamilyCountsProvider defaultCounts={modelFamilyCounts}>
-      <div className="relative flex min-h-svh bg-background">
-        <Sidebar
-          accountCounts={accountCounts}
-          activeAccountCounts={activeAccountCounts}
-          accountIndicators={accountIndicators}
-          modelFamilyCounts={modelFamilyCounts}
-        />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Suspense fallback={<HeaderSkeleton />}>
-            <Header
-              accountCounts={accountCounts}
-              activeAccountCounts={activeAccountCounts}
-              accountIndicators={accountIndicators}
-              modelFamilyCounts={modelFamilyCounts}
-              disabledModels={disabledModels}
-              statsByModel={statsByModel}
-              fallbackDayKeys={fallbackDayKeys}
-              fallbackHourKeys={fallbackHourKeys}
-              availableModelIds={allModels}
-              activeProviderNames={Array.from(activeProviderNames)}
-              user={user}
-            />
-          </Suspense>
-          <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-7xl px-5 pb-8 pt-5 sm:px-6 lg:px-8">
-              {children}
-            </div>
-          </main>
-        </div>
+      <PlaygroundPresetProvider>
+        <div className="relative flex min-h-svh bg-background">
+          <Sidebar
+            accountCounts={accountCounts}
+            activeAccountCounts={activeAccountCounts}
+            accountIndicators={accountIndicators}
+            modelFamilyCounts={modelFamilyCounts}
+          />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Suspense fallback={<HeaderSkeleton />}>
+              <Header
+                accountCounts={accountCounts}
+                activeAccountCounts={activeAccountCounts}
+                accountIndicators={accountIndicators}
+                modelFamilyCounts={modelFamilyCounts}
+                disabledModels={disabledModels}
+                statsByModel={statsByModel}
+                fallbackDayKeys={fallbackDayKeys}
+                fallbackHourKeys={fallbackHourKeys}
+                availableModelIds={allModels}
+                activeProviderNames={Array.from(activeProviderNames)}
+                user={user}
+              />
+            </Suspense>
+            <main className="flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-7xl px-5 pb-8 pt-5 sm:px-6 lg:px-8">
+                {children}
+              </div>
+            </main>
+          </div>
 
-        <Toaster />
-      </div>
+          <Toaster />
+        </div>
+      </PlaygroundPresetProvider>
     </ModelFamilyCountsProvider>
   );
 }
