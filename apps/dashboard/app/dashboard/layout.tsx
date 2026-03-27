@@ -247,7 +247,7 @@ export default async function DashboardLayout({
               />
             </Suspense>
             <main className="flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-7xl px-5 pb-8 pt-5 sm:px-6 lg:px-8">
+              <div className="w-full px-5 pb-8 pt-5 sm:px-6 lg:px-8">
                 {children}
               </div>
             </main>

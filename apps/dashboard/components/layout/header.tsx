@@ -84,7 +84,7 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-background px-5 sm:px-6 lg:px-8">
-      <div className="mx-auto flex h-full w-full max-w-7xl items-center gap-3 md:gap-0">
+      <div className="flex h-full w-full items-center gap-3 md:gap-0">
         <div className="flex min-w-0 items-center">
           <MobileNav
             accountCounts={accountCounts}
