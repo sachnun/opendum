@@ -18,7 +18,7 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = ["iflow", "qwen_code"]
+providers = ["qwen_code"]
 
 [opendum.upstream]
 qwen_code = "coder-model"

@@ -18,7 +18,7 @@ output = ["text"]
 
 [opendum]
 family = "Kimi"
-providers = ["iflow", "nvidia_nim", "ollama_cloud"]
+providers = ["nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]
 nvidia_nim = "moonshotai/kimi-k2-thinking"

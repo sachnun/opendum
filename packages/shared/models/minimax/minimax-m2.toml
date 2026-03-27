@@ -17,4 +17,4 @@ output = ["text"]
 
 [opendum]
 family = "MiniMax"
-providers = ["iflow", "ollama_cloud"]
+providers = ["ollama_cloud"]

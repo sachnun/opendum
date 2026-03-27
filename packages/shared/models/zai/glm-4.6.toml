@@ -18,4 +18,4 @@ output = ["text"]
 
 [opendum]
 family = "Z.AI"
-providers = ["iflow", "ollama_cloud"]
+providers = ["ollama_cloud"]

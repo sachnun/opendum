@@ -18,7 +18,7 @@ output = ["text"]
 
 [opendum]
 family = "DeepSeek"
-providers = ["iflow", "kiro", "nvidia_nim", "ollama_cloud"]
+providers = ["kiro", "nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]
 kiro = "deepseek-3.2"

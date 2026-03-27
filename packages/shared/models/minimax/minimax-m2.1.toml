@@ -17,7 +17,7 @@ output = ["text"]
 
 [opendum]
 family = "MiniMax"
-providers = ["iflow", "kiro", "ollama_cloud"]
+providers = ["kiro", "ollama_cloud"]
 
 [opendum.upstream]
 kiro = "minimax-m2.1"
