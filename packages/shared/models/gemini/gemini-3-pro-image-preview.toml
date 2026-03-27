@@ -20,6 +20,7 @@ output = ["text"]
 family = "Gemini"
 providers = ["antigravity"]
 aliases = ["gemini-3-pro-image"]
+ignored = true
 
 [opendum.upstream]
 antigravity = "gemini-3-pro-image"
