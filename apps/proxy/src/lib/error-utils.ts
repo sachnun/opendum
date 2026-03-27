@@ -228,6 +228,7 @@ export function shouldRotateToNextAccount(statusCode: number): boolean {
     statusCode >= 500 ||
     statusCode === 429 ||
     statusCode === 408 ||
+    statusCode === 404 ||
     statusCode === 403 ||
     statusCode === 402 ||
     statusCode === 401
