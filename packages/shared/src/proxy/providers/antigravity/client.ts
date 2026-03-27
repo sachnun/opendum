@@ -279,13 +279,14 @@ export const antigravityProvider: Provider = {
     const requestId = generateRequestId();
 
     const includeReasoning =
-      normalizedBody._includeReasoning ??
+      (normalizedBody._includeReasoning ??
       !!(
         normalizedBody.reasoning ||
         normalizedBody.reasoning_effort ||
         normalizedBody.thinking_budget ||
         normalizedBody.include_thoughts
-      );
+      )) ||
+      isOpusThinkingModel(effectiveModel);
 
     const context: TransformContext = {
       model: effectiveModel,
