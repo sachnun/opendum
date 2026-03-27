@@ -27,12 +27,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  exchangeIflowOAuthCode,
   exchangeAntigravityOAuthCode,
   exchangeGeminiCliOAuthCode,
   exchangeCodexOAuthCode,
   exchangeKiroOAuthCode,
-  getIflowAuthUrl,
   getAntigravityAuthUrl,
   getGeminiCliAuthUrl,
   getCodexAuthUrl,
@@ -84,13 +82,6 @@ type ProviderFullConfig = ProviderConfig &
   (OAuthRedirectConfig | DeviceCodeConfig | ApiKeyConfig);
 
 const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
-  iflow: {
-    name: "Iflow",
-    description: "Access OpenAI compatible API",
-    flowType: "oauth_redirect",
-    getAuthUrl: getIflowAuthUrl,
-    exchangeAction: exchangeIflowOAuthCode,
-  },
   antigravity: {
     name: "Antigravity",
     description: "Access Gemini & Claude via Google OAuth",
@@ -171,7 +162,6 @@ const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
   "antigravity",
   "codex",
   "kiro",
-  "iflow",
   "gemini_cli",
   "qwen_code",
   "copilot",

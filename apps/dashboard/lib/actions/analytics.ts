@@ -400,7 +400,7 @@ export async function getAnalyticsData(
 
     const whereCondition = and(...conditions);
     const bucketExpression = getTimeBucketExpression(config.granularity);
-    const normalizedModelExpression = sql<string>`replace(${usageLog.model}, 'iflow/', '')`;
+    const normalizedModelExpression = usageLog.model;
 
     const [timeSeriesRows, topModelRows, totalsRow] = await Promise.all([
       db

@@ -33,7 +33,6 @@ function createEmptyProviderAccountMap<T>(createValue: () => T): Record<Provider
     codex: createValue(),
     copilot: createValue(),
     kiro: createValue(),
-    iflow: createValue(),
     gemini_cli: createValue(),
     groq: createValue(),
     qwen_code: createValue(),
@@ -240,7 +239,6 @@ export default async function ProviderAccountsPage({
 
       <AccountsList
         antigravityAccounts={groupedAccounts.antigravity}
-        iflowAccounts={groupedAccounts.iflow}
         geminiCliAccounts={groupedAccounts.gemini_cli}
         qwenCodeAccounts={groupedAccounts.qwen_code}
         copilotAccounts={groupedAccounts.copilot}

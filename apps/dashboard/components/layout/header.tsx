@@ -22,7 +22,6 @@ import { type ModelStats, buildEmptyModelStats } from "@/lib/model-stats";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
 
 const PROVIDER_LABELS: Record<string, string> = {
-  iflow: "Iflow",
   antigravity: "Antigravity",
   qwen_code: "Qwen Code",
   gemini_cli: "Gemini CLI",

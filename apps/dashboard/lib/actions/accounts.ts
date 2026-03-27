@@ -7,12 +7,6 @@ import { eq, and, count as countFn, asc, desc } from "drizzle-orm";
 import { encrypt, decrypt, hashString } from "@opendum/shared/encryption";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { iflowProvider } from "@opendum/shared/proxy/providers/iflow";
-import {
-  IFLOW_REDIRECT_URI,
-  IFLOW_OAUTH_AUTHORIZE_URL,
-  IFLOW_CLIENT_ID,
-} from "@opendum/shared/proxy/providers/iflow/constants";
 import { antigravityProvider } from "@opendum/shared/proxy/providers/antigravity";
 import {
   ANTIGRAVITY_REDIRECT_URI,
@@ -612,104 +606,6 @@ export async function connectGroqApiKey(
 }
 
 /**
- * Exchange Iflow OAuth callback URL for tokens and create/update account
- */
-export async function exchangeIflowOAuthCode(
-  callbackUrl: string
-): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const session = await getSession();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    return { success: false, error: "Callback URL is required" };
-  }
-
-  try {
-    // Parse the callback URL to extract the code
-    let url: URL;
-    try {
-      url = new URL(callbackUrl);
-    } catch {
-      return { success: false, error: "Invalid URL format" };
-    }
-
-    const code = url.searchParams.get("code");
-    if (!code) {
-      return { 
-        success: false, 
-        error: "No authorization code found in URL. Make sure you copied the complete URL from your browser." 
-      };
-    }
-
-    // Check for error in URL
-    const error = url.searchParams.get("error");
-    if (error) {
-      return { success: false, error: `Iflow OAuth error: ${error}` };
-    }
-
-    // Exchange code for tokens using the provider
-    const oauthResult = await iflowProvider.exchangeCode(code, IFLOW_REDIRECT_URI);
-
-    // Check if account with this email already exists for this user
-    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "iflow"), eq(providerAccount.email, oauthResult.email))).limit(1);
-
-    if (existingAccount) {
-      // Update existing account
-      await db.update(providerAccount).set({
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
-        expiresAt: oauthResult.expiresAt,
-        isActive: true,
-      }).where(eq(providerAccount.id, existingAccount.id));
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: true,
-        },
-      };
-    } else {
-      // Create new account
-      const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "iflow")));
-      const accountCount = countResult.value;
-
-      await db.insert(providerAccount).values({
-        userId: session.user.id,
-        provider: "iflow",
-        name: `Iflow ${accountCount + 1}`,
-        accessToken: encrypt(oauthResult.accessToken),
-        refreshToken: encrypt(oauthResult.refreshToken),
-        apiKey: oauthResult.apiKey ? encrypt(oauthResult.apiKey) : null,
-        expiresAt: oauthResult.expiresAt,
-        email: oauthResult.email,
-        isActive: true,
-      });
-
-      revalidatePath("/dashboard/accounts");
-
-      return {
-        success: true,
-        data: {
-          email: oauthResult.email,
-          isUpdate: false,
-        },
-      };
-    }
-  } catch (err) {
-    console.error("Failed to exchange OAuth code:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: errorMessage };
-  }
-}
-
-/**
  * Get all accounts for the current user grouped by provider
  */
 export async function getAccountsByProvider(): Promise<
@@ -754,32 +650,6 @@ export async function getAccountsByProvider(): Promise<
     console.error("Failed to get accounts:", error);
     return { success: false, error: "Failed to get accounts" };
   }
-}
-
-// Backwards compatibility aliases
-export const deleteIflowAccount = deleteProviderAccount;
-export const updateIflowAccount = updateProviderAccount;
-
-/**
- * Get Iflow OAuth authorization URL
- */
-export async function getIflowAuthUrl(): Promise<ActionResult<{ authUrl: string }>> {
-  const session = await getSession();
-
-  if (!session?.user?.id) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  const authParams = new URLSearchParams({
-    loginMethod: "phone",
-    type: "phone",
-    redirect: IFLOW_REDIRECT_URI,
-    client_id: IFLOW_CLIENT_ID,
-  });
-
-  const authUrl = `${IFLOW_OAUTH_AUTHORIZE_URL}?${authParams.toString()}`;
-
-  return { success: true, data: { authUrl } };
 }
 
 /**

@@ -112,7 +112,6 @@ interface Account {
 
 interface AccountsListProps {
   antigravityAccounts: Account[];
-  iflowAccounts: Account[];
   geminiCliAccounts: Account[];
   qwenCodeAccounts: Account[];
   copilotAccounts: Account[];
@@ -1079,7 +1078,6 @@ function ProviderSection({
 
 export function AccountsList({
   antigravityAccounts,
-  iflowAccounts,
   geminiCliAccounts,
   qwenCodeAccounts,
   copilotAccounts,
@@ -1435,20 +1433,6 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.codex}
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
-        disabledModelsByAccountId={disabledModelsByAccountId}
-      />
-    );
-  }
-  if (shouldRenderProvider("iflow")) {
-    oauthProviderSections.push(
-      <ProviderSection
-        key="iflow"
-        id="iflow-accounts"
-        title="Iflow"
-        hideHeader={hasProviderFilter}
-        accounts={iflowAccounts}
-        emptyMessage="No Iflow connections yet."
-        supportedModels={supportedModelsByProvider?.iflow}
         disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );

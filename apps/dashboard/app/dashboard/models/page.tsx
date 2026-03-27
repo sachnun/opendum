@@ -26,8 +26,6 @@ import ModelsLoading from "./loading";
 
 function getProviderLabel(provider: string): string {
   switch (provider) {
-    case ProviderName.IFLOW:
-      return "Iflow";
     case ProviderName.ANTIGRAVITY:
       return "Antigravity";
     case ProviderName.QWEN_CODE:
@@ -79,7 +77,6 @@ async function ModelsContent() {
   const statsByModel = await getModelStatsByModel(session.user.id, allModels);
 
   const providerEntries: { id: string; label: string }[] = [
-    { id: ProviderName.IFLOW, label: "Iflow" },
     { id: ProviderName.ANTIGRAVITY, label: "Antigravity" },
     { id: ProviderName.GEMINI_CLI, label: "Gemini CLI" },
     { id: ProviderName.QWEN_CODE, label: "Qwen Code" },

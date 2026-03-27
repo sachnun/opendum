@@ -125,7 +125,6 @@ function getSortedFamilies(groups: Record<string, ModelOption[]>): string[] {
 
 function formatProviderName(provider: string): string {
   const names: Record<string, string> = {
-    iflow: "Iflow",
     antigravity: "Antigravity",
     qwen_code: "Qwen Code",
     gemini_cli: "Gemini CLI",

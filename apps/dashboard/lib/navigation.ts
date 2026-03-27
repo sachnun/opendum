@@ -29,7 +29,6 @@ export interface ProviderAccountCounts {
   copilot: number;
   gemini_cli: number;
   groq: number;
-  iflow: number;
   kiro: number;
   nvidia_nim: number;
   ollama_cloud: number;
@@ -45,7 +44,6 @@ export interface ProviderAccountIndicators {
   copilot: ProviderAccountIndicator;
   gemini_cli: ProviderAccountIndicator;
   groq: ProviderAccountIndicator;
-  iflow: ProviderAccountIndicator;
   kiro: ProviderAccountIndicator;
   nvidia_nim: ProviderAccountIndicator;
   ollama_cloud: ProviderAccountIndicator;
@@ -74,7 +72,6 @@ export const primaryNavigation: NavItem[] = [
         name: "Gemini CLI",
         href: getProviderAccountPath("gemini_cli"),
       },
-      { name: "Iflow", href: getProviderAccountPath("iflow") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       {
         name: "Nvidia",

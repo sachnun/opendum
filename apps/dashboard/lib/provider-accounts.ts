@@ -4,7 +4,6 @@ export type ProviderAccountKey =
   | "copilot"
   | "gemini_cli"
   | "groq"
-  | "iflow"
   | "kiro"
   | "nvidia_nim"
   | "ollama_cloud"
@@ -54,14 +53,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Gemini CLI connections yet.",
     showTier: true,
-  },
-  {
-    key: "iflow",
-    slug: "iflow",
-    label: "Iflow",
-    category: "oauth",
-    emptyMessage: "No Iflow connections yet.",
-    showTier: false,
   },
   {
     key: "kiro",
@@ -177,10 +168,6 @@ export function getProviderSuccessMessage(successParam: string): string {
 
   if (successParam === "kiro_added") {
     return "Kiro connected successfully!";
-  }
-
-  if (successParam === "iflow_added") {
-    return "Iflow connected successfully!";
   }
 
   if (successParam === "nvidia_nim_added") {
