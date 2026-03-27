@@ -4,7 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   type ProviderAccountIndicators,
   type ModelFamilyCounts,
@@ -17,21 +27,20 @@ import { buildProviderHrefMap } from "@/lib/provider-accounts";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 import { AccountStatusIndicator } from "@/components/layout/account-status-indicator";
 import { useModelFamilyCounts } from "@/lib/model-family-counts-context";
-import { Input } from "@/components/ui/input";
 
-interface SidebarProps {
+interface SidebarNavContentProps {
   accountCounts: ProviderAccountCounts;
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
-  modelFamilyCounts: ModelFamilyCounts;
+  onNavigate?: () => void;
 }
 
-export function Sidebar({
+function SidebarNavContent({
   accountCounts,
   activeAccountCounts,
   accountIndicators,
-  modelFamilyCounts,
-}: SidebarProps) {
+  onNavigate,
+}: SidebarNavContentProps) {
   const pathname = usePathname();
   const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
@@ -85,6 +94,7 @@ export function Sidebar({
           >
             <Link
               href={item.href}
+              onClick={onNavigate}
               className="flex flex-1 items-center gap-3 py-2.5 pl-3"
             >
               <item.icon
@@ -111,6 +121,7 @@ export function Sidebar({
         ) : (
           <Link
             href={item.href}
+            onClick={onNavigate}
             className={cn(
               "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
               isActive
@@ -177,7 +188,10 @@ export function Sidebar({
                       key={`${item.name}-${subItem.name}`}
                       href={subItem.href}
                       prefetch={false}
-                      onClick={(event) => handleSubItemClick(event, subItem)}
+                      onClick={(event) => {
+                        handleSubItemClick(event, subItem);
+                        onNavigate?.();
+                      }}
                       className={cn(
                         "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                         isSubActive
@@ -222,26 +236,99 @@ export function Sidebar({
   };
 
   return (
+    <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
+      </nav>
+      <div className="shrink-0">
+        <nav className="mt-4 space-y-1 border-t border-border/60 pt-4">
+          {supportNavigation.map(renderNavItem)}
+        </nav>
+      </div>
+    </div>
+  );
+}
+
+interface SidebarProps {
+  accountCounts: ProviderAccountCounts;
+  activeAccountCounts: ProviderAccountCounts;
+  accountIndicators: ProviderAccountIndicators;
+  modelFamilyCounts: ModelFamilyCounts;
+}
+
+export function Sidebar({
+  accountCounts,
+  activeAccountCounts,
+  accountIndicators,
+}: SidebarProps) {
+  return (
     <div className="hidden md:sticky md:top-0 md:flex md:h-svh md:w-60 md:flex-col md:border-r md:border-border md:bg-card">
       <div className="flex h-16 items-center border-b border-border px-5">
         <Link href="/dashboard" className="inline-flex items-center gap-2.5">
           <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-            </span>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+          </span>
           <span className="text-base font-semibold tracking-tight">Opendum</span>
         </Link>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
-        <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
-        </nav>
-        <div className="shrink-0">
-          <nav className="mt-4 space-y-1 border-t border-border/60 pt-4">
-            {supportNavigation.map(renderNavItem)}
-          </nav>
-        </div>
-      </div>
+      <SidebarNavContent
+        accountCounts={accountCounts}
+        activeAccountCounts={activeAccountCounts}
+        accountIndicators={accountIndicators}
+      />
     </div>
+  );
+}
+
+export function MobileNav({
+  accountCounts,
+  activeAccountCounts,
+  accountIndicators,
+}: SidebarProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-lg border border-border bg-card md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Toggle menu</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" hideClose className="flex w-[78vw] max-w-[18rem] flex-col gap-0 p-0">
+        <SheetHeader className="h-16 justify-center border-b border-border px-5">
+          <SheetTitle className="text-left">
+            <div className="flex items-center justify-between">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-base font-semibold tracking-tight"
+                onClick={() => setOpen(false)}
+              >
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                </span>
+                Opendum
+              </Link>
+              <SheetClose className="opacity-70 transition-opacity cursor-pointer hover:opacity-100 focus:outline-none">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </SheetClose>
+            </div>
+          </SheetTitle>
+        </SheetHeader>
+        <SidebarNavContent
+          accountCounts={accountCounts}
+          activeAccountCounts={activeAccountCounts}
+          accountIndicators={accountIndicators}
+          onNavigate={() => setOpen(false)}
+        />
+      </SheetContent>
+    </Sheet>
   );
 }

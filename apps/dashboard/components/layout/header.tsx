@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { MobileNav } from "@/components/layout/mobile-nav";
+import { MobileNav } from "@/components/layout/sidebar";
 import type {
   ModelFamilyCounts,
   ProviderAccountCounts,
