@@ -249,6 +249,7 @@ export default async function ProviderAccountsPage({
         ollamaCloudAccounts={groupedAccounts.ollama_cloud}
         openRouterAccounts={groupedAccounts.openrouter}
         groqAccounts={groupedAccounts.groq}
+        cerebrasAccounts={groupedAccounts.cerebras}
         visibleProviders={[selectedProvider]}
         supportedModelsByProvider={{ [selectedProvider]: providerModels }}
         disabledModelsByAccountId={disabledModelsByAccountId}

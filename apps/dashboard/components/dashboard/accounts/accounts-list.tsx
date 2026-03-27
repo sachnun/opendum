@@ -121,6 +121,7 @@ interface AccountsListProps {
   ollamaCloudAccounts: Account[];
   openRouterAccounts: Account[];
   groqAccounts: Account[];
+  cerebrasAccounts: Account[];
   visibleProviders?: ProviderAccountKey[];
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
   disabledModelsByAccountId?: Record<string, string[]>;
@@ -1087,6 +1088,7 @@ export function AccountsList({
   ollamaCloudAccounts,
   openRouterAccounts,
   groqAccounts,
+  cerebrasAccounts,
   visibleProviders,
   supportedModelsByProvider,
   disabledModelsByAccountId,
@@ -1556,6 +1558,20 @@ export function AccountsList({
         accounts={groqAccounts}
         emptyMessage="No Groq accounts connected yet."
         supportedModels={supportedModelsByProvider?.groq}
+      />
+    );
+  }
+  if (shouldRenderProvider("cerebras")) {
+    apiKeyProviderSections.push(
+      <ProviderSection
+        key="cerebras"
+        id="cerebras-accounts"
+        title="Cerebras"
+        hideHeader={hasProviderFilter}
+        accounts={cerebrasAccounts}
+        emptyMessage="No Cerebras accounts connected yet."
+        supportedModels={supportedModelsByProvider?.cerebras}
+        disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
   }
