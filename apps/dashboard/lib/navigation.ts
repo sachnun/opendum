@@ -25,6 +25,7 @@ export interface NavSubItem {
 
 export interface ProviderAccountCounts {
   antigravity: number;
+  cerebras: number;
   codex: number;
   copilot: number;
   gemini_cli: number;
@@ -40,6 +41,7 @@ export type ProviderAccountIndicator = "normal" | "warning" | "error";
 
 export interface ProviderAccountIndicators {
   antigravity: ProviderAccountIndicator;
+  cerebras: ProviderAccountIndicator;
   codex: ProviderAccountIndicator;
   copilot: ProviderAccountIndicator;
   gemini_cli: ProviderAccountIndicator;
@@ -86,6 +88,7 @@ export const primaryNavigation: NavItem[] = [
         href: getProviderAccountPath("openrouter"),
       },
       { name: "Groq", href: getProviderAccountPath("groq") },
+      { name: "Cerebras", href: getProviderAccountPath("cerebras") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],
   },

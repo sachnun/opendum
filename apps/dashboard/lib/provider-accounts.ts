@@ -1,5 +1,6 @@
 export type ProviderAccountKey =
   | "antigravity"
+  | "cerebras"
   | "codex"
   | "copilot"
   | "gemini_cli"
@@ -102,6 +103,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     emptyMessage: "No Groq accounts connected yet.",
     showTier: false,
   },
+  {
+    key: "cerebras",
+    slug: "cerebras",
+    label: "Cerebras",
+    category: "api_key",
+    emptyMessage: "No Cerebras accounts connected yet.",
+    showTier: false,
+  },
 ];
 
 export const PROVIDER_ACCOUNT_BY_KEY: Record<ProviderAccountKey, ProviderAccountDefinition> =
@@ -184,6 +193,10 @@ export function getProviderSuccessMessage(successParam: string): string {
 
   if (successParam === "groq_added") {
     return "Groq account connected successfully!";
+  }
+
+  if (successParam === "cerebras_added") {
+    return "Cerebras account connected successfully!";
   }
 
   return "Connected successfully!";

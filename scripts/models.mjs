@@ -13,6 +13,7 @@ const modelsDir = resolve(rootDir, "packages/shared/models");
 const refreshScripts = [
   "antigravity-version.mjs",
   "antigravity-models.mjs",
+  "cerebras.mjs",
   "codex.mjs",
   "copilot.mjs",
   "groq.mjs",
@@ -25,7 +26,7 @@ const refreshScripts = [
 ];
 
 // Providers whose models are refreshed by the scripts above
-const REFRESHED_PROVIDERS = ["antigravity", "codex", "copilot", "gemini_cli", "groq", "kiro", "nvidia_nim", "ollama_cloud", "openrouter", "qwen_code"];
+const REFRESHED_PROVIDERS = ["antigravity", "cerebras", "codex", "copilot", "gemini_cli", "groq", "kiro", "nvidia_nim", "ollama_cloud", "openrouter", "qwen_code"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

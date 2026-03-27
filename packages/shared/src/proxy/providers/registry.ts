@@ -14,6 +14,7 @@ let nvidiaNimProvider: Provider | null = null;
 let ollamaCloudProvider: Provider | null = null;
 let openRouterProvider: Provider | null = null;
 let groqProvider: Provider | null = null;
+let cerebrasProvider: Provider | null = null;
 
 /**
  * Get a provider instance by name
@@ -90,6 +91,13 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
       }
       return groqProvider;
 
+    case ProviderName.CEREBRAS:
+      if (!cerebrasProvider) {
+        const { cerebrasProvider: provider } = await import("./cerebras/index.js");
+        cerebrasProvider = provider;
+      }
+      return cerebrasProvider;
+
     default:
       throw new Error(`Unknown provider: ${name}`);
   }
@@ -99,7 +107,7 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq] = await Promise.all([
+  const [antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq, cerebras] = await Promise.all([
     getProvider(ProviderName.ANTIGRAVITY),
     getProvider(ProviderName.COPILOT),
     getProvider(ProviderName.QWEN_CODE),
@@ -110,8 +118,9 @@ export async function getAllProviders(): Promise<Provider[]> {
     getProvider(ProviderName.OPENROUTER),
     getProvider(ProviderName.NVIDIA_NIM),
     getProvider(ProviderName.GROQ),
+    getProvider(ProviderName.CEREBRAS),
   ]);
-  return [antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq];
+  return [antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq, cerebras];
 }
 
 /**

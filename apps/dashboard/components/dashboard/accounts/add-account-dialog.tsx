@@ -43,6 +43,7 @@ import {
   connectOllamaCloudApiKey,
   connectOpenRouterApiKey,
   connectGroqApiKey,
+  connectCerebrasApiKey,
 } from "@/lib/actions/accounts";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { cn } from "@/lib/utils";
@@ -156,6 +157,15 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     accountNamePlaceholder: "Groq Personal",
     connectAction: connectGroqApiKey,
   },
+  cerebras: {
+    name: "Cerebras",
+    description: "Access ultra-fast open-source models via Cerebras API",
+    flowType: "api_key",
+    apiKeyPortalUrl: "https://cloud.cerebras.ai",
+    apiKeyPlaceholder: "csk-...",
+    accountNamePlaceholder: "Cerebras Personal",
+    connectAction: connectCerebrasApiKey,
+  },
 };
 
 const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
@@ -172,6 +182,7 @@ const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
   "openrouter",
   "nvidia_nim",
   "groq",
+  "cerebras",
 ];
 
 

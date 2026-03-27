@@ -37,6 +37,7 @@ const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
 
 const PROVIDER_KEY_BY_PROVIDER_NAME = {
   antigravity: "antigravity",
+  cerebras: "cerebras",
   copilot: "copilot",
   codex: "codex",
   kiro: "kiro",
@@ -118,6 +119,7 @@ export default async function DashboardLayout({
 
   const accountCounts: ProviderAccountCounts = {
     antigravity: 0,
+    cerebras: 0,
     copilot: 0,
     codex: 0,
     kiro: 0,
@@ -131,6 +133,7 @@ export default async function DashboardLayout({
 
   const activeAccountCounts: ProviderAccountCounts = {
     antigravity: 0,
+    cerebras: 0,
     copilot: 0,
     codex: 0,
     kiro: 0,
@@ -144,6 +147,7 @@ export default async function DashboardLayout({
 
   const accountIndicators: ProviderAccountIndicators = {
     antigravity: "normal",
+    cerebras: "normal",
     copilot: "normal",
     codex: "normal",
     kiro: "normal",

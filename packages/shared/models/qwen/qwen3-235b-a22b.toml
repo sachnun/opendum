@@ -18,5 +18,8 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = []
+providers = ["cerebras"]
 aliases = ["qwen-qwen3-235b-a22b", "qwen/qwen3-235b-a22b"]
+
+[opendum.upstream]
+cerebras = "qwen-3-235b-a22b-instruct-2507"
