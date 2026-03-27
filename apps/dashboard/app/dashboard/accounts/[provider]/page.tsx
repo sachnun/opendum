@@ -30,6 +30,7 @@ function buildDayKeys(days: number): string[] {
 function createEmptyProviderAccountMap<T>(createValue: () => T): Record<ProviderAccountKey, T> {
   return {
     antigravity: createValue(),
+    cerebras: createValue(),
     codex: createValue(),
     copilot: createValue(),
     kiro: createValue(),

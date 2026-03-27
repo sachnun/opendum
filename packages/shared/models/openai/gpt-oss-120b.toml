@@ -17,8 +17,9 @@ output = ["text"]
 
 [opendum]
 family = "OpenAI"
-providers = ["ollama_cloud", "openrouter"]
+providers = ["ollama_cloud", "openrouter", "cerebras"]
 
 [opendum.upstream]
 ollama_cloud = "gpt-oss:120b"
 openrouter = "openai/gpt-oss-120b:free"
+cerebras = "gpt-oss-120b"
