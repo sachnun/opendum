@@ -78,10 +78,6 @@ const MANUAL_MAP = {
 
   // DeepSeek naming differences
   "deepseek-coder-6.7b-instruct": ["nvidia", "deepseek-ai/deepseek-coder-6.7b-instruct"],
-  "deepseek-v3.1-671b":    ["iflowcn", "deepseek-v3.1"],
-  "deepseek-v3.2-chat":    ["iflowcn", "deepseek-v3.2"],
-  "deepseek-v3.2-reasoner": ["iflowcn", "deepseek-v3.2"],
-
   // Gemma (provider-prefixed in API)
   "codegemma-1.1-7b":      ["nvidia", "google/codegemma-1.1-7b"],
   "codegemma-7b":           ["nvidia", "google/codegemma-7b"],
