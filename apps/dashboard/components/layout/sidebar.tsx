@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import {
   type ProviderAccountIndicators,
   type ModelFamilyCounts,
@@ -47,44 +47,6 @@ export function Sidebar({
       setIsModelsExpanded(true);
     }
   }, [isModelsActive]);
-
-  const primaryNavRef = useRef<HTMLElement>(null);
-  const [isOverflowing, setIsOverflowing] = useState(false);
-  const [isBottomMenuExpanded, setIsBottomMenuExpanded] = useState(true);
-  const userToggledRef = useRef(false);
-
-  const checkOverflow = useCallback(() => {
-    const el = primaryNavRef.current;
-    if (!el) return;
-    const overflowing = el.scrollHeight > el.clientHeight;
-    setIsOverflowing(overflowing);
-    if (!userToggledRef.current) {
-      setIsBottomMenuExpanded(!overflowing);
-    }
-  }, []);
-
-  useEffect(() => {
-    const el = primaryNavRef.current;
-    if (!el) return;
-
-    checkOverflow();
-
-    const resizeObserver = new ResizeObserver(() => {
-      checkOverflow();
-    });
-    resizeObserver.observe(el);
-
-    // Also observe children changes via MutationObserver
-    const mutationObserver = new MutationObserver(() => {
-      checkOverflow();
-    });
-    mutationObserver.observe(el, { childList: true, subtree: true });
-
-    return () => {
-      resizeObserver.disconnect();
-      mutationObserver.disconnect();
-    };
-  }, [checkOverflow]);
 
   const renderNavItem = (item: NavItem) => {
     const isActive =
@@ -271,32 +233,13 @@ export function Sidebar({
         </Link>
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
-        <nav ref={primaryNavRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="space-y-1">{primaryNavigation.map(renderNavItem)}</div>
         </nav>
         <div className="shrink-0">
-          {isOverflowing ? (
-            <button
-              type="button"
-              onClick={() => {
-                userToggledRef.current = true;
-                setIsBottomMenuExpanded((prev) => !prev);
-              }}
-              className="flex w-full items-center justify-center border-t border-border/60 pt-2 text-muted-foreground transition-colors cursor-pointer hover:text-foreground"
-              aria-label={isBottomMenuExpanded ? "Collapse menu" : "Expand menu"}
-            >
-              {isBottomMenuExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
-            </button>
-          ) : null}
-          {isBottomMenuExpanded ? (
-            <nav className={cn("space-y-1", isOverflowing ? "pt-2" : "mt-4 border-t border-border/60 pt-4")}>
-              {supportNavigation.map(renderNavItem)}
-            </nav>
-          ) : null}
+          <nav className="mt-4 space-y-1 border-t border-border/60 pt-4">
+            {supportNavigation.map(renderNavItem)}
+          </nav>
         </div>
       </div>
     </div>
