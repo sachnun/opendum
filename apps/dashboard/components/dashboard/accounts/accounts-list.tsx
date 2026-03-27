@@ -736,6 +736,12 @@ function AccountModelAccess({
     }
   };
 
+  const [expanded, setExpanded] = useState(false);
+  const VISIBLE_COUNT = 5;
+  const hasMore = supportedModels.length > VISIBLE_COUNT;
+  const visibleModels = expanded ? supportedModels : supportedModels.slice(0, VISIBLE_COUNT);
+  const hiddenCount = supportedModels.length - VISIBLE_COUNT;
+
   if (supportedModels.length === 0) {
     return null;
   }
@@ -750,7 +756,7 @@ function AccountModelAccess({
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {supportedModels.map((model) => {
+        {visibleModels.map((model) => {
           const isEnabled = !disabledModels.has(model);
           const isToggling = togglingModels.has(model);
 
@@ -771,6 +777,15 @@ function AccountModelAccess({
             </button>
           );
         })}
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {expanded ? "Show less" : `+${hiddenCount} more`}
+          </button>
+        )}
       </div>
     </div>
   );
