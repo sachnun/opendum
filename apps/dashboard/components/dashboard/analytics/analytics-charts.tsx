@@ -415,7 +415,7 @@ export function AnalyticsCharts({
 
       {!isLoading &&
         (data ? (
-          <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
             <RequestsOverTimeChart data={data.requestsOverTime} granularity={data.granularity} />
             <TokenUsageChart data={data.tokenUsage} granularity={data.granularity} />
             <RequestsByModelChart data={data.requestsByModel} />
