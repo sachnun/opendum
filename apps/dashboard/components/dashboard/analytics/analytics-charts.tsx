@@ -400,7 +400,7 @@ export function AnalyticsCharts({
       </div>
 
       {data && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
           {statCards.map((item) => (
             <div key={item.title} className="rounded-xl bg-muted/40 px-4 py-4 sm:px-5">
               <p className="text-xs font-medium text-muted-foreground">
@@ -415,7 +415,7 @@ export function AnalyticsCharts({
 
       {!isLoading &&
         (data ? (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
             <RequestsOverTimeChart data={data.requestsOverTime} granularity={data.granularity} />
             <TokenUsageChart data={data.tokenUsage} granularity={data.granularity} />
             <RequestsByModelChart data={data.requestsByModel} />

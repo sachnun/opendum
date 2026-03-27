@@ -241,7 +241,7 @@ export function ModelsList({ models, availableProviders }: ModelsListProps) {
                 <h3 className="text-sm font-semibold">{section.name}</h3>
                 <span className="text-xs text-muted-foreground">{section.models.length} models</span>
               </div>
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
                 {section.models.map((model) => (
                   <ModelCard
                     key={model.id}

@@ -41,7 +41,7 @@ export default function Loading() {
       </div>
 
       {/* Chat panels: 1 panel + 1 dashed add card */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <div className="flex h-[400px] flex-col rounded-xl border border-border bg-card p-3">
           {/* Panel header: model selector */}
           <div className="flex items-center justify-between gap-2">

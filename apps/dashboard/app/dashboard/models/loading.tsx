@@ -106,7 +106,7 @@ export default function Loading() {
               <Skeleton className="h-4 w-20" />
               <Skeleton className="h-3 w-14" />
             </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+             <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
               {MODEL_CARDS.map((_, index) => (
                 <ModelCardSkeleton key={`model-${index}`} />
               ))}

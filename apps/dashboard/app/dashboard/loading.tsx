@@ -15,7 +15,7 @@ export default function Loading() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
         {STAT_CARDS.map((_, index) => (
           <div
             key={`stat-${index}`}
@@ -28,7 +28,7 @@ export default function Loading() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
         {CHART_CARDS.map((_, index) => (
           <div
             key={`chart-${index}`}

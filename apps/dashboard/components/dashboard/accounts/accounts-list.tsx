@@ -1055,7 +1055,7 @@ function ProviderSection({
 
       <div className="pt-1">
         {accounts.length > 0 ? (
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+           <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             {accounts.map((account) => (
               <AccountCard
                 key={account.id}
