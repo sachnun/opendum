@@ -87,7 +87,7 @@ const MANUAL_MAP = {
   "codegemma-7b":           ["nvidia", "google/codegemma-7b"],
   "gemma-2-27b-it":         ["nvidia", "google/gemma-2-27b-it"],
   "gemma-2-2b-it":          ["nvidia", "google/gemma-2-2b-it"],
-  "gemma-2-9b-it":          ["groq", "gemma2-9b-it"],
+  "gemma-2-9b-it":          ["nvidia", "google/gemma-2-9b-it"],
   "gemma-3-1b-it":          ["nvidia", "google/gemma-3-1b-it"],
   "gemma-3-4b-it":          ["nvidia", "google/gemma-3-4b-it"],
   "gemma-3n-e2b-it":        ["nvidia", "google/gemma-3n-e2b-it"],
