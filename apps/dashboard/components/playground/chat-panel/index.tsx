@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Bot, ChevronDown, ChevronLeft, ChevronUp, Settings, User, Wrench, X } from "lucide-react";
+import { AlertCircle, Bot, ChevronDown, ChevronLeft, ChevronUp, RotateCw, Settings, User, Wrench, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -81,6 +81,7 @@ interface ChatPanelProps {
   selectedAccountId?: string | null;
   onModelChange: (modelId: string, accountId: string | null) => void;
   onRemove?: () => void;
+  onRetry?: () => void;
   response?: ResponseData;
   disabled?: boolean;
   /** When set, only models whose ID is in this set are shown in the model picker. */
@@ -404,6 +405,7 @@ export function ChatPanel({
   selectedAccountId = null,
   onModelChange,
   onRemove,
+  onRetry,
   response,
   disabled = false,
   allowedModelIds = null,
@@ -743,11 +745,26 @@ export function ChatPanel({
             )}
 
             {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription className="text-sm">{error}</AlertDescription>
-              </Alert>
+              <div className="space-y-2">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription className="text-sm">{error}</AlertDescription>
+                </Alert>
+                {onRetry && selectedModel && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onRetry}
+                    disabled={disabled || isLoading}
+                    className="w-full gap-1.5"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                    Retry
+                  </Button>
+                )}
+              </div>
             )}
 
             {(content || reasoning || toolCalls.length > 0 || isLoading) && selectedModel && (
@@ -770,7 +787,23 @@ export function ChatPanel({
         <div className="shrink-0 border-t bg-card px-3 py-2 text-[11px]">
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">Wait</span>
-            <span className="font-medium tabular-nums">{waitLabel}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium tabular-nums">{waitLabel}</span>
+              {onRetry && selectedModel && !isLoading && (content || reasoning || error) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={onRetry}
+                  disabled={disabled}
+                  title="Retry"
+                  aria-label="Retry request"
+                  className="h-5 w-5"
+                >
+                  <RotateCw className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="shrink-0 whitespace-nowrap text-muted-foreground">

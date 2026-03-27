@@ -2003,7 +2003,30 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
         {panels.map((panel) => {
           const selectedAccountId = getValidAccountIdForPanel(panel);
 
-          return (
+  const retryPanel = React.useCallback(
+    async (panelId: string) => {
+      const panel = panels.find((p) => p.id === panelId);
+      if (!panel?.modelId || !selectedScenario) {
+        return;
+      }
+
+      setIsAnyLoading(true);
+
+      await fetchFromModel(
+        panel.id,
+        panel.modelId,
+        selectedScenario,
+        settings,
+        getValidAccountIdForPanel(panel)
+      );
+
+      setIsAnyLoading(false);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [panels, selectedScenario, settings, getValidAccountIdForPanel]
+  );
+
+  return (
             <ChatPanel
               key={panel.id}
               panelId={panel.id}
@@ -2015,6 +2038,7 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
                 updatePanelSelection(panel.id, modelId, accountId)
               }
               onRemove={() => removePanel(panel.id)}
+              onRetry={() => retryPanel(panel.id)}
               response={responses[panel.id]}
               disabled={isAnyLoading}
               allowedModelIds={activePresetModelIds}
