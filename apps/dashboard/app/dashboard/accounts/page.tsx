@@ -142,24 +142,17 @@ export default async function AccountsPage({
 
   return (
     <div className="space-y-6">
-      <div className="relative">
-          <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-3">
-          <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
-            <div className="bg-background">
-              <div className="border-b border-border pb-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">Provider Accounts</h2>
-                  </div>
-                  <div className="flex w-full items-center gap-2 sm:w-auto">
-                    <AddAccountDialog triggerClassName="flex-1 sm:w-auto sm:flex-none" />
-                  </div>
-                </div>
-              </div>
+      <div className="sticky top-0 z-20 -mx-5 bg-background px-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="border-b border-border pb-4 pt-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Provider Accounts</h2>
+            </div>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <AddAccountDialog triggerClassName="flex-1 sm:w-auto sm:flex-none" />
             </div>
           </div>
         </div>
-        <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
 
       {params.error && (
@@ -175,7 +168,7 @@ export default async function AccountsPage({
         <div className="space-y-1">
           <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
           {OAUTH_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {
             const summary = summaryByProvider[provider.key];
 
@@ -210,7 +203,7 @@ export default async function AccountsPage({
         <div className="space-y-1">
           <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
           {API_KEY_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {
             const summary = summaryByProvider[provider.key];
 

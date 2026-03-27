@@ -26,27 +26,20 @@ function SummaryCardSkeleton() {
 export default function Loading() {
   return (
     <div className="space-y-6">
-      <div className="relative">
-        <div className="fixed inset-x-0 top-16 z-20 bg-background pt-3 md:left-60 md:pt-3">
-          <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8">
-            <div className="bg-background">
-              <div className="border-b border-border pb-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Skeleton className="h-7 w-44" />
-                  <Skeleton className="h-9 w-full rounded-md sm:w-32" />
-                </div>
-              </div>
-            </div>
+      <div className="sticky top-0 z-20 -mx-5 bg-background px-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="border-b border-border pb-4 pt-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Skeleton className="h-7 w-44" />
+            <Skeleton className="h-9 w-full rounded-md sm:w-32" />
           </div>
         </div>
-        <div className="h-[88px] sm:h-[84px] md:h-[80px]" />
       </div>
 
       <section className="space-y-4 md:space-y-2">
         <div className="space-y-1">
           <Skeleton className="h-5 w-48" />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
           {OAUTH_CARDS.map((_, index) => (
             <SummaryCardSkeleton key={`oauth-${index}`} />
           ))}
@@ -57,7 +50,7 @@ export default function Loading() {
         <div className="space-y-1">
           <Skeleton className="h-5 w-48" />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
           {API_KEY_CARDS.map((_, index) => (
             <SummaryCardSkeleton key={`api-${index}`} />
           ))}
