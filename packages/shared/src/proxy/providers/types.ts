@@ -43,7 +43,7 @@ export interface OAuthResult {
   expiresAt: Date;
   email: string;
   // Provider-specific fields
-  apiKey?: string;     // Iflow only
+  apiKey?: string;
   projectId?: string;  // Antigravity only
   tier?: string;       // Antigravity only: "free" | "paid"
   accountId?: string;  // Codex only: ChatGPT account ID from JWT
@@ -169,7 +169,7 @@ export interface Provider {
    * Get valid credentials for making API requests
    * Handles token refresh if needed
    * @param account Provider account from database
-   * @returns API key (Iflow) or access token (Antigravity)
+   * @returns API key or access token
    */
   getValidCredentials(account: ProviderAccount): Promise<string>;
 
@@ -192,7 +192,6 @@ export interface Provider {
  * Provider names enum
  */
 export const ProviderName = {
-  IFLOW: "iflow",
   ANTIGRAVITY: "antigravity",
   COPILOT: "copilot",
   QWEN_CODE: "qwen_code",
@@ -221,7 +220,6 @@ export function normalizeProviderAlias(provider: string): string {
 }
 
 export const OAUTH_PROVIDER_NAMES: ProviderNameType[] = [
-  ProviderName.IFLOW,
   ProviderName.ANTIGRAVITY,
   ProviderName.COPILOT,
   ProviderName.QWEN_CODE,

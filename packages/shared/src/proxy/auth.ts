@@ -359,7 +359,7 @@ export async function invalidateApiKeyValidationCache(
  * - "provider/model" (specific provider)
  * 
  * @example parseModelParam("qwen3-coder-plus") => { provider: null, model: "qwen3-coder-plus" }
- * @example parseModelParam("iflow/qwen3-coder-plus") => { provider: "iflow", model: "qwen3-coder-plus" }
+ * @example parseModelParam("antigravity/qwen3-coder-plus") => { provider: "antigravity", model: "qwen3-coder-plus" }
  */
 export function parseModelParam(modelParam: string): ParsedModel {
   const slashIndex = modelParam.indexOf("/");

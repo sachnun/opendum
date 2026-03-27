@@ -4,7 +4,6 @@ import type { Provider, ProviderNameType } from "./types.js";
 import { ProviderName } from "./types.js";
 
 // Provider instances will be lazily imported
-let iflowProvider: Provider | null = null;
 let antigravityProvider: Provider | null = null;
 let copilotProvider: Provider | null = null;
 let qwenCodeProvider: Provider | null = null;
@@ -21,13 +20,6 @@ let groqProvider: Provider | null = null;
  */
 export async function getProvider(name: ProviderNameType): Promise<Provider> {
   switch (name) {
-    case ProviderName.IFLOW:
-      if (!iflowProvider) {
-        const { iflowProvider: provider } = await import("./iflow/index.js");
-        iflowProvider = provider;
-      }
-      return iflowProvider;
-
     case ProviderName.ANTIGRAVITY:
       if (!antigravityProvider) {
         const { antigravityProvider: provider } = await import("./antigravity/index.js");
@@ -107,8 +99,7 @@ export async function getProvider(name: ProviderNameType): Promise<Provider> {
  * Get all available providers
  */
 export async function getAllProviders(): Promise<Provider[]> {
-  const [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq] = await Promise.all([
-    getProvider(ProviderName.IFLOW),
+  const [antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq] = await Promise.all([
     getProvider(ProviderName.ANTIGRAVITY),
     getProvider(ProviderName.COPILOT),
     getProvider(ProviderName.QWEN_CODE),
@@ -120,7 +111,7 @@ export async function getAllProviders(): Promise<Provider[]> {
     getProvider(ProviderName.NVIDIA_NIM),
     getProvider(ProviderName.GROQ),
   ]);
-  return [iflow, antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq];
+  return [antigravity, copilot, qwenCode, geminiCli, codex, kiro, ollamaCloud, openRouter, nvidiaNim, groq];
 }
 
 /**
