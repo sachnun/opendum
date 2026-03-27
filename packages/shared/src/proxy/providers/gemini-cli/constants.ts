@@ -18,7 +18,7 @@ export const GEMINI_CLI_SCOPES: readonly string[] = [
 export const GEMINI_CLI_REDIRECT_URI = "http://localhost:1/oauth2callback";
 
 // User Agent format: GeminiCLI/${version}/${model} (${platform}; ${arch})
-export const GEMINI_CLI_VERSION = "0.26.0";
+export const GEMINI_CLI_VERSION = "0.34.0";
 export const GEMINI_CLI_USER_AGENT_BASE = `GeminiCLI/${GEMINI_CLI_VERSION}`;
 
 // Build User-Agent for a specific model
