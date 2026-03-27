@@ -3,28 +3,28 @@
 /**
  * Sync Cerebras model availability into TOML registry.
  *
- * Data source: Cerebras Inference API /v1/models endpoint
- *   https://api.cerebras.ai/v1/models
+ * Data source: Cerebras public models API (no auth required)
+ *   https://api.cerebras.ai/public/v1/models
  *
- * Requires CEREBRAS_API_KEY environment variable.
- * Falls back to a known static model list when no key is available.
+ * The public endpoint may temporarily omit models under high demand,
+ * so results are merged with a static baseline from the docs.
  *
  * Usage:
- *   CEREBRAS_API_KEY=csk-... node scripts/cerebras.mjs
- *   node scripts/cerebras.mjs          # uses static fallback
+ *   node scripts/cerebras.mjs
  */
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderToToml, buildTomlIndex } from "./toml-utils.mjs";
 
-const CEREBRAS_MODELS_URL = "https://api.cerebras.ai/v1/models";
+const CEREBRAS_PUBLIC_MODELS_URL = "https://api.cerebras.ai/public/v1/models";
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
 // ---------------------------------------------------------------------------
-// Static fallback — kept in sync with Cerebras docs.
-// Used when CEREBRAS_API_KEY is not set.
+// Static baseline — kept in sync with Cerebras docs.
+// The public API may temporarily hide models under load pressure, so
+// these are always included to prevent accidental removal from TOMLs.
 // ---------------------------------------------------------------------------
 
 const STATIC_MODELS = [
@@ -84,7 +84,7 @@ function toModelKey(cerebrasModelId, reverseMap) {
 }
 
 // ---------------------------------------------------------------------------
-// Fetch live Cerebras models from API (requires API key)
+// Fetch live Cerebras models from public API (no auth)
 // ---------------------------------------------------------------------------
 
 function sleep(ms) {
@@ -93,14 +93,13 @@ function sleep(ms) {
   });
 }
 
-async function fetchCerebrasModels(apiKey) {
+async function fetchCerebrasPublicModels() {
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(CEREBRAS_MODELS_URL, {
+      const response = await fetch(CEREBRAS_PUBLIC_MODELS_URL, {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
           Accept: "application/json",
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -108,17 +107,18 @@ async function fetchCerebrasModels(apiKey) {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch Cerebras models (${response.status} ${response.statusText})`
+          `Failed to fetch Cerebras public models (${response.status} ${response.statusText})`
         );
       }
 
       const payload = await response.json();
       if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected Cerebras /v1/models payload format");
+        throw new Error("Unexpected Cerebras public /v1/models payload format");
       }
 
       return payload.data
-        .map((item) => (typeof item?.id === "string" ? item.id.trim() : ""))
+        .filter((item) => item && !item.deprecated)
+        .map((item) => (typeof item.id === "string" ? item.id.trim() : ""))
         .filter((id) => id.length > 0);
     } catch (error) {
       lastError = error;
@@ -131,7 +131,7 @@ async function fetchCerebrasModels(apiKey) {
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("Failed to fetch Cerebras model list");
+    : new Error("Failed to fetch Cerebras public model list");
 }
 
 // ---------------------------------------------------------------------------
@@ -159,17 +159,16 @@ async function main() {
 
   const reverseMap = buildReverseMap(modelsDir);
 
-  const apiKey = process.env.CEREBRAS_API_KEY;
-  let cerebrasModelIds;
-
-  if (apiKey) {
-    cerebrasModelIds = await fetchCerebrasModels(apiKey);
-  } else {
-    console.log("CEREBRAS_API_KEY not set, using static model list.");
-    cerebrasModelIds = STATIC_MODELS;
+  let liveModels;
+  try {
+    liveModels = await fetchCerebrasPublicModels();
+  } catch (error) {
+    console.warn(`Warning: ${error.message}. Using static list only.`);
+    liveModels = [];
   }
 
-  const modelMap = buildModelMap(cerebrasModelIds, reverseMap);
+  const merged = [...new Set([...liveModels, ...STATIC_MODELS])].sort();
+  const modelMap = buildModelMap(merged, reverseMap);
 
   const result = syncProviderToToml(modelsDir, "cerebras", modelMap);
 
