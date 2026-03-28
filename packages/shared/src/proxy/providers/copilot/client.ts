@@ -132,6 +132,94 @@ function extractInstructionsFromChatMessages(
 }
 
 /**
+ * Convert a Chat Completions `image_url` content block to a Responses API
+ * `input_image` block.
+ */
+function convertImageUrlBlock(
+  block: { type: string; [key: string]: unknown }
+): { type: string; [key: string]: unknown } {
+  const imageUrlValue = block.image_url;
+
+  if (typeof imageUrlValue === "string") {
+    const { image_url, ...rest } = block;
+    return { ...rest, type: "input_image", image_url };
+  }
+
+  if (imageUrlValue && typeof imageUrlValue === "object") {
+    const nested = imageUrlValue as Record<string, unknown>;
+    const url = typeof nested.url === "string" ? nested.url : "";
+    const detail = nested.detail ?? block.detail;
+    const { image_url: _img, detail: _det, ...rest } = block;
+    return {
+      ...rest,
+      type: "input_image",
+      image_url: url,
+      ...(detail !== undefined ? { detail } : {}),
+    };
+  }
+
+  return { ...block, type: "input_image" };
+}
+
+/**
+ * Normalize Chat Completions content block types for Responses API.
+ *
+ * Chat Completions uses `text` and `image_url` block types while Responses API
+ * expects `input_text`/`output_text` and `input_image`.
+ */
+function convertMessageContentForResponses(
+  content: string | Array<{ type: string; [key: string]: unknown }>,
+  role: string
+): string | Array<{ type: string; [key: string]: unknown }> {
+  if (!Array.isArray(content)) {
+    return content;
+  }
+
+  const targetTextType = role === "assistant" ? "output_text" : "input_text";
+
+  return content.map((block) => {
+    if (block.type === "text") {
+      return { ...block, type: targetTextType };
+    }
+
+    if (block.type === "image_url") {
+      return convertImageUrlBlock(block);
+    }
+
+    return block;
+  });
+}
+
+/**
+ * Normalize Responses API input[] payloads coming from passthrough callers.
+ * Ensures message content blocks never contain Chat Completions-only types.
+ */
+function normalizeResponsesInputForCopilot(
+  input: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> {
+  return input.map((item) => {
+    if (item.type !== "message") {
+      return item;
+    }
+
+    const content = item.content;
+    if (!Array.isArray(content)) {
+      return item;
+    }
+
+    const role = typeof item.role === "string" ? item.role : "user";
+
+    return {
+      ...item,
+      content: convertMessageContentForResponses(
+        content as Array<{ type: string; [key: string]: unknown }>,
+        role
+      ),
+    };
+  });
+}
+
+/**
  * Convert Chat Completions messages[] to Responses API input[] items.
  */
 function convertChatMessagesToResponsesInput(
@@ -143,17 +231,29 @@ function convertChatMessagesToResponsesInput(
     switch (msg.role) {
       case "system":
       case "developer":
-        input.push({ type: "message", role: "developer", content: msg.content });
+        input.push({
+          type: "message",
+          role: "developer",
+          content: convertMessageContentForResponses(msg.content, "developer"),
+        });
         break;
 
       case "user":
-        input.push({ type: "message", role: "user", content: msg.content });
+        input.push({
+          type: "message",
+          role: "user",
+          content: convertMessageContentForResponses(msg.content, "user"),
+        });
         break;
 
       case "assistant":
         if (msg.tool_calls && msg.tool_calls.length > 0) {
           if (msg.content) {
-            input.push({ type: "message", role: "assistant", content: msg.content });
+            input.push({
+              type: "message",
+              role: "assistant",
+              content: convertMessageContentForResponses(msg.content, "assistant"),
+            });
           }
           for (const tc of msg.tool_calls) {
             const toolCall = tc as {
@@ -169,7 +269,11 @@ function convertChatMessagesToResponsesInput(
             });
           }
         } else {
-          input.push({ type: "message", role: "assistant", content: msg.content });
+          input.push({
+            type: "message",
+            role: "assistant",
+            content: convertMessageContentForResponses(msg.content, "assistant"),
+          });
         }
         break;
 
@@ -185,7 +289,11 @@ function convertChatMessagesToResponsesInput(
         break;
 
       default:
-        input.push({ type: "message", role: msg.role, content: msg.content });
+        input.push({
+          type: "message",
+          role: msg.role,
+          content: convertMessageContentForResponses(msg.content, msg.role),
+        });
     }
   }
 
@@ -223,7 +331,7 @@ function buildCopilotResponsesPayload(
 
   const input =
     Array.isArray(body._responsesInput) && body._responsesInput.length > 0
-      ? body._responsesInput
+      ? normalizeResponsesInputForCopilot(body._responsesInput)
       : convertChatMessagesToResponsesInput(body.messages);
 
   const payload: Record<string, unknown> = {
