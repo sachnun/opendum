@@ -1,6 +1,6 @@
 "use client";
 
-import { AreaChart, Area, XAxis, YAxis } from "recharts";
+import { LineChart, Line, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
 import { ChartCard, EmptyChart } from "./chart-card";
 import type { SuccessRateData, Granularity } from "@/lib/actions/analytics";
@@ -11,11 +11,11 @@ interface Props {
 }
 
 const chartConfig = {
-  success: {
+  successRate: {
     label: "Success",
     color: "var(--chart-2)",
   },
-  error: {
+  errorRate: {
     label: "Error",
     color: "var(--destructive)",
   },
@@ -50,6 +50,27 @@ function formatTooltipLabel(value: string, granularity: Granularity): string {
 
 export function SuccessRateChart({ data, granularity }: Props) {
   const hasData = data.some((d) => d.success > 0 || d.error > 0);
+  const chartData = data.map((point) => {
+    const total = point.success + point.error;
+    const successRate =
+      point.successRate !== undefined
+        ? point.successRate
+        : total > 0
+          ? Math.round((point.success / total) * 1000) / 10
+          : 0;
+    const errorRate =
+      point.errorRate !== undefined
+        ? point.errorRate
+        : total > 0
+          ? Math.round((point.error / total) * 1000) / 10
+          : 0;
+
+    return {
+      ...point,
+      successRate,
+      errorRate,
+    };
+  });
 
   return (
     <ChartCard title="Success / Error Rate">
@@ -57,17 +78,7 @@ export function SuccessRateChart({ data, granularity }: Props) {
         <EmptyChart />
       ) : (
         <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[250px]">
-          <AreaChart accessibilityLayer data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <defs>
-              <linearGradient id="fillSuccess" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-success)" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="var(--color-success)" stopOpacity={0.01} />
-              </linearGradient>
-              <linearGradient id="fillError" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-error)" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="var(--color-error)" stopOpacity={0.01} />
-              </linearGradient>
-            </defs>
+          <LineChart accessibilityLayer data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10 }}
@@ -80,32 +91,48 @@ export function SuccessRateChart({ data, granularity }: Props) {
               tick={{ fontSize: 11 }}
               tickLine={false}
               axisLine={false}
-              width={40}
+              width={44}
+              domain={[0, 100]}
+              tickFormatter={(value) => `${value}%`}
             />
             <ChartTooltip
-              content={<ChartTooltipContent />}
+              content={(
+                <ChartTooltipContent
+                  formatter={(value, name, item) => {
+                    const numericValue = typeof value === "number" ? value : Number(value);
+                    const formattedRate = `${numericValue.toFixed(1)}%`;
+                    const successCount = Number(item.payload?.success ?? 0).toLocaleString();
+                    const errorCount = Number(item.payload?.error ?? 0).toLocaleString();
+
+                    if (item.dataKey === "successRate") {
+                      return [formattedRate, `Success (${successCount})`];
+                    }
+
+                    return [formattedRate, `Error (${errorCount})`];
+                  }}
+                />
+              )}
               labelFormatter={(value) => formatTooltipLabel(value, granularity)}
             />
-            <Area
-              type="natural"
-              dataKey="success"
-              stackId="1"
-              stroke="var(--color-success)"
-              strokeWidth={1.5}
-              fill="url(#fillSuccess)"
-              fillOpacity={1}
+            <Line
+              type="monotone"
+              dataKey="successRate"
+              stroke="var(--color-successRate)"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 3.5, strokeWidth: 0 }}
             />
-            <Area
-              type="natural"
-              dataKey="error"
-              stackId="1"
-              stroke="var(--color-error)"
-              strokeWidth={1.5}
-              fill="url(#fillError)"
-              fillOpacity={1}
+            <Line
+              type="monotone"
+              dataKey="errorRate"
+              stroke="var(--color-errorRate)"
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="4 3"
+              activeDot={{ r: 3.5, strokeWidth: 0 }}
             />
             <ChartLegend content={<ChartLegendContent />} />
-          </AreaChart>
+          </LineChart>
         </ChartContainer>
       )}
     </ChartCard>

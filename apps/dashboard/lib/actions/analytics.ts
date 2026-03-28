@@ -87,6 +87,8 @@ export interface SuccessRateData {
   date: string;
   success: number;
   error: number;
+  successRate?: number;
+  errorRate?: number;
 }
 
 export interface DurationOverTimeData {
@@ -511,11 +513,19 @@ export async function getAnalyticsData(
       output: timeSeriesBySlot.get(date)?.outputTokens ?? 0,
     }));
 
-    const successRate: SuccessRateData[] = timeSlots.map((date) => ({
-      date,
-      success: timeSeriesBySlot.get(date)?.successCount ?? 0,
-      error: timeSeriesBySlot.get(date)?.errorCount ?? 0,
-    }));
+    const successRate: SuccessRateData[] = timeSlots.map((date) => {
+      const success = timeSeriesBySlot.get(date)?.successCount ?? 0;
+      const error = timeSeriesBySlot.get(date)?.errorCount ?? 0;
+      const total = success + error;
+
+      return {
+        date,
+        success,
+        error,
+        successRate: total > 0 ? Math.round((success / total) * 1000) / 10 : 0,
+        errorRate: total > 0 ? Math.round((error / total) * 1000) / 10 : 0,
+      };
+    });
 
     const durationOverTime: DurationOverTimeData[] = timeSlots.map((date) => {
       const entry = timeSeriesBySlot.get(date);
