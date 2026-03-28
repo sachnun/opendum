@@ -1660,6 +1660,29 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
     });
   }, []);
 
+  const retryPanel = React.useCallback(
+    async (panelId: string) => {
+      const panel = panels.find((p) => p.id === panelId);
+      if (!panel?.modelId || !selectedScenario) {
+        return;
+      }
+
+      setIsAnyLoading(true);
+
+      await fetchFromModel(
+        panel.id,
+        panel.modelId,
+        selectedScenario,
+        settings,
+        getValidAccountIdForPanel(panel)
+      );
+
+      setIsAnyLoading(false);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [panels, selectedScenario, settings, getValidAccountIdForPanel]
+  );
+
   const fetchFromModel = async (
     panelId: string,
     modelId: string,
@@ -1691,11 +1714,11 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
           : endpoint === "responses"
             ? buildResponsesRequestBody(modelId, scenarioMessages, currentSettings, accountId)
             : buildChatCompletionsRequestBody(
-                modelId,
-                scenarioMessages,
-                currentSettings,
-                accountId
-              );
+              modelId,
+              scenarioMessages,
+              currentSettings,
+              accountId
+            );
 
       const endpointOverrides = adaptRequestOverridesForEndpoint(
         scenario.requestOverrides,
@@ -2003,30 +2026,7 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
         {panels.map((panel) => {
           const selectedAccountId = getValidAccountIdForPanel(panel);
 
-  const retryPanel = React.useCallback(
-    async (panelId: string) => {
-      const panel = panels.find((p) => p.id === panelId);
-      if (!panel?.modelId || !selectedScenario) {
-        return;
-      }
-
-      setIsAnyLoading(true);
-
-      await fetchFromModel(
-        panel.id,
-        panel.modelId,
-        selectedScenario,
-        settings,
-        getValidAccountIdForPanel(panel)
-      );
-
-      setIsAnyLoading(false);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panels, selectedScenario, settings, getValidAccountIdForPanel]
-  );
-
-  return (
+          return (
             <ChatPanel
               key={panel.id}
               panelId={panel.id}
