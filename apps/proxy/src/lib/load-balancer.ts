@@ -70,23 +70,16 @@ export async function getNextAccount(
 }
 
 /**
- * Get the next available (non-rate-limited) account for a user and model using LRU
- * Skips accounts that are rate-limited for the requested model
- * Deprioritizes degraded and failed accounts.
- * Failed accounts are retried automatically after a cooldown window.
- * @param userId User ID
- * @param model Model name
- * @param provider Optional specific provider
- * @param excludeAccountIds Account IDs to exclude (already tried this request)
- * @param accountAccess Optional API key account access rules (whitelist/blacklist)
+ * Get all eligible (active + model-enabled + access-allowed) accounts for a user
+ * Does not apply rate limit or failed cooldown filters.
  */
-export async function getNextAvailableAccount(
+export async function getEligibleAccounts(
   userId: string,
   model: string,
   provider: string | null = null,
   excludeAccountIds: string[] = [],
   accountAccess?: ApiKeyAccountAccess
-): Promise<ProviderAccount | null> {
+): Promise<ProviderAccount[]> {
   let targetProviders: string[];
 
   if (provider !== null) {
@@ -94,12 +87,10 @@ export async function getNextAvailableAccount(
   } else {
     targetProviders = getProvidersForModel(model);
     if (targetProviders.length === 0) {
-      return null;
+      return [];
     }
   }
 
-  // Get all active accounts.
-  // Ordered by: status (active -> degraded -> failed), then LRU.
   const whereConditions = [
     eq(providerAccount.userId, userId),
     inArray(providerAccount.provider, targetProviders),
@@ -110,7 +101,6 @@ export async function getNextAvailableAccount(
     whereConditions.push(notInArray(providerAccount.id, excludeAccountIds));
   }
 
-  // Apply account access rules (whitelist/blacklist) from API key
   if (accountAccess && accountAccess.mode !== "all" && accountAccess.accounts.length > 0) {
     if (accountAccess.mode === "whitelist") {
       whereConditions.push(inArray(providerAccount.id, accountAccess.accounts));
@@ -130,10 +120,9 @@ export async function getNextAvailableAccount(
     );
 
   if (accounts.length === 0) {
-    return null;
+    return [];
   }
 
-  // Filter out accounts that have this model disabled at the per-account level
   const modelLookupKeys = getModelLookupKeys(resolveModelAlias(model));
   const disabledEntries = await db
     .select({ providerAccountId: providerAccountDisabledModel.providerAccountId })
@@ -152,9 +141,38 @@ export async function getNextAvailableAccount(
     disabledEntries.map((e) => e.providerAccountId)
   );
 
-  const eligibleAccounts = modelDisabledAccountIds.size > 0
-    ? accounts.filter((a) => !modelDisabledAccountIds.has(a.id))
-    : accounts;
+  if (modelDisabledAccountIds.size === 0) {
+    return accounts;
+  }
+
+  return accounts.filter((account) => !modelDisabledAccountIds.has(account.id));
+}
+
+/**
+ * Get the next available (non-rate-limited) account for a user and model using LRU
+ * Skips accounts that are rate-limited for the requested model
+ * Deprioritizes degraded and failed accounts.
+ * Failed accounts are retried automatically after a cooldown window.
+ * @param userId User ID
+ * @param model Model name
+ * @param provider Optional specific provider
+ * @param excludeAccountIds Account IDs to exclude (already tried this request)
+ * @param accountAccess Optional API key account access rules (whitelist/blacklist)
+ */
+export async function getNextAvailableAccount(
+  userId: string,
+  model: string,
+  provider: string | null = null,
+  excludeAccountIds: string[] = [],
+  accountAccess?: ApiKeyAccountAccess
+): Promise<ProviderAccount | null> {
+  const eligibleAccounts = await getEligibleAccounts(
+    userId,
+    model,
+    provider,
+    excludeAccountIds,
+    accountAccess
+  );
 
   if (eligibleAccounts.length === 0) {
     return null;

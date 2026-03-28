@@ -20,7 +20,12 @@ import {
 import { db, providerAccount } from "@opendum/shared";
 import { eq, and, sql } from "drizzle-orm";
 import { authenticateRequest } from "../plugins/auth.js";
-import { getNextAvailableAccount, markAccountFailed, markAccountSuccess } from "./load-balancer.js";
+import {
+  getEligibleAccounts,
+  getNextAvailableAccount,
+  markAccountFailed,
+  markAccountSuccess,
+} from "./load-balancer.js";
 import {
   formatWaitTimeMs,
   getRateLimitScope,
@@ -429,6 +434,29 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
           const isFirstAttempt = triedAccountIds.length === 0;
 
           if (isFirstAttempt) {
+            const eligibleAccounts = await getEligibleAccounts(
+              userId,
+              model,
+              provider,
+              [],
+              apiKeyAccountAccess
+            );
+            if (eligibleAccounts.length > 0) {
+              const waitTimeMs = await getMinWaitTime(
+                eligibleAccounts.map((acc) => acc.id),
+                rateLimitScope
+              );
+              if (waitTimeMs > 0) {
+                return reply.code(config.rateLimitStatusCode).send(
+                  config.formatError({
+                    message: `All accounts are rate limited. Retry in ${formatWaitTimeMs(waitTimeMs)}.`,
+                    type: "rate_limit_error",
+                    retry_after: formatWaitTimeMs(waitTimeMs),
+                    retry_after_ms: waitTimeMs,
+                  })
+                );
+              }
+            }
             return reply.code(config.noAccountsStatusCode).send(
               config.formatError({
                 message:
