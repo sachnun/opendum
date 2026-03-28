@@ -39,6 +39,7 @@ import {
   CODEX_OAUTH_SCOPE,
   CODEX_ORIGINATOR,
 } from "@opendum/shared/proxy/providers/codex";
+import { fetchCodexQuotaFromApi } from "@opendum/shared/proxy/providers/codex/quota";
 import {
   buildKiroAuthUrl,
   generateCodeVerifier as generateKiroCodeVerifier,
@@ -83,6 +84,23 @@ interface CodexOAuthContext {
 interface KiroOAuthContext {
   state: string;
   codeVerifier: string;
+}
+
+async function detectCodexTier(
+  accessToken: string,
+  accountId?: string | null
+): Promise<string | null> {
+  try {
+    const quota = await fetchCodexQuotaFromApi(accessToken, accountId ?? null);
+    if (quota.status !== "success") {
+      return null;
+    }
+
+    const tier = quota.planType?.trim();
+    return tier && tier.length > 0 ? tier : null;
+  } catch {
+    return null;
+  }
 }
 
 function generateCodexState(): string {
@@ -1358,6 +1376,10 @@ export async function exchangeCodexOAuthCode(
     const chatgptAccountId = oauthResult.accountId || null;
     const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
     const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
+    const detectedTier = await detectCodexTier(
+      oauthResult.accessToken,
+      chatgptAccountId
+    );
 
     let existingAccount = null;
 
@@ -1377,6 +1399,7 @@ export async function exchangeCodexOAuthCode(
         refreshToken: encrypt(oauthResult.refreshToken),
         expiresAt: oauthResult.expiresAt,
         ...(chatgptAccountId && { accountId: chatgptAccountId }),
+        ...(detectedTier && { tier: detectedTier }),
         isActive: true,
       }).where(eq(providerAccount.id, existingAccount.id));
 
@@ -1405,6 +1428,7 @@ export async function exchangeCodexOAuthCode(
       expiresAt: oauthResult.expiresAt,
       email,
       accountId: chatgptAccountId,
+      tier: detectedTier,
       isActive: true,
     });
 
@@ -1706,6 +1730,10 @@ export async function pollCodexAuth(
     const chatgptAccountId = oauthResult.accountId || null;
     const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
     const workspaceEmail = workspaceAccountId ? `codex-${workspaceAccountId}` : null;
+    const detectedTier = await detectCodexTier(
+      oauthResult.accessToken,
+      chatgptAccountId
+    );
 
     // Clean up the PKCE cookie
     cookieStore.delete(`codex_cv_${deviceAuthId}`);
@@ -1729,6 +1757,7 @@ export async function pollCodexAuth(
         refreshToken: encrypt(oauthResult.refreshToken),
         expiresAt: oauthResult.expiresAt,
         ...(chatgptAccountId && { accountId: chatgptAccountId }),
+        ...(detectedTier && { tier: detectedTier }),
         isActive: true,
       }).where(eq(providerAccount.id, existingAccount.id));
 
@@ -1758,6 +1787,7 @@ export async function pollCodexAuth(
         expiresAt: oauthResult.expiresAt,
         email,
         accountId: chatgptAccountId,
+        tier: detectedTier,
         isActive: true,
       });
 

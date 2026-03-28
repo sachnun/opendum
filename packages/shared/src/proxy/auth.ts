@@ -13,6 +13,21 @@ import {
 } from "./models.js";
 import { normalizeProviderAlias } from "./providers/types.js";
 
+const CODEX_PAID_TIER_REQUIRED_MODELS = new Set(["gpt-5.4"]);
+const CODEX_FREE_TIER_PREFIXES = ["free"];
+
+function requiresPaidCodexTier(model: string): boolean {
+  return CODEX_PAID_TIER_REQUIRED_MODELS.has(model.toLowerCase());
+}
+
+function isCodexFreeTier(tier: string | null | undefined): boolean {
+  if (!tier) return false;
+  const normalized = tier.trim().toLowerCase();
+  return CODEX_FREE_TIER_PREFIXES.some(
+    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}-`)
+  );
+}
+
 /**
  * Parsed model parameter
  */
@@ -699,6 +714,10 @@ export interface AccountModelAvailability {
    * Map of `"provider:model"` → number of active accounts that have disabled that model.
    */
   disabledCountByProviderModel: Map<string, number>;
+  /** Map of provider -> active account IDs for per-account policy checks. */
+  activeAccountIdsByProvider: Map<string, string[]>;
+  /** Map of active account ID -> normalized tier string (when available). */
+  accountTierById: Map<string, string>;
 }
 
 /**
@@ -719,6 +738,18 @@ export function isModelUsableByAccounts(
   for (const provider of providers) {
     const totalAccounts = availability.accountCountByProvider.get(provider) ?? 0;
     if (totalAccounts === 0) continue;
+
+    if (provider === "codex" && requiresPaidCodexTier(canonical)) {
+      const accountIds = availability.activeAccountIdsByProvider.get(provider) ?? [];
+      const hasPaidOrUnknownTierAccount = accountIds.some((accountId) => {
+        const tier = availability.accountTierById.get(accountId);
+        return !isCodexFreeTier(tier);
+      });
+
+      if (!hasPaidOrUnknownTierAccount) {
+        continue;
+      }
+    }
 
     const key = `${provider}:${canonical}`;
     const disabledCount = availability.disabledCountByProviderModel.get(key) ?? 0;
@@ -747,6 +778,7 @@ export async function getAccountModelAvailability(
     .select({
       id: providerAccount.id,
       provider: providerAccount.provider,
+      tier: providerAccount.tier,
     })
     .from(providerAccount)
     .where(
@@ -759,6 +791,8 @@ export async function getAccountModelAvailability(
   const activeProviders = new Set<string>();
   const accountCountByProvider = new Map<string, number>();
   const accountIdToProvider = new Map<string, string>();
+  const activeAccountIdsByProvider = new Map<string, string[]>();
+  const accountTierById = new Map<string, string>();
 
   for (const acc of activeAccounts) {
     activeProviders.add(acc.provider);
@@ -767,6 +801,17 @@ export async function getAccountModelAvailability(
       (accountCountByProvider.get(acc.provider) ?? 0) + 1
     );
     accountIdToProvider.set(acc.id, acc.provider);
+
+    const providerAccountIds = activeAccountIdsByProvider.get(acc.provider);
+    if (providerAccountIds) {
+      providerAccountIds.push(acc.id);
+    } else {
+      activeAccountIdsByProvider.set(acc.provider, [acc.id]);
+    }
+
+    if (typeof acc.tier === "string" && acc.tier.trim().length > 0) {
+      accountTierById.set(acc.id, acc.tier.trim().toLowerCase());
+    }
   }
 
   // 2. Get per-account disabled models for all active accounts
@@ -801,5 +846,7 @@ export async function getAccountModelAvailability(
     activeProviders,
     accountCountByProvider,
     disabledCountByProviderModel,
+    activeAccountIdsByProvider,
+    accountTierById,
   };
 }
