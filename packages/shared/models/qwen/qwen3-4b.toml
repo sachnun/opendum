@@ -18,7 +18,4 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = ["openrouter"]
-
-[opendum.upstream]
-openrouter = "qwen/qwen3-4b:free"
+providers = []

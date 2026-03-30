@@ -18,8 +18,7 @@ output = ["text"]
 
 [opendum]
 family = "Kimi"
-providers = ["groq", "nvidia_nim"]
+providers = ["nvidia_nim"]
 
 [opendum.upstream]
-groq = "moonshotai/kimi-k2-instruct-0905"
 nvidia_nim = "moonshotai/kimi-k2-instruct-0905"
