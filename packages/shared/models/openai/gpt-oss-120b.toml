@@ -1,0 +1,5 @@
+[opendum]
+providers = ["ollama_cloud"]
+
+[opendum.upstream]
+ollama_cloud = "gpt-oss:120b"
