@@ -1,0 +1,6 @@
+[opendum]
+providers = ["kilo_code"]
+ignored = true
+
+[opendum.upstream]
+kilo_code = "corethink:free"
