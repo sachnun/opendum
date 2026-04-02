@@ -8,6 +8,7 @@ import {
   BarChart3,
   Check,
   CheckCircle,
+  ClipboardList,
   Copy,
   FlaskConical,
 } from "lucide-react";
@@ -436,6 +437,8 @@ function LastErrorMessageDialog({
     }
   };
 
+  const [copiedAll, setCopiedAll] = useState(false);
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(message);
@@ -443,6 +446,22 @@ function LastErrorMessageDialog({
       setTimeout(() => setCopied(false), 1500);
     } catch {
       toast.error("Failed to copy error details");
+    }
+  };
+
+  const handleCopyAll = async () => {
+    try {
+      const parts: string[] = [`[Current Error]\n${message}`];
+      if (historyEntries && historyEntries.length > 0) {
+        for (const entry of historyEntries) {
+          parts.push(`[${entry.errorCode ? `HTTP ${entry.errorCode}` : "No code"} - ${new Date(entry.createdAt).toLocaleString()}]\n${entry.errorMessage}`);
+        }
+      }
+      await navigator.clipboard.writeText(parts.join("\n\n---\n\n"));
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 1500);
+    } catch {
+      toast.error("Failed to copy all errors");
     }
   };
 
@@ -462,6 +481,20 @@ function LastErrorMessageDialog({
     }
   };
 
+  const [copiedPreview, setCopiedPreview] = useState(false);
+
+  const handleCopyPreview = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopiedPreview(true);
+      setTimeout(() => setCopiedPreview(false), 1500);
+    } catch {
+      toast.error("Failed to copy error details");
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
@@ -469,7 +502,18 @@ function LastErrorMessageDialog({
           type="button"
           className="w-full min-h-[3.25rem] rounded-sm pt-2 text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="text-muted-foreground text-xs">Last Error Message:</span>
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-muted-foreground text-xs">Last Error Message:</span>
+            <button
+              type="button"
+              className="shrink-0 p-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Copy last error message"
+              title="Copy last error message"
+              onClick={handleCopyPreview}
+            >
+              {copiedPreview ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+            </button>
+          </div>
           <span className={`mt-1 block text-xs line-clamp-2 break-all ${previewColorClass}`}>
             {code && `[${code}] `}
             {preview}
@@ -487,6 +531,16 @@ function LastErrorMessageDialog({
               </DialogDescription>
             </div>
             <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Copy all errors"
+                onClick={handleCopyAll}
+                title="Copy all errors (current + history)"
+              >
+                {copiedAll ? <Check className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
