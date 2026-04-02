@@ -8,6 +8,7 @@ export type ProviderAccountKey =
   | "kiro"
   | "nvidia_nim"
   | "ollama_cloud"
+  | "kilo_code"
   | "openrouter"
   | "qwen_code";
 
@@ -104,6 +105,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     showTier: false,
   },
   {
+    key: "kilo_code",
+    slug: "kilo-code",
+    label: "Kilo Code",
+    category: "api_key",
+    emptyMessage: "No Kilo Code accounts connected yet.",
+    showTier: false,
+  },
+  {
     key: "cerebras",
     slug: "cerebras",
     label: "Cerebras",
@@ -193,6 +202,10 @@ export function getProviderSuccessMessage(successParam: string): string {
 
   if (successParam === "groq_added") {
     return "Groq account connected successfully!";
+  }
+
+  if (successParam === "kilo_code_added") {
+    return "Kilo Code account connected successfully!";
   }
 
   if (successParam === "cerebras_added") {

@@ -61,6 +61,9 @@ import {
 import {
   CEREBRAS_API_BASE_URL,
 } from "@opendum/shared/proxy/providers/cerebras/constants";
+import {
+  KILO_CODE_API_BASE_URL,
+} from "@opendum/shared/proxy/providers/kilo-code/constants";
 import { getProviderModelMap } from "@opendum/shared/proxy/models";
 
 export type ActionResult<T = void> = 
@@ -149,6 +152,13 @@ const API_KEY_PROVIDER_SETTINGS = {
     label: "Cerebras",
     baseUrl: CEREBRAS_API_BASE_URL,
     modelMap: getProviderModelMap("cerebras"),
+    validationPath: "/models",
+    requireSuccessfulStatus: true,
+  },
+  kilo_code: {
+    label: "Kilo Code",
+    baseUrl: KILO_CODE_API_BASE_URL,
+    modelMap: getProviderModelMap("kilo_code"),
     validationPath: "/models",
     requireSuccessfulStatus: true,
   },
@@ -662,6 +672,33 @@ export async function connectCerebrasApiKey(
   } catch (error) {
     console.error("Failed to connect Cerebras account:", error);
     return { success: false, error: "Failed to connect Cerebras account" };
+  }
+}
+
+/**
+ * Connect Kilo Code account using API key
+ */
+export async function connectKiloCodeApiKey(
+  apiKey: string,
+  accountName?: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    return await connectApiKeyProviderAccount(
+      session.user.id,
+      "kilo_code",
+      "Kilo Code",
+      apiKey,
+      accountName
+    );
+  } catch (error) {
+    console.error("Failed to connect Kilo Code account:", error);
+    return { success: false, error: "Failed to connect Kilo Code account" };
   }
 }
 

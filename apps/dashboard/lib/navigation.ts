@@ -30,6 +30,7 @@ export interface ProviderAccountCounts {
   copilot: number;
   gemini_cli: number;
   groq: number;
+  kilo_code: number;
   kiro: number;
   nvidia_nim: number;
   ollama_cloud: number;
@@ -46,6 +47,7 @@ export interface ProviderAccountIndicators {
   copilot: ProviderAccountIndicator;
   gemini_cli: ProviderAccountIndicator;
   groq: ProviderAccountIndicator;
+  kilo_code: ProviderAccountIndicator;
   kiro: ProviderAccountIndicator;
   nvidia_nim: ProviderAccountIndicator;
   ollama_cloud: ProviderAccountIndicator;
@@ -88,6 +90,7 @@ export const primaryNavigation: NavItem[] = [
         href: getProviderAccountPath("openrouter"),
       },
       { name: "Groq", href: getProviderAccountPath("groq") },
+      { name: "Kilo Code", href: getProviderAccountPath("kilo_code") },
       { name: "Cerebras", href: getProviderAccountPath("cerebras") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],
