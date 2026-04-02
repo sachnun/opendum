@@ -1,0 +1,5 @@
+[opendum]
+providers = ["kilo_code"]
+
+[opendum.upstream]
+kilo_code = "x-ai/grok-code-fast-1:optimized:free"

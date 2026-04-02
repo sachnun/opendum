@@ -195,6 +195,7 @@ const FAMILY_RULES = [
   { test: /^phi-/, folder: "microsoft" },
   { test: /^qwen|^qwq-/, folder: "qwen" },
   { test: /^deepseek-/, folder: "deepseek" },
+  { test: /^kilo-auto-/, folder: "kilo-code" },
   { test: /^kimi-/, folder: "kimi" },
   { test: /^minimax-/, folder: "minimax" },
   { test: /^glm-/, folder: "zai" },

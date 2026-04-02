@@ -203,6 +203,7 @@ export const ProviderName = {
   NVIDIA_NIM: "nvidia_nim",
   GROQ: "groq",
   CEREBRAS: "cerebras",
+  KILO_CODE: "kilo_code",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
@@ -235,4 +236,5 @@ export const API_KEY_PROVIDER_NAMES: ProviderNameType[] = [
   ProviderName.NVIDIA_NIM,
   ProviderName.GROQ,
   ProviderName.CEREBRAS,
+  ProviderName.KILO_CODE,
 ];

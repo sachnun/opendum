@@ -18,7 +18,8 @@ output = ["text"]
 
 [opendum]
 family = "Trinity"
-providers = ["openrouter"]
+providers = ["kilo_code", "openrouter"]
 
 [opendum.upstream]
+kilo_code = "arcee-ai/trinity-large-preview:free"
 openrouter = "arcee-ai/trinity-large-preview:free"
