@@ -215,6 +215,8 @@ export function AddAccountDialog({
   const [callbackUrl, setCallbackUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedDeviceCode, setCopiedDeviceCode] = useState(false);
   const [accountName, setAccountName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -312,6 +314,8 @@ export function AddAccountDialog({
     setCallbackUrl("");
     setApiKey("");
     setIsApiKeyVisible(false);
+    setCopiedLink(false);
+    setCopiedDeviceCode(false);
     setAccountName("");
     setError("");
     setIsLoading(false);
@@ -496,6 +500,8 @@ export function AddAccountDialog({
     if (urlToCopy) {
       try {
         await navigator.clipboard.writeText(urlToCopy);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 1800);
       } catch {
         toast.error("Failed to copy link");
       }
@@ -517,6 +523,8 @@ export function AddAccountDialog({
 
     try {
       await navigator.clipboard.writeText(deviceCodeInfo.userCode);
+      setCopiedDeviceCode(true);
+      setTimeout(() => setCopiedDeviceCode(false), 1800);
     } catch {
       toast.error("Failed to copy code");
     }
@@ -761,9 +769,9 @@ export function AddAccountDialog({
                       onClick={handleCopyLink}
                       variant="outline"
                       disabled={isFetchingUrl || !authUrl}
-                      title="Copy login link"
+                      title={copiedLink ? "Copied!" : "Copy login link"}
                     >
-                      <Copy className="h-4 w-4" />
+                      {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                   <Alert>
@@ -808,10 +816,10 @@ export function AddAccountDialog({
                           size="sm"
                           variant="outline"
                           onClick={handleCopyDeviceCode}
-                          title="Copy code"
+                          title={copiedDeviceCode ? "Copied!" : "Copy code"}
                         >
-                          <Copy className="mr-1 h-3.5 w-3.5" />
-                          Copy code
+                          {copiedDeviceCode ? <Check className="mr-1 h-3.5 w-3.5" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
+                          {copiedDeviceCode ? "Copied" : "Copy code"}
                         </Button>
                       </div>
                     </div>
@@ -836,9 +844,9 @@ export function AddAccountDialog({
                       onClick={handleCopyLink}
                       variant="outline"
                       disabled={isFetchingUrl || !deviceCodeInfo}
-                      title="Copy login link"
+                      title={copiedLink ? "Copied!" : "Copy login link"}
                     >
-                      <Copy className="h-4 w-4" />
+                      {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                   {isPolling && (
@@ -888,9 +896,9 @@ export function AddAccountDialog({
                       type="button"
                       onClick={handleCopyLink}
                       variant="outline"
-                      title="Copy API key portal link"
+                      title={copiedLink ? "Copied!" : "Copy API key portal link"}
                     >
-                      <Copy className="h-4 w-4" />
+                      {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
 
