@@ -179,6 +179,7 @@ export const providerAccountErrorHistory = pgTable(
     userId: text("userId")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    model: text("model"),
     errorCode: integer("errorCode").notNull(),
     errorMessage: text("errorMessage").notNull(),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
@@ -328,6 +329,49 @@ export const usageLog = pgTable(
     ),
     index("usage_log_providerAccountId_idx").on(table.providerAccountId),
     index("usage_log_createdAt_idx").on(table.createdAt),
+  ],
+);
+
+export const providerAccountModelHealth = pgTable(
+  "provider_account_model_health",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    providerAccountId: text("providerAccountId")
+      .notNull()
+      .references(() => providerAccount.id, { onDelete: "cascade" }),
+    model: text("model").notNull(),
+
+    consecutiveErrors: integer("consecutiveErrors").notNull().default(0),
+    status: text("status").notNull().default("active"),
+    statusReason: text("statusReason"),
+    statusChangedAt: timestamp("statusChangedAt"),
+
+    lastErrorAt: timestamp("lastErrorAt"),
+    lastErrorCode: integer("lastErrorCode"),
+    lastErrorMessage: text("lastErrorMessage"),
+    lastSuccessAt: timestamp("lastSuccessAt"),
+
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("provider_account_model_health_accountId_model_key").on(
+      table.providerAccountId,
+      table.model,
+    ),
+    index("provider_account_model_health_providerAccountId_idx").on(
+      table.providerAccountId,
+    ),
+    index("provider_account_model_health_providerAccountId_status_idx").on(
+      table.providerAccountId,
+      table.model,
+      table.status,
+    ),
   ],
 );
 

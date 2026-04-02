@@ -5,6 +5,7 @@ import {
   account,
   providerAccount,
   providerAccountErrorHistory,
+  providerAccountModelHealth,
   providerAccountDisabledModel,
   proxyApiKey,
   proxyApiKeyRateLimit,
@@ -44,6 +45,7 @@ export const providerAccountRelations = relations(
       references: [user.id],
     }),
     errorHistory: many(providerAccountErrorHistory),
+    modelHealth: many(providerAccountModelHealth),
     usageLogs: many(usageLog),
     disabledModels: many(providerAccountDisabledModel),
   }),
@@ -112,6 +114,16 @@ export const providerAccountDisabledModelRelations = relations(
   ({ one }) => ({
     providerAccount: one(providerAccount, {
       fields: [providerAccountDisabledModel.providerAccountId],
+      references: [providerAccount.id],
+    }),
+  }),
+);
+
+export const providerAccountModelHealthRelations = relations(
+  providerAccountModelHealth,
+  ({ one }) => ({
+    providerAccount: one(providerAccount, {
+      fields: [providerAccountModelHealth.providerAccountId],
       references: [providerAccount.id],
     }),
   }),
