@@ -24,6 +24,8 @@ import {
   ArrowRight,
   Check,
   Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -965,7 +967,7 @@ export function AddAccountDialog({
                 <Label htmlFor="provider-api-key" className="text-sm font-medium">
                   API Key
                 </Label>
-                <div className="flex items-center gap-2">
+                <div className="relative">
                   <Input
                     id="provider-api-key"
                     type="text"
@@ -981,21 +983,22 @@ export function AddAccountDialog({
                     onChange={(e) => setApiKey(e.target.value)}
                     disabled={isLoading}
                     autoFocus
+                    className="pr-9"
                     style={
                       isApiKeyVisible
                         ? undefined
                         : ({ WebkitTextSecurity: "disc" } as React.CSSProperties)
                     }
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
                     onClick={() => setIsApiKeyVisible((current) => !current)}
                     disabled={isLoading}
-                    className="min-w-16"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                    aria-label={isApiKeyVisible ? "Hide API key" : "Show API key"}
                   >
-                    {isApiKeyVisible ? "Hide" : "Show"}
-                  </Button>
+                    {isApiKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
