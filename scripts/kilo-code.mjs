@@ -8,7 +8,14 @@ const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
+const MODEL_KEY_OVERRIDES = new Map([
+  ["x-ai/grok-code-fast-1:optimized:free", "grok-code-fast-1"],
+]);
+
 function toModelKey(modelId) {
+  const override = MODEL_KEY_OVERRIDES.get(modelId);
+  if (override) return override;
+
   // kilo-auto/* models: replace / with -
   if (modelId.startsWith("kilo-auto/")) {
     return modelId.replace("/", "-");
