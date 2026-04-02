@@ -1,5 +1,6 @@
 [opendum]
-providers = ["ollama_cloud"]
+providers = ["ollama_cloud", "openrouter"]
 
 [opendum.upstream]
 ollama_cloud = "gpt-oss:120b"
+openrouter = "openai/gpt-oss-120b:free"
