@@ -1090,7 +1090,7 @@ export const messagesRoute: RouteHandlerMethod = createProxyRoute({
     const tracker = createAnthropicStreamTracker(
       model,
       (usage) => {
-        markAccountSuccess(account.id).catch(() => undefined);
+        markAccountSuccess(account.id, model).catch(() => undefined);
         recordLatency(
           account.provider,
           model,
@@ -1169,7 +1169,7 @@ export const messagesRoute: RouteHandlerMethod = createProxyRoute({
       includeThinking
     );
 
-    markAccountSuccess(account.id).catch(() => undefined);
+    markAccountSuccess(account.id, model).catch(() => undefined);
     recordLatency(
       account.provider,
       model,

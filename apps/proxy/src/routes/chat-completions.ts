@@ -170,7 +170,7 @@ export const chatCompletionsRoute: RouteHandlerMethod = createProxyRoute({
       reply.raw.end();
 
       const usage = tracker.getUsage();
-      markAccountSuccess(accountId).catch(() => undefined);
+      markAccountSuccess(accountId, model).catch(() => undefined);
       recordLatency(accountProvider, model, true, Date.now() - requestStartTime).catch(
         () => undefined
       );
@@ -195,7 +195,7 @@ export const chatCompletionsRoute: RouteHandlerMethod = createProxyRoute({
     const responseData = (await response.json()) as Record<string, unknown> & {
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
-    markAccountSuccess(account.id).catch(() => undefined);
+    markAccountSuccess(account.id, model).catch(() => undefined);
     recordLatency(account.provider, model, false, Date.now() - requestStartTime).catch(
       () => undefined
     );

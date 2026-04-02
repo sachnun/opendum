@@ -605,6 +605,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
 
               await markAccountFailed(
                 account.id,
+                model,
                 providerResponse.status,
                 detailedError
               );
@@ -691,7 +692,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
             `[${account.provider}] request failed for account ${account.id}: ${errorMessage}`
           );
 
-          await markAccountFailed(account.id, statusCode, detailedError);
+          await markAccountFailed(account.id, model, statusCode, detailedError);
 
           void logUsage({
             userId,

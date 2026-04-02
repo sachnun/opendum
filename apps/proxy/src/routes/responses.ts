@@ -356,7 +356,7 @@ export const responsesRoute: RouteHandlerMethod = createProxyRoute({
       reply.raw.end();
 
       const usage = tracker.getUsage();
-      markAccountSuccess(accountId).catch(() => undefined);
+      markAccountSuccess(accountId, model).catch(() => undefined);
       recordLatency(
         accountProvider,
         model,
@@ -394,7 +394,7 @@ export const responsesRoute: RouteHandlerMethod = createProxyRoute({
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
 
-    markAccountSuccess(account.id).catch(() => undefined);
+    markAccountSuccess(account.id, model).catch(() => undefined);
     recordLatency(
       account.provider,
       model,

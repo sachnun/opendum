@@ -2,7 +2,7 @@
 
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { providerAccount, providerAccountErrorHistory } from "@opendum/shared/db/schema";
+import { providerAccount, providerAccountErrorHistory, providerAccountModelHealth } from "@opendum/shared/db/schema";
 import { eq, and, count as countFn, asc, desc } from "drizzle-orm";
 import { encrypt, decrypt, hashString } from "@opendum/shared/encryption";
 import { revalidatePath } from "next/cache";
@@ -514,6 +514,11 @@ export async function resolveProviderAccountErrors(
     await db
       .delete(providerAccountErrorHistory)
       .where(eq(providerAccountErrorHistory.providerAccountId, accountId));
+
+    // Delete all per-model health entries for this account
+    await db
+      .delete(providerAccountModelHealth)
+      .where(eq(providerAccountModelHealth.providerAccountId, accountId));
 
     revalidatePath("/dashboard/accounts");
     revalidatePath("/dashboard/accounts", "layout");
