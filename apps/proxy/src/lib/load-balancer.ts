@@ -1,12 +1,14 @@
 import { db } from "@opendum/shared/db";
-import { providerAccount, providerAccountErrorHistory, providerAccountDisabledModel } from "@opendum/shared/db/schema";
+import { providerAccount, providerAccountErrorHistory, providerAccountModelHealth, providerAccountDisabledModel } from "@opendum/shared/db/schema";
 import { eq, and, inArray, notInArray, asc, desc, sql } from "drizzle-orm";
 import type { ProviderAccount } from "@opendum/shared/db/schema";
 import type { ApiKeyAccountAccess } from "@opendum/shared/proxy/auth";
 import { getProvidersForModel, resolveModelAlias, getModelLookupKeys } from "@opendum/shared/proxy/models";
 import { getRateLimitedAccountIds, getRateLimitScope } from "./rate-limit.js";
 
-const FAILED_ACCOUNT_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
+const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
+const DEGRADED_THRESHOLD = 3;
+const FAILED_THRESHOLD = 7;
 const MAX_STORED_ERROR_MESSAGE_LENGTH = 10000;
 const MAX_ERROR_HISTORY_PER_ACCOUNT = 200;
 
@@ -151,8 +153,8 @@ export async function getEligibleAccounts(
 /**
  * Get the next available (non-rate-limited) account for a user and model using LRU
  * Skips accounts that are rate-limited for the requested model
- * Deprioritizes degraded and failed accounts.
- * Failed accounts are retried automatically after a cooldown window.
+ * Uses per-model circuit breaker health to filter/deprioritize accounts.
+ * Implements half-open state: after cooldown, allows one probe request before fully restoring.
  * @param userId User ID
  * @param model Model name
  * @param provider Optional specific provider
@@ -180,38 +182,81 @@ export async function getNextAvailableAccount(
 
   const rateLimitScope = getRateLimitScope(model);
 
-  // Separate paid and free accounts (both already sorted by status then LRU)
   const paidAccounts = eligibleAccounts.filter((a) => a.tier === "paid");
   const freeAccounts = eligibleAccounts.filter((a) => a.tier !== "paid");
-
-  // Prioritize paid accounts first, then free accounts
-  let selectedAccount: ProviderAccount | null = null;
-  const now = Date.now();
   const prioritizedAccounts = [...paidAccounts, ...freeAccounts];
+
   const rateLimitedAccountIds = await getRateLimitedAccountIds(
     prioritizedAccounts.map((account) => account.id),
     rateLimitScope
   );
 
+  const resolvedModel = resolveModelAlias(model);
+  const modelLookupKeys = getModelLookupKeys(resolvedModel);
+
+  const healthRows = prioritizedAccounts.length > 0
+    ? await db
+        .select()
+        .from(providerAccountModelHealth)
+        .where(
+          and(
+            inArray(
+              providerAccountModelHealth.providerAccountId,
+              prioritizedAccounts.map((a) => a.id)
+            ),
+            inArray(providerAccountModelHealth.model, modelLookupKeys)
+          )
+        )
+    : [];
+
+  const healthByAccountId = new Map<string, typeof healthRows[number]>();
+  for (const row of healthRows) {
+    healthByAccountId.set(row.providerAccountId, row);
+  }
+
+  const now = Date.now();
+  let selectedAccount: ProviderAccount | null = null;
+
   for (const acc of prioritizedAccounts) {
-    if (acc.status === "failed" && acc.statusChangedAt) {
-      const elapsed = now - acc.statusChangedAt.getTime();
-      if (elapsed < FAILED_ACCOUNT_RETRY_COOLDOWN_MS) {
+    if (rateLimitedAccountIds.has(acc.id)) {
+      continue;
+    }
+
+    const health = healthByAccountId.get(acc.id);
+    if (health) {
+      if (health.status === "failed") {
+        if (health.statusChangedAt) {
+          const elapsed = now - health.statusChangedAt.getTime();
+          if (elapsed < FAILED_COOLDOWN_MS) {
+            continue;
+          }
+        }
+        await db
+          .update(providerAccountModelHealth)
+          .set({
+            status: "half_open",
+            statusReason: "cooldown expired, probing",
+            statusChangedAt: new Date(),
+          })
+          .where(eq(providerAccountModelHealth.id, health.id));
+      }
+
+      if (health.status === "half_open" || health.status === "degraded") {
+        if (!selectedAccount) {
+          selectedAccount = acc;
+        }
         continue;
       }
     }
 
-    if (!rateLimitedAccountIds.has(acc.id)) {
-      selectedAccount = acc;
-      break;
-    }
+    selectedAccount = acc;
+    break;
   }
 
   if (!selectedAccount) {
     return null;
   }
 
-  // Update last used timestamp
   await db
     .update(providerAccount)
     .set({
@@ -265,121 +310,191 @@ export async function getNextAccountForProvider(
   return selectedAccount;
 }
 /**
- * Mark an account as having failed with error details
- * Auto-degrades status based on consecutive error count:
- * - 5+ consecutive errors: "degraded" (deprioritized in selection)
- * - 10+ consecutive errors: "failed" (temporarily sidelined, retried after cooldown)
+ * Mark an account as having failed for a specific model.
+ * Per-model circuit breaker with half-open state:
+ * - 3+ consecutive errors: "degraded" (deprioritized)
+ * - 7+ consecutive errors: "failed" (sidelined until cooldown)
+ * - If in "half_open" and error occurs: back to "failed" with fresh cooldown
  */
 export async function markAccountFailed(
   accountId: string,
+  model: string,
   errorCode: number,
   errorMessage: string
 ): Promise<void> {
   const normalizedErrorMessage = errorMessage.slice(0, MAX_STORED_ERROR_MESSAGE_LENGTH);
+  const resolvedModel = resolveModelAlias(model);
 
-  // Update error tracking fields
-  const [account] = await db
+  await db
     .update(providerAccount)
     .set({
       errorCount: sql`${providerAccount.errorCount} + 1`,
-      consecutiveErrors: sql`${providerAccount.consecutiveErrors} + 1`,
       lastErrorAt: new Date(),
       lastErrorMessage: normalizedErrorMessage,
       lastErrorCode: errorCode,
     })
-    .where(eq(providerAccount.id, accountId))
-    .returning();
+    .where(eq(providerAccount.id, accountId));
 
-  if (!account) {
-    return;
-  }
-
-  await db.insert(providerAccountErrorHistory).values({
-    providerAccountId: accountId,
-    userId: account.userId,
-    errorCode,
-    errorMessage: normalizedErrorMessage,
-  });
-
-  const staleHistoryEntries = await db
-    .select({ id: providerAccountErrorHistory.id })
-    .from(providerAccountErrorHistory)
-    .where(eq(providerAccountErrorHistory.providerAccountId, accountId))
-    .orderBy(
-      desc(providerAccountErrorHistory.createdAt),
-      desc(providerAccountErrorHistory.id)
+  const [existingHealth] = await db
+    .select()
+    .from(providerAccountModelHealth)
+    .where(
+      and(
+        eq(providerAccountModelHealth.providerAccountId, accountId),
+        eq(providerAccountModelHealth.model, resolvedModel)
+      )
     )
-    .offset(MAX_ERROR_HISTORY_PER_ACCOUNT);
+    .limit(1);
 
-  if (staleHistoryEntries.length > 0) {
+  let newConsecutiveErrors: number;
+
+  if (existingHealth) {
+    newConsecutiveErrors = existingHealth.consecutiveErrors + 1;
+
     await db
-      .delete(providerAccountErrorHistory)
-      .where(
-        inArray(
-          providerAccountErrorHistory.id,
-          staleHistoryEntries.map((entry) => entry.id)
-        )
-      );
+      .update(providerAccountModelHealth)
+      .set({
+        consecutiveErrors: newConsecutiveErrors,
+        lastErrorAt: new Date(),
+        lastErrorCode: errorCode,
+        lastErrorMessage: normalizedErrorMessage,
+      })
+      .where(eq(providerAccountModelHealth.id, existingHealth.id));
+  } else {
+    newConsecutiveErrors = 1;
+
+    await db
+      .insert(providerAccountModelHealth)
+      .values({
+        providerAccountId: accountId,
+        model: resolvedModel,
+        consecutiveErrors: 1,
+        lastErrorAt: new Date(),
+        lastErrorCode: errorCode,
+        lastErrorMessage: normalizedErrorMessage,
+      });
   }
 
-  // Auto-degradation based on consecutive errors
-  const newConsecutiveErrors = account.consecutiveErrors;
+  const currentStatus = existingHealth?.status ?? "active";
   let newStatus: string | null = null;
   let statusReason: string | null = null;
 
-  if (newConsecutiveErrors >= 10 && account.status !== "failed") {
+  if (currentStatus === "half_open") {
     newStatus = "failed";
-    statusReason = `${newConsecutiveErrors} consecutive errors (auto-disabled)`;
-  } else if (newConsecutiveErrors >= 5 && account.status === "active") {
+    statusReason = `probe failed during half-open (${resolvedModel})`;
+  } else if (newConsecutiveErrors >= FAILED_THRESHOLD && currentStatus !== "failed") {
+    newStatus = "failed";
+    statusReason = `${newConsecutiveErrors} consecutive errors on ${resolvedModel}`;
+  } else if (newConsecutiveErrors >= DEGRADED_THRESHOLD && currentStatus === "active") {
     newStatus = "degraded";
-    statusReason = `${newConsecutiveErrors} consecutive errors`;
+    statusReason = `${newConsecutiveErrors} consecutive errors on ${resolvedModel}`;
   }
 
   if (newStatus) {
-    await db
-      .update(providerAccount)
-      .set({
-        status: newStatus,
-        statusReason,
-        statusChangedAt: new Date(),
-      })
-      .where(eq(providerAccount.id, accountId));
+    const healthId = existingHealth?.id;
+    if (healthId) {
+      await db
+        .update(providerAccountModelHealth)
+        .set({
+          status: newStatus,
+          statusReason,
+          statusChangedAt: new Date(),
+        })
+        .where(eq(providerAccountModelHealth.id, healthId));
+    }
   }
-}
 
-/**
- * Mark an account as having succeeded
- * Resets consecutive errors and restores status to "active" if it was degraded/failed
- */
-export async function markAccountSuccess(accountId: string): Promise<void> {
   const [account] = await db
-    .select({
-      status: providerAccount.status,
-      consecutiveErrors: providerAccount.consecutiveErrors,
-    })
+    .select({ userId: providerAccount.userId })
     .from(providerAccount)
     .where(eq(providerAccount.id, accountId))
     .limit(1);
 
-  if (!account) return;
+  if (account) {
+    await db.insert(providerAccountErrorHistory).values({
+      providerAccountId: accountId,
+      userId: account.userId,
+      model: resolvedModel,
+      errorCode,
+      errorMessage: normalizedErrorMessage,
+    });
+
+    const staleHistoryEntries = await db
+      .select({ id: providerAccountErrorHistory.id })
+      .from(providerAccountErrorHistory)
+      .where(eq(providerAccountErrorHistory.providerAccountId, accountId))
+      .orderBy(
+        desc(providerAccountErrorHistory.createdAt),
+        desc(providerAccountErrorHistory.id)
+      )
+      .offset(MAX_ERROR_HISTORY_PER_ACCOUNT);
+
+    if (staleHistoryEntries.length > 0) {
+      await db
+        .delete(providerAccountErrorHistory)
+        .where(
+          inArray(
+            providerAccountErrorHistory.id,
+            staleHistoryEntries.map((entry) => entry.id)
+          )
+        );
+    }
+  }
+}
+
+/**
+ * Mark an account as having succeeded for a specific model.
+ * Resets per-model consecutive errors and restores health status.
+ * Half-open -> active on success (circuit closes).
+ */
+export async function markAccountSuccess(
+  accountId: string,
+  model: string
+): Promise<void> {
+  const resolvedModel = resolveModelAlias(model);
+
+  await db
+    .update(providerAccount)
+    .set({
+      successCount: sql`${providerAccount.successCount} + 1`,
+      lastSuccessAt: new Date(),
+    })
+    .where(eq(providerAccount.id, accountId));
+
+  const [existingHealth] = await db
+    .select()
+    .from(providerAccountModelHealth)
+    .where(
+      and(
+        eq(providerAccountModelHealth.providerAccountId, accountId),
+        eq(providerAccountModelHealth.model, resolvedModel)
+      )
+    )
+    .limit(1);
+
+  if (!existingHealth) {
+    return;
+  }
 
   const updates: Record<string, unknown> = {
     consecutiveErrors: 0,
-    successCount: sql`${providerAccount.successCount} + 1`,
     lastSuccessAt: new Date(),
   };
 
-  // Restore status if it was auto-degraded (not manually disabled)
-  if (account.status === "degraded" || account.status === "failed") {
+  if (
+    existingHealth.status === "degraded" ||
+    existingHealth.status === "failed" ||
+    existingHealth.status === "half_open"
+  ) {
     updates.status = "active";
     updates.statusReason = null;
     updates.statusChangedAt = new Date();
   }
 
   await db
-    .update(providerAccount)
+    .update(providerAccountModelHealth)
     .set(updates)
-    .where(eq(providerAccount.id, accountId));
+    .where(eq(providerAccountModelHealth.id, existingHealth.id));
 }
 
 /**
