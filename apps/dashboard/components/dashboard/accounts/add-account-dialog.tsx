@@ -44,6 +44,7 @@ import {
   connectOpenRouterApiKey,
   connectGroqApiKey,
   connectCerebrasApiKey,
+  connectKiloCodeApiKey,
 } from "@/lib/actions/accounts";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { cn } from "@/lib/utils";
@@ -166,6 +167,15 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     accountNamePlaceholder: "Cerebras Personal",
     connectAction: connectCerebrasApiKey,
   },
+  kilo_code: {
+    name: "Kilo Code",
+    description: "Access free & auto-routed models via Kilo Gateway",
+    flowType: "api_key",
+    apiKeyPortalUrl: "https://app.kilo.ai",
+    apiKeyPlaceholder: "sk-...",
+    accountNamePlaceholder: "Kilo Code Personal",
+    connectAction: connectKiloCodeApiKey,
+  },
 };
 
 const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
@@ -183,6 +193,7 @@ const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
   "nvidia_nim",
   "groq",
   "cerebras",
+  "kilo_code",
 ];
 
 

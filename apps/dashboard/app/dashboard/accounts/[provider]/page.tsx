@@ -33,6 +33,7 @@ function createEmptyProviderAccountMap<T>(createValue: () => T): Record<Provider
     cerebras: createValue(),
     codex: createValue(),
     copilot: createValue(),
+    kilo_code: createValue(),
     kiro: createValue(),
     gemini_cli: createValue(),
     groq: createValue(),
@@ -243,6 +244,7 @@ export default async function ProviderAccountsPage({
         openRouterAccounts={groupedAccounts.openrouter}
         groqAccounts={groupedAccounts.groq}
         cerebrasAccounts={groupedAccounts.cerebras}
+        kiloCodeAccounts={groupedAccounts.kilo_code}
         visibleProviders={[selectedProvider]}
         supportedModelsByProvider={{ [selectedProvider]: providerModels }}
         disabledModelsByAccountId={disabledModelsByAccountId}

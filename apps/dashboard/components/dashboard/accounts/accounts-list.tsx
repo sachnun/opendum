@@ -122,6 +122,7 @@ interface AccountsListProps {
   openRouterAccounts: Account[];
   groqAccounts: Account[];
   cerebrasAccounts: Account[];
+  kiloCodeAccounts: Account[];
   visibleProviders?: ProviderAccountKey[];
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
   disabledModelsByAccountId?: Record<string, string[]>;
@@ -1104,6 +1105,7 @@ export function AccountsList({
   openRouterAccounts,
   groqAccounts,
   cerebrasAccounts,
+  kiloCodeAccounts,
   visibleProviders,
   supportedModelsByProvider,
   disabledModelsByAccountId,
@@ -1586,6 +1588,20 @@ export function AccountsList({
         accounts={cerebrasAccounts}
         emptyMessage="No Cerebras accounts connected yet."
         supportedModels={supportedModelsByProvider?.cerebras}
+        disabledModelsByAccountId={disabledModelsByAccountId}
+      />
+    );
+  }
+  if (shouldRenderProvider("kilo_code")) {
+    apiKeyProviderSections.push(
+      <ProviderSection
+        key="kilo-code"
+        id="kilo-code-accounts"
+        title="Kilo Code"
+        hideHeader={hasProviderFilter}
+        accounts={kiloCodeAccounts}
+        emptyMessage="No Kilo Code accounts connected yet."
+        supportedModels={supportedModelsByProvider?.kilo_code}
         disabledModelsByAccountId={disabledModelsByAccountId}
       />
     );
