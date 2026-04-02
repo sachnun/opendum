@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   refresh-models:
@@ -30,13 +29,20 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Refresh provider models
-        run: pnpm run models:refresh -- --summary "$RUNNER_TEMP/pr-body.md"
+        run: pnpm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
 
-      - name: Open pull request
-        uses: peter-evans/create-pull-request@v7
+      - name: Build commit message
+        id: commit_msg
+        run: |
+          echo 'msg<<EOF' >> "$GITHUB_OUTPUT"
+          echo 'chore: refresh provider model registry' >> "$GITHUB_OUTPUT"
+          echo '' >> "$GITHUB_OUTPUT"
+          if [ -f "$RUNNER_TEMP/summary.md" ]; then
+            cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_OUTPUT"
+          fi
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit-message: "chore: refresh provider model registry"
-          title: "chore: refresh provider model registry"
-          body-path: ${{ runner.temp }}/pr-body.md
-          branch: chore/refresh-provider-models
-          delete-branch: true
+          commit_message: ${{ steps.commit_msg.outputs.msg }}
