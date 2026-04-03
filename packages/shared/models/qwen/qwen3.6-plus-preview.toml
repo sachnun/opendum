@@ -1,6 +1,2 @@
 [opendum]
-providers = ["kilo_code", "openrouter"]
-
-[opendum.upstream]
-kilo_code = "qwen/qwen3.6-plus-preview:free"
-openrouter = "qwen/qwen3.6-plus-preview:free"
+providers = []

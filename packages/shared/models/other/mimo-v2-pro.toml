@@ -1,5 +1,2 @@
 [opendum]
-providers = ["kilo_code"]
-
-[opendum.upstream]
-kilo_code = "xiaomi/mimo-v2-pro:free"
+providers = []

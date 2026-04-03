@@ -1,0 +1,5 @@
+[opendum]
+providers = ["kilo_code"]
+
+[opendum.upstream]
+kilo_code = "bytedance-seed/dola-seed-2.0-pro:free"
