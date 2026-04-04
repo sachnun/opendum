@@ -121,9 +121,33 @@ export default async function DashboardLayout({
   const validProviderKeys = new Set<string>(
     PROVIDER_ACCOUNT_DEFINITIONS.map((d) => d.key)
   );
-  const pinnedProviders: ProviderAccountKey[] = pinnedProviderRows
-    .map((r: { providerKey: string }) => r.providerKey)
-    .filter((k: string): k is ProviderAccountKey => validProviderKeys.has(k));
+
+  let pinnedProviders: ProviderAccountKey[];
+
+  if (pinnedProviderRows.length === 0) {
+    const providersWithAccounts = new Set(
+      providerAccounts.map((a: { provider: string }) => a.provider)
+    );
+    const autoPinKeys = PROVIDER_ACCOUNT_DEFINITIONS
+      .filter((d) => providersWithAccounts.has(d.key))
+      .slice(0, 5)
+      .map((d) => d.key);
+
+    const rowsToInsert = [
+      ...autoPinKeys.map((key) => ({ userId: session.user.id, providerKey: key })),
+      { userId: session.user.id, providerKey: "_auto_pinned" },
+    ];
+
+    if (rowsToInsert.length > 0) {
+      await db.insert(pinnedProvider).values(rowsToInsert).onConflictDoNothing();
+    }
+
+    pinnedProviders = autoPinKeys;
+  } else {
+    pinnedProviders = pinnedProviderRows
+      .map((r: { providerKey: string }) => r.providerKey)
+      .filter((k: string): k is ProviderAccountKey => validProviderKeys.has(k));
+  }
 
   const user = {
     name: session.user.name ?? null,
