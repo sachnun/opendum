@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, ArrowRight } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
+import { PinButton } from "@/components/dashboard/accounts/pin-button";
 import type { ProviderAccountIndicator } from "@/lib/navigation";
 import {
   API_KEY_PROVIDER_ACCOUNT_DEFINITIONS,
@@ -16,6 +17,7 @@ import {
   type ProviderAccountKey,
   getProviderAccountPath,
 } from "@/lib/provider-accounts";
+import { pinnedProvider } from "@opendum/shared/db/schema";
 
 const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
 
@@ -109,6 +111,13 @@ export default async function AccountsPage({
     .from(providerAccount)
     .where(eq(providerAccount.userId, session.user.id));
 
+  const pinnedRows = await db
+    .select({ providerKey: pinnedProvider.providerKey })
+    .from(pinnedProvider)
+    .where(eq(pinnedProvider.userId, session.user.id));
+
+  const pinnedSet = new Set<string>(pinnedRows.map((r: { providerKey: string }) => r.providerKey));
+
   const summaryByProvider: Record<ProviderAccountKey, ProviderSummary> =
     Object.fromEntries(
       PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => [
@@ -181,7 +190,13 @@ export default async function AccountsPage({
                 <Card className="h-full transition-colors group-hover:border-primary/40">
                   <CardHeader className="space-y-1 pb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base">{provider.label}</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <PinButton
+                          providerKey={provider.key}
+                          initialPinned={pinnedSet.has(provider.key)}
+                        />
+                        <CardTitle className="text-base">{provider.label}</CardTitle>
+                      </div>
                       {getIndicatorBadge(summary.indicator, summary.connected)}
                     </div>
                   </CardHeader>
@@ -216,7 +231,13 @@ export default async function AccountsPage({
                 <Card className="h-full transition-colors group-hover:border-primary/40">
                   <CardHeader className="space-y-1 pb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base">{provider.label}</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <PinButton
+                          providerKey={provider.key}
+                          initialPinned={pinnedSet.has(provider.key)}
+                        />
+                        <CardTitle className="text-base">{provider.label}</CardTitle>
+                      </div>
                       {getIndicatorBadge(summary.indicator, summary.connected)}
                     </div>
                   </CardHeader>
