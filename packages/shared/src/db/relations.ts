@@ -7,6 +7,7 @@ import {
   providerAccountErrorHistory,
   providerAccountModelHealth,
   providerAccountDisabledModel,
+  pinnedProvider,
   proxyApiKey,
   proxyApiKeyRateLimit,
   usageLog,
@@ -18,6 +19,7 @@ export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   providerAccounts: many(providerAccount),
   providerAccountErrorHistoryEntries: many(providerAccountErrorHistory),
+  pinnedProviders: many(pinnedProvider),
   proxyApiKeys: many(proxyApiKey),
   usageLogs: many(usageLog),
   disabledModels: many(disabledModel),
@@ -118,6 +120,13 @@ export const providerAccountDisabledModelRelations = relations(
     }),
   }),
 );
+
+export const pinnedProviderRelations = relations(pinnedProvider, ({ one }) => ({
+  user: one(user, {
+    fields: [pinnedProvider.userId],
+    references: [user.id],
+  }),
+}));
 
 export const providerAccountModelHealthRelations = relations(
   providerAccountModelHealth,

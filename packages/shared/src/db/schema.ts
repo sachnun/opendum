@@ -398,4 +398,25 @@ export const providerAccountDisabledModel = pgTable(
   ],
 );
 
+export const pinnedProvider = pgTable(
+  "pinned_provider",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    providerKey: text("providerKey").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("pinned_provider_userId_providerKey_key").on(
+      table.userId,
+      table.providerKey,
+    ),
+    index("pinned_provider_userId_idx").on(table.userId),
+  ],
+);
+
 export type ProviderAccount = InferSelectModel<typeof providerAccount>;
