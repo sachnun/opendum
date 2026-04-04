@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
   AlertCircle,
@@ -11,6 +12,8 @@ import {
   ClipboardList,
   Copy,
   FlaskConical,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,6 +72,7 @@ import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
 import { setAccountModelEnabled } from "@/lib/actions/account-models";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { usePlaygroundPreset } from "@/lib/playground-preset-context";
+import { togglePinnedProvider } from "@/lib/actions/pinned-providers";
 
 type AccountQuotaInfo =
   | AntigravityAccountQuotaInfo
@@ -127,6 +131,7 @@ interface AccountsListProps {
   visibleProviders?: ProviderAccountKey[];
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
   disabledModelsByAccountId?: Record<string, string[]>;
+  pinnedProviders: ProviderAccountKey[];
 }
 
 function formatTierLabel(tier: string): string {
@@ -1074,6 +1079,7 @@ function AccountCard({
 
 interface ProviderSectionProps {
   id: string;
+  providerKey: ProviderAccountKey;
   title: string;
   accounts: Account[];
   showTier?: boolean;
@@ -1083,10 +1089,13 @@ interface ProviderSectionProps {
   isQuotaLoading?: boolean;
   hideHeader?: boolean;
   disabledModelsByAccountId?: Record<string, string[]>;
+  isPinned: boolean;
+  onTogglePin: (providerKey: ProviderAccountKey) => void;
 }
 
 function ProviderSection({
   id,
+  providerKey,
   title,
   accounts,
   showTier = false,
@@ -1096,6 +1105,8 @@ function ProviderSection({
   isQuotaLoading = false,
   hideHeader = false,
   disabledModelsByAccountId,
+  isPinned,
+  onTogglePin,
 }: ProviderSectionProps) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4 md:space-y-2">
@@ -1105,6 +1116,36 @@ function ProviderSection({
           <Badge variant="outline" className="text-xs">
             {accounts.length} connected
           </Badge>
+          <button
+            type="button"
+            onClick={() => onTogglePin(providerKey)}
+            className={cn(
+              "ml-auto p-1 rounded-md transition-colors cursor-pointer",
+              isPinned
+                ? "text-foreground hover:text-muted-foreground"
+                : "text-muted-foreground/40 hover:text-muted-foreground"
+            )}
+            title={isPinned ? "Unpin from sidebar" : "Pin to sidebar"}
+          >
+            {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+          </button>
+        </div>
+      )}
+      {hideHeader && (
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => onTogglePin(providerKey)}
+            className={cn(
+              "p-1 rounded-md transition-colors cursor-pointer",
+              isPinned
+                ? "text-foreground hover:text-muted-foreground"
+                : "text-muted-foreground/40 hover:text-muted-foreground"
+            )}
+            title={isPinned ? "Unpin from sidebar" : "Pin to sidebar"}
+          >
+            {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+          </button>
         </div>
       )}
 
@@ -1163,7 +1204,39 @@ export function AccountsList({
   visibleProviders,
   supportedModelsByProvider,
   disabledModelsByAccountId,
+  pinnedProviders,
 }: AccountsListProps) {
+  const [pinnedSet, setPinnedSet] = useState<Set<ProviderAccountKey>>(
+    () => new Set(pinnedProviders)
+  );
+
+  const handleTogglePin = useCallback(async (providerKey: ProviderAccountKey) => {
+    const wasPinned = pinnedSet.has(providerKey);
+    setPinnedSet((prev) => {
+      const next = new Set(prev);
+      if (wasPinned) {
+        next.delete(providerKey);
+      } else {
+        next.add(providerKey);
+      }
+      return next;
+    });
+
+    const result = await togglePinnedProvider(providerKey);
+    if (!result.success) {
+      setPinnedSet((prev) => {
+        const reverted = new Set(prev);
+        if (wasPinned) {
+          reverted.add(providerKey);
+        } else {
+          reverted.delete(providerKey);
+        }
+        return reverted;
+      });
+      toast.error(result.error);
+    }
+  }, [pinnedSet]);
+
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
     useState<Record<string, AccountQuotaInfo>>({});
   const [codexQuotaByAccountId, setCodexQuotaByAccountId] =
@@ -1481,6 +1554,7 @@ export function AccountsList({
       <ProviderSection
         key="antigravity"
         id="antigravity-accounts"
+        providerKey="antigravity"
         title="Antigravity"
         hideHeader={hasProviderFilter}
         accounts={antigravityAccounts}
@@ -1490,6 +1564,8 @@ export function AccountsList({
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("antigravity")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1498,6 +1574,7 @@ export function AccountsList({
       <ProviderSection
         key="codex"
         id="codex-accounts"
+        providerKey="codex"
         title="Codex"
         hideHeader={hasProviderFilter}
         accounts={codexAccounts}
@@ -1507,6 +1584,8 @@ export function AccountsList({
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("codex")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1515,6 +1594,7 @@ export function AccountsList({
       <ProviderSection
         key="kiro"
         id="kiro-accounts"
+        providerKey="kiro"
         title="Kiro"
         hideHeader={hasProviderFilter}
         accounts={kiroAccounts}
@@ -1523,6 +1603,8 @@ export function AccountsList({
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("kiro")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1531,6 +1613,7 @@ export function AccountsList({
       <ProviderSection
         key="gemini-cli"
         id="gemini-cli-accounts"
+        providerKey="gemini_cli"
         title="Gemini CLI"
         hideHeader={hasProviderFilter}
         accounts={geminiCliAccounts}
@@ -1540,6 +1623,8 @@ export function AccountsList({
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("gemini_cli")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1548,12 +1633,15 @@ export function AccountsList({
       <ProviderSection
         key="qwen-code"
         id="qwen-code-accounts"
+        providerKey="qwen_code"
         title="Qwen Code"
         hideHeader={hasProviderFilter}
         accounts={qwenCodeAccounts}
         emptyMessage="No Qwen Code connections yet."
         supportedModels={supportedModelsByProvider?.qwen_code}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("qwen_code")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1562,6 +1650,7 @@ export function AccountsList({
       <ProviderSection
         key="copilot"
         id="copilot-accounts"
+        providerKey="copilot"
         title="Copilot"
         hideHeader={hasProviderFilter}
         accounts={copilotAccounts}
@@ -1570,6 +1659,8 @@ export function AccountsList({
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("copilot")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1580,12 +1671,15 @@ export function AccountsList({
       <ProviderSection
         key="nvidia-nim"
         id="nvidia-nim-accounts"
+        providerKey="nvidia_nim"
         title="Nvidia"
         hideHeader={hasProviderFilter}
         accounts={nvidiaNimAccounts}
         emptyMessage="No Nvidia connections yet."
         supportedModels={supportedModelsByProvider?.nvidia_nim}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("nvidia_nim")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1594,12 +1688,15 @@ export function AccountsList({
       <ProviderSection
         key="ollama-cloud"
         id="ollama-cloud-accounts"
+        providerKey="ollama_cloud"
         title="Ollama Cloud"
         hideHeader={hasProviderFilter}
         accounts={ollamaCloudAccounts}
         emptyMessage="No Ollama Cloud connections yet."
         supportedModels={supportedModelsByProvider?.ollama_cloud}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("ollama_cloud")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1608,6 +1705,7 @@ export function AccountsList({
       <ProviderSection
         key="openrouter"
         id="openrouter-accounts"
+        providerKey="openrouter"
         title="OpenRouter"
         hideHeader={hasProviderFilter}
         accounts={openRouterAccounts}
@@ -1616,6 +1714,8 @@ export function AccountsList({
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("openrouter")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1624,11 +1724,14 @@ export function AccountsList({
       <ProviderSection
         key="groq"
         id="groq-accounts"
+        providerKey="groq"
         title="Groq Accounts"
         hideHeader={hasProviderFilter}
         accounts={groqAccounts}
         emptyMessage="No Groq accounts connected yet."
         supportedModels={supportedModelsByProvider?.groq}
+        isPinned={pinnedSet.has("groq")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1637,12 +1740,15 @@ export function AccountsList({
       <ProviderSection
         key="cerebras"
         id="cerebras-accounts"
+        providerKey="cerebras"
         title="Cerebras"
         hideHeader={hasProviderFilter}
         accounts={cerebrasAccounts}
         emptyMessage="No Cerebras accounts connected yet."
         supportedModels={supportedModelsByProvider?.cerebras}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("cerebras")}
+        onTogglePin={handleTogglePin}
       />
     );
   }
@@ -1651,12 +1757,15 @@ export function AccountsList({
       <ProviderSection
         key="kilo-code"
         id="kilo-code-accounts"
+        providerKey="kilo_code"
         title="Kilo Code"
         hideHeader={hasProviderFilter}
         accounts={kiloCodeAccounts}
         emptyMessage="No Kilo Code accounts connected yet."
         supportedModels={supportedModelsByProvider?.kilo_code}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("kilo_code")}
+        onTogglePin={handleTogglePin}
       />
     );
   }

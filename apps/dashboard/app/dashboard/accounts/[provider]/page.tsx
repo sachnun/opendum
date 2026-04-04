@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { providerAccount, providerAccountDisabledModel, usageLog } from "@opendum/shared/db/schema";
+import { pinnedProvider, providerAccount, providerAccountDisabledModel, usageLog } from "@opendum/shared/db/schema";
 import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -205,6 +205,16 @@ export default async function ProviderAccountsPage({
     }
   }
 
+  const pinnedProviderRows = await db
+    .select({ providerKey: pinnedProvider.providerKey })
+    .from(pinnedProvider)
+    .where(eq(pinnedProvider.userId, session.user.id));
+
+  const validProviderKeys = new Set<string>(Object.keys(PROVIDER_ACCOUNT_BY_KEY));
+  const pinnedProviders = pinnedProviderRows
+    .map((r: { providerKey: string }) => r.providerKey)
+    .filter((k: string): k is ProviderAccountKey => validProviderKeys.has(k));
+
   return (
     <div className="space-y-6">
       <div className="sticky top-0 z-20 -mx-5 bg-background px-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -248,6 +258,7 @@ export default async function ProviderAccountsPage({
         visibleProviders={[selectedProvider]}
         supportedModelsByProvider={{ [selectedProvider]: providerModels }}
         disabledModelsByAccountId={disabledModelsByAccountId}
+        pinnedProviders={pinnedProviders}
       />
     </div>
   );
