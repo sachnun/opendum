@@ -6,6 +6,7 @@ import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
+import { PinButton } from "@/components/dashboard/accounts/pin-button";
 import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
 import {
   type ProviderAccountKey,
@@ -221,7 +222,13 @@ export default async function ProviderAccountsPage({
         <div className="border-b border-border pb-4 pt-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">{providerMeta.label}</h2>
+              <h2 className="inline-flex items-center gap-2 text-xl font-semibold">
+                <PinButton
+                  providerKey={selectedProvider}
+                  initialPinned={pinnedProviders.includes(selectedProvider)}
+                />
+                {providerMeta.label}
+              </h2>
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
               <AddAccountDialog

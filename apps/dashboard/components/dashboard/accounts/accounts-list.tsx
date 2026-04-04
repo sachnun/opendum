@@ -1131,23 +1131,6 @@ function ProviderSection({
           </Badge>
         </div>
       )}
-      {hideHeader && (
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => onTogglePin(providerKey)}
-            className={cn(
-              "p-1 rounded-md transition-colors cursor-pointer",
-              isPinned
-                ? "text-foreground hover:text-muted-foreground"
-                : "text-muted-foreground/40 hover:text-muted-foreground"
-            )}
-            title={isPinned ? "Unpin from sidebar" : "Pin to sidebar"}
-          >
-            {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
-          </button>
-        </div>
-      )}
 
       <div className="pt-1">
         {accounts.length > 0 ? (
