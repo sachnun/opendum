@@ -1112,15 +1112,11 @@ function ProviderSection({
     <section id={id} className="scroll-mt-24 space-y-4 md:space-y-2">
       {!hideHeader && (
         <div className="flex items-center gap-2">
-          <h3 className="text-base md:text-lg font-semibold">{title}</h3>
-          <Badge variant="outline" className="text-xs">
-            {accounts.length} connected
-          </Badge>
           <button
             type="button"
             onClick={() => onTogglePin(providerKey)}
             className={cn(
-              "ml-auto p-1 rounded-md transition-colors cursor-pointer",
+              "p-1 rounded-md transition-colors cursor-pointer",
               isPinned
                 ? "text-foreground hover:text-muted-foreground"
                 : "text-muted-foreground/40 hover:text-muted-foreground"
@@ -1129,10 +1125,14 @@ function ProviderSection({
           >
             {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
           </button>
+          <h3 className="text-base md:text-lg font-semibold">{title}</h3>
+          <Badge variant="outline" className="text-xs">
+            {accounts.length} connected
+          </Badge>
         </div>
       )}
       {hideHeader && (
-        <div className="flex items-center justify-end">
+        <div className="flex items-center">
           <button
             type="button"
             onClick={() => onTogglePin(providerKey)}
