@@ -123,15 +123,19 @@ function generateSummary(before, after) {
 async function main() {
   const before = snapshotProviderModels();
 
-  const results = await Promise.allSettled(refreshScripts.map((scriptName) => runScript(scriptName)));
-  const failures = results.filter((result) => result.status === "rejected");
+  const failures = [];
+
+  for (const scriptName of refreshScripts) {
+    try {
+      await runScript(scriptName);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(reason);
+      failures.push(scriptName);
+    }
+  }
 
   if (failures.length > 0) {
-    for (const failure of failures) {
-      const reason = failure.reason instanceof Error ? failure.reason.message : String(failure.reason);
-      console.error(reason);
-    }
-
     process.exitCode = 1;
   }
 
