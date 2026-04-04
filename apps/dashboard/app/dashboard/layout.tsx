@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
-import { disabledModel, providerAccount } from "@opendum/shared/db/schema";
+import { disabledModel, pinnedProvider, providerAccount } from "@opendum/shared/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -32,6 +32,8 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { ModelFamilyCountsProvider } from "@/lib/model-family-counts-context";
 import { PlaygroundPresetProvider } from "@/lib/playground-preset-context";
+import type { ProviderAccountKey } from "@/lib/provider-accounts";
+import { PROVIDER_ACCOUNT_DEFINITIONS } from "@/lib/provider-accounts";
 
 const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
 
@@ -96,7 +98,7 @@ export default async function DashboardLayout({
     redirect("/");
   }
 
-  const [providerAccounts, disabledModels] = await Promise.all([
+  const [providerAccounts, disabledModels, pinnedProviderRows] = await Promise.all([
     db
       .select({
         provider: providerAccount.provider,
@@ -110,7 +112,18 @@ export default async function DashboardLayout({
       .select({ model: disabledModel.model })
       .from(disabledModel)
       .where(eq(disabledModel.userId, session.user.id)),
+    db
+      .select({ providerKey: pinnedProvider.providerKey })
+      .from(pinnedProvider)
+      .where(eq(pinnedProvider.userId, session.user.id)),
   ]);
+
+  const validProviderKeys = new Set<string>(
+    PROVIDER_ACCOUNT_DEFINITIONS.map((d) => d.key)
+  );
+  const pinnedProviders: ProviderAccountKey[] = pinnedProviderRows
+    .map((r: { providerKey: string }) => r.providerKey)
+    .filter((k: string): k is ProviderAccountKey => validProviderKeys.has(k));
 
   const user = {
     name: session.user.name ?? null,
@@ -233,6 +246,7 @@ export default async function DashboardLayout({
             activeAccountCounts={activeAccountCounts}
             accountIndicators={accountIndicators}
             modelFamilyCounts={modelFamilyCounts}
+            pinnedProviders={pinnedProviders}
           />
           <div className="flex min-w-0 flex-1 flex-col">
             <Suspense fallback={<HeaderSkeleton />}>
@@ -241,6 +255,7 @@ export default async function DashboardLayout({
                 activeAccountCounts={activeAccountCounts}
                 accountIndicators={accountIndicators}
                 modelFamilyCounts={modelFamilyCounts}
+                pinnedProviders={pinnedProviders}
                 disabledModels={disabledModels}
                 statsByModel={statsByModel}
                 fallbackDayKeys={fallbackDayKeys}

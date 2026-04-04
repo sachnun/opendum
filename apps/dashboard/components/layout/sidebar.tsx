@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetClose,
@@ -23,7 +22,8 @@ import {
   primaryNavigation,
   supportNavigation,
 } from "@/lib/navigation";
-import { buildProviderHrefMap } from "@/lib/provider-accounts";
+import { buildProviderHrefMap, getProviderAccountPath } from "@/lib/provider-accounts";
+import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { useSubNavigation } from "@/components/layout/use-sub-navigation";
 import { AccountStatusIndicator } from "@/components/layout/account-status-indicator";
 import { useModelFamilyCounts } from "@/lib/model-family-counts-context";
@@ -32,6 +32,7 @@ interface SidebarNavContentProps {
   accountCounts: ProviderAccountCounts;
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
+  pinnedProviders: ProviderAccountKey[];
   onNavigate?: () => void;
 }
 
@@ -39,13 +40,16 @@ function SidebarNavContent({
   accountCounts,
   activeAccountCounts,
   accountIndicators,
+  pinnedProviders,
   onNavigate,
 }: SidebarNavContentProps) {
   const pathname = usePathname();
-  const [accountsSubmenuSearch, setAccountsSubmenuSearch] = useState("");
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
   const { counts: liveModelFamilyCounts } = useModelFamilyCounts();
-  const normalizedAccountsSubmenuSearch = accountsSubmenuSearch.trim().toLowerCase();
+
+  const pinnedHrefs = new Set(
+    pinnedProviders.map((key) => getProviderAccountPath(key))
+  );
 
   const isModelsActive =
     pathname === "/dashboard/models" || pathname.startsWith("/dashboard/models/");
@@ -69,9 +73,7 @@ function SidebarNavContent({
     const modelCountByAnchorId = isModelsItem ? liveModelFamilyCounts : null;
     const visibleSubItems =
       isAccountsItem && item.children
-        ? item.children.filter((subItem) =>
-            subItem.name.toLowerCase().includes(normalizedAccountsSubmenuSearch)
-          )
+        ? item.children.filter((subItem) => pinnedHrefs.has(subItem.href))
         : isModelsItem && item.children && modelCountByAnchorId
           ? item.children.filter((subItem) =>
               subItem.anchorId ? (modelCountByAnchorId[subItem.anchorId] ?? 0) > 0 : true
@@ -141,30 +143,6 @@ function SidebarNavContent({
 
         {item.children?.length && isExpanded ? (
           <div className="ml-6 space-y-1 border-l border-border/60 pl-3">
-            {isAccountsItem ? (
-              <div className="px-1 pb-1 pt-2">
-                <div className="relative">
-                  <Input
-                    value={accountsSubmenuSearch}
-                    onChange={(event) => setAccountsSubmenuSearch(event.target.value)}
-                    placeholder="Search providers..."
-                    aria-label="Search provider accounts"
-                    className="h-7 border-0 bg-transparent px-2 pr-6 text-xs shadow-none focus-visible:border-transparent focus-visible:ring-0"
-                  />
-                  {accountsSubmenuSearch ? (
-                    <button
-                      type="button"
-                      onClick={() => setAccountsSubmenuSearch("")}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors cursor-pointer hover:text-foreground"
-                      aria-label="Clear search"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
             <div>
               {visibleSubItems.length ? (
                 visibleSubItems.map((subItem) => {
@@ -226,7 +204,7 @@ function SidebarNavContent({
                   );
                 })
               ) : isAccountsItem ? (
-                <p className="px-2.5 py-1 text-[11px] text-muted-foreground">No providers found.</p>
+                <p className="px-2.5 py-1 text-[11px] text-muted-foreground">No pinned providers.</p>
               ) : null}
             </div>
           </div>
@@ -254,12 +232,14 @@ interface SidebarProps {
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
+  pinnedProviders: ProviderAccountKey[];
 }
 
 export function Sidebar({
   accountCounts,
   activeAccountCounts,
   accountIndicators,
+  pinnedProviders,
 }: SidebarProps) {
   return (
     <div className="hidden md:sticky md:top-0 md:flex md:h-svh md:w-60 md:flex-col md:border-r md:border-border md:bg-card">
@@ -276,6 +256,7 @@ export function Sidebar({
         accountCounts={accountCounts}
         activeAccountCounts={activeAccountCounts}
         accountIndicators={accountIndicators}
+        pinnedProviders={pinnedProviders}
       />
     </div>
   );
@@ -285,6 +266,7 @@ export function MobileNav({
   accountCounts,
   activeAccountCounts,
   accountIndicators,
+  pinnedProviders,
 }: SidebarProps) {
   const [open, setOpen] = useState(false);
 
@@ -326,6 +308,7 @@ export function MobileNav({
           accountCounts={accountCounts}
           activeAccountCounts={activeAccountCounts}
           accountIndicators={accountIndicators}
+          pinnedProviders={pinnedProviders}
           onNavigate={() => setOpen(false)}
         />
       </SheetContent>

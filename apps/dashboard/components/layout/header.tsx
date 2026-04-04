@@ -17,6 +17,7 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "@/lib/navigation";
+import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { MODEL_REGISTRY, getProvidersForModel, resolveModelAlias } from "@opendum/shared/proxy/models";
 import { type ModelStats, buildEmptyModelStats } from "@/lib/model-stats";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
@@ -38,6 +39,7 @@ interface HeaderProps {
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
   modelFamilyCounts: ModelFamilyCounts;
+  pinnedProviders: ProviderAccountKey[];
   disabledModels: Array<{ model: string }>;
   statsByModel: Record<string, ModelStats>;
   fallbackDayKeys: string[];
@@ -56,6 +58,7 @@ export function Header({
   activeAccountCounts,
   accountIndicators,
   modelFamilyCounts,
+  pinnedProviders,
   disabledModels,
   statsByModel,
   fallbackDayKeys,
@@ -91,6 +94,7 @@ export function Header({
             activeAccountCounts={activeAccountCounts}
             accountIndicators={accountIndicators}
             modelFamilyCounts={modelFamilyCounts}
+            pinnedProviders={pinnedProviders}
           />
         </div>
         <div className="min-w-0 flex-1">
