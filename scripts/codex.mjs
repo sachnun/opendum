@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { syncProviderToToml, buildTomlIndex, parseToml, serializeToml } from "./toml-utils.mjs";
 
 const CODEX_MODELS_URL =
-  "https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/models.json";
+  "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
