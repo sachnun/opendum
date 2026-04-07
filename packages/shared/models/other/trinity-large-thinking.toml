@@ -1,0 +1,5 @@
+[opendum]
+providers = ["kilo_code"]
+
+[opendum.upstream]
+kilo_code = "arcee-ai/trinity-large-thinking:free"
