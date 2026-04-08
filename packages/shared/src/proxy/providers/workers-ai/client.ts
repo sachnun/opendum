@@ -10,6 +10,7 @@ import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
 import { fetchWithTimeout } from "../../timeout.js";
 import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
+import { convertImageUrlsToBase64 } from "../../image-utils.js";
 import {
   getWorkersAiChatUrl,
   WORKERS_AI_SUPPORTED_PARAMS,
@@ -101,9 +102,13 @@ export const workersAiProvider: Provider = {
 
     const upstreamModel = resolveWorkersAiModel(body.model);
 
+    // Workers AI rejects image URLs — convert to base64 data URIs
+    const messages = await convertImageUrlsToBase64(body.messages);
+
     const requestPayload = buildRequestPayload(
       {
         ...body,
+        messages,
         model: upstreamModel,
       },
       stream
