@@ -18,9 +18,10 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim", "groq"]
+providers = ["nvidia_nim", "groq", "workers_ai"]
 aliases = ["meta-llama-4-scout-17b-16e-instruct", "meta/llama-4-scout-17b-16e-instruct"]
 
 [opendum.upstream]
 nvidia_nim = "meta/llama-4-scout-17b-16e-instruct"
 groq = "meta-llama/llama-4-scout-17b-16e-instruct"
+workers_ai = "@cf/meta/llama-4-scout-17b-16e-instruct"

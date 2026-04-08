@@ -1,0 +1,23 @@
+release_date = "2025-06"
+reasoning = true
+tool_call = true
+attachment = true
+
+[cost]
+input = 0.1
+output = 0.3
+
+[limit]
+context = 128_000
+output = 8_192
+
+[modalities]
+input = ["text","image"]
+output = ["text"]
+
+[opendum]
+family = "Google"
+providers = ["workers_ai"]
+
+[opendum.upstream]
+workers_ai = "@cf/google/gemma-4-26b-a4b-it"
