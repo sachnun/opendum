@@ -1,0 +1,6 @@
+[opendum]
+providers = ["kilo_code", "openrouter"]
+
+[opendum.upstream]
+kilo_code = "google/gemma-4-26b-a4b-it:free"
+openrouter = "google/gemma-4-26b-a4b-it:free"
