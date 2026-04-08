@@ -64,6 +64,10 @@ import {
 import {
   KILO_CODE_API_BASE_URL,
 } from "@opendum/shared/proxy/providers/kilo-code/constants";
+import {
+  WORKERS_AI_API_BASE_URL,
+  getWorkersAiModelsUrl,
+} from "@opendum/shared/proxy/providers/workers-ai/constants";
 import { getProviderModelMap } from "@opendum/shared/proxy/models";
 
 export type ActionResult<T = void> = 
@@ -699,6 +703,139 @@ export async function connectKiloCodeApiKey(
   } catch (error) {
     console.error("Failed to connect Kilo Code account:", error);
     return { success: false, error: "Failed to connect Kilo Code account" };
+  }
+}
+
+/**
+ * Connect Workers AI account using API token + Cloudflare Account ID
+ */
+export async function connectWorkersAiApiKey(
+  apiToken: string,
+  cfAccountId: string,
+  accountName?: string
+): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+  const session = await getSession();
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const normalizedApiToken = apiToken.trim();
+  const normalizedAccountId = cfAccountId.trim();
+
+  if (!normalizedApiToken) {
+    return { success: false, error: "API token is required" };
+  }
+  if (!normalizedAccountId) {
+    return { success: false, error: "Cloudflare Account ID is required" };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(getWorkersAiModelsUrl(normalizedAccountId), {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${normalizedApiToken}`,
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+        cache: "no-store",
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        return { success: false, error: "Workers AI API token is invalid." };
+      }
+
+      if (!response.ok) {
+        let responseText = "";
+        try {
+          responseText = await response.text();
+        } catch {
+          responseText = "";
+        }
+
+        const normalizedBody = responseText.toLowerCase();
+        const looksLikeAuthFailure =
+          normalizedBody.includes("authenticate") ||
+          normalizedBody.includes("unauthorized") ||
+          normalizedBody.includes("invalid") ||
+          normalizedBody.includes("not found");
+
+        if (looksLikeAuthFailure) {
+          return { success: false, error: "Workers AI API token or Account ID is invalid." };
+        }
+
+        return {
+          success: false,
+          error: `Unable to validate Workers AI credentials (HTTP ${response.status}). Please try again.`,
+        };
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return { success: false, error: "Workers AI validation timed out. Please try again." };
+      }
+      return {
+        success: false,
+        error: "Unable to validate Workers AI credentials. Please check your network and try again.",
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const identifier = `workers_ai-${hashString(normalizedApiToken).slice(0, 16)}`;
+    const normalizedAccountName = accountName?.trim();
+
+    const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "workers_ai"), eq(providerAccount.email, identifier))).limit(1);
+
+    if (existingAccount) {
+      await db.update(providerAccount).set({
+        accessToken: encrypt(normalizedApiToken),
+        refreshToken: encrypt(normalizedApiToken),
+        expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+        accountId: normalizedAccountId,
+        ...(normalizedAccountName ? { name: normalizedAccountName } : {}),
+        isActive: true,
+      }).where(eq(providerAccount.id, existingAccount.id));
+
+      revalidatePath("/dashboard", "layout");
+      revalidatePath("/dashboard/accounts");
+      revalidatePath("/dashboard/playground");
+
+      return {
+        success: true,
+        data: { email: identifier, isUpdate: true },
+      };
+    }
+
+    const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, session.user.id), eq(providerAccount.provider, "workers_ai")));
+    const accountCount = countResult.value;
+
+    await db.insert(providerAccount).values({
+      userId: session.user.id,
+      provider: "workers_ai",
+      name: normalizedAccountName || `Workers AI ${accountCount + 1}`,
+      accessToken: encrypt(normalizedApiToken),
+      refreshToken: encrypt(normalizedApiToken),
+      expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY,
+      email: identifier,
+      accountId: normalizedAccountId,
+      isActive: true,
+    });
+
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/accounts");
+    revalidatePath("/dashboard/playground");
+
+    return {
+      success: true,
+      data: { email: identifier, isUpdate: false },
+    };
+  } catch (error) {
+    console.error("Failed to connect Workers AI account:", error);
+    return { success: false, error: "Failed to connect Workers AI account" };
   }
 }
 

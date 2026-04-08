@@ -10,7 +10,8 @@ export type ProviderAccountKey =
   | "ollama_cloud"
   | "kilo_code"
   | "openrouter"
-  | "qwen_code";
+  | "qwen_code"
+  | "workers_ai";
 
 export type ProviderAccountCategory = "oauth" | "api_key";
 
@@ -120,6 +121,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     emptyMessage: "No Cerebras accounts connected yet.",
     showTier: false,
   },
+  {
+    key: "workers_ai",
+    slug: "workers-ai",
+    label: "Workers AI",
+    category: "api_key",
+    emptyMessage: "No Workers AI accounts connected yet.",
+    showTier: false,
+  },
 ];
 
 export const PROVIDER_ACCOUNT_BY_KEY: Record<ProviderAccountKey, ProviderAccountDefinition> =
@@ -210,6 +219,10 @@ export function getProviderSuccessMessage(successParam: string): string {
 
   if (successParam === "cerebras_added") {
     return "Cerebras account connected successfully!";
+  }
+
+  if (successParam === "workers_ai_added") {
+    return "Workers AI account connected successfully!";
   }
 
   return "Connected successfully!";

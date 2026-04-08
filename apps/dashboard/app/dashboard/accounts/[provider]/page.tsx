@@ -42,6 +42,7 @@ function createEmptyProviderAccountMap<T>(createValue: () => T): Record<Provider
     nvidia_nim: createValue(),
     ollama_cloud: createValue(),
     openrouter: createValue(),
+    workers_ai: createValue(),
   };
 }
 
@@ -262,6 +263,7 @@ export default async function ProviderAccountsPage({
         groqAccounts={groupedAccounts.groq}
         cerebrasAccounts={groupedAccounts.cerebras}
         kiloCodeAccounts={groupedAccounts.kilo_code}
+        workersAiAccounts={groupedAccounts.workers_ai}
         visibleProviders={[selectedProvider]}
         supportedModelsByProvider={{ [selectedProvider]: providerModels }}
         disabledModelsByAccountId={disabledModelsByAccountId}
