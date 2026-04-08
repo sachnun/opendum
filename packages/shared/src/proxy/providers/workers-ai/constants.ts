@@ -10,6 +10,10 @@ export function getWorkersAiModelsUrl(accountId: string): string {
   return `${WORKERS_AI_API_BASE_URL}/${accountId}/ai/v1/models`;
 }
 
+export function getWorkersAiValidationUrl(accountId: string): string {
+  return `${WORKERS_AI_API_BASE_URL}/${accountId}/ai/models/search`;
+}
+
 export const WORKERS_AI_SUPPORTED_PARAMS = new Set([
   "model",
   "messages",

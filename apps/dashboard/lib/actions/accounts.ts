@@ -66,7 +66,7 @@ import {
 } from "@opendum/shared/proxy/providers/kilo-code/constants";
 import {
   WORKERS_AI_API_BASE_URL,
-  getWorkersAiModelsUrl,
+  getWorkersAiValidationUrl,
 } from "@opendum/shared/proxy/providers/workers-ai/constants";
 import { getProviderModelMap } from "@opendum/shared/proxy/models";
 
@@ -735,7 +735,7 @@ export async function connectWorkersAiApiKey(
     const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
 
     try {
-      const response = await fetch(getWorkersAiModelsUrl(normalizedAccountId), {
+      const response = await fetch(getWorkersAiValidationUrl(normalizedAccountId), {
         method: "GET",
         headers: {
           Authorization: `Bearer ${normalizedApiToken}`,
