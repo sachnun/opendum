@@ -204,6 +204,7 @@ export const ProviderName = {
   GROQ: "groq",
   CEREBRAS: "cerebras",
   KILO_CODE: "kilo_code",
+  WORKERS_AI: "workers_ai",
 } as const;
 
 export type ProviderNameType = (typeof ProviderName)[keyof typeof ProviderName];
@@ -237,4 +238,5 @@ export const API_KEY_PROVIDER_NAMES: ProviderNameType[] = [
   ProviderName.GROQ,
   ProviderName.CEREBRAS,
   ProviderName.KILO_CODE,
+  ProviderName.WORKERS_AI,
 ];
