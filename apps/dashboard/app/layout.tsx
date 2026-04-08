@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Opendum",
-  description: "Your accounts, one API.",
+  description: "Your accounts, one proxy.",
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml", sizes: "any" }],
     shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
