@@ -1,5 +1,7 @@
 [opendum]
-providers = ["nvidia_nim"]
+providers = ["kilo_code", "nvidia_nim", "openrouter"]
 
 [opendum.upstream]
+kilo_code = "google/gemma-4-31b-it:free"
 nvidia_nim = "google/gemma-4-31b-it"
+openrouter = "google/gemma-4-31b-it:free"
