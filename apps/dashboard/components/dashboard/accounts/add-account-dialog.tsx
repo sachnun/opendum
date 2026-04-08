@@ -47,6 +47,7 @@ import {
   connectGroqApiKey,
   connectCerebrasApiKey,
   connectKiloCodeApiKey,
+  connectWorkersAiApiKey,
 } from "@/lib/actions/accounts";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { cn } from "@/lib/utils";
@@ -77,13 +78,30 @@ interface ApiKeyConfig {
   >;
 }
 
+interface ApiKeyWithAccountIdConfig {
+  flowType: "api_key_with_account_id";
+  apiKeyPortalUrl: string;
+  apiKeyPlaceholder: string;
+  accountIdPlaceholder: string;
+  accountIdLabel: string;
+  accountNamePlaceholder: string;
+  connectAction: (
+    apiKey: string,
+    accountId: string,
+    accountName?: string
+  ) => Promise<
+    | { success: true; data: { email: string; isUpdate: boolean } }
+    | { success: false; error: string }
+  >;
+}
+
 interface ProviderConfig {
   name: string;
   description: string;
 }
 
 type ProviderFullConfig = ProviderConfig &
-  (OAuthRedirectConfig | DeviceCodeConfig | ApiKeyConfig);
+  (OAuthRedirectConfig | DeviceCodeConfig | ApiKeyConfig | ApiKeyWithAccountIdConfig);
 
 const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
   antigravity: {
@@ -178,6 +196,17 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     accountNamePlaceholder: "Kilo Code Personal",
     connectAction: connectKiloCodeApiKey,
   },
+  workers_ai: {
+    name: "Workers AI",
+    description: "Access open-source models on Cloudflare's global network",
+    flowType: "api_key_with_account_id",
+    apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai",
+    apiKeyPlaceholder: "Bearer token...",
+    accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...",
+    accountIdLabel: "Cloudflare Account ID",
+    accountNamePlaceholder: "Workers AI Personal",
+    connectAction: connectWorkersAiApiKey,
+  },
 };
 
 const OAUTH_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
@@ -196,6 +225,7 @@ const API_KEY_PROVIDER_ORDER: Array<Exclude<Provider, null>> = [
   "groq",
   "cerebras",
   "kilo_code",
+  "workers_ai",
 ];
 
 
@@ -220,6 +250,7 @@ export function AddAccountDialog({
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedDeviceCode, setCopiedDeviceCode] = useState(false);
   const [accountName, setAccountName] = useState("");
+  const [cfAccountId, setCfAccountId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
@@ -298,7 +329,7 @@ export function AddAccountDialog({
             }
           })
           .finally(() => setIsFetchingUrl(false));
-      } else if (providerConfig.flowType === "api_key") {
+      } else if (providerConfig.flowType === "api_key" || providerConfig.flowType === "api_key_with_account_id") {
         setIsFetchingUrl(false);
         setAuthUrl(providerConfig.apiKeyPortalUrl);
         setDeviceCodeInfo(null);
@@ -319,6 +350,7 @@ export function AddAccountDialog({
     setCopiedLink(false);
     setCopiedDeviceCode(false);
     setAccountName("");
+    setCfAccountId("");
     setError("");
     setIsLoading(false);
     setAuthUrl("");
@@ -508,7 +540,7 @@ export function AddAccountDialog({
         toast.error("Failed to copy link");
       }
 
-      if (step === 2 && providerConfig?.flowType === "api_key") {
+      if (step === 2 && (providerConfig?.flowType === "api_key" || providerConfig?.flowType === "api_key_with_account_id")) {
         setStep(3);
       }
 
@@ -533,7 +565,7 @@ export function AddAccountDialog({
   };
 
   const handleOpenApiKeyPortal = () => {
-    if (!providerConfig || providerConfig.flowType !== "api_key") {
+    if (!providerConfig || (providerConfig.flowType !== "api_key" && providerConfig.flowType !== "api_key_with_account_id")) {
       return;
     }
 
@@ -562,7 +594,7 @@ export function AddAccountDialog({
     e.preventDefault();
     setError("");
 
-    if (!providerConfig || providerConfig.flowType !== "api_key") {
+    if (!providerConfig) {
       setError("Invalid provider configuration");
       return;
     }
@@ -575,10 +607,29 @@ export function AddAccountDialog({
     setIsLoading(true);
 
     try {
-      const result = await providerConfig.connectAction(
-        apiKey.trim(),
-        accountName.trim() || undefined
-      );
+      let result: { success: true; data: { email: string; isUpdate: boolean } } | { success: false; error: string };
+
+      if (providerConfig.flowType === "api_key_with_account_id") {
+        if (!cfAccountId.trim()) {
+          setError(`Please enter the ${providerConfig.accountIdLabel}`);
+          setIsLoading(false);
+          return;
+        }
+        result = await providerConfig.connectAction(
+          apiKey.trim(),
+          cfAccountId.trim(),
+          accountName.trim() || undefined
+        );
+      } else if (providerConfig.flowType === "api_key") {
+        result = await providerConfig.connectAction(
+          apiKey.trim(),
+          accountName.trim() || undefined
+        );
+      } else {
+        setError("Invalid provider configuration");
+        setIsLoading(false);
+        return;
+      }
 
       if (!result.success) {
         throw new Error(result.error);
@@ -946,7 +997,7 @@ export function AddAccountDialog({
             </form>
           )}
 
-          {step === 3 && providerConfig && providerConfig.flowType === "api_key" && (
+          {step === 3 && providerConfig && (providerConfig.flowType === "api_key" || providerConfig.flowType === "api_key_with_account_id") && (
             <form
               onSubmit={handleConnectWithApiKey}
               className="space-y-4"
@@ -959,13 +1010,15 @@ export function AddAccountDialog({
                   Connect {providerConfig.name}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Paste your provider API key directly. The key will be stored encrypted.
+                  {providerConfig.flowType === "api_key_with_account_id"
+                    ? "Paste your API token and Account ID. Credentials will be stored encrypted."
+                    : "Paste your provider API key directly. The key will be stored encrypted."}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="provider-api-key" className="text-sm font-medium">
-                  API Key
+                  {providerConfig.flowType === "api_key_with_account_id" ? "API Token" : "API Key"}
                 </Label>
                 <div className="relative">
                   <Input
@@ -1001,6 +1054,29 @@ export function AddAccountDialog({
                   </button>
                 </div>
               </div>
+
+              {providerConfig.flowType === "api_key_with_account_id" && (
+                <div className="space-y-2">
+                  <Label htmlFor="provider-account-id" className="text-sm font-medium">
+                    {providerConfig.accountIdLabel}
+                  </Label>
+                  <Input
+                    id="provider-account-id"
+                    type="text"
+                    name="provider-account-id"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    placeholder={providerConfig.accountIdPlaceholder}
+                    value={cfAccountId}
+                    onChange={(e) => setCfAccountId(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="provider-account-name" className="text-sm font-medium">

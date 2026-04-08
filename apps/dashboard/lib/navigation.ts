@@ -36,6 +36,7 @@ export interface ProviderAccountCounts {
   ollama_cloud: number;
   openrouter: number;
   qwen_code: number;
+  workers_ai: number;
 }
 
 export type ProviderAccountIndicator = "normal" | "warning" | "error";
@@ -53,6 +54,7 @@ export interface ProviderAccountIndicators {
   ollama_cloud: ProviderAccountIndicator;
   openrouter: ProviderAccountIndicator;
   qwen_code: ProviderAccountIndicator;
+  workers_ai: ProviderAccountIndicator;
 }
 
 export interface ModelFamilyCounts {
@@ -92,6 +94,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "Groq", href: getProviderAccountPath("groq") },
       { name: "Kilo Code", href: getProviderAccountPath("kilo_code") },
       { name: "Cerebras", href: getProviderAccountPath("cerebras") },
+      { name: "Workers AI", href: getProviderAccountPath("workers_ai") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],
   },

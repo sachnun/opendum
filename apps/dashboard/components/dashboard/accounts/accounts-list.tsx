@@ -128,6 +128,7 @@ interface AccountsListProps {
   groqAccounts: Account[];
   cerebrasAccounts: Account[];
   kiloCodeAccounts: Account[];
+  workersAiAccounts: Account[];
   visibleProviders?: ProviderAccountKey[];
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
   disabledModelsByAccountId?: Record<string, string[]>;
@@ -1184,6 +1185,7 @@ export function AccountsList({
   groqAccounts,
   cerebrasAccounts,
   kiloCodeAccounts,
+  workersAiAccounts,
   visibleProviders,
   supportedModelsByProvider,
   disabledModelsByAccountId,
@@ -1748,6 +1750,23 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.kilo_code}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("kilo_code")}
+        onTogglePin={handleTogglePin}
+      />
+    );
+  }
+  if (shouldRenderProvider("workers_ai")) {
+    apiKeyProviderSections.push(
+      <ProviderSection
+        key="workers-ai"
+        id="workers-ai-accounts"
+        providerKey="workers_ai"
+        title="Workers AI"
+        hideHeader={hasProviderFilter}
+        accounts={workersAiAccounts}
+        emptyMessage="No Workers AI accounts connected yet."
+        supportedModels={supportedModelsByProvider?.workers_ai}
+        disabledModelsByAccountId={disabledModelsByAccountId}
+        isPinned={pinnedSet.has("workers_ai")}
         onTogglePin={handleTogglePin}
       />
     );

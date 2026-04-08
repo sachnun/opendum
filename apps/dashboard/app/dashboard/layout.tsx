@@ -50,6 +50,7 @@ const PROVIDER_KEY_BY_PROVIDER_NAME = {
   nvidia_nim: "nvidia_nim",
   ollama_cloud: "ollama_cloud",
   openrouter: "openrouter",
+  workers_ai: "workers_ai",
 } as const;
 
 const INDICATOR_WEIGHT: Record<ProviderAccountIndicator, number> = {
@@ -168,6 +169,7 @@ export default async function DashboardLayout({
     nvidia_nim: 0,
     ollama_cloud: 0,
     openrouter: 0,
+    workers_ai: 0,
   };
 
   const activeAccountCounts: ProviderAccountCounts = {
@@ -183,6 +185,7 @@ export default async function DashboardLayout({
     nvidia_nim: 0,
     ollama_cloud: 0,
     openrouter: 0,
+    workers_ai: 0,
   };
 
   const accountIndicators: ProviderAccountIndicators = {
@@ -198,6 +201,7 @@ export default async function DashboardLayout({
     nvidia_nim: "normal",
     ollama_cloud: "normal",
     openrouter: "normal",
+    workers_ai: "normal",
   };
 
   for (const account of providerAccounts) {
