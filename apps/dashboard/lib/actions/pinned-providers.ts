@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
 import { pinnedProvider } from "@opendum/shared/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "@/lib/provider-accounts";
 
@@ -82,7 +82,8 @@ export async function getPinnedProviders(): Promise<
     const rows = await db
       .select({ providerKey: pinnedProvider.providerKey })
       .from(pinnedProvider)
-      .where(eq(pinnedProvider.userId, session.user.id));
+      .where(eq(pinnedProvider.userId, session.user.id))
+      .orderBy(asc(pinnedProvider.createdAt));
 
     const providers = rows
       .map((r: { providerKey: string }) => r.providerKey)

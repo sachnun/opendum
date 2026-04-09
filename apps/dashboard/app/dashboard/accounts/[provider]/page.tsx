@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
 import { pinnedProvider, providerAccount, providerAccountDisabledModel, usageLog } from "@opendum/shared/db/schema";
-import { eq, and, gte, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, gte, inArray, desc, asc, sql } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
@@ -210,7 +210,8 @@ export default async function ProviderAccountsPage({
   const pinnedProviderRows = await db
     .select({ providerKey: pinnedProvider.providerKey })
     .from(pinnedProvider)
-    .where(eq(pinnedProvider.userId, session.user.id));
+    .where(eq(pinnedProvider.userId, session.user.id))
+    .orderBy(asc(pinnedProvider.createdAt));
 
   const validProviderKeys = new Set<string>(Object.keys(PROVIDER_ACCOUNT_BY_KEY));
   const pinnedProviders = pinnedProviderRows

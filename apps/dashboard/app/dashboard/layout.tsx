@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
 import { disabledModel, pinnedProvider, providerAccount } from "@opendum/shared/db/schema";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -116,7 +116,8 @@ export default async function DashboardLayout({
     db
       .select({ providerKey: pinnedProvider.providerKey })
       .from(pinnedProvider)
-      .where(eq(pinnedProvider.userId, session.user.id)),
+      .where(eq(pinnedProvider.userId, session.user.id))
+      .orderBy(asc(pinnedProvider.createdAt)),
   ]);
 
   const validProviderKeys = new Set<string>(

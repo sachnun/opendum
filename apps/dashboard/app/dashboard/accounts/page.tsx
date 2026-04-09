@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
 import { providerAccount } from "@opendum/shared/db/schema";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,7 +114,8 @@ export default async function AccountsPage({
   const pinnedRows = await db
     .select({ providerKey: pinnedProvider.providerKey })
     .from(pinnedProvider)
-    .where(eq(pinnedProvider.userId, session.user.id));
+    .where(eq(pinnedProvider.userId, session.user.id))
+    .orderBy(asc(pinnedProvider.createdAt));
 
   const pinnedSet = new Set<string>(pinnedRows.map((r: { providerKey: string }) => r.providerKey));
 
