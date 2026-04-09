@@ -47,8 +47,8 @@ function SidebarNavContent({
   const { handleSubItemClick, isSubItemActive } = useSubNavigation(pathname, primaryNavigation);
   const { counts: liveModelFamilyCounts } = useModelFamilyCounts();
 
-  const pinnedHrefs = new Set(
-    pinnedProviders.map((key) => getProviderAccountPath(key))
+  const pinnedHrefOrder = new Map(
+    pinnedProviders.map((key, index) => [getProviderAccountPath(key), index])
   );
 
   const isModelsActive =
@@ -73,7 +73,9 @@ function SidebarNavContent({
     const modelCountByAnchorId = isModelsItem ? liveModelFamilyCounts : null;
     const visibleSubItems =
       isAccountsItem && item.children
-        ? item.children.filter((subItem) => pinnedHrefs.has(subItem.href))
+        ? item.children
+            .filter((subItem) => pinnedHrefOrder.has(subItem.href))
+            .sort((a, b) => (pinnedHrefOrder.get(a.href) ?? 0) - (pinnedHrefOrder.get(b.href) ?? 0))
         : isModelsItem && item.children && modelCountByAnchorId
           ? item.children.filter((subItem) =>
               subItem.anchorId ? (modelCountByAnchorId[subItem.anchorId] ?? 0) > 0 : true
