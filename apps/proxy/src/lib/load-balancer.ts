@@ -335,47 +335,30 @@ export async function markAccountFailed(
     })
     .where(eq(providerAccount.id, accountId));
 
-  const [existingHealth] = await db
-    .select()
-    .from(providerAccountModelHealth)
-    .where(
-      and(
-        eq(providerAccountModelHealth.providerAccountId, accountId),
-        eq(providerAccountModelHealth.model, resolvedModel)
-      )
-    )
-    .limit(1);
-
-  let newConsecutiveErrors: number;
-
-  if (existingHealth) {
-    newConsecutiveErrors = existingHealth.consecutiveErrors + 1;
-
-    await db
-      .update(providerAccountModelHealth)
-      .set({
-        consecutiveErrors: newConsecutiveErrors,
-        lastErrorAt: new Date(),
+  const now = new Date();
+  const [health] = await db
+    .insert(providerAccountModelHealth)
+    .values({
+      providerAccountId: accountId,
+      model: resolvedModel,
+      consecutiveErrors: 1,
+      lastErrorAt: now,
+      lastErrorCode: errorCode,
+      lastErrorMessage: normalizedErrorMessage,
+    })
+    .onConflictDoUpdate({
+      target: [providerAccountModelHealth.providerAccountId, providerAccountModelHealth.model],
+      set: {
+        consecutiveErrors: sql`${providerAccountModelHealth.consecutiveErrors} + 1`,
+        lastErrorAt: now,
         lastErrorCode: errorCode,
         lastErrorMessage: normalizedErrorMessage,
-      })
-      .where(eq(providerAccountModelHealth.id, existingHealth.id));
-  } else {
-    newConsecutiveErrors = 1;
+      },
+    })
+    .returning();
 
-    await db
-      .insert(providerAccountModelHealth)
-      .values({
-        providerAccountId: accountId,
-        model: resolvedModel,
-        consecutiveErrors: 1,
-        lastErrorAt: new Date(),
-        lastErrorCode: errorCode,
-        lastErrorMessage: normalizedErrorMessage,
-      });
-  }
-
-  const currentStatus = existingHealth?.status ?? "active";
+  const newConsecutiveErrors = health.consecutiveErrors;
+  const currentStatus = health.status;
   let newStatus: string | null = null;
   let statusReason: string | null = null;
 
@@ -391,17 +374,14 @@ export async function markAccountFailed(
   }
 
   if (newStatus) {
-    const healthId = existingHealth?.id;
-    if (healthId) {
-      await db
-        .update(providerAccountModelHealth)
-        .set({
-          status: newStatus,
-          statusReason,
-          statusChangedAt: new Date(),
-        })
-        .where(eq(providerAccountModelHealth.id, healthId));
-    }
+    await db
+      .update(providerAccountModelHealth)
+      .set({
+        status: newStatus,
+        statusReason,
+        statusChangedAt: now,
+      })
+      .where(eq(providerAccountModelHealth.id, health.id));
   }
 
   const [account] = await db
