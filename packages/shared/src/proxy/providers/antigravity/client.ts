@@ -310,8 +310,12 @@ export const antigravityProvider: Provider = {
       ? transformClaudeRequest(context, geminiPayload)
       : transformGeminiRequest(context, geminiPayload);
 
-    // Claude models require streaming - force it and buffer if user wants non-streaming
-    const needsForcedStreaming = isClaudeModel && !stream;
+    // Non-native-Gemini models (Claude, GPT-OSS, etc.) require forced streaming
+    // through Code Assist. Claude needs it because the API requires streaming;
+    // OpenAI-compat models (e.g. gpt-oss-*) need it because Code Assist adds
+    // stream_options internally which is rejected when stream is false.
+    const isNativeGeminiModel = effectiveModel.includes("gemini");
+    const needsForcedStreaming = !isNativeGeminiModel && !stream;
     const actualStream = needsForcedStreaming ? true : stream;
 
     const action = actualStream ? "streamGenerateContent?alt=sse" : "generateContent";
