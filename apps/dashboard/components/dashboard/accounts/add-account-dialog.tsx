@@ -405,7 +405,7 @@ export function AddAccountDialog({
       window.open(authUrl, "_blank");
     }
 
-    setStep(3);
+    setTimeout(() => setStep(3), 600);
   };
 
   const handleStartDeviceCodeAuth = () => {
@@ -586,7 +586,7 @@ export function AddAccountDialog({
     }
 
     if (step === 2) {
-      setStep(3);
+      setTimeout(() => setStep(3), 600);
     }
   };
 
