@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Copy, Check, Search, FlaskConical, Brain, Wrench, Eye, Calendar, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { cn } from "@/lib/utils";
+import { usePlaygroundPreset } from "@/lib/playground-preset-context";
 import { setModelEnabled } from "@/lib/actions/models";
 import type { ModelMeta } from "@opendum/shared/proxy/models";
 import type { ModelStats } from "@/lib/model-stats";
@@ -82,6 +83,8 @@ function ModelDetailContent({
   model: ModelSearchItem;
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const { setPreset } = usePlaygroundPreset();
   const [copied, setCopied] = useState(false);
   const [isEnabled, setIsEnabled] = useState(model.isEnabled);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -172,13 +175,14 @@ function ModelDetailContent({
             variant="ghost"
             size="xs"
             className="h-5 px-1.5 text-[11px]"
-            asChild
             title="Try in Playground"
-            onClick={onClose}
+            onClick={() => {
+              setPreset({ modelId: model.id });
+              onClose();
+              router.push("/dashboard/playground");
+            }}
           >
-            <Link href={`/dashboard/playground?model=${encodeURIComponent(model.id)}`}>
-              <FlaskConical className="h-3 w-3" />
-            </Link>
+            <FlaskConical className="h-3 w-3" />
           </Button>
         )}
       </div>
