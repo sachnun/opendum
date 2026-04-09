@@ -17,9 +17,8 @@ output = ["text"]
 
 [opendum]
 family = "Google"
-providers = ["kilo_code", "openrouter", "workers_ai"]
+providers = ["openrouter", "workers_ai"]
 
 [opendum.upstream]
-kilo_code = "google/gemma-4-26b-a4b-it:free"
 openrouter = "google/gemma-4-26b-a4b-it:free"
 workers_ai = "@cf/google/gemma-4-26b-a4b-it"

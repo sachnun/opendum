@@ -18,8 +18,4 @@ output = ["text"]
 
 [opendum]
 family = "StepFun"
-providers = ["kilo_code", "openrouter"]
-
-[opendum.upstream]
-kilo_code = "stepfun/step-3.5-flash:free"
-openrouter = "stepfun/step-3.5-flash:free"
+providers = []
