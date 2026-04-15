@@ -13,9 +13,6 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["nvidia-llama-3.3-nemotron-super-49b-v1", "nvidia/llama-3.3-nemotron-super-49b-v1"]
 ignored = true
-
-[opendum.upstream]
-nvidia_nim = "nvidia/llama-3.3-nemotron-super-49b-v1"

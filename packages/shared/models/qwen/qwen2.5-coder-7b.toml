@@ -8,9 +8,6 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["qwen-qwen2.5-coder-7b-instruct", "qwen/qwen2.5-coder-7b-instruct"]
 ignored = true
-
-[opendum.upstream]
-nvidia_nim = "qwen/qwen2.5-coder-7b-instruct"

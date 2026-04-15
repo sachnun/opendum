@@ -13,9 +13,6 @@ output = ["text"]
 
 [opendum]
 family = "Mistral"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["mistralai-mamba-codestral-7b-v0.1", "mistralai/mamba-codestral-7b-v0.1"]
 ignored = true
-
-[opendum.upstream]
-nvidia_nim = "mistralai/mamba-codestral-7b-v0.1"

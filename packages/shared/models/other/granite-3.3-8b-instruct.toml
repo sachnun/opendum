@@ -1,6 +1,3 @@
 [opendum]
 family = "IBM"
-providers = ["nvidia_nim"]
-
-[opendum.upstream]
-nvidia_nim = "ibm/granite-3.3-8b-instruct"
+providers = []

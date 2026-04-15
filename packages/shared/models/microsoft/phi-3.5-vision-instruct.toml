@@ -13,9 +13,6 @@ output = ["text"]
 
 [opendum]
 family = "Microsoft"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["microsoft-phi-3.5-vision-instruct", "microsoft/phi-3.5-vision-instruct"]
 ignored = true
-
-[opendum.upstream]
-nvidia_nim = "microsoft/phi-3.5-vision-instruct"

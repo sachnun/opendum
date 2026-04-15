@@ -1,7 +1,4 @@
 [opendum]
 family = "Marin"
-providers = ["nvidia_nim"]
+providers = []
 ignored = true
-
-[opendum.upstream]
-nvidia_nim = "marin/marin-8b-instruct"

@@ -18,4 +18,7 @@ output = ["text"]
 
 [opendum]
 family = "StepFun"
-providers = []
+providers = ["kilo_code"]
+
+[opendum.upstream]
+kilo_code = "stepfun/step-3.5-flash:free"
