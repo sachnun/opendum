@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Copy,
   FlaskConical,
+  RefreshCw,
   Pin,
   PinOff,
 } from "lucide-react";
@@ -857,6 +858,7 @@ function AccountCard({
   showTier = false,
   quotaInfo,
   isQuotaLoading = false,
+  onRefreshQuota,
   supportedModels,
   disabledModels,
 }: { 
@@ -864,6 +866,7 @@ function AccountCard({
   showTier?: boolean;
   quotaInfo?: AccountQuotaInfo;
   isQuotaLoading?: boolean;
+  onRefreshQuota?: () => void;
   supportedModels?: string[];
   disabledModels?: string[];
 }) {
@@ -1012,11 +1015,25 @@ function AccountCard({
             <div className="pt-3 mt-3 border-t space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Quota</span>
-                {quotaInfo?.status === "success" && quotaInfo.groups.some((group) => group.isEstimated) && (
-                  <Badge variant="outline" className="text-[10px] px-1 py-0">
-                    estimated
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {quotaInfo?.status === "success" && quotaInfo.groups.some((group) => group.isEstimated) && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0">
+                      estimated
+                    </Badge>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={onRefreshQuota}
+                    disabled={isQuotaLoading || !onRefreshQuota}
+                    title="Refresh quota"
+                    aria-label={`Refresh quota for ${title}`}
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", isQuotaLoading && "animate-spin")} />
+                  </Button>
+                </div>
               </div>
 
               {isQuotaLoading && !quotaInfo ? (
@@ -1092,6 +1109,7 @@ interface ProviderSectionProps {
   disabledModelsByAccountId?: Record<string, string[]>;
   isPinned: boolean;
   onTogglePin: (providerKey: ProviderAccountKey) => void;
+  onRefreshQuota?: () => void;
 }
 
 function ProviderSection({
@@ -1108,6 +1126,7 @@ function ProviderSection({
   disabledModelsByAccountId,
   isPinned,
   onTogglePin,
+  onRefreshQuota,
 }: ProviderSectionProps) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4 md:space-y-2">
@@ -1143,6 +1162,7 @@ function ProviderSection({
                 showTier={showTier}
                 quotaInfo={quotaByAccountId?.[account.id]}
                 isQuotaLoading={isQuotaLoading}
+                onRefreshQuota={onRefreshQuota}
                 supportedModels={supportedModels}
                 disabledModels={disabledModelsByAccountId?.[account.id]}
               />
@@ -1548,6 +1568,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.antigravity}
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
+        onRefreshQuota={() => void fetchAntigravityQuota(true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("antigravity")}
         onTogglePin={handleTogglePin}
@@ -1568,6 +1589,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.codex}
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
+        onRefreshQuota={() => void fetchCodexQuota(true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("codex")}
         onTogglePin={handleTogglePin}
@@ -1587,6 +1609,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.kiro}
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
+        onRefreshQuota={() => void fetchKiroQuota(true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("kiro")}
         onTogglePin={handleTogglePin}
@@ -1607,6 +1630,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.gemini_cli}
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
+        onRefreshQuota={() => void fetchGeminiCliQuota(true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("gemini_cli")}
         onTogglePin={handleTogglePin}
@@ -1643,6 +1667,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.copilot}
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
+        onRefreshQuota={() => void fetchCopilotQuota(true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("copilot")}
         onTogglePin={handleTogglePin}
@@ -1698,6 +1723,7 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.openrouter}
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
+        onRefreshQuota={() => void fetchOpenRouterQuota(true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("openrouter")}
         onTogglePin={handleTogglePin}
