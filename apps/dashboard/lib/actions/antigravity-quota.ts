@@ -56,6 +56,7 @@ export type QuotaActionResult =
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
+  accountId?: string;
 }
 
 const ANTIGRAVITY_QUOTA_CACHE_PREFIX = "opendum:quota:antigravity";
@@ -123,8 +124,9 @@ export async function getAntigravityQuota(
     return { success: false, error: "Unauthorized" };
   }
 
+  const targetAccountId = options.accountId?.trim();
   const cacheKey = getAntigravityQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
+  if (!options.forceRefresh && !targetAccountId) {
     const cachedResult = await getRedisJson<QuotaActionResult>(cacheKey);
     if (cachedResult?.success) {
       return cachedResult;
@@ -150,7 +152,8 @@ export async function getAntigravityQuota(
       .where(
         and(
           eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "antigravity")
+          eq(providerAccount.provider, "antigravity"),
+          ...(targetAccountId ? [eq(providerAccount.id, targetAccountId)] : [])
         )
       )
       .orderBy(desc(providerAccount.lastUsedAt));
@@ -170,7 +173,9 @@ export async function getAntigravityQuota(
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+      if (!targetAccountId) {
+        await setRedisJson(cacheKey, emptyResult, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+      }
       return emptyResult;
     }
 
@@ -295,7 +300,9 @@ export async function getAntigravityQuota(
       },
     };
 
-    await setRedisJson(cacheKey, result, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+    if (!targetAccountId) {
+      await setRedisJson(cacheKey, result, ANTIGRAVITY_QUOTA_CACHE_TTL_SECONDS);
+    }
     return result;
   } catch (error) {
     return {

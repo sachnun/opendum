@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -866,7 +874,7 @@ function AccountCard({
   showTier?: boolean;
   quotaInfo?: AccountQuotaInfo;
   isQuotaLoading?: boolean;
-  onRefreshQuota?: () => void;
+  onRefreshQuota?: (accountId: string) => void;
   supportedModels?: string[];
   disabledModels?: string[];
 }) {
@@ -1026,7 +1034,7 @@ function AccountCard({
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6"
-                    onClick={onRefreshQuota}
+                    onClick={() => onRefreshQuota?.(account.id)}
                     disabled={isQuotaLoading || !onRefreshQuota}
                     title="Refresh quota"
                     aria-label={`Refresh quota for ${title}`}
@@ -1109,7 +1117,8 @@ interface ProviderSectionProps {
   disabledModelsByAccountId?: Record<string, string[]>;
   isPinned: boolean;
   onTogglePin: (providerKey: ProviderAccountKey) => void;
-  onRefreshQuota?: () => void;
+  onRefreshQuota?: (accountId: string) => void;
+  quotaLoadingAccountIds?: Set<string>;
 }
 
 function ProviderSection({
@@ -1127,6 +1136,7 @@ function ProviderSection({
   isPinned,
   onTogglePin,
   onRefreshQuota,
+  quotaLoadingAccountIds,
 }: ProviderSectionProps) {
   return (
     <section id={id} className="scroll-mt-24 space-y-4 md:space-y-2">
@@ -1161,7 +1171,7 @@ function ProviderSection({
                 account={account}
                 showTier={showTier}
                 quotaInfo={quotaByAccountId?.[account.id]}
-                isQuotaLoading={isQuotaLoading}
+                isQuotaLoading={isQuotaLoading || quotaLoadingAccountIds?.has(account.id) === true}
                 onRefreshQuota={onRefreshQuota}
                 supportedModels={supportedModels}
                 disabledModels={disabledModelsByAccountId?.[account.id]}
@@ -1260,6 +1270,14 @@ export function AccountsList({
   const [isGeminiCliQuotaLoading, setIsGeminiCliQuotaLoading] = useState(false);
   const [isKiroQuotaLoading, setIsKiroQuotaLoading] = useState(false);
   const [isOpenRouterQuotaLoading, setIsOpenRouterQuotaLoading] = useState(false);
+  const [quotaLoadingAccountIds, setQuotaLoadingAccountIds] = useState<Record<string, Set<string>>>(() => ({
+    antigravity: new Set<string>(),
+    codex: new Set<string>(),
+    copilot: new Set<string>(),
+    geminiCli: new Set<string>(),
+    kiro: new Set<string>(),
+    openRouter: new Set<string>(),
+  }));
   const quotaRequestIdsRef = useRef({
     antigravity: 0,
     codex: 0,
@@ -1269,7 +1287,78 @@ export function AccountsList({
     openRouter: 0,
   });
 
-  const fetchAntigravityQuota = useCallback(async (forceRefresh = false) => {
+  const setProviderQuotaAccountLoading = useCallback(
+    (
+      provider:
+        | "antigravity"
+        | "codex"
+        | "copilot"
+        | "geminiCli"
+        | "kiro"
+        | "openRouter",
+      accountId: string,
+      isLoading: boolean
+    ) => {
+      setQuotaLoadingAccountIds((prev) => {
+        const current = prev[provider];
+        const hasAccount = current.has(accountId);
+        if ((isLoading && hasAccount) || (!isLoading && !hasAccount)) {
+          return prev;
+        }
+
+        const next = new Set(current);
+        if (isLoading) {
+          next.add(accountId);
+        } else {
+          next.delete(accountId);
+        }
+
+        return {
+          ...prev,
+          [provider]: next,
+        };
+      });
+    },
+    []
+  );
+
+  const mergeQuotaResult = useCallback(
+    (
+      accountId: string | undefined,
+      resultAccounts: AccountQuotaInfo[],
+      setQuotaByAccountId: Dispatch<SetStateAction<Record<string, AccountQuotaInfo>>>
+    ) => {
+      const quotaMap = resultAccounts.reduce<Record<string, AccountQuotaInfo>>((accumulator, accountQuota) => {
+        accumulator[accountQuota.accountId] = accountQuota;
+        return accumulator;
+      }, {});
+
+      if (!accountId) {
+        setQuotaByAccountId(quotaMap);
+        return;
+      }
+
+      setQuotaByAccountId((prev) => {
+        if (resultAccounts.length === 0) {
+          if (!(accountId in prev)) {
+            return prev;
+          }
+
+          const next = { ...prev };
+          delete next[accountId];
+          return next;
+        }
+
+        return {
+          ...prev,
+          ...quotaMap,
+        };
+      });
+    },
+    []
+  );
+
+  const fetchAntigravityQuota = useCallback(async (forceRefresh = false, accountId?: string) => {
     if (antigravityAccounts.length === 0) {
       quotaRequestIdsRef.current.antigravity += 1;
       setAntigravityQuotaByAccountId({});
@@ -1278,36 +1367,36 @@ export function AccountsList({
     }
 
     const requestId = ++quotaRequestIdsRef.current.antigravity;
-    setIsAntigravityQuotaLoading(true);
+    if (accountId) {
+      setProviderQuotaAccountLoading("antigravity", accountId, true);
+    } else {
+      setIsAntigravityQuotaLoading(true);
+    }
 
     try {
-      const result = await getAntigravityQuota({ forceRefresh });
-      if (requestId !== quotaRequestIdsRef.current.antigravity) {
+      const result = await getAntigravityQuota({ forceRefresh, accountId });
+      if (!accountId && requestId !== quotaRequestIdsRef.current.antigravity) {
         return;
       }
 
       if (!result.success) {
-        setAntigravityQuotaByAccountId({});
+        if (!accountId) {
+          setAntigravityQuotaByAccountId({});
+        }
         return;
       }
 
-      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
-        (accumulator, accountQuota) => {
-          accumulator[accountQuota.accountId] = accountQuota;
-          return accumulator;
-        },
-        {}
-      );
-
-      setAntigravityQuotaByAccountId(quotaMap);
+      mergeQuotaResult(accountId, result.data.accounts, setAntigravityQuotaByAccountId);
     } finally {
-      if (requestId === quotaRequestIdsRef.current.antigravity) {
+      if (accountId) {
+        setProviderQuotaAccountLoading("antigravity", accountId, false);
+      } else if (requestId === quotaRequestIdsRef.current.antigravity) {
         setIsAntigravityQuotaLoading(false);
       }
     }
-  }, [antigravityAccounts.length]);
+  }, [antigravityAccounts.length, mergeQuotaResult, setProviderQuotaAccountLoading]);
 
-  const fetchCodexQuota = useCallback(async (forceRefresh = false) => {
+  const fetchCodexQuota = useCallback(async (forceRefresh = false, accountId?: string) => {
     if (codexAccounts.length === 0) {
       quotaRequestIdsRef.current.codex += 1;
       setCodexQuotaByAccountId({});
@@ -1316,36 +1405,36 @@ export function AccountsList({
     }
 
     const requestId = ++quotaRequestIdsRef.current.codex;
-    setIsCodexQuotaLoading(true);
+    if (accountId) {
+      setProviderQuotaAccountLoading("codex", accountId, true);
+    } else {
+      setIsCodexQuotaLoading(true);
+    }
 
     try {
-      const result = await getCodexQuota({ forceRefresh });
-      if (requestId !== quotaRequestIdsRef.current.codex) {
+      const result = await getCodexQuota({ forceRefresh, accountId });
+      if (!accountId && requestId !== quotaRequestIdsRef.current.codex) {
         return;
       }
 
       if (!result.success) {
-        setCodexQuotaByAccountId({});
+        if (!accountId) {
+          setCodexQuotaByAccountId({});
+        }
         return;
       }
 
-      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
-        (accumulator, accountQuota) => {
-          accumulator[accountQuota.accountId] = accountQuota;
-          return accumulator;
-        },
-        {}
-      );
-
-      setCodexQuotaByAccountId(quotaMap);
+      mergeQuotaResult(accountId, result.data.accounts, setCodexQuotaByAccountId);
     } finally {
-      if (requestId === quotaRequestIdsRef.current.codex) {
+      if (accountId) {
+        setProviderQuotaAccountLoading("codex", accountId, false);
+      } else if (requestId === quotaRequestIdsRef.current.codex) {
         setIsCodexQuotaLoading(false);
       }
     }
-  }, [codexAccounts.length]);
+  }, [codexAccounts.length, mergeQuotaResult, setProviderQuotaAccountLoading]);
 
-  const fetchCopilotQuota = useCallback(async (forceRefresh = false) => {
+  const fetchCopilotQuota = useCallback(async (forceRefresh = false, accountId?: string) => {
     if (copilotAccounts.length === 0) {
       quotaRequestIdsRef.current.copilot += 1;
       setCopilotQuotaByAccountId({});
@@ -1354,36 +1443,36 @@ export function AccountsList({
     }
 
     const requestId = ++quotaRequestIdsRef.current.copilot;
-    setIsCopilotQuotaLoading(true);
+    if (accountId) {
+      setProviderQuotaAccountLoading("copilot", accountId, true);
+    } else {
+      setIsCopilotQuotaLoading(true);
+    }
 
     try {
-      const result = await getCopilotQuota({ forceRefresh });
-      if (requestId !== quotaRequestIdsRef.current.copilot) {
+      const result = await getCopilotQuota({ forceRefresh, accountId });
+      if (!accountId && requestId !== quotaRequestIdsRef.current.copilot) {
         return;
       }
 
       if (!result.success) {
-        setCopilotQuotaByAccountId({});
+        if (!accountId) {
+          setCopilotQuotaByAccountId({});
+        }
         return;
       }
 
-      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
-        (accumulator, accountQuota) => {
-          accumulator[accountQuota.accountId] = accountQuota;
-          return accumulator;
-        },
-        {}
-      );
-
-      setCopilotQuotaByAccountId(quotaMap);
+      mergeQuotaResult(accountId, result.data.accounts, setCopilotQuotaByAccountId);
     } finally {
-      if (requestId === quotaRequestIdsRef.current.copilot) {
+      if (accountId) {
+        setProviderQuotaAccountLoading("copilot", accountId, false);
+      } else if (requestId === quotaRequestIdsRef.current.copilot) {
         setIsCopilotQuotaLoading(false);
       }
     }
-  }, [copilotAccounts.length]);
+  }, [copilotAccounts.length, mergeQuotaResult, setProviderQuotaAccountLoading]);
 
-  const fetchGeminiCliQuota = useCallback(async (forceRefresh = false) => {
+  const fetchGeminiCliQuota = useCallback(async (forceRefresh = false, accountId?: string) => {
     if (geminiCliAccounts.length === 0) {
       quotaRequestIdsRef.current.geminiCli += 1;
       setGeminiCliQuotaByAccountId({});
@@ -1392,36 +1481,36 @@ export function AccountsList({
     }
 
     const requestId = ++quotaRequestIdsRef.current.geminiCli;
-    setIsGeminiCliQuotaLoading(true);
+    if (accountId) {
+      setProviderQuotaAccountLoading("geminiCli", accountId, true);
+    } else {
+      setIsGeminiCliQuotaLoading(true);
+    }
 
     try {
-      const result = await getGeminiCliQuota({ forceRefresh });
-      if (requestId !== quotaRequestIdsRef.current.geminiCli) {
+      const result = await getGeminiCliQuota({ forceRefresh, accountId });
+      if (!accountId && requestId !== quotaRequestIdsRef.current.geminiCli) {
         return;
       }
 
       if (!result.success) {
-        setGeminiCliQuotaByAccountId({});
+        if (!accountId) {
+          setGeminiCliQuotaByAccountId({});
+        }
         return;
       }
 
-      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
-        (accumulator, accountQuota) => {
-          accumulator[accountQuota.accountId] = accountQuota;
-          return accumulator;
-        },
-        {}
-      );
-
-      setGeminiCliQuotaByAccountId(quotaMap);
+      mergeQuotaResult(accountId, result.data.accounts, setGeminiCliQuotaByAccountId);
     } finally {
-      if (requestId === quotaRequestIdsRef.current.geminiCli) {
+      if (accountId) {
+        setProviderQuotaAccountLoading("geminiCli", accountId, false);
+      } else if (requestId === quotaRequestIdsRef.current.geminiCli) {
         setIsGeminiCliQuotaLoading(false);
       }
     }
-  }, [geminiCliAccounts.length]);
+  }, [geminiCliAccounts.length, mergeQuotaResult, setProviderQuotaAccountLoading]);
 
-  const fetchOpenRouterQuota = useCallback(async (forceRefresh = false) => {
+  const fetchOpenRouterQuota = useCallback(async (forceRefresh = false, accountId?: string) => {
     if (openRouterAccounts.length === 0) {
       quotaRequestIdsRef.current.openRouter += 1;
       setOpenRouterQuotaByAccountId({});
@@ -1430,36 +1519,36 @@ export function AccountsList({
     }
 
     const requestId = ++quotaRequestIdsRef.current.openRouter;
-    setIsOpenRouterQuotaLoading(true);
+    if (accountId) {
+      setProviderQuotaAccountLoading("openRouter", accountId, true);
+    } else {
+      setIsOpenRouterQuotaLoading(true);
+    }
 
     try {
-      const result = await getOpenRouterQuota({ forceRefresh });
-      if (requestId !== quotaRequestIdsRef.current.openRouter) {
+      const result = await getOpenRouterQuota({ forceRefresh, accountId });
+      if (!accountId && requestId !== quotaRequestIdsRef.current.openRouter) {
         return;
       }
 
       if (!result.success) {
-        setOpenRouterQuotaByAccountId({});
+        if (!accountId) {
+          setOpenRouterQuotaByAccountId({});
+        }
         return;
       }
 
-      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
-        (accumulator, accountQuota) => {
-          accumulator[accountQuota.accountId] = accountQuota;
-          return accumulator;
-        },
-        {}
-      );
-
-      setOpenRouterQuotaByAccountId(quotaMap);
+      mergeQuotaResult(accountId, result.data.accounts, setOpenRouterQuotaByAccountId);
     } finally {
-      if (requestId === quotaRequestIdsRef.current.openRouter) {
+      if (accountId) {
+        setProviderQuotaAccountLoading("openRouter", accountId, false);
+      } else if (requestId === quotaRequestIdsRef.current.openRouter) {
         setIsOpenRouterQuotaLoading(false);
       }
     }
-  }, [openRouterAccounts.length]);
+  }, [mergeQuotaResult, openRouterAccounts.length, setProviderQuotaAccountLoading]);
 
-  const fetchKiroQuota = useCallback(async (forceRefresh = false) => {
+  const fetchKiroQuota = useCallback(async (forceRefresh = false, accountId?: string) => {
     if (kiroAccounts.length === 0) {
       quotaRequestIdsRef.current.kiro += 1;
       setKiroQuotaByAccountId({});
@@ -1468,34 +1557,34 @@ export function AccountsList({
     }
 
     const requestId = ++quotaRequestIdsRef.current.kiro;
-    setIsKiroQuotaLoading(true);
+    if (accountId) {
+      setProviderQuotaAccountLoading("kiro", accountId, true);
+    } else {
+      setIsKiroQuotaLoading(true);
+    }
 
     try {
-      const result = await getKiroQuota({ forceRefresh });
-      if (requestId !== quotaRequestIdsRef.current.kiro) {
+      const result = await getKiroQuota({ forceRefresh, accountId });
+      if (!accountId && requestId !== quotaRequestIdsRef.current.kiro) {
         return;
       }
 
       if (!result.success) {
-        setKiroQuotaByAccountId({});
+        if (!accountId) {
+          setKiroQuotaByAccountId({});
+        }
         return;
       }
 
-      const quotaMap = result.data.accounts.reduce<Record<string, AccountQuotaInfo>>(
-        (accumulator, accountQuota) => {
-          accumulator[accountQuota.accountId] = accountQuota;
-          return accumulator;
-        },
-        {}
-      );
-
-      setKiroQuotaByAccountId(quotaMap);
+      mergeQuotaResult(accountId, result.data.accounts, setKiroQuotaByAccountId);
     } finally {
-      if (requestId === quotaRequestIdsRef.current.kiro) {
+      if (accountId) {
+        setProviderQuotaAccountLoading("kiro", accountId, false);
+      } else if (requestId === quotaRequestIdsRef.current.kiro) {
         setIsKiroQuotaLoading(false);
       }
     }
-  }, [kiroAccounts.length]);
+  }, [kiroAccounts.length, mergeQuotaResult, setProviderQuotaAccountLoading]);
 
   useEffect(() => {
     void fetchAntigravityQuota();
@@ -1568,7 +1657,8 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.antigravity}
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
-        onRefreshQuota={() => void fetchAntigravityQuota(true)}
+        quotaLoadingAccountIds={quotaLoadingAccountIds.antigravity}
+        onRefreshQuota={(accountId) => void fetchAntigravityQuota(true, accountId)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("antigravity")}
         onTogglePin={handleTogglePin}
@@ -1589,7 +1679,8 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.codex}
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
-        onRefreshQuota={() => void fetchCodexQuota(true)}
+        quotaLoadingAccountIds={quotaLoadingAccountIds.codex}
+        onRefreshQuota={(accountId) => void fetchCodexQuota(true, accountId)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("codex")}
         onTogglePin={handleTogglePin}
@@ -1609,7 +1700,8 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.kiro}
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
-        onRefreshQuota={() => void fetchKiroQuota(true)}
+        quotaLoadingAccountIds={quotaLoadingAccountIds.kiro}
+        onRefreshQuota={(accountId) => void fetchKiroQuota(true, accountId)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("kiro")}
         onTogglePin={handleTogglePin}
@@ -1630,7 +1722,8 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.gemini_cli}
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
-        onRefreshQuota={() => void fetchGeminiCliQuota(true)}
+        quotaLoadingAccountIds={quotaLoadingAccountIds.geminiCli}
+        onRefreshQuota={(accountId) => void fetchGeminiCliQuota(true, accountId)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("gemini_cli")}
         onTogglePin={handleTogglePin}
@@ -1667,7 +1760,8 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.copilot}
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
-        onRefreshQuota={() => void fetchCopilotQuota(true)}
+        quotaLoadingAccountIds={quotaLoadingAccountIds.copilot}
+        onRefreshQuota={(accountId) => void fetchCopilotQuota(true, accountId)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("copilot")}
         onTogglePin={handleTogglePin}
@@ -1723,7 +1817,8 @@ export function AccountsList({
         supportedModels={supportedModelsByProvider?.openrouter}
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
-        onRefreshQuota={() => void fetchOpenRouterQuota(true)}
+        quotaLoadingAccountIds={quotaLoadingAccountIds.openRouter}
+        onRefreshQuota={(accountId) => void fetchOpenRouterQuota(true, accountId)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("openrouter")}
         onTogglePin={handleTogglePin}

@@ -80,6 +80,7 @@ export type OpenRouterQuotaActionResult =
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
+  accountId?: string;
 }
 
 const OPENROUTER_QUOTA_CACHE_PREFIX = "opendum:quota:openrouter";
@@ -396,8 +397,9 @@ export async function getOpenRouterQuota(
     return { success: false, error: "Unauthorized" };
   }
 
+  const targetAccountId = options.accountId?.trim();
   const cacheKey = getOpenRouterQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
+  if (!options.forceRefresh && !targetAccountId) {
     const cachedResult = await getRedisJson<OpenRouterQuotaActionResult>(cacheKey);
     if (cachedResult?.success) {
       return cachedResult;
@@ -420,7 +422,8 @@ export async function getOpenRouterQuota(
       .where(
         and(
           eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "openrouter")
+          eq(providerAccount.provider, "openrouter"),
+          ...(targetAccountId ? [eq(providerAccount.id, targetAccountId)] : [])
         )
       )
       .orderBy(desc(providerAccount.lastUsedAt));
@@ -440,7 +443,9 @@ export async function getOpenRouterQuota(
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+      if (!targetAccountId) {
+        await setRedisJson(cacheKey, emptyResult, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+      }
       return emptyResult;
     }
 
@@ -536,7 +541,9 @@ export async function getOpenRouterQuota(
       },
     };
 
-    await setRedisJson(cacheKey, result, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+    if (!targetAccountId) {
+      await setRedisJson(cacheKey, result, OPENROUTER_QUOTA_CACHE_TTL_SECONDS);
+    }
     return result;
   } catch (error) {
     return {

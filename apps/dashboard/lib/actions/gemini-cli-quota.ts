@@ -65,6 +65,7 @@ export type GeminiCliQuotaActionResult =
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
+  accountId?: string;
 }
 
 const GEMINI_CLI_QUOTA_CACHE_PREFIX = "opendum:quota:gemini-cli";
@@ -146,8 +147,9 @@ export async function getGeminiCliQuota(
     return { success: false, error: "Unauthorized" };
   }
 
+  const targetAccountId = options.accountId?.trim();
   const cacheKey = getGeminiCliQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
+  if (!options.forceRefresh && !targetAccountId) {
     const cachedResult = await getRedisJson<GeminiCliQuotaActionResult>(cacheKey);
     if (cachedResult?.success) {
       return cachedResult;
@@ -172,7 +174,8 @@ export async function getGeminiCliQuota(
       .where(
         and(
           eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "gemini_cli")
+          eq(providerAccount.provider, "gemini_cli"),
+          ...(targetAccountId ? [eq(providerAccount.id, targetAccountId)] : [])
         )
       )
       .orderBy(desc(providerAccount.lastUsedAt));
@@ -192,7 +195,9 @@ export async function getGeminiCliQuota(
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
+      if (!targetAccountId) {
+        await setRedisJson(cacheKey, emptyResult, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
+      }
       return emptyResult;
     }
 
@@ -339,7 +344,9 @@ export async function getGeminiCliQuota(
       },
     };
 
-    await setRedisJson(cacheKey, result, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
+    if (!targetAccountId) {
+      await setRedisJson(cacheKey, result, GEMINI_CLI_QUOTA_CACHE_TTL_SECONDS);
+    }
     return result;
   } catch (error) {
     return {

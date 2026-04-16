@@ -61,6 +61,7 @@ export type KiroQuotaActionResult =
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
+  accountId?: string;
 }
 
 const KIRO_QUOTA_CACHE_PREFIX = "opendum:quota:kiro";
@@ -148,8 +149,9 @@ export async function getKiroQuota(
     return { success: false, error: "Unauthorized" };
   }
 
+  const targetAccountId = options.accountId?.trim();
   const cacheKey = getKiroQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
+  if (!options.forceRefresh && !targetAccountId) {
     const cachedResult = await getRedisJson<KiroQuotaActionResult>(cacheKey);
     if (cachedResult?.success) {
       return cachedResult;
@@ -174,7 +176,8 @@ export async function getKiroQuota(
       .where(
         and(
           eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "kiro")
+          eq(providerAccount.provider, "kiro"),
+          ...(targetAccountId ? [eq(providerAccount.id, targetAccountId)] : [])
         )
       )
       .orderBy(desc(providerAccount.lastUsedAt));
@@ -194,7 +197,9 @@ export async function getKiroQuota(
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, KIRO_QUOTA_CACHE_TTL_SECONDS);
+      if (!targetAccountId) {
+        await setRedisJson(cacheKey, emptyResult, KIRO_QUOTA_CACHE_TTL_SECONDS);
+      }
       return emptyResult;
     }
 
@@ -288,7 +293,9 @@ export async function getKiroQuota(
       },
     };
 
-    await setRedisJson(cacheKey, result, KIRO_QUOTA_CACHE_TTL_SECONDS);
+    if (!targetAccountId) {
+      await setRedisJson(cacheKey, result, KIRO_QUOTA_CACHE_TTL_SECONDS);
+    }
     return result;
   } catch (error) {
     return {

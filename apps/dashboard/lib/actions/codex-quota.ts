@@ -63,6 +63,7 @@ export type CodexQuotaActionResult =
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
+  accountId?: string;
 }
 
 const CODEX_QUOTA_CACHE_PREFIX = "opendum:quota:codex";
@@ -181,8 +182,9 @@ export async function getCodexQuota(
     return { success: false, error: "Unauthorized" };
   }
 
+  const targetAccountId = options.accountId?.trim();
   const cacheKey = getCodexQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
+  if (!options.forceRefresh && !targetAccountId) {
     const cachedResult = await getRedisJson<CodexQuotaActionResult>(cacheKey);
     if (cachedResult?.success) {
       return cachedResult;
@@ -206,7 +208,8 @@ export async function getCodexQuota(
       .where(
         and(
           eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "codex")
+          eq(providerAccount.provider, "codex"),
+          ...(targetAccountId ? [eq(providerAccount.id, targetAccountId)] : [])
         )
       )
       .orderBy(desc(providerAccount.lastUsedAt));
@@ -226,7 +229,9 @@ export async function getCodexQuota(
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, CODEX_QUOTA_CACHE_TTL_SECONDS);
+      if (!targetAccountId) {
+        await setRedisJson(cacheKey, emptyResult, CODEX_QUOTA_CACHE_TTL_SECONDS);
+      }
       return emptyResult;
     }
 
@@ -317,7 +322,9 @@ export async function getCodexQuota(
       },
     };
 
-    await setRedisJson(cacheKey, result, CODEX_QUOTA_CACHE_TTL_SECONDS);
+    if (!targetAccountId) {
+      await setRedisJson(cacheKey, result, CODEX_QUOTA_CACHE_TTL_SECONDS);
+    }
     return result;
   } catch (error) {
     return {

@@ -62,6 +62,7 @@ export type CopilotQuotaActionResult =
 
 interface QuotaRequestOptions {
   forceRefresh?: boolean;
+  accountId?: string;
 }
 
 const COPILOT_QUOTA_CACHE_PREFIX = "opendum:quota:copilot";
@@ -212,8 +213,9 @@ export async function getCopilotQuota(
     return { success: false, error: "Unauthorized" };
   }
 
+  const targetAccountId = options.accountId?.trim();
   const cacheKey = getCopilotQuotaCacheKey(session.user.id);
-  if (!options.forceRefresh) {
+  if (!options.forceRefresh && !targetAccountId) {
     const cachedResult = await getRedisJson<CopilotQuotaActionResult>(cacheKey);
     if (cachedResult?.success) {
       return cachedResult;
@@ -237,7 +239,8 @@ export async function getCopilotQuota(
       .where(
         and(
           eq(providerAccount.userId, session.user.id),
-          eq(providerAccount.provider, "copilot")
+          eq(providerAccount.provider, "copilot"),
+          ...(targetAccountId ? [eq(providerAccount.id, targetAccountId)] : [])
         )
       )
       .orderBy(desc(providerAccount.lastUsedAt));
@@ -257,7 +260,9 @@ export async function getCopilotQuota(
         },
       };
 
-      await setRedisJson(cacheKey, emptyResult, COPILOT_QUOTA_CACHE_TTL_SECONDS);
+      if (!targetAccountId) {
+        await setRedisJson(cacheKey, emptyResult, COPILOT_QUOTA_CACHE_TTL_SECONDS);
+      }
       return emptyResult;
     }
 
@@ -355,7 +360,9 @@ export async function getCopilotQuota(
       },
     };
 
-    await setRedisJson(cacheKey, result, COPILOT_QUOTA_CACHE_TTL_SECONDS);
+    if (!targetAccountId) {
+      await setRedisJson(cacheKey, result, COPILOT_QUOTA_CACHE_TTL_SECONDS);
+    }
     return result;
   } catch (error) {
     return {
