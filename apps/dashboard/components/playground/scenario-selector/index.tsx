@@ -177,7 +177,7 @@ export function ScenarioSelector({
             disabled={disabled}
             className={cn(
               "h-auto py-2 px-3 flex flex-col items-center gap-1 min-w-[72px]",
-              scenario.isReasoning && !isSelected && "border-dashed border-amber-400 hover:border-amber-500 dark:border-amber-700 dark:hover:border-amber-600",
+              scenario.isReasoning && !isSelected && "border-dashed border-amber-700 hover:border-amber-600",
               scenario.isReasoning && isSelected && "bg-amber-600 hover:bg-amber-700"
             )}
           >

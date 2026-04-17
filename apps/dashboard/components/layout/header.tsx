@@ -10,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { MobileNav } from "@/components/layout/sidebar";
 import type {
   ModelFamilyCounts,
@@ -101,7 +100,6 @@ export function Header({
           <ModelSearchPopover models={models} className="mx-auto max-w-xl" />
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

@@ -337,8 +337,8 @@ function AssistantBubble({
         <p className="mb-1 text-[11px] font-medium text-muted-foreground">Assistant</p>
         <div className="space-y-2">
           {reasoning && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-3 py-2">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            <div className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
                 Reasoning
               </p>
               <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">

@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Check, Copy } from "lucide-react";
-import { useTheme } from "next-themes";
 import type { BundledLanguage } from "shiki";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,6 @@ export function CodeBlock({
   showCopyButton = false,
   copyButtonLabel = "snippet",
 }: CodeBlockProps) {
-  const { resolvedTheme } = useTheme();
   const [html, setHtml] = React.useState<string>("");
   const [loading, setLoading] = React.useState(true);
   const [copied, setCopied] = React.useState(false);
@@ -63,14 +61,13 @@ export function CodeBlock({
     const highlightCode = async () => {
       const shiki = await import("shiki");
       const highlighter = await shiki.createHighlighter({
-        themes: ["github-light", "github-dark"],
+        themes: ["github-dark"],
         langs: [language],
       });
 
-      const theme = resolvedTheme === "dark" ? "github-dark" : "github-light";
       const highlighted = highlighter.codeToHtml(code, {
         lang: language,
-        theme,
+        theme: "github-dark",
       });
 
       setHtml(highlighted);
@@ -78,7 +75,7 @@ export function CodeBlock({
     };
 
     highlightCode().catch(console.error);
-  }, [code, language, resolvedTheme]);
+  }, [code, language]);
 
   if (loading) {
     return (

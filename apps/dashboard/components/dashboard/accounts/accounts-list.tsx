@@ -252,17 +252,17 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
   }
 
   let barColor = "bg-green-500";
-  let textColor = "text-green-600 dark:text-green-400";
+  let textColor = "text-green-400";
 
   if (percentRemaining <= 10) {
     barColor = "bg-red-500";
-    textColor = "text-red-600 dark:text-red-400";
+    textColor = "text-red-400";
   } else if (percentRemaining <= 25) {
     barColor = "bg-orange-500";
-    textColor = "text-orange-600 dark:text-orange-400";
+    textColor = "text-orange-400";
   } else if (percentRemaining <= 50) {
     barColor = "bg-yellow-500";
-    textColor = "text-yellow-600 dark:text-yellow-400";
+    textColor = "text-yellow-400";
   }
 
   return (
@@ -403,8 +403,7 @@ function LastErrorMessageDialog({
   const [historyEntries, setHistoryEntries] = useState<ProviderAccountErrorHistoryEntry[] | null>(null);
   const historyRequestIdRef = useRef(0);
   const preview = message.length > 150 ? `${message.slice(0, 150)}...` : message;
-  const previewColorClass =
-    tone === "warning" ? "text-amber-600 dark:text-amber-400" : "text-red-500";
+  const previewColorClass = tone === "warning" ? "text-amber-400" : "text-red-500";
   const details = parseStoredErrorMessage(message);
 
   useEffect(() => {
@@ -902,9 +901,7 @@ function AccountCard({
       account.lastSuccessAt &&
       account.lastSuccessAt.getTime() > account.lastErrorAt.getTime()
   );
-  const errorToneClass = hasSuccessAfterLastError
-    ? "text-amber-600 dark:text-amber-400"
-    : "text-red-500";
+  const errorToneClass = hasSuccessAfterLastError ? "text-amber-400" : "text-red-500";
   const errorCountToneClass = hasErrors ? errorToneClass : "text-muted-foreground";
   const lastErrorToneClass = account.lastErrorAt ? errorToneClass : "text-muted-foreground";
   const [isToggling, setIsToggling] = useState(false);
