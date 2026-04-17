@@ -1,0 +1,6 @@
+[opendum]
+providers = ["copilot", "kiro"]
+
+[opendum.upstream]
+copilot = "claude-opus-4.7"
+kiro = "claude-opus-4.7"
