@@ -11,10 +11,7 @@ export default async function UsagePage() {
   return (
     <div className="space-y-6">
       <div className="border-b border-border pb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-xl font-semibold">Usage</h2>
-          <Badge variant="secondary">Quickstart</Badge>
-        </div>
+        <h2 className="text-xl font-semibold">Usage</h2>
       </div>
 
       <Card className="bg-card">

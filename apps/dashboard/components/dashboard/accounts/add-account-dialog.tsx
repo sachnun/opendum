@@ -524,7 +524,7 @@ export function AddAccountDialog({
 
     // Initial poll after one interval (give user time to authorize)
     pollingRef.current = setTimeout(poll, currentIntervalMs);
-  }, [deviceCodeInfo, isPolling, resetForm, router, providerConfig?.name]);
+  }, [deviceCodeInfo, isPolling, resetForm, router]);
 
   const handleCopyLink = async () => {
     const urlToCopy = providerConfig?.flowType === "device_code" 
@@ -687,6 +687,13 @@ export function AddAccountDialog({
     }
   };
 
+  const shouldPreventOutsideClose =
+    isPolling ||
+    (step === 2 &&
+      (providerConfig?.flowType === "api_key" ||
+        providerConfig?.flowType === "api_key_with_account_id")) ||
+    (step === 3 && providerConfig?.flowType === "oauth_redirect");
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -698,7 +705,7 @@ export function AddAccountDialog({
       <DialogContent
         className="top-[38%] sm:top-[50%] sm:max-w-md"
         onInteractOutside={(e) => {
-          if (isPolling) e.preventDefault();
+          if (shouldPreventOutsideClose) e.preventDefault();
         }}
         onEscapeKeyDown={(e) => {
           if (isPolling) e.preventDefault();

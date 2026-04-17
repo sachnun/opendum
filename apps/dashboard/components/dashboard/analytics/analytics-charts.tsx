@@ -402,7 +402,7 @@ export function AnalyticsCharts({
       {data && (
         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
           {statCards.map((item) => (
-            <div key={item.title} className="rounded-xl bg-muted/40 px-4 py-4 sm:px-5">
+            <div key={item.title} className="rounded-xl border border-border bg-muted/40 px-4 py-4 sm:px-5">
               <p className="text-xs font-medium text-muted-foreground">
                 {item.title}
               </p>

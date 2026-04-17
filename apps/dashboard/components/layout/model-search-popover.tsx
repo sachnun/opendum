@@ -131,8 +131,7 @@ function ModelDetailContent({
 
   return (
     <div className={`space-y-3 ${!isEnabled ? "opacity-70" : ""}`}>
-      {/* Row 1: Model ID + Toggle */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 pr-12 sm:pr-14">
         <p
           className="flex-1 min-w-0 overflow-hidden text-sm font-mono font-semibold leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
           title={model.id}
@@ -395,7 +394,7 @@ export function ModelSearchPopover({ models, className }: ModelSearchPopoverProp
       </div>
 
       <Dialog open={detailModel !== null} onOpenChange={(open) => { if (!open) handleDetailClose(); }}>
-        <DialogContent className="sm:max-w-md gap-0">
+        <DialogContent className="sm:max-w-md gap-0 pr-12 sm:pr-14">
           {detailModel && (
             <ModelDetailContent model={detailModel} onClose={handleDetailClose} />
           )}

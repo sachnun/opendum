@@ -4,13 +4,9 @@ export default function Loading() {
   return (
     <div className="space-y-6">
       <div className="border-b border-border pb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Skeleton className="h-7 w-16" />
-          <Skeleton className="h-5 w-24 rounded-full" />
-        </div>
+        <Skeleton className="h-7 w-16" />
       </div>
 
-      {/* Card 1: "Start in 3 steps" */}
       <div className="rounded-xl border border-border bg-card">
         <div className="p-6 pb-0">
           <Skeleton className="h-5 w-32" />
@@ -20,22 +16,15 @@ export default function Loading() {
             {Array.from({ length: 3 }).map((_, index) => (
               <div key={`step-${index}`} className="flex gap-3">
                 <Skeleton className="mt-0.5 h-5 w-5 shrink-0 rounded-full" />
-                <Skeleton className="h-4 w-full max-w-72" />
+                <Skeleton
+                  className={`h-4 ${index === 0 ? "w-full max-w-80" : index === 1 ? "w-full max-w-64" : "w-full max-w-[30rem]"}`}
+                />
               </div>
             ))}
-          </div>
-          {/* Alert skeleton */}
-          <div className="rounded-lg border border-border p-4 flex gap-3">
-            <Skeleton className="h-4 w-4 shrink-0 rounded-full" />
-            <div className="space-y-1.5 flex-1">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-3.5 w-full max-w-80" />
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Card 2: "Compatibility reference" */}
       <div className="rounded-xl border border-border bg-card">
         <div className="p-6 pb-0">
           <Skeleton className="h-5 w-48" />
