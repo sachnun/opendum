@@ -394,7 +394,7 @@ export function ModelSearchPopover({ models, className }: ModelSearchPopoverProp
       </div>
 
       <Dialog open={detailModel !== null} onOpenChange={(open) => { if (!open) handleDetailClose(); }}>
-        <DialogContent className="sm:max-w-md gap-0 pr-12 sm:pr-14">
+        <DialogContent className="gap-0 pr-12 sm:max-w-md sm:pr-14 [&>[data-slot=dialog-close]]:top-3 [&>[data-slot=dialog-close]]:right-3 [&>[data-slot=dialog-close]]:h-8 [&>[data-slot=dialog-close]]:w-8 [&>[data-slot=dialog-close]]:rounded-full [&>[data-slot=dialog-close]]:border [&>[data-slot=dialog-close]]:border-border/70 [&>[data-slot=dialog-close]]:bg-background/95 [&>[data-slot=dialog-close]]:shadow-sm [&>[data-slot=dialog-close]]:backdrop-blur-sm [&>[data-slot=dialog-close]]:opacity-100 [&>[data-slot=dialog-close]]:hover:bg-muted [&>[data-slot=dialog-close]]:hover:text-foreground">
           {detailModel && (
             <ModelDetailContent model={detailModel} onClose={handleDetailClose} />
           )}
