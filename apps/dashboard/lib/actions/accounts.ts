@@ -65,7 +65,6 @@ import {
   KILO_CODE_API_BASE_URL,
 } from "@opendum/shared/proxy/providers/kilo-code/constants";
 import {
-  WORKERS_AI_API_BASE_URL,
   getWorkersAiValidationUrl,
 } from "@opendum/shared/proxy/providers/workers-ai/constants";
 import { getProviderModelMap } from "@opendum/shared/proxy/models";

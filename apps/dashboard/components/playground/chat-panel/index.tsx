@@ -438,10 +438,6 @@ export function ChatPanel({
 
   const selectedModelData = models.find((m) => m.id === selectedModel);
   const selectedAccountData = accountOptions.find((account) => account.id === selectedAccountId);
-  const selectedAccountDisabledModels = React.useMemo(
-    () => new Set(selectedAccountData?.disabledModels ?? []),
-    [selectedAccountData]
-  );
   const usedAccountData = response?.usedAccountId
     ? accountOptions.find((account) => account.id === response.usedAccountId) ?? null
     : null;
@@ -461,12 +457,15 @@ export function ChatPanel({
 
   // When a specific account is selected on this panel, hide models that
   // the account has disabled so users don't pick an unusable combination.
-  const accountFilteredModels = React.useMemo(() => {
+  const accountFilteredModels = (() => {
+    const selectedAccountDisabledModels = new Set(selectedAccountData?.disabledModels ?? []);
+
     if (selectedAccountDisabledModels.size === 0) {
       return filteredModels;
     }
+
     return filteredModels.filter((m) => !selectedAccountDisabledModels.has(m.id));
-  }, [filteredModels, selectedAccountDisabledModels]);
+  })();
 
   const groupedModels = React.useMemo(() => groupModelsByFamily(accountFilteredModels), [accountFilteredModels]);
   const sortedFamilies = React.useMemo(() => getSortedFamilies(groupedModels), [groupedModels]);

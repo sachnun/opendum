@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,12 +55,6 @@ function SidebarNavContent({
     pathname === "/dashboard/models" || pathname.startsWith("/dashboard/models/");
   const [isModelsExpanded, setIsModelsExpanded] = useState(isModelsActive);
 
-  useEffect(() => {
-    if (isModelsActive) {
-      setIsModelsExpanded(true);
-    }
-  }, [isModelsActive]);
-
   const renderNavItem = (item: NavItem) => {
     const isActive =
       pathname === item.href ||
@@ -83,7 +77,7 @@ function SidebarNavContent({
           : (item.children ?? []);
 
     const isCollapsible = isModelsItem;
-    const isExpanded = isModelsItem ? isModelsExpanded : true;
+    const isExpanded = isModelsItem ? (isModelsActive || isModelsExpanded) : true;
 
     return (
       <div key={item.name} className="space-y-1">

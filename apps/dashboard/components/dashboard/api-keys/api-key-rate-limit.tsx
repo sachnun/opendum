@@ -2,12 +2,10 @@
 
 import { useMemo, useState } from "react";
 import {
-  Check,
   ChevronDown,
   Gauge,
   Plus,
   Trash2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -44,7 +42,6 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
 
 interface RateLimitRuleState {
   target: string;

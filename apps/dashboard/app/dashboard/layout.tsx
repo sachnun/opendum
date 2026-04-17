@@ -21,12 +21,10 @@ import type {
   ProviderAccountCounts,
 } from "@/lib/navigation";
 import {
-  type ModelStats,
   MODEL_STATS_DAYS,
   MODEL_DURATION_LOOKBACK_HOURS,
   buildDayKeys,
   buildHourKeys,
-  buildEmptyModelStats,
   getModelStatsByModel,
 } from "@/lib/model-stats";
 import { Toaster } from "@/components/ui/sonner";
