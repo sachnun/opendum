@@ -35,7 +35,7 @@ function getAntigravityPlatform(): string {
   return `${platform}/${arch}`;
 }
 
-export const ANTIGRAVITY_USER_AGENT = `antigravity/1.22.2 ${getAntigravityPlatform()}`;
+export const ANTIGRAVITY_USER_AGENT = `antigravity/1.23.2 ${getAntigravityPlatform()}`;
 export const ANTIGRAVITY_API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1";
 export const ANTIGRAVITY_CLIENT_METADATA =
   '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';

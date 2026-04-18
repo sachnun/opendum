@@ -1,2 +1,5 @@
 [opendum]
-providers = ["ollama_cloud"]
+providers = ["nvidia_nim", "ollama_cloud"]
+
+[opendum.upstream]
+nvidia_nim = "z-ai/glm-5.1"

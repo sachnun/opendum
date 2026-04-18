@@ -1,6 +1,2 @@
 [opendum]
-providers = ["kilo_code", "openrouter"]
-
-[opendum.upstream]
-kilo_code = "meta-llama/llama-guard-4-12b:free"
-openrouter = "meta-llama/llama-guard-4-12b:free"
+providers = []
