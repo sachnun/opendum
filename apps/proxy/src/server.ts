@@ -25,11 +25,6 @@ await app.register(cors, {
   credentials: true,
 });
 
-// Health check
-app.get("/health", async () => {
-  return { status: "ok", timestamp: new Date().toISOString() };
-});
-
 // Root
 app.get("/", async () => {
   return {
@@ -41,7 +36,6 @@ app.get("/", async () => {
       messages: "/v1/messages",
       responses: "/v1/responses",
       models: "/v1/models",
-      health: "/health",
     },
   };
 });
