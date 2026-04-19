@@ -60,6 +60,7 @@ function getProviderAccounts(
 }
 
 export default async function PlaygroundPage() {
+  const proxyBaseUrl = process.env.NEXT_PUBLIC_PROXY_URL?.replace(/\/$/, "") || undefined;
   const session = await getSession();
 
   if (!session?.user?.id) {
@@ -121,7 +122,7 @@ export default async function PlaygroundPage() {
 
   // Get all active API keys for the playground key selector
   let apiKeyOptions: ApiKeyOption[] = [];
-  if (process.env.NEXT_PUBLIC_PROXY_URL) {
+  if (proxyBaseUrl) {
     const activeKeys = await db
       .select({
         id: proxyApiKey.id,
@@ -168,6 +169,7 @@ export default async function PlaygroundPage() {
       models={models}
       providerAccounts={getProviderAccounts(providerAccounts, disabledModelsByAccount)}
       apiKeyOptions={apiKeyOptions}
+      proxyBaseUrl={proxyBaseUrl}
     />
   );
 }

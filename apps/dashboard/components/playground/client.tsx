@@ -51,6 +51,7 @@ interface PlaygroundClientProps {
   models: ModelOption[];
   providerAccounts: ProviderAccountOption[];
   apiKeyOptions?: ApiKeyOption[];
+  proxyBaseUrl?: string;
 }
 
 interface PanelState {
@@ -457,10 +458,8 @@ function getScenarioMessages(scenario: Scenario): ScenarioMessage[] {
     : [{ role: "user", content: scenario.prompt }];
 }
 
-const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL ?? "";
-
-function getEndpointPath(endpoint: PlaygroundEndpoint): string {
-  const base = PROXY_URL ? PROXY_URL.replace(/\/$/, "") : "";
+function getEndpointPath(endpoint: PlaygroundEndpoint, proxyBaseUrl?: string): string {
+  const base = proxyBaseUrl ? proxyBaseUrl.replace(/\/$/, "") : "";
 
   if (endpoint === "messages") {
     return `${base}/v1/messages`;
@@ -1359,7 +1358,12 @@ function findApiKeyWithMostModels(
   return bestId;
 }
 
-export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] }: PlaygroundClientProps) {
+export function PlaygroundClient({
+  models,
+  providerAccounts,
+  apiKeyOptions = [],
+  proxyBaseUrl,
+}: PlaygroundClientProps) {
   const router = useRouter();
   const { consumePreset } = usePlaygroundPreset();
   const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
@@ -1734,11 +1738,11 @@ export function PlaygroundClient({ models, providerAccounts, apiKeyOptions = [] 
       const controller = new AbortController();
       controllersRef.current.set(panelId, controller);
 
-      const response = await fetch(getEndpointPath(endpoint), {
+      const response = await fetch(getEndpointPath(endpoint, proxyBaseUrl), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(PROXY_URL && apiKeyRef.current
+          ...(proxyBaseUrl && apiKeyRef.current
             ? { Authorization: `Bearer ${apiKeyRef.current}` }
             : {}),
         },
