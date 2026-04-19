@@ -1,3 +1,4 @@
+import { Suspense, type ComponentProps } from "react";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
@@ -7,13 +8,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-dialog";
 import { PinButton } from "@/components/dashboard/accounts/pin-button";
-import { AccountsList } from "@/components/dashboard/accounts/accounts-list";
+import {
+  AccountsList,
+  type AccountsListInitialQuotaByProvider,
+} from "@/components/dashboard/accounts/accounts-list";
 import {
   type ProviderAccountKey,
   PROVIDER_ACCOUNT_BY_KEY,
   getProviderFromSlug,
 } from "@/lib/provider-accounts";
 import { getProviderModelSet } from "@opendum/shared/proxy/models";
+import { getAntigravityQuota } from "@/lib/actions/antigravity-quota";
+import { getCodexQuota } from "@/lib/actions/codex-quota";
+import { getCopilotQuota } from "@/lib/actions/copilot-quota";
+import { getGeminiCliQuota } from "@/lib/actions/gemini-cli-quota";
+import { getKiroQuota } from "@/lib/actions/kiro-quota";
+import { getOpenRouterQuota } from "@/lib/actions/openrouter-quota";
 
 const ACCOUNT_STATS_DAYS = 30;
 
@@ -44,6 +54,89 @@ function createEmptyProviderAccountMap<T>(createValue: () => T): Record<Provider
     openrouter: createValue(),
     workers_ai: createValue(),
   };
+}
+
+async function getInitialQuotaByProvider(
+  provider: ProviderAccountKey
+): Promise<AccountsListInitialQuotaByProvider> {
+  switch (provider) {
+    case "antigravity": {
+      const result = await getAntigravityQuota();
+      return {
+        antigravity: result.success
+          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
+          : {},
+      };
+    }
+    case "codex": {
+      const result = await getCodexQuota();
+      return {
+        codex: result.success
+          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
+          : {},
+      };
+    }
+    case "copilot": {
+      const result = await getCopilotQuota();
+      return {
+        copilot: result.success
+          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
+          : {},
+      };
+    }
+    case "gemini_cli": {
+      const result = await getGeminiCliQuota();
+      return {
+        geminiCli: result.success
+          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
+          : {},
+      };
+    }
+    case "kiro": {
+      const result = await getKiroQuota();
+      return {
+        kiro: result.success
+          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
+          : {},
+      };
+    }
+    case "openrouter": {
+      const result = await getOpenRouterQuota();
+      return {
+        openRouter: result.success
+          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
+          : {},
+      };
+    }
+    default:
+      return {};
+  }
+}
+
+type ProviderAccountsListProps = Omit<
+  ComponentProps<typeof AccountsList>,
+  "initialQuotaByProvider" | "initialQuotaLoadingProviders"
+>;
+
+function ProviderAccountsListFallback({
+  selectedProvider,
+  ...props
+}: ProviderAccountsListProps & { selectedProvider: ProviderAccountKey }) {
+  return (
+    <AccountsList
+      {...props}
+      initialQuotaLoadingProviders={[selectedProvider]}
+    />
+  );
+}
+
+async function ProviderAccountsListWithQuota({
+  selectedProvider,
+  ...props
+}: ProviderAccountsListProps & { selectedProvider: ProviderAccountKey }) {
+  const initialQuotaByProvider = await getInitialQuotaByProvider(selectedProvider);
+
+  return <AccountsList {...props} initialQuotaByProvider={initialQuotaByProvider} />;
 }
 
 export default async function ProviderAccountsPage({
@@ -218,6 +311,26 @@ export default async function ProviderAccountsPage({
     .map((r: { providerKey: string }) => r.providerKey)
     .filter((k: string): k is ProviderAccountKey => validProviderKeys.has(k));
 
+  const accountsListProps: ProviderAccountsListProps = {
+    antigravityAccounts: groupedAccounts.antigravity,
+    geminiCliAccounts: groupedAccounts.gemini_cli,
+    qwenCodeAccounts: groupedAccounts.qwen_code,
+    copilotAccounts: groupedAccounts.copilot,
+    codexAccounts: groupedAccounts.codex,
+    kiroAccounts: groupedAccounts.kiro,
+    nvidiaNimAccounts: groupedAccounts.nvidia_nim,
+    ollamaCloudAccounts: groupedAccounts.ollama_cloud,
+    openRouterAccounts: groupedAccounts.openrouter,
+    groqAccounts: groupedAccounts.groq,
+    cerebrasAccounts: groupedAccounts.cerebras,
+    kiloCodeAccounts: groupedAccounts.kilo_code,
+    workersAiAccounts: groupedAccounts.workers_ai,
+    visibleProviders: [selectedProvider],
+    supportedModelsByProvider: { [selectedProvider]: providerModels },
+    disabledModelsByAccountId,
+    pinnedProviders,
+  };
+
   return (
     <div className="space-y-6">
       <div className="sticky top-0 z-20 -mx-5 bg-background px-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -251,25 +364,19 @@ export default async function ProviderAccountsPage({
         </Alert>
       )}
 
-      <AccountsList
-        antigravityAccounts={groupedAccounts.antigravity}
-        geminiCliAccounts={groupedAccounts.gemini_cli}
-        qwenCodeAccounts={groupedAccounts.qwen_code}
-        copilotAccounts={groupedAccounts.copilot}
-        codexAccounts={groupedAccounts.codex}
-        kiroAccounts={groupedAccounts.kiro}
-        nvidiaNimAccounts={groupedAccounts.nvidia_nim}
-        ollamaCloudAccounts={groupedAccounts.ollama_cloud}
-        openRouterAccounts={groupedAccounts.openrouter}
-        groqAccounts={groupedAccounts.groq}
-        cerebrasAccounts={groupedAccounts.cerebras}
-        kiloCodeAccounts={groupedAccounts.kilo_code}
-        workersAiAccounts={groupedAccounts.workers_ai}
-        visibleProviders={[selectedProvider]}
-        supportedModelsByProvider={{ [selectedProvider]: providerModels }}
-        disabledModelsByAccountId={disabledModelsByAccountId}
-        pinnedProviders={pinnedProviders}
-      />
+      <Suspense
+        fallback={
+          <ProviderAccountsListFallback
+            {...accountsListProps}
+            selectedProvider={selectedProvider}
+          />
+        }
+      >
+        <ProviderAccountsListWithQuota
+          {...accountsListProps}
+          selectedProvider={selectedProvider}
+        />
+      </Suspense>
     </div>
   );
 }

@@ -90,6 +90,19 @@ type AccountQuotaInfo =
   | GeminiCliAccountQuotaInfo
   | KiroAccountQuotaInfo
   | OpenRouterAccountQuotaInfo;
+
+type QuotaStateProviderKey =
+  | "antigravity"
+  | "codex"
+  | "copilot"
+  | "geminiCli"
+  | "kiro"
+  | "openRouter";
+
+export type AccountsListInitialQuotaByProvider = Partial<
+  Record<QuotaStateProviderKey, Record<string, AccountQuotaInfo>>
+>;
+
 type QuotaGroupDisplay =
   | AntigravityQuotaGroupDisplay
   | CopilotQuotaGroupDisplay
@@ -142,6 +155,15 @@ interface AccountsListProps {
   supportedModelsByProvider?: Partial<Record<ProviderAccountKey, string[]>>;
   disabledModelsByAccountId?: Record<string, string[]>;
   pinnedProviders: ProviderAccountKey[];
+  initialQuotaByProvider?: AccountsListInitialQuotaByProvider;
+  initialQuotaLoadingProviders?: ProviderAccountKey[];
+}
+
+function isQuotaInitiallyLoading(
+  loadingProviders: ProviderAccountKey[] | undefined,
+  provider: ProviderAccountKey
+): boolean {
+  return loadingProviders?.includes(provider) === true;
 }
 
 function formatTierLabel(tier: string): string {
@@ -1217,6 +1239,8 @@ export function AccountsList({
   supportedModelsByProvider,
   disabledModelsByAccountId,
   pinnedProviders,
+  initialQuotaByProvider,
+  initialQuotaLoadingProviders,
 }: AccountsListProps) {
   const [pinnedSet, setPinnedSet] = useState<Set<ProviderAccountKey>>(
     () => new Set(pinnedProviders)
@@ -1250,23 +1274,35 @@ export function AccountsList({
   }, [pinnedSet]);
 
   const [antigravityQuotaByAccountId, setAntigravityQuotaByAccountId] =
-    useState<Record<string, AccountQuotaInfo>>({});
+    useState<Record<string, AccountQuotaInfo>>(() => initialQuotaByProvider?.antigravity ?? {});
   const [codexQuotaByAccountId, setCodexQuotaByAccountId] =
-    useState<Record<string, AccountQuotaInfo>>({});
+    useState<Record<string, AccountQuotaInfo>>(() => initialQuotaByProvider?.codex ?? {});
   const [copilotQuotaByAccountId, setCopilotQuotaByAccountId] =
-    useState<Record<string, AccountQuotaInfo>>({});
+    useState<Record<string, AccountQuotaInfo>>(() => initialQuotaByProvider?.copilot ?? {});
   const [geminiCliQuotaByAccountId, setGeminiCliQuotaByAccountId] =
-    useState<Record<string, AccountQuotaInfo>>({});
+    useState<Record<string, AccountQuotaInfo>>(() => initialQuotaByProvider?.geminiCli ?? {});
   const [kiroQuotaByAccountId, setKiroQuotaByAccountId] =
-    useState<Record<string, AccountQuotaInfo>>({});
+    useState<Record<string, AccountQuotaInfo>>(() => initialQuotaByProvider?.kiro ?? {});
   const [openRouterQuotaByAccountId, setOpenRouterQuotaByAccountId] =
-    useState<Record<string, AccountQuotaInfo>>({});
-  const [isAntigravityQuotaLoading, setIsAntigravityQuotaLoading] = useState(false);
-  const [isCodexQuotaLoading, setIsCodexQuotaLoading] = useState(false);
-  const [isCopilotQuotaLoading, setIsCopilotQuotaLoading] = useState(false);
-  const [isGeminiCliQuotaLoading, setIsGeminiCliQuotaLoading] = useState(false);
-  const [isKiroQuotaLoading, setIsKiroQuotaLoading] = useState(false);
-  const [isOpenRouterQuotaLoading, setIsOpenRouterQuotaLoading] = useState(false);
+    useState<Record<string, AccountQuotaInfo>>(() => initialQuotaByProvider?.openRouter ?? {});
+  const [isAntigravityQuotaLoading, setIsAntigravityQuotaLoading] = useState(() =>
+    isQuotaInitiallyLoading(initialQuotaLoadingProviders, "antigravity")
+  );
+  const [isCodexQuotaLoading, setIsCodexQuotaLoading] = useState(() =>
+    isQuotaInitiallyLoading(initialQuotaLoadingProviders, "codex")
+  );
+  const [isCopilotQuotaLoading, setIsCopilotQuotaLoading] = useState(() =>
+    isQuotaInitiallyLoading(initialQuotaLoadingProviders, "copilot")
+  );
+  const [isGeminiCliQuotaLoading, setIsGeminiCliQuotaLoading] = useState(() =>
+    isQuotaInitiallyLoading(initialQuotaLoadingProviders, "gemini_cli")
+  );
+  const [isKiroQuotaLoading, setIsKiroQuotaLoading] = useState(() =>
+    isQuotaInitiallyLoading(initialQuotaLoadingProviders, "kiro")
+  );
+  const [isOpenRouterQuotaLoading, setIsOpenRouterQuotaLoading] = useState(() =>
+    isQuotaInitiallyLoading(initialQuotaLoadingProviders, "openrouter")
+  );
   const [quotaLoadingAccountIds, setQuotaLoadingAccountIds] = useState<Record<string, Set<string>>>(() => ({
     antigravity: new Set<string>(),
     codex: new Set<string>(),
@@ -1283,6 +1319,33 @@ export function AccountsList({
     kiro: 0,
     openRouter: 0,
   });
+
+  useEffect(() => {
+    if (!initialQuotaByProvider) {
+      return;
+    }
+
+    setAntigravityQuotaByAccountId(initialQuotaByProvider.antigravity ?? {});
+    setCodexQuotaByAccountId(initialQuotaByProvider.codex ?? {});
+    setCopilotQuotaByAccountId(initialQuotaByProvider.copilot ?? {});
+    setGeminiCliQuotaByAccountId(initialQuotaByProvider.geminiCli ?? {});
+    setKiroQuotaByAccountId(initialQuotaByProvider.kiro ?? {});
+    setOpenRouterQuotaByAccountId(initialQuotaByProvider.openRouter ?? {});
+    setIsAntigravityQuotaLoading(false);
+    setIsCodexQuotaLoading(false);
+    setIsCopilotQuotaLoading(false);
+    setIsGeminiCliQuotaLoading(false);
+    setIsKiroQuotaLoading(false);
+    setIsOpenRouterQuotaLoading(false);
+    setQuotaLoadingAccountIds({
+      antigravity: new Set<string>(),
+      codex: new Set<string>(),
+      copilot: new Set<string>(),
+      geminiCli: new Set<string>(),
+      kiro: new Set<string>(),
+      openRouter: new Set<string>(),
+    });
+  }, [initialQuotaByProvider]);
 
   const setProviderQuotaAccountLoading = useCallback(
     (
@@ -1582,30 +1645,6 @@ export function AccountsList({
       }
     }
   }, [kiroAccounts.length, mergeQuotaResult, setProviderQuotaAccountLoading]);
-
-  useEffect(() => {
-    void fetchAntigravityQuota();
-  }, [fetchAntigravityQuota]);
-
-  useEffect(() => {
-    void fetchCodexQuota();
-  }, [fetchCodexQuota]);
-
-  useEffect(() => {
-    void fetchCopilotQuota();
-  }, [fetchCopilotQuota]);
-
-  useEffect(() => {
-    void fetchGeminiCliQuota();
-  }, [fetchGeminiCliQuota]);
-
-  useEffect(() => {
-    void fetchOpenRouterQuota();
-  }, [fetchOpenRouterQuota]);
-
-  useEffect(() => {
-    void fetchKiroQuota();
-  }, [fetchKiroQuota]);
 
   useEffect(() => {
     const handleProviderAccountsRefresh = () => {
