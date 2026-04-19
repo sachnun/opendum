@@ -13,6 +13,7 @@
     ]
   },
   "deploy": {
-    "startCommand": "node packages/shared/dist/cron/run-refresh-tokens.js"
+    "startCommand": "node packages/shared/dist/cron/run-refresh-tokens.js",
+    "cronSchedule": "0 */6 * * *"
   }
 }
