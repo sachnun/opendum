@@ -1,7 +1,6 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "RAILPACK",
     "buildCommand": "pnpm --filter @opendum/dashboard build",
     "watchPatterns": [
       "apps/dashboard/**",
@@ -14,10 +13,6 @@
     ]
   },
   "deploy": {
-    "startCommand": "node apps/dashboard/.next/standalone/apps/dashboard/server.js",
-    "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 20,
-    "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10
+    "startCommand": "HOSTNAME=0.0.0.0 node apps/dashboard/.next/standalone/apps/dashboard/server.js"
   }
 }
