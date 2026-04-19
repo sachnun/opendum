@@ -17,12 +17,11 @@ output = ["text"]
 
 [opendum]
 family = "OpenAI"
-providers = ["nvidia_nim", "ollama_cloud", "openrouter", "groq", "workers_ai"]
+providers = ["nvidia_nim", "ollama_cloud", "openrouter", "workers_ai"]
 aliases = ["openai-gpt-oss-20b"]
 
 [opendum.upstream]
 nvidia_nim = "openai/gpt-oss-20b"
 ollama_cloud = "gpt-oss:20b"
 openrouter = "openai/gpt-oss-20b:free"
-groq = "openai/gpt-oss-20b"
 workers_ai = "@cf/openai/gpt-oss-20b"

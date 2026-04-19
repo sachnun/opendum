@@ -18,9 +18,8 @@ output = ["text"]
 
 [opendum]
 family = "Kimi"
-providers = ["nvidia_nim", "ollama_cloud", "openrouter", "workers_ai"]
+providers = ["nvidia_nim", "ollama_cloud", "workers_ai"]
 
 [opendum.upstream]
 nvidia_nim = "moonshotai/kimi-k2.5"
-openrouter = "moonshotai/kimi-k2.5"
 workers_ai = "@cf/moonshotai/kimi-k2.5"
