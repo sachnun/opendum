@@ -1,29 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import CryptoJS from "crypto-js";
 
-let deprecationWarningLogged = false;
-
 const getEncryptionKey = (): string => {
-  const encryptionSecret = process.env.ENCRYPTION_SECRET;
-  if (encryptionSecret) {
-    return encryptionSecret;
-  }
-
   const authSecret = process.env.BETTER_AUTH_SECRET;
   if (authSecret) {
-    if (!deprecationWarningLogged) {
-      console.warn(
-        "[encryption] ENCRYPTION_SECRET is not set — falling back to BETTER_AUTH_SECRET. " +
-          "Set ENCRYPTION_SECRET in your environment for better security separation.",
-      );
-      deprecationWarningLogged = true;
-    }
     return authSecret;
   }
 
-  throw new Error(
-    "Neither ENCRYPTION_SECRET nor BETTER_AUTH_SECRET is defined",
-  );
+  throw new Error("BETTER_AUTH_SECRET is not defined");
 };
 
 /**

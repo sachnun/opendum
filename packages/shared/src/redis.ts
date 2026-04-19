@@ -1,5 +1,4 @@
 import Redis from "ioredis";
-import RedisMock from "ioredis-mock";
 
 const globalKey = "__opendum_redis_client__";
 
@@ -19,15 +18,15 @@ export async function getRedisClient(): Promise<Redis> {
 
   const redisUrl = process.env.REDIS_URL ?? null;
 
-  if (redisUrl) {
-    redisClient = new Redis(redisUrl, {
-      maxRetriesPerRequest: null,
-      lazyConnect: false,
-    });
-    redisClient.on("error", () => undefined);
-  } else {
-    redisClient = new RedisMock() as unknown as Redis;
+  if (!redisUrl) {
+    throw new Error("REDIS_URL is required");
   }
+
+  redisClient = new Redis(redisUrl, {
+    maxRetriesPerRequest: null,
+    lazyConnect: false,
+  });
+  redisClient.on("error", () => undefined);
 
   (globalThis as Record<string, unknown>)[globalKey] = redisClient;
 

@@ -1,8 +1,10 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@electric-sql/pglite"],
+  output: "standalone",
   transpilePackages: ["@opendum/shared"],
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   outputFileTracingIncludes: {
     "/**": ["../../packages/shared/models/**/*.toml"],
   },

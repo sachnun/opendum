@@ -1,35 +1,35 @@
-import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema.js";
 import * as relations from "./relations.js";
 
 const fullSchema = { ...schema, ...relations };
 
-type Database = ReturnType<typeof drizzleNeon<typeof fullSchema>>;
+type Database = ReturnType<typeof drizzleNodePg<typeof fullSchema>>;
 
 const globalForDb = globalThis as unknown as {
   db: Database | undefined;
+  pool: Pool | undefined;
 };
 
 function createDb(): Database {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
-    // Fallback to local PGlite when DATABASE_URL is not set
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { drizzle } = require("drizzle-orm/pglite") as typeof import("drizzle-orm/pglite");
-
-    return drizzle({
-      connection: { dataDir: ".pglite" },
-      schema: fullSchema,
-    }) as unknown as Database;
+    throw new Error("DATABASE_URL is required");
   }
 
-  const sql = neon(connectionString);
-  return drizzleNeon(sql, { schema: fullSchema });
+  const pool = new Pool({ connectionString });
+  globalForDb.pool = pool;
+  return drizzleNodePg(pool, { schema: fullSchema });
 }
 
-export const db = globalForDb.db ?? createDb();
+export const db: Database = globalForDb.db ?? createDb();
+
+export async function closeDb() {
+  await globalForDb.pool?.end();
+  globalForDb.pool = undefined;
+}
 
 if (process.env.NODE_ENV !== "production") {
   globalForDb.db = db;

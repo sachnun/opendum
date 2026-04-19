@@ -791,7 +791,7 @@ async function fetchGeminiCliProjectFromResourceManager(
 export async function fetchGeminiCliAccountInfo(
   accessToken: string
 ): Promise<GeminiCliAccountInfo> {
-  const configuredProjectId = process.env.GEMINI_CLI_PROJECT_ID?.trim() || "";
+  const configuredProjectId = "";
   const requestMetadata = buildGeminiCliRequestMetadata(
     configuredProjectId || null
   );

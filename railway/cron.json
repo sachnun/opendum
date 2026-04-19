@@ -1,0 +1,21 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK",
+    "buildCommand": "pnpm --filter @opendum/shared build",
+    "watchPatterns": [
+      "apps/dashboard/app/api/cron/**",
+      "packages/shared/**",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "tsconfig.base.json",
+      "railway/cron.json"
+    ]
+  },
+  "deploy": {
+    "startCommand": "node packages/shared/dist/cron/run-refresh-tokens.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}

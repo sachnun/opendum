@@ -1,8 +1,6 @@
 import { KIRO_REGION } from "./constants.js";
 
-const KIRO_USAGE_LIMITS_URL =
-  process.env.KIRO_USAGE_LIMITS_URL ||
-  `https://q.${KIRO_REGION}.amazonaws.com/`;
+const KIRO_USAGE_LIMITS_URL = `https://q.${KIRO_REGION}.amazonaws.com/`;
 const KIRO_USAGE_REQUEST_TIMEOUT_MS = 10000;
 const KIRO_USAGE_TARGET = "AmazonCodeWhispererService.GetUsageLimits";
 const KIRO_DEFAULT_USER_AGENT = "KiroIDE-0.7.45";

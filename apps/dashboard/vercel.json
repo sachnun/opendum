@@ -1,11 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @opendum/shared build && next build",
-  "ignoreCommand": "git diff --quiet ${VERCEL_GIT_PREVIOUS_SHA:-HEAD^} HEAD -- . ../../packages/shared/ ../../pnpm-lock.yaml ../../tsconfig.base.json",
-  "crons": [
-    {
-      "path": "/api/cron/refresh-tokens",
-      "schedule": "0 0 * * *"
-    }
-  ]
+  "buildCommand": "pnpm --filter @opendum/dashboard build",
+  "ignoreCommand": "git diff --quiet ${VERCEL_GIT_PREVIOUS_SHA:-HEAD^} HEAD -- . ../../packages/shared/ ../../pnpm-lock.yaml ../../tsconfig.base.json"
 }

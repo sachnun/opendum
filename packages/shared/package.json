@@ -20,6 +20,14 @@
       "types": "./dist/encryption.d.ts",
       "default": "./dist/encryption.js"
     },
+    "./cron/refresh-tokens": {
+      "types": "./dist/cron/refresh-tokens.d.ts",
+      "default": "./dist/cron/refresh-tokens.js"
+    },
+    "./cron/run-refresh-tokens": {
+      "types": "./dist/cron/run-refresh-tokens.d.ts",
+      "default": "./dist/cron/run-refresh-tokens.js"
+    },
     "./redis": {
       "types": "./dist/redis.d.ts",
       "default": "./dist/redis.js"
@@ -78,23 +86,21 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist tsconfig.tsbuildinfo && tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.4.1",
-    "@neondatabase/serverless": "^1.0.2",
     "@paralleldrive/cuid2": "^3.3.0",
     "crypto-js": "^4.2.0",
     "drizzle-orm": "^0.45.1",
     "ioredis": "^5.10.1",
-    "ioredis-mock": "^8.13.1",
+    "pg": "^8.16.3",
     "smol-toml": "^1.6.0"
   },
   "devDependencies": {
     "@types/crypto-js": "^4.2.2",
-    "@types/ioredis-mock": "^8.2.7",
     "@types/node": "^25.5.0",
+    "@types/pg": "^8.15.6",
     "typescript": "^5.9.3"
   }
 }

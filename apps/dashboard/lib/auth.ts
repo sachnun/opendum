@@ -10,6 +10,14 @@ const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
+if (!githubClientId || !githubClientSecret) {
+  throw new Error("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are required");
+}
+
+if (!googleClientId || !googleClientSecret) {
+  throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required");
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -23,22 +31,14 @@ export const auth = betterAuth({
     enabled: process.env.NODE_ENV === "development",
   },
   socialProviders: {
-    ...(githubClientId && githubClientSecret
-      ? {
-          github: {
-            clientId: githubClientId,
-            clientSecret: githubClientSecret,
-          },
-        }
-      : {}),
-    ...(googleClientId && googleClientSecret
-      ? {
-          google: {
-            clientId: googleClientId,
-            clientSecret: googleClientSecret,
-          },
-        }
-      : {}),
+    github: {
+      clientId: githubClientId,
+      clientSecret: githubClientSecret,
+    },
+    google: {
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+    },
   },
   plugins: [nextCookies()],
   pages: {

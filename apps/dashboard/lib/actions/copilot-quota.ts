@@ -77,23 +77,12 @@ function resolveCopilotMonthlyLimit(detectedLimit?: number): {
   limit: number;
   estimated: boolean;
 } {
-  // Priority 1: Explicit env var override
-  const rawValue =
-    process.env.COPILOT_PREMIUM_REQUEST_LIMIT ?? process.env.GH_COPILOT_LIMIT;
-
-  if (rawValue) {
-    const parsed = Number.parseInt(rawValue, 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return { limit: parsed, estimated: false };
-    }
-  }
-
-  // Priority 2: Auto-detected from internal Copilot API (snapshot.planLimit)
+  // Priority 1: Auto-detected from internal Copilot API (snapshot.planLimit)
   if (detectedLimit !== undefined && detectedLimit > 0) {
     return { limit: detectedLimit, estimated: false };
   }
 
-  // Priority 3: Hardcoded default
+  // Priority 2: Hardcoded default
   return { limit: COPILOT_DEFAULT_MONTHLY_LIMIT, estimated: true };
 }
 

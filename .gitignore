@@ -32,9 +32,6 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local dev database (PGlite)
-.pglite/
-
 # OpenCode / OpenSpec
 .opencode/
 openspec/

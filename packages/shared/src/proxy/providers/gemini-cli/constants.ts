@@ -2,10 +2,8 @@
 
 // OAuth Configuration (Gemini CLI specific - different from Antigravity)
 export const GEMINI_CLI_CLIENT_ID =
-  process.env.GEMINI_CLI_CLIENT_ID ||
   "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com";
 export const GEMINI_CLI_CLIENT_SECRET =
-  process.env.GEMINI_CLI_CLIENT_SECRET ||
   "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";
 
 export const GEMINI_CLI_SCOPES: readonly string[] = [

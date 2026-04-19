@@ -11,7 +11,7 @@ const HOST = process.env.HOST ?? "0.0.0.0";
 
 const app = Fastify({
   logger: {
-    level: process.env.LOG_LEVEL ?? "info",
+    level: "info",
   },
   bodyLimit: 10 * 1024 * 1024, // 10 MB
 });

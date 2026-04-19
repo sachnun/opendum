@@ -9,7 +9,7 @@
     "dev:proxy": "pnpm --filter @opendum/proxy dev",
     "dev": "pnpm --filter @opendum/shared build && pnpm -r --parallel dev",
     "build:shared": "pnpm --filter @opendum/shared build",
-    "build:dashboard": "pnpm --filter @opendum/shared build && pnpm --filter @opendum/dashboard build",
+    "build:dashboard": "pnpm --filter @opendum/dashboard build",
     "build:proxy": "pnpm --filter @opendum/shared build && pnpm --filter @opendum/proxy build",
     "build": "pnpm --filter @opendum/shared build && pnpm -r --parallel --filter !@opendum/shared build",
     "db:push": "pnpm --filter @opendum/dashboard db:push",
