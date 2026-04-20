@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -19,7 +20,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@opendum/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@opendum/shared/*": ["../../packages/shared/dist/*"]
     }
   },
   "include": [
