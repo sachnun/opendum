@@ -6,6 +6,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetClose,
@@ -143,6 +144,7 @@ function SidebarNavContent({
               {visibleSubItems.length ? (
                 visibleSubItems.map((subItem) => {
                   const isSubActive = isSubItemActive(subItem);
+                  const isSubDisabled = subItem.disabled;
                   const subItemCount =
                     isAccountsItem
                       ? accountCountByHref[subItem.href]
@@ -156,6 +158,28 @@ function SidebarNavContent({
                   const shouldShowSubItemCount =
                     !isAccountsItem && typeof subItemCount === "number" && subItemCount > 0;
                   const shouldShowIndicator = isAccountsItem;
+                  const subItemLabel = (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate">{subItem.name}</span>
+                      {subItem.tag ? (
+                        <Badge variant="outline" className="px-1.5 py-0 text-[10px] lowercase">
+                          {subItem.tag}
+                        </Badge>
+                      ) : null}
+                    </span>
+                  );
+
+                  if (isSubDisabled) {
+                    return (
+                      <div
+                        key={`${item.name}-${subItem.name}`}
+                        className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
+                        aria-disabled="true"
+                      >
+                        {subItemLabel}
+                      </div>
+                    );
+                  }
 
                   return (
                     <Link
@@ -173,7 +197,7 @@ function SidebarNavContent({
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       )}
                     >
-                      <span className="truncate">{subItem.name}</span>
+                      {subItemLabel}
                       {shouldShowIndicator || shouldShowSubItemCount ? (
                         <span className="flex items-center gap-2">
                           {shouldShowIndicator ? (

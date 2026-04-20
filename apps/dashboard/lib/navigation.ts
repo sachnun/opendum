@@ -21,6 +21,8 @@ export interface NavSubItem {
   name: string;
   href: string;
   anchorId?: string;
+  disabled?: boolean;
+  tag?: string;
 }
 
 export interface ProviderAccountCounts {
@@ -98,7 +100,19 @@ export const primaryNavigation: NavItem[] = [
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],
   },
-  { name: "API Keys", href: "/dashboard/api-keys", icon: Key },
+  {
+    name: "API Keys",
+    href: "/dashboard/api-keys",
+    icon: Key,
+    children: [
+      {
+        name: "Share",
+        href: "/dashboard/api-keys/share",
+        disabled: true,
+        tag: "coming",
+      },
+    ],
+  },
   {
     name: "Models",
     href: "/dashboard/models",
