@@ -2010,7 +2010,7 @@ export function PlaygroundClient({
                   }
                 }}
                 disabled={isAnyLoading}
-                className="h-auto min-h-[68px] w-full min-w-0 flex-col items-center justify-between gap-1 px-3 py-2 text-center sm:min-w-[92px] sm:w-auto"
+                className="h-auto w-full min-w-0 flex-col items-center gap-0.5 px-3 py-2 text-center sm:min-w-[92px] sm:w-auto"
               >
                 <span className="whitespace-normal break-words text-xs leading-tight">
                   {preset.family}
