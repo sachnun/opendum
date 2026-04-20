@@ -16,22 +16,10 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "@/lib/navigation";
-import type { ProviderAccountKey } from "@/lib/provider-accounts";
+import { getProviderLabel, type ProviderAccountKey } from "@/lib/provider-accounts";
 import { MODEL_REGISTRY, getProvidersForModel, resolveModelAlias } from "@opendum/shared/proxy/models";
 import { type ModelStats, buildEmptyModelStats } from "@/lib/model-stats";
 import { ModelSearchPopover } from "@/components/layout/model-search-popover";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  antigravity: "Antigravity",
-  qwen_code: "Qwen Code",
-  gemini_cli: "Gemini CLI",
-  codex: "Codex",
-  copilot: "Copilot",
-  kiro: "Kiro",
-  nvidia_nim: "Nvidia",
-  ollama_cloud: "Ollama Cloud",
-  openrouter: "OpenRouter",
-};
 
 interface HeaderProps {
   accountCounts: ProviderAccountCounts;
@@ -77,7 +65,7 @@ export function Header({
       id,
       providers: getProvidersForModel(id)
         .filter((p: string) => activeProviderSet.has(p))
-        .map((provider: string) => PROVIDER_LABELS[provider] ?? provider),
+        .map(getProviderLabel),
       meta: MODEL_REGISTRY[id]?.meta,
       isEnabled: !disabledModelSet.has(id),
       stats: statsByModel[id] ?? buildEmptyModelStats(fallbackDayKeys, fallbackHourKeys),

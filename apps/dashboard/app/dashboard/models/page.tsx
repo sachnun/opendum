@@ -5,6 +5,10 @@ import { db } from "@opendum/shared/db";
 import { disabledModel } from "@opendum/shared/db/schema";
 import { eq } from "drizzle-orm";
 import {
+  getProviderLabel,
+  PROVIDER_ACCOUNT_DEFINITIONS,
+} from "@/lib/provider-accounts";
+import {
   MODEL_REGISTRY,
   getAllModels,
   getModelFamily,
@@ -13,7 +17,6 @@ import {
   resolveModelAlias,
 } from "@opendum/shared/proxy/models";
 import { getAccountModelAvailability, isModelUsableByAccounts } from "@opendum/shared/proxy/auth";
-import { ProviderName } from "@opendum/shared/proxy/providers/types";
 import {
   MODEL_STATS_DAYS,
   MODEL_DURATION_LOOKBACK_HOURS,
@@ -23,31 +26,6 @@ import {
   getModelStatsByModel,
 } from "@/lib/model-stats";
 import ModelsLoading from "./loading";
-
-function getProviderLabel(provider: string): string {
-  switch (provider) {
-    case ProviderName.ANTIGRAVITY:
-      return "Antigravity";
-    case ProviderName.QWEN_CODE:
-      return "Qwen Code";
-    case ProviderName.GEMINI_CLI:
-      return "Gemini CLI";
-    case ProviderName.CODEX:
-      return "Codex";
-    case ProviderName.COPILOT:
-      return "Copilot";
-    case ProviderName.KIRO:
-      return "Kiro";
-    case ProviderName.NVIDIA_NIM:
-      return "Nvidia";
-    case ProviderName.OLLAMA_CLOUD:
-      return "Ollama Cloud";
-    case ProviderName.OPENROUTER:
-      return "OpenRouter";
-    default:
-      return provider;
-  }
-}
 
 async function ModelsContent() {
   const session = await getSession();
@@ -76,17 +54,9 @@ async function ModelsContent() {
 
   const statsByModel = await getModelStatsByModel(session.user.id, allModels);
 
-  const providerEntries: { id: string; label: string }[] = [
-    { id: ProviderName.ANTIGRAVITY, label: "Antigravity" },
-    { id: ProviderName.GEMINI_CLI, label: "Gemini CLI" },
-    { id: ProviderName.QWEN_CODE, label: "Qwen Code" },
-    { id: ProviderName.CODEX, label: "Codex" },
-    { id: ProviderName.COPILOT, label: "Copilot" },
-    { id: ProviderName.KIRO, label: "Kiro" },
-    { id: ProviderName.NVIDIA_NIM, label: "Nvidia" },
-    { id: ProviderName.OLLAMA_CLOUD, label: "Ollama Cloud" },
-    { id: ProviderName.OPENROUTER, label: "OpenRouter" },
-  ];
+  const providerEntries: { id: string; label: string }[] = PROVIDER_ACCOUNT_DEFINITIONS.map(
+    (provider) => ({ id: provider.key, label: provider.label })
+  );
 
   // Only show providers the user has an account for
   const availableProviders = providerEntries.filter(

@@ -147,6 +147,14 @@ export const OAUTH_PROVIDER_ACCOUNT_DEFINITIONS =
 export const API_KEY_PROVIDER_ACCOUNT_DEFINITIONS =
   PROVIDER_ACCOUNT_DEFINITIONS.filter((definition) => definition.category === "api_key");
 
+export function getProviderLabel(provider: string): string {
+  if (provider in PROVIDER_ACCOUNT_BY_KEY) {
+    return PROVIDER_ACCOUNT_BY_KEY[provider as ProviderAccountKey].label;
+  }
+
+  return provider;
+}
+
 export function getProviderAccountPath(provider: ProviderAccountKey): string {
   return `/dashboard/accounts/${PROVIDER_ACCOUNT_BY_KEY[provider].slug}`;
 }
