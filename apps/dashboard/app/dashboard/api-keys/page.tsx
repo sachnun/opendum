@@ -176,9 +176,9 @@ export default async function ApiKeysPage() {
             return (
               <Card
                 key={apiKey.id}
-                className={`bg-card py-4 ${isInactive ? "opacity-70" : ""}`}
+                className={`bg-card ${isInactive ? "opacity-70" : ""}`}
               >
-                <CardContent className="p-4 md:p-5">
+                <CardContent>
                   <div className="space-y-4">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0">
