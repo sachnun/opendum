@@ -20,9 +20,16 @@ import { updateApiKeyName } from "@/lib/actions/api-keys";
 interface EditableApiKeyNameProps {
   id: string;
   name: string | null;
+  showTitle?: boolean;
+  showEditButton?: boolean;
 }
 
-export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
+export function EditableApiKeyName({
+  id,
+  name,
+  showTitle = true,
+  showEditButton = true,
+}: EditableApiKeyNameProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [newName, setNewName] = useState(name ?? "");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -45,59 +52,67 @@ export function EditableApiKeyName({ id, name }: EditableApiKeyNameProps) {
   };
 
   return (
-    <div className="flex min-w-0 items-center gap-1">
-      <span className="min-w-0 truncate text-sm font-semibold">{name ?? "Unnamed key"}</span>
-      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+    <Dialog
+      open={editDialogOpen}
+      onOpenChange={(open) => {
         setEditDialogOpen(open);
         if (open) setNewName(name ?? "");
-      }}>
-        <DialogTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground" 
-            title="Edit name"
-          >
-            <Pencil className="h-3 w-3" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Edit API Key Name</DialogTitle>
-            <DialogDescription className="sr-only">
-              Change the name of your API key.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-3">
-            <Label htmlFor="apiKeyName">Name</Label>
-            <Input
-              id="apiKeyName"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="My API Key"
-              className="mt-1.5"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleUpdateName();
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>
-              Cancel
-            </Button>
+      }}
+    >
+      <div className="flex min-w-0 items-center gap-1.5">
+        {showTitle && (
+          <span className="min-w-0 truncate text-lg font-semibold">{name ?? "Unnamed key"}</span>
+        )}
+        {showEditButton && (
+          <DialogTrigger asChild>
             <Button
-              size="sm"
-              onClick={handleUpdateName}
-              disabled={isUpdating}
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground"
+              title="Edit name"
+              aria-label="Edit name"
             >
-              {isUpdating ? "Saving..." : "Save"}
+              <Pencil className="h-4 w-4" />
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogTrigger>
+        )}
+      </div>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Edit API Key Name</DialogTitle>
+          <DialogDescription className="sr-only">
+            Change the name of your API key.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-3">
+          <Label htmlFor="apiKeyName">Name</Label>
+          <Input
+            id="apiKeyName"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="My API Key"
+            className="mt-1.5"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleUpdateName();
+              }
+            }}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleUpdateName}
+            disabled={isUpdating}
+          >
+            {isUpdating ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

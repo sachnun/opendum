@@ -183,7 +183,11 @@ export default async function ApiKeysPage() {
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
+                          <EditableApiKeyName
+                            id={apiKey.id}
+                            name={apiKey.name}
+                            showEditButton={false}
+                          />
                           {status.label !== "Active" && <Badge variant={status.variant}>{status.label}</Badge>}
                         </div>
                       </div>
