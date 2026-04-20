@@ -1,3 +1,5 @@
+import { search } from "fast-fuzzy";
+
 import {
   MODEL_REGISTRY,
   IGNORED_MODELS,
@@ -64,6 +66,12 @@ for (const [canonical, aliases] of Object.entries(canonicalToAliases)) {
     a.localeCompare(b)
   );
 }
+
+const MODEL_SUGGESTION_THRESHOLD = 0.7;
+const ALL_MODEL_SUGGESTION_CANDIDATES = Array.from(
+  new Set(getAllModelsWithAliases())
+).sort((a, b) => a.localeCompare(b));
+const providerModelSuggestionCache = new Map<string, string[]>();
 
 /** Cached per-provider model map: canonical → upstream name. */
 const providerModelMapCache = new Map<string, Record<string, string>>();
@@ -183,6 +191,50 @@ export function getAllModelsWithAliases(): string[] {
     }
   }
   return models;
+}
+
+export function getSuggestedModels(
+  model: string,
+  provider: string | null = null,
+  limit = 5
+): string[] {
+  const term = model.trim();
+  if (!term) {
+    return [];
+  }
+
+  let candidates = ALL_MODEL_SUGGESTION_CANDIDATES;
+  let useProviderPrefix = false;
+
+  if (provider) {
+    let providerCandidates = providerModelSuggestionCache.get(provider);
+    if (!providerCandidates) {
+      providerCandidates = Array.from(new Set(getModelsForProvider(provider))).sort(
+        (a, b) => a.localeCompare(b)
+      );
+      providerModelSuggestionCache.set(provider, providerCandidates);
+    }
+
+    if (providerCandidates.length > 0) {
+      candidates = providerCandidates;
+      useProviderPrefix = true;
+    }
+  }
+
+  const matches = search(term, candidates, {
+    ignoreCase: true,
+    ignoreSymbols: true,
+    normalizeWhitespace: true,
+    threshold: MODEL_SUGGESTION_THRESHOLD,
+  });
+
+  return Array.from(
+    new Set(
+      matches
+        .slice(0, limit)
+        .map((match) => (useProviderPrefix && provider ? `${provider}/${match}` : match))
+    )
+  );
 }
 
 /**

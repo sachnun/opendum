@@ -7,8 +7,8 @@ import { getRedisClient } from "../redis.js";
 import {
   isModelSupported,
   isModelSupportedByProvider,
-  getAllModelsWithAliases,
   getProvidersForModel,
+  getSuggestedModels,
   resolveModelAlias,
 } from "./models.js";
 import { normalizeProviderAlias } from "./providers/types.js";
@@ -401,12 +401,17 @@ export function validateModel(modelParam: string): ModelValidationResult {
   
   // Check if model exists
   if (!isModelSupported(model)) {
-    const allModels = getAllModelsWithAliases();
+    const suggestions = getSuggestedModels(rawModel, provider);
+    const suggestionMessage =
+      suggestions.length > 0
+        ? ` Did you mean: ${suggestions.join(", ")}?`
+        : " Use GET /v1/models for the full list.";
+
     return {
       valid: false,
       provider,
       model: rawModel,
-      error: `Invalid model: ${rawModel}. Available models: ${allModels.sort().join(", ")}`,
+      error: `Invalid model: ${modelParam}.${suggestionMessage}`,
       param: "model",
       code: "invalid_model",
     };
