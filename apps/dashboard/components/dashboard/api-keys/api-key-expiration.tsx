@@ -72,7 +72,7 @@ export function ApiKeyExpiration({
   };
 
   const displayText = expiresAt
-    ? `Exp ${format(expiresAt, "MMM d, yyyy")}`
+    ? format(expiresAt, "MMM d, yyyy")
     : "No expiry";
 
   return (
@@ -81,7 +81,7 @@ export function ApiKeyExpiration({
         <button
           type="button"
           className={cn(
-            "inline-flex items-center gap-1 text-xs transition-colors cursor-pointer hover:text-primary",
+            "inline-flex items-center gap-1 text-sm transition-colors cursor-pointer hover:text-primary",
             isExpired
               ? "text-destructive"
               : "text-muted-foreground"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, ListFilter, X } from "lucide-react";
+import { Check, ChevronDown, ListFilter, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
 import { updateApiKeyModelAccess, type ApiKeyModelAccessMode } from "@/lib/actions/api-keys";
 import { Badge } from "@/components/ui/badge";
@@ -14,15 +14,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -46,6 +37,18 @@ function sameModelList(left: string[], right: string[]): boolean {
   return left.every((model, index) => model === right[index]);
 }
 
+function getModeLabel(mode: ApiKeyModelAccessMode): string {
+  if (mode === "all") {
+    return "All models";
+  }
+
+  if (mode === "whitelist") {
+    return "Whitelist";
+  }
+
+  return "Blacklist";
+}
+
 export function ApiKeyModelAccess({
   apiKeyId,
   availableModels,
@@ -54,7 +57,6 @@ export function ApiKeyModelAccess({
 }: ApiKeyModelAccessProps) {
   const normalizedInitialModels = useMemo(() => normalizeModels(initialModels), [initialModels]);
 
-  const [open, setOpen] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -72,24 +74,10 @@ export function ApiKeyModelAccess({
     draftMode !== savedMode ||
     !sameModelList(modelsForSave, draftMode === "all" ? [] : normalizedSavedModels);
 
-  const modeLabel =
-    savedMode === "all"
-      ? "All models"
-      : savedMode === "whitelist"
-        ? "Whitelist"
-        : "Blacklist";
-
   const resetDraftState = () => {
     setDraftMode(savedMode);
     setDraftModels(normalizedSavedModels);
     setModelPickerOpen(false);
-  };
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      resetDraftState();
-    }
-    setOpen(nextOpen);
   };
 
   const toggleModel = (modelId: string) => {
@@ -119,7 +107,6 @@ export function ApiKeyModelAccess({
       setSavedModels(nextModels);
       setDraftMode(result.data.mode);
       setDraftModels(nextModels);
-      setOpen(false);
       setModelPickerOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update model access");
@@ -129,145 +116,162 @@ export function ApiKeyModelAccess({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-        >
-          <ListFilter className="h-3 w-3" />
-          <span>{modeLabel}</span>
-          {savedMode !== "all" && (
-            <span className="text-muted-foreground/70">({normalizedSavedModels.length})</span>
-          )}
-        </button>
-      </DialogTrigger>
-
-      <DialogContent className="sm:max-w-[480px]">
-        <DialogHeader>
-          <DialogTitle>Model Access Rules</DialogTitle>
-          <DialogDescription className="sr-only">
-            Control which models can be used with this API key.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3 py-2">
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium">Mode</p>
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              value={draftMode}
-              onValueChange={(value) => {
-                if (value === "all" || value === "whitelist" || value === "blacklist") {
-                  setDraftMode(value);
-                }
-              }}
-              className="w-full justify-start"
-            >
-              <ToggleGroupItem value="all">All</ToggleGroupItem>
-              <ToggleGroupItem value="whitelist">Whitelist</ToggleGroupItem>
-              <ToggleGroupItem value="blacklist">Blacklist</ToggleGroupItem>
-            </ToggleGroup>
+    <section className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/20 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-sm font-semibold">
+            <ListFilter className="h-4 w-4 text-muted-foreground" />
+            <span>Model Access</span>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Choose whether this key can use all models, only selected models, or all except selected models.
+          </p>
+        </div>
+        <Badge variant="outline" className="shrink-0">
+          {getModeLabel(savedMode)}
+        </Badge>
+      </div>
 
-          {draftMode !== "all" && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium">Models</p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-1.5 text-[11px]"
-                  onClick={() => setDraftModels([])}
-                  disabled={normalizedDraftModels.length === 0}
-                >
-                  Clear
-                </Button>
-              </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
+          <p className="text-[11px] text-muted-foreground">Mode</p>
+          <p className="mt-1 font-medium">{getModeLabel(savedMode)}</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
+          <p className="text-[11px] text-muted-foreground">Selected</p>
+          <p className="mt-1 font-medium">
+            {savedMode === "all" ? "All models" : `${normalizedSavedModels.length} model`}
+            {savedMode !== "all" && normalizedSavedModels.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
 
-              <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-8 w-full justify-between px-2.5 text-xs"
-                    disabled={isSaving}
-                  >
-                    <span className="truncate">
-                      {normalizedDraftModels.length > 0
-                        ? `${normalizedDraftModels.length} model selected`
-                        : "Select models"}
-                    </span>
-                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-[min(90vw,28rem)] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search model..." />
-                    <CommandList>
-                      <CommandEmpty>No model found.</CommandEmpty>
-                      <CommandGroup>
-                        {availableModels.map((modelId) => {
-                          const selected = normalizedDraftModels.includes(modelId);
-                          return (
-                            <CommandItem
-                              key={modelId}
-                              value={modelId}
-                              onSelect={() => toggleModel(modelId)}
-                              className="gap-2"
-                            >
-                              <Check
-                                className={cn(
-                                  "h-3 w-3",
-                                  selected ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <span className="truncate font-mono text-[11px]">{modelId}</span>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-
-              <div className="max-h-28 overflow-y-auto rounded-md border border-border bg-muted/20 p-1.5">
-                {normalizedDraftModels.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground px-1">No models selected</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1">
-                    {normalizedDraftModels.map((modelId) => (
-                      <Badge key={modelId} variant="secondary" className="max-w-full gap-0.5 pr-0.5 font-normal text-[10px] py-0">
-                        <span className="min-w-0 truncate font-mono">{modelId}</span>
-                        <button
-                          type="button"
-                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-muted-foreground cursor-pointer hover:text-foreground"
-                          onClick={() => toggleModel(modelId)}
-                          aria-label={`Remove ${modelId}`}
-                        >
-                          <X className="h-2.5 w-2.5" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+      <div className="mt-4 space-y-3 flex-1">
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium">Mode</p>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={draftMode}
+            onValueChange={(value) => {
+              if (value === "all" || value === "whitelist" || value === "blacklist") {
+                setDraftMode(value);
+              }
+            }}
+            className="w-full justify-start"
+          >
+            <ToggleGroupItem value="all" className="flex-1">All</ToggleGroupItem>
+            <ToggleGroupItem value="whitelist" className="flex-1">Whitelist</ToggleGroupItem>
+            <ToggleGroupItem value="blacklist" className="flex-1">Blacklist</ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => handleOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={isSaving || !hasChanges}>
-            {isSaving ? "Saving..." : "Save"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {draftMode !== "all" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium">Models</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => setDraftModels([])}
+                disabled={normalizedDraftModels.length === 0 || isSaving}
+              >
+                Clear
+              </Button>
+            </div>
+
+            <Popover open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-9 w-full justify-between px-3 text-xs"
+                  disabled={isSaving}
+                >
+                  <span className="truncate">
+                    {normalizedDraftModels.length > 0
+                      ? `${normalizedDraftModels.length} model selected`
+                      : "Select models"}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-[min(90vw,28rem)] p-0">
+                <Command>
+                  <CommandInput placeholder="Search model..." />
+                  <CommandList>
+                    <CommandEmpty>No model found.</CommandEmpty>
+                    <CommandGroup>
+                      {availableModels.map((modelId) => {
+                        const selected = normalizedDraftModels.includes(modelId);
+                        return (
+                          <CommandItem
+                            key={modelId}
+                            value={modelId}
+                            onSelect={() => toggleModel(modelId)}
+                            className="gap-2"
+                          >
+                            <Check
+                              className={cn(
+                                "h-3.5 w-3.5",
+                                selected ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <span className="truncate font-mono text-[11px]">{modelId}</span>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <div className="max-h-40 overflow-y-auto rounded-lg border border-border/60 bg-background/80 p-2">
+              {normalizedDraftModels.length === 0 ? (
+                <p className="px-1 text-[11px] text-muted-foreground">No models selected</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {normalizedDraftModels.map((modelId) => (
+                    <Badge
+                      key={modelId}
+                      variant="secondary"
+                      className="max-w-full gap-1 pr-1 font-normal text-[10px]"
+                    >
+                      <span className="min-w-0 truncate font-mono">{modelId}</span>
+                      <button
+                        type="button"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                        onClick={() => toggleModel(modelId)}
+                        aria-label={`Remove ${modelId}`}
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={resetDraftState}
+          disabled={isSaving || !hasChanges}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={isSaving || !hasChanges}>
+          {isSaving ? "Saving..." : "Save"}
+        </Button>
+      </div>
+    </section>
   );
 }

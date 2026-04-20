@@ -67,8 +67,7 @@ export default async function ApiKeysPage() {
     .where(eq(proxyApiKey.userId, session.user.id))
     .orderBy(desc(proxyApiKey.createdAt));
 
-  // Fetch rate limit rules for all user's API keys
-  const apiKeyIds = apiKeys.map((k) => k.id);
+  const apiKeyIds = apiKeys.map((key) => key.id);
   const rateLimitRulesData =
     apiKeyIds.length > 0
       ? await db
@@ -84,7 +83,6 @@ export default async function ApiKeysPage() {
           .where(inArray(proxyApiKeyRateLimit.apiKeyId, apiKeyIds))
       : [];
 
-  // Group rate limit rules by API key ID
   const rateLimitsByKeyId = new Map<string, RateLimitRuleInput[]>();
   for (const row of rateLimitRulesData) {
     const rules = rateLimitsByKeyId.get(row.apiKeyId) ?? [];
@@ -114,7 +112,7 @@ export default async function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <div className="pb-4 border-b border-border">
+      <div className="border-b border-border pb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold">API Keys</h2>
           <CreateApiKeyButton />
@@ -128,6 +126,9 @@ export default async function ApiKeysPage() {
               <Key className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-semibold">No API keys</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create a key to manage model access, account access, and rate limits in one place.
+            </p>
             <div className="mt-4">
               <CreateApiKeyButton />
             </div>
@@ -137,7 +138,7 @@ export default async function ApiKeysPage() {
         <div className="space-y-4">
           {apiKeys.map((apiKey) => {
             const status = getApiKeyStatus(apiKey);
-            const isExpiredOrDisabled = status.label !== "Active";
+            const isInactive = status.label !== "Active";
             const modelAccessMode = normalizeModelAccessMode(apiKey.modelAccessMode);
             const accountAccessMode = normalizeAccountAccessMode(apiKey.accountAccessMode);
             const keyRateLimits = rateLimitsByKeyId.get(apiKey.id) ?? [];
@@ -145,46 +146,79 @@ export default async function ApiKeysPage() {
             return (
               <Card
                 key={apiKey.id}
-                className={`bg-card ${isExpiredOrDisabled ? "opacity-65" : ""}`}
+                className={`bg-card ${isInactive ? "opacity-70" : ""}`}
               >
-                <CardContent className="px-5 py-3">
-                  {/* Row 1: Name + Actions + Badge */}
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-                    <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
-                    <div className="flex shrink-0 items-center gap-2">
-                      <ApiKeyActions apiKey={apiKey} />
-                      <Badge variant={status.variant} className="shrink-0">{status.label}</Badge>
+                <CardContent className="p-5 md:p-6">
+                  <div className="space-y-5">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0 space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
+                          <Badge variant={status.variant}>{status.label}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Keep this key scoped to the right models, accounts, and usage limits.
+                        </p>
+                      </div>
+
+                      <div className="w-full xl:min-w-[420px] xl:max-w-[480px]">
+                        <ApiKeyActions apiKey={apiKey} />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Row 2: Metadata + Access controls + Analytics */}
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      {new Date(apiKey.createdAt).toLocaleDateString()}
-                      {" · "}
-                      <ApiKeyExpiration
-                        apiKeyId={apiKey.id}
-                        initialExpiresAt={apiKey.expiresAt}
-                      />
-                      {" · "}
-                      {apiKey.lastUsedAt
-                        ? `Used ${formatRelativeTime(apiKey.lastUsedAt)}`
-                        : "Never used"}
-                    </span>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                        <p className="text-[11px] text-muted-foreground">Created</p>
+                        <p className="mt-1 text-sm font-medium">
+                          {new Date(apiKey.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                        <p className="text-[11px] text-muted-foreground">Expiration</p>
+                        <div className="mt-1">
+                          <ApiKeyExpiration
+                            apiKeyId={apiKey.id}
+                            initialExpiresAt={apiKey.expiresAt}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                        <p className="text-[11px] text-muted-foreground">Last used</p>
+                        <p className="mt-1 text-sm font-medium">
+                          {apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : "Never used"}
+                        </p>
+                      </div>
+
+                      <Link
+                        href={`/dashboard/analistik/${apiKey.id}`}
+                        className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 transition-colors hover:border-border hover:bg-muted/35"
+                        title="View analytics"
+                      >
+                        <p className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          Analytics
+                        </p>
+                        <p className="mt-1 text-sm font-medium">Open usage details</p>
+                      </Link>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
                       <ApiKeyModelAccess
                         apiKeyId={apiKey.id}
                         availableModels={availableModels}
                         initialMode={modelAccessMode}
                         initialModels={apiKey.modelAccessList}
                       />
+
                       <ApiKeyAccountAccess
                         apiKeyId={apiKey.id}
                         availableAccounts={providerAccounts}
                         initialMode={accountAccessMode}
                         initialAccounts={apiKey.accountAccessList}
                       />
+
                       <ApiKeyRateLimit
                         apiKeyId={apiKey.id}
                         availableModels={availableModels}
@@ -192,15 +226,6 @@ export default async function ApiKeysPage() {
                         initialRules={keyRateLimits}
                       />
                     </div>
-
-                    <Link
-                      href={`/dashboard/analistik/${apiKey.id}`}
-                      className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                      title="View analytics"
-                    >
-                      <BarChart3 className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Analytics</span>
-                    </Link>
                   </div>
                 </CardContent>
               </Card>
