@@ -703,7 +703,7 @@ export function AddAccountDialog({
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="top-[38%] sm:top-[50%] sm:max-w-md"
+        className="max-h-[calc(100dvh-1rem)] p-4 sm:max-w-md sm:p-6"
         onInteractOutside={(e) => {
           if (shouldPreventOutsideClose) e.preventDefault();
         }}
@@ -722,7 +722,7 @@ export function AddAccountDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center">
           {(initialProvider ? [2, 3] : [1, 2, 3]).map((s, index, steps) => (
             <div key={s} className="flex items-center">
               <div
@@ -740,7 +740,7 @@ export function AddAccountDialog({
               {index < steps.length - 1 && (
                 <div
                   className={cn(
-                    "h-px w-8 transition-colors",
+                    "h-px w-10 transition-colors",
                     step > s ? "bg-primary" : "bg-border"
                   )}
                 />
