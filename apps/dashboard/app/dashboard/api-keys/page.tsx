@@ -46,15 +46,20 @@ function normalizeAccountAccessMode(mode: string): ApiKeyAccountAccessMode {
 
 function MobileApiKeySection({
   title,
+  defaultOpen,
   children,
 }: {
   title: string;
+  defaultOpen: boolean;
   children: ReactNode;
 }) {
   return (
     <>
       <div className="hidden lg:block h-full">{children}</div>
-      <Collapsible defaultOpen={false} className="rounded-xl border border-border/70 bg-muted/20 lg:hidden">
+      <Collapsible
+        defaultOpen={defaultOpen}
+        className="rounded-xl border border-border/70 bg-muted/20 lg:hidden"
+      >
         <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold [&[data-state=open]>svg]:rotate-180">
           <span>{title}</span>
           <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
@@ -162,6 +167,11 @@ export default async function ApiKeysPage() {
             const modelAccessMode = normalizeModelAccessMode(apiKey.modelAccessMode);
             const accountAccessMode = normalizeAccountAccessMode(apiKey.accountAccessMode);
             const keyRateLimits = rateLimitsByKeyId.get(apiKey.id) ?? [];
+            const modelAccessExpanded =
+              modelAccessMode !== "all" || apiKey.modelAccessList.length > 0;
+            const accountAccessExpanded =
+              accountAccessMode !== "all" || apiKey.accountAccessList.length > 0;
+            const rateLimitExpanded = keyRateLimits.length > 0;
 
             return (
               <Card
@@ -228,7 +238,7 @@ export default async function ApiKeysPage() {
                     </div>
 
                     <div className="grid gap-3.5 lg:grid-cols-2 2xl:grid-cols-3">
-                      <MobileApiKeySection title="Model Access">
+                      <MobileApiKeySection title="Model Access" defaultOpen={modelAccessExpanded}>
                         <ApiKeyModelAccess
                           apiKeyId={apiKey.id}
                           availableModels={availableModels}
@@ -237,7 +247,7 @@ export default async function ApiKeysPage() {
                         />
                       </MobileApiKeySection>
 
-                      <MobileApiKeySection title="Account Access">
+                      <MobileApiKeySection title="Account Access" defaultOpen={accountAccessExpanded}>
                         <ApiKeyAccountAccess
                           apiKeyId={apiKey.id}
                           availableAccounts={providerAccounts}
@@ -246,7 +256,7 @@ export default async function ApiKeysPage() {
                         />
                       </MobileApiKeySection>
 
-                      <MobileApiKeySection title="Rate Limits">
+                      <MobileApiKeySection title="Rate Limits" defaultOpen={rateLimitExpanded}>
                         <ApiKeyRateLimit
                           apiKeyId={apiKey.id}
                           availableModels={availableModels}
