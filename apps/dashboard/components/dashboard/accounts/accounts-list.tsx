@@ -275,15 +275,7 @@ function StatusBadge({ status, consecutiveErrors }: { status: string; consecutiv
 
 function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
   const percentRemaining = Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
-  const customRemainingLabel =
-    "remainingLabel" in group && typeof group.remainingLabel === "string"
-      ? group.remainingLabel
-      : null;
-  const remainingLabel =
-    customRemainingLabel ??
-    (group.models.length === 0
-      ? `${percentRemaining}%`
-      : `${group.remainingRequests}/${group.maxRequests}`);
+  const percentageLabel = `${percentRemaining}%`;
   let resetTitle: string | undefined;
 
   if (group.resetTimeIso) {
@@ -317,7 +309,7 @@ function QuotaGroupBar({ group }: { group: QuotaGroupDisplay }) {
               {group.resetInHuman}
             </span>
           )}
-          <span className={`font-mono ${textColor}`}>{remainingLabel}</span>
+          <span className={`font-mono ${textColor}`}>{percentageLabel}</span>
         </span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -1109,11 +1101,6 @@ function AccountCard({
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Quota</span>
                 <div className="flex items-center gap-1.5">
-                  {quotaInfo?.status === "success" && quotaInfo.groups.some((group) => group.isEstimated) && (
-                    <Badge variant="outline" className="text-[10px] px-1 py-0">
-                      estimated
-                    </Badge>
-                  )}
                   <Button
                     type="button"
                     variant="ghost"
