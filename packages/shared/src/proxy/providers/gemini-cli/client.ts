@@ -11,9 +11,6 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types.js";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   GEMINI_CLI_CLIENT_ID,
   GEMINI_CLI_CLIENT_SECRET,
@@ -172,7 +169,6 @@ export const geminiCliConfig: ProviderConfig = {
   name: "gemini_cli",
   displayName: "Gemini CLI",
   supportedModels: getProviderModelSet("gemini_cli"),
-  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const geminiCliProvider: Provider = {
@@ -428,20 +424,13 @@ export const geminiCliProvider: Provider = {
       "User-Agent": buildGeminiCliUserAgent(model),
     });
 
-    const fallbackMs = stream
-      ? geminiCliConfig.timeouts.streamMs
-      : geminiCliConfig.timeouts.nonStreamMs;
-    const timeoutMs = await getAdaptiveTimeout(
-      geminiCliConfig.name, body.model, stream, fallbackMs
-    );
-    const response = await fetchWithTimeout(
+    const response = await fetch(
       stream ? `${url}?alt=sse` : url,
       {
         method: "POST",
         headers,
         body: JSON.stringify(requestPayload),
-      },
-      timeoutMs
+      }
     );
 
     return await transformGeminiCliResponse(

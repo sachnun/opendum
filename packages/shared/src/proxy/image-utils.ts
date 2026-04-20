@@ -1,7 +1,7 @@
 import type { ChatCompletionRequest } from "./providers/types.js";
 
-// Timeout for fetching individual image URLs (10 seconds)
-const IMAGE_FETCH_TIMEOUT_MS = 10_000;
+// Timeout for fetching individual image URLs (30 seconds)
+const IMAGE_FETCH_TIMEOUT_MS = 30_000;
 
 /**
  * Fetch an HTTP(S) URL and return a base64 data URI.

@@ -22,10 +22,6 @@ export interface ModelMeta {
   reasoning?: boolean;
   toolCall?: boolean;
   vision?: boolean;
-  pricing?: {
-    input: number;
-    output: number;
-  };
   modalities?: {
     input: string[];
     output: string[];
@@ -50,10 +46,6 @@ interface TomlModel {
   reasoning?: boolean;
   tool_call?: boolean;
   attachment?: boolean;        // maps to ModelMeta.vision
-  cost?: {
-    input?: number;
-    output?: number;
-  };
   limit?: {
     context?: number;
     output?: number;
@@ -120,7 +112,6 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
     raw.reasoning !== undefined ||
     raw.tool_call !== undefined ||
     raw.attachment !== undefined ||
-    raw.cost !== undefined ||
     raw.limit !== undefined ||
     raw.modalities !== undefined;
 
@@ -134,9 +125,6 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
     if (raw.reasoning !== undefined) meta.reasoning = raw.reasoning;
     if (raw.tool_call !== undefined) meta.toolCall = raw.tool_call;
     if (raw.attachment !== undefined) meta.vision = raw.attachment;
-    if (raw.cost?.input !== undefined && raw.cost?.output !== undefined) {
-      meta.pricing = { input: raw.cost.input, output: raw.cost.output };
-    }
     if (raw.modalities) {
       meta.modalities = {
         input: raw.modalities.input ?? [],

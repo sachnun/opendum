@@ -6,9 +6,6 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types.js";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import {
   KILO_CODE_API_BASE_URL,
@@ -50,7 +47,6 @@ export const kiloCodeConfig: ProviderConfig = {
   name: "kilo_code",
   displayName: "Kilo Code",
   supportedModels: getProviderModelSet("kilo_code"),
-  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const kiloCodeProvider: Provider = {
@@ -105,13 +101,7 @@ export const kiloCodeProvider: Provider = {
       stream
     );
 
-    const fallbackMs = stream
-      ? kiloCodeConfig.timeouts.streamMs
-      : kiloCodeConfig.timeouts.nonStreamMs;
-    const timeoutMs = await getAdaptiveTimeout(
-      kiloCodeConfig.name, body.model, stream, fallbackMs
-    );
-    return fetchWithTimeout(`${KILO_CODE_API_BASE_URL}/chat/completions`, {
+    return fetch(`${KILO_CODE_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -119,6 +109,6 @@ export const kiloCodeProvider: Provider = {
         Accept: stream ? "text/event-stream" : "application/json",
       },
       body: JSON.stringify(requestPayload),
-    }, timeoutMs);
+    });
   },
 };

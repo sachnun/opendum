@@ -7,15 +7,14 @@
  *   node scripts/update-metadata.mjs
  *
  * Fetches https://models.dev/api.json and updates metadata fields
- * (release_date, knowledge, reasoning, tool_call, attachment, cost, limit, modalities)
+ * (release_date, knowledge, reasoning, tool_call, attachment, limit, modalities)
  * in existing TOML files while preserving all [opendum] sections.
  */
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync, writeFileSync } from "node:fs";
-import { buildTomlIndex, serializeToml, collectTomlFiles } from "./toml-utils.mjs";
-import { basename } from "node:path";
+import { writeFileSync } from "node:fs";
+import { buildTomlIndex, serializeToml } from "./toml-utils.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
@@ -207,35 +206,10 @@ function buildApiLookup(apiData) {
 }
 
 // ---------------------------------------------------------------------------
-// Find highest-paid cost for a model ID across all providers
-// ---------------------------------------------------------------------------
-
-function findHighestPaidCost(apiData, apiModelId) {
-  let best = null;
-  let bestTotal = 0;
-  let bestProvider = null;
-
-  for (const [provName, provData] of Object.entries(apiData)) {
-    const m = provData.models?.[apiModelId];
-    if (!m?.cost) continue;
-    const inp = m.cost.input ?? 0;
-    const out = m.cost.output ?? 0;
-    const total = inp + out;
-    if (total > bestTotal) {
-      bestTotal = total;
-      best = { input: inp, output: out };
-      bestProvider = provName;
-    }
-  }
-
-  return best ? { cost: best, provider: bestProvider } : null;
-}
-
-// ---------------------------------------------------------------------------
 // Merge API metadata into TOML data (preserving [opendum])
 // ---------------------------------------------------------------------------
 
-function mergeMetadata(tomlData, apiModel, paidCost) {
+function mergeMetadata(tomlData, apiModel) {
   const merged = { ...tomlData };
 
   // Top-level scalar fields
@@ -253,14 +227,6 @@ function mergeMetadata(tomlData, apiModel, paidCost) {
   }
   if (apiModel.attachment != null) {
     merged.attachment = apiModel.attachment;
-  }
-
-  // [cost] — use paid cost (highest across all providers)
-  if (paidCost) {
-    merged.cost = {
-      input: paidCost.input,
-      output: paidCost.output,
-    };
   }
 
   // [limit]
@@ -331,43 +297,14 @@ async function main() {
 
     matched++;
 
-    // Determine pricing: use source's cost if paid, otherwise find highest-paid across providers
-    const apiModelId = MANUAL_MAP[modelId] ? MANUAL_MAP[modelId][1] : modelId;
-    const sourceCost = apiEntry.data.cost;
-    const sourceIsFree = !sourceCost || (sourceCost.input === 0 && sourceCost.output === 0);
-
-    let paidCost = null;
-    let costSource = null;
-
-    if (!sourceIsFree && sourceCost?.input != null && sourceCost?.output != null) {
-      // Source has real pricing — use it
-      paidCost = { input: sourceCost.input, output: sourceCost.output };
-      costSource = apiEntry.provider;
-    } else {
-      // Source is free — find highest-paid alternative
-      let result = findHighestPaidCost(apiData, apiModelId);
-      // Also try the canonical TOML model ID if different
-      if (apiModelId !== modelId) {
-        const alt = findHighestPaidCost(apiData, modelId);
-        if (alt && (!result || (alt.cost.input + alt.cost.output) > (result.cost.input + result.cost.output))) {
-          result = alt;
-        }
-      }
-      if (result) {
-        paidCost = result.cost;
-        costSource = result.provider;
-      }
-    }
-
     const oldSerialized = serializeToml(entry.data);
-    const merged = mergeMetadata(entry.data, apiEntry.data, paidCost);
+    const merged = mergeMetadata(entry.data, apiEntry.data);
     const newSerialized = serializeToml(merged);
 
     if (oldSerialized !== newSerialized) {
       writeFileSync(entry.path, newSerialized);
       updated++;
-      const costInfo = paidCost ? ` cost=$${paidCost.input}/$${paidCost.output} via ${costSource}` : "";
-      console.log(`  Updated: ${modelId} (source: ${source}${costInfo})`);
+      console.log(`  Updated: ${modelId} (source: ${source})`);
     }
   }
 

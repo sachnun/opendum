@@ -4,10 +4,6 @@ reasoning = false
 tool_call = true
 attachment = false
 
-[cost]
-input = 0.2
-output = 0.2
-
 [limit]
 context = 128_000
 output = 16_384
@@ -21,6 +17,6 @@ family = "Meta"
 providers = ["nvidia_nim", "groq", "cerebras"]
 
 [opendum.upstream]
-nvidia_nim = "meta/llama-3.1-8b-instruct"
-groq = "llama-3.1-8b-instant"
 cerebras = "llama3.1-8b"
+groq = "llama-3.1-8b-instant"
+nvidia_nim = "meta/llama-3.1-8b-instruct"

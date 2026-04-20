@@ -6,9 +6,6 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types.js";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import { convertImageUrlsToBase64 } from "../../image-utils.js";
 import {
@@ -47,10 +44,6 @@ export const workersAiConfig: ProviderConfig = {
   name: "workers_ai",
   displayName: "Workers AI",
   supportedModels: getProviderModelSet("workers_ai"),
-  timeouts: {
-    ...DEFAULT_PROVIDER_TIMEOUTS,
-    nonStreamMs: 30_000,
-  },
 };
 
 export const workersAiProvider: Provider = {
@@ -114,13 +107,7 @@ export const workersAiProvider: Provider = {
       stream
     );
 
-    const fallbackMs = stream
-      ? workersAiConfig.timeouts.streamMs
-      : workersAiConfig.timeouts.nonStreamMs;
-    const timeoutMs = await getAdaptiveTimeout(
-      workersAiConfig.name, body.model, stream, fallbackMs
-    );
-    return fetchWithTimeout(getWorkersAiChatUrl(accountId), {
+    return fetch(getWorkersAiChatUrl(accountId), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiToken}`,
@@ -128,6 +115,6 @@ export const workersAiProvider: Provider = {
         Accept: stream ? "text/event-stream" : "application/json",
       },
       body: JSON.stringify(requestPayload),
-    }, timeoutMs);
+    });
   },
 };

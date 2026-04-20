@@ -6,9 +6,6 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types.js";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import {
   CEREBRAS_API_BASE_URL,
@@ -46,7 +43,6 @@ export const cerebrasConfig: ProviderConfig = {
   name: "cerebras",
   displayName: "Cerebras",
   supportedModels: getProviderModelSet("cerebras"),
-  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const cerebrasProvider: Provider = {
@@ -101,13 +97,7 @@ export const cerebrasProvider: Provider = {
       stream
     );
 
-    const fallbackMs = stream
-      ? cerebrasConfig.timeouts.streamMs
-      : cerebrasConfig.timeouts.nonStreamMs;
-    const timeoutMs = await getAdaptiveTimeout(
-      cerebrasConfig.name, body.model, stream, fallbackMs
-    );
-    return fetchWithTimeout(`${CEREBRAS_API_BASE_URL}/chat/completions`, {
+    return fetch(`${CEREBRAS_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -115,6 +105,6 @@ export const cerebrasProvider: Provider = {
         Accept: stream ? "text/event-stream" : "application/json",
       },
       body: JSON.stringify(requestPayload),
-    }, timeoutMs);
+    });
   },
 };

@@ -52,10 +52,6 @@
       "types": "./dist/proxy/adaptive-timeout.d.ts",
       "default": "./dist/proxy/adaptive-timeout.js"
     },
-    "./proxy/timeout": {
-      "types": "./dist/proxy/timeout.d.ts",
-      "default": "./dist/proxy/timeout.js"
-    },
     "./proxy/providers": {
       "types": "./dist/proxy/providers/index.d.ts",
       "default": "./dist/proxy/providers/index.js"

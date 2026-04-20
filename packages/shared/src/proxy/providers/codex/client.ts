@@ -9,8 +9,6 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   CODEX_CLIENT_ID,
   CODEX_DEVICE_CODE_ENDPOINT,
@@ -1272,7 +1270,6 @@ export const codexConfig: ProviderConfig = {
   name: "codex",
   displayName: "Codex",
   supportedModels: getProviderModelSet("codex"),
-  timeouts: { streamMs: 5_000, nonStreamMs: 5_000 },
 };
 
 export const codexProvider: Provider = {
@@ -1485,15 +1482,11 @@ export const codexProvider: Provider = {
       headers["ChatGPT-Account-Id"] = account.accountId;
     }
 
-    // Codex always streams upstream, so use the stream timeout
-    const timeoutMs = await getAdaptiveTimeout(
-      codexConfig.name, body.model, true, codexConfig.timeouts.streamMs
-    );
-    const response = await fetchWithTimeout(CODEX_API_BASE_URL, {
+    const response = await fetch(CODEX_API_BASE_URL, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
-    }, timeoutMs);
+    });
 
     try {
       await updateCodexQuotaFromHeaders(account.id, response.headers);

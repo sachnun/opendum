@@ -3,10 +3,6 @@ reasoning = false
 tool_call = true
 attachment = false
 
-[cost]
-input = 0.39
-output = 1.57
-
 [limit]
 context = 204_800
 output = 128_000

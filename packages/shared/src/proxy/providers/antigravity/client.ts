@@ -9,9 +9,6 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types.js";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   ANTIGRAVITY_CLIENT_ID,
   ANTIGRAVITY_CLIENT_SECRET,
@@ -124,7 +121,6 @@ export const antigravityConfig: ProviderConfig = {
   name: "antigravity",
   displayName: "Antigravity (Google)",
   supportedModels: getProviderModelSet("antigravity"),
-  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const antigravityProvider: Provider = {
@@ -337,17 +333,11 @@ export const antigravityProvider: Provider = {
       const url = `${endpoint}/v1internal:${action}`;
 
       try {
-        const fallbackMs = actualStream
-          ? antigravityConfig.timeouts.streamMs
-          : antigravityConfig.timeouts.nonStreamMs;
-        const timeoutMs = await getAdaptiveTimeout(
-          antigravityConfig.name, body.model, actualStream, fallbackMs
-        );
-        const response = await fetchWithTimeout(url, {
+        const response = await fetch(url, {
           method: "POST",
           headers,
           body: result.body,
-        }, timeoutMs);
+        });
 
         // 429 = quota exhausted (per-account, not per-endpoint).
         // Return immediately so the proxy rate-limit handler can parse

@@ -2,10 +2,6 @@ reasoning = true
 tool_call = true
 attachment = true
 
-[cost]
-input = 0
-output = 0
-
 [limit]
 context = 200_000
 

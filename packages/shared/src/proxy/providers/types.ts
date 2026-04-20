@@ -3,35 +3,12 @@
 import type { ProviderAccount } from "../../db/schema.js";
 
 /**
- * Per-provider timeout configuration (milliseconds).
- *
- * `streamMs`    — TTFB timeout for streaming upstream requests.
- *                 The server usually sends headers quickly once generation
- *                 starts, so this can be short (default 5 s).
- * `nonStreamMs` — TTFB timeout for non-streaming upstream requests.
- *                 For non-stream the server buffers the full response before
- *                 sending headers, so TTFB ≈ total processing time.
- *                 Default 10 s but providers serving heavy models may need more.
- */
-export interface ProviderTimeouts {
-  streamMs: number;
-  nonStreamMs: number;
-}
-
-/** Sensible defaults — override per-provider when needed. */
-export const DEFAULT_PROVIDER_TIMEOUTS: ProviderTimeouts = {
-  streamMs: 5_000,
-  nonStreamMs: 10_000,
-};
-
-/**
  * Provider configuration metadata
  */
 export interface ProviderConfig {
   name: string;
   displayName: string;
   supportedModels: Set<string>;
-  timeouts: ProviderTimeouts;
 }
 
 /**

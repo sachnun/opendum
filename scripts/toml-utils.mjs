@@ -92,14 +92,6 @@ export function serializeToml(data) {
   if (data.attachment !== undefined) lines.push(`attachment = ${data.attachment}`);
   if (lines.length > 0) lines.push("");
 
-  // [cost]
-  if (data.cost) {
-    lines.push("[cost]");
-    if (data.cost.input !== undefined) lines.push(`input = ${data.cost.input}`);
-    if (data.cost.output !== undefined) lines.push(`output = ${data.cost.output}`);
-    lines.push("");
-  }
-
   // [limit]
   if (data.limit) {
     lines.push("[limit]");

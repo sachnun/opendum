@@ -98,14 +98,11 @@ export {
   type RateLimitRule,
 } from "./proxy/auth.js";
 
-// Proxy - Adaptive Timeout
-export { getAdaptiveTimeout, recordLatency } from "./proxy/adaptive-timeout.js";
+// Proxy - Latency Tracking
+export { recordLatency } from "./proxy/adaptive-timeout.js";
 
 // Proxy - Message Sanitizer
 export { stripImageContent } from "./proxy/message-sanitizer.js";
-
-// Proxy - Timeout
-export { fetchWithTimeout, type OnTTFBCallback } from "./proxy/timeout.js";
 
 // Cron
 export {
@@ -127,11 +124,9 @@ export {
   API_KEY_PROVIDER_NAMES,
   PROVIDER_ALIASES,
   normalizeProviderAlias,
-  DEFAULT_PROVIDER_TIMEOUTS,
   type Provider,
   type ProviderConfig,
   type ProviderNameType,
-  type ProviderTimeouts,
   type OAuthResult,
   type ChatCompletionRequest,
   type ProxyEndpointType,

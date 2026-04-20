@@ -6,9 +6,6 @@ import type {
   Provider,
   ProviderConfig,
 } from "../types.js";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import {
   GROQ_API_BASE_URL,
@@ -46,7 +43,6 @@ export const groqConfig: ProviderConfig = {
   name: "groq",
   displayName: "Groq",
   supportedModels: getProviderModelSet("groq"),
-  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const groqProvider: Provider = {
@@ -101,13 +97,7 @@ export const groqProvider: Provider = {
       stream
     );
 
-    const fallbackMs = stream
-      ? groqConfig.timeouts.streamMs
-      : groqConfig.timeouts.nonStreamMs;
-    const timeoutMs = await getAdaptiveTimeout(
-      groqConfig.name, body.model, stream, fallbackMs
-    );
-    return fetchWithTimeout(`${GROQ_API_BASE_URL}/chat/completions`, {
+    return fetch(`${GROQ_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -115,6 +105,6 @@ export const groqProvider: Provider = {
         Accept: stream ? "text/event-stream" : "application/json",
       },
       body: JSON.stringify(requestPayload),
-    }, timeoutMs);
+    });
   },
 };

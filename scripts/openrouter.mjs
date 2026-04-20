@@ -29,11 +29,6 @@ function toModelKey(modelId) {
   return modelKey;
 }
 
-function toNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : Number.NaN;
-}
-
 function isFreeChatModel(model) {
   if (!model || typeof model !== "object") {
     return false;
@@ -44,10 +39,8 @@ function isFreeChatModel(model) {
     return false;
   }
 
-  const pricing = model.pricing || {};
-  const promptPrice = toNumber(pricing.prompt);
-  const completionPrice = toNumber(pricing.completion);
-  if (promptPrice !== 0 || completionPrice !== 0) {
+  const isFreeModelId = id === "openrouter/free" || id.endsWith(":free");
+  if (!isFreeModelId) {
     return false;
   }
 

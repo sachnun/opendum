@@ -9,9 +9,6 @@ import type {
   OAuthResult,
   ChatCompletionRequest,
 } from "../types.js";
-import { DEFAULT_PROVIDER_TIMEOUTS } from "../types.js";
-import { fetchWithTimeout } from "../../timeout.js";
-import { getAdaptiveTimeout } from "../../adaptive-timeout.js";
 import {
   COPILOT_CLIENT_ID,
   COPILOT_DEVICE_CODE_ENDPOINT,
@@ -755,7 +752,6 @@ export const copilotConfig: ProviderConfig = {
   name: "copilot",
   displayName: "GitHub Copilot",
   supportedModels: getProviderModelSet("copilot"),
-  timeouts: DEFAULT_PROVIDER_TIMEOUTS,
 };
 
 export const copilotProvider: Provider = {
@@ -935,13 +931,6 @@ export const copilotProvider: Provider = {
 
     const visionRequest = isCopilotVisionRequest(body);
 
-    const fallbackMs = stream
-      ? copilotConfig.timeouts.streamMs
-      : copilotConfig.timeouts.nonStreamMs;
-    const timeoutMs = await getAdaptiveTimeout(
-      copilotConfig.name, body.model, stream, fallbackMs
-    );
-
     // Codex models require the Responses API endpoint on GitHub Copilot
     if (requiresCopilotResponsesApi(upstreamModel)) {
       const payload = buildCopilotResponsesPayload(
@@ -949,14 +938,13 @@ export const copilotProvider: Provider = {
         stream
       );
 
-      const response = await fetchWithTimeout(
+      const response = await fetch(
         `${COPILOT_API_BASE_URL}/responses`,
         {
           method: "POST",
           headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
           body: JSON.stringify(payload),
-        },
-        timeoutMs
+        }
       );
 
       // Transform streaming Responses API SSE back to Chat Completions SSE
@@ -1005,11 +993,11 @@ export const copilotProvider: Provider = {
     }
     const requestPayload = buildRequestPayload(chatBody, stream);
 
-    return fetchWithTimeout(`${COPILOT_API_BASE_URL}/chat/completions`, {
+    return fetch(`${COPILOT_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
       body: JSON.stringify(requestPayload),
-    }, timeoutMs);
+    });
   },
 };
 

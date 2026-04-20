@@ -4,10 +4,6 @@ reasoning = false
 tool_call = true
 attachment = false
 
-[cost]
-input = 0.1
-output = 0.3
-
 [limit]
 context = 128_000
 output = 128_000

@@ -4,10 +4,6 @@ reasoning = true
 tool_call = true
 attachment = false
 
-[cost]
-input = 0.6
-output = 2.2
-
 [limit]
 context = 204_800
 output = 131_072
@@ -21,5 +17,5 @@ family = "Z.AI"
 providers = ["nvidia_nim", "ollama_cloud", "cerebras"]
 
 [opendum.upstream]
-nvidia_nim = "z-ai/glm4.7"
 cerebras = "zai-glm-4.7"
+nvidia_nim = "z-ai/glm4.7"
