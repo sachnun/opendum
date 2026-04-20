@@ -19,6 +19,8 @@ import {
   CheckCircle,
   ClipboardList,
   Copy,
+  Eye,
+  EyeOff,
   FlaskConical,
   RefreshCw,
   Pin,
@@ -253,6 +255,10 @@ function getAccountHeader(account: Account): { title: string; subtitle: string |
   }
 
   return { title, subtitle: rawEmail };
+}
+
+function maskSensitiveText(value: string): string {
+  return value.replace(/[^\s@._-]/g, "•");
 }
 
 function formatDuration(duration: number | null): string {
@@ -966,10 +972,16 @@ function AccountCard({
   const errorCountToneClass = hasErrors ? errorToneClass : "text-muted-foreground";
   const lastErrorToneClass = account.lastErrorAt ? errorToneClass : "text-muted-foreground";
   const [isToggling, setIsToggling] = useState(false);
+  const [isSubtitleVisible, setIsSubtitleVisible] = useState(false);
   const quotaCardRef = useRef<HTMLDivElement | null>(null);
   const hasTriggeredQuotaLoadRef = useRef(false);
   const router = useRouter();
   const { setPreset } = usePlaygroundPreset();
+  const subtitleDisplay = subtitle
+    ? isSubtitleVisible
+      ? subtitle
+      : maskSensitiveText(subtitle)
+    : null;
 
   useEffect(() => {
     if (!supportsQuotaMonitor || !onLoadQuota || hasTriggeredQuotaLoadRef.current) {
@@ -1051,7 +1063,34 @@ function AccountCard({
             )}
           </div>
         </div>
-        {subtitle && <CardDescription>{subtitle}</CardDescription>}
+        {subtitleDisplay && (
+          <div
+            className={cn(
+              "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1",
+              isSubtitleVisible ? "items-start" : "w-full items-center overflow-hidden"
+            )}
+          >
+            <CardDescription
+              className={cn(
+                "min-w-0 font-mono",
+                isSubtitleVisible ? "break-all whitespace-normal" : "truncate whitespace-nowrap"
+              )}
+            >
+              {subtitleDisplay}
+            </CardDescription>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 self-start text-muted-foreground hover:text-foreground"
+              onClick={() => setIsSubtitleVisible((current) => !current)}
+              aria-label={isSubtitleVisible ? `Hide account email for ${title}` : `Show account email for ${title}`}
+              title={isSubtitleVisible ? "Hide email" : "Show email"}
+            >
+              {isSubtitleVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
         <div className="space-y-2 text-sm flex-1">
