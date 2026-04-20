@@ -156,7 +156,7 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
           </button>
         </div>
 
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -206,8 +206,8 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
             <EditableApiKeyName id={apiKey.id} name={apiKey.name} showTitle={false} />
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 self-end">
-            <span className="text-[11px] text-muted-foreground">
+          <div className="flex shrink-0 items-center gap-1.5 self-center">
+            <span className="text-[11px] leading-none text-muted-foreground">
               {apiKey.isActive ? "On" : "Off"}
             </span>
             <Switch

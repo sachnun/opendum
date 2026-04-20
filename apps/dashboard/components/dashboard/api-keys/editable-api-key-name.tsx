@@ -68,11 +68,11 @@ export function EditableApiKeyName({
             <Button
               variant="outline"
               size="icon"
-              className="h-9 w-9 text-muted-foreground"
+              className="h-9 w-9 text-muted-foreground/80 hover:text-foreground"
               title="Edit name"
               aria-label="Edit name"
             >
-              <Pencil className="h-4 w-4" />
+              <Pencil className="h-3.5 w-3.5" />
             </Button>
           </DialogTrigger>
         )}
