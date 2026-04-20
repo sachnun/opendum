@@ -68,7 +68,6 @@ interface ApiKeyConfig {
   flowType: "api_key";
   apiKeyPortalUrl: string;
   apiKeyPlaceholder: string;
-  accountNamePlaceholder: string;
   connectAction: (
     apiKey: string,
     accountName?: string
@@ -84,7 +83,6 @@ interface ApiKeyWithAccountIdConfig {
   apiKeyPlaceholder: string;
   accountIdPlaceholder: string;
   accountIdLabel: string;
-  accountNamePlaceholder: string;
   connectAction: (
     apiKey: string,
     accountId: string,
@@ -148,7 +146,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     flowType: "api_key",
     apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys",
     apiKeyPlaceholder: "nvapi-...",
-    accountNamePlaceholder: "Nvidia Personal",
     connectAction: connectNvidiaNimApiKey,
   },
   ollama_cloud: {
@@ -157,7 +154,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     flowType: "api_key",
     apiKeyPortalUrl: "https://ollama.com/settings/keys",
     apiKeyPlaceholder: "ollama_...",
-    accountNamePlaceholder: "Ollama Cloud Personal",
     connectAction: connectOllamaCloudApiKey,
   },
   openrouter: {
@@ -166,7 +162,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     flowType: "api_key",
     apiKeyPortalUrl: "https://openrouter.ai/settings/keys",
     apiKeyPlaceholder: "sk-or-v1-...",
-    accountNamePlaceholder: "OpenRouter Personal",
     connectAction: connectOpenRouterApiKey,
   },
   groq: {
@@ -175,7 +170,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     flowType: "api_key",
     apiKeyPortalUrl: "https://console.groq.com/keys",
     apiKeyPlaceholder: "gsk_...",
-    accountNamePlaceholder: "Groq Personal",
     connectAction: connectGroqApiKey,
   },
   cerebras: {
@@ -184,7 +178,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     flowType: "api_key",
     apiKeyPortalUrl: "https://cloud.cerebras.ai",
     apiKeyPlaceholder: "csk-...",
-    accountNamePlaceholder: "Cerebras Personal",
     connectAction: connectCerebrasApiKey,
   },
   kilo_code: {
@@ -193,7 +186,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     flowType: "api_key",
     apiKeyPortalUrl: "https://app.kilo.ai",
     apiKeyPlaceholder: "sk-...",
-    accountNamePlaceholder: "Kilo Code Personal",
     connectAction: connectKiloCodeApiKey,
   },
   workers_ai: {
@@ -204,7 +196,6 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     apiKeyPlaceholder: "Bearer token...",
     accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...",
     accountIdLabel: "Cloudflare Account ID",
-    accountNamePlaceholder: "Workers AI Personal",
     connectAction: connectWorkersAiApiKey,
   },
 };
@@ -249,7 +240,6 @@ export function AddAccountDialog({
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedDeviceCode, setCopiedDeviceCode] = useState(false);
-  const [accountName, setAccountName] = useState("");
   const [cfAccountId, setCfAccountId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -349,7 +339,6 @@ export function AddAccountDialog({
     setIsApiKeyVisible(false);
     setCopiedLink(false);
     setCopiedDeviceCode(false);
-    setAccountName("");
     setCfAccountId("");
     setError("");
     setIsLoading(false);
@@ -617,14 +606,10 @@ export function AddAccountDialog({
         }
         result = await providerConfig.connectAction(
           apiKey.trim(),
-          cfAccountId.trim(),
-          accountName.trim() || undefined
+          cfAccountId.trim()
         );
       } else if (providerConfig.flowType === "api_key") {
-        result = await providerConfig.connectAction(
-          apiKey.trim(),
-          accountName.trim() || undefined
-        );
+        result = await providerConfig.connectAction(apiKey.trim());
       } else {
         setError("Invalid provider configuration");
         setIsLoading(false);
@@ -1095,24 +1080,6 @@ export function AddAccountDialog({
                   />
                 </div>
               )}
-
-              <div className="space-y-2">
-                <Label htmlFor="provider-account-name" className="text-sm font-medium">
-                  Account Name
-                </Label>
-                <Input
-                  id="provider-account-name"
-                  name="provider-account-label"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  placeholder={providerConfig.accountNamePlaceholder}
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
 

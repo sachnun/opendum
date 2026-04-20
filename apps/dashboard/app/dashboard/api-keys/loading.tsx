@@ -21,9 +21,14 @@ export default function Loading() {
             {/* Row 1: Name + Actions + Badge */}
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
               <Skeleton className="h-5 w-36" />
-              <div className="flex shrink-0 items-center gap-2">
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <Skeleton className="h-8 w-8 rounded-md" />
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Skeleton className="h-5 w-24 rounded-sm" />
+                  <Skeleton className="h-6 w-6 rounded-sm" />
+                  <Skeleton className="h-6 w-6 rounded-sm" />
+                  <Skeleton className="h-5 w-9 rounded-full" />
+                  <Skeleton className="h-6 w-6 rounded-sm" />
+                </div>
                 <Skeleton className="h-5 w-14 rounded-full" />
               </div>
             </div>
@@ -32,6 +37,7 @@ export default function Loading() {
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
               <Skeleton className="h-3.5 w-52" />
               <div className="flex flex-wrap items-center gap-2">
+                <Skeleton className="h-7 w-28 rounded-md" />
                 <Skeleton className="h-7 w-28 rounded-md" />
                 <Skeleton className="h-7 w-28 rounded-md" />
               </div>

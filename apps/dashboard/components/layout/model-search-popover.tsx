@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Copy, Check, Search, FlaskConical, Brain, Wrench, Eye, Calendar, BarChart3 } from "lucide-react";
+import { ChevronDown, Copy, Check, Search, FlaskConical, Brain, Wrench, Eye, Calendar, BarChart3, ArrowDown, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -191,11 +191,17 @@ function ModelDetailContent({
         <div className="space-y-1.5 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5 flex-wrap">
             {meta.contextLength && (
-              <span className="tabular-nums">{formatTokens(meta.contextLength)} in</span>
+              <span className="inline-flex items-center gap-1 tabular-nums" title="Input tokens">
+                {formatTokens(meta.contextLength)}
+                <ArrowDown className="h-3 w-3 shrink-0" />
+              </span>
             )}
             {meta.contextLength && meta.outputLimit && <span>·</span>}
             {meta.outputLimit && (
-              <span className="tabular-nums">{formatTokens(meta.outputLimit)} out</span>
+              <span className="inline-flex items-center gap-1 tabular-nums" title="Output tokens">
+                {formatTokens(meta.outputLimit)}
+                <ArrowUp className="h-3 w-3 shrink-0" />
+              </span>
             )}
             {meta.knowledgeCutoff && (
               <>

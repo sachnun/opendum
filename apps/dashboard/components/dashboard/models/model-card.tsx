@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3, FlaskConical } from "lucide-react";
+import { Eye, Copy, Check, Brain, Wrench, Calendar, BarChart3, FlaskConical, ArrowDown, ArrowUp } from "lucide-react";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import { usePlaygroundPreset } from "@/lib/playground-preset-context";
 import type { ModelMeta } from "@opendum/shared/proxy/models";
@@ -158,11 +158,17 @@ export function ModelCard({
             <div className="space-y-1.5 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5 flex-wrap">
                 {meta.contextLength && (
-                  <span className="tabular-nums">{formatTokens(meta.contextLength)} in</span>
+                  <span className="inline-flex items-center gap-1 tabular-nums" title="Input tokens">
+                    {formatTokens(meta.contextLength)}
+                    <ArrowDown className="h-3 w-3 shrink-0" />
+                  </span>
                 )}
                 {meta.contextLength && meta.outputLimit && <span>·</span>}
                 {meta.outputLimit && (
-                  <span className="tabular-nums">{formatTokens(meta.outputLimit)} out</span>
+                  <span className="inline-flex items-center gap-1 tabular-nums" title="Output tokens">
+                    {formatTokens(meta.outputLimit)}
+                    <ArrowUp className="h-3 w-3 shrink-0" />
+                  </span>
                 )}
                 {meta.knowledgeCutoff && (
                   <>

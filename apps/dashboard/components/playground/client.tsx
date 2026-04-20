@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Key, Play, Plus, Square } from "lucide-react";
+import { Check, ChevronDown, Key, Play, Plus, Square } from "lucide-react";
 
 import {
   ChatPanel,
@@ -40,11 +40,15 @@ export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
 
 export interface ApiKeyOption {
   id: string;
-  name: string;
+  name: string | null;
   keyPreview: string;
   decryptedKey: string;
   modelAccessMode: ApiKeyModelAccessMode;
   modelAccessList: string[];
+}
+
+function getApiKeyLabel(apiKey: Pick<ApiKeyOption, "name">): string {
+  return apiKey.name?.trim() || "Unnamed key";
 }
 
 interface PlaygroundClientProps {
@@ -1375,6 +1379,7 @@ export function PlaygroundClient({
     () => apiKeyOptions.find((k) => k.id === selectedApiKeyId) ?? null,
     [apiKeyOptions, selectedApiKeyId]
   );
+  const selectedApiKeyLabel = selectedApiKey ? getApiKeyLabel(selectedApiKey) : "Select key";
   const apiKeyRef = React.useRef(selectedApiKey?.decryptedKey);
 
   React.useEffect(() => {
@@ -1905,13 +1910,13 @@ export function PlaygroundClient({
                     variant="outline"
                     size="sm"
                     disabled={isAnyLoading}
-                    className="max-w-[200px] gap-1.5"
+                    className="gap-1.5 sm:max-w-[200px]"
                   >
                     <Key className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">
-                      {selectedApiKey ? selectedApiKey.name : "Select key"}
+                    <span className="hidden truncate sm:inline">
+                      {selectedApiKeyLabel}
                     </span>
-                    <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                    <ChevronDown className="hidden h-3 w-3 shrink-0 opacity-50 sm:block" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[280px] p-0" align="end">
@@ -1923,7 +1928,7 @@ export function PlaygroundClient({
                         {apiKeyOptions.map((key) => (
                           <CommandItem
                             key={key.id}
-                            value={`${key.name} ${key.keyPreview}`}
+                            value={`${getApiKeyLabel(key)} ${key.keyPreview}`}
                             onSelect={() => {
                               setSelectedApiKeyId(key.id);
                               setApiKeyPickerOpen(false);
@@ -1931,11 +1936,12 @@ export function PlaygroundClient({
                             className={selectedApiKeyId === key.id ? "bg-accent" : ""}
                           >
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-medium">{key.name}</p>
+                              <p className="truncate text-xs font-medium">{getApiKeyLabel(key)}</p>
                               <p className="truncate text-[10px] text-muted-foreground font-mono">
                                 {key.keyPreview}
                               </p>
                             </div>
+                            {selectedApiKeyId === key.id && <Check className="h-3.5 w-3.5 text-foreground" />}
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -2004,7 +2010,7 @@ export function PlaygroundClient({
                   }
                 }}
                 disabled={isAnyLoading}
-                className="h-auto min-w-[92px] flex-col items-center gap-1 px-3 py-2"
+                className="h-auto w-full min-w-[92px] flex-col items-center gap-1 px-3 py-2 sm:w-auto"
               >
                 <span className="text-xs">{preset.family}</span>
                 <span
