@@ -1,6 +1,6 @@
 [opendum]
 family = "Z.AI"
-providers = ["nvidia_nim", "ollama_cloud"]
+providers = ["ollama_cloud", "nvidia_nim"]
 
 [opendum.upstream]
 nvidia_nim = "z-ai/glm-5.1"

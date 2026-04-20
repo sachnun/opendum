@@ -14,7 +14,7 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim", "groq", "cerebras"]
+providers = ["groq", "cerebras", "nvidia_nim"]
 
 [opendum.upstream]
 cerebras = "llama3.1-8b"

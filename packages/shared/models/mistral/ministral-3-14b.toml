@@ -14,7 +14,7 @@ output = ["text"]
 
 [opendum]
 family = "Mistral"
-providers = ["nvidia_nim", "ollama_cloud"]
+providers = ["ollama_cloud", "nvidia_nim"]
 ignored = true
 
 [opendum.upstream]

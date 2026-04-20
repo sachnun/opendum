@@ -14,7 +14,7 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = ["nvidia_nim", "openrouter"]
+providers = ["openrouter", "nvidia_nim"]
 aliases = ["qwen-qwen3-next-80b-a3b-instruct", "qwen/qwen3-next-80b-a3b-instruct"]
 
 [opendum.upstream]

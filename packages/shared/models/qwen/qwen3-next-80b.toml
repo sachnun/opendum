@@ -14,7 +14,7 @@ output = ["text"]
 
 [opendum]
 family = "Qwen"
-providers = ["nvidia_nim", "ollama_cloud"]
+providers = ["ollama_cloud", "nvidia_nim"]
 
 [opendum.upstream]
 nvidia_nim = "qwen/qwen3-next-80b-a3b-thinking"

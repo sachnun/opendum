@@ -1,6 +1,6 @@
 [opendum]
 family = "Google"
-providers = ["nvidia_nim", "openrouter"]
+providers = ["openrouter", "nvidia_nim"]
 
 [opendum.upstream]
 nvidia_nim = "google/gemma-4-31b-it"

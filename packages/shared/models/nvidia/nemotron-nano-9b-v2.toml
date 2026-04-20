@@ -14,7 +14,7 @@ output = ["text"]
 
 [opendum]
 family = "NVIDIA"
-providers = ["nvidia_nim", "openrouter"]
+providers = ["openrouter", "nvidia_nim"]
 aliases = ["nvidia-nvidia-nemotron-nano-9b-v2", "nvidia-nemotron-nano-9b-v2", "nvidia/nvidia-nemotron-nano-9b-v2"]
 ignored = true
 

@@ -14,8 +14,7 @@ output = ["text"]
 
 [opendum]
 family = "Z.AI"
-providers = ["nvidia_nim", "ollama_cloud", "cerebras"]
+providers = ["ollama_cloud", "nvidia_nim"]
 
 [opendum.upstream]
-cerebras = "zai-glm-4.7"
 nvidia_nim = "z-ai/glm4.7"

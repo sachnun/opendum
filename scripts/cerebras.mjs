@@ -29,10 +29,13 @@ const MAX_FETCH_ATTEMPTS = 3;
 
 const STATIC_MODELS = [
   "llama3.1-8b",
-  "gpt-oss-120b",
   "qwen-3-235b-a22b-instruct-2507",
-  "zai-glm-4.7",
 ];
+
+const IGNORED_MODELS = new Set([
+  "gpt-oss-120b",
+  "zai-glm-4.7",
+]);
 
 // ---------------------------------------------------------------------------
 // Model key overrides: cerebras upstream ID → canonical TOML key
@@ -142,6 +145,10 @@ function buildModelMap(cerebrasModelIds, reverseMap) {
   const map = new Map();
 
   for (const cerebrasId of cerebrasModelIds) {
+    if (IGNORED_MODELS.has(cerebrasId)) {
+      continue;
+    }
+
     const modelKey = toModelKey(cerebrasId, reverseMap);
     map.set(modelKey, cerebrasId);
   }
