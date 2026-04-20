@@ -29,8 +29,8 @@ function AccountCardSkeleton({
 }) {
   return (
     <div className="h-full">
-      <div className="flex h-full flex-col rounded-xl border border-border bg-card">
-        <div className="space-y-2 p-6 pb-2">
+      <div className="flex h-full flex-col gap-6 rounded-xl border border-border bg-card py-6">
+        <div className="space-y-2 px-6 pb-2">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <Skeleton className="h-6 w-36" />
             <div className="flex flex-wrap gap-1">
@@ -45,7 +45,7 @@ function AccountCardSkeleton({
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col p-6 pt-0">
+        <div className="flex flex-1 flex-col px-6">
           <div className="flex-1 space-y-2 text-sm">
             <div className="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
               <div className="mb-2 flex items-center justify-between">

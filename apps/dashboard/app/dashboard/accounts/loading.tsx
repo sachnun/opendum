@@ -6,8 +6,8 @@ import {
 
 function ProviderOverviewCardSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-card">
-      <div className="space-y-1 p-4 pb-3 sm:p-5 sm:pb-3">
+    <div className="flex h-full flex-col gap-6 rounded-xl border border-border bg-card py-6">
+      <div className="space-y-1 px-6 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1">
             <Skeleton className="h-6 w-6 rounded-md" />
@@ -16,7 +16,7 @@ function ProviderOverviewCardSkeleton() {
           <Skeleton className="h-5 w-20 rounded-full" />
         </div>
       </div>
-      <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+      <div className="space-y-3 px-6">
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
             <Skeleton className="h-5 w-24 rounded-full" />
