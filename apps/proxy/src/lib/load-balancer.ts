@@ -12,6 +12,43 @@ const FAILED_THRESHOLD = 7;
 const MAX_STORED_ERROR_MESSAGE_LENGTH = 10000;
 const MAX_ERROR_HISTORY_PER_ACCOUNT = 200;
 
+function sortAccountsByProviderPriority(
+  accounts: ProviderAccount[],
+  providerPriority: string[]
+): ProviderAccount[] {
+  const providerOrder = new Map(
+    providerPriority.map((provider, index) => [provider, index])
+  );
+
+  return [...accounts].sort((accountA, accountB) => {
+    const providerOrderA = providerOrder.get(accountA.provider) ?? Number.MAX_SAFE_INTEGER;
+    const providerOrderB = providerOrder.get(accountB.provider) ?? Number.MAX_SAFE_INTEGER;
+
+    if (providerOrderA !== providerOrderB) {
+      return providerOrderA - providerOrderB;
+    }
+
+    const statusCompare = accountA.status.localeCompare(accountB.status);
+    if (statusCompare !== 0) {
+      return statusCompare;
+    }
+
+    const lastUsedAtA = accountA.lastUsedAt?.getTime() ?? Number.MIN_SAFE_INTEGER;
+    const lastUsedAtB = accountB.lastUsedAt?.getTime() ?? Number.MIN_SAFE_INTEGER;
+    if (lastUsedAtA !== lastUsedAtB) {
+      return lastUsedAtA - lastUsedAtB;
+    }
+
+    return accountA.createdAt.getTime() - accountB.createdAt.getTime();
+  });
+}
+
+function prioritizeAccountsWithinProvider(accounts: ProviderAccount[]): ProviderAccount[] {
+  const paidAccounts = accounts.filter((account) => account.tier === "paid");
+  const freeAccounts = accounts.filter((account) => account.tier !== "paid");
+  return [...paidAccounts, ...freeAccounts];
+}
+
 /**
  * Get the next active provider account for a user and model using LRU (Least Recently Used)
  * Selects the account that was used longest ago (or never used) for fair distribution
@@ -38,8 +75,7 @@ export async function getNextAccount(
     }
   }
 
-  // Get the least recently used active account (nulls first = never used accounts get priority)
-  const [selectedAccount] = await db
+  const accounts = await db
     .select()
     .from(providerAccount)
     .where(
@@ -52,8 +88,11 @@ export async function getNextAccount(
     .orderBy(
       sql`${providerAccount.lastUsedAt} ASC NULLS FIRST`,
       asc(providerAccount.createdAt)
-    )
-    .limit(1);
+    );
+
+  const [selectedAccount] = provider === null
+    ? sortAccountsByProviderPriority(accounts, targetProviders)
+    : accounts;
 
   if (!selectedAccount) {
     return null;
@@ -143,11 +182,15 @@ export async function getEligibleAccounts(
     disabledEntries.map((e) => e.providerAccountId)
   );
 
-  if (modelDisabledAccountIds.size === 0) {
-    return accounts;
+  const enabledAccounts = modelDisabledAccountIds.size === 0
+    ? accounts
+    : accounts.filter((account) => !modelDisabledAccountIds.has(account.id));
+
+  if (provider !== null) {
+    return enabledAccounts;
   }
 
-  return accounts.filter((account) => !modelDisabledAccountIds.has(account.id));
+  return sortAccountsByProviderPriority(enabledAccounts, targetProviders);
 }
 
 /**
@@ -182,9 +225,25 @@ export async function getNextAvailableAccount(
 
   const rateLimitScope = getRateLimitScope(model);
 
-  const paidAccounts = eligibleAccounts.filter((a) => a.tier === "paid");
-  const freeAccounts = eligibleAccounts.filter((a) => a.tier !== "paid");
-  const prioritizedAccounts = [...paidAccounts, ...freeAccounts];
+  const prioritizedAccounts = provider === null
+    ? (() => {
+        const providerPriority = getProvidersForModel(model);
+        const accountsByProvider = new Map<string, ProviderAccount[]>();
+
+        for (const account of eligibleAccounts) {
+          const existing = accountsByProvider.get(account.provider);
+          if (existing) {
+            existing.push(account);
+          } else {
+            accountsByProvider.set(account.provider, [account]);
+          }
+        }
+
+        return providerPriority.flatMap((providerName) =>
+          prioritizeAccountsWithinProvider(accountsByProvider.get(providerName) ?? [])
+        );
+      })()
+    : prioritizeAccountsWithinProvider(eligibleAccounts);
 
   const rateLimitedAccountIds = await getRateLimitedAccountIds(
     prioritizedAccounts.map((account) => account.id),
