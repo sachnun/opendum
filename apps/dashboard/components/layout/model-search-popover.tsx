@@ -131,7 +131,7 @@ function ModelDetailContent({
 
   return (
     <div className={`space-y-3 ${!isEnabled ? "opacity-70" : ""}`}>
-      <div className="flex items-start justify-between gap-2 pr-12 sm:pr-14">
+      <div className="flex items-start justify-between gap-2">
         <p
           className="flex-1 min-w-0 overflow-hidden text-sm font-mono font-semibold leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
           title={model.id}
@@ -394,7 +394,7 @@ export function ModelSearchPopover({ models, className }: ModelSearchPopoverProp
       </div>
 
       <Dialog open={detailModel !== null} onOpenChange={(open) => { if (!open) handleDetailClose(); }}>
-        <DialogContent className="gap-0 pr-12 sm:max-w-md sm:pr-14 [&>[data-slot=dialog-close]]:top-3 [&>[data-slot=dialog-close]]:right-3 [&>[data-slot=dialog-close]]:h-8 [&>[data-slot=dialog-close]]:w-8 [&>[data-slot=dialog-close]]:rounded-full [&>[data-slot=dialog-close]]:border [&>[data-slot=dialog-close]]:border-border/70 [&>[data-slot=dialog-close]]:bg-background/95 [&>[data-slot=dialog-close]]:shadow-sm [&>[data-slot=dialog-close]]:backdrop-blur-sm [&>[data-slot=dialog-close]]:opacity-100 [&>[data-slot=dialog-close]]:hover:bg-muted [&>[data-slot=dialog-close]]:hover:text-foreground">
+        <DialogContent className="sm:max-w-md gap-0">
           {detailModel && (
             <ModelDetailContent model={detailModel} onClose={handleDetailClose} />
           )}
