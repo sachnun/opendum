@@ -99,6 +99,15 @@ type QuotaStateProviderKey =
   | "kiro"
   | "openRouter";
 
+type QueuedQuotaRequest = {
+  provider: QuotaStateProviderKey;
+  accountId: string;
+  forceRefresh: boolean;
+};
+
+const QUOTA_LAZY_LOAD_CONCURRENCY = 3;
+const QUOTA_LAZY_LOAD_ROOT_MARGIN = "400px 0px";
+
 export type AccountsListInitialQuotaByProvider = Partial<
   Record<QuotaStateProviderKey, Record<string, AccountQuotaInfo>>
 >;
@@ -164,6 +173,17 @@ function isQuotaInitiallyLoading(
   provider: ProviderAccountKey
 ): boolean {
   return loadingProviders?.includes(provider) === true;
+}
+
+function createEmptyQuotaStateMap<T>(createValue: () => T): Record<QuotaStateProviderKey, T> {
+  return {
+    antigravity: createValue(),
+    codex: createValue(),
+    copilot: createValue(),
+    geminiCli: createValue(),
+    kiro: createValue(),
+    openRouter: createValue(),
+  };
 }
 
 function formatTierLabel(tier: string): string {
@@ -887,6 +907,7 @@ function AccountCard({
   showTier = false,
   quotaInfo,
   isQuotaLoading = false,
+  onLoadQuota,
   onRefreshQuota,
   supportedModels,
   disabledModels,
@@ -895,6 +916,7 @@ function AccountCard({
   showTier?: boolean;
   quotaInfo?: AccountQuotaInfo;
   isQuotaLoading?: boolean;
+  onLoadQuota?: (accountId: string) => void;
   onRefreshQuota?: (accountId: string) => void;
   supportedModels?: string[];
   disabledModels?: string[];
@@ -927,8 +949,51 @@ function AccountCard({
   const errorCountToneClass = hasErrors ? errorToneClass : "text-muted-foreground";
   const lastErrorToneClass = account.lastErrorAt ? errorToneClass : "text-muted-foreground";
   const [isToggling, setIsToggling] = useState(false);
+  const quotaCardRef = useRef<HTMLDivElement | null>(null);
+  const hasTriggeredQuotaLoadRef = useRef(false);
   const router = useRouter();
   const { setPreset } = usePlaygroundPreset();
+
+  useEffect(() => {
+    if (!supportsQuotaMonitor || !onLoadQuota || hasTriggeredQuotaLoadRef.current) {
+      return;
+    }
+
+    if (quotaInfo || isQuotaLoading) {
+      hasTriggeredQuotaLoadRef.current = true;
+      return;
+    }
+
+    const node = quotaCardRef.current;
+    if (!node) {
+      return;
+    }
+
+    if (typeof IntersectionObserver === "undefined") {
+      hasTriggeredQuotaLoadRef.current = true;
+      onLoadQuota(account.id);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return;
+        }
+
+        hasTriggeredQuotaLoadRef.current = true;
+        onLoadQuota(account.id);
+        observer.disconnect();
+      },
+      {
+        rootMargin: QUOTA_LAZY_LOAD_ROOT_MARGIN,
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [account.id, isQuotaLoading, onLoadQuota, quotaInfo, supportsQuotaMonitor]);
 
   const handleOpenPlayground = () => {
     setPreset({ accountId: account.id });
@@ -950,7 +1015,8 @@ function AccountCard({
   };
 
   return (
-    <Card className={`bg-card h-full flex flex-col ${!account.isActive ? "opacity-65" : ""}`}>
+    <div ref={quotaCardRef} className="h-full">
+      <Card className={`bg-card h-full flex flex-col ${!account.isActive ? "opacity-65" : ""}`}>
       <CardHeader className="pb-2">
         <div className="flex min-w-0 items-center justify-between gap-2">
           <CardTitle className="min-w-0 truncate text-lg">{title}</CardTitle>
@@ -1118,7 +1184,8 @@ function AccountCard({
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -1136,6 +1203,7 @@ interface ProviderSectionProps {
   disabledModelsByAccountId?: Record<string, string[]>;
   isPinned: boolean;
   onTogglePin: (providerKey: ProviderAccountKey) => void;
+  onLoadQuota?: (accountId: string) => void;
   onRefreshQuota?: (accountId: string) => void;
   quotaLoadingAccountIds?: Set<string>;
 }
@@ -1154,6 +1222,7 @@ function ProviderSection({
   disabledModelsByAccountId,
   isPinned,
   onTogglePin,
+  onLoadQuota,
   onRefreshQuota,
   quotaLoadingAccountIds,
 }: ProviderSectionProps) {
@@ -1191,6 +1260,7 @@ function ProviderSection({
                 showTier={showTier}
                 quotaInfo={quotaByAccountId?.[account.id]}
                 isQuotaLoading={isQuotaLoading || quotaLoadingAccountIds?.has(account.id) === true}
+                onLoadQuota={onLoadQuota}
                 onRefreshQuota={onRefreshQuota}
                 supportedModels={supportedModels}
                 disabledModels={disabledModelsByAccountId?.[account.id]}
@@ -1311,6 +1381,18 @@ export function AccountsList({
     kiro: new Set<string>(),
     openRouter: new Set<string>(),
   }));
+  const loadedQuotaAccountIdsRef = useRef<Record<QuotaStateProviderKey, Set<string>>>(
+    createEmptyQuotaStateMap(() => new Set<string>())
+  );
+  const pendingQuotaRequestsRef = useRef<Record<QuotaStateProviderKey, QueuedQuotaRequest[]>>(
+    createEmptyQuotaStateMap(() => [])
+  );
+  const activeQuotaRequestsRef = useRef<Record<QuotaStateProviderKey, number>>(
+    createEmptyQuotaStateMap(() => 0)
+  );
+  const loadingQuotaAccountIdsRef = useRef<Record<QuotaStateProviderKey, Set<string>>>(
+    createEmptyQuotaStateMap(() => new Set<string>())
+  );
   const quotaRequestIdsRef = useRef({
     antigravity: 0,
     codex: 0,
@@ -1347,18 +1429,52 @@ export function AccountsList({
     });
   }, [initialQuotaByProvider]);
 
+  useEffect(() => {
+    const nextLoadedQuotaAccountIds = createEmptyQuotaStateMap(() => new Set<string>());
+
+    for (const accountId of Object.keys(initialQuotaByProvider?.antigravity ?? {})) {
+      nextLoadedQuotaAccountIds.antigravity.add(accountId);
+    }
+
+    for (const accountId of Object.keys(initialQuotaByProvider?.codex ?? {})) {
+      nextLoadedQuotaAccountIds.codex.add(accountId);
+    }
+
+    for (const accountId of Object.keys(initialQuotaByProvider?.copilot ?? {})) {
+      nextLoadedQuotaAccountIds.copilot.add(accountId);
+    }
+
+    for (const accountId of Object.keys(initialQuotaByProvider?.geminiCli ?? {})) {
+      nextLoadedQuotaAccountIds.geminiCli.add(accountId);
+    }
+
+    for (const accountId of Object.keys(initialQuotaByProvider?.kiro ?? {})) {
+      nextLoadedQuotaAccountIds.kiro.add(accountId);
+    }
+
+    for (const accountId of Object.keys(initialQuotaByProvider?.openRouter ?? {})) {
+      nextLoadedQuotaAccountIds.openRouter.add(accountId);
+    }
+
+    loadedQuotaAccountIdsRef.current = nextLoadedQuotaAccountIds;
+    pendingQuotaRequestsRef.current = createEmptyQuotaStateMap(() => []);
+    activeQuotaRequestsRef.current = createEmptyQuotaStateMap(() => 0);
+    loadingQuotaAccountIdsRef.current = createEmptyQuotaStateMap(() => new Set<string>());
+  }, [initialQuotaByProvider]);
+
   const setProviderQuotaAccountLoading = useCallback(
     (
-      provider:
-        | "antigravity"
-        | "codex"
-        | "copilot"
-        | "geminiCli"
-        | "kiro"
-        | "openRouter",
+      provider: QuotaStateProviderKey,
       accountId: string,
       isLoading: boolean
     ) => {
+      const currentRef = loadingQuotaAccountIdsRef.current[provider];
+      if (isLoading) {
+        currentRef.add(accountId);
+      } else {
+        currentRef.delete(accountId);
+      }
+
       setQuotaLoadingAccountIds((prev) => {
         const current = prev[provider];
         const hasAccount = current.has(accountId);
@@ -1447,6 +1563,9 @@ export function AccountsList({
       }
 
       mergeQuotaResult(accountId, result.data.accounts, setAntigravityQuotaByAccountId);
+      if (accountId) {
+        loadedQuotaAccountIdsRef.current.antigravity.add(accountId);
+      }
     } finally {
       if (accountId) {
         setProviderQuotaAccountLoading("antigravity", accountId, false);
@@ -1485,6 +1604,9 @@ export function AccountsList({
       }
 
       mergeQuotaResult(accountId, result.data.accounts, setCodexQuotaByAccountId);
+      if (accountId) {
+        loadedQuotaAccountIdsRef.current.codex.add(accountId);
+      }
     } finally {
       if (accountId) {
         setProviderQuotaAccountLoading("codex", accountId, false);
@@ -1523,6 +1645,9 @@ export function AccountsList({
       }
 
       mergeQuotaResult(accountId, result.data.accounts, setCopilotQuotaByAccountId);
+      if (accountId) {
+        loadedQuotaAccountIdsRef.current.copilot.add(accountId);
+      }
     } finally {
       if (accountId) {
         setProviderQuotaAccountLoading("copilot", accountId, false);
@@ -1561,6 +1686,9 @@ export function AccountsList({
       }
 
       mergeQuotaResult(accountId, result.data.accounts, setGeminiCliQuotaByAccountId);
+      if (accountId) {
+        loadedQuotaAccountIdsRef.current.geminiCli.add(accountId);
+      }
     } finally {
       if (accountId) {
         setProviderQuotaAccountLoading("geminiCli", accountId, false);
@@ -1599,6 +1727,9 @@ export function AccountsList({
       }
 
       mergeQuotaResult(accountId, result.data.accounts, setOpenRouterQuotaByAccountId);
+      if (accountId) {
+        loadedQuotaAccountIdsRef.current.openRouter.add(accountId);
+      }
     } finally {
       if (accountId) {
         setProviderQuotaAccountLoading("openRouter", accountId, false);
@@ -1637,6 +1768,9 @@ export function AccountsList({
       }
 
       mergeQuotaResult(accountId, result.data.accounts, setKiroQuotaByAccountId);
+      if (accountId) {
+        loadedQuotaAccountIdsRef.current.kiro.add(accountId);
+      }
     } finally {
       if (accountId) {
         setProviderQuotaAccountLoading("kiro", accountId, false);
@@ -1646,14 +1780,145 @@ export function AccountsList({
     }
   }, [kiroAccounts.length, mergeQuotaResult, setProviderQuotaAccountLoading]);
 
+  const getQuotaAccountsForProvider = useCallback(
+    (provider: QuotaStateProviderKey) => {
+      switch (provider) {
+        case "antigravity":
+          return antigravityAccounts;
+        case "codex":
+          return codexAccounts;
+        case "copilot":
+          return copilotAccounts;
+        case "geminiCli":
+          return geminiCliAccounts;
+        case "kiro":
+          return kiroAccounts;
+        case "openRouter":
+          return openRouterAccounts;
+      }
+    },
+    [
+      antigravityAccounts,
+      codexAccounts,
+      copilotAccounts,
+      geminiCliAccounts,
+      kiroAccounts,
+      openRouterAccounts,
+    ]
+  );
+
+  const getQuotaFetcherForProvider = useCallback(
+    (provider: QuotaStateProviderKey) => {
+      switch (provider) {
+        case "antigravity":
+          return fetchAntigravityQuota;
+        case "codex":
+          return fetchCodexQuota;
+        case "copilot":
+          return fetchCopilotQuota;
+        case "geminiCli":
+          return fetchGeminiCliQuota;
+        case "kiro":
+          return fetchKiroQuota;
+        case "openRouter":
+          return fetchOpenRouterQuota;
+      }
+    },
+    [
+      fetchAntigravityQuota,
+      fetchCodexQuota,
+      fetchCopilotQuota,
+      fetchGeminiCliQuota,
+      fetchKiroQuota,
+      fetchOpenRouterQuota,
+    ]
+  );
+
+  const runNextQueuedQuotaRequest = useCallback(
+    (provider: QuotaStateProviderKey) => {
+      const pendingRequests = pendingQuotaRequestsRef.current[provider];
+      if (activeQuotaRequestsRef.current[provider] >= QUOTA_LAZY_LOAD_CONCURRENCY || pendingRequests.length === 0) {
+        return;
+      }
+
+      const nextRequest = pendingRequests.shift();
+      if (!nextRequest) {
+        return;
+      }
+
+      const providerAccounts = getQuotaAccountsForProvider(provider);
+      if (!providerAccounts.some((account) => account.id === nextRequest.accountId)) {
+        runNextQueuedQuotaRequest(provider);
+        return;
+      }
+
+      const fetchQuota = getQuotaFetcherForProvider(provider);
+      if (!fetchQuota) {
+        runNextQueuedQuotaRequest(provider);
+        return;
+      }
+
+      activeQuotaRequestsRef.current[provider] += 1;
+
+      void fetchQuota(nextRequest.forceRefresh, nextRequest.accountId)
+        .finally(() => {
+          activeQuotaRequestsRef.current[provider] = Math.max(
+            0,
+            activeQuotaRequestsRef.current[provider] - 1
+          );
+          runNextQueuedQuotaRequest(provider);
+        });
+    },
+    [getQuotaAccountsForProvider, getQuotaFetcherForProvider]
+  );
+
+  const enqueueQuotaRequest = useCallback(
+    (provider: QuotaStateProviderKey, accountId: string, forceRefresh = false) => {
+      const providerAccounts = getQuotaAccountsForProvider(provider);
+      if (!providerAccounts.some((account) => account.id === accountId)) {
+        return;
+      }
+
+      if (!forceRefresh && loadedQuotaAccountIdsRef.current[provider].has(accountId)) {
+        return;
+      }
+
+      if (loadingQuotaAccountIdsRef.current[provider].has(accountId)) {
+        return;
+      }
+
+      const pendingRequests = pendingQuotaRequestsRef.current[provider];
+      const existingPendingRequest = pendingRequests.find((request) => request.accountId === accountId);
+      if (existingPendingRequest) {
+        if (forceRefresh) {
+          existingPendingRequest.forceRefresh = true;
+        }
+      } else {
+        pendingRequests.push({ provider, accountId, forceRefresh });
+      }
+
+      runNextQueuedQuotaRequest(provider);
+    },
+    [getQuotaAccountsForProvider, runNextQueuedQuotaRequest]
+  );
+
+  const enqueueQuotaRequests = useCallback(
+    (provider: QuotaStateProviderKey, accountIds: string[], forceRefresh = false) => {
+      for (const accountId of accountIds) {
+        enqueueQuotaRequest(provider, accountId, forceRefresh);
+      }
+    },
+    [enqueueQuotaRequest]
+  );
+
   useEffect(() => {
     const handleProviderAccountsRefresh = () => {
-      void fetchAntigravityQuota(true);
-      void fetchCodexQuota(true);
-      void fetchCopilotQuota(true);
-      void fetchGeminiCliQuota(true);
-      void fetchKiroQuota(true);
-      void fetchOpenRouterQuota(true);
+      enqueueQuotaRequests("antigravity", antigravityAccounts.map((account) => account.id), true);
+      enqueueQuotaRequests("codex", codexAccounts.map((account) => account.id), true);
+      enqueueQuotaRequests("copilot", copilotAccounts.map((account) => account.id), true);
+      enqueueQuotaRequests("geminiCli", geminiCliAccounts.map((account) => account.id), true);
+      enqueueQuotaRequests("kiro", kiroAccounts.map((account) => account.id), true);
+      enqueueQuotaRequests("openRouter", openRouterAccounts.map((account) => account.id), true);
     };
 
     window.addEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
@@ -1662,12 +1927,13 @@ export function AccountsList({
       window.removeEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
     };
   }, [
-    fetchAntigravityQuota,
-    fetchCodexQuota,
-    fetchCopilotQuota,
-    fetchGeminiCliQuota,
-    fetchKiroQuota,
-    fetchOpenRouterQuota,
+    antigravityAccounts,
+    codexAccounts,
+    copilotAccounts,
+    enqueueQuotaRequests,
+    geminiCliAccounts,
+    kiroAccounts,
+    openRouterAccounts,
   ]);
 
   const visibleProviderSet =
@@ -1694,7 +1960,8 @@ export function AccountsList({
         quotaByAccountId={antigravityQuotaByAccountId}
         isQuotaLoading={isAntigravityQuotaLoading}
         quotaLoadingAccountIds={quotaLoadingAccountIds.antigravity}
-        onRefreshQuota={(accountId) => void fetchAntigravityQuota(true, accountId)}
+        onLoadQuota={(accountId) => enqueueQuotaRequest("antigravity", accountId)}
+        onRefreshQuota={(accountId) => enqueueQuotaRequest("antigravity", accountId, true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("antigravity")}
         onTogglePin={handleTogglePin}
@@ -1716,7 +1983,8 @@ export function AccountsList({
         quotaByAccountId={codexQuotaByAccountId}
         isQuotaLoading={isCodexQuotaLoading}
         quotaLoadingAccountIds={quotaLoadingAccountIds.codex}
-        onRefreshQuota={(accountId) => void fetchCodexQuota(true, accountId)}
+        onLoadQuota={(accountId) => enqueueQuotaRequest("codex", accountId)}
+        onRefreshQuota={(accountId) => enqueueQuotaRequest("codex", accountId, true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("codex")}
         onTogglePin={handleTogglePin}
@@ -1737,7 +2005,8 @@ export function AccountsList({
         quotaByAccountId={kiroQuotaByAccountId}
         isQuotaLoading={isKiroQuotaLoading}
         quotaLoadingAccountIds={quotaLoadingAccountIds.kiro}
-        onRefreshQuota={(accountId) => void fetchKiroQuota(true, accountId)}
+        onLoadQuota={(accountId) => enqueueQuotaRequest("kiro", accountId)}
+        onRefreshQuota={(accountId) => enqueueQuotaRequest("kiro", accountId, true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("kiro")}
         onTogglePin={handleTogglePin}
@@ -1759,7 +2028,8 @@ export function AccountsList({
         quotaByAccountId={geminiCliQuotaByAccountId}
         isQuotaLoading={isGeminiCliQuotaLoading}
         quotaLoadingAccountIds={quotaLoadingAccountIds.geminiCli}
-        onRefreshQuota={(accountId) => void fetchGeminiCliQuota(true, accountId)}
+        onLoadQuota={(accountId) => enqueueQuotaRequest("geminiCli", accountId)}
+        onRefreshQuota={(accountId) => enqueueQuotaRequest("geminiCli", accountId, true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("gemini_cli")}
         onTogglePin={handleTogglePin}
@@ -1797,7 +2067,8 @@ export function AccountsList({
         quotaByAccountId={copilotQuotaByAccountId}
         isQuotaLoading={isCopilotQuotaLoading}
         quotaLoadingAccountIds={quotaLoadingAccountIds.copilot}
-        onRefreshQuota={(accountId) => void fetchCopilotQuota(true, accountId)}
+        onLoadQuota={(accountId) => enqueueQuotaRequest("copilot", accountId)}
+        onRefreshQuota={(accountId) => enqueueQuotaRequest("copilot", accountId, true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("copilot")}
         onTogglePin={handleTogglePin}
@@ -1854,7 +2125,8 @@ export function AccountsList({
         quotaByAccountId={openRouterQuotaByAccountId}
         isQuotaLoading={isOpenRouterQuotaLoading}
         quotaLoadingAccountIds={quotaLoadingAccountIds.openRouter}
-        onRefreshQuota={(accountId) => void fetchOpenRouterQuota(true, accountId)}
+        onLoadQuota={(accountId) => enqueueQuotaRequest("openRouter", accountId)}
+        onRefreshQuota={(accountId) => enqueueQuotaRequest("openRouter", accountId, true)}
         disabledModelsByAccountId={disabledModelsByAccountId}
         isPinned={pinnedSet.has("openrouter")}
         onTogglePin={handleTogglePin}

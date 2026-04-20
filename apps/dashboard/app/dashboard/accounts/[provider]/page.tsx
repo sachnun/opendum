@@ -1,4 +1,4 @@
-import { Suspense, type ComponentProps } from "react";
+import type { ComponentProps } from "react";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
@@ -10,7 +10,6 @@ import { AddAccountDialog } from "@/components/dashboard/accounts/add-account-di
 import { PinButton } from "@/components/dashboard/accounts/pin-button";
 import {
   AccountsList,
-  type AccountsListInitialQuotaByProvider,
 } from "@/components/dashboard/accounts/accounts-list";
 import {
   type ProviderAccountKey,
@@ -18,12 +17,6 @@ import {
   getProviderFromSlug,
 } from "@/lib/provider-accounts";
 import { getProviderModelSet } from "@opendum/shared/proxy/models";
-import { getAntigravityQuota } from "@/lib/actions/antigravity-quota";
-import { getCodexQuota } from "@/lib/actions/codex-quota";
-import { getCopilotQuota } from "@/lib/actions/copilot-quota";
-import { getGeminiCliQuota } from "@/lib/actions/gemini-cli-quota";
-import { getKiroQuota } from "@/lib/actions/kiro-quota";
-import { getOpenRouterQuota } from "@/lib/actions/openrouter-quota";
 
 const ACCOUNT_STATS_DAYS = 30;
 
@@ -56,88 +49,7 @@ function createEmptyProviderAccountMap<T>(createValue: () => T): Record<Provider
   };
 }
 
-async function getInitialQuotaByProvider(
-  provider: ProviderAccountKey
-): Promise<AccountsListInitialQuotaByProvider> {
-  switch (provider) {
-    case "antigravity": {
-      const result = await getAntigravityQuota();
-      return {
-        antigravity: result.success
-          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
-          : {},
-      };
-    }
-    case "codex": {
-      const result = await getCodexQuota();
-      return {
-        codex: result.success
-          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
-          : {},
-      };
-    }
-    case "copilot": {
-      const result = await getCopilotQuota();
-      return {
-        copilot: result.success
-          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
-          : {},
-      };
-    }
-    case "gemini_cli": {
-      const result = await getGeminiCliQuota();
-      return {
-        geminiCli: result.success
-          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
-          : {},
-      };
-    }
-    case "kiro": {
-      const result = await getKiroQuota();
-      return {
-        kiro: result.success
-          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
-          : {},
-      };
-    }
-    case "openrouter": {
-      const result = await getOpenRouterQuota();
-      return {
-        openRouter: result.success
-          ? Object.fromEntries(result.data.accounts.map((account) => [account.accountId, account]))
-          : {},
-      };
-    }
-    default:
-      return {};
-  }
-}
-
-type ProviderAccountsListProps = Omit<
-  ComponentProps<typeof AccountsList>,
-  "initialQuotaByProvider" | "initialQuotaLoadingProviders"
->;
-
-function ProviderAccountsListFallback({
-  selectedProvider,
-  ...props
-}: ProviderAccountsListProps & { selectedProvider: ProviderAccountKey }) {
-  return (
-    <AccountsList
-      {...props}
-      initialQuotaLoadingProviders={[selectedProvider]}
-    />
-  );
-}
-
-async function ProviderAccountsListWithQuota({
-  selectedProvider,
-  ...props
-}: ProviderAccountsListProps & { selectedProvider: ProviderAccountKey }) {
-  const initialQuotaByProvider = await getInitialQuotaByProvider(selectedProvider);
-
-  return <AccountsList {...props} initialQuotaByProvider={initialQuotaByProvider} />;
-}
+type ProviderAccountsListProps = ComponentProps<typeof AccountsList>;
 
 export default async function ProviderAccountsPage({
   params,
@@ -364,19 +276,7 @@ export default async function ProviderAccountsPage({
         </Alert>
       )}
 
-      <Suspense
-        fallback={
-          <ProviderAccountsListFallback
-            {...accountsListProps}
-            selectedProvider={selectedProvider}
-          />
-        }
-      >
-        <ProviderAccountsListWithQuota
-          {...accountsListProps}
-          selectedProvider={selectedProvider}
-        />
-      </Suspense>
+      <AccountsList {...accountsListProps} />
     </div>
   );
 }
