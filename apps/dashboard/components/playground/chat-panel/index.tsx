@@ -28,6 +28,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@/lib/model-families";
+import { getProviderLabel } from "@/lib/provider-accounts";
 
 export interface ModelOption {
   id: string; // unique: "model"
@@ -125,18 +126,7 @@ function getSortedFamilies(groups: Record<string, ModelOption[]>): string[] {
 }
 
 function formatProviderName(provider: string): string {
-  const names: Record<string, string> = {
-    antigravity: "Antigravity",
-    qwen_code: "Qwen Code",
-    gemini_cli: "Gemini CLI",
-    codex: "Codex",
-    copilot: "Copilot",
-    kiro: "Kiro",
-    nvidia_nim: "Nvidia",
-    ollama_cloud: "Ollama Cloud",
-    openrouter: "OpenRouter",
-  };
-  return names[provider] || provider;
+  return getProviderLabel(provider);
 }
 
 function formatDurationMs(value: number | null | undefined): string {
@@ -444,18 +434,36 @@ export function ChatPanel({
     ? accountOptions.find((account) => account.id === response.usedAccountId) ?? null
     : null;
   const pendingModelData = models.find((model) => model.id === pendingModelId) ?? null;
-  const pendingModelAccounts = pendingModelData
-    ? accountOptions.filter((account) => {
-        if (!pendingModelData.providers.includes(account.provider)) {
-          return false;
-        }
-        // Exclude accounts that have disabled this model
-        if (account.disabledModels?.includes(pendingModelData.id)) {
-          return false;
-        }
-        return true;
-      })
-    : [];
+  const pendingModelAccounts = !pendingModelData
+    ? []
+    : (() => {
+        const providerOrder = new Map(
+          pendingModelData.providers.map((provider, index) => [provider, index])
+        );
+
+        return accountOptions
+          .filter((account) => {
+            if (!pendingModelData.providers.includes(account.provider)) {
+              return false;
+            }
+
+            if (account.disabledModels?.includes(pendingModelData.id)) {
+              return false;
+            }
+
+            return true;
+          })
+          .sort((accountA, accountB) => {
+            const providerOrderA = providerOrder.get(accountA.provider) ?? Number.MAX_SAFE_INTEGER;
+            const providerOrderB = providerOrder.get(accountB.provider) ?? Number.MAX_SAFE_INTEGER;
+
+            if (providerOrderA !== providerOrderB) {
+              return providerOrderA - providerOrderB;
+            }
+
+            return getAccountLabel(accountA).localeCompare(getAccountLabel(accountB));
+          });
+      })();
 
   // When a specific account is selected on this panel, hide models that
   // the account has disabled so users don't pick an unusable combination.

@@ -34,6 +34,16 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "@/lib/model-families";
 
 export type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
@@ -68,6 +78,8 @@ interface FamilyPreset {
   family: string;
   models: ModelOption[];
 }
+
+const START_LONG_PRESS_DELAY_MS = 600;
 
 function buildFamilyPresets(
   models: ModelOption[],
@@ -1431,7 +1443,17 @@ export function PlaygroundClient({
   const [settings, setSettings] = React.useState<PlaygroundSettings>(DEFAULT_SETTINGS);
   const [responses, setResponses] = React.useState<Record<string, ResponseData>>({});
   const [isAnyLoading, setIsAnyLoading] = React.useState(false);
+  const [loopDialogOpen, setLoopDialogOpen] = React.useState(false);
+  const [loopCount, setLoopCount] = React.useState(2);
+  const [loopCountInput, setLoopCountInput] = React.useState("2");
+  const [activeLoopProgress, setActiveLoopProgress] = React.useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const controllersRef = React.useRef(new Map<string, AbortController>());
+  const startLongPressTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startLongPressTriggeredRef = React.useRef(false);
+  const stopRequestedRef = React.useRef(false);
   const maxPanels = Math.max(filteredModels.length, 1);
 
   const providerAccountsById = React.useMemo(
@@ -1558,8 +1580,23 @@ export function PlaygroundClient({
 
   const canAddPanel = panels.length < maxPanels;
   const hasSelectedModel = panels.some((panel) => panel.modelId);
+  const parsedLoopCount = Number(loopCountInput);
+  const isLoopCountValid = Number.isInteger(parsedLoopCount) && parsedLoopCount >= 1;
+  const activeLoopBadgeLabel =
+    activeLoopProgress && activeLoopProgress.total > 1
+      ? `${activeLoopProgress.current}/${activeLoopProgress.total}`
+      : null;
 
   const [activeFamilyPreset, setActiveFamilyPreset] = React.useState<string | null>(null);
+
+  const clearStartLongPressTimeout = React.useCallback(() => {
+    if (startLongPressTimeoutRef.current !== null) {
+      clearTimeout(startLongPressTimeoutRef.current);
+      startLongPressTimeoutRef.current = null;
+    }
+  }, []);
+
+  React.useEffect(() => clearStartLongPressTimeout, [clearStartLongPressTimeout]);
 
   // Reset panel model selections that are no longer available when API key changes
   React.useEffect(() => {
@@ -1610,8 +1647,8 @@ export function PlaygroundClient({
     }
   };
 
-  const runSelectedScenario = async () => {
-    if (!selectedScenario) {
+  const runSelectedScenario = async (requestedLoopCount = 1) => {
+    if (!selectedScenario || isAnyLoading) {
       return;
     }
 
@@ -1626,36 +1663,56 @@ export function PlaygroundClient({
       return;
     }
 
+    const totalLoops = Math.max(1, Math.floor(requestedLoopCount));
+    stopRequestedRef.current = false;
+    setActiveLoopProgress(totalLoops > 1 ? { current: 1, total: totalLoops } : null);
     setIsAnyLoading(true);
 
-    const clearedResponses: Record<string, ResponseData> = {};
-    panelsWithModels.forEach((panel) => {
-      clearedResponses[panel.id] = {
-        content: "",
-        reasoning: "",
-        isLoading: true,
-        metrics: buildResponseMetrics(null, null, null),
-      };
-    });
-    setResponses(clearedResponses);
+    try {
+      for (let iteration = 0; iteration < totalLoops; iteration += 1) {
+        if (stopRequestedRef.current) {
+          break;
+        }
 
-    const promises = panelsWithModels.map((panel) =>
-      fetchFromModel(
-        panel.id,
-        panel.modelId!,
-        selectedScenario,
-        currentSettings,
-        getValidAccountIdForPanel(panel)
-      )
-    );
+        if (totalLoops > 1) {
+          setActiveLoopProgress({ current: iteration + 1, total: totalLoops });
+        }
 
-    await Promise.all(promises);
-    setIsAnyLoading(false);
+        const clearedResponses: Record<string, ResponseData> = {};
+        panelsWithModels.forEach((panel) => {
+          clearedResponses[panel.id] = {
+            content: "",
+            reasoning: "",
+            isLoading: true,
+            metrics: buildResponseMetrics(null, null, null),
+          };
+        });
+        setResponses(clearedResponses);
+
+        const promises = panelsWithModels.map((panel) =>
+          fetchFromModel(
+            panel.id,
+            panel.modelId!,
+            selectedScenario,
+            currentSettings,
+            getValidAccountIdForPanel(panel)
+          )
+        );
+
+        await Promise.all(promises);
+      }
+    } finally {
+      stopRequestedRef.current = false;
+      setActiveLoopProgress(null);
+      setIsAnyLoading(false);
+    }
   };
 
   const stopAllRequests = React.useCallback(() => {
+    stopRequestedRef.current = true;
     controllersRef.current.forEach((controller) => controller.abort());
     controllersRef.current.clear();
+    setActiveLoopProgress(null);
     setIsAnyLoading(false);
 
     setResponses((prev) => {
@@ -1668,6 +1725,269 @@ export function PlaygroundClient({
       return next;
     });
   }, []);
+
+  const handleStartPointerDown = React.useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+
+      clearStartLongPressTimeout();
+      startLongPressTriggeredRef.current = false;
+      startLongPressTimeoutRef.current = setTimeout(() => {
+        startLongPressTriggeredRef.current = true;
+        setLoopCountInput(String(loopCount));
+        setLoopDialogOpen(true);
+      }, START_LONG_PRESS_DELAY_MS);
+    },
+    [clearStartLongPressTimeout, loopCount]
+  );
+
+  const handleStartPointerEnd = React.useCallback(() => {
+    clearStartLongPressTimeout();
+
+    if (startLongPressTriggeredRef.current) {
+      setTimeout(() => {
+        startLongPressTriggeredRef.current = false;
+      }, 0);
+    }
+  }, [clearStartLongPressTimeout]);
+
+  const handleStartClick = () => {
+    if (startLongPressTriggeredRef.current) {
+      startLongPressTriggeredRef.current = false;
+      return;
+    }
+
+    void runSelectedScenario();
+  };
+
+  const handleLoopDialogChange = React.useCallback(
+    (open: boolean) => {
+      setLoopDialogOpen(open);
+
+      if (open) {
+        setLoopCountInput(String(loopCount));
+      }
+    },
+    [loopCount]
+  );
+
+  const handleLoopRun = () => {
+    if (!isLoopCountValid) {
+      return;
+    }
+
+    setLoopCount(parsedLoopCount);
+    setLoopDialogOpen(false);
+    void runSelectedScenario(parsedLoopCount);
+  };
+
+  const fetchFromModel = React.useCallback(
+    async (
+      panelId: string,
+      modelId: string,
+      scenario: Scenario,
+      currentSettings: PlaygroundSettings = settings,
+      accountId: string | null = null
+    ) => {
+      setResponses((prev) => ({
+        ...prev,
+        [panelId]: {
+          content: "",
+          reasoning: "",
+          isLoading: true,
+          metrics: buildResponseMetrics(null, null, null),
+        },
+      }));
+
+      const requestStartedAt = Date.now();
+      let waitMs: number | null = null;
+      let usedAccountId: string | null = null;
+
+      try {
+        const scenarioMessages = getScenarioMessages(scenario);
+        const endpoint = currentSettings.endpoint;
+
+        const requestBody =
+          endpoint === "messages"
+            ? buildMessagesRequestBody(modelId, scenarioMessages, currentSettings, accountId)
+            : endpoint === "responses"
+              ? buildResponsesRequestBody(modelId, scenarioMessages, currentSettings, accountId)
+              : buildChatCompletionsRequestBody(
+                modelId,
+                scenarioMessages,
+                currentSettings,
+                accountId
+              );
+
+        const endpointOverrides = adaptRequestOverridesForEndpoint(
+          scenario.requestOverrides,
+          endpoint
+        );
+        if (endpointOverrides) {
+          Object.assign(requestBody, endpointOverrides);
+        }
+
+        const streamValue = requestBody.stream;
+        const shouldStream = typeof streamValue === "boolean" ? streamValue : true;
+
+        const controller = new AbortController();
+        controllersRef.current.set(panelId, controller);
+
+        const response = await fetch(getEndpointPath(endpoint, proxyBaseUrl), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(proxyBaseUrl && apiKeyRef.current
+              ? { Authorization: `Bearer ${apiKeyRef.current}` }
+              : {}),
+          },
+          signal: controller.signal,
+          body: JSON.stringify(requestBody),
+        });
+
+        waitMs = Date.now() - requestStartedAt;
+        usedAccountId = response.headers.get("x-provider-account-id") || null;
+
+        if (!response.ok) {
+          const clonedResponse = response.clone();
+          let errorMessage = "Request failed";
+
+          try {
+            const errorData = await response.json();
+            const apiError = extractErrorMessage(errorData);
+            if (apiError) {
+              errorMessage = apiError;
+            }
+          } catch {
+            const errorText = await clonedResponse.text();
+            if (errorText.trim()) {
+              errorMessage = errorText;
+            }
+          }
+
+          throw new Error(errorMessage);
+        }
+
+        const contentType = response.headers.get("content-type") || "";
+        const isStreamingResponse =
+          shouldStream && contentType.includes("text/event-stream");
+
+        if (isStreamingResponse) {
+          let streamedContent = "";
+          let streamedReasoning = "";
+          let streamedToolCalls: ToolCallData[] = [];
+          let firstResponseMs: number | null = null;
+          let usage: ParsedUsageData | null = null;
+
+          const handleStreamChunk = (chunk: ParsedCompletionData) => {
+            if (firstResponseMs === null) {
+              firstResponseMs = Date.now() - requestStartedAt;
+            }
+
+            streamedContent += chunk.content;
+            streamedReasoning += chunk.reasoning;
+            if (chunk.toolCalls.length > 0) {
+              streamedToolCalls = [...streamedToolCalls, ...chunk.toolCalls];
+            }
+            usage = mergeUsageData(usage, chunk.usage);
+
+            setResponses((prev) => ({
+              ...prev,
+              [panelId]: {
+                content: streamedContent,
+                reasoning: streamedReasoning,
+                toolCalls: streamedToolCalls,
+                isLoading: true,
+                metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
+                usedAccountId,
+              },
+            }));
+          };
+
+          if (endpoint === "messages") {
+            await consumeAnthropicMessageStream(response, handleStreamChunk);
+          } else if (endpoint === "responses") {
+            await consumeResponsesStream(response, handleStreamChunk);
+          } else {
+            await consumeChatCompletionStream(response, handleStreamChunk);
+          }
+
+          setResponses((prev) => ({
+            ...prev,
+            [panelId]: {
+              content: streamedContent,
+              reasoning: streamedReasoning,
+              toolCalls: streamedToolCalls,
+              isLoading: false,
+              metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
+              usedAccountId,
+            },
+          }));
+
+          return;
+        }
+
+        const data = await response.json();
+        const parsedData =
+          endpoint === "messages"
+            ? extractAnthropicCompletionData(data)
+            : endpoint === "responses"
+              ? extractResponsesCompletionData(data)
+              : extractChatCompletionData(data);
+        const firstResponseMs = Date.now() - requestStartedAt;
+
+        setResponses((prev) => ({
+          ...prev,
+          [panelId]: {
+            content: parsedData.content,
+            reasoning: parsedData.reasoning,
+            toolCalls: parsedData.toolCalls,
+            isLoading: false,
+            metrics: buildResponseMetrics(waitMs, firstResponseMs, parsedData.usage),
+            usedAccountId,
+          },
+        }));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          setResponses((prev) => {
+            const existing = prev[panelId];
+            if (!existing) {
+              return prev;
+            }
+
+            return {
+              ...prev,
+              [panelId]: {
+                ...existing,
+                isLoading: false,
+                error: undefined,
+              },
+            };
+          });
+          return;
+        }
+
+        setResponses((prev) => ({
+          ...prev,
+          [panelId]: {
+            content: "",
+            reasoning: "",
+            isLoading: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+            metrics: buildResponseMetrics(waitMs, null, null),
+            usedAccountId,
+          },
+        }));
+
+        router.refresh();
+      } finally {
+        controllersRef.current.delete(panelId);
+      }
+    },
+    [proxyBaseUrl, router, settings]
+  );
 
   const retryPanel = React.useCallback(
     async (panelId: string) => {
@@ -1688,219 +2008,52 @@ export function PlaygroundClient({
 
       setIsAnyLoading(false);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panels, selectedScenario, settings, getValidAccountIdForPanel]
+    [fetchFromModel, getValidAccountIdForPanel, panels, selectedScenario, settings]
   );
 
-  const fetchFromModel = async (
-    panelId: string,
-    modelId: string,
-    scenario: Scenario,
-    currentSettings: PlaygroundSettings = settings,
-    accountId: string | null = null
-  ) => {
-    setResponses((prev) => ({
-      ...prev,
-      [panelId]: {
-        content: "",
-        reasoning: "",
-        isLoading: true,
-        metrics: buildResponseMetrics(null, null, null),
-      },
-    }));
-
-    const requestStartedAt = Date.now();
-    let waitMs: number | null = null;
-    let usedAccountId: string | null = null;
-
-    try {
-      const scenarioMessages = getScenarioMessages(scenario);
-      const endpoint = currentSettings.endpoint;
-
-      const requestBody =
-        endpoint === "messages"
-          ? buildMessagesRequestBody(modelId, scenarioMessages, currentSettings, accountId)
-          : endpoint === "responses"
-            ? buildResponsesRequestBody(modelId, scenarioMessages, currentSettings, accountId)
-            : buildChatCompletionsRequestBody(
-              modelId,
-              scenarioMessages,
-              currentSettings,
-              accountId
-            );
-
-      const endpointOverrides = adaptRequestOverridesForEndpoint(
-        scenario.requestOverrides,
-        endpoint
-      );
-      if (endpointOverrides) {
-        Object.assign(requestBody, endpointOverrides);
-      }
-
-      const streamValue = requestBody.stream;
-      const shouldStream = typeof streamValue === "boolean" ? streamValue : true;
-
-      const controller = new AbortController();
-      controllersRef.current.set(panelId, controller);
-
-      const response = await fetch(getEndpointPath(endpoint, proxyBaseUrl), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(proxyBaseUrl && apiKeyRef.current
-            ? { Authorization: `Bearer ${apiKeyRef.current}` }
-            : {}),
-        },
-        signal: controller.signal,
-        body: JSON.stringify(requestBody),
-      });
-
-      waitMs = Date.now() - requestStartedAt;
-      usedAccountId = response.headers.get("x-provider-account-id") || null;
-
-      if (!response.ok) {
-        const clonedResponse = response.clone();
-        let errorMessage = "Request failed";
-
-        try {
-          const errorData = await response.json();
-          const apiError = extractErrorMessage(errorData);
-          if (apiError) {
-            errorMessage = apiError;
-          }
-        } catch {
-          const errorText = await clonedResponse.text();
-          if (errorText.trim()) {
-            errorMessage = errorText;
-          }
-        }
-
-        throw new Error(errorMessage);
-      }
-
-      const contentType = response.headers.get("content-type") || "";
-      const isStreamingResponse =
-        shouldStream && contentType.includes("text/event-stream");
-
-      if (isStreamingResponse) {
-        let streamedContent = "";
-        let streamedReasoning = "";
-        let streamedToolCalls: ToolCallData[] = [];
-        let firstResponseMs: number | null = null;
-        let usage: ParsedUsageData | null = null;
-
-        const handleStreamChunk = (chunk: ParsedCompletionData) => {
-          if (firstResponseMs === null) {
-            firstResponseMs = Date.now() - requestStartedAt;
-          }
-
-          streamedContent += chunk.content;
-          streamedReasoning += chunk.reasoning;
-          if (chunk.toolCalls.length > 0) {
-            streamedToolCalls = [...streamedToolCalls, ...chunk.toolCalls];
-          }
-          usage = mergeUsageData(usage, chunk.usage);
-
-          setResponses((prev) => ({
-            ...prev,
-            [panelId]: {
-              content: streamedContent,
-              reasoning: streamedReasoning,
-              toolCalls: streamedToolCalls,
-              isLoading: true,
-              metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
-              usedAccountId,
-            },
-          }));
-        };
-
-        if (endpoint === "messages") {
-          await consumeAnthropicMessageStream(response, handleStreamChunk);
-        } else if (endpoint === "responses") {
-          await consumeResponsesStream(response, handleStreamChunk);
-        } else {
-          await consumeChatCompletionStream(response, handleStreamChunk);
-        }
-
-        setResponses((prev) => ({
-          ...prev,
-          [panelId]: {
-            content: streamedContent,
-            reasoning: streamedReasoning,
-            toolCalls: streamedToolCalls,
-            isLoading: false,
-            metrics: buildResponseMetrics(waitMs, firstResponseMs, usage),
-            usedAccountId,
-          },
-        }));
-
-        return;
-      }
-
-      const data = await response.json();
-      const parsedData =
-        endpoint === "messages"
-          ? extractAnthropicCompletionData(data)
-          : endpoint === "responses"
-            ? extractResponsesCompletionData(data)
-            : extractChatCompletionData(data);
-      const firstResponseMs = Date.now() - requestStartedAt;
-
-      setResponses((prev) => ({
-        ...prev,
-        [panelId]: {
-          content: parsedData.content,
-          reasoning: parsedData.reasoning,
-          toolCalls: parsedData.toolCalls,
-          isLoading: false,
-          metrics: buildResponseMetrics(waitMs, firstResponseMs, parsedData.usage),
-          usedAccountId,
-        },
-      }));
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        setResponses((prev) => {
-          const existing = prev[panelId];
-          if (!existing) {
-            return prev;
-          }
-
-          return {
-            ...prev,
-            [panelId]: {
-              ...existing,
-              isLoading: false,
-              error: undefined,
-            },
-          };
-        });
-        return;
-      }
-
-      setResponses((prev) => ({
-        ...prev,
-        [panelId]: {
-          content: "",
-          reasoning: "",
-          isLoading: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-          metrics: buildResponseMetrics(waitMs, null, null),
-          usedAccountId,
-        },
-      }));
-
-      // Refresh server data so sidebar provider indicators reflect the new error state
-      router.refresh();
-    } finally {
-      controllersRef.current.delete(panelId);
-    }
-  };
-
   return (
-    <div className="space-y-6">
-      <div className="pb-4 border-b border-border">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold">Playground</h1>
+      <>
+      <Dialog open={loopDialogOpen} onOpenChange={handleLoopDialogChange}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Run Loop</DialogTitle>
+            <DialogDescription>
+              Choose how many times to run the selected playground scenario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="playground-loop-count">Loop count</Label>
+            <Input
+              id="playground-loop-count"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={loopCountInput}
+              onChange={(event) => setLoopCountInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleLoopRun();
+                }
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setLoopDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleLoopRun} disabled={!isLoopCountValid}>
+              Run loop
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="space-y-6">
+        <div className="pb-4 border-b border-border">
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-xl font-semibold">Playground</h1>
           <div className="flex items-center gap-2">
             {apiKeyOptions.length > 1 && (
               <Popover open={apiKeyPickerOpen} onOpenChange={setApiKeyPickerOpen}>
@@ -1957,7 +2110,14 @@ export function PlaygroundClient({
                 size="sm"
                 onClick={stopAllRequests}
               >
-                <Square className="h-3.5 w-3.5" />
+                <span className="relative inline-flex">
+                  <Square className="h-3.5 w-3.5" />
+                  {activeLoopBadgeLabel ? (
+                    <span className="absolute -top-2 -right-3 rounded-full bg-primary px-1 py-0.5 text-[9px] font-semibold leading-none text-primary-foreground">
+                      {activeLoopBadgeLabel}
+                    </span>
+                  ) : null}
+                </span>
                 Stop
               </Button>
             ) : (
@@ -1965,7 +2125,11 @@ export function PlaygroundClient({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={runSelectedScenario}
+                onClick={handleStartClick}
+                onPointerDown={handleStartPointerDown}
+                onPointerUp={handleStartPointerEnd}
+                onPointerLeave={handleStartPointerEnd}
+                onPointerCancel={handleStartPointerEnd}
                 disabled={!selectedScenario || !hasSelectedModel}
               >
                 <Play className="h-4 w-4" />
@@ -2077,6 +2241,7 @@ export function PlaygroundClient({
           </Card>
         )}
       </div>
-    </div>
+      </div>
+      </>
   );
 }
