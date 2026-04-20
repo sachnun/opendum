@@ -2010,14 +2010,16 @@ export function PlaygroundClient({
                   }
                 }}
                 disabled={isAnyLoading}
-                className="h-auto w-full min-w-0 flex-col items-center gap-1 px-3 py-2 sm:min-w-[92px] sm:w-auto"
+                className="h-auto min-h-[68px] w-full min-w-0 flex-col items-center justify-between gap-1 px-3 py-2 text-center sm:min-w-[92px] sm:w-auto"
               >
-                <span className="text-xs">{preset.family}</span>
+                <span className="whitespace-normal break-words text-xs leading-tight">
+                  {preset.family}
+                </span>
                 <span
                   className={
                     activeFamilyPreset === preset.family
-                      ? "text-[10px] text-primary-foreground/85"
-                      : "text-[10px] text-muted-foreground"
+                      ? "text-[10px] leading-none text-primary-foreground/85"
+                      : "text-[10px] leading-none text-muted-foreground"
                   }
                 >
                   {preset.models.length} models
