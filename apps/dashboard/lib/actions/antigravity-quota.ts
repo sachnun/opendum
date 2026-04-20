@@ -31,6 +31,7 @@ export interface QuotaGroupDisplay {
   displayName: string;
   models: string[];
   remainingFraction: number;
+  remainingLabel?: string;
   remainingRequests: number;
   maxRequests: number;
   usedRequests: number;
@@ -95,6 +96,7 @@ function formatTimeUntilReset(resetTimestamp: number | null): string | null {
  */
 function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
   const usedRequests = group.maxRequests - group.remainingRequests;
+  const percentRemaining = Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
   const percentUsed = group.maxRequests > 0 
     ? Math.round((usedRequests / group.maxRequests) * 100) 
     : 0;
@@ -104,13 +106,14 @@ function toQuotaGroupDisplay(group: QuotaGroupInfo): QuotaGroupDisplay {
     displayName: group.displayName,
     models: group.models,
     remainingFraction: group.remainingFraction,
+    remainingLabel: `${percentRemaining}%`,
     remainingRequests: group.remainingRequests,
     maxRequests: group.maxRequests,
     usedRequests,
     percentUsed,
     isExhausted: group.remainingFraction <= 0,
-    isEstimated: false,
-    confidence: "high",
+    isEstimated: true,
+    confidence: "medium",
     resetTimeIso: group.resetTimeIso,
     resetInHuman: formatTimeUntilReset(group.resetTimestamp),
   };
