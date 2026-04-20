@@ -5,23 +5,24 @@ const MODEL_CARDS = Array.from({ length: 6 });
 
 function ModelCardSkeleton() {
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-card py-4">
+    <div className="flex flex-col gap-6 rounded-xl border border-border bg-card py-4">
       {/* CardHeader */}
       <div className="px-4 pb-2 sm:px-5">
-        {/* Row 1: Model ID + Switch */}
+        {/* Row 1: Copy button + Model ID + Switch */}
         <div className="flex items-start justify-between gap-2">
-          <Skeleton className="h-5 w-36" />
+          <div className="flex flex-1 items-start gap-1.5">
+            <Skeleton className="mt-0.5 h-6 w-6 rounded-md" />
+            <Skeleton className="h-5 w-36" />
+          </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <Skeleton className="h-3 w-5" />
             <Skeleton className="h-5 w-9 rounded-full" />
           </div>
         </div>
-        {/* Row 2: Provider badges + Copy + Play */}
+        {/* Row 2: Provider badges + Play */}
         <div className="mt-1.5 flex flex-wrap items-center gap-1">
           <Skeleton className="h-5 w-16 rounded-full" />
           <Skeleton className="h-5 w-14 rounded-full" />
-          <span className="mx-0.5" />
-          <Skeleton className="h-5 w-12 rounded-sm" />
           <Skeleton className="h-5 w-10 rounded-sm" />
         </div>
       </div>

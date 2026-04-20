@@ -132,12 +132,21 @@ function ModelDetailContent({
   return (
     <div className={`space-y-3 ${!isEnabled ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-2">
-        <p
-          className="flex-1 min-w-0 overflow-hidden text-sm font-mono font-semibold leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
-          title={model.id}
+        <button
+          type="button"
+          onClick={handleCopy}
+          title="Copy model ID"
+          aria-label={copied ? "Copied" : `Copy model ID ${model.id}`}
+          className={`flex min-w-0 flex-1 items-start gap-1.5 rounded-md p-1 -m-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${copied ? "bg-secondary text-secondary-foreground" : "hover:bg-accent/50"}`}
         >
-          {model.id}
-        </p>
+          {copied ? <Check className="mt-0.5 h-3 w-3 shrink-0" /> : <Copy className="mt-0.5 h-3 w-3 shrink-0" />}
+          <span
+            className="min-w-0 flex-1 overflow-hidden text-sm font-mono font-semibold leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+            title={model.id}
+          >
+            {model.id}
+          </span>
+        </button>
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[11px] text-muted-foreground">
             {isEnabled ? "On" : "Off"}
@@ -151,24 +160,13 @@ function ModelDetailContent({
         </div>
       </div>
 
-      {/* Row 2: Provider badges + Copy/Play */}
+      {/* Row 2: Provider badges + Play */}
       <div className="flex flex-wrap items-center gap-1">
         {model.providers.map((provider) => (
           <Badge key={provider} variant="secondary" className="text-xs">
             {provider}
           </Badge>
         ))}
-        <span className="mx-0.5" />
-        <Button
-          variant={copied ? "secondary" : "ghost"}
-          size="xs"
-          className="h-5 px-1.5 text-[11px]"
-          onClick={handleCopy}
-          title="Copy model ID"
-        >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? "Copied" : "Copy"}
-        </Button>
         {isEnabled && (
           <Button
             variant="ghost"
