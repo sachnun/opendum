@@ -138,23 +138,18 @@ export function ApiKeyAccountAccess({
   };
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/20 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 text-sm font-semibold">
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-            <span>Account Access</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Restrict this key to specific provider accounts or block only the accounts you choose.
-          </p>
+    <section className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/20 p-4 lg:border lg:border-border/70 lg:bg-muted/20 max-lg:border-0 max-lg:bg-transparent max-lg:p-0">
+      <div className="hidden items-start justify-between gap-3 lg:flex">
+        <div className="inline-flex items-center gap-2 text-sm font-semibold">
+          <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+          <span>Account Access</span>
         </div>
         <Badge variant="outline" className="shrink-0">
           {getModeLabel(savedMode)}
         </Badge>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-xs lg:mt-4">
         <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
           <p className="text-[11px] text-muted-foreground">Mode</p>
           <p className="mt-1 font-medium">{getModeLabel(savedMode)}</p>
@@ -168,7 +163,7 @@ export function ApiKeyAccountAccess({
         </div>
       </div>
 
-      <div className="mt-4 space-y-3 flex-1">
+      <div className="space-y-3 flex-1 lg:mt-4">
         <div className="space-y-1.5">
           <p className="text-xs font-medium">Mode</p>
           <ToggleGroup
@@ -290,7 +285,7 @@ export function ApiKeyAccountAccess({
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+      <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
         <Button
           variant="outline"
           size="sm"

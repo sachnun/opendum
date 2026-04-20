@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { db } from "@opendum/shared/db";
@@ -5,7 +6,7 @@ import { proxyApiKey, proxyApiKeyRateLimit, providerAccount } from "@opendum/sha
 import { eq, desc, asc, inArray } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, Key } from "lucide-react";
+import { BarChart3, ChevronDown, Key } from "lucide-react";
 import { CreateApiKeyButton } from "@/components/dashboard/api-keys/create-api-key-button";
 import { ApiKeyActions } from "@/components/dashboard/api-keys/api-key-actions";
 import { EditableApiKeyName } from "@/components/dashboard/api-keys/editable-api-key-name";
@@ -16,6 +17,7 @@ import { ApiKeyRateLimit } from "@/components/dashboard/api-keys/api-key-rate-li
 import type { ApiKeyModelAccessMode, ApiKeyAccountAccessMode, RateLimitRuleInput } from "@/lib/actions/api-keys";
 import { getAllModels, getAllFamilies } from "@opendum/shared/proxy/models";
 import { formatRelativeTime } from "@/lib/date";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 function getApiKeyStatus(apiKey: { isActive: boolean; expiresAt: Date | null }) {
   const now = new Date();
@@ -40,6 +42,27 @@ function normalizeAccountAccessMode(mode: string): ApiKeyAccountAccessMode {
     return mode;
   }
   return "all";
+}
+
+function MobileApiKeySection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <div className="hidden lg:block h-full">{children}</div>
+      <Collapsible defaultOpen={false} className="rounded-xl border border-border/70 bg-muted/20 lg:hidden">
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold [&[data-state=open]>svg]:rotate-180">
+          <span>{title}</span>
+          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="px-4 pb-4">{children}</CollapsibleContent>
+      </Collapsible>
+    </>
+  );
 }
 
 export default async function ApiKeysPage() {
@@ -151,14 +174,11 @@ export default async function ApiKeysPage() {
                 <CardContent className="p-5 md:p-6">
                   <div className="space-y-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="min-w-0 space-y-3">
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <EditableApiKeyName id={apiKey.id} name={apiKey.name} />
-                          <Badge variant={status.variant}>{status.label}</Badge>
+                          {status.label !== "Active" && <Badge variant={status.variant}>{status.label}</Badge>}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Keep this key scoped to the right models, accounts, and usage limits.
-                        </p>
                       </div>
 
                       <div className="w-full xl:min-w-[420px] xl:max-w-[480px]">
@@ -205,26 +225,32 @@ export default async function ApiKeysPage() {
                     </div>
 
                     <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                      <ApiKeyModelAccess
-                        apiKeyId={apiKey.id}
-                        availableModels={availableModels}
-                        initialMode={modelAccessMode}
-                        initialModels={apiKey.modelAccessList}
-                      />
+                      <MobileApiKeySection title="Model Access">
+                        <ApiKeyModelAccess
+                          apiKeyId={apiKey.id}
+                          availableModels={availableModels}
+                          initialMode={modelAccessMode}
+                          initialModels={apiKey.modelAccessList}
+                        />
+                      </MobileApiKeySection>
 
-                      <ApiKeyAccountAccess
-                        apiKeyId={apiKey.id}
-                        availableAccounts={providerAccounts}
-                        initialMode={accountAccessMode}
-                        initialAccounts={apiKey.accountAccessList}
-                      />
+                      <MobileApiKeySection title="Account Access">
+                        <ApiKeyAccountAccess
+                          apiKeyId={apiKey.id}
+                          availableAccounts={providerAccounts}
+                          initialMode={accountAccessMode}
+                          initialAccounts={apiKey.accountAccessList}
+                        />
+                      </MobileApiKeySection>
 
-                      <ApiKeyRateLimit
-                        apiKeyId={apiKey.id}
-                        availableModels={availableModels}
-                        availableFamilies={availableFamilies}
-                        initialRules={keyRateLimits}
-                      />
+                      <MobileApiKeySection title="Rate Limits">
+                        <ApiKeyRateLimit
+                          apiKeyId={apiKey.id}
+                          availableModels={availableModels}
+                          availableFamilies={availableFamilies}
+                          initialRules={keyRateLimits}
+                        />
+                      </MobileApiKeySection>
                     </div>
                   </div>
                 </CardContent>

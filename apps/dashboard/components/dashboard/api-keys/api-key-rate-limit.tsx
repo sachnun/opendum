@@ -204,23 +204,18 @@ export function ApiKeyRateLimit({
       : availableFamilies.filter((family) => !usedTargets.has(`family:${family}`));
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/20 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 text-sm font-semibold">
-            <Gauge className="h-4 w-4 text-muted-foreground" />
-            <span>Rate Limits</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Set request limits per model or family to keep shared usage predictable.
-          </p>
+    <section className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/20 p-4 lg:border lg:border-border/70 lg:bg-muted/20 max-lg:border-0 max-lg:bg-transparent max-lg:p-0">
+      <div className="hidden items-start justify-between gap-3 lg:flex">
+        <div className="inline-flex items-center gap-2 text-sm font-semibold">
+          <Gauge className="h-4 w-4 text-muted-foreground" />
+          <span>Rate Limits</span>
         </div>
         <Badge variant="outline" className="shrink-0">
           {savedRules.length} rule{savedRules.length === 1 ? "" : "s"}
         </Badge>
       </div>
 
-      <div className="mt-4 rounded-lg border border-border/60 bg-background/80 p-3 text-xs">
+      <div className="rounded-lg border border-border/60 bg-background/80 p-3 text-xs lg:mt-4">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-muted-foreground">Current rules</p>
           <span className="font-medium">
@@ -250,7 +245,7 @@ export function ApiKeyRateLimit({
         </div>
       </div>
 
-      <div className="mt-4 space-y-3 flex-1">
+      <div className="space-y-3 flex-1 lg:mt-4">
         {draftRules.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 bg-background/60 px-3 py-6 text-center text-xs text-muted-foreground">
             No rate limits configured. Requests use the default unlimited behavior.
@@ -378,7 +373,7 @@ export function ApiKeyRateLimit({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+      <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
         <Button
           variant="outline"
           size="sm"
