@@ -84,24 +84,6 @@ function rulesEqual(
   return b.every((rule) => setA.has(serialize(rule)));
 }
 
-function formatRuleSummary(rule: RateLimitRuleInput): string {
-  const parts: string[] = [];
-
-  if (rule.perMinute != null) {
-    parts.push(`${rule.perMinute}/m`);
-  }
-
-  if (rule.perHour != null) {
-    parts.push(`${rule.perHour}/h`);
-  }
-
-  if (rule.perDay != null) {
-    parts.push(`${rule.perDay}/d`);
-  }
-
-  return parts.length > 0 ? parts.join(" | ") : "Unlimited";
-}
-
 export function ApiKeyRateLimit({
   apiKeyId,
   availableModels,
@@ -204,7 +186,7 @@ export function ApiKeyRateLimit({
       : availableFamilies.filter((family) => !usedTargets.has(`family:${family}`));
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/20 p-4 lg:border lg:border-border/70 lg:bg-muted/20 max-lg:border-0 max-lg:bg-transparent max-lg:p-0">
+    <section className="flex h-full flex-col p-4 max-lg:p-0">
       <div className="hidden items-start justify-between gap-3 lg:flex">
         <div className="inline-flex items-center gap-2 text-sm font-semibold">
           <Gauge className="h-4 w-4 text-muted-foreground" />
@@ -215,39 +197,9 @@ export function ApiKeyRateLimit({
         </Badge>
       </div>
 
-      <div className="rounded-lg border border-border/60 bg-background/80 p-3 text-xs lg:mt-4">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] text-muted-foreground">Current rules</p>
-          <span className="font-medium">
-            {savedRules.length === 0 ? "Unlimited" : `${savedRules.length} active`}
-          </span>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {savedRules.length === 0 ? (
-            <Badge variant="secondary" className="font-normal">
-              No custom limits
-            </Badge>
-          ) : (
-            savedRules.slice(0, 3).map((rule) => (
-              <Badge
-                key={`${rule.targetType}:${rule.target}`}
-                variant="secondary"
-                className="max-w-full gap-1 font-normal"
-              >
-                <span className="truncate font-mono text-[10px]">{rule.target}</span>
-                <span className="text-[10px] text-muted-foreground">{formatRuleSummary(rule)}</span>
-              </Badge>
-            ))
-          )}
-          {savedRules.length > 3 && (
-            <Badge variant="outline">+{savedRules.length - 3} more</Badge>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-3 flex-1 lg:mt-4">
+      <div className="flex-1 space-y-3 lg:mt-5">
         {draftRules.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/70 bg-background/60 px-3 py-6 text-center text-xs text-muted-foreground">
+          <div className="px-1 py-4 text-xs text-muted-foreground">
             No rate limits configured. Requests use the default unlimited behavior.
           </div>
         ) : (
@@ -255,7 +207,7 @@ export function ApiKeyRateLimit({
             {draftRules.map((rule, idx) => (
               <div
                 key={`${rule.targetType}:${rule.target}`}
-                className="rounded-lg border border-border/60 bg-background/80 p-3"
+                className="border-b border-border/60 pb-3"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -309,7 +261,7 @@ export function ApiKeyRateLimit({
           </div>
         )}
 
-        <div className="rounded-lg border border-border/60 bg-background/80 p-3 space-y-2">
+        <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium">Add rule</p>
             <ToggleGroup

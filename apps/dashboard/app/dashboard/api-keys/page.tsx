@@ -149,9 +149,6 @@ export default async function ApiKeysPage() {
               <Key className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-semibold">No API keys</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create a key to manage model access, account access, and rate limits in one place.
-            </p>
             <div className="mt-4">
               <CreateApiKeyButton />
             </div>
@@ -169,10 +166,10 @@ export default async function ApiKeysPage() {
             return (
               <Card
                 key={apiKey.id}
-                className={`bg-card ${isInactive ? "opacity-70" : ""}`}
+                className={`bg-card py-4 ${isInactive ? "opacity-70" : ""}`}
               >
-                <CardContent className="p-5 md:p-6">
-                  <div className="space-y-5">
+                <CardContent className="p-4 md:p-5">
+                  <div className="space-y-4">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -186,45 +183,51 @@ export default async function ApiKeysPage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                        <p className="text-[11px] text-muted-foreground">Created</p>
-                        <p className="mt-1 text-sm font-medium">
-                          {new Date(apiKey.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                        <p className="text-[11px] text-muted-foreground">Expiration</p>
-                        <div className="mt-1">
-                          <ApiKeyExpiration
-                            apiKeyId={apiKey.id}
-                            initialExpiresAt={apiKey.expiresAt}
-                          />
+                    <div className="space-y-2.5">
+                      <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-1">
+                        <div className="flex items-center justify-between gap-4 py-3 text-sm">
+                          <span className="text-muted-foreground">Created</span>
+                          <span className="font-medium text-right">
+                            {new Date(apiKey.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
-                      </div>
 
-                      <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                        <p className="text-[11px] text-muted-foreground">Last used</p>
-                        <p className="mt-1 text-sm font-medium">
-                          {apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : "Never used"}
-                        </p>
+                        <div className="border-t border-border/60" />
+
+                        <div className="flex items-center justify-between gap-4 py-3 text-sm">
+                          <span className="text-muted-foreground">Expiration</span>
+                          <div className="text-right">
+                            <ApiKeyExpiration
+                              apiKeyId={apiKey.id}
+                              initialExpiresAt={apiKey.expiresAt}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="border-t border-border/60" />
+
+                        <div className="flex items-center justify-between gap-4 py-3 text-sm">
+                          <span className="text-muted-foreground">Last used</span>
+                          <span className="font-medium text-right">
+                            {apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : "Never used"}
+                          </span>
+                        </div>
                       </div>
 
                       <Link
                         href={`/dashboard/analistik/${apiKey.id}`}
-                        className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 transition-colors hover:border-border hover:bg-muted/35"
+                        className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-sm transition-colors hover:border-border hover:bg-muted/35"
                         title="View analytics"
                       >
-                        <p className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                           <BarChart3 className="h-3.5 w-3.5" />
                           Analytics
-                        </p>
-                        <p className="mt-1 text-sm font-medium">Open usage details</p>
+                        </span>
+                        <span className="font-medium text-right">Open usage details</span>
                       </Link>
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                    <div className="grid gap-3.5 lg:grid-cols-2 2xl:grid-cols-3">
                       <MobileApiKeySection title="Model Access">
                         <ApiKeyModelAccess
                           apiKeyId={apiKey.id}

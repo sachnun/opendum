@@ -116,7 +116,7 @@ export function ApiKeyModelAccess({
   };
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border/70 bg-muted/20 p-4 lg:border lg:border-border/70 lg:bg-muted/20 max-lg:border-0 max-lg:bg-transparent max-lg:p-0">
+    <section className="flex h-full flex-col p-4 max-lg:p-0">
       <div className="hidden items-start justify-between gap-3 lg:flex">
         <div className="inline-flex items-center gap-2 text-sm font-semibold">
           <ListFilter className="h-4 w-4 text-muted-foreground" />
@@ -127,23 +127,8 @@ export function ApiKeyModelAccess({
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs lg:mt-4">
-        <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">Mode</p>
-          <p className="mt-1 font-medium">{getModeLabel(savedMode)}</p>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">Selected</p>
-          <p className="mt-1 font-medium">
-            {savedMode === "all" ? "All models" : `${normalizedSavedModels.length} model`}
-            {savedMode !== "all" && normalizedSavedModels.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-3 flex-1 lg:mt-4">
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium">Mode</p>
+      <div className="flex-1 space-y-3 lg:mt-5">
+        <div>
           <ToggleGroup
             type="single"
             variant="outline"
@@ -224,7 +209,7 @@ export function ApiKeyModelAccess({
               </PopoverContent>
             </Popover>
 
-            <div className="max-h-40 overflow-y-auto rounded-lg border border-border/60 bg-background/80 p-2">
+            <div className="max-h-40 overflow-y-auto py-1">
               {normalizedDraftModels.length === 0 ? (
                 <p className="px-1 text-[11px] text-muted-foreground">No models selected</p>
               ) : (

@@ -110,9 +110,6 @@ export function CreateApiKeyButton() {
                   )}
                 </Button>
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                You can reveal and copy this key anytime from the list.
-              </p>
             </div>
             <DialogFooter>
               <Button size="sm" onClick={handleClose}>Done</Button>
