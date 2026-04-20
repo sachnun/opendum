@@ -6,6 +6,17 @@ import {
   type RateLimitRule,
 } from "@opendum/shared";
 
+function formatAuthenticationError(message: string) {
+  return {
+    error: {
+      message,
+      type: "authentication_error",
+      param: null,
+      code: null,
+    },
+  };
+}
+
 export interface AuthenticatedUser {
   userId: string;
   apiKeyId?: string;
@@ -30,24 +41,20 @@ export async function authenticateRequest(
     null;
 
   if (!authHeader) {
-    reply.code(401).send({
-      error: {
-        message: "Missing Authorization header. Use Bearer <api-key> or X-Api-Key header.",
-        type: "authentication_error",
-      },
-    });
+    reply.code(401).send(
+      formatAuthenticationError(
+        "Missing Authorization header. Use Bearer <api-key> or X-Api-Key header."
+      )
+    );
     return null;
   }
 
   const authResult = await validateApiKey(authHeader);
 
   if (!authResult.valid) {
-    reply.code(401).send({
-      error: {
-        message: authResult.error,
-        type: "authentication_error",
-      },
-    });
+    reply.code(401).send(
+      formatAuthenticationError(authResult.error ?? "Invalid API key.")
+    );
     return null;
   }
 

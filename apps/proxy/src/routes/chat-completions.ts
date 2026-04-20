@@ -17,8 +17,8 @@ function formatOpenAIError(info: ErrorInfo): unknown {
     error: {
       message: info.message,
       type: info.type,
-      ...(info.param !== undefined ? { param: info.param } : {}),
-      ...(info.code !== undefined ? { code: info.code } : {}),
+      param: info.param ?? null,
+      code: info.code ?? null,
       ...(info.retry_after !== undefined
         ? { retry_after: info.retry_after }
         : {}),

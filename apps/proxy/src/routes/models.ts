@@ -8,6 +8,17 @@ import {
   resolveModelAlias,
 } from "@opendum/shared";
 
+function formatAuthenticationError(message: string) {
+  return {
+    error: {
+      message,
+      type: "authentication_error",
+      param: null,
+      code: null,
+    },
+  };
+}
+
 export const modelsRoute: RouteHandlerMethod = async (
   request: FastifyRequest,
   reply: FastifyReply
@@ -25,9 +36,9 @@ export const modelsRoute: RouteHandlerMethod = async (
     const authResult = await validateApiKey(authHeader);
 
     if (!authResult.valid) {
-      return reply.code(401).send({
-        error: { message: authResult.error, type: "authentication_error" },
-      });
+      return reply
+        .code(401)
+        .send(formatAuthenticationError(authResult.error ?? "Invalid API key."));
     }
 
     userId = authResult.userId ?? null;

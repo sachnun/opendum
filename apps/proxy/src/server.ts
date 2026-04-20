@@ -16,6 +16,32 @@ const app = Fastify({
   bodyLimit: 10 * 1024 * 1024, // 10 MB
 });
 
+function formatOpenAIStyleError(message: string) {
+  return {
+    error: {
+      message,
+      type: "invalid_request_error",
+      param: null,
+      code: null,
+    },
+  };
+}
+
+function formatGlobalError(
+  message: string,
+  type: "invalid_request_error" | "api_error",
+  code: string | null = null
+) {
+  return {
+    error: {
+      message,
+      type,
+      param: null,
+      code,
+    },
+  };
+}
+
 // CORS — allow all
 await app.register(cors, {
   origin: true,
@@ -26,30 +52,13 @@ await app.register(cors, {
 });
 
 // Root
-app.get("/", async () => {
-  return {
-    name: "Opendum Proxy",
-    version: "1.0.0",
-    status: "operational",
-    endpoints: {
-      chat_completions: "/v1/chat/completions",
-      messages: "/v1/messages",
-      responses: "/v1/responses",
-      models: "/v1/models",
-    },
-  };
+app.get("/", async (_request, reply) => {
+  return reply.redirect("/v1", 308);
 });
 
 // V1 root
-app.get("/v1", async () => {
-  return {
-    endpoints: {
-      chat_completions: "/v1/chat/completions",
-      messages: "/v1/messages",
-      responses: "/v1/responses",
-      models: "/v1/models",
-    },
-  };
+app.get("/v1", async (_request, reply) => {
+  return reply.code(404).send(formatOpenAIStyleError("Unknown API endpoint."));
 });
 
 // Proxy routes
@@ -60,37 +69,25 @@ app.get("/v1/models", modelsRoute);
 
 // 404 for unknown v1 paths
 app.all("/v1/*", async (_request, reply) => {
-  return reply.code(404).send({
-    error: {
-      message: "Unknown API endpoint.",
-      type: "invalid_request_error",
-      code: "unknown_endpoint",
-    },
-  });
+  return reply.code(404).send(formatOpenAIStyleError("Unknown API endpoint."));
 });
 
 // Global 404
 app.setNotFoundHandler(async (_request, reply) => {
-  return reply.code(404).send({
-    error: {
-      message: "Not found.",
-      type: "invalid_request_error",
-      code: "not_found",
-    },
-  });
+  return reply.code(404).send(formatOpenAIStyleError("Not Found"));
 });
 
 // Global error handler
 app.setErrorHandler(async (error, _request, reply) => {
   const err = error as { statusCode?: number; message?: string; code?: string };
   const statusCode = err.statusCode ?? 500;
-  reply.code(statusCode).send({
-    error: {
-      message: statusCode >= 500 ? "Internal server error." : (err.message ?? "Unknown error."),
-      type: statusCode >= 500 ? "api_error" : "invalid_request_error",
-      code: err.code ?? "unknown_error",
-    },
-  });
+  reply.code(statusCode).send(
+    formatGlobalError(
+      statusCode >= 500 ? "Internal server error." : (err.message ?? "Unknown error."),
+      statusCode >= 500 ? "api_error" : "invalid_request_error",
+      err.code ?? null
+    )
+  );
 });
 
 // Graceful shutdown
