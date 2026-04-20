@@ -1993,7 +1993,7 @@ export function PlaygroundClient({
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">Family Preset</h2>
         {familyPresets.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
             {familyPresets.map((preset) => (
               <Button
                 key={preset.family}
@@ -2010,7 +2010,7 @@ export function PlaygroundClient({
                   }
                 }}
                 disabled={isAnyLoading}
-                className="h-auto w-full min-w-[92px] flex-col items-center gap-1 px-3 py-2 sm:w-auto"
+                className="h-auto w-full min-w-0 flex-col items-center gap-1 px-3 py-2 sm:min-w-[92px] sm:w-auto"
               >
                 <span className="text-xs">{preset.family}</span>
                 <span
