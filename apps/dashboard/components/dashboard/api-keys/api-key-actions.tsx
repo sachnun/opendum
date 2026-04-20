@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
@@ -125,45 +126,11 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
 
   return (
     <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2 lg:max-w-[260px]">
-          <p className="text-[11px] text-muted-foreground">Key preview</p>
-          <code
-            className={cn(
-              "block rounded-lg border border-border/60 bg-background px-3 py-2 font-mono text-xs text-muted-foreground",
-              isRevealed ? "break-all" : "truncate"
-            )}
-          >
-            {displayKey}
-          </code>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={handleReveal}
-            disabled={isLoading}
-            title={isRevealed ? "Hide key" : "Reveal key"}
-          >
-            {isRevealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={handleCopy}
-            disabled={isLoading}
-            title="Copy key"
-          >
-            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-          </Button>
-
-          <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1.5">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-[11px] text-muted-foreground">
-              {apiKey.isActive ? "Enabled" : "Disabled"}
+              {apiKey.isActive ? "On" : "Off"}
             </span>
             <Switch
               checked={apiKey.isActive}
@@ -206,6 +173,42 @@ export function ApiKeyActions({ apiKey }: { apiKey: ApiKey }) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        </div>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative lg:max-w-[320px] lg:flex-1">
+            <Input
+              value={displayKey}
+              readOnly
+              className={cn(
+                "pr-10 font-mono text-xs text-muted-foreground",
+                isRevealed ? "h-auto min-h-9 break-all whitespace-normal" : "truncate"
+              )}
+            />
+            <button
+              type="button"
+              onClick={handleReveal}
+              disabled={isLoading}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              aria-label={isRevealed ? "Hide API key" : "Show API key"}
+              title={isRevealed ? "Hide key" : "Reveal key"}
+            >
+              {isRevealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              onClick={handleCopy}
+              disabled={isLoading}
+              title="Copy key"
+            >
+              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
