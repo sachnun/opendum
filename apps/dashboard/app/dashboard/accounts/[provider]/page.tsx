@@ -19,6 +19,7 @@ import {
 import { getProviderModelSet } from "@opendum/shared/proxy/models";
 
 const ACCOUNT_STATS_DAYS = 30;
+const ACCOUNT_DURATION_LOOKBACK_HOURS = 24;
 
 function buildDayKeys(days: number): string[] {
   const now = new Date();
@@ -28,6 +29,19 @@ function buildDayKeys(days: number): string[] {
     const date = new Date(todayUtc);
     date.setUTCDate(todayUtc.getUTCDate() - (days - 1 - index));
     return date.toISOString().split("T")[0];
+  });
+}
+
+function buildHourKeys(hours: number): string[] {
+  const now = new Date();
+  const currentHourUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours())
+  );
+
+  return Array.from({ length: hours }, (_, index) => {
+    const date = new Date(currentHourUtc);
+    date.setUTCHours(currentHourUtc.getUTCHours() - (hours - 1 - index));
+    return date.toISOString();
   });
 }
 
@@ -105,28 +119,52 @@ export default async function ProviderAccountsPage({
 
   const dayKeys = buildDayKeys(ACCOUNT_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
+  const hourKeys = buildHourKeys(ACCOUNT_DURATION_LOOKBACK_HOURS);
+  const hourKeySet = new Set(hourKeys);
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
+  const durationStartDate = new Date(hourKeys[0]);
   const accountIds = accounts.map((account) => account.id);
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
+  const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
 
-  const dailyUsageRows = accountIds.length
-    ? await db
-        .select({
-          providerAccountId: usageLog.providerAccountId,
-          dayBucket: dayBucketExpression,
-          requestCount: sql<number>`count(*)`,
-          successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
-        })
-        .from(usageLog)
-        .where(
-          and(
-            eq(usageLog.userId, session.user.id),
-            inArray(usageLog.providerAccountId, accountIds),
-            gte(usageLog.createdAt, statsStartDate)
+  const [dailyUsageRows, durationRows] = await Promise.all([
+    accountIds.length
+      ? db
+          .select({
+            providerAccountId: usageLog.providerAccountId,
+            dayBucket: dayBucketExpression,
+            requestCount: sql<number>`count(*)`,
+            successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+          })
+          .from(usageLog)
+          .where(
+            and(
+              eq(usageLog.userId, session.user.id),
+              inArray(usageLog.providerAccountId, accountIds),
+              gte(usageLog.createdAt, statsStartDate)
+            )
           )
-        )
-        .groupBy(usageLog.providerAccountId, dayBucketExpression)
-    : [];
+          .groupBy(usageLog.providerAccountId, dayBucketExpression)
+      : Promise.resolve([]),
+    accountIds.length
+      ? db
+          .select({
+            providerAccountId: usageLog.providerAccountId,
+            hourBucket: hourBucketExpression,
+            durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`,
+            durationCount: sql<number>`count(${usageLog.duration})`,
+          })
+          .from(usageLog)
+          .where(
+            and(
+              eq(usageLog.userId, session.user.id),
+              inArray(usageLog.providerAccountId, accountIds),
+              gte(usageLog.createdAt, durationStartDate)
+            )
+          )
+          .groupBy(usageLog.providerAccountId, hourBucketExpression)
+      : Promise.resolve([]),
+  ]);
 
   const statsByAccountId = new Map<
     string,
@@ -134,6 +172,7 @@ export default async function ProviderAccountsPage({
       totalRequests: number;
       successfulRequests: number;
       dailyCounts: Map<string, number>;
+      durationByHour: Map<string, { total: number; count: number }>;
     }
   >();
 
@@ -158,6 +197,7 @@ export default async function ProviderAccountsPage({
         totalRequests: 0,
         successfulRequests: 0,
         dailyCounts: new Map<string, number>(),
+        durationByHour: new Map<string, { total: number; count: number }>(),
       };
 
     const requestCount = Number(row.requestCount) || 0;
@@ -169,10 +209,65 @@ export default async function ProviderAccountsPage({
     statsByAccountId.set(row.providerAccountId, current);
   }
 
+  for (const row of durationRows) {
+    if (!row.providerAccountId) {
+      continue;
+    }
+
+    const hourDate = row.hourBucket instanceof Date ? row.hourBucket : new Date(row.hourBucket);
+    if (Number.isNaN(hourDate.getTime())) {
+      continue;
+    }
+
+    const hourKey = hourDate.toISOString();
+    if (!hourKeySet.has(hourKey)) {
+      continue;
+    }
+
+    const durationCount = Number(row.durationCount) || 0;
+    const durationTotal = Number(row.durationTotal) || 0;
+    if (durationCount <= 0) {
+      continue;
+    }
+
+    const current =
+      statsByAccountId.get(row.providerAccountId) ??
+      {
+        totalRequests: 0,
+        successfulRequests: 0,
+        dailyCounts: new Map<string, number>(),
+        durationByHour: new Map<string, { total: number; count: number }>(),
+      };
+
+    const durationBucket = current.durationByHour.get(hourKey) ?? { total: 0, count: 0 };
+    durationBucket.total += durationTotal;
+    durationBucket.count += durationCount;
+    current.durationByHour.set(hourKey, durationBucket);
+    statsByAccountId.set(row.providerAccountId, current);
+  }
+
   const accountsWithStats = accounts.map((account) => {
     const accountStats = statsByAccountId.get(account.id);
     const totalRequests = accountStats?.totalRequests ?? 0;
     const successfulRequests = accountStats?.successfulRequests ?? 0;
+    const durationLast24Hours = hourKeys.map((time) => {
+      const durationBucket = accountStats?.durationByHour.get(time);
+      return {
+        time,
+        avgDuration:
+          durationBucket && durationBucket.count > 0
+            ? Math.round(durationBucket.total / durationBucket.count)
+            : null,
+      };
+    });
+    const durationTotalLastDay = Array.from(accountStats?.durationByHour.values() ?? []).reduce(
+      (sum, durationBucket) => sum + durationBucket.total,
+      0
+    );
+    const durationCountLastDay = Array.from(accountStats?.durationByHour.values() ?? []).reduce(
+      (sum, durationBucket) => sum + durationBucket.count,
+      0
+    );
 
     return {
       ...account,
@@ -184,6 +279,11 @@ export default async function ProviderAccountsPage({
           date: day,
           count: accountStats?.dailyCounts.get(day) ?? 0,
         })),
+        avgDurationLastDay:
+          durationCountLastDay > 0
+            ? Math.round(durationTotalLastDay / durationCountLastDay)
+            : null,
+        durationLast24Hours,
       },
     };
   });

@@ -143,6 +143,8 @@ interface Account {
     totalRequests: number;
     successRate: number | null;
     dailyRequests: Array<{ date: string; count: number }>;
+    avgDurationLastDay: number | null;
+    durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
   };
 }
 
@@ -251,6 +253,23 @@ function getAccountHeader(account: Account): { title: string; subtitle: string |
   }
 
   return { title, subtitle: rawEmail };
+}
+
+function formatDuration(duration: number | null): string {
+  if (duration === null) {
+    return "-";
+  }
+
+  if (duration >= 1000) {
+    return `${(duration / 1000).toFixed(2)}s`;
+  }
+
+  return `${duration}ms`;
+}
+
+function formatHourLabel(time: string): string {
+  const date = new Date(time);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function StatusBadge({ status, consecutiveErrors }: { status: string; consecutiveErrors: number }) {
@@ -922,8 +941,14 @@ function AccountCard({
     account.provider === "kiro" ||
     account.provider === "openrouter";
   const dailyValues = account.stats.dailyRequests.map((point) => point.count);
+  const durationValues = account.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0);
+  const durationLabelPoints = [
+    account.stats.durationLast24Hours[0],
+    account.stats.durationLast24Hours[Math.floor(account.stats.durationLast24Hours.length / 2)],
+    account.stats.durationLast24Hours[account.stats.durationLast24Hours.length - 1],
+  ].filter((point): point is { time: string; avgDuration: number | null } => Boolean(point));
   const peakRequests = Math.max(...dailyValues, 0);
-  const weeklySuccessRate = account.stats.successRate;
+  const successRate = account.stats.successRate;
   const { title, subtitle } = getAccountHeader(account);
   const effectiveTier =
     account.provider === "codex" ? (quotaInfo?.tier ?? account.tier) : account.tier;
@@ -1034,23 +1059,47 @@ function AccountCard({
             <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <BarChart3 className="h-3 w-3" />
-                Last 30 days
+                30d
               </span>
-              <span>{peakRequests.toLocaleString()} peak/day</span>
+              <span className="tabular-nums">{peakRequests.toLocaleString()} peak</span>
             </div>
 
-            <div className="mb-2 grid grid-cols-2 gap-2">
+            <div className="mb-2 grid grid-cols-3 gap-1.5">
               <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-                <p className="text-[10px] text-muted-foreground">Requests</p>
-                <p className="text-sm font-semibold text-foreground">
+                <p className="text-[10px] text-muted-foreground truncate">Requests</p>
+                <p className="text-sm font-semibold text-foreground tabular-nums truncate">
                   {account.stats.totalRequests.toLocaleString()}
                 </p>
               </div>
               <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-                <p className="text-[10px] text-muted-foreground">Success</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {weeklySuccessRate === null ? "-" : `${weeklySuccessRate}%`}
+                <p className="text-[10px] text-muted-foreground truncate">Success</p>
+                <p className="text-sm font-semibold text-foreground tabular-nums truncate">
+                  {successRate === null ? "-" : `${successRate}%`}
                 </p>
+              </div>
+              <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+                <p className="text-[10px] text-muted-foreground truncate">Latency</p>
+                <p className="text-sm font-semibold text-foreground tabular-nums truncate">
+                  {formatDuration(account.stats.avgDurationLastDay)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-2 rounded border border-border/60 bg-background/70 px-2 py-1.5">
+              <UsageSparkline
+                values={durationValues}
+                color="var(--chart-2)"
+                ariaLabel={`Average duration trend for ${title} over last 24 hours`}
+                emptyLabel="No duration data"
+                className="h-6"
+                height={24}
+              />
+              <div className="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
+                {durationLabelPoints.map((point) => (
+                  <span key={point.time} className="text-center truncate">
+                    {formatHourLabel(point.time)}
+                  </span>
+                ))}
               </div>
             </div>
 

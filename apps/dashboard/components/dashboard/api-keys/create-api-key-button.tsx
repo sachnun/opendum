@@ -128,7 +128,7 @@ export function CreateApiKeyButton() {
             </DialogHeader>
             <div className="space-y-3 py-3">
               <div>
-                <Label htmlFor="keyName">Name (optional)</Label>
+                <Label htmlFor="keyName">Name</Label>
                 <Input
                   id="keyName"
                   value={name}

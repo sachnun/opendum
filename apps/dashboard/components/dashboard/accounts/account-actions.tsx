@@ -86,7 +86,11 @@ export function AccountActions({ account }: { account: Account }) {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">
+              <span>
+                Name <span aria-hidden="true" className="text-destructive">*</span>
+              </span>
+            </Label>
             <Input
               id="name"
               value={editName}

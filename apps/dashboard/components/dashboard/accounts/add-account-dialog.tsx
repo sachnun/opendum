@@ -970,11 +970,16 @@ export function AddAccountDialog({
           {step === 3 && providerConfig && providerConfig.flowType === "oauth_redirect" && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Paste Callback URL</Label>
+                <Label htmlFor="callback-url" className="text-sm font-medium">
+                  <span>
+                    Paste Callback URL <span aria-hidden="true" className="text-destructive">*</span>
+                  </span>
+                </Label>
                 <p className="text-sm text-muted-foreground">
                   Paste the URL from your browser after the OAuth redirect.
                 </p>
                 <Input
+                  id="callback-url"
                   placeholder={
                     provider === "kiro"
                       ? "http://localhost:49153/oauth/callback?code=..."
@@ -1025,7 +1030,10 @@ export function AddAccountDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="provider-api-key" className="text-sm font-medium">
-                  {providerConfig.flowType === "api_key_with_account_id" ? "API Token" : "API Key"}
+                  <span>
+                    {providerConfig.flowType === "api_key_with_account_id" ? "API Token" : "API Key"}{" "}
+                    <span aria-hidden="true" className="text-destructive">*</span>
+                  </span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -1065,7 +1073,10 @@ export function AddAccountDialog({
               {providerConfig.flowType === "api_key_with_account_id" && (
                 <div className="space-y-2">
                   <Label htmlFor="provider-account-id" className="text-sm font-medium">
-                    {providerConfig.accountIdLabel}
+                    <span>
+                      {providerConfig.accountIdLabel}{" "}
+                      <span aria-hidden="true" className="text-destructive">*</span>
+                    </span>
                   </Label>
                   <Input
                     id="provider-account-id"
@@ -1087,7 +1098,7 @@ export function AddAccountDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="provider-account-name" className="text-sm font-medium">
-                  Account Name (optional)
+                  Account Name
                 </Label>
                 <Input
                   id="provider-account-name"
