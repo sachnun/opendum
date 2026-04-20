@@ -17,6 +17,7 @@ export const FEATURED_MODEL_FAMILIES = [
   "DeepSeek",
   "Kimi",
   "MiniMax",
+  "Xiaomi",
   "Z.AI",
 ] as const;
 
@@ -31,6 +32,7 @@ export const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   DeepSeek: "deepseek-models",
   Kimi: "kimi-models",
   MiniMax: "minimax-models",
+  Xiaomi: "xiaomi-models",
   "Z.AI": "zai-models",
 };
 
