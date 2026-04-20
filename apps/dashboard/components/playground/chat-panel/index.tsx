@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Bot, ChevronDown, ChevronLeft, ChevronUp, RotateCw, Settings, User, Wrench, X } from "lucide-react";
+import { AlertCircle, Bot, ChevronDown, ChevronLeft, ChevronUp, Play, RotateCw, Settings, User, Wrench, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -81,6 +81,7 @@ interface ChatPanelProps {
   selectedAccountId?: string | null;
   onModelChange: (modelId: string, accountId: string | null) => void;
   onRemove?: () => void;
+  onPlay?: () => void;
   onRetry?: () => void;
   response?: ResponseData;
   disabled?: boolean;
@@ -404,6 +405,7 @@ export function ChatPanel({
   selectedAccountId = null,
   onModelChange,
   onRemove,
+  onPlay,
   onRetry,
   response,
   disabled = false,
@@ -528,6 +530,7 @@ export function ChatPanel({
       ? nowMs - loadingStartedAt
       : metrics?.waitMs;
   const waitLabel = formatDurationMs(liveWaitMs);
+  const hasResponse = Boolean(content || reasoning || error || toolCalls.length > 0);
 
   React.useEffect(() => {
     if (!isLoading) {
@@ -787,6 +790,20 @@ export function ChatPanel({
             <span className="text-muted-foreground">Wait</span>
             <div className="flex items-center gap-2">
               <span className="font-medium tabular-nums">{waitLabel}</span>
+              {onPlay && selectedModel && !isLoading && !hasResponse && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={onPlay}
+                  disabled={disabled}
+                  title="Play"
+                  aria-label="Run panel"
+                  className="h-5 w-5"
+                >
+                  <Play className="h-3 w-3 fill-current" />
+                </Button>
+              )}
               {onRetry && selectedModel && !isLoading && (content || reasoning || error) && (
                 <Button
                   type="button"

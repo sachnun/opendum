@@ -157,11 +157,6 @@ export function ModelCard({
           {meta && (
             <div className="space-y-1.5 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5 flex-wrap">
-                {meta.pricing && (
-                  <Badge variant="outline" className="text-[11px] py-0 h-5 font-normal tabular-nums">
-                    ${meta.pricing.input} / ${meta.pricing.output}
-                  </Badge>
-                )}
                 {meta.contextLength && (
                   <span className="tabular-nums">{formatTokens(meta.contextLength)} in</span>
                 )}

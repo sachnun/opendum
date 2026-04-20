@@ -2042,6 +2042,7 @@ export function PlaygroundClient({
                 updatePanelSelection(panel.id, modelId, accountId)
               }
               onRemove={() => removePanel(panel.id)}
+              onPlay={selectedScenario ? () => retryPanel(panel.id) : undefined}
               onRetry={() => retryPanel(panel.id)}
               response={responses[panel.id]}
               disabled={isAnyLoading}
