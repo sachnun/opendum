@@ -1,4 +1,5 @@
 [opendum]
+family = "Trinity"
 providers = ["kilo_code"]
 
 [opendum.upstream]

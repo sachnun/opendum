@@ -1,4 +1,5 @@
 [opendum]
+family = "Z.AI"
 providers = ["nvidia_nim", "ollama_cloud"]
 
 [opendum.upstream]

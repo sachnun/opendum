@@ -1,4 +1,5 @@
 [opendum]
+family = "Google"
 providers = ["ollama_cloud"]
 
 [opendum.upstream]

@@ -1,4 +1,5 @@
 [opendum]
+family = "ByteDance"
 providers = ["kilo_code"]
 
 [opendum.upstream]
