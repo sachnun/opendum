@@ -136,10 +136,12 @@ function ModelDetailContent({
           type="button"
           onClick={handleCopy}
           title="Copy model ID"
-          aria-label={copied ? "Copied" : `Copy model ID ${model.id}`}
-          className={`flex min-w-0 flex-1 items-start gap-1.5 rounded-md p-1 -m-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${copied ? "bg-secondary text-secondary-foreground" : "hover:bg-accent/50"}`}
+          aria-label={`Copy model ID ${model.id}`}
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 -m-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          {copied ? <Check className="mt-0.5 h-3 w-3 shrink-0" /> : <Copy className="mt-0.5 h-3 w-3 shrink-0" />}
+          <span className="flex size-3 shrink-0 items-center justify-center">
+            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          </span>
           <span
             className="min-w-0 flex-1 overflow-hidden text-sm font-mono font-semibold leading-5 whitespace-normal break-all [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
             title={model.id}
