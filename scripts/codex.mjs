@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderToToml, buildTomlIndex, parseToml, serializeToml } from "./toml-utils.mjs";
@@ -9,6 +9,15 @@ const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
+
+// Codex's public models feed includes CLI/API variants that are not accepted by
+// the ChatGPT-backed Codex account flow used by this project. Keep the synced
+// `codex` provider registry restricted to the subset we know works here.
+const CHATGPT_COMPATIBLE_CODEX_MODELS = new Set([
+  "gpt-5.4",
+  "gpt-5.3-codex",
+  "gpt-5.2",
+]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,6 +81,7 @@ function filterModels(models) {
     if (!m.slug || typeof m.slug !== "string") return false;
     if (m.visibility && m.visibility !== "list") return false;
     if (m.supported_in_api === false) return false;
+    if (!CHATGPT_COMPATIBLE_CODEX_MODELS.has(m.slug)) return false;
     return true;
   });
 }
@@ -163,6 +173,18 @@ async function main() {
   const modelMap = buildModelMap(filtered);
   const metadataLookup = buildMetadataLookup(filtered);
 
+  const missingCompatibleModels = [...CHATGPT_COMPATIBLE_CODEX_MODELS]
+    .filter((slug) => !metadataLookup.has(slug))
+    .sort((a, b) => a.localeCompare(b));
+
+  if (missingCompatibleModels.length > 0) {
+    console.warn(
+      `[codex] Source feed is missing documented ChatGPT-compatible models: ${missingCompatibleModels.join(
+        ", "
+      )}`
+    );
+  }
+
   const result = syncProviderToToml(modelsDir, "codex", modelMap);
 
   // Enrich newly created TOML files with metadata from models.json
@@ -180,7 +202,7 @@ async function main() {
     );
   } else {
     console.log(
-      `Codex CLI: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`
+      `Codex ChatGPT-compatible models: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`
     );
   }
 }

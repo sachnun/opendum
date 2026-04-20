@@ -12,6 +12,10 @@ import {
   resolveModelAlias,
 } from "./models.js";
 import { normalizeProviderAlias } from "./providers/types.js";
+import {
+  getChatGptCompatibleCodexModels,
+  isChatGptAccountCompatibleCodexModel,
+} from "./providers/codex/model-compatibility.js";
 
 const CODEX_PAID_TIER_REQUIRED_MODELS = new Set(["gpt-5.4"]);
 const CODEX_FREE_TIER_PREFIXES = ["free"];
@@ -26,6 +30,32 @@ function isCodexFreeTier(tier: string | null | undefined): boolean {
   return CODEX_FREE_TIER_PREFIXES.some(
     (prefix) => normalized === prefix || normalized.startsWith(`${prefix}-`)
   );
+}
+
+function validateCodexModelCompatibility(
+  provider: string | null,
+  rawModel: string,
+  model: string
+): ModelValidationResult | null {
+  if (provider !== "codex") {
+    return null;
+  }
+
+  if (isChatGptAccountCompatibleCodexModel(model)) {
+    return null;
+  }
+
+  const supportedModels = getChatGptCompatibleCodexModels();
+  return {
+    valid: false,
+    provider,
+    model,
+    error:
+      `Model "${rawModel}" is not supported for Codex when using a ChatGPT account. ` +
+      `Supported Codex models here: ${supportedModels.join(", ")}`,
+    param: "model",
+    code: "unsupported_codex_chatgpt_model",
+  };
 }
 
 /**
@@ -399,6 +429,15 @@ export function validateModel(modelParam: string): ModelValidationResult {
         param: "model",
         code: "invalid_provider_model",
       };
+    }
+
+    const codexCompatibilityError = validateCodexModelCompatibility(
+      provider,
+      rawModel,
+      model
+    );
+    if (codexCompatibilityError) {
+      return codexCompatibilityError;
     }
   }
   

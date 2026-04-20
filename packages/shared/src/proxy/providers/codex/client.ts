@@ -21,8 +21,9 @@ import {
   CODEX_REFRESH_BUFFER_SECONDS,
   CODEX_ORIGINATOR,
 } from "./constants.js";
-import { getProviderModelSet } from "../../models.js";
+import { getProviderModelSet, resolveModelAlias } from "../../models.js";
 import { updateCodexQuotaFromHeaders } from "./quota.js";
+import { isChatGptAccountCompatibleCodexModel } from "./model-compatibility.js";
 
 /**
  * Device code initiation response
@@ -1456,9 +1457,31 @@ export const codexProvider: Provider = {
     body: ChatCompletionRequest,
     stream: boolean
   ): Promise<Response> {
-    const modelName = body.model.includes("/")
+    const requestedModel = body.model.includes("/")
       ? body.model.split("/").pop()!
       : body.model;
+    const modelName = resolveModelAlias(requestedModel);
+
+    if (!isChatGptAccountCompatibleCodexModel(modelName)) {
+      return new Response(
+        JSON.stringify({
+          error: {
+            message:
+              `Model \"${requestedModel}\" is not supported for Codex when using a ChatGPT account. ` +
+              `Use one of: gpt-5.4, gpt-5.3-codex, gpt-5.2.`,
+            type: "invalid_request_error",
+            param: "model",
+            code: "unsupported_codex_chatgpt_model",
+          },
+        }),
+        {
+          status: 400,
+          headers: new Headers({
+            "Content-Type": "application/json",
+          }),
+        }
+      );
+    }
 
     // Codex endpoint currently requires stream=true for upstream requests.
     // For non-streaming downstream calls, we aggregate the stream response.

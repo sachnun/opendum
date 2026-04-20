@@ -14,4 +14,4 @@ output = ["text"]
 
 [opendum]
 family = "OpenAI"
-providers = ["codex"]
+providers = []
