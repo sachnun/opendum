@@ -7,7 +7,7 @@ import {
   isImageGenerationModel,
   normalizeThinkingConfig,
 } from "../request-helpers.js";
-import { cacheToolSchemas } from "../tool-schema-cache.js";
+import { buildToolSchemaMap } from "../tool-schema-cache.js";
 import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
 const THOUGHT_SIGNATURE_BYPASS = "skip_thought_signature_validator";
@@ -465,12 +465,13 @@ function countTools(payload: RequestPayload): number {
 /**
  * Transforms a request payload for native Gemini models.
  */
-export function transformGeminiRequest(
+export async function transformGeminiRequest(
   context: TransformContext,
   parsedBody: RequestPayload
-): TransformResult {
+): Promise<TransformResult> {
   const requestPayload: RequestPayload = { ...parsedBody };
   const isImageModel = isImageGenerationModel(context.model);
+  let toolSchemas = buildToolSchemaMap(undefined);
 
   delete requestPayload.safetySettings;
 
@@ -567,8 +568,7 @@ export function transformGeminiRequest(
     // Sanitize tool names to ensure Gemini API compatibility
     sanitizeToolNames(requestPayload);
 
-    // Cache tool schemas for response normalization
-    cacheToolSchemas(
+    toolSchemas = buildToolSchemaMap(
       requestPayload.tools as Array<Record<string, unknown>> | undefined
     );
 
@@ -608,7 +608,7 @@ export function transformGeminiRequest(
           const thoughtText = part.text as string | undefined;
 
           if (thoughtText && context.sessionId) {
-            const cachedSig = getCachedSignature(
+            const cachedSig = await getCachedSignature(
               context.family,
               context.sessionId,
               thoughtText
@@ -663,6 +663,7 @@ export function transformGeminiRequest(
 
   return {
     body: JSON.stringify(wrappedBody),
+    toolSchemas,
     debugInfo: {
       transformer: "gemini",
       toolCount,

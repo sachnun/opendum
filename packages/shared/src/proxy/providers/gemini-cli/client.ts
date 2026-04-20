@@ -35,6 +35,7 @@ import {
   createAntigravityUnwrapTransform,
 } from "../antigravity/converter.js";
 import { cacheSignature } from "../antigravity/cache.js";
+import { buildToolSchemaMap } from "../antigravity/tool-schema-cache.js";
 import { getProviderModelSet, getUpstreamModelName } from "../../models.js";
 
 /**
@@ -465,13 +466,14 @@ async function transformGeminiCliResponse(
 ): Promise<Response> {
   const contentType = response.headers.get("content-type") ?? "";
   const isEventStream = contentType.includes("text/event-stream");
+  const toolSchemas = buildToolSchemaMap(undefined);
 
   if (streaming && response.ok && isEventStream && response.body) {
     const transformedBody = response.body
       .pipeThrough(new TextDecoderStream())
       .pipeThrough(createAntigravityUnwrapTransform())
       .pipeThrough(createSignatureCachingTransform(sessionId))
-      .pipeThrough(createGeminiToOpenAISseTransform(model, includeReasoning))
+      .pipeThrough(createGeminiToOpenAISseTransform(model, includeReasoning, toolSchemas))
       .pipeThrough(new TextEncoderStream());
 
     return new Response(transformedBody, {
@@ -511,7 +513,8 @@ async function transformGeminiCliResponse(
     const openaiResponse = convertGeminiToOpenAI(
       unwrapped,
       model,
-      includeReasoning
+      includeReasoning,
+      toolSchemas
     );
 
     return new Response(JSON.stringify(openaiResponse), {
@@ -916,10 +919,10 @@ export async function fetchGeminiCliAccountInfo(
 /**
  * Cache signatures from response
  */
-function cacheSignaturesFromResponse(
+async function cacheSignaturesFromResponse(
   response: Record<string, unknown>,
   sessionId: string
-): void {
+): Promise<void> {
   const candidates = response.candidates as
     | Array<Record<string, unknown>>
     | undefined;
@@ -939,7 +942,7 @@ function cacheSignaturesFromResponse(
         typeof part.thoughtSignature === "string"
       ) {
         // Use gemini-pro as family for Gemini CLI
-        cacheSignature("gemini-pro", sessionId, part.text, part.thoughtSignature);
+        await cacheSignature("gemini-pro", sessionId, part.text, part.thoughtSignature);
       }
     }
   }
@@ -962,7 +965,7 @@ function createSignatureCachingTransform(
 
       try {
         const parsed = JSON.parse(json) as Record<string, unknown>;
-        cacheSignaturesFromResponse(parsed, sessionId);
+        void cacheSignaturesFromResponse(parsed, sessionId);
       } catch {
         // Ignore parsing errors
       }

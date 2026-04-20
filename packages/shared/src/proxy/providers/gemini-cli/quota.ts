@@ -89,8 +89,6 @@ export interface GeminiCliQuotaSnapshot {
   source: "api";
 }
 
-const quotaSnapshots = new Map<string, GeminiCliQuotaSnapshot>();
-
 function normalizeTier(tier: string | null | undefined): string {
   if (!tier) {
     return "free-tier";
@@ -269,21 +267,6 @@ export async function fetchGeminiCliQuotaFromApi(
     fetchedAt: Date.now(),
     source: "api",
   };
-}
-
-export function getGeminiCliQuotaSnapshot(accountId: string): GeminiCliQuotaSnapshot | null {
-  return quotaSnapshots.get(accountId) ?? null;
-}
-
-export function setGeminiCliQuotaSnapshot(
-  accountId: string,
-  snapshot: GeminiCliQuotaSnapshot
-): void {
-  if (snapshot.status !== "success") {
-    return;
-  }
-
-  quotaSnapshots.set(accountId, snapshot);
 }
 
 export function isGeminiCliQuotaStale(snapshot: GeminiCliQuotaSnapshot): boolean {

@@ -28,6 +28,7 @@ import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import { generateRequestId, isImageGenerationModel } from "./request-helpers.js";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform/index.js";
 import type { TransformContext } from "./transform/types.js";
+import type { ToolSchemaMap } from "./tool-schema-cache.js";
 import {
   convertOpenAIToGemini,
   convertGeminiToOpenAI,
@@ -306,9 +307,9 @@ export const antigravityProvider: Provider = {
 
     const geminiPayload = convertOpenAIToGemini(normalizedBody);
 
-    const result = isClaudeModel
+    const result = await (isClaudeModel
       ? transformClaudeRequest(context, geminiPayload)
-      : transformGeminiRequest(context, geminiPayload);
+      : transformGeminiRequest(context, geminiPayload));
 
     // Non-native-Gemini models (Claude, GPT-OSS, etc.) require forced streaming
     // through Code Assist. Claude needs it because the API requires streaming;
@@ -388,13 +389,18 @@ export const antigravityProvider: Provider = {
         if (needsForcedStreaming && response.body) {
           const bufferedResponse = await bufferStreamingToGeminiResponse(response);
 
-          cacheSignaturesFromResponse(
+          await cacheSignaturesFromResponse(
             bufferedResponse,
             family as "claude" | "gemini-flash" | "gemini-pro",
             sessionId
           );
 
-          const openaiResponse = convertGeminiToOpenAI(bufferedResponse, rawModel, includeReasoning);
+          const openaiResponse = convertGeminiToOpenAI(
+            bufferedResponse,
+            rawModel,
+            includeReasoning,
+            result.toolSchemas
+          );
 
           return new Response(JSON.stringify(openaiResponse), {
             status: response.status,
@@ -408,7 +414,8 @@ export const antigravityProvider: Provider = {
           family,
           sessionId,
           rawModel,
-          includeReasoning
+          includeReasoning,
+          result.toolSchemas
         );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -447,7 +454,8 @@ async function transformAntigravityResponse(
   family: string,
   sessionId: string,
   model: string,
-  includeReasoning: boolean = true
+  includeReasoning: boolean = true,
+  toolSchemas?: ToolSchemaMap
 ): Promise<Response> {
   const contentType = response.headers.get("content-type") ?? "";
   const isEventStream = contentType.includes("text/event-stream");
@@ -459,7 +467,7 @@ async function transformAntigravityResponse(
       .pipeThrough(
         createSignatureCachingTransform(family as "claude" | "gemini-flash" | "gemini-pro", sessionId)
       )
-      .pipeThrough(createGeminiToOpenAISseTransform(model, includeReasoning))
+      .pipeThrough(createGeminiToOpenAISseTransform(model, includeReasoning, toolSchemas))
       .pipeThrough(new TextEncoderStream());
 
     return new Response(transformedBody, {
@@ -493,13 +501,18 @@ async function transformAntigravityResponse(
 
     const unwrapped = (parsed.response ?? parsed) as Record<string, unknown>;
 
-    cacheSignaturesFromResponse(
+    await cacheSignaturesFromResponse(
       unwrapped,
       family as "claude" | "gemini-flash" | "gemini-pro",
       sessionId
     );
 
-    const openaiResponse = convertGeminiToOpenAI(unwrapped, model, includeReasoning);
+    const openaiResponse = convertGeminiToOpenAI(
+      unwrapped,
+      model,
+      includeReasoning,
+      toolSchemas
+    );
 
     return new Response(JSON.stringify(openaiResponse), {
       status: response.status,
@@ -749,11 +762,11 @@ async function onboardUser(
 /**
  * Cache signatures from response
  */
-function cacheSignaturesFromResponse(
+async function cacheSignaturesFromResponse(
   response: Record<string, unknown>,
   family: "claude" | "gemini-flash" | "gemini-pro",
   sessionId: string
-): void {
+): Promise<void> {
   const candidates = response.candidates as
     | Array<Record<string, unknown>>
     | undefined;
@@ -772,7 +785,7 @@ function cacheSignaturesFromResponse(
         typeof part.text === "string" &&
         typeof part.thoughtSignature === "string"
       ) {
-        cacheSignature(family, sessionId, part.text, part.thoughtSignature);
+        await cacheSignature(family, sessionId, part.text, part.thoughtSignature);
       }
     }
   }
@@ -796,7 +809,7 @@ function createSignatureCachingTransform(
 
       try {
         const parsed = JSON.parse(json) as Record<string, unknown>;
-        cacheSignaturesFromResponse(parsed, family, sessionId);
+        void cacheSignaturesFromResponse(parsed, family, sessionId);
       } catch {
         // Ignore parsing errors
       }

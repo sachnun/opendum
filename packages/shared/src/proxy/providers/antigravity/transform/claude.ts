@@ -6,7 +6,7 @@ import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
 } from "../request-helpers.js";
-import { cacheToolSchemas } from "../tool-schema-cache.js";
+import { buildToolSchemaMap } from "../tool-schema-cache.js";
 import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
 /**
@@ -129,13 +129,14 @@ function sanitizeToolBlocksForClaude(
  * 2. Remove `$schema` from parameters (not valid for Claude)
  * 3. Ensure `type: "object"` and `properties: {}` exist (Claude requires these)
  */
-export function transformClaudeRequest(
+export async function transformClaudeRequest(
   context: TransformContext,
   parsedBody: RequestPayload
-): TransformResult {
+): Promise<TransformResult> {
   const requestPayload: RequestPayload = { ...parsedBody };
   let toolsTransformed = false;
   let toolCount = 0;
+  let toolSchemas = buildToolSchemaMap(undefined);
 
   delete requestPayload.safetySettings;
 
@@ -285,8 +286,7 @@ export function transformClaudeRequest(
     delete requestPayload.model;
   }
 
-  // Cache tool schemas for response normalization
-  cacheToolSchemas(
+  toolSchemas = buildToolSchemaMap(
     requestPayload.tools as Array<Record<string, unknown>> | undefined
   );
 
@@ -352,7 +352,7 @@ export function transformClaudeRequest(
             (typeof signature === "string" && signature.length < 50)
           ) {
             if (typeof part.text === "string") {
-              const cached = getCachedSignature(
+              const cached = await getCachedSignature(
                 context.family,
                 context.sessionId,
                 part.text
@@ -366,7 +366,7 @@ export function transformClaudeRequest(
 
           if (typeof signature === "string" && signature.length > 50) {
             if (typeof part.text === "string" && context.sessionId) {
-              cacheSignature(
+              await cacheSignature(
                 context.family,
                 context.sessionId,
                 part.text,
@@ -461,6 +461,7 @@ export function transformClaudeRequest(
 
   return {
     body: JSON.stringify(wrappedBody),
+    toolSchemas,
     debugInfo: {
       transformer: "claude",
       toolCount,

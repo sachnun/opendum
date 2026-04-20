@@ -3,6 +3,7 @@
 import type { ChatCompletionRequest } from "../types.js";
 import type { RequestPayload, ModelFamily } from "./transform/types.js";
 import { normalizeToolCallArgs } from "./request-helpers.js";
+import type { ToolSchemaMap } from "./tool-schema-cache.js";
 
 /**
  * Infer MIME type from a URL based on file extension.
@@ -671,7 +672,8 @@ export function getModelFamily(model: string): ModelFamily {
 export function convertGeminiToOpenAI(
   geminiResponse: Record<string, unknown>,
   model: string,
-  includeReasoning: boolean = true
+  includeReasoning: boolean = true,
+  toolSchemas?: ToolSchemaMap
 ): Record<string, unknown> {
   const candidates = geminiResponse.candidates as
     | Array<Record<string, unknown>>
@@ -701,7 +703,11 @@ export function convertGeminiToOpenAI(
           } else if (part.functionCall) {
             const fc = part.functionCall as Record<string, unknown>;
             const funcName = fc.name as string;
-            const normalizedArgs = normalizeToolCallArgs(fc.args ?? {}, funcName);
+            const normalizedArgs = normalizeToolCallArgs(
+              fc.args ?? {},
+              funcName,
+              toolSchemas
+            );
             toolCalls.push({
               id: fc.id ?? `call_${crypto.randomUUID()}`,
               type: "function",
@@ -776,7 +782,8 @@ export function convertGeminiToOpenAI(
  */
 export function createGeminiToOpenAISseTransform(
   model: string,
-  includeReasoning: boolean = true
+  includeReasoning: boolean = true,
+  toolSchemas?: ToolSchemaMap
 ): TransformStream<string, string> {
   let isFirstChunk = true;
   let toolCallIndex = 0;
@@ -893,7 +900,11 @@ export function createGeminiToOpenAISseTransform(
               isFirstChunk = false;
             }
 
-            const normalizedArgs = normalizeToolCallArgs(fc.args ?? {}, funcName);
+            const normalizedArgs = normalizeToolCallArgs(
+              fc.args ?? {},
+              funcName,
+              toolSchemas
+            );
 
             delta.tool_calls = [
               {

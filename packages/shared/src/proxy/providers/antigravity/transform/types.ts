@@ -1,3 +1,5 @@
+import type { ToolSchemaMap } from "../tool-schema-cache.js";
+
 export type ModelFamily = "claude" | "gemini-flash" | "gemini-pro";
 
 export interface TransformContext {
@@ -11,6 +13,7 @@ export interface TransformContext {
 
 export interface TransformResult {
   body: string;
+  toolSchemas?: ToolSchemaMap;
   debugInfo: {
     transformer: string;
     toolCount?: number;

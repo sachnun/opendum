@@ -2,16 +2,7 @@
 // Includes system instruction injection and thinking config normalization
 
 import type { RequestPayload, ThinkingConfig } from "./transform/types.js";
-import { getParamType } from "./tool-schema-cache.js";
-
-const SESSION_ID = `-${Math.floor(Math.random() * 9_000_000_000_000_000)}`;
-
-/**
- * Get session ID (stable per process)
- */
-export function getSessionId(): string {
-  return SESSION_ID;
-}
+import { getParamType, type ToolSchemaMap } from "./tool-schema-cache.js";
 
 /**
  * Check if a model is an image generation model (e.g. Nano Banana / Nano Banana Pro).
@@ -265,7 +256,8 @@ export function recursivelyParseJsonStrings(value: unknown): unknown {
  */
 export function normalizeToolCallArgs(
   args: unknown,
-  toolName: string
+  toolName: string,
+  toolSchemas?: ToolSchemaMap
 ): unknown {
   if (!args || typeof args !== "object") {
     return args;
@@ -275,7 +267,7 @@ export function normalizeToolCallArgs(
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(record)) {
-    const expectedType = getParamType(toolName, key);
+    const expectedType = getParamType(toolSchemas, toolName, key);
 
     if (expectedType === "string") {
       result[key] = processEscapeSequencesOnly(value);

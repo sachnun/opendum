@@ -7,11 +7,14 @@
  */
 
 import { CODEX_ORIGINATOR } from "./constants.js";
+import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
 
 const CODEX_USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
 const CODEX_DEFAULT_USER_AGENT = "codex-cli";
 
 export const CODEX_QUOTA_STALE_THRESHOLD_MS = 15 * 60 * 1000;
+const CODEX_QUOTA_CACHE_PREFIX = "opendum:quota:codex:snapshot";
+const CODEX_QUOTA_CACHE_TTL_SECONDS = Math.ceil(CODEX_QUOTA_STALE_THRESHOLD_MS / 1000);
 
 export interface CodexRateLimitWindow {
   usedPercent: number;
@@ -47,7 +50,9 @@ interface ParsedCodexQuota {
   credits: CodexCreditsInfo | null;
 }
 
-const quotaSnapshots = new Map<string, CodexQuotaSnapshot>();
+function getCodexQuotaCacheKey(accountId: string): string {
+  return `${CODEX_QUOTA_CACHE_PREFIX}:${accountId}`;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object") {
@@ -328,32 +333,49 @@ function toSnapshot(
   };
 }
 
-export function getCodexQuotaSnapshot(accountId: string): CodexQuotaSnapshot | null {
-  return quotaSnapshots.get(accountId) ?? null;
+export async function getCodexQuotaSnapshot(
+  accountId: string
+): Promise<CodexQuotaSnapshot | null> {
+  const snapshot = await getRedisJson<CodexQuotaSnapshot>(
+    getCodexQuotaCacheKey(accountId)
+  );
+
+  if (!snapshot || snapshot.status !== "success") {
+    return null;
+  }
+
+  return snapshot;
 }
 
 export function isCodexQuotaStale(snapshot: CodexQuotaSnapshot): boolean {
   return Date.now() - snapshot.fetchedAt > CODEX_QUOTA_STALE_THRESHOLD_MS;
 }
 
-export function setCodexQuotaSnapshot(accountId: string, snapshot: CodexQuotaSnapshot): void {
+export async function setCodexQuotaSnapshot(
+  accountId: string,
+  snapshot: CodexQuotaSnapshot
+): Promise<void> {
   if (snapshot.status !== "success") {
     return;
   }
 
-  quotaSnapshots.set(accountId, snapshot);
+  await setRedisJson(
+    getCodexQuotaCacheKey(accountId),
+    snapshot,
+    CODEX_QUOTA_CACHE_TTL_SECONDS
+  );
 }
 
-export function updateCodexQuotaFromHeaders(
+export async function updateCodexQuotaFromHeaders(
   accountId: string,
   headers: Headers | Record<string, string>
-): CodexQuotaSnapshot | null {
+): Promise<CodexQuotaSnapshot | null> {
   const parsedFromHeaders = parseQuotaFromHeaders(headers);
   if (!parsedFromHeaders) {
     return null;
   }
 
-  const existingSnapshot = getCodexQuotaSnapshot(accountId);
+  const existingSnapshot = await getCodexQuotaSnapshot(accountId);
   const existingParsed: ParsedCodexQuota | null = existingSnapshot
     ? {
         planType: existingSnapshot.planType,
@@ -369,7 +391,7 @@ export function updateCodexQuotaFromHeaders(
   }
 
   const snapshot = toSnapshot(merged, "headers");
-  quotaSnapshots.set(accountId, snapshot);
+  await setCodexQuotaSnapshot(accountId, snapshot);
   return snapshot;
 }
 

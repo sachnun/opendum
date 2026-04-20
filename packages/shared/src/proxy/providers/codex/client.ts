@@ -1496,7 +1496,7 @@ export const codexProvider: Provider = {
     }, timeoutMs);
 
     try {
-      updateCodexQuotaFromHeaders(account.id, response.headers);
+      await updateCodexQuotaFromHeaders(account.id, response.headers);
     } catch {
       // Ignore quota header parsing failures
     }

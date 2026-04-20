@@ -1,5 +1,4 @@
-// Tool schema cache for Antigravity
-// Caches tool parameter schemas for response normalization
+// Tool schema helpers for Antigravity
 
 /**
  * Info about a tool parameter schema.
@@ -11,9 +10,9 @@ export type SchemaInfo = {
 };
 
 /**
- * Cache structure: Map<toolName, Map<paramName, SchemaInfo>>
+ * Schema lookup structure: Map<toolName, Map<paramName, SchemaInfo>>
  */
-const toolSchemaCache = new Map<string, Map<string, SchemaInfo>>();
+export type ToolSchemaMap = Map<string, Map<string, SchemaInfo>>;
 
 /**
  * Sanitizes tool names for Gemini API compatibility.
@@ -52,12 +51,13 @@ function extractSchemaInfo(schema: unknown): SchemaInfo {
 }
 
 /**
- * Caches tool schemas from a request payload.
+ * Builds tool schemas from a request payload.
  */
-export function cacheToolSchemas(
+export function buildToolSchemaMap(
   tools: Array<Record<string, unknown>> | undefined
-): void {
-  if (!Array.isArray(tools)) return;
+): ToolSchemaMap {
+  const toolSchemaMap: ToolSchemaMap = new Map();
+  if (!Array.isArray(tools)) return toolSchemaMap;
 
   for (const tool of tools) {
     const funcDecls = tool.functionDeclarations as
@@ -86,28 +86,24 @@ export function cacheToolSchemas(
         paramMap.set(paramName, extractSchemaInfo(paramSchema));
       }
 
-      toolSchemaCache.set(sanitizedName, paramMap);
+      toolSchemaMap.set(sanitizedName, paramMap);
       // Also cache with original name to be safe
       if (sanitizedName !== originalName) {
-        toolSchemaCache.set(originalName, paramMap);
+        toolSchemaMap.set(originalName, paramMap);
       }
     }
   }
+
+  return toolSchemaMap;
 }
 
 /**
  * Gets the expected type for a tool parameter.
  */
 export function getParamType(
+  toolSchemas: ToolSchemaMap | undefined,
   toolName: string,
   paramName: string
 ): string | undefined {
-  return toolSchemaCache.get(toolName)?.get(paramName)?.type;
-}
-
-/**
- * Clears the tool schema cache.
- */
-export function clearToolSchemaCache(): void {
-  toolSchemaCache.clear();
+  return toolSchemas?.get(toolName)?.get(paramName)?.type;
 }

@@ -1,9 +1,12 @@
 // Thought signature cache for Antigravity
 // Caches thought block signatures for multi-turn conversations
 
+import { hashString } from "../../../encryption.js";
+import { deleteRedisKey, getRedisJson, setRedisJson } from "../../../redis-cache.js";
 import type { ModelFamily } from "./transform/types.js";
 
-const signatureCache = new Map<string, string>();
+const SIGNATURE_CACHE_PREFIX = "opendum:thought-signature";
+const SIGNATURE_CACHE_TTL_SECONDS = 60 * 60 * 24;
 
 /**
  * Generates a cache key for a thought block.
@@ -13,51 +16,56 @@ function normalizeThoughtText(text: string): string {
   return text.trim();
 }
 
-function getSignatureKeySync(
+function getSignatureCacheKey(
   family: ModelFamily,
   sessionId: string,
   thoughtText: string
 ): string {
-  // Synchronous version using simple hash for cache key
   const normalizedText = normalizeThoughtText(thoughtText);
-  const input = `${family}:${sessionId}:${normalizedText}`;
-  // Use first 100 chars + length as fallback for sync operations
-  const prefix = input.slice(0, 100);
-  return `${prefix}::${input.length}`;
+  return `${SIGNATURE_CACHE_PREFIX}:${hashString(`${family}:${sessionId}:${normalizedText}`)}`;
 }
 
 /**
  * Caches a thought signature for a given session and thought text.
  */
-export function cacheSignature(
+export async function cacheSignature(
   family: ModelFamily,
   sessionId: string,
   thoughtText: string,
   signature: string
-): void {
+) : Promise<void> {
   if (!sessionId || !thoughtText || !signature) return;
 
-  const key = getSignatureKeySync(family, sessionId, thoughtText);
-  signatureCache.set(key, signature);
+  await setRedisJson(
+    getSignatureCacheKey(family, sessionId, thoughtText),
+    { signature },
+    SIGNATURE_CACHE_TTL_SECONDS
+  );
 }
 
 /**
  * Gets cached signature for a thought.
  */
-export function getCachedSignature(
+export async function getCachedSignature(
   family: ModelFamily,
   sessionId: string,
   thoughtText: string
-): string | null {
+) : Promise<string | null> {
   if (!sessionId || !thoughtText) return null;
 
-  const key = getSignatureKeySync(family, sessionId, thoughtText);
-  return signatureCache.get(key) ?? null;
+  const cached = await getRedisJson<{ signature?: string }>(
+    getSignatureCacheKey(family, sessionId, thoughtText)
+  );
+  return typeof cached?.signature === "string" ? cached.signature : null;
 }
 
 /**
  * Clears all cached signatures.
  */
-export function clearSignatureCache(): void {
-  signatureCache.clear();
+export async function clearSignatureCache(
+  family: ModelFamily,
+  sessionId: string,
+  thoughtText: string
+): Promise<void> {
+  await deleteRedisKey(getSignatureCacheKey(family, sessionId, thoughtText));
 }
