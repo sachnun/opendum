@@ -1,12 +1,12 @@
 const GITHUB_API_BASE_URL = "https://api.github.com";
 const GITHUB_API_VERSION = "2022-11-28";
-const COPILOT_QUOTA_USER_AGENT = "opendum/copilot-quota";
+const USER_AGENT = "opendum/copilot-quota";
 
 /**
  * Headers mimicking a VS Code Copilot Chat client, required by the
  * internal /copilot_internal/user endpoint.
  */
-const COPILOT_INTERNAL_HEADERS = {
+const INTERNAL_HEADERS = {
   Accept: "application/json",
   "User-Agent": "GitHubCopilotChat/0.26.7",
   "Editor-Version": "vscode/1.96.2",
@@ -17,7 +17,7 @@ const COPILOT_INTERNAL_HEADERS = {
  * Known Copilot plan monthly premium-request limits.
  * Used as a fallback when the internal API does not return an entitlement.
  */
-const COPILOT_PLAN_LIMITS: Record<string, number> = {
+const PLAN_LIMITS: Record<string, number> = {
   free: 50,
   student: 300,
   pro: 300,
@@ -228,7 +228,7 @@ async function fetchGithubUsername(
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": GITHUB_API_VERSION,
-        "User-Agent": COPILOT_QUOTA_USER_AGENT,
+        "User-Agent": USER_AGENT,
       },
       cache: "no-store",
     });
@@ -282,7 +282,7 @@ async function fetchCopilotInternalUser(
         method: "GET",
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          ...COPILOT_INTERNAL_HEADERS,
+          ...INTERNAL_HEADERS,
         },
         cache: "no-store",
       }
@@ -341,7 +341,7 @@ async function fetchCopilotInternalUser(
 
     const entitlement =
       toFiniteNumber(premiumSnapshot?.entitlement) ??
-      COPILOT_PLAN_LIMITS[plan] ??
+      PLAN_LIMITS[plan] ??
       0;
     const remaining =
       toFiniteNumber(premiumSnapshot?.quota_remaining) ??
@@ -418,7 +418,7 @@ async function fetchBillingUsage(
           Authorization: `Bearer ${accessToken}`,
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": GITHUB_API_VERSION,
-          "User-Agent": COPILOT_QUOTA_USER_AGENT,
+          "User-Agent": USER_AGENT,
         },
         cache: "no-store",
       }

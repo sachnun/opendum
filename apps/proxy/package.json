@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "pnpm exec tsc -b",
     "start": "node dist/server.js",
-    "lint": "tsc --noEmit"
+    "lint": "pnpm exec tsc --noEmit"
   },
   "dependencies": {
     "@opendum/shared": "workspace:*",

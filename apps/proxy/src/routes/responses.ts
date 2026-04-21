@@ -8,7 +8,7 @@ import {
   createProxyRoute,
   createPassthroughUsageTracker,
   type ErrorInfo,
-} from "../lib/proxy-handler.js";
+} from "../lib/handler.js";
 
 import type { ChatCompletionRequest } from "@opendum/shared";
 

@@ -13,6 +13,7 @@
       "@opendum/shared/*": ["../../packages/shared/dist/*"]
     }
   },
+  "references": [{ "path": "../../packages/shared" }],
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

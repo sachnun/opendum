@@ -8,7 +8,7 @@ import { markAccountSuccess } from "../lib/load-balancer.js";
 import {
   createProxyRoute,
   type ErrorInfo,
-} from "../lib/proxy-handler.js";
+} from "../lib/handler.js";
 
 // ---------------------------------------------------------------------------
 // Interfaces (route-specific)

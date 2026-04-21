@@ -1,13 +1,13 @@
-import { KIRO_REGION } from "./constants.js";
+import { REGION } from "./constants.js";
 
-const KIRO_USAGE_LIMITS_URL = `https://q.${KIRO_REGION}.amazonaws.com/`;
-const KIRO_USAGE_REQUEST_TIMEOUT_MS = 10000;
-const KIRO_USAGE_TARGET = "AmazonCodeWhispererService.GetUsageLimits";
-const KIRO_DEFAULT_USER_AGENT = "KiroIDE-0.7.45";
+const USAGE_LIMITS_URL = `https://q.${REGION}.amazonaws.com/`;
+const REQUEST_TIMEOUT_MS = 10000;
+const USAGE_TARGET = "AmazonCodeWhispererService.GetUsageLimits";
+const DEFAULT_USER_AGENT = "KiroIDE-0.7.45";
 
 type JsonRecord = Record<string, unknown>;
 
-const KIRO_METRIC_DISPLAY_NAMES: Record<string, string> = {
+const METRIC_LABELS: Record<string, string> = {
   AI_EDITOR: "Kiro requests",
   AGENTIC_REQUEST: "Agentic requests",
   CODE_COMPLETIONS: "Code completions",
@@ -107,7 +107,7 @@ function toIsoTimestamp(value: unknown): string | null {
 
 function toDisplayName(metricName: string): string {
   const normalizedName = metricName.trim().toUpperCase();
-  const mapped = KIRO_METRIC_DISPLAY_NAMES[normalizedName];
+  const mapped = METRIC_LABELS[normalizedName];
   if (mapped) {
     return mapped;
   }
@@ -288,7 +288,7 @@ export async function fetchKiroQuotaFromApi(
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
-    KIRO_USAGE_REQUEST_TIMEOUT_MS
+    REQUEST_TIMEOUT_MS
   );
 
   try {
@@ -301,7 +301,7 @@ export async function fetchKiroQuotaFromApi(
       requestPayload.profileArn = profileArn;
     }
 
-    const requestUrl = new URL(KIRO_USAGE_LIMITS_URL);
+    const requestUrl = new URL(USAGE_LIMITS_URL);
     for (const [key, value] of Object.entries(requestPayload)) {
       requestUrl.searchParams.set(key, String(value));
     }
@@ -312,9 +312,9 @@ export async function fetchKiroQuotaFromApi(
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/x-amz-json-1.0",
         Accept: "application/json",
-        "User-Agent": KIRO_DEFAULT_USER_AGENT,
-        "x-amz-user-agent": KIRO_DEFAULT_USER_AGENT,
-        "x-amz-target": KIRO_USAGE_TARGET,
+        "User-Agent": DEFAULT_USER_AGENT,
+        "x-amz-user-agent": DEFAULT_USER_AGENT,
+        "x-amz-target": USAGE_TARGET,
         "x-amzn-codewhisperer-optout": "true",
         "x-amzn-kiro-agent-mode": "vibe",
         "amz-sdk-invocation-id": invocationId,

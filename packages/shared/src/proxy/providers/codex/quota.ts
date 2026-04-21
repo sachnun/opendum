@@ -6,15 +6,15 @@
  * - x-codex-* response headers from regular requests
  */
 
-import { CODEX_ORIGINATOR } from "./constants.js";
+import { ORIGINATOR } from "./constants.js";
 import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
 
-const CODEX_USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
-const CODEX_DEFAULT_USER_AGENT = "codex-cli";
+const USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
+const DEFAULT_USER_AGENT = "codex-cli";
 
-export const CODEX_QUOTA_STALE_THRESHOLD_MS = 15 * 60 * 1000;
-const CODEX_QUOTA_CACHE_PREFIX = "opendum:quota:codex:snapshot";
-const CODEX_QUOTA_CACHE_TTL_SECONDS = Math.ceil(CODEX_QUOTA_STALE_THRESHOLD_MS / 1000);
+export const QUOTA_STALE_MS = 15 * 60 * 1000;
+const CACHE_PREFIX = "opendum:quota:codex:snapshot";
+const CACHE_TTL_SECONDS = Math.ceil(QUOTA_STALE_MS / 1000);
 
 export interface CodexRateLimitWindow {
   usedPercent: number;
@@ -51,7 +51,7 @@ interface ParsedCodexQuota {
 }
 
 function getCodexQuotaCacheKey(accountId: string): string {
-  return `${CODEX_QUOTA_CACHE_PREFIX}:${accountId}`;
+  return `${CACHE_PREFIX}:${accountId}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -348,7 +348,7 @@ export async function getCodexQuotaSnapshot(
 }
 
 export function isCodexQuotaStale(snapshot: CodexQuotaSnapshot): boolean {
-  return Date.now() - snapshot.fetchedAt > CODEX_QUOTA_STALE_THRESHOLD_MS;
+  return Date.now() - snapshot.fetchedAt > QUOTA_STALE_MS;
 }
 
 export async function setCodexQuotaSnapshot(
@@ -362,7 +362,7 @@ export async function setCodexQuotaSnapshot(
   await setRedisJson(
     getCodexQuotaCacheKey(accountId),
     snapshot,
-    CODEX_QUOTA_CACHE_TTL_SECONDS
+    CACHE_TTL_SECONDS
   );
 }
 
@@ -404,15 +404,15 @@ export async function fetchCodexQuotaFromApi(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": CODEX_DEFAULT_USER_AGENT,
-      originator: CODEX_ORIGINATOR,
+      "User-Agent": DEFAULT_USER_AGENT,
+      originator: ORIGINATOR,
     };
 
     if (chatgptAccountId) {
       requestHeaders["ChatGPT-Account-Id"] = chatgptAccountId;
     }
 
-    const response = await fetch(CODEX_USAGE_ENDPOINT, {
+    const response = await fetch(USAGE_ENDPOINT, {
       method: "GET",
       headers: requestHeaders,
       cache: "no-store",

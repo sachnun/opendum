@@ -8,13 +8,13 @@
 import { getRedisClient } from "../redis.js";
 
 /** Redis key prefix for latency sorted sets. */
-const LATENCY_KEY_PREFIX = "opendum:latency";
+const KEY_PREFIX = "opendum:latency";
 
 /** Maximum number of latency samples retained per key. */
 const MAX_SAMPLES = 100;
 
 /** TTL for latency keys (seconds). Stale data auto-expires. */
-const LATENCY_TTL_SECONDS = 86_400; // 24 hours
+const TTL_SECONDS = 86_400; // 24 hours
 
 function buildKey(
   provider: string,
@@ -23,7 +23,7 @@ function buildKey(
 ): string {
   const mode = isStream ? "stream" : "nonstream";
   const normalizedModel = model.trim().toLowerCase();
-  return `${LATENCY_KEY_PREFIX}:${provider}:${normalizedModel}:${mode}`;
+  return `${KEY_PREFIX}:${provider}:${normalizedModel}:${mode}`;
 }
 
 /**
@@ -60,7 +60,7 @@ export async function recordLatency(
     }
 
     // Refresh TTL so the key doesn't expire while still actively used.
-    await redis.expire(key, LATENCY_TTL_SECONDS);
+    await redis.expire(key, TTL_SECONDS);
   } catch {
     // Swallow – latency tracking must never break the request path.
   }

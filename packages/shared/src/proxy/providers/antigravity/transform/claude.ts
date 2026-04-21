@@ -5,8 +5,8 @@ import { cacheSignature, getCachedSignature } from "../cache.js";
 import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
-} from "../request-helpers.js";
-import { buildToolSchemaMap } from "../tool-schema-cache.js";
+} from "../helpers.js";
+import { buildToolSchemaMap } from "../tool-schema.js";
 import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
 /**

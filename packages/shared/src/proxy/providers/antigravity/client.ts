@@ -10,22 +10,22 @@ import type {
   ChatCompletionRequest,
 } from "../types.js";
 import {
-  ANTIGRAVITY_CLIENT_ID,
-  ANTIGRAVITY_CLIENT_SECRET,
-  ANTIGRAVITY_SCOPES,
-  CODE_ASSIST_ENDPOINT_FALLBACKS,
+  CLIENT_ID,
+  CLIENT_SECRET,
+  SCOPES,
+  ENDPOINT_FALLBACKS,
   CODE_ASSIST_HEADERS,
-  ANTIGRAVITY_REFRESH_BUFFER_SECONDS,
+  REFRESH_BUFFER_SECONDS,
   LOAD_CODE_ASSIST_ENDPOINTS,
   ONBOARD_USER_ENDPOINTS,
-  ANTIGRAVITY_AUTH_HEADERS,
+  AUTH_HEADERS,
   DEFAULT_PROJECT_ID,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
-import { generateRequestId, isImageGenerationModel } from "./request-helpers.js";
+import { generateRequestId, isImageGenerationModel } from "./helpers.js";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform/index.js";
 import type { TransformContext } from "./transform/types.js";
-import type { ToolSchemaMap } from "./tool-schema-cache.js";
+import type { ToolSchemaMap } from "./tool-schema.js";
 import {
   convertOpenAIToGemini,
   convertGeminiToOpenAI,
@@ -34,7 +34,7 @@ import {
   createGeminiToOpenAISseTransform,
 } from "./converter.js";
 import { cacheSignature } from "./cache.js";
-import { convertImageUrlsToBase64 } from "../../image-utils.js";
+import { convertImageUrlsToBase64 } from "../../images.js";
 
 /**
  * Generate PKCE code verifier
@@ -62,7 +62,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
  * Check if token needs refresh
  */
 function isTokenExpired(expiresAt: Date): boolean {
-  const bufferMs = ANTIGRAVITY_REFRESH_BUFFER_SECONDS * 1000;
+  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
 
@@ -132,10 +132,10 @@ export const antigravityProvider: Provider = {
     }
 
     const params = new URLSearchParams({
-      client_id: ANTIGRAVITY_CLIENT_ID,
+      client_id: CLIENT_ID,
       redirect_uri: `${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/api/oauth/antigravity/callback`,
       response_type: "code",
-      scope: ANTIGRAVITY_SCOPES.join(" "),
+      scope: SCOPES.join(" "),
       access_type: "offline",
       prompt: "consent",
       state,
@@ -151,8 +151,8 @@ export const antigravityProvider: Provider = {
     codeVerifier?: string
   ): Promise<OAuthResult> {
     const body: Record<string, string> = {
-      client_id: ANTIGRAVITY_CLIENT_ID,
-      client_secret: ANTIGRAVITY_CLIENT_SECRET,
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
       code,
       grant_type: "authorization_code",
       redirect_uri: redirectUri,
@@ -196,8 +196,8 @@ export const antigravityProvider: Provider = {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: ANTIGRAVITY_CLIENT_ID,
-        client_secret: ANTIGRAVITY_CLIENT_SECRET,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: "refresh_token",
       }),
@@ -329,7 +329,7 @@ export const antigravityProvider: Provider = {
     }
 
     let lastError: Error | null = null;
-    for (const endpoint of CODE_ASSIST_ENDPOINT_FALLBACKS) {
+    for (const endpoint of ENDPOINT_FALLBACKS) {
       const url = `${endpoint}/v1internal:${action}`;
 
       try {
@@ -548,7 +548,7 @@ async function fetchAccountInfo(
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          ...ANTIGRAVITY_AUTH_HEADERS,
+          ...AUTH_HEADERS,
         },
         body: JSON.stringify({
           metadata: requestMetadata,
@@ -619,7 +619,7 @@ async function fetchAccountInfo(
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          ...ANTIGRAVITY_AUTH_HEADERS,
+          ...AUTH_HEADERS,
         },
       }
     );
@@ -702,7 +702,7 @@ async function onboardUser(
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          ...ANTIGRAVITY_AUTH_HEADERS,
+          ...AUTH_HEADERS,
         },
         body: JSON.stringify(onboardRequest),
       });
@@ -721,7 +721,7 @@ async function onboardUser(
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
-            ...ANTIGRAVITY_AUTH_HEADERS,
+            ...AUTH_HEADERS,
           },
           body: JSON.stringify(onboardRequest),
         });

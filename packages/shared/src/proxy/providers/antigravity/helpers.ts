@@ -2,7 +2,7 @@
 // Includes system instruction injection and thinking config normalization
 
 import type { RequestPayload, ThinkingConfig } from "./transform/types.js";
-import { getParamType, type ToolSchemaMap } from "./tool-schema-cache.js";
+import { getParamType, type ToolSchemaMap } from "./tool-schema.js";
 
 /**
  * Check if a model is an image generation model (e.g. Nano Banana / Nano Banana Pro).
@@ -27,7 +27,7 @@ export function generateRequestId(): string {
 /**
  * Base Antigravity system instruction - required by the API
  */
-export const ANTIGRAVITY_BASE_SYSTEM_INSTRUCTION =
+export const BASE_SYSTEM_INSTRUCTION =
   "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**";
 
 /**
@@ -80,7 +80,7 @@ export function applyAntigravitySystemInstruction(
   }
 
   const nextParts = [
-    { text: ANTIGRAVITY_BASE_SYSTEM_INSTRUCTION },
+    { text: BASE_SYSTEM_INSTRUCTION },
     ...existingParts,
   ];
 

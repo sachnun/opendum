@@ -1,8 +1,8 @@
 // OpenRouter API constants
 
-export const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1";
+export const API_BASE_URL = "https://openrouter.ai/api/v1";
 
-export const OPENROUTER_SUPPORTED_PARAMS = new Set([
+export const SUPPORTED_PARAMS = new Set([
   "model",
   "messages",
   "temperature",

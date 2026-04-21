@@ -49,13 +49,13 @@ export function getErrorStatusCode(error: unknown): number {
   return 500;
 }
 
-const MAX_STRING_LENGTH = 200;
-const MAX_ARRAY_SUMMARY_ITEMS = 10;
+const TEXT_LIMIT = 200;
+const ARRAY_PREVIEW_LIMIT = 10;
 
 /**
  * Truncate a string to a max length, appending "[truncated]" if it exceeds.
  */
-function truncateString(value: string, maxLength: number = MAX_STRING_LENGTH): string {
+function truncateString(value: string, maxLength: number = TEXT_LIMIT): string {
   if (value.length <= maxLength) return value;
   return value.slice(0, maxLength) + `...[truncated, ${value.length} chars total]`;
 }
@@ -65,7 +65,7 @@ function truncateString(value: string, maxLength: number = MAX_STRING_LENGTH): s
  */
 function summarizeTools(tools: unknown[]): string {
   const names: string[] = [];
-  for (const tool of tools.slice(0, MAX_ARRAY_SUMMARY_ITEMS)) {
+  for (const tool of tools.slice(0, ARRAY_PREVIEW_LIMIT)) {
     if (tool && typeof tool === "object") {
       const t = tool as Record<string, unknown>;
       // OpenAI format: { type: "function", function: { name, ... } }
@@ -79,8 +79,8 @@ function summarizeTools(tools: unknown[]): string {
       }
     }
   }
-  const suffix = tools.length > MAX_ARRAY_SUMMARY_ITEMS
-    ? `, +${tools.length - MAX_ARRAY_SUMMARY_ITEMS} more`
+  const suffix = tools.length > ARRAY_PREVIEW_LIMIT
+    ? `, +${tools.length - ARRAY_PREVIEW_LIMIT} more`
     : "";
   return `[${tools.length} tool(s): ${names.join(", ")}${suffix}]`;
 }
@@ -106,8 +106,8 @@ function sanitizeValue(value: unknown, key?: string): unknown {
     }
 
     // Other arrays: show count + summarized items
-    if (value.length > MAX_ARRAY_SUMMARY_ITEMS) {
-      const preview = value.slice(0, MAX_ARRAY_SUMMARY_ITEMS).map((item, i) => sanitizeValue(item, `${key}[${i}]`));
+    if (value.length > ARRAY_PREVIEW_LIMIT) {
+      const preview = value.slice(0, ARRAY_PREVIEW_LIMIT).map((item, i) => sanitizeValue(item, `${key}[${i}]`));
       return [...preview, `...[truncated, ${value.length} items total]`];
     }
 
@@ -241,9 +241,9 @@ export type ProxyErrorType =
   | "rate_limit_error"
   | "api_error";
 
-const MAX_CLIENT_ERROR_DETAIL_LENGTH = 320;
+const CLIENT_DETAIL_LIMIT = 320;
 
-function truncateForClient(value: string, maxLength: number = MAX_CLIENT_ERROR_DETAIL_LENGTH): string {
+function truncateForClient(value: string, maxLength: number = CLIENT_DETAIL_LIMIT): string {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, maxLength)}...[truncated]`;
 }

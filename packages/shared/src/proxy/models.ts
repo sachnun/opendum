@@ -5,7 +5,7 @@ import {
   IGNORED_MODELS,
   type ModelMeta,
   type ModelInfo,
-} from "./model-loader.js";
+} from "./loader.js";
 
 // Re-export types and registry so existing consumers keep working
 export { MODEL_REGISTRY, IGNORED_MODELS };
@@ -77,21 +77,21 @@ for (const [canonical, aliases] of Object.entries(canonicalToAliases)) {
   );
 }
 
-const MODEL_SUGGESTION_THRESHOLD = 0.7;
-const ALL_MODEL_SUGGESTION_CANDIDATES = Array.from(
+const SUGGESTION_THRESHOLD = 0.7;
+const SUGGESTION_CANDIDATES = Array.from(
   new Set(getAllModelsWithAliases())
 ).sort((a, b) => a.localeCompare(b));
-const providerModelSuggestionCache = new Map<string, string[]>();
+const suggestionCache = new Map<string, string[]>();
 
 /** Cached per-provider model map: canonical → upstream name. */
-const providerModelMapCache = new Map<string, Record<string, string>>();
+const modelMapCache = new Map<string, Record<string, string>>();
 
 /**
  * Build (and cache) the full model map for a provider from the TOML registry.
  * Keys are canonical model IDs, values are upstream model names.
  */
 export function getProviderModelMap(provider: string): Record<string, string> {
-  const cached = providerModelMapCache.get(provider);
+  const cached = modelMapCache.get(provider);
   if (cached) return cached;
 
   const map: Record<string, string> = {};
@@ -100,22 +100,22 @@ export function getProviderModelMap(provider: string): Record<string, string> {
     map[canonical] = info.upstream?.[provider] ?? canonical;
   }
 
-  providerModelMapCache.set(provider, map);
+  modelMapCache.set(provider, map);
   return map;
 }
 
 /** Cached per-provider model set. */
-const providerModelSetCache = new Map<string, Set<string>>();
+const modelSetCache = new Map<string, Set<string>>();
 
 /**
  * Get the set of canonical model IDs supported by a provider.
  */
 export function getProviderModelSet(provider: string): Set<string> {
-  const cached = providerModelSetCache.get(provider);
+  const cached = modelSetCache.get(provider);
   if (cached) return cached;
 
   const modelSet = new Set(Object.keys(getProviderModelMap(provider)));
-  providerModelSetCache.set(provider, modelSet);
+  modelSetCache.set(provider, modelSet);
   return modelSet;
 }
 
@@ -231,16 +231,16 @@ export function getSuggestedModels(
     return [];
   }
 
-  let candidates = ALL_MODEL_SUGGESTION_CANDIDATES;
+  let candidates = SUGGESTION_CANDIDATES;
   let useProviderPrefix = false;
 
   if (provider) {
-    let providerCandidates = providerModelSuggestionCache.get(provider);
+    let providerCandidates = suggestionCache.get(provider);
     if (!providerCandidates) {
       providerCandidates = Array.from(new Set(getModelsForProvider(provider))).sort(
         (a, b) => a.localeCompare(b)
       );
-      providerModelSuggestionCache.set(provider, providerCandidates);
+      suggestionCache.set(provider, providerCandidates);
     }
 
     if (providerCandidates.length > 0) {
@@ -253,7 +253,7 @@ export function getSuggestedModels(
     ignoreCase: true,
     ignoreSymbols: true,
     normalizeWhitespace: true,
-    threshold: MODEL_SUGGESTION_THRESHOLD,
+    threshold: SUGGESTION_THRESHOLD,
   });
 
   return Array.from(

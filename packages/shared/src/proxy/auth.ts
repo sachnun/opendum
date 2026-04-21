@@ -16,9 +16,9 @@ import { normalizeProviderAlias } from "./providers/types.js";
 import {
   getChatGptCompatibleCodexModels,
   isChatGptAccountCompatibleCodexModel,
-} from "./providers/codex/model-compatibility.js";
+} from "./providers/codex/compat.js";
 
-function normalizeTierForProvider(provider: string, tier: string | null | undefined): string | null {
+function normalizeTierForProvider(tier: string | null | undefined): string | null {
   if (!tier) return null;
 
   const normalized = tier.trim().toLowerCase();
@@ -28,7 +28,6 @@ function normalizeTierForProvider(provider: string, tier: string | null | undefi
 }
 
 function doesAccountTierSatisfyRule(
-  provider: string,
   accountTier: string | null | undefined,
   minTier: string | null | undefined
 ): boolean {
@@ -36,12 +35,12 @@ function doesAccountTierSatisfyRule(
     return true;
   }
 
-  const normalizedRequiredTier = normalizeTierForProvider(provider, minTier);
+  const normalizedRequiredTier = normalizeTierForProvider(minTier);
   if (!normalizedRequiredTier) {
     return true;
   }
 
-  const normalizedAccountTier = normalizeTierForProvider(provider, accountTier);
+  const normalizedAccountTier = normalizeTierForProvider(accountTier);
   if (!normalizedAccountTier) {
     return false;
   }
@@ -141,14 +140,14 @@ function normalizeApiKeyModelList(models: string[]): string[] {
   return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
 }
 
-const API_KEY_VALIDATION_CACHE_PREFIX = "opendum:api-key:validation";
-const API_KEY_LAST_USED_THROTTLE_PREFIX = "opendum:api-key:last-used";
-const DISABLED_MODELS_CACHE_PREFIX = "opendum:user:disabled-models";
+const VALIDATION_PREFIX = "opendum:api-key:validation";
+const LAST_USED_PREFIX = "opendum:api-key:last-used";
+const DISABLED_MODELS_PREFIX = "opendum:user:disabled-models";
 
-const API_KEY_VALIDATION_POSITIVE_TTL_SECONDS = 45;
-const API_KEY_VALIDATION_NEGATIVE_TTL_SECONDS = 10;
-const API_KEY_LAST_USED_THROTTLE_SECONDS = 60;
-const DISABLED_MODELS_CACHE_TTL_SECONDS = 60;
+const VALID_TTL_SECONDS = 45;
+const INVALID_TTL_SECONDS = 10;
+const LAST_USED_TTL_SECONDS = 60;
+const DISABLED_MODELS_TTL_SECONDS = 60;
 
 export interface RateLimitRule {
   target: string;
@@ -188,15 +187,15 @@ function parseJsonValue<T>(rawValue: string | null): T | null {
 }
 
 function getApiKeyValidationCacheKey(keyHash: string): string {
-  return `${API_KEY_VALIDATION_CACHE_PREFIX}:${keyHash}`;
+  return `${VALIDATION_PREFIX}:${keyHash}`;
 }
 
 function getApiKeyLastUsedThrottleKey(apiKeyId: string): string {
-  return `${API_KEY_LAST_USED_THROTTLE_PREFIX}:${apiKeyId}`;
+  return `${LAST_USED_PREFIX}:${apiKeyId}`;
 }
 
 function getDisabledModelsCacheKey(userId: string): string {
-  return `${DISABLED_MODELS_CACHE_PREFIX}:${userId}`;
+  return `${DISABLED_MODELS_PREFIX}:${userId}`;
 }
 
 async function touchApiKeyLastUsed(apiKeyId: string): Promise<void> {
@@ -207,7 +206,7 @@ async function touchApiKeyLastUsed(apiKeyId: string): Promise<void> {
       getApiKeyLastUsedThrottleKey(apiKeyId),
       "1",
       "EX",
-      API_KEY_LAST_USED_THROTTLE_SECONDS,
+      LAST_USED_TTL_SECONDS,
       "NX"
     );
 
@@ -334,7 +333,7 @@ async function setCachedDisabledModels(userId: string, models: string[]): Promis
       getDisabledModelsCacheKey(userId),
       JSON.stringify({ models: normalizeApiKeyModelList(models) }),
       "EX",
-      DISABLED_MODELS_CACHE_TTL_SECONDS
+      DISABLED_MODELS_TTL_SECONDS
     );
   } catch {
     // Ignore cache write errors
@@ -613,7 +612,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     await setCachedApiKeyValidation(
       keyHash,
       { valid: false, error: "Invalid API key" },
-      API_KEY_VALIDATION_NEGATIVE_TTL_SECONDS
+      INVALID_TTL_SECONDS
     );
     return { valid: false, error: "Invalid API key" };
   }
@@ -622,7 +621,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     await setCachedApiKeyValidation(
       keyHash,
       { valid: false, error: "API key has been revoked" },
-      API_KEY_VALIDATION_NEGATIVE_TTL_SECONDS
+      INVALID_TTL_SECONDS
     );
     return { valid: false, error: "API key has been revoked" };
   }
@@ -634,7 +633,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     await setCachedApiKeyValidation(
       keyHash,
       { valid: false, error: "API key has expired" },
-      API_KEY_VALIDATION_NEGATIVE_TTL_SECONDS
+      INVALID_TTL_SECONDS
     );
     return { valid: false, error: "API key has expired" };
   }
@@ -665,7 +664,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   const accountAccessList = normalizeApiKeyAccountList(apiKey.accountAccessList);
   const expiresAtMs = apiKey.expiresAt ? apiKey.expiresAt.getTime() : null;
 
-  let cacheTtlSeconds = API_KEY_VALIDATION_POSITIVE_TTL_SECONDS;
+  let cacheTtlSeconds = VALID_TTL_SECONDS;
   if (typeof expiresAtMs === "number") {
     const secondsUntilExpiry = Math.floor((expiresAtMs - Date.now()) / 1000);
     cacheTtlSeconds = Math.max(1, Math.min(cacheTtlSeconds, secondsUntilExpiry));
@@ -779,7 +778,7 @@ export function isModelUsableByAccounts(
       const accountIds = availability.activeAccountIdsByProvider.get(provider) ?? [];
       const hasEligibleTierAccount = accountIds.some((accountId) => {
         const tier = availability.accountTierById.get(accountId);
-        return doesAccountTierSatisfyRule(provider, tier, accessRule.minTier);
+        return doesAccountTierSatisfyRule(tier, accessRule.minTier);
       });
 
       if (!hasEligibleTierAccount) {

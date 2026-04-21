@@ -6,8 +6,8 @@ import {
   applyAntigravitySystemInstruction,
   isImageGenerationModel,
   normalizeThinkingConfig,
-} from "../request-helpers.js";
-import { buildToolSchemaMap } from "../tool-schema-cache.js";
+} from "../helpers.js";
+import { buildToolSchemaMap } from "../tool-schema.js";
 import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
 const THOUGHT_SIGNATURE_BYPASS = "skip_thought_signature_validator";

@@ -1,8 +1,8 @@
 // Kilo Code (Kilo Gateway) API constants
 
-export const KILO_CODE_API_BASE_URL = "https://api.kilo.ai/api/gateway";
+export const API_BASE_URL = "https://api.kilo.ai/api/gateway";
 
-export const KILO_CODE_SUPPORTED_PARAMS = new Set([
+export const SUPPORTED_PARAMS = new Set([
   "model",
   "messages",
   "temperature",

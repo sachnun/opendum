@@ -7,10 +7,10 @@ import type {
   ProviderConfig,
 } from "../types.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
-import { convertImageUrlsToBase64 } from "../../image-utils.js";
+import { convertImageUrlsToBase64 } from "../../images.js";
 import {
   getWorkersAiChatUrl,
-  WORKERS_AI_SUPPORTED_PARAMS,
+  SUPPORTED_PARAMS,
 } from "./constants.js";
 
 const API_KEY_ACCOUNT_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000;
@@ -26,7 +26,7 @@ function buildRequestPayload(
   const payload: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(params)) {
-    if (WORKERS_AI_SUPPORTED_PARAMS.has(key) && value !== undefined) {
+    if (SUPPORTED_PARAMS.has(key) && value !== undefined) {
       payload[key] = value;
     }
   }

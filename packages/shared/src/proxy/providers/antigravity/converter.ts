@@ -2,8 +2,8 @@
 
 import type { ChatCompletionRequest } from "../types.js";
 import type { RequestPayload, ModelFamily } from "./transform/types.js";
-import { normalizeToolCallArgs } from "./request-helpers.js";
-import type { ToolSchemaMap } from "./tool-schema-cache.js";
+import { normalizeToolCallArgs } from "./helpers.js";
+import type { ToolSchemaMap } from "./tool-schema.js";
 
 /**
  * Infer MIME type from a URL based on file extension.

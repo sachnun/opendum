@@ -12,17 +12,17 @@ import type {
   ChatCompletionRequest,
 } from "../types.js";
 import {
-  GEMINI_CLI_CLIENT_ID,
-  GEMINI_CLI_CLIENT_SECRET,
-  GEMINI_CLI_SCOPES,
+  CLIENT_ID,
+  CLIENT_SECRET,
+  SCOPES,
   CODE_ASSIST_ENDPOINT,
-  GEMINI_CLI_LOAD_CODE_ASSIST_ENDPOINTS,
-  GEMINI_CLI_ONBOARD_USER_ENDPOINTS,
-  GEMINI_CLI_REFRESH_BUFFER_SECONDS,
-  GEMINI_CLI_AUTH_HEADERS,
+  LOAD_CODE_ASSIST_ENDPOINTS,
+  ONBOARD_USER_ENDPOINTS,
+  REFRESH_BUFFER_SECONDS,
+  AUTH_HEADERS,
   buildGeminiCliUserAgent,
-  THINKING_BUDGET_MAP,
-  GEMINI3_THINKING_LEVELS,
+  BUDGET_MAP,
+  THINKING_LEVELS,
   DEFAULT_SAFETY_SETTINGS,
 } from "./constants.js";
 import {
@@ -32,7 +32,7 @@ import {
   createAntigravityUnwrapTransform,
 } from "../antigravity/converter.js";
 import { cacheSignature } from "../antigravity/cache.js";
-import { buildToolSchemaMap } from "../antigravity/tool-schema-cache.js";
+import { buildToolSchemaMap } from "../antigravity/tool-schema.js";
 import { getProviderModelSet, getUpstreamModelName } from "../../models.js";
 
 /**
@@ -61,7 +61,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
  * Check if token needs refresh
  */
 function isTokenExpired(expiresAt: Date): boolean {
-  const bufferMs = GEMINI_CLI_REFRESH_BUFFER_SECONDS * 1000;
+  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
 
@@ -141,8 +141,8 @@ function getThinkingConfig(
   if (isG3) {
     // Gemini 3 uses thinkingLevel (low/medium/high for Flash, low/high for Pro)
     const levels = modelName.includes("flash")
-      ? GEMINI3_THINKING_LEVELS["gemini-3-flash"]
-      : GEMINI3_THINKING_LEVELS["gemini-3-pro"];
+      ? THINKING_LEVELS["gemini-3-flash"]
+      : THINKING_LEVELS["gemini-3-pro"];
 
     const level = levels[reasoningEffort as keyof typeof levels] ?? levels.high;
     return {
@@ -153,10 +153,10 @@ function getThinkingConfig(
 
   // Gemini 2.5 uses thinkingBudget
   const budgets = modelName.includes("flash")
-    ? THINKING_BUDGET_MAP["gemini-2.5-flash"]
+    ? BUDGET_MAP["gemini-2.5-flash"]
     : modelName.includes("pro")
-      ? THINKING_BUDGET_MAP["gemini-2.5-pro"]
-      : THINKING_BUDGET_MAP.default;
+      ? BUDGET_MAP["gemini-2.5-pro"]
+      : BUDGET_MAP.default;
 
   const budget = budgets[reasoningEffort as keyof typeof budgets] ?? budgets.high;
   return {
@@ -180,10 +180,10 @@ export const geminiCliProvider: Provider = {
     }
 
     const params = new URLSearchParams({
-      client_id: GEMINI_CLI_CLIENT_ID,
+      client_id: CLIENT_ID,
       redirect_uri: `${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/api/oauth/gemini-cli/callback`,
       response_type: "code",
-      scope: GEMINI_CLI_SCOPES.join(" "),
+      scope: SCOPES.join(" "),
       access_type: "offline",
       prompt: "consent",
       state,
@@ -198,8 +198,8 @@ export const geminiCliProvider: Provider = {
     codeVerifier?: string
   ): Promise<OAuthResult> {
     const body: Record<string, string> = {
-      client_id: GEMINI_CLI_CLIENT_ID,
-      client_secret: GEMINI_CLI_CLIENT_SECRET,
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
       code,
       grant_type: "authorization_code",
       redirect_uri: redirectUri,
@@ -250,8 +250,8 @@ export const geminiCliProvider: Provider = {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: GEMINI_CLI_CLIENT_ID,
-        client_secret: GEMINI_CLI_CLIENT_SECRET,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: "refresh_token",
       }),
@@ -665,14 +665,14 @@ async function onboardGeminiCliUser(
     metadata: requestMetadata,
   };
 
-  for (const baseEndpoint of GEMINI_CLI_ONBOARD_USER_ENDPOINTS) {
+  for (const baseEndpoint of ONBOARD_USER_ENDPOINTS) {
     try {
       const response = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          ...GEMINI_CLI_AUTH_HEADERS,
+          ...AUTH_HEADERS,
         },
         body: JSON.stringify(onboardRequest),
       });
@@ -691,7 +691,7 @@ async function onboardGeminiCliUser(
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
-            ...GEMINI_CLI_AUTH_HEADERS,
+            ...AUTH_HEADERS,
           },
           body: JSON.stringify(onboardRequest),
         });
@@ -753,7 +753,7 @@ async function fetchGeminiCliProjectFromResourceManager(
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          ...GEMINI_CLI_AUTH_HEADERS,
+          ...AUTH_HEADERS,
         },
         cache: "no-store",
       }
@@ -794,14 +794,14 @@ export async function fetchGeminiCliAccountInfo(
   let allowedTiers: GeminiCliAllowedTier[] = [];
   let discoveryError: string | undefined;
 
-  for (const baseEndpoint of GEMINI_CLI_LOAD_CODE_ASSIST_ENDPOINTS) {
+  for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
     try {
       const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          ...GEMINI_CLI_AUTH_HEADERS,
+          ...AUTH_HEADERS,
         },
         body: JSON.stringify({
           cloudaicompanionProject: configuredProjectId || null,

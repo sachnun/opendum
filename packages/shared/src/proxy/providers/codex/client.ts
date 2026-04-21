@@ -10,20 +10,20 @@ import type {
   ChatCompletionRequest,
 } from "../types.js";
 import {
-  CODEX_CLIENT_ID,
-  CODEX_DEVICE_CODE_ENDPOINT,
-  CODEX_DEVICE_POLL_ENDPOINT,
-  CODEX_TOKEN_ENDPOINT,
-  CODEX_REDIRECT_URI,
-  CODEX_DEVICE_VERIFICATION_URL,
-  CODEX_API_BASE_URL,
-  CODEX_SUPPORTED_PARAMS,
-  CODEX_REFRESH_BUFFER_SECONDS,
-  CODEX_ORIGINATOR,
+  CLIENT_ID,
+  DEVICE_CODE_ENDPOINT,
+  DEVICE_POLL_ENDPOINT,
+  TOKEN_ENDPOINT,
+  REDIRECT_URI,
+  DEVICE_VERIFICATION_URL,
+  API_BASE_URL,
+  SUPPORTED_PARAMS,
+  REFRESH_BUFFER_SECONDS,
+  ORIGINATOR,
 } from "./constants.js";
 import { getProviderModelSet, resolveModelAlias } from "../../models.js";
 import { updateCodexQuotaFromHeaders } from "./quota.js";
-import { isChatGptAccountCompatibleCodexModel } from "./model-compatibility.js";
+import { isChatGptAccountCompatibleCodexModel } from "./compat.js";
 
 /**
  * Device code initiation response
@@ -108,7 +108,7 @@ function setIfCodexParamSupported(
     return;
   }
 
-  if (CODEX_SUPPORTED_PARAMS.has(key)) {
+  if (SUPPORTED_PARAMS.has(key)) {
     payload[key] = value;
   }
 }
@@ -123,7 +123,7 @@ function filterSupportedCodexPayload(
       continue;
     }
 
-    if (CODEX_SUPPORTED_PARAMS.has(key)) {
+    if (SUPPORTED_PARAMS.has(key)) {
       filtered[key] = value;
     }
   }
@@ -1263,7 +1263,7 @@ function convertChatCompletionSseToCompletion(
 }
 
 function isTokenExpired(expiresAt: Date): boolean {
-  const bufferMs = CODEX_REFRESH_BUFFER_SECONDS * 1000;
+  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
 
@@ -1299,15 +1299,15 @@ export const codexProvider: Provider = {
     const body: Record<string, string> = {
       grant_type: "authorization_code",
       code,
-      client_id: CODEX_CLIENT_ID,
-      redirect_uri: redirectUri || CODEX_REDIRECT_URI,
+      client_id: CLIENT_ID,
+      redirect_uri: redirectUri || REDIRECT_URI,
     };
 
     if (codeVerifier) {
       body.code_verifier = codeVerifier;
     }
 
-    const response = await fetch(CODEX_TOKEN_ENDPOINT, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -1347,7 +1347,7 @@ export const codexProvider: Provider = {
    * Refresh access token
    */
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(CODEX_TOKEN_ENDPOINT, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -1356,7 +1356,7 @@ export const codexProvider: Provider = {
       body: new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: refreshToken,
-        client_id: CODEX_CLIENT_ID,
+        client_id: CLIENT_ID,
       }),
     });
 
@@ -1496,7 +1496,7 @@ export const codexProvider: Provider = {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       Accept: "text/event-stream",
-      originator: CODEX_ORIGINATOR,
+      originator: ORIGINATOR,
       "User-Agent":
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     };
@@ -1505,7 +1505,7 @@ export const codexProvider: Provider = {
       headers["ChatGPT-Account-Id"] = account.accountId;
     }
 
-    const response = await fetch(CODEX_API_BASE_URL, {
+    const response = await fetch(API_BASE_URL, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
@@ -1595,14 +1595,14 @@ export async function initiateCodexDeviceCodeFlow(): Promise<{
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  const response = await fetch(CODEX_DEVICE_CODE_ENDPOINT, {
+  const response = await fetch(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
     body: JSON.stringify({
-      client_id: CODEX_CLIENT_ID,
+      client_id: CLIENT_ID,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
     }),
@@ -1652,7 +1652,7 @@ export async function initiateCodexDeviceCodeFlow(): Promise<{
   return {
     deviceAuthId: data.device_auth_id,
     userCode: data.user_code,
-    verificationUrl: CODEX_DEVICE_VERIFICATION_URL,
+    verificationUrl: DEVICE_VERIFICATION_URL,
     expiresIn,
     interval,
     codeVerifier,
@@ -1670,7 +1670,7 @@ export async function pollCodexDeviceCodeAuthorization(
 ): Promise<
   OAuthResult | { pending: true } | { error: string }
 > {
-  const pollResponse = await fetch(CODEX_DEVICE_POLL_ENDPOINT, {
+  const pollResponse = await fetch(DEVICE_POLL_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1691,7 +1691,7 @@ export async function pollCodexDeviceCodeAuthorization(
 
     const tokenCodeVerifier = pollData.code_verifier || codeVerifier;
 
-    const tokenResponse = await fetch(CODEX_TOKEN_ENDPOINT, {
+    const tokenResponse = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -1700,8 +1700,8 @@ export async function pollCodexDeviceCodeAuthorization(
       body: new URLSearchParams({
         grant_type: "authorization_code",
         code: pollData.authorization_code,
-        client_id: CODEX_CLIENT_ID,
-        redirect_uri: CODEX_REDIRECT_URI,
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
         code_verifier: tokenCodeVerifier,
       }),
     });

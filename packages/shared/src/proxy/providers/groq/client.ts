@@ -8,8 +8,8 @@ import type {
 } from "../types.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 import {
-  GROQ_API_BASE_URL,
-  GROQ_SUPPORTED_PARAMS,
+  API_BASE_URL,
+  SUPPORTED_PARAMS,
 } from "./constants.js";
 
 const API_KEY_ACCOUNT_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000;
@@ -25,7 +25,7 @@ function buildRequestPayload(
   const payload: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(params)) {
-    if (GROQ_SUPPORTED_PARAMS.has(key) && value !== undefined) {
+    if (SUPPORTED_PARAMS.has(key) && value !== undefined) {
       payload[key] = value;
     }
   }
@@ -97,7 +97,7 @@ export const groqProvider: Provider = {
       stream
     );
 
-    return fetch(`${GROQ_API_BASE_URL}/chat/completions`, {
+    return fetch(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,

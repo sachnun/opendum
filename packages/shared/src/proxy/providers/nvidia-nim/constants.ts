@@ -1,8 +1,8 @@
 // Nvidia API constants
 
-export const NVIDIA_NIM_API_BASE_URL = "https://integrate.api.nvidia.com/v1";
+export const API_BASE_URL = "https://integrate.api.nvidia.com/v1";
 
-export const NVIDIA_NIM_SUPPORTED_PARAMS = new Set([
+export const SUPPORTED_PARAMS = new Set([
   "model",
   "messages",
   "temperature",

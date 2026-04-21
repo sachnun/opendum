@@ -48,9 +48,9 @@
       "types": "./dist/proxy/auth.d.ts",
       "default": "./dist/proxy/auth.js"
     },
-    "./proxy/adaptive-timeout": {
-      "types": "./dist/proxy/adaptive-timeout.d.ts",
-      "default": "./dist/proxy/adaptive-timeout.js"
+    "./proxy/latency": {
+      "types": "./dist/proxy/latency.d.ts",
+      "default": "./dist/proxy/latency.js"
     },
     "./proxy/providers": {
       "types": "./dist/proxy/providers/index.d.ts",
@@ -82,7 +82,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist tsconfig.tsbuildinfo && tsc",
+    "build": "tsc -b",
     "dev": "tsc --watch"
   },
   "dependencies": {

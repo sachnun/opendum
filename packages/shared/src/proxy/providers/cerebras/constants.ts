@@ -1,12 +1,12 @@
 // Cerebras API constants
 
-export const CEREBRAS_API_BASE_URL = "https://api.cerebras.ai/v1";
+export const API_BASE_URL = "https://api.cerebras.ai/v1";
 
 // Cerebras is OpenAI-compatible but does NOT support:
 // - frequency_penalty
 // - presence_penalty
 // - logit_bias
-export const CEREBRAS_SUPPORTED_PARAMS = new Set([
+export const SUPPORTED_PARAMS = new Set([
   "model",
   "messages",
   "temperature",

@@ -101,7 +101,7 @@ export {
 } from "./proxy/auth.js";
 
 // Proxy - Latency Tracking
-export { recordLatency } from "./proxy/adaptive-timeout.js";
+export { recordLatency } from "./proxy/latency.js";
 
 // Proxy - Message Sanitizer
 export { stripImageContent } from "./proxy/message-sanitizer.js";

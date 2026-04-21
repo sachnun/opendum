@@ -1,9 +1,9 @@
 import {
-  CODE_ASSIST_ENDPOINT_FALLBACKS,
-  GEMINI_CLI_AUTH_HEADERS,
+  ENDPOINT_FALLBACKS,
+  AUTH_HEADERS,
 } from "./constants.js";
 
-export const GEMINI_CLI_QUOTA_STALE_THRESHOLD_MS = 15 * 60 * 1000;
+export const QUOTA_STALE_MS = 15 * 60 * 1000;
 
 const DEFAULT_MAX_REQUESTS = 1000;
 
@@ -31,7 +31,7 @@ const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
   },
 };
 
-export const GEMINI_CLI_QUOTA_GROUPS: Record<
+export const QUOTA_GROUPS: Record<
   string,
   { displayName: string; models: string[] }
 > = {
@@ -140,7 +140,7 @@ function buildQuotaGroups(
 ): GeminiCliQuotaGroupInfo[] {
   const groups: GeminiCliQuotaGroupInfo[] = [];
 
-  for (const [groupName, groupConfig] of Object.entries(GEMINI_CLI_QUOTA_GROUPS)) {
+  for (const [groupName, groupConfig] of Object.entries(QUOTA_GROUPS)) {
     const representative = groupConfig.models.find((model) => models[model]);
     if (!representative) {
       continue;
@@ -177,7 +177,7 @@ export async function fetchGeminiCliQuotaFromApi(
   const errors: string[] = [];
   const normalizedTier = normalizeTier(tier);
 
-  for (const baseEndpoint of CODE_ASSIST_ENDPOINT_FALLBACKS) {
+  for (const baseEndpoint of ENDPOINT_FALLBACKS) {
     try {
       const response = await fetch(
         `${baseEndpoint}/v1internal:retrieveUserQuota`,
@@ -187,7 +187,7 @@ export async function fetchGeminiCliQuotaFromApi(
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
             Accept: "application/json",
-            ...GEMINI_CLI_AUTH_HEADERS,
+            ...AUTH_HEADERS,
           },
           body: JSON.stringify({ project: projectId }),
           cache: "no-store",
@@ -270,5 +270,5 @@ export async function fetchGeminiCliQuotaFromApi(
 }
 
 export function isGeminiCliQuotaStale(snapshot: GeminiCliQuotaSnapshot): boolean {
-  return Date.now() - snapshot.fetchedAt > GEMINI_CLI_QUOTA_STALE_THRESHOLD_MS;
+  return Date.now() - snapshot.fetchedAt > QUOTA_STALE_MS;
 }

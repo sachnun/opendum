@@ -10,14 +10,14 @@ import type {
   ProviderConfig,
 } from "../types.js";
 import {
-  KIRO_API_BASE_URL,
-  KIRO_BROWSER_REDIRECT_URI,
-  KIRO_DEFAULT_MODEL,
-  KIRO_OAUTH_AUTHORIZE_ENDPOINT,
-  KIRO_OAUTH_IDP,
-  KIRO_OAUTH_REFRESH_ENDPOINT,
-  KIRO_OAUTH_TOKEN_ENDPOINT,
-  KIRO_REFRESH_BUFFER_SECONDS,
+  API_BASE_URL,
+  BROWSER_REDIRECT_URI,
+  DEFAULT_MODEL,
+  AUTHORIZE_ENDPOINT,
+  IDP,
+  REFRESH_ENDPOINT,
+  TOKEN_ENDPOINT,
+  REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 
@@ -44,7 +44,7 @@ interface KiroToolCall {
 type JsonObject = Record<string, unknown>;
 
 function isTokenExpired(expiresAt: Date): boolean {
-  const bufferMs = KIRO_REFRESH_BUFFER_SECONDS * 1000;
+  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
@@ -71,7 +71,7 @@ function normalizeModel(model: string): string {
   const upstream = getUpstreamModelName(rawModel, "kiro");
   // If model was not found in TOML, fall back to default model's upstream name
   if (upstream === rawModel && !getProviderModelSet("kiro").has(rawModel)) {
-    return getUpstreamModelName(KIRO_DEFAULT_MODEL, "kiro");
+    return getUpstreamModelName(DEFAULT_MODEL, "kiro");
   }
   return upstream;
 }
@@ -456,7 +456,7 @@ export const kiroProvider: Provider = {
       throw new Error("Code verifier is required for Kiro token exchange");
     }
 
-    const response = await fetch(KIRO_OAUTH_TOKEN_ENDPOINT, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -466,7 +466,7 @@ export const kiroProvider: Provider = {
       body: JSON.stringify({
         code,
         code_verifier: codeVerifier,
-        redirect_uri: redirectUri || KIRO_BROWSER_REDIRECT_URI,
+        redirect_uri: redirectUri || BROWSER_REDIRECT_URI,
       }),
     });
 
@@ -489,7 +489,7 @@ export const kiroProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(KIRO_OAUTH_REFRESH_ENDPOINT, {
+    const response = await fetch(REFRESH_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -554,7 +554,7 @@ export const kiroProvider: Provider = {
       payload.profileArn = account.accountId;
     }
 
-    const upstreamResponse = await fetch(KIRO_API_BASE_URL, {
+    const upstreamResponse = await fetch(API_BASE_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${credentials}`,
@@ -710,13 +710,13 @@ export const kiroProvider: Provider = {
 export async function buildKiroAuthUrl(state: string, codeVerifier: string): Promise<string> {
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const params = new URLSearchParams({
-    idp: KIRO_OAUTH_IDP,
-    redirect_uri: KIRO_BROWSER_REDIRECT_URI,
+    idp: IDP,
+    redirect_uri: BROWSER_REDIRECT_URI,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
     state,
     prompt: "select_account",
   });
 
-  return `${KIRO_OAUTH_AUTHORIZE_ENDPOINT}?${params.toString()}`;
+  return `${AUTHORIZE_ENDPOINT}?${params.toString()}`;
 }

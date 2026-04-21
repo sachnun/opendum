@@ -24,7 +24,19 @@ function createDb(): Database {
   return drizzleNodePg(pool, { schema: fullSchema });
 }
 
-export const db: Database = globalForDb.db ?? createDb();
+function getDb(): Database {
+  if (!globalForDb.db) {
+    globalForDb.db = createDb();
+  }
+
+  return globalForDb.db;
+}
+
+export const db = new Proxy({} as Database, {
+  get(_target, property, receiver) {
+    return Reflect.get(getDb() as object, property, receiver);
+  },
+}) as Database;
 
 export async function closeDb() {
   await globalForDb.pool?.end();
@@ -32,7 +44,7 @@ export async function closeDb() {
 }
 
 if (process.env.NODE_ENV !== "production") {
-  globalForDb.db = db;
+  globalForDb.db ??= getDb();
 }
 
 // Re-export schema for convenience

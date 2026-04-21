@@ -86,11 +86,11 @@ interface TomlModel {
   [key: string]: unknown;
 }
 
-const RESERVED_TOP_LEVEL_TABLES = new Set(["limit", "modalities", "opendum"]);
+const RESERVED_TABLES = new Set(["limit", "modalities", "opendum"]);
 
 function extractProviderConfigs(raw: TomlModel): ModelInfo["providerConfig"] {
   const entries = Object.entries(raw)
-    .filter(([key]) => !RESERVED_TOP_LEVEL_TABLES.has(key))
+    .filter(([key]) => !RESERVED_TABLES.has(key))
     .map(([provider, value]) => {
       if (!value || typeof value !== "object" || Array.isArray(value)) {
         return null;
@@ -127,8 +127,8 @@ function extractProviderConfigs(raw: TomlModel): ModelInfo["providerConfig"] {
 
 function resolveModelsDir(): string {
   // Try to find the models directory relative to this file's location.
-  // When built: dist/proxy/model-loader.js → ../../models
-  // When running from source: src/proxy/model-loader.ts → ../../models
+  // When built: dist/proxy/loader.js -> ../../models
+  // When running from source: src/proxy/loader.ts -> ../../models
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
   const relativeModelsDir = join(__dirname, "..", "..", "models");

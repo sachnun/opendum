@@ -1,4 +1,4 @@
-import type { ToolSchemaMap } from "../tool-schema-cache.js";
+import type { ToolSchemaMap } from "../tool-schema.js";
 
 export type ModelFamily = "claude" | "gemini-flash" | "gemini-pro";
 

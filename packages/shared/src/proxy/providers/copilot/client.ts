@@ -10,21 +10,21 @@ import type {
   ChatCompletionRequest,
 } from "../types.js";
 import {
-  COPILOT_CLIENT_ID,
-  COPILOT_DEVICE_CODE_ENDPOINT,
-  COPILOT_TOKEN_ENDPOINT,
-  COPILOT_API_BASE_URL,
-  COPILOT_USER_ENDPOINT,
-  COPILOT_SCOPE,
-  COPILOT_SUPPORTED_PARAMS,
-  COPILOT_OPENCODE_USER_AGENT,
-  COPILOT_OPENCODE_INTENT,
-  COPILOT_POLLING_INTERVAL,
-  COPILOT_DEVICE_CODE_EXPIRY,
-  COPILOT_REFRESH_BUFFER_SECONDS,
+  CLIENT_ID,
+  DEVICE_CODE_ENDPOINT,
+  TOKEN_ENDPOINT,
+  API_BASE_URL,
+  USER_ENDPOINT,
+  SCOPE,
+  SUPPORTED_PARAMS,
+  USER_AGENT,
+  INTENT,
+  POLLING_INTERVAL,
+  DEVICE_CODE_EXPIRY,
+  REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet, MODEL_REGISTRY, resolveModelAlias } from "../../models.js";
-import { convertImageUrlsToBase64, convertResponsesInputImageUrlsToBase64 } from "../../image-utils.js";
+import { convertImageUrlsToBase64, convertResponsesInputImageUrlsToBase64 } from "../../images.js";
 import {
   convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
@@ -56,7 +56,7 @@ interface CopilotTokenResponse {
 const POLLING_SAFETY_MARGIN_SECONDS = 3;
 
 function isTokenExpired(expiresAt: Date): boolean {
-  const bufferMs = COPILOT_REFRESH_BUFFER_SECONDS * 1000;
+  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
 
@@ -67,7 +67,7 @@ function buildRequestPayload(
   const payload: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(params)) {
-    if (COPILOT_SUPPORTED_PARAMS.has(key) && value !== undefined) {
+    if (SUPPORTED_PARAMS.has(key) && value !== undefined) {
       payload[key] = value;
     }
   }
@@ -704,9 +704,9 @@ function buildCopilotHeaders(
 ): Record<string, string> {
   const headers: Record<string, string> = {
     "x-initiator": initiator,
-    "User-Agent": COPILOT_OPENCODE_USER_AGENT,
+    "User-Agent": USER_AGENT,
     Authorization: `Bearer ${accessToken}`,
-    "Openai-Intent": COPILOT_OPENCODE_INTENT,
+    "Openai-Intent": INTENT,
     "Content-Type": "application/json",
     Accept: stream ? "text/event-stream" : "application/json",
   };
@@ -720,11 +720,11 @@ function buildCopilotHeaders(
 
 async function fetchCopilotIdentity(accessToken: string): Promise<string> {
   try {
-    const response = await fetch(COPILOT_USER_ENDPOINT, {
+    const response = await fetch(USER_ENDPOINT, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
-        "User-Agent": COPILOT_OPENCODE_USER_AGENT,
+        "User-Agent": USER_AGENT,
       },
       cache: "no-store",
     });
@@ -803,15 +803,15 @@ export const copilotProvider: Provider = {
   },
 
   async exchangeCode(code: string): Promise<OAuthResult> {
-    const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "User-Agent": COPILOT_OPENCODE_USER_AGENT,
+        "User-Agent": USER_AGENT,
       },
       body: JSON.stringify({
-        client_id: COPILOT_CLIENT_ID,
+        client_id: CLIENT_ID,
         device_code: code,
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       }),
@@ -839,15 +839,15 @@ export const copilotProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "User-Agent": COPILOT_OPENCODE_USER_AGENT,
+        "User-Agent": USER_AGENT,
       },
       body: JSON.stringify({
-        client_id: COPILOT_CLIENT_ID,
+        client_id: CLIENT_ID,
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       }),
@@ -939,7 +939,7 @@ export const copilotProvider: Provider = {
       );
 
       const response = await fetch(
-        `${COPILOT_API_BASE_URL}/responses`,
+        `${API_BASE_URL}/responses`,
         {
           method: "POST",
           headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
@@ -993,7 +993,7 @@ export const copilotProvider: Provider = {
     }
     const requestPayload = buildRequestPayload(chatBody, stream);
 
-    return fetch(`${COPILOT_API_BASE_URL}/chat/completions`, {
+    return fetch(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
       body: JSON.stringify(requestPayload),
@@ -1009,16 +1009,16 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
   expiresIn: number;
   interval: number;
 }> {
-  const response = await fetch(COPILOT_DEVICE_CODE_ENDPOINT, {
+  const response = await fetch(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": COPILOT_OPENCODE_USER_AGENT,
+      "User-Agent": USER_AGENT,
     },
     body: JSON.stringify({
-      client_id: COPILOT_CLIENT_ID,
-      scope: COPILOT_SCOPE,
+      client_id: CLIENT_ID,
+      scope: SCOPE,
     }),
     cache: "no-store",
   });
@@ -1035,23 +1035,23 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
     userCode: data.user_code,
     verificationUrl: data.verification_uri,
     verificationUrlComplete: data.verification_uri_complete || data.verification_uri,
-    expiresIn: data.expires_in || COPILOT_DEVICE_CODE_EXPIRY,
-    interval: data.interval || COPILOT_POLLING_INTERVAL,
+    expiresIn: data.expires_in || DEVICE_CODE_EXPIRY,
+    interval: data.interval || POLLING_INTERVAL,
   };
 }
 
 export async function pollCopilotDeviceCodeAuthorization(
   deviceCode: string
 ): Promise<OAuthResult | { pending: true; retryAfterSeconds?: number } | { error: string }> {
-  const response = await fetch(COPILOT_TOKEN_ENDPOINT, {
+  const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": COPILOT_OPENCODE_USER_AGENT,
+      "User-Agent": USER_AGENT,
     },
     body: JSON.stringify({
-      client_id: COPILOT_CLIENT_ID,
+      client_id: CLIENT_ID,
       device_code: deviceCode,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
     }),
@@ -1084,7 +1084,7 @@ export async function pollCopilotDeviceCodeAuthorization(
   // interval by 5 seconds (or use the server-provided interval).  We also add
   // a safety margin to guard against monotonic-clock drift in VMs/WSL.
   if (data.error === "slow_down") {
-    const serverInterval = data.interval ?? COPILOT_POLLING_INTERVAL + 5;
+    const serverInterval = data.interval ?? POLLING_INTERVAL + 5;
     return {
       pending: true,
       retryAfterSeconds: serverInterval + POLLING_SAFETY_MARGIN_SECONDS,

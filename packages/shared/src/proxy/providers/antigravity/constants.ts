@@ -1,10 +1,10 @@
 // OAuth Configuration (Google OAuth)
-export const ANTIGRAVITY_CLIENT_ID =
+export const CLIENT_ID =
   "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
-export const ANTIGRAVITY_CLIENT_SECRET =
+export const CLIENT_SECRET =
   "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";
 
-export const ANTIGRAVITY_SCOPES: readonly string[] = [
+export const SCOPES: readonly string[] = [
   "https://www.googleapis.com/auth/cloud-platform",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/userinfo.profile",
@@ -13,7 +13,7 @@ export const ANTIGRAVITY_SCOPES: readonly string[] = [
 ];
 
 // OAuth callback on localhost (user copies URL manually)
-export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:1/oauth2callback";
+export const REDIRECT_URI = "http://localhost:1/oauth2callback";
 
 // User Agent & API Client headers
 // Dynamically detect OS/arch for accurate User-Agent header
@@ -33,9 +33,9 @@ function getAntigravityPlatform(): string {
   return `${platform}/${arch}`;
 }
 
-export const ANTIGRAVITY_USER_AGENT = `antigravity/1.23.2 ${getAntigravityPlatform()}`;
-export const ANTIGRAVITY_API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1";
-export const ANTIGRAVITY_CLIENT_METADATA =
+export const USER_AGENT = `antigravity/1.23.2 ${getAntigravityPlatform()}`;
+export const API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1";
+export const CLIENT_METADATA =
   '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
 
 // Endpoint fallbacks (daily → autopush → prod)
@@ -45,7 +45,7 @@ export const CODE_ASSIST_ENDPOINT_AUTOPUSH =
   "https://autopush-cloudcode-pa.sandbox.googleapis.com";
 export const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
-export const CODE_ASSIST_ENDPOINT_FALLBACKS = [
+export const ENDPOINT_FALLBACKS = [
   CODE_ASSIST_ENDPOINT_DAILY,
   CODE_ASSIST_ENDPOINT_AUTOPUSH,
   CODE_ASSIST_ENDPOINT_PROD,
@@ -68,21 +68,21 @@ export const ONBOARD_USER_ENDPOINTS = [
 export const CODE_ASSIST_ENDPOINT = CODE_ASSIST_ENDPOINT_DAILY;
 
 // Headers for auth/discovery calls (loadCodeAssist, onboardUser)
-export const ANTIGRAVITY_AUTH_HEADERS = {
-  "User-Agent": ANTIGRAVITY_USER_AGENT,
-  "X-Goog-Api-Client": ANTIGRAVITY_API_CLIENT,
-  "Client-Metadata": ANTIGRAVITY_CLIENT_METADATA,
+export const AUTH_HEADERS = {
+  "User-Agent": USER_AGENT,
+  "X-Goog-Api-Client": API_CLIENT,
+  "Client-Metadata": CLIENT_METADATA,
 } as const;
 export const CODE_ASSIST_API_VERSION = "v1internal";
 
 export const CODE_ASSIST_HEADERS = {
-  "User-Agent": ANTIGRAVITY_USER_AGENT,
-  "X-Goog-Api-Client": ANTIGRAVITY_API_CLIENT,
-  "Client-Metadata": ANTIGRAVITY_CLIENT_METADATA,
+  "User-Agent": USER_AGENT,
+  "X-Goog-Api-Client": API_CLIENT,
+  "Client-Metadata": CLIENT_METADATA,
 } as const;
 
 // Token refresh buffer (1 hour before expiry)
-export const ANTIGRAVITY_REFRESH_BUFFER_SECONDS = 60 * 60;
+export const REFRESH_BUFFER_SECONDS = 60 * 60;
 
 // Default project ID fallback when discovery fails
 export const DEFAULT_PROJECT_ID = "rising-fact-p41fc";

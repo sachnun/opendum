@@ -1,5 +1,5 @@
 import { getRedisClient } from "../../../redis.js";
-import { COPILOT_X_INITIATOR_WINDOW_MS } from "./constants.js";
+import { X_INITIATOR_WINDOW_MS } from "./constants.js";
 
 export type CopilotInitiator = "user" | "agent";
 
@@ -8,7 +8,7 @@ export interface CopilotSystemToolMode {
   injectSystemTool: boolean;
 }
 
-const COPILOT_SYSTEM_TOOL_KEY_PREFIX = "opendum:copilot:system-tool-window";
+const KEY_PREFIX = "opendum:copilot:system-tool-window";
 
 const TOOL_NAME = "get_context";
 const TOOL_CALL_ID = "call_init";
@@ -18,7 +18,7 @@ function getCurrentYear(): string {
 }
 
 function getWindowKey(accountId: string): string {
-  return `${COPILOT_SYSTEM_TOOL_KEY_PREFIX}:${accountId}`;
+  return `${KEY_PREFIX}:${accountId}`;
 }
 
 function toTtlSeconds(windowMs: number): number {
@@ -40,7 +40,7 @@ export async function getCopilotSystemToolMode(
       getWindowKey(normalizedAccountId),
       "1",
       "EX",
-      toTtlSeconds(COPILOT_X_INITIATOR_WINDOW_MS),
+      toTtlSeconds(X_INITIATOR_WINDOW_MS),
       "NX"
     );
 

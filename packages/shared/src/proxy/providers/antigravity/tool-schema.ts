@@ -56,8 +56,8 @@ function extractSchemaInfo(schema: unknown): SchemaInfo {
 export function buildToolSchemaMap(
   tools: Array<Record<string, unknown>> | undefined
 ): ToolSchemaMap {
-  const toolSchemaMap: ToolSchemaMap = new Map();
-  if (!Array.isArray(tools)) return toolSchemaMap;
+  const schemaMap: ToolSchemaMap = new Map();
+  if (!Array.isArray(tools)) return schemaMap;
 
   for (const tool of tools) {
     const funcDecls = tool.functionDeclarations as
@@ -86,15 +86,15 @@ export function buildToolSchemaMap(
         paramMap.set(paramName, extractSchemaInfo(paramSchema));
       }
 
-      toolSchemaMap.set(sanitizedName, paramMap);
+      schemaMap.set(sanitizedName, paramMap);
       // Also cache with original name to be safe
       if (sanitizedName !== originalName) {
-        toolSchemaMap.set(originalName, paramMap);
+        schemaMap.set(originalName, paramMap);
       }
     }
   }
 
-  return toolSchemaMap;
+  return schemaMap;
 }
 
 /**

@@ -13,13 +13,13 @@ import type {
   ChatCompletionRequest,
 } from "../types.js";
 import {
-  QWEN_CODE_CLIENT_ID,
-  QWEN_CODE_SCOPE,
-  QWEN_CODE_TOKEN_ENDPOINT,
-  QWEN_CODE_DEVICE_CODE_ENDPOINT,
-  QWEN_CODE_API_BASE_URL,
-  QWEN_CODE_SUPPORTED_PARAMS,
-  QWEN_CODE_REFRESH_BUFFER_SECONDS,
+  CLIENT_ID,
+  SCOPE,
+  TOKEN_ENDPOINT,
+  DEVICE_CODE_ENDPOINT,
+  API_BASE_URL,
+  SUPPORTED_PARAMS,
+  REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 
@@ -74,7 +74,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
  * Check if token needs refresh (with buffer)
  */
 function isTokenExpired(expiresAt: Date): boolean {
-  const bufferMs = QWEN_CODE_REFRESH_BUFFER_SECONDS * 1000;
+  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
 
@@ -150,7 +150,7 @@ function buildRequestPayload(
   const payload: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(params)) {
-    if (QWEN_CODE_SUPPORTED_PARAMS.has(key) && value !== undefined) {
+    if (SUPPORTED_PARAMS.has(key) && value !== undefined) {
       payload[key] = value;
     }
   }
@@ -227,14 +227,14 @@ export const qwenCodeProvider: Provider = {
     const body: Record<string, string> = {
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       device_code: code,
-      client_id: QWEN_CODE_CLIENT_ID,
+      client_id: CLIENT_ID,
     };
 
     if (codeVerifier) {
       body.code_verifier = codeVerifier;
     }
 
-    const response = await fetch(QWEN_CODE_TOKEN_ENDPOINT, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -260,7 +260,7 @@ export const qwenCodeProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(QWEN_CODE_TOKEN_ENDPOINT, {
+    const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -270,7 +270,7 @@ export const qwenCodeProvider: Provider = {
       body: new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: refreshToken,
-        client_id: QWEN_CODE_CLIENT_ID,
+        client_id: CLIENT_ID,
       }),
     });
 
@@ -348,7 +348,7 @@ export const qwenCodeProvider: Provider = {
       stream
     );
 
-    const response = await fetch(`${QWEN_CODE_API_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -400,7 +400,7 @@ export async function initiateDeviceCodeFlow(): Promise<{
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  const response = await fetch(QWEN_CODE_DEVICE_CODE_ENDPOINT, {
+  const response = await fetch(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -408,8 +408,8 @@ export async function initiateDeviceCodeFlow(): Promise<{
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     },
     body: new URLSearchParams({
-      client_id: QWEN_CODE_CLIENT_ID,
-      scope: QWEN_CODE_SCOPE,
+      client_id: CLIENT_ID,
+      scope: SCOPE,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
     }),
@@ -441,7 +441,7 @@ export async function pollDeviceCodeAuthorization(
   deviceCode: string,
   codeVerifier: string
 ): Promise<OAuthResult | { pending: true } | { error: string }> {
-  const response = await fetch(QWEN_CODE_TOKEN_ENDPOINT, {
+  const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -451,7 +451,7 @@ export async function pollDeviceCodeAuthorization(
     body: new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       device_code: deviceCode,
-      client_id: QWEN_CODE_CLIENT_ID,
+      client_id: CLIENT_ID,
       code_verifier: codeVerifier,
     }),
   });

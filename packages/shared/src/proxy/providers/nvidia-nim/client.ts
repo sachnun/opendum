@@ -7,8 +7,8 @@ import type {
   ProviderConfig,
 } from "../types.js";
 import {
-  NVIDIA_NIM_API_BASE_URL,
-  NVIDIA_NIM_SUPPORTED_PARAMS,
+  API_BASE_URL,
+  SUPPORTED_PARAMS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 
@@ -29,7 +29,7 @@ function buildRequestPayload(
   const payload: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(params)) {
-    if (NVIDIA_NIM_SUPPORTED_PARAMS.has(key) && value !== undefined) {
+    if (SUPPORTED_PARAMS.has(key) && value !== undefined) {
       payload[key] = value;
     }
   }
@@ -101,7 +101,7 @@ export const nvidiaNimProvider: Provider = {
       stream
     );
 
-    return fetch(`${NVIDIA_NIM_API_BASE_URL}/chat/completions`, {
+    return fetch(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,

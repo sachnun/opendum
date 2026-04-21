@@ -1,8 +1,8 @@
 // Ollama Cloud API constants
 
-export const OLLAMA_CLOUD_API_BASE_URL = "https://ollama.com/v1";
+export const API_BASE_URL = "https://ollama.com/v1";
 
-export const OLLAMA_CLOUD_SUPPORTED_PARAMS = new Set([
+export const SUPPORTED_PARAMS = new Set([
   "model",
   "messages",
   "temperature",

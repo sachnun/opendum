@@ -13,6 +13,6 @@
     ]
   },
   "deploy": {
-    "startCommand": "HOSTNAME=0.0.0.0 node apps/dashboard/.next/standalone/apps/dashboard/server.js"
+    "startCommand": "pnpm --filter @opendum/dashboard start"
   }
 }

@@ -1,7 +1,7 @@
 import type { ChatCompletionRequest } from "./providers/types.js";
 
 // Timeout for fetching individual image URLs (30 seconds)
-const IMAGE_FETCH_TIMEOUT_MS = 30_000;
+const FETCH_TIMEOUT_MS = 30_000;
 
 /**
  * Fetch an HTTP(S) URL and return a base64 data URI.
@@ -10,7 +10,7 @@ const IMAGE_FETCH_TIMEOUT_MS = 30_000;
 async function fetchAsDataUri(url: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timer);
 

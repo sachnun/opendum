@@ -13,7 +13,6 @@ import {
   logUsage,
   isModelSupportedByProvider,
   getProvider,
-  recordLatency,
   isVisionModel,
   stripImageContent,
 } from "@opendum/shared";
@@ -24,7 +23,6 @@ import {
   getEligibleAccounts,
   getNextAvailableAccount,
   markAccountFailed,
-  markAccountSuccess,
 } from "./load-balancer.js";
 import {
   formatWaitTimeMs,
@@ -42,7 +40,7 @@ import {
   getSanitizedProxyError,
   shouldRotateToNextAccount,
   type ProxyErrorType,
-} from "./error-utils.js";
+} from "./errors.js";
 import { checkAndIncrementRateLimit } from "./api-key-rate-limit.js";
 
 // ---------------------------------------------------------------------------
