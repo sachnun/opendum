@@ -590,6 +590,7 @@ function LastErrorMessageDialog({
             {code && `[${code}] `}
             {preview}
           </span>
+          <span className="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">

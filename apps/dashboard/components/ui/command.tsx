@@ -67,6 +67,17 @@ function CommandInput({
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [hasValue, setHasValue] = React.useState(false)
 
+  const resetListScroll = () => {
+    window.requestAnimationFrame(() => {
+      const commandRoot = inputRef.current?.closest('[data-slot="command"]')
+      const commandList = commandRoot?.querySelector<HTMLElement>(
+        '[data-slot="command-list"]'
+      )
+
+      commandList?.scrollTo({ top: 0 })
+    })
+  }
+
   return (
     <div
       data-slot="command-input-wrapper"
@@ -83,6 +94,7 @@ function CommandInput({
         onValueChange={(value) => {
           setHasValue(value.length > 0)
           props.onValueChange?.(value)
+          resetListScroll()
         }}
         {...props}
       />
@@ -96,16 +108,17 @@ function CommandInput({
               const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
                 window.HTMLInputElement.prototype,
                 "value"
-              )?.set
-              nativeInputValueSetter?.call(inputRef.current, "")
-              inputRef.current.dispatchEvent(new Event("input", { bubbles: true }))
-            }
-            setHasValue(false)
-          }}
-          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
-        >
-          <XIcon className="size-4" />
-        </button>
+               )?.set
+               nativeInputValueSetter?.call(inputRef.current, "")
+               inputRef.current.dispatchEvent(new Event("input", { bubbles: true }))
+             }
+             setHasValue(false)
+             resetListScroll()
+           }}
+           className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+         >
+           <XIcon className="size-4" />
+         </button>
       )}
     </div>
   )

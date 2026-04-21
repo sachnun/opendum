@@ -33,8 +33,6 @@ import {
   exchangeGeminiCliOAuthCode,
   exchangeCodexOAuthCode,
   exchangeKiroOAuthCode,
-  getAntigravityAuthUrl,
-  getGeminiCliAuthUrl,
   getCodexAuthUrl,
   getKiroAuthUrl,
   initiateQwenCodeAuth,
@@ -49,14 +47,18 @@ import {
   connectKiloCodeApiKey,
   connectWorkersAiApiKey,
 } from "@/lib/actions/accounts";
+import { buildPublicGoogleOAuthUrl } from "@/lib/public-google-oauth";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { cn } from "@/lib/utils";
 
 type Provider = ProviderAccountKey | null;
 
+type AuthUrlResult = { success: true; data: { authUrl: string } } | { success: false; error: string };
+
 interface OAuthRedirectConfig {
   flowType: "oauth_redirect";
-  getAuthUrl: () => Promise<{ success: true; data: { authUrl: string } } | { success: false; error: string }>;
+  buildAuthUrl?: () => string;
+  getAuthUrl?: () => Promise<AuthUrlResult>;
   exchangeAction: (callbackUrl: string) => Promise<{ success: true; data: { email: string; isUpdate: boolean } } | { success: false; error: string }>;
 }
 
@@ -106,14 +108,14 @@ const PROVIDERS: Record<Exclude<Provider, null>, ProviderFullConfig> = {
     name: "Antigravity",
     description: "Access Gemini & Claude via Google OAuth",
     flowType: "oauth_redirect",
-    getAuthUrl: getAntigravityAuthUrl,
+    buildAuthUrl: () => buildPublicGoogleOAuthUrl("antigravity"),
     exchangeAction: exchangeAntigravityOAuthCode,
   },
   gemini_cli: {
     name: "Gemini CLI",
     description: "Access Gemini 2.5 Pro & 3 models",
     flowType: "oauth_redirect",
-    getAuthUrl: getGeminiCliAuthUrl,
+    buildAuthUrl: () => buildPublicGoogleOAuthUrl("gemini_cli"),
     exchangeAction: exchangeGeminiCliOAuthCode,
   },
   qwen_code: {
@@ -281,8 +283,25 @@ export function AddAccountDialog({
   useEffect(() => {
     if (open && step === 2 && provider && providerConfig) {
       if (providerConfig.flowType === "oauth_redirect") {
-        setIsFetchingUrl(true);
         setAuthUrl("");
+        if (providerConfig.buildAuthUrl) {
+          try {
+            setAuthUrl(providerConfig.buildAuthUrl());
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Failed to build login URL";
+            setError(message);
+          }
+          setIsFetchingUrl(false);
+          return;
+        }
+
+        if (!providerConfig.getAuthUrl) {
+          setError("Invalid provider configuration");
+          setIsFetchingUrl(false);
+          return;
+        }
+
+        setIsFetchingUrl(true);
         providerConfig.getAuthUrl()
           .then((result) => {
             if (result.success) {

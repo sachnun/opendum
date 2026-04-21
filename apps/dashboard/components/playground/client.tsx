@@ -2073,7 +2073,7 @@ export function PlaygroundClient({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[280px] p-0" align="end">
-                  <Command>
+                  <Command defaultValue={selectedApiKeyId ?? undefined}>
                     <CommandInput placeholder="Search API keys..." />
                     <CommandList>
                       <CommandEmpty>No API key found.</CommandEmpty>
@@ -2081,12 +2081,12 @@ export function PlaygroundClient({
                         {apiKeyOptions.map((key) => (
                           <CommandItem
                             key={key.id}
-                            value={`${getApiKeyLabel(key)} ${key.keyPreview}`}
+                            value={key.id}
+                            keywords={[getApiKeyLabel(key), key.keyPreview]}
                             onSelect={() => {
                               setSelectedApiKeyId(key.id);
                               setApiKeyPickerOpen(false);
                             }}
-                            className={selectedApiKeyId === key.id ? "bg-accent" : ""}
                           >
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-xs font-medium">{getApiKeyLabel(key)}</p>

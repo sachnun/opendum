@@ -106,7 +106,7 @@ export const primaryNavigation: NavItem[] = [
     icon: Key,
     children: [
       {
-        name: "Share",
+        name: "Sharing",
         href: "/dashboard/api-keys/share",
         disabled: true,
         tag: "coming",
