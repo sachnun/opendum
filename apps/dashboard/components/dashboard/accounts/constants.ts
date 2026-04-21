@@ -1,1 +1,1 @@
-export const PROVIDER_ACCOUNTS_REFRESH_EVENT = "provider-accounts:refresh";
+export const REFRESH_EVENT = "provider-accounts:refresh";

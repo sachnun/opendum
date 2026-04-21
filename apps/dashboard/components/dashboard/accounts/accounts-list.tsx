@@ -79,7 +79,7 @@ import { formatRelativeTime } from "@/lib/date";
 import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
-import { PROVIDER_ACCOUNTS_REFRESH_EVENT } from "./constants";
+import { REFRESH_EVENT } from "./constants";
 import { setAccountModelEnabled } from "@/lib/actions/account-models";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { usePlaygroundPreset } from "@/lib/playground-preset-context";
@@ -546,7 +546,7 @@ function LastErrorMessageDialog({
         throw new Error(result.error);
       }
       setIsOpen(false);
-      window.dispatchEvent(new CustomEvent(PROVIDER_ACCOUNTS_REFRESH_EVENT));
+      window.dispatchEvent(new CustomEvent(REFRESH_EVENT));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to resolve errors");
     } finally {
@@ -1999,10 +1999,10 @@ export function AccountsList({
       enqueueQuotaRequests("openRouter", openRouterAccounts.map((account) => account.id), true);
     };
 
-    window.addEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
+    window.addEventListener(REFRESH_EVENT, handleProviderAccountsRefresh);
 
     return () => {
-      window.removeEventListener(PROVIDER_ACCOUNTS_REFRESH_EVENT, handleProviderAccountsRefresh);
+      window.removeEventListener(REFRESH_EVENT, handleProviderAccountsRefresh);
     };
   }, [
     antigravityAccounts,

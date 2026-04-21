@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getProviderFromSlug,
-  PROVIDER_ACCOUNT_BY_KEY,
+  BY_KEY,
   type ProviderAccountKey,
 } from "@/lib/provider-accounts";
 
@@ -143,7 +143,7 @@ export default function Loading() {
   const params = useParams<{ provider: string }>();
   const providerKey =
     typeof params.provider === "string" ? getProviderFromSlug(params.provider) : null;
-  const providerMeta = providerKey ? PROVIDER_ACCOUNT_BY_KEY[providerKey] : null;
+  const providerMeta = providerKey ? BY_KEY[providerKey] : null;
   const supportsQuota = providerKey ? QUOTA_PROVIDER_KEYS.has(providerKey) : false;
 
   return (

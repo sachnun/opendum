@@ -12,8 +12,8 @@ import { PinButton } from "@/components/dashboard/accounts/pin-button";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
 import type { ProviderAccountIndicator } from "@/lib/navigation";
 import {
-  API_KEY_PROVIDER_ACCOUNT_DEFINITIONS,
-  OAUTH_PROVIDER_ACCOUNT_DEFINITIONS,
+  API_KEY_DEFINITIONS,
+  OAUTH_DEFINITIONS,
   PROVIDER_ACCOUNT_DEFINITIONS,
   type ProviderAccountKey,
   getProviderAccountPath,
@@ -508,7 +508,7 @@ export default async function AccountsPage({
           <h3 className="text-base font-semibold">OAuth Provider Accounts</h3>
         </div>
         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-          {OAUTH_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {
+          {OAUTH_DEFINITIONS.map((provider) => {
             const summary = summaryByProvider[provider.key];
 
             return (
@@ -528,7 +528,7 @@ export default async function AccountsPage({
           <h3 className="text-base font-semibold">API Key Provider Accounts</h3>
         </div>
         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-          {API_KEY_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => {
+          {API_KEY_DEFINITIONS.map((provider) => {
             const summary = summaryByProvider[provider.key];
 
             return (

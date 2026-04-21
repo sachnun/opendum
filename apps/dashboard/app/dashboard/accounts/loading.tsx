@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  API_KEY_PROVIDER_ACCOUNT_DEFINITIONS,
-  OAUTH_PROVIDER_ACCOUNT_DEFINITIONS,
+  API_KEY_DEFINITIONS,
+  OAUTH_DEFINITIONS,
 } from "@/lib/provider-accounts";
 
 function ProviderOverviewCardSkeleton() {
@@ -76,7 +76,7 @@ export default function Loading() {
           <Skeleton className="h-5 w-48" />
         </div>
         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-          {OAUTH_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => (
+          {OAUTH_DEFINITIONS.map((provider) => (
             <ProviderOverviewCardSkeleton key={provider.key} />
           ))}
         </div>
@@ -87,7 +87,7 @@ export default function Loading() {
           <Skeleton className="h-5 w-48" />
         </div>
         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-          {API_KEY_PROVIDER_ACCOUNT_DEFINITIONS.map((provider) => (
+          {API_KEY_DEFINITIONS.map((provider) => (
             <ProviderOverviewCardSkeleton key={provider.key} />
           ))}
         </div>

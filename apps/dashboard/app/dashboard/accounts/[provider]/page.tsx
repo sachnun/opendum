@@ -13,7 +13,7 @@ import {
 } from "@/components/dashboard/accounts/accounts-list";
 import {
   type ProviderAccountKey,
-  PROVIDER_ACCOUNT_BY_KEY,
+  BY_KEY,
   getProviderFromSlug,
 } from "@/lib/provider-accounts";
 import { getProviderModelSet } from "@opendum/shared/proxy/models";
@@ -85,7 +85,7 @@ export default async function ProviderAccountsPage({
     notFound();
   }
 
-  const providerMeta = PROVIDER_ACCOUNT_BY_KEY[selectedProvider];
+  const providerMeta = BY_KEY[selectedProvider];
 
   const accounts = await db
     .select({
@@ -318,7 +318,7 @@ export default async function ProviderAccountsPage({
     .where(eq(pinnedProvider.userId, session.user.id))
     .orderBy(asc(pinnedProvider.createdAt));
 
-  const validProviderKeys = new Set<string>(Object.keys(PROVIDER_ACCOUNT_BY_KEY));
+  const validProviderKeys = new Set<string>(Object.keys(BY_KEY));
   const pinnedProviders = pinnedProviderRows
     .map((r: { providerKey: string }) => r.providerKey)
     .filter((k: string): k is ProviderAccountKey => validProviderKeys.has(k));

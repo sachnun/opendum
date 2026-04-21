@@ -98,7 +98,7 @@ export function SuccessRateChart({ data, granularity }: Props) {
             <ChartTooltip
               content={(
                 <ChartTooltipContent
-                  formatter={(value, name, item) => {
+                  formatter={(value, _name, item) => {
                     const numericValue = typeof value === "number" ? value : Number(value);
                     const formattedRate = `${numericValue.toFixed(1)}%`;
                     const successCount = Number(item.payload?.success ?? 0).toLocaleString();

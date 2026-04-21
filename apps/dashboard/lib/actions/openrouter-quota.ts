@@ -7,7 +7,7 @@ import { providerAccount } from "@opendum/shared/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getRedisJson, setRedisJson } from "@opendum/shared/redis-cache";
 import { openRouterProvider } from "@opendum/shared/proxy/providers/openrouter";
-import { OPENROUTER_API_BASE_URL } from "@opendum/shared/proxy/providers/openrouter/constants";
+import { API_BASE_URL as openRouterApiBaseUrl } from "@opendum/shared/proxy/providers/openrouter/constants";
 
 const OPENROUTER_REQUEST_TIMEOUT_MS = 10000;
 
@@ -194,7 +194,7 @@ async function fetchOpenRouterJson(
   const timeout = setTimeout(() => controller.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${OPENROUTER_API_BASE_URL}${path}`, {
+    const response = await fetch(`${openRouterApiBaseUrl}${path}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,

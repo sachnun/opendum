@@ -9,15 +9,15 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { antigravityProvider } from "@opendum/shared/proxy/providers/antigravity";
 import {
-  ANTIGRAVITY_REDIRECT_URI,
-  ANTIGRAVITY_CLIENT_ID,
-  ANTIGRAVITY_SCOPES,
+  REDIRECT_URI as antigravityRedirectUri,
+  CLIENT_ID as antigravityClientId,
+  SCOPES as antigravityScopes,
 } from "@opendum/shared/proxy/providers/antigravity/constants";
 import { geminiCliProvider } from "@opendum/shared/proxy/providers/gemini-cli";
 import {
-  GEMINI_CLI_REDIRECT_URI,
-  GEMINI_CLI_CLIENT_ID,
-  GEMINI_CLI_SCOPES,
+  REDIRECT_URI as geminiCliRedirectUri,
+  CLIENT_ID as geminiCliClientId,
+  SCOPES as geminiCliScopes,
 } from "@opendum/shared/proxy/providers/gemini-cli/constants";
 import {
   initiateDeviceCodeFlow,
@@ -33,36 +33,36 @@ import {
   codexProvider,
   generateCodeVerifier,
   generateCodeChallenge,
-  CODEX_CLIENT_ID,
-  CODEX_OAUTH_AUTHORIZE_ENDPOINT,
-  CODEX_BROWSER_REDIRECT_URI,
-  CODEX_OAUTH_SCOPE,
-  CODEX_ORIGINATOR,
+  CLIENT_ID as codexClientId,
+  AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint,
+  BROWSER_REDIRECT_URI as codexBrowserRedirectUri,
+  SCOPE as codexScope,
+  ORIGINATOR as codexOriginator,
 } from "@opendum/shared/proxy/providers/codex";
 import { fetchCodexQuotaFromApi } from "@opendum/shared/proxy/providers/codex/quota";
 import {
   buildKiroAuthUrl,
   generateCodeVerifier as generateKiroCodeVerifier,
   kiroProvider,
-  KIRO_BROWSER_REDIRECT_URI,
+  BROWSER_REDIRECT_URI as kiroBrowserRedirectUri,
 } from "@opendum/shared/proxy/providers/kiro";
 import {
-  NVIDIA_NIM_API_BASE_URL,
+  API_BASE_URL as nvidiaApiBaseUrl,
 } from "@opendum/shared/proxy/providers/nvidia-nim/constants";
 import {
-  OLLAMA_CLOUD_API_BASE_URL,
+  API_BASE_URL as ollamaApiBaseUrl,
 } from "@opendum/shared/proxy/providers/ollama-cloud/constants";
 import {
-  OPENROUTER_API_BASE_URL,
+  API_BASE_URL as openRouterApiBaseUrl,
 } from "@opendum/shared/proxy/providers/openrouter/constants";
 import {
-  GROQ_API_BASE_URL,
+  API_BASE_URL as groqApiBaseUrl,
 } from "@opendum/shared/proxy/providers/groq/constants";
 import {
-  CEREBRAS_API_BASE_URL,
+  API_BASE_URL as cerebrasApiBaseUrl,
 } from "@opendum/shared/proxy/providers/cerebras/constants";
 import {
-  KILO_CODE_API_BASE_URL,
+  API_BASE_URL as kiloCodeApiBaseUrl,
 } from "@opendum/shared/proxy/providers/kilo-code/constants";
 import {
   getWorkersAiValidationUrl,
@@ -125,42 +125,42 @@ const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const API_KEY_PROVIDER_SETTINGS = {
   nvidia_nim: {
     label: "Nvidia",
-    baseUrl: NVIDIA_NIM_API_BASE_URL,
+    baseUrl: nvidiaApiBaseUrl,
     modelMap: getProviderModelMap("nvidia_nim"),
     validationPath: "/chat/completions",
     requireSuccessfulStatus: false,
   },
   ollama_cloud: {
     label: "Ollama Cloud",
-    baseUrl: OLLAMA_CLOUD_API_BASE_URL,
+    baseUrl: ollamaApiBaseUrl,
     modelMap: getProviderModelMap("ollama_cloud"),
     validationPath: "/chat/completions",
     requireSuccessfulStatus: false,
   },
   openrouter: {
     label: "OpenRouter",
-    baseUrl: OPENROUTER_API_BASE_URL,
+    baseUrl: openRouterApiBaseUrl,
     modelMap: getProviderModelMap("openrouter"),
     validationPath: "/models",
     requireSuccessfulStatus: true,
   },
   groq: {
     label: "Groq",
-    baseUrl: GROQ_API_BASE_URL,
+    baseUrl: groqApiBaseUrl,
     modelMap: getProviderModelMap("groq"),
     validationPath: "/models",
     requireSuccessfulStatus: true,
   },
   cerebras: {
     label: "Cerebras",
-    baseUrl: CEREBRAS_API_BASE_URL,
+    baseUrl: cerebrasApiBaseUrl,
     modelMap: getProviderModelMap("cerebras"),
     validationPath: "/models",
     requireSuccessfulStatus: true,
   },
   kilo_code: {
     label: "Kilo Code",
-    baseUrl: KILO_CODE_API_BASE_URL,
+    baseUrl: kiloCodeApiBaseUrl,
     modelMap: getProviderModelMap("kilo_code"),
     validationPath: "/models",
     requireSuccessfulStatus: true,
@@ -898,10 +898,10 @@ export async function getAntigravityAuthUrl(): Promise<ActionResult<{ authUrl: s
   }
 
   const params = new URLSearchParams({
-    client_id: ANTIGRAVITY_CLIENT_ID,
-    redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+    client_id: antigravityClientId,
+    redirect_uri: antigravityRedirectUri,
     response_type: "code",
-    scope: ANTIGRAVITY_SCOPES.join(" "),
+    scope: antigravityScopes.join(" "),
     access_type: "offline",
     prompt: "consent",
   });
@@ -953,7 +953,7 @@ export async function exchangeAntigravityOAuthCode(
     // Exchange code for tokens using the provider
     const oauthResult = await antigravityProvider.exchangeCode(
       code, 
-      ANTIGRAVITY_REDIRECT_URI
+      antigravityRedirectUri
     );
 
     // Check if account with this email already exists for this user
@@ -1314,10 +1314,10 @@ export async function getGeminiCliAuthUrl(): Promise<ActionResult<{ authUrl: str
   }
 
   const params = new URLSearchParams({
-    client_id: GEMINI_CLI_CLIENT_ID,
-    redirect_uri: GEMINI_CLI_REDIRECT_URI,
+    client_id: geminiCliClientId,
+    redirect_uri: geminiCliRedirectUri,
     response_type: "code",
-    scope: GEMINI_CLI_SCOPES.join(" "),
+    scope: geminiCliScopes.join(" "),
     access_type: "offline",
     prompt: "consent",
   });
@@ -1369,7 +1369,7 @@ export async function exchangeGeminiCliOAuthCode(
     // Exchange code for tokens using the provider
     const oauthResult = await geminiCliProvider.exchangeCode(
       code, 
-      GEMINI_CLI_REDIRECT_URI
+      geminiCliRedirectUri
     );
 
     // Check if account with this email already exists for this user
@@ -1457,18 +1457,18 @@ export async function getCodexAuthUrl(): Promise<ActionResult<{ authUrl: string 
 
     const params = new URLSearchParams({
       response_type: "code",
-      client_id: CODEX_CLIENT_ID,
-      redirect_uri: CODEX_BROWSER_REDIRECT_URI,
-      scope: CODEX_OAUTH_SCOPE,
+      client_id: codexClientId,
+      redirect_uri: codexBrowserRedirectUri,
+      scope: codexScope,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       id_token_add_organizations: "true",
       codex_cli_simplified_flow: "true",
       state,
-      originator: CODEX_ORIGINATOR,
+      originator: codexOriginator,
     });
 
-    const authUrl = `${CODEX_OAUTH_AUTHORIZE_ENDPOINT}?${params.toString()}`;
+    const authUrl = `${codexAuthorizeEndpoint}?${params.toString()}`;
 
     return { success: true, data: { authUrl } };
   } catch (err) {
@@ -1547,7 +1547,7 @@ export async function exchangeCodexOAuthCode(
 
     const oauthResult = await codexProvider.exchangeCode(
       code,
-      CODEX_BROWSER_REDIRECT_URI,
+      codexBrowserRedirectUri,
       oauthContext.codeVerifier
     );
 
@@ -1736,7 +1736,7 @@ export async function exchangeKiroOAuthCode(
 
     const oauthResult = await kiroProvider.exchangeCode(
       code,
-      KIRO_BROWSER_REDIRECT_URI,
+      kiroBrowserRedirectUri,
       oauthContext.codeVerifier
     );
 

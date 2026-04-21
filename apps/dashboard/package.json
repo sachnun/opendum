@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm --filter @opendum/shared build && next build && mkdir -p .next/standalone/apps/dashboard/.next && cp -r .next/static .next/standalone/apps/dashboard/.next/",
-    "start": "HOSTNAME=0.0.0.0 node .next/standalone/apps/dashboard/server.js",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
