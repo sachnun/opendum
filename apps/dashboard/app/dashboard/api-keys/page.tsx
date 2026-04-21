@@ -160,7 +160,7 @@ export default async function ApiKeysPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
           {apiKeys.map((apiKey) => {
             const status = getApiKeyStatus(apiKey);
             const isInactive = status.label !== "Active";
@@ -180,7 +180,7 @@ export default async function ApiKeysPage() {
               >
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="flex flex-col gap-4">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <EditableApiKeyName
@@ -192,7 +192,7 @@ export default async function ApiKeysPage() {
                         </div>
                       </div>
 
-                      <div className="w-full xl:min-w-[420px] xl:max-w-[480px]">
+                      <div className="w-full max-w-[540px]">
                         <ApiKeyActions apiKey={apiKey} />
                       </div>
                     </div>
@@ -241,7 +241,7 @@ export default async function ApiKeysPage() {
                       </Link>
                     </div>
 
-                    <div className="grid gap-3.5 lg:grid-cols-2 2xl:grid-cols-3">
+                    <div className="grid gap-3.5">
                       <MobileApiKeySection title="Model Access" defaultOpen={modelAccessExpanded}>
                         <ApiKeyModelAccess
                           apiKeyId={apiKey.id}

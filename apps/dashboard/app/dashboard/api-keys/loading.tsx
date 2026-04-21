@@ -52,14 +52,14 @@ export default function Loading() {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
         {KEY_CARDS.map((_, index) => (
           <div
             key={`key-${index}`}
             className="rounded-xl border border-border bg-card p-5 md:p-6"
           >
             <div className="space-y-5">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-4">
                 <div className="min-w-0 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Skeleton className="h-6 w-36" />
@@ -69,38 +69,53 @@ export default function Loading() {
                   <Skeleton className="h-4 w-full max-w-80" />
                 </div>
 
-                <div className="w-full xl:min-w-[420px] xl:max-w-[480px]">
+                <div className="w-full max-w-[540px]">
                   <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="space-y-2 lg:max-w-[260px]">
-                        <Skeleton className="h-3 w-16" />
-                        <Skeleton className="h-11 w-full rounded-lg" />
-                      </div>
+                    <div className="space-y-4">
+                      <Skeleton className="h-9 w-full rounded-lg" />
 
-                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        <Skeleton className="h-9 w-9 rounded-md" />
-                        <Skeleton className="h-9 w-9 rounded-md" />
-                        <Skeleton className="h-9 w-[92px] rounded-full" />
-                        <Skeleton className="h-9 w-9 rounded-md" />
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-9 w-9 rounded-md" />
+                          <Skeleton className="h-9 w-9 rounded-md" />
+                          <Skeleton className="h-9 w-9 rounded-md" />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-3 w-6" />
+                          <Skeleton className="h-6 w-10 rounded-full" />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {Array.from({ length: 4 }).map((__, metaIndex) => (
-                  <div
-                    key={`meta-${metaIndex}`}
-                    className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3"
-                  >
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="mt-2 h-4 w-28" />
+              <div className="space-y-3">
+                <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-1">
+                  {Array.from({ length: 3 }).map((__, metaIndex) => (
+                    <div key={`meta-${metaIndex}`}>
+                      {metaIndex > 0 && <div className="border-t border-border/60" />}
+                      <div className="flex items-center justify-between gap-4 py-3">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-4 rounded" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                    <Skeleton className="h-4 w-28" />
                   </div>
-                ))}
+                </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid gap-4">
                 <PanelSkeleton />
                 <PanelSkeleton />
                 <PanelSkeleton showList={false} />

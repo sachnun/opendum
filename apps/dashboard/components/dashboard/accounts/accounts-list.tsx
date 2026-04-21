@@ -107,7 +107,6 @@ type QueuedQuotaRequest = {
   forceRefresh: boolean;
 };
 
-const QUOTA_LAZY_LOAD_CONCURRENCY = 3;
 const QUOTA_LAZY_LOAD_ROOT_MARGIN = "400px 0px";
 
 export type AccountsListInitialQuotaByProvider = Partial<
@@ -1915,7 +1914,7 @@ export function AccountsList({
   const runNextQueuedQuotaRequest = useCallback(
     (provider: QuotaStateProviderKey) => {
       const pendingRequests = pendingQuotaRequestsRef.current[provider];
-      if (activeQuotaRequestsRef.current[provider] >= QUOTA_LAZY_LOAD_CONCURRENCY || pendingRequests.length === 0) {
+      if (pendingRequests.length === 0) {
         return;
       }
 
