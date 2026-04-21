@@ -20,6 +20,7 @@ import { deleteProviderAccount, updateProviderAccount } from "@/lib/actions/acco
 interface Account {
   id: string;
   name: string;
+  provider: string;
   email: string | null;
   isActive: boolean;
 }

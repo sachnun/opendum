@@ -198,6 +198,7 @@ export async function getCodexQuota(
         name: providerAccount.name,
         email: providerAccount.email,
         accountId: providerAccount.accountId,
+        tier: providerAccount.tier,
         isActive: providerAccount.isActive,
         accessToken: providerAccount.accessToken,
         refreshToken: providerAccount.refreshToken,
@@ -247,12 +248,13 @@ export async function getCodexQuota(
           account as unknown as ProviderAccount
         );
       } catch {
-        byTier.unknown = (byTier.unknown ?? 0) + 1;
+        const tier = account.tier?.trim() || "free";
+        byTier[tier] = (byTier[tier] ?? 0) + 1;
         results.push({
           accountId: account.id,
           accountName: account.name,
           email: account.email,
-          tier: "unknown",
+          tier,
           isActive: account.isActive,
           status: "expired",
           error: "Token expired - please re-authenticate",
@@ -266,7 +268,7 @@ export async function getCodexQuota(
       const liveQuota = await fetchCodexQuotaFromApi(accessToken, account.accountId);
 
       if (liveQuota.status === "success") {
-        const tier = liveQuota.planType ?? "unknown";
+        const tier = liveQuota.planType?.trim() || account.tier?.trim() || "free";
         byTier[tier] = (byTier[tier] ?? 0) + 1;
 
         const groups = snapshotToGroups(liveQuota, false, "high");
@@ -291,12 +293,13 @@ export async function getCodexQuota(
         continue;
       }
 
-      byTier.unknown = (byTier.unknown ?? 0) + 1;
+      const tier = account.tier?.trim() || "free";
+      byTier[tier] = (byTier[tier] ?? 0) + 1;
       results.push({
         accountId: account.id,
         accountName: account.name,
         email: account.email,
-        tier: "unknown",
+        tier,
         isActive: account.isActive,
         status: "error",
         error: liveQuota.error ?? "Failed to fetch Codex quota data",

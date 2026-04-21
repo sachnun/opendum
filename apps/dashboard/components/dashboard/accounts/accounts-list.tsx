@@ -956,13 +956,16 @@ function AccountCard({
   const peakRequests = Math.max(...dailyValues, 0);
   const successRate = account.stats.successRate;
   const { title, subtitle } = getAccountHeader(account);
+  const codexQuotaTier = quotaInfo?.tier?.trim();
   const effectiveTier =
-    account.provider === "codex" ? (quotaInfo?.tier ?? account.tier) : account.tier;
-  const normalizedTier = effectiveTier?.trim().toLowerCase() ?? null;
-  const isPaidTier = normalizedTier ? isPaidTierValue(normalizedTier) : false;
-  const tierLabel = normalizedTier ? formatTierLabel(normalizedTier) : null;
+    account.provider === "codex" && codexQuotaTier && codexQuotaTier.toLowerCase() !== "unknown"
+      ? codexQuotaTier
+      : account.tier;
+  const normalizedTier = effectiveTier?.trim().toLowerCase() || "free";
+  const isPaidTier = isPaidTierValue(normalizedTier);
+  const tierLabel = formatTierLabel(normalizedTier);
   const showTierBadge =
-    showTier && Boolean(tierLabel) && normalizedTier !== "unknown" && normalizedTier !== "guest";
+    showTier && normalizedTier !== "unknown" && normalizedTier !== "guest";
   const hasSuccessAfterLastError = Boolean(
     account.lastErrorAt &&
       account.lastSuccessAt &&

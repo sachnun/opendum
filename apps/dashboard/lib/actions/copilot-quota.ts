@@ -261,7 +261,7 @@ export async function getCopilotQuota(
     const byTier: Record<string, number> = {};
 
     for (const account of accounts) {
-      const tier = account.tier ?? "unknown";
+      const tier = account.tier?.trim() || "free";
       byTier[tier] = (byTier[tier] ?? 0) + 1;
 
       let accessToken: string;

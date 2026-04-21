@@ -215,7 +215,7 @@ export async function getKiroQuota(
           account as unknown as ProviderAccount
         );
       } catch {
-        const tier = account.tier ?? "unknown";
+        const tier = account.tier?.trim() || "free";
         byTier[tier] = (byTier[tier] ?? 0) + 1;
 
         results.push({
@@ -234,7 +234,7 @@ export async function getKiroQuota(
       }
 
       const liveQuota = await fetchKiroQuotaFromApi(accessToken, account.accountId);
-      const tier = liveQuota.tier ?? account.tier ?? "unknown";
+      const tier = liveQuota.tier?.trim() || account.tier?.trim() || "free";
       byTier[tier] = (byTier[tier] ?? 0) + 1;
 
       if (liveQuota.status === "success") {

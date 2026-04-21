@@ -213,6 +213,15 @@ async function validateProviderApiKey(
           : undefined,
     });
 
+    let responseText = "";
+    if (response.status === 401 || response.status === 403 || (requireSuccessfulStatus && !response.ok)) {
+      try {
+        responseText = await response.text();
+      } catch {
+        responseText = "";
+      }
+    }
+
     if (response.status === 401 || response.status === 403) {
       return {
         success: false,
@@ -221,13 +230,6 @@ async function validateProviderApiKey(
     }
 
     if (requireSuccessfulStatus && !response.ok) {
-      let responseText = "";
-      try {
-        responseText = await response.text();
-      } catch {
-        responseText = "";
-      }
-
       const normalizedBody = responseText.toLowerCase();
       const looksLikeAuthFailure =
         normalizedBody.includes("authenticate") ||
