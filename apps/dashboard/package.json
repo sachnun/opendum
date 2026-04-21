@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm --filter @opendum/shared build && next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
     "db:push": "drizzle-kit push",
