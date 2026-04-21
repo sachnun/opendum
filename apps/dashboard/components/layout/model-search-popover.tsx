@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, Copy, Check, Search, FlaskConical, Brain, Wrench, Eye, Calendar, BarChart3, ArrowDown, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -78,10 +78,8 @@ function formatHourLabel(time: string): string {
 
 function ModelDetailContent({
   model,
-  onClose,
 }: {
   model: ModelSearchItem;
-  onClose: () => void;
 }) {
   const router = useRouter();
   const { setPreset } = usePlaygroundPreset();
@@ -177,7 +175,6 @@ function ModelDetailContent({
             title="Try in Playground"
             onClick={() => {
               setPreset({ modelId: model.id });
-              onClose();
               router.push("/dashboard/playground");
             }}
           >
@@ -294,7 +291,7 @@ function ModelDetailContent({
   );
 }
 
-export function ModelSearchPopover({ models, className }: ModelSearchPopoverProps) {
+function ModelSearchPopoverContent({ models, className }: ModelSearchPopoverProps) {
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [detailModel, setDetailModel] = useState<ModelSearchItem | null>(null);
@@ -397,10 +394,16 @@ export function ModelSearchPopover({ models, className }: ModelSearchPopoverProp
       <Dialog open={detailModel !== null} onOpenChange={(open) => { if (!open) handleDetailClose(); }}>
         <DialogContent className="sm:max-w-md gap-0">
           {detailModel && (
-            <ModelDetailContent model={detailModel} onClose={handleDetailClose} />
+            <ModelDetailContent model={detailModel} />
           )}
         </DialogContent>
       </Dialog>
     </>
   );
+}
+
+export function ModelSearchPopover(props: ModelSearchPopoverProps) {
+  const pathname = usePathname();
+
+  return <ModelSearchPopoverContent key={pathname} {...props} />;
 }
