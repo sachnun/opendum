@@ -15,5 +15,5 @@ output = ["text"]
 family = "IBM"
 providers = ["workers_ai"]
 
-[opendum.upstream]
-workers_ai = "@cf/ibm-granite/granite-4.0-h-micro"
+[workers_ai]
+upstream = "@cf/ibm-granite/granite-4.0-h-micro"

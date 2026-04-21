@@ -353,6 +353,18 @@ function extractProviderErrorDetail(providerErrorBody?: string): string | null {
   return `${normalizedMessage} (request_id: ${normalizedRequestId})`;
 }
 
+export function isSubscriptionRequiredProviderError(providerErrorBody?: string): boolean {
+  const providerDetail = extractProviderErrorDetail(providerErrorBody);
+  if (!providerDetail) return false;
+
+  const normalized = providerDetail.toLowerCase();
+  return (
+    normalized.includes("requires a subscription") ||
+    normalized.includes("upgrade for access") ||
+    normalized.includes("this model requires a subscription")
+  );
+}
+
 export function getSanitizedProxyError(
   statusCode: number,
   providerErrorBody?: string
@@ -372,6 +384,15 @@ export function getSanitizedProxyError(
   }
 
   if (statusCode === 401 || statusCode === 403) {
+    if (statusCode === 403 && isSubscriptionRequiredProviderError(providerErrorBody)) {
+      return {
+        type: "invalid_request_error",
+        message: providerDetail
+          ? `Model access blocked by provider subscription tier: ${providerDetail}`
+          : "Model access blocked by provider subscription tier.",
+      };
+    }
+
     return {
       type: "authentication_error",
       message: "Provider authentication failed. Please re-authenticate your account.",

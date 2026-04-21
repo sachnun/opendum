@@ -17,5 +17,5 @@ family = "Claude"
 providers = ["kiro"]
 aliases = ["claude-sonnet-4.6-1m", "claude-sonnet-4-6-1m"]
 
-[opendum.upstream]
-kiro = "claude-sonnet-4.6-1m"
+[kiro]
+upstream = "claude-sonnet-4.6-1m"

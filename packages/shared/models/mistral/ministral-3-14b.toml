@@ -17,6 +17,8 @@ family = "Mistral"
 providers = ["ollama_cloud", "nvidia_nim"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "mistralai/ministral-14b-instruct-2512"
-ollama_cloud = "ministral-3:14b"
+[nvidia_nim]
+upstream = "mistralai/ministral-14b-instruct-2512"
+
+[ollama_cloud]
+upstream = "ministral-3:14b"

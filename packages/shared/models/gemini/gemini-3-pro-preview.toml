@@ -17,5 +17,5 @@ family = "Gemini"
 providers = ["antigravity", "gemini_cli"]
 aliases = ["gemini-3-pro", "gemini-3-pro-high", "gemini-3-pro-low"]
 
-[opendum.upstream]
-antigravity = "gemini-3-pro-high"
+[antigravity]
+upstream = "gemini-3-pro-high"

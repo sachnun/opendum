@@ -16,7 +16,11 @@ output = ["text"]
 family = "Meta"
 providers = ["groq", "cerebras", "nvidia_nim"]
 
-[opendum.upstream]
-cerebras = "llama3.1-8b"
-groq = "llama-3.1-8b-instant"
-nvidia_nim = "meta/llama-3.1-8b-instruct"
+[cerebras]
+upstream = "llama3.1-8b"
+
+[groq]
+upstream = "llama-3.1-8b-instant"
+
+[nvidia_nim]
+upstream = "meta/llama-3.1-8b-instruct"

@@ -17,5 +17,5 @@ providers = ["nvidia_nim"]
 aliases = ["microsoft-phi-3-vision-128k-instruct", "microsoft/phi-3-vision-128k-instruct"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "microsoft/phi-3-vision-128k-instruct"
+[nvidia_nim]
+upstream = "microsoft/phi-3-vision-128k-instruct"

@@ -2,5 +2,5 @@
 family = "Mistral"
 providers = ["nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "mistralai/mixtral-8x22b-instruct-v0.1"
+[nvidia_nim]
+upstream = "mistralai/mixtral-8x22b-instruct-v0.1"

@@ -16,5 +16,5 @@ output = ["text"]
 family = "NVIDIA"
 providers = ["openrouter"]
 
-[opendum.upstream]
-openrouter = "nvidia/nemotron-3-nano-30b-a3b:free"
+[openrouter]
+upstream = "nvidia/nemotron-3-nano-30b-a3b:free"

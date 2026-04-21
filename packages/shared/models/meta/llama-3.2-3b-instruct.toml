@@ -16,6 +16,8 @@ output = ["text"]
 family = "Meta"
 providers = ["openrouter", "nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "meta/llama-3.2-3b-instruct"
-openrouter = "meta-llama/llama-3.2-3b-instruct:free"
+[nvidia_nim]
+upstream = "meta/llama-3.2-3b-instruct"
+
+[openrouter]
+upstream = "meta-llama/llama-3.2-3b-instruct:free"

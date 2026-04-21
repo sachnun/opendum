@@ -17,5 +17,5 @@ family = "Gemini"
 providers = ["antigravity"]
 aliases = ["gemini-3.1-flash-image", "gemini-3-flash-image"]
 
-[opendum.upstream]
-antigravity = "gemini-3.1-flash-image"
+[antigravity]
+upstream = "gemini-3.1-flash-image"

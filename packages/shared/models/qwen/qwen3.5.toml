@@ -16,5 +16,5 @@ output = ["text"]
 family = "Qwen"
 providers = ["qwen_code"]
 
-[opendum.upstream]
-qwen_code = "coder-model"
+[qwen_code]
+upstream = "coder-model"

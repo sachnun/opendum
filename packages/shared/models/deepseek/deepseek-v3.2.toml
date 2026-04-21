@@ -16,6 +16,8 @@ output = ["text"]
 family = "DeepSeek"
 providers = ["kiro", "ollama_cloud", "nvidia_nim"]
 
-[opendum.upstream]
-kiro = "deepseek-3.2"
-nvidia_nim = "deepseek-ai/deepseek-v3.2"
+[kiro]
+upstream = "deepseek-3.2"
+
+[nvidia_nim]
+upstream = "deepseek-ai/deepseek-v3.2"

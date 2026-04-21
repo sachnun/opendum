@@ -16,5 +16,5 @@ output = ["text"]
 family = "Kimi"
 providers = ["ollama_cloud"]
 
-[opendum.upstream]
-ollama_cloud = "kimi-k2:1t"
+[ollama_cloud]
+upstream = "kimi-k2:1t"

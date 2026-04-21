@@ -15,5 +15,5 @@ output = ["text"]
 family = "Qwen"
 providers = ["kiro", "ollama_cloud"]
 
-[opendum.upstream]
-kiro = "qwen3-coder-next"
+[kiro]
+upstream = "qwen3-coder-next"

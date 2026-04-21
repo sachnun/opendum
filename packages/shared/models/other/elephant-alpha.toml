@@ -1,5 +1,5 @@
 [opendum]
 providers = ["kilo_code"]
 
-[opendum.upstream]
-kilo_code = "openrouter/elephant-alpha"
+[kilo_code]
+upstream = "openrouter/elephant-alpha"

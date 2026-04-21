@@ -16,9 +16,17 @@ family = "OpenAI"
 providers = ["groq", "ollama_cloud", "openrouter", "workers_ai", "nvidia_nim"]
 aliases = ["openai-gpt-oss-20b"]
 
-[opendum.upstream]
-groq = "openai/gpt-oss-20b"
-nvidia_nim = "openai/gpt-oss-20b"
-ollama_cloud = "gpt-oss:20b"
-openrouter = "openai/gpt-oss-20b:free"
-workers_ai = "@cf/openai/gpt-oss-20b"
+[groq]
+upstream = "openai/gpt-oss-20b"
+
+[nvidia_nim]
+upstream = "openai/gpt-oss-20b"
+
+[ollama_cloud]
+upstream = "gpt-oss:20b"
+
+[openrouter]
+upstream = "openai/gpt-oss-20b:free"
+
+[workers_ai]
+upstream = "@cf/openai/gpt-oss-20b"

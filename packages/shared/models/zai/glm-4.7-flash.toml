@@ -16,5 +16,5 @@ output = ["text"]
 family = "Z.AI"
 providers = ["workers_ai"]
 
-[opendum.upstream]
-workers_ai = "@cf/zai-org/glm-4.7-flash"
+[workers_ai]
+upstream = "@cf/zai-org/glm-4.7-flash"

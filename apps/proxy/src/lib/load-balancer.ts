@@ -178,11 +178,10 @@ export async function getEligibleAccounts(
       )
     );
 
-  const modelDisabledAccountIds = new Set(
-    disabledEntries.map((e) => e.providerAccountId)
-  );
+  const modelDisabledAccountIds = new Set(disabledEntries.map((e) => e.providerAccountId));
 
-  const enabledAccounts = modelDisabledAccountIds.size === 0
+  const enabledAccounts =
+    modelDisabledAccountIds.size === 0
     ? accounts
     : accounts.filter((account) => !modelDisabledAccountIds.has(account.id));
 

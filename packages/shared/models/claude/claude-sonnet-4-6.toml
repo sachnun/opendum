@@ -17,6 +17,8 @@ family = "Claude"
 providers = ["antigravity", "copilot", "kiro"]
 aliases = ["claude-sonnet-4.6", "claude-sonnet4.6"]
 
-[opendum.upstream]
-copilot = "claude-sonnet-4.6"
-kiro = "claude-sonnet-4.6"
+[copilot]
+upstream = "claude-sonnet-4.6"
+
+[kiro]
+upstream = "claude-sonnet-4.6"

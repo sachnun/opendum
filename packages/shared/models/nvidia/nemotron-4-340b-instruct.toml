@@ -17,5 +17,5 @@ providers = ["nvidia_nim"]
 aliases = ["nvidia-nemotron-4-340b-instruct", "nvidia/nemotron-4-340b-instruct"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "nvidia/nemotron-4-340b-instruct"
+[nvidia_nim]
+upstream = "nvidia/nemotron-4-340b-instruct"

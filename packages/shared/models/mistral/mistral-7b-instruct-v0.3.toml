@@ -15,5 +15,5 @@ output = ["text"]
 family = "Mistral"
 providers = ["nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "mistralai/mistral-7b-instruct-v0.3"
+[nvidia_nim]
+upstream = "mistralai/mistral-7b-instruct-v0.3"

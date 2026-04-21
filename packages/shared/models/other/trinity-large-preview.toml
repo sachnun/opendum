@@ -16,5 +16,5 @@ output = ["text"]
 family = "Trinity"
 providers = ["openrouter"]
 
-[opendum.upstream]
-openrouter = "arcee-ai/trinity-large-preview:free"
+[openrouter]
+upstream = "arcee-ai/trinity-large-preview:free"

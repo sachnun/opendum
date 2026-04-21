@@ -12,5 +12,5 @@ family = "RNJ"
 providers = ["ollama_cloud"]
 ignored = true
 
-[opendum.upstream]
-ollama_cloud = "rnj-1:8b"
+[ollama_cloud]
+upstream = "rnj-1:8b"

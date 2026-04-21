@@ -17,5 +17,5 @@ providers = ["nvidia_nim"]
 aliases = ["meta-codellama-70b", "meta/codellama-70b"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "meta/codellama-70b"
+[nvidia_nim]
+upstream = "meta/codellama-70b"

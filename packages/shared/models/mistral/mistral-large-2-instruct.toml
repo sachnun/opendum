@@ -17,5 +17,5 @@ providers = ["nvidia_nim"]
 aliases = ["mistralai-mistral-large-2-instruct", "mistralai/mistral-large-2-instruct"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "mistralai/mistral-large-2-instruct"
+[nvidia_nim]
+upstream = "mistralai/mistral-large-2-instruct"

@@ -67,6 +67,8 @@ export {
   getProviderModelMap,
   getProviderModelSet,
   getUpstreamModelName,
+  getProviderAccessRule,
+  getProviderModelConfig,
   getModelLookupKeys,
   formatModelsForOpenAI,
   getModelInfo,

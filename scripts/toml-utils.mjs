@@ -131,6 +131,29 @@ export function serializeToml(data) {
     }
   }
 
+  const providersWithConfig = new Set([
+    ...Object.keys(upstream),
+    ...Object.keys(op.access || {}),
+  ]);
+  for (const provider of Array.from(providersWithConfig).sort((a, b) => a.localeCompare(b))) {
+    const providerUpstream = upstream[provider];
+    const accessRule = op.access?.[provider] || {};
+    const minTier = accessRule.min_tier || accessRule.minTier;
+    const aliases = Array.isArray(accessRule.aliases) ? accessRule.aliases.filter(Boolean) : [];
+
+    if (!providerUpstream && !minTier && aliases.length === 0) {
+      continue;
+    }
+
+    lines.push("");
+    lines.push(`[${provider}]`);
+    if (providerUpstream) lines.push(`upstream = "${providerUpstream}"`);
+    if (minTier) lines.push(`min_tier = "${minTier}"`);
+    if (aliases.length > 0) {
+      lines.push(`aliases = [${aliases.map((alias) => `"${alias}"`).join(", ")}]`);
+    }
+  }
+
   lines.push(""); // trailing newline
   return lines.join("\n");
 }
@@ -231,12 +254,15 @@ export function syncProviderToToml(modelsDir, providerName, modelMap) {
     const newProviders = providers.filter(p => p !== providerName);
     entry.data.opendum.providers = newProviders;
 
-    // Remove upstream entry for this provider
+    // Remove provider-specific config for this provider
     if (entry.data.opendum?.upstream?.[providerName]) {
       delete entry.data.opendum.upstream[providerName];
       if (Object.keys(entry.data.opendum.upstream).length === 0) {
         delete entry.data.opendum.upstream;
       }
+    }
+    if (entry.data[providerName] && typeof entry.data[providerName] === "object") {
+      delete entry.data[providerName];
     }
 
     writeFileSync(entry.path, serializeToml(entry.data));
@@ -260,13 +286,23 @@ export function syncProviderToToml(modelsDir, providerName, modelMap) {
         changed = true;
       }
 
+      if (!existing.data[providerName] || typeof existing.data[providerName] !== "object") {
+        existing.data[providerName] = {};
+      }
+
       // Set upstream if different from canonical
       if (upstreamName !== modelKey) {
-        if (!existing.data.opendum.upstream) existing.data.opendum.upstream = {};
-        if (existing.data.opendum.upstream[providerName] !== upstreamName) {
-          existing.data.opendum.upstream[providerName] = upstreamName;
+        if (existing.data[providerName].upstream !== upstreamName) {
+          existing.data[providerName].upstream = upstreamName;
           changed = true;
         }
+      } else if (existing.data[providerName].upstream !== undefined) {
+        delete existing.data[providerName].upstream;
+        changed = true;
+      }
+
+      if (Object.keys(existing.data[providerName]).length === 0) {
+        delete existing.data[providerName];
       }
 
       if (changed) {
@@ -286,7 +322,7 @@ export function syncProviderToToml(modelsDir, providerName, modelMap) {
       };
 
       if (upstreamName !== modelKey) {
-        data.opendum.upstream = { [providerName]: upstreamName };
+        data[providerName] = { upstream: upstreamName };
       }
 
       const filePath = join(folderPath, `${modelKey}.toml`);

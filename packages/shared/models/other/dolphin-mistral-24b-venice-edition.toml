@@ -16,5 +16,5 @@ output = ["text"]
 family = "Cognitive Computations"
 providers = ["openrouter"]
 
-[opendum.upstream]
-openrouter = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+[openrouter]
+upstream = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"

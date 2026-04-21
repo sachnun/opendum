@@ -18,6 +18,8 @@ providers = ["openrouter", "nvidia_nim"]
 aliases = ["nvidia-nvidia-nemotron-nano-9b-v2", "nvidia-nemotron-nano-9b-v2", "nvidia/nvidia-nemotron-nano-9b-v2"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "nvidia/nvidia-nemotron-nano-9b-v2"
-openrouter = "nvidia/nemotron-nano-9b-v2:free"
+[nvidia_nim]
+upstream = "nvidia/nvidia-nemotron-nano-9b-v2"
+
+[openrouter]
+upstream = "nvidia/nemotron-nano-9b-v2:free"

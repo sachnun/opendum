@@ -15,5 +15,5 @@ output = ["text"]
 family = "MiniMax"
 providers = ["kiro", "ollama_cloud"]
 
-[opendum.upstream]
-kiro = "minimax-m2.1"
+[kiro]
+upstream = "minimax-m2.1"

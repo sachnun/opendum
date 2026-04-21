@@ -3,5 +3,5 @@ family = "Databricks"
 providers = ["nvidia_nim"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "databricks/dbrx-instruct"
+[nvidia_nim]
+upstream = "databricks/dbrx-instruct"

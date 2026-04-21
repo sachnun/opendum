@@ -15,5 +15,5 @@ output = ["text"]
 family = "ByteDance"
 providers = ["nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "bytedance/seed-oss-36b-instruct"
+[nvidia_nim]
+upstream = "bytedance/seed-oss-36b-instruct"

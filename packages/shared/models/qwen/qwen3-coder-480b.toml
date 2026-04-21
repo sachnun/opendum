@@ -16,6 +16,8 @@ output = ["text"]
 family = "Qwen"
 providers = ["ollama_cloud", "nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "qwen/qwen3-coder-480b-a35b-instruct"
-ollama_cloud = "qwen3-coder:480b"
+[nvidia_nim]
+upstream = "qwen/qwen3-coder-480b-a35b-instruct"
+
+[ollama_cloud]
+upstream = "qwen3-coder:480b"

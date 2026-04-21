@@ -17,5 +17,5 @@ family = "Mistral"
 providers = ["ollama_cloud"]
 ignored = true
 
-[opendum.upstream]
-ollama_cloud = "devstral-small-2:24b"
+[ollama_cloud]
+upstream = "devstral-small-2:24b"

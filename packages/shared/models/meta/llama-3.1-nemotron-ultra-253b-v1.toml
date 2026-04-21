@@ -17,5 +17,5 @@ family = "Meta"
 providers = ["nvidia_nim"]
 aliases = ["nvidia-llama-3.1-nemotron-ultra-253b-v1", "nvidia/llama-3.1-nemotron-ultra-253b-v1"]
 
-[opendum.upstream]
-nvidia_nim = "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+[nvidia_nim]
+upstream = "nvidia/llama-3.1-nemotron-ultra-253b-v1"

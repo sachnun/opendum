@@ -16,5 +16,5 @@ output = ["text"]
 family = "StepFun"
 providers = ["kilo_code"]
 
-[opendum.upstream]
-kilo_code = "stepfun/step-3.5-flash:free"
+[kilo_code]
+upstream = "stepfun/step-3.5-flash:free"

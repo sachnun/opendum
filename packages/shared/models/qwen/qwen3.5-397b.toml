@@ -16,5 +16,5 @@ output = ["text"]
 family = "Qwen"
 providers = ["ollama_cloud"]
 
-[opendum.upstream]
-ollama_cloud = "qwen3.5:397b"
+[ollama_cloud]
+upstream = "qwen3.5:397b"

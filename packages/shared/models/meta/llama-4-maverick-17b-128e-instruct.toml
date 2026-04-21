@@ -17,5 +17,5 @@ family = "Meta"
 providers = ["nvidia_nim"]
 aliases = ["meta-llama-4-maverick-17b-128e-instruct", "meta/llama-4-maverick-17b-128e-instruct"]
 
-[opendum.upstream]
-nvidia_nim = "meta/llama-4-maverick-17b-128e-instruct"
+[nvidia_nim]
+upstream = "meta/llama-4-maverick-17b-128e-instruct"

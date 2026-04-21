@@ -16,5 +16,5 @@ output = ["text"]
 family = "Nous Research"
 providers = ["openrouter"]
 
-[opendum.upstream]
-openrouter = "nousresearch/hermes-3-llama-3.1-405b:free"
+[openrouter]
+upstream = "nousresearch/hermes-3-llama-3.1-405b:free"

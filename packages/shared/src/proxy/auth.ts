@@ -8,6 +8,7 @@ import {
   isModelSupported,
   isModelSupportedByProvider,
   getProvidersForModel,
+  getProviderAccessRule,
   getSuggestedModels,
   resolveModelAlias,
 } from "./models.js";
@@ -17,19 +18,39 @@ import {
   isChatGptAccountCompatibleCodexModel,
 } from "./providers/codex/model-compatibility.js";
 
-const CODEX_PAID_TIER_REQUIRED_MODELS = new Set(["gpt-5.4"]);
-const CODEX_FREE_TIER_PREFIXES = ["free"];
+function normalizeTierForProvider(provider: string, tier: string | null | undefined): string | null {
+  if (!tier) return null;
 
-function requiresPaidCodexTier(model: string): boolean {
-  return CODEX_PAID_TIER_REQUIRED_MODELS.has(model.toLowerCase());
+  const normalized = tier.trim().toLowerCase();
+  if (!normalized) return null;
+
+  return normalized;
 }
 
-function isCodexFreeTier(tier: string | null | undefined): boolean {
-  if (!tier) return false;
-  const normalized = tier.trim().toLowerCase();
-  return CODEX_FREE_TIER_PREFIXES.some(
-    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}-`)
-  );
+function doesAccountTierSatisfyRule(
+  provider: string,
+  accountTier: string | null | undefined,
+  minTier: string | null | undefined
+): boolean {
+  if (!minTier) {
+    return true;
+  }
+
+  const normalizedRequiredTier = normalizeTierForProvider(provider, minTier);
+  if (!normalizedRequiredTier) {
+    return true;
+  }
+
+  const normalizedAccountTier = normalizeTierForProvider(provider, accountTier);
+  if (!normalizedAccountTier) {
+    return false;
+  }
+
+  if (normalizedRequiredTier === "free") {
+    return true;
+  }
+
+  return normalizedAccountTier === normalizedRequiredTier;
 }
 
 function validateCodexModelCompatibility(
@@ -753,21 +774,21 @@ export function isModelUsableByAccounts(
     const totalAccounts = availability.accountCountByProvider.get(provider) ?? 0;
     if (totalAccounts === 0) continue;
 
-    if (provider === "codex" && requiresPaidCodexTier(canonical)) {
+    const accessRule = getProviderAccessRule(canonical, provider);
+    if (accessRule?.minTier) {
       const accountIds = availability.activeAccountIdsByProvider.get(provider) ?? [];
-      const hasPaidOrUnknownTierAccount = accountIds.some((accountId) => {
+      const hasEligibleTierAccount = accountIds.some((accountId) => {
         const tier = availability.accountTierById.get(accountId);
-        return !isCodexFreeTier(tier);
+        return doesAccountTierSatisfyRule(provider, tier, accessRule.minTier);
       });
 
-      if (!hasPaidOrUnknownTierAccount) {
+      if (!hasEligibleTierAccount) {
         continue;
       }
     }
 
     const key = `${provider}:${canonical}`;
     const disabledCount = availability.disabledCountByProviderModel.get(key) ?? 0;
-
     // At least one account for this provider has NOT disabled the model
     if (disabledCount < totalAccounts) {
       return true;
@@ -830,7 +851,6 @@ export async function getAccountModelAvailability(
 
   // 2. Get per-account disabled models for all active accounts
   const disabledCountByProviderModel = new Map<string, number>();
-
   if (activeAccounts.length > 0) {
     const accountIds = activeAccounts.map((a) => a.id);
     const disabledEntries = await db

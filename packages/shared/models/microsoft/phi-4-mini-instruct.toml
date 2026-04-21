@@ -16,5 +16,5 @@ family = "Microsoft"
 providers = ["nvidia_nim"]
 aliases = ["microsoft-phi-4-mini-instruct", "microsoft/phi-4-mini-instruct"]
 
-[opendum.upstream]
-nvidia_nim = "microsoft/phi-4-mini-instruct"
+[nvidia_nim]
+upstream = "microsoft/phi-4-mini-instruct"

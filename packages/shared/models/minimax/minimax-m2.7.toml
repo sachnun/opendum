@@ -15,5 +15,5 @@ output = ["text"]
 family = "MiniMax"
 providers = ["ollama_cloud", "nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "minimaxai/minimax-m2.7"
+[nvidia_nim]
+upstream = "minimaxai/minimax-m2.7"

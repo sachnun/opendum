@@ -16,6 +16,8 @@ output = ["text"]
 family = "NVIDIA"
 providers = ["ollama_cloud", "nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "nvidia/nemotron-3-nano-30b-a3b"
-ollama_cloud = "nemotron-3-nano:30b"
+[nvidia_nim]
+upstream = "nvidia/nemotron-3-nano-30b-a3b"
+
+[ollama_cloud]
+upstream = "nemotron-3-nano:30b"

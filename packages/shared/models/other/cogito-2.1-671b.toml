@@ -12,5 +12,5 @@ family = "Deep Cogito"
 providers = ["ollama_cloud"]
 ignored = true
 
-[opendum.upstream]
-ollama_cloud = "cogito-2.1:671b"
+[ollama_cloud]
+upstream = "cogito-2.1:671b"

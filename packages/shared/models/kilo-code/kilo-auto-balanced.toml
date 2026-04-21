@@ -2,5 +2,5 @@
 providers = ["kilo_code"]
 ignored = true
 
-[opendum.upstream]
-kilo_code = "kilo-auto/balanced"
+[kilo_code]
+upstream = "kilo-auto/balanced"

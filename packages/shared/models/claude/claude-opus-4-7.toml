@@ -2,6 +2,8 @@
 family = "Claude"
 providers = ["copilot", "kiro"]
 
-[opendum.upstream]
-copilot = "claude-opus-4.7"
-kiro = "claude-opus-4.7"
+[copilot]
+upstream = "claude-opus-4.7"
+
+[kiro]
+upstream = "claude-opus-4.7"

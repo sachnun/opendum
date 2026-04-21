@@ -17,5 +17,5 @@ providers = ["nvidia_nim"]
 aliases = ["nvidia-llama3-chatqa-1.5-70b", "nvidia/llama3-chatqa-1.5-70b"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "nvidia/llama3-chatqa-1.5-70b"
+[nvidia_nim]
+upstream = "nvidia/llama3-chatqa-1.5-70b"

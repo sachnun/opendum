@@ -11,5 +11,5 @@ output = 131_072
 family = "Qwen"
 providers = ["ollama_cloud"]
 
-[opendum.upstream]
-ollama_cloud = "qwen3-vl:235b-instruct"
+[ollama_cloud]
+upstream = "qwen3-vl:235b-instruct"

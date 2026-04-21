@@ -3,5 +3,5 @@ family = "Zyphra"
 providers = ["nvidia_nim"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "zyphra/zamba2-7b-instruct"
+[nvidia_nim]
+upstream = "zyphra/zamba2-7b-instruct"

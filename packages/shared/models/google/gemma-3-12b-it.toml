@@ -16,5 +16,5 @@ output = ["text"]
 family = "Google"
 providers = ["openrouter"]
 
-[opendum.upstream]
-openrouter = "google/gemma-3-12b-it:free"
+[openrouter]
+upstream = "google/gemma-3-12b-it:free"

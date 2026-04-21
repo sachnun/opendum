@@ -16,5 +16,5 @@ output = ["text"]
 family = "Qwen"
 providers = ["openrouter"]
 
-[opendum.upstream]
-openrouter = "qwen/qwen3-coder:free"
+[openrouter]
+upstream = "qwen/qwen3-coder:free"

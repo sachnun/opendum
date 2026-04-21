@@ -2,5 +2,5 @@
 family = "Z.AI"
 providers = ["ollama_cloud", "nvidia_nim"]
 
-[opendum.upstream]
-nvidia_nim = "z-ai/glm-5.1"
+[nvidia_nim]
+upstream = "z-ai/glm-5.1"

@@ -16,5 +16,5 @@ family = "Mistral"
 providers = ["nvidia_nim"]
 aliases = ["mistralai-codestral-22b-instruct-v0.1", "mistralai/codestral-22b-instruct-v0.1"]
 
-[opendum.upstream]
-nvidia_nim = "mistralai/codestral-22b-instruct-v0.1"
+[nvidia_nim]
+upstream = "mistralai/codestral-22b-instruct-v0.1"

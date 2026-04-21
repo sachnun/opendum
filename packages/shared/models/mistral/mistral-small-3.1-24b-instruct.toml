@@ -15,5 +15,5 @@ output = ["text"]
 family = "Mistral"
 providers = ["workers_ai"]
 
-[opendum.upstream]
-workers_ai = "@cf/mistralai/mistral-small-3.1-24b-instruct"
+[workers_ai]
+upstream = "@cf/mistralai/mistral-small-3.1-24b-instruct"

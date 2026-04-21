@@ -12,5 +12,5 @@ providers = ["nvidia_nim"]
 aliases = ["meta/llama-3.1-70b-instruct"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "meta/llama-3.1-70b-instruct"
+[nvidia_nim]
+upstream = "meta/llama-3.1-70b-instruct"

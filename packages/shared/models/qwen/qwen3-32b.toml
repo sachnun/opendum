@@ -10,5 +10,5 @@ output = 40_960
 family = "Qwen"
 providers = ["groq"]
 
-[opendum.upstream]
-groq = "qwen/qwen3-32b"
+[groq]
+upstream = "qwen/qwen3-32b"

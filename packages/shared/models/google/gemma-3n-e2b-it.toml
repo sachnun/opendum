@@ -18,6 +18,8 @@ providers = ["openrouter", "nvidia_nim"]
 aliases = ["google-gemma-3n-e2b-it", "google/gemma-3n-e2b-it"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "google/gemma-3n-e2b-it"
-openrouter = "google/gemma-3n-e2b-it:free"
+[nvidia_nim]
+upstream = "google/gemma-3n-e2b-it"
+
+[openrouter]
+upstream = "google/gemma-3n-e2b-it:free"

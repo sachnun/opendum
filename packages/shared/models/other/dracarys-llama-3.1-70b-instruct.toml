@@ -3,5 +3,5 @@ family = "Abacus.AI"
 providers = ["nvidia_nim"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "abacusai/dracarys-llama-3.1-70b-instruct"
+[nvidia_nim]
+upstream = "abacusai/dracarys-llama-3.1-70b-instruct"

@@ -3,5 +3,5 @@ family = "IBM"
 providers = ["nvidia_nim"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "ibm/granite-34b-code-instruct"
+[nvidia_nim]
+upstream = "ibm/granite-34b-code-instruct"

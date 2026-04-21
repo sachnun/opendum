@@ -37,6 +37,20 @@ export interface ModelInfo {
   meta?: ModelMeta;
   /** Per-provider upstream model name. When absent, the canonical id is used. */
   upstream?: Record<string, string>;
+  access?: Record<
+    string,
+    {
+      minTier?: string;
+    }
+  >;
+  providerConfig?: Record<
+    string,
+    {
+      upstream?: string;
+      minTier?: string;
+      aliases?: string[];
+    }
+  >;
 }
 
 interface TomlModel {
@@ -62,7 +76,53 @@ interface TomlModel {
     ignored?: boolean;
     description?: string;
     upstream?: Record<string, string>;
+    access?: Record<
+      string,
+      {
+        min_tier?: string;
+      }
+    >;
   };
+  [key: string]: unknown;
+}
+
+const RESERVED_TOP_LEVEL_TABLES = new Set(["limit", "modalities", "opendum"]);
+
+function extractProviderConfigs(raw: TomlModel): ModelInfo["providerConfig"] {
+  const entries = Object.entries(raw)
+    .filter(([key]) => !RESERVED_TOP_LEVEL_TABLES.has(key))
+    .map(([provider, value]) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+      }
+
+      const record = value as Record<string, unknown>;
+      const upstream = typeof record.upstream === "string" && record.upstream.trim().length > 0
+        ? record.upstream.trim()
+        : undefined;
+      const minTier = typeof record.min_tier === "string" && record.min_tier.trim().length > 0
+        ? record.min_tier.trim()
+        : undefined;
+      const aliases = Array.isArray(record.aliases)
+        ? record.aliases.filter((alias): alias is string => typeof alias === "string" && alias.trim().length > 0)
+        : undefined;
+
+      if (!upstream && !minTier && (!aliases || aliases.length === 0)) {
+        return null;
+      }
+
+      return [
+        provider,
+        {
+          ...(upstream ? { upstream } : {}),
+          ...(minTier ? { minTier } : {}),
+          ...(aliases && aliases.length > 0 ? { aliases } : {}),
+        },
+      ] as const;
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function resolveModelsDir(): string {
@@ -104,7 +164,35 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
   const aliases = opendum.aliases;
   const description = opendum.description;
   const family = opendum.family;
-  const upstream = opendum.upstream;
+  const providerConfig = extractProviderConfigs(raw);
+  const upstream = {
+    ...(opendum.upstream ?? {}),
+    ...Object.fromEntries(
+      Object.entries(providerConfig ?? {})
+        .filter(([, config]) => typeof config.upstream === "string")
+        .map(([provider, config]) => [provider, config.upstream as string])
+    ),
+  };
+  const access = {
+    ...Object.fromEntries(
+      Object.entries(opendum.access ?? {}).map(([provider, rule]) => [
+        provider,
+        {
+          ...(rule?.min_tier ? { minTier: rule.min_tier } : {}),
+        },
+      ])
+    ),
+    ...Object.fromEntries(
+      Object.entries(providerConfig ?? {})
+        .filter(([, config]) => typeof config.minTier === "string")
+        .map(([provider, config]) => [
+          provider,
+          {
+            minTier: config.minTier,
+          },
+        ])
+    ),
+  };
 
   const hasMeta =
     raw.release_date !== undefined ||
@@ -139,7 +227,9 @@ function tomlToModelInfo(raw: TomlModel): ModelInfo {
     description,
     family,
     meta,
-    upstream: upstream && Object.keys(upstream).length > 0 ? upstream : undefined,
+    upstream: Object.keys(upstream).length > 0 ? upstream : undefined,
+    access: Object.keys(access).length > 0 ? access : undefined,
+    providerConfig,
   };
 }
 

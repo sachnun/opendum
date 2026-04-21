@@ -17,5 +17,5 @@ providers = ["nvidia_nim"]
 aliases = ["google-codegemma-1.1-7b", "google/codegemma-1.1-7b"]
 ignored = true
 
-[opendum.upstream]
-nvidia_nim = "google/codegemma-1.1-7b"
+[nvidia_nim]
+upstream = "google/codegemma-1.1-7b"

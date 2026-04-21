@@ -15,5 +15,5 @@ output = ["text"]
 family = "Qwen"
 providers = ["workers_ai"]
 
-[opendum.upstream]
-workers_ai = "@cf/qwen/qwen3-30b-a3b-fp8"
+[workers_ai]
+upstream = "@cf/qwen/qwen3-30b-a3b-fp8"

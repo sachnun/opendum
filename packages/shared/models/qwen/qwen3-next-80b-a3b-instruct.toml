@@ -17,6 +17,8 @@ family = "Qwen"
 providers = ["openrouter", "nvidia_nim"]
 aliases = ["qwen-qwen3-next-80b-a3b-instruct", "qwen/qwen3-next-80b-a3b-instruct"]
 
-[opendum.upstream]
-nvidia_nim = "qwen/qwen3-next-80b-a3b-instruct"
-openrouter = "qwen/qwen3-next-80b-a3b-instruct:free"
+[nvidia_nim]
+upstream = "qwen/qwen3-next-80b-a3b-instruct"
+
+[openrouter]
+upstream = "qwen/qwen3-next-80b-a3b-instruct:free"

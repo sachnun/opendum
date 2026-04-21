@@ -16,5 +16,5 @@ family = "Qwen"
 providers = ["nvidia_nim"]
 aliases = ["qwen-qwen2.5-coder-32b-instruct", "qwen/qwen2.5-coder-32b-instruct"]
 
-[opendum.upstream]
-nvidia_nim = "qwen/qwen2.5-coder-32b-instruct"
+[nvidia_nim]
+upstream = "qwen/qwen2.5-coder-32b-instruct"

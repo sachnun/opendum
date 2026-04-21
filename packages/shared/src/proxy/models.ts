@@ -11,6 +11,16 @@ import {
 export { MODEL_REGISTRY, IGNORED_MODELS };
 export type { ModelMeta, ModelInfo };
 
+export interface ProviderAccessRule {
+  minTier?: string;
+}
+
+export interface ProviderModelConfig {
+  upstream?: string;
+  minTier?: string;
+  aliases?: string[];
+}
+
 function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
   return upstreamModel
     .replace(/^library\//, "")
@@ -117,6 +127,24 @@ export function getUpstreamModelName(model: string, provider: string): string {
   const canonical = resolveModelAlias(model);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
   return info?.upstream?.[provider] ?? canonical;
+}
+
+export function getProviderAccessRule(
+  model: string,
+  provider: string
+): ProviderAccessRule | null {
+  const canonical = resolveModelAlias(model);
+  const info = EFFECTIVE_MODEL_REGISTRY[canonical];
+  return info?.access?.[provider] ?? null;
+}
+
+export function getProviderModelConfig(
+  model: string,
+  provider: string
+): ProviderModelConfig | null {
+  const canonical = resolveModelAlias(model);
+  const info = EFFECTIVE_MODEL_REGISTRY[canonical];
+  return info?.providerConfig?.[provider] ?? null;
 }
 
 /**

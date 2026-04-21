@@ -2,7 +2,11 @@
 family = "OpenAI"
 providers = ["ollama_cloud", "openrouter", "workers_ai"]
 
-[opendum.upstream]
-ollama_cloud = "gpt-oss:120b"
-openrouter = "openai/gpt-oss-120b:free"
-workers_ai = "@cf/openai/gpt-oss-120b"
+[ollama_cloud]
+upstream = "gpt-oss:120b"
+
+[openrouter]
+upstream = "openai/gpt-oss-120b:free"
+
+[workers_ai]
+upstream = "@cf/openai/gpt-oss-120b"

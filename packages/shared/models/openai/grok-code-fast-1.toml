@@ -16,5 +16,5 @@ output = ["text"]
 family = "OpenAI"
 providers = ["copilot", "kilo_code"]
 
-[opendum.upstream]
-kilo_code = "x-ai/grok-code-fast-1:optimized:free"
+[kilo_code]
+upstream = "x-ai/grok-code-fast-1:optimized:free"
