@@ -22,6 +22,7 @@ import { authenticateRequest } from "../plugins/auth.js";
 import {
   getEligibleAccounts,
   getNextAvailableAccount,
+  markAccountsRecoveredByRotation,
   markAccountFailed,
 } from "./load-balancer.js";
 import {
@@ -414,6 +415,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
 
       // 5. Retry loop
       const accountRetryLimit = forcedAccount ? 1 : MAX_ACCOUNT_RETRIES;
+      const recoverableFailures: Array<{ accountId: string; failedAt: Date }> = [];
 
       for (let attempt = 0; attempt < accountRetryLimit; attempt++) {
         let account = forcedAccount;
@@ -590,9 +592,11 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
           // Non-OK handling
           if (!providerResponse.ok) {
             const errorText = await providerResponse.text();
+            const recordedAccountError = providerResponse.status !== 408;
+            let recordedAccountErrorAt: Date | null = null;
 
             // Timeouts (408) are transient — don't count them as account errors
-            if (providerResponse.status !== 408) {
+            if (recordedAccountError) {
               const detailedError = buildAccountErrorMessage(errorText, {
                 model,
                 provider: account.provider,
@@ -601,7 +605,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
                 parameters: paramsForError,
               });
 
-              await markAccountFailed(
+              recordedAccountErrorAt = await markAccountFailed(
                 account.id,
                 model,
                 providerResponse.status,
@@ -635,6 +639,12 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
               shouldRotateToNextAccount(providerResponse.status) &&
               attempt < accountRetryLimit - 1
             ) {
+              if (recordedAccountErrorAt) {
+                recoverableFailures.push({
+                  accountId: account.id,
+                  failedAt: recordedAccountErrorAt,
+                });
+              }
               continue;
             }
 
@@ -659,6 +669,9 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
               apiKeyId,
               model,
             });
+            markAccountsRecoveredByRotation(recoverableFailures).catch(
+              () => undefined
+            );
             return;
           }
 
@@ -674,6 +687,9 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
             apiKeyId,
             model,
           });
+          markAccountsRecoveredByRotation(recoverableFailures).catch(
+            () => undefined
+          );
           return;
         } catch (error) {
           const errorMessage = getErrorMessage(error);
@@ -690,7 +706,12 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
             `[${account.provider}] request failed for account ${account.id}: ${errorMessage}`
           );
 
-          await markAccountFailed(account.id, model, statusCode, detailedError);
+          const failedAt = await markAccountFailed(
+            account.id,
+            model,
+            statusCode,
+            detailedError
+          );
 
           void logUsage({
             userId,
@@ -718,6 +739,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
             shouldRotateToNextAccount(statusCode) &&
             attempt < accountRetryLimit - 1
           ) {
+            recoverableFailures.push({ accountId: account.id, failedAt });
             continue;
           }
 

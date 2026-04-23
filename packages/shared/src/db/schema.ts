@@ -130,6 +130,7 @@ export const providerAccount = pgTable(
     lastErrorAt: timestamp("lastErrorAt"),
     lastErrorMessage: text("lastErrorMessage"),
     lastErrorCode: integer("lastErrorCode"),
+    lastRecoveredByRotationAt: timestamp("lastRecoveredByRotationAt"),
 
     // Health status
     status: text("status").notNull().default("active"),

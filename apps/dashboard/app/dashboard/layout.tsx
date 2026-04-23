@@ -63,7 +63,8 @@ function isKnownProvider(provider: string): provider is keyof typeof PROVIDER_KE
 
 function getAccountIndicator(
   lastErrorAt: Date | null,
-  lastSuccessAt: Date | null
+  lastSuccessAt: Date | null,
+  lastRecoveredByRotationAt: Date | null
 ): ProviderAccountIndicator {
   if (!lastErrorAt) {
     return "normal";
@@ -72,8 +73,11 @@ function getAccountIndicator(
   const nowMs = Date.now();
 
   const errorTimeMs = lastErrorAt.getTime();
-  const successTimeMs = lastSuccessAt?.getTime() ?? 0;
-  const hasRecoveredAfterError = Boolean(lastSuccessAt && successTimeMs > errorTimeMs);
+  const recoveredTimeMs = Math.max(
+    lastSuccessAt?.getTime() ?? 0,
+    lastRecoveredByRotationAt?.getTime() ?? 0
+  );
+  const hasRecoveredAfterError = recoveredTimeMs > errorTimeMs;
 
   if (!hasRecoveredAfterError) {
     return "error";
@@ -104,6 +108,7 @@ export default async function DashboardLayout({
         isActive: providerAccount.isActive,
         lastErrorAt: providerAccount.lastErrorAt,
         lastSuccessAt: providerAccount.lastSuccessAt,
+        lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
       })
       .from(providerAccount)
       .where(eq(providerAccount.userId, session.user.id)),
@@ -217,7 +222,11 @@ export default async function DashboardLayout({
 
     activeAccountCounts[providerKey] += 1;
 
-    const nextIndicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt);
+    const nextIndicator = getAccountIndicator(
+      account.lastErrorAt,
+      account.lastSuccessAt,
+      account.lastRecoveredByRotationAt
+    );
     if (INDICATOR_WEIGHT[nextIndicator] > INDICATOR_WEIGHT[accountIndicators[providerKey]]) {
       accountIndicators[providerKey] = nextIndicator;
     }

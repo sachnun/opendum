@@ -511,6 +511,7 @@ export async function resolveProviderAccountErrors(
       lastErrorAt: null,
       lastErrorMessage: null,
       lastErrorCode: null,
+      lastRecoveredByRotationAt: null,
     };
 
     // Restore status to active if it was auto-degraded

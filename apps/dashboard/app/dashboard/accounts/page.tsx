@@ -104,7 +104,8 @@ function formatHourLabel(time: string): string {
 
 function getAccountIndicator(
   lastErrorAt: Date | null,
-  lastSuccessAt: Date | null
+  lastSuccessAt: Date | null,
+  lastRecoveredByRotationAt: Date | null
 ): ProviderAccountIndicator {
   if (!lastErrorAt) {
     return "normal";
@@ -112,8 +113,11 @@ function getAccountIndicator(
 
   const nowMs = Date.now();
   const errorTimeMs = lastErrorAt.getTime();
-  const successTimeMs = lastSuccessAt?.getTime() ?? 0;
-  const hasRecoveredAfterError = Boolean(lastSuccessAt && successTimeMs > errorTimeMs);
+  const recoveredTimeMs = Math.max(
+    lastSuccessAt?.getTime() ?? 0,
+    lastRecoveredByRotationAt?.getTime() ?? 0
+  );
+  const hasRecoveredAfterError = recoveredTimeMs > errorTimeMs;
 
   if (!hasRecoveredAfterError) {
     return "error";
@@ -290,6 +294,7 @@ export default async function AccountsPage({
         isActive: providerAccount.isActive,
         lastErrorAt: providerAccount.lastErrorAt,
         lastSuccessAt: providerAccount.lastSuccessAt,
+        lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
       })
       .from(providerAccount)
       .where(eq(providerAccount.userId, session.user.id)),
@@ -364,7 +369,11 @@ export default async function AccountsPage({
     }
 
     providerSummary.active += 1;
-    const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt);
+    const indicator = getAccountIndicator(
+      account.lastErrorAt,
+      account.lastSuccessAt,
+      account.lastRecoveredByRotationAt
+    );
     if (INDICATOR_WEIGHT[indicator] > INDICATOR_WEIGHT[providerSummary.indicator]) {
       providerSummary.indicator = indicator;
     }

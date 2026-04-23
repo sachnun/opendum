@@ -104,6 +104,7 @@ export default async function ProviderAccountsPage({
       lastErrorAt: providerAccount.lastErrorAt,
       lastErrorMessage: providerAccount.lastErrorMessage,
       lastErrorCode: providerAccount.lastErrorCode,
+      lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
       successCount: providerAccount.successCount,
       lastSuccessAt: providerAccount.lastSuccessAt,
       createdAt: providerAccount.createdAt,

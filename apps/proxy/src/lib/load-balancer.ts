@@ -1,6 +1,6 @@
 import { db } from "@opendum/shared/db";
 import { providerAccount, providerAccountErrorHistory, providerAccountModelHealth, providerAccountDisabledModel } from "@opendum/shared/db/schema";
-import { eq, and, inArray, notInArray, asc, desc, sql } from "drizzle-orm";
+import { eq, and, inArray, notInArray, asc, desc, lte, sql } from "drizzle-orm";
 import type { ProviderAccount } from "@opendum/shared/db/schema";
 import type { ApiKeyAccountAccess } from "@opendum/shared/proxy/auth";
 import { getProvidersForModel, resolveModelAlias, getModelLookupKeys } from "@opendum/shared/proxy/models";
@@ -379,7 +379,8 @@ export async function markAccountFailed(
   model: string,
   errorCode: number,
   errorMessage: string
-): Promise<void> {
+): Promise<Date> {
+  const now = new Date();
   const normalizedErrorMessage = errorMessage.slice(0, MAX_STORED_ERROR_MESSAGE_LENGTH);
   const resolvedModel = resolveModelAlias(model);
 
@@ -387,13 +388,12 @@ export async function markAccountFailed(
     .update(providerAccount)
     .set({
       errorCount: sql`${providerAccount.errorCount} + 1`,
-      lastErrorAt: new Date(),
+      lastErrorAt: now,
       lastErrorMessage: normalizedErrorMessage,
       lastErrorCode: errorCode,
     })
     .where(eq(providerAccount.id, accountId));
 
-  const now = new Date();
   const [health] = await db
     .insert(providerAccountModelHealth)
     .values({
@@ -478,6 +478,8 @@ export async function markAccountFailed(
         );
     }
   }
+
+  return now;
 }
 
 /**
@@ -533,6 +535,37 @@ export async function markAccountSuccess(
     .update(providerAccountModelHealth)
     .set(updates)
     .where(eq(providerAccountModelHealth.id, existingHealth.id));
+}
+
+export async function markAccountsRecoveredByRotation(
+  failures: Array<{ accountId: string; failedAt: Date }>
+): Promise<void> {
+  const latestFailureByAccountId = new Map<string, Date>();
+  for (const failure of failures) {
+    const existing = latestFailureByAccountId.get(failure.accountId);
+    if (!existing || failure.failedAt > existing) {
+      latestFailureByAccountId.set(failure.accountId, failure.failedAt);
+    }
+  }
+
+  if (latestFailureByAccountId.size === 0) {
+    return;
+  }
+
+  const recoveredAt = new Date();
+  await Promise.all(
+    Array.from(latestFailureByAccountId, ([accountId, failedAt]) =>
+      db
+        .update(providerAccount)
+        .set({ lastRecoveredByRotationAt: recoveredAt })
+        .where(
+          and(
+            eq(providerAccount.id, accountId),
+            lte(providerAccount.lastErrorAt, failedAt)
+          )
+        )
+    )
+  );
 }
 
 /**

@@ -138,6 +138,7 @@ interface Account {
   lastErrorAt: Date | null;
   lastErrorMessage: string | null;
   lastErrorCode: number | null;
+  lastRecoveredByRotationAt: Date | null;
   successCount: number;
   lastSuccessAt: Date | null;
   stats: {
@@ -968,8 +969,10 @@ function AccountCard({
     showTier && normalizedTier !== "unknown" && normalizedTier !== "guest";
   const hasSuccessAfterLastError = Boolean(
     account.lastErrorAt &&
-      account.lastSuccessAt &&
-      account.lastSuccessAt.getTime() > account.lastErrorAt.getTime()
+      Math.max(
+        account.lastSuccessAt?.getTime() ?? 0,
+        account.lastRecoveredByRotationAt?.getTime() ?? 0
+      ) > account.lastErrorAt.getTime()
   );
   const errorToneClass = hasSuccessAfterLastError ? "text-amber-400" : "text-red-500";
   const errorCountToneClass = hasErrors ? errorToneClass : "text-muted-foreground";
