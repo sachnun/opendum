@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { REFRESH_EVENT } from "./constants";
+import { REFRESH_QUOTAS_EVENT } from "./constants";
 
 export function RefreshAccountsButton() {
   const router = useRouter();
@@ -12,7 +12,7 @@ export function RefreshAccountsButton() {
 
   const handleRefresh = () => {
     startRefresh(() => {
-      window.dispatchEvent(new CustomEvent(REFRESH_EVENT));
+      window.dispatchEvent(new CustomEvent(REFRESH_QUOTAS_EVENT));
       router.refresh();
     });
   };

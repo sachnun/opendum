@@ -1,1 +1,1 @@
-export const REFRESH_EVENT = "provider-accounts:refresh";
+export const REFRESH_QUOTAS_EVENT = "provider-accounts:refresh-quotas";

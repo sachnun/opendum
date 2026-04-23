@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Key, Play, Plus, Square } from "lucide-react";
 
 import {
@@ -1380,7 +1379,6 @@ export function PlaygroundClient({
   apiKeyOptions = [],
   proxyBaseUrl,
 }: PlaygroundClientProps) {
-  const router = useRouter();
   const { consumePreset } = usePlaygroundPreset();
   const [selectedApiKeyId, setSelectedApiKeyId] = React.useState<string | null>(
     () => findApiKeyWithMostModels(apiKeyOptions, models)
@@ -1980,13 +1978,11 @@ export function PlaygroundClient({
             usedAccountId,
           },
         }));
-
-        router.refresh();
       } finally {
         controllersRef.current.delete(panelId);
       }
     },
-    [proxyBaseUrl, router, settings]
+    [proxyBaseUrl, settings]
   );
 
   const retryPanel = React.useCallback(

@@ -79,7 +79,7 @@ import { formatRelativeTime } from "@/lib/date";
 import { toast } from "sonner";
 import { AccountActions } from "./account-actions";
 import { UsageSparkline } from "@/components/dashboard/shared/usage-sparkline";
-import { REFRESH_EVENT } from "./constants";
+import { REFRESH_QUOTAS_EVENT } from "./constants";
 import { setAccountModelEnabled } from "@/lib/actions/account-models";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { usePlaygroundPreset } from "@/lib/playground-preset-context";
@@ -461,6 +461,7 @@ function LastErrorMessageDialog({
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<ProviderAccountErrorHistoryEntry[] | null>(null);
   const historyRequestIdRef = useRef(0);
+  const router = useRouter();
   const preview = message.length > 150 ? `${message.slice(0, 150)}...` : message;
   const previewColorClass = tone === "warning" ? "text-amber-400" : "text-red-500";
   const details = parseStoredErrorMessage(message);
@@ -546,7 +547,7 @@ function LastErrorMessageDialog({
         throw new Error(result.error);
       }
       setIsOpen(false);
-      window.dispatchEvent(new CustomEvent(REFRESH_EVENT));
+      router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to resolve errors");
     } finally {
@@ -2002,10 +2003,10 @@ export function AccountsList({
       enqueueQuotaRequests("openRouter", openRouterAccounts.map((account) => account.id), true);
     };
 
-    window.addEventListener(REFRESH_EVENT, handleProviderAccountsRefresh);
+    window.addEventListener(REFRESH_QUOTAS_EVENT, handleProviderAccountsRefresh);
 
     return () => {
-      window.removeEventListener(REFRESH_EVENT, handleProviderAccountsRefresh);
+      window.removeEventListener(REFRESH_QUOTAS_EVENT, handleProviderAccountsRefresh);
     };
   }, [
     antigravityAccounts,

@@ -222,7 +222,6 @@ export async function updateApiKeyModelAccess(
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
 
     revalidatePath("/dashboard/api-keys");
-    revalidatePath("/dashboard");
 
     return {
       success: true,
@@ -306,7 +305,6 @@ export async function updateApiKeyAccountAccess(
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
 
     revalidatePath("/dashboard/api-keys");
-    revalidatePath("/dashboard");
 
     return {
       success: true,
