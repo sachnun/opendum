@@ -14,17 +14,5 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["openrouter", "groq", "workers_ai", "nvidia_nim"]
+providers = ["openrouter", "workers_ai", "nvidia_nim"]
 aliases = ["meta-llama-3.3-70b-instruct", "meta/llama-3.3-70b-instruct"]
-
-[groq]
-upstream = "llama-3.3-70b-versatile"
-
-[nvidia_nim]
-upstream = "meta/llama-3.3-70b-instruct"
-
-[openrouter]
-upstream = "meta-llama/llama-3.3-70b-instruct:free"
-
-[workers_ai]
-upstream = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"

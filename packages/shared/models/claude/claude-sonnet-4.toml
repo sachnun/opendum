@@ -16,6 +16,3 @@ output = ["text"]
 family = "Claude"
 providers = ["kiro", "copilot"]
 aliases = ["claude-sonnet-4-0", "claude-sonnet-4.0", "claude-sonnet4.0"]
-
-[kiro]
-upstream = "claude-sonnet-4"

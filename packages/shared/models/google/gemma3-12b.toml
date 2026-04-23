@@ -13,10 +13,4 @@ output = ["text"]
 
 [opendum]
 family = "Google"
-providers = ["ollama_cloud", "nvidia_nim"]
-
-[nvidia_nim]
-upstream = "google/gemma-3-12b-it"
-
-[ollama_cloud]
-upstream = "gemma3:12b"
+providers = ["ollama_cloud"]

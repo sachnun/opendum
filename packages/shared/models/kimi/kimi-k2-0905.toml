@@ -14,7 +14,4 @@ output = ["text"]
 
 [opendum]
 family = "Kimi"
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "moonshotai/kimi-k2-instruct-0905"
+providers = []

@@ -13,9 +13,6 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["nvidia-llama3-chatqa-1.5-70b", "nvidia/llama3-chatqa-1.5-70b"]
 ignored = true
-
-[nvidia_nim]
-upstream = "nvidia/llama3-chatqa-1.5-70b"

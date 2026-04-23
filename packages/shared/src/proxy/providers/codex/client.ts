@@ -23,7 +23,10 @@ import {
 } from "./constants.js";
 import { getProviderModelSet, resolveModelAlias } from "../../models.js";
 import { updateCodexQuotaFromHeaders } from "./quota.js";
-import { isChatGptAccountCompatibleCodexModel } from "./compat.js";
+import {
+  getChatGptCompatibleCodexModels,
+  isChatGptAccountCompatibleCodexModel,
+} from "./compat.js";
 
 /**
  * Device code initiation response
@@ -1463,12 +1466,13 @@ export const codexProvider: Provider = {
     const modelName = resolveModelAlias(requestedModel);
 
     if (!isChatGptAccountCompatibleCodexModel(modelName)) {
+      const supportedModels = getChatGptCompatibleCodexModels();
       return new Response(
         JSON.stringify({
           error: {
             message:
               `Model \"${requestedModel}\" is not supported for Codex when using a ChatGPT account. ` +
-              `Use one of: gpt-5.4, gpt-5.3-codex, gpt-5.2.`,
+              `Use one of: ${supportedModels.join(", ")}.`,
             type: "invalid_request_error",
             param: "model",
             code: "unsupported_codex_chatgpt_model",

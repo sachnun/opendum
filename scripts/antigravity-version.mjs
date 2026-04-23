@@ -4,7 +4,7 @@
  * Antigravity version refresh script.
  *
  * Fetches the latest version from the Antigravity changelog and updates
- * ANTIGRAVITY_USER_AGENT in constants.ts to prevent version-gating errors.
+ * USER_AGENT in constants.ts to prevent version-gating errors.
  *
  * The upstream Google Code Assist API checks the User-Agent version and
  * gates access to newer models (e.g. Gemini 3.1 Pro requires >= 1.18.3).
@@ -29,9 +29,9 @@ const CONSTANTS_PATH = resolve(
   "../packages/shared/src/proxy/providers/antigravity/constants.ts"
 );
 
-// Regex to extract version from User-Agent constant
+// Regex to extract version from the Antigravity User-Agent constant
 const USER_AGENT_REGEX =
-  /^(export const ANTIGRAVITY_USER_AGENT = `antigravity\/)(\d+\.\d+\.\d+)( \$\{getAntigravityPlatform\(\)\}`;)$/m;
+  /^(export const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+\$\{getAntigravityPlatform\(\)\}`;)$/m;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -155,9 +155,7 @@ function updateVersion(newVersion) {
 async function main() {
   const currentVersion = getCurrentVersion();
   if (!currentVersion) {
-    throw new Error(
-      "Could not find ANTIGRAVITY_USER_AGENT version in constants.ts"
-    );
+    throw new Error("Could not find USER_AGENT version in constants.ts");
   }
 
   console.log(`Antigravity: current version in constants.ts is ${currentVersion}`);

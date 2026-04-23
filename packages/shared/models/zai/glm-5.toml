@@ -13,7 +13,4 @@ output = ["text"]
 
 [opendum]
 family = "Z.AI"
-providers = ["kiro", "ollama_cloud", "nvidia_nim"]
-
-[nvidia_nim]
-upstream = "z-ai/glm5"
+providers = ["kiro", "ollama_cloud"]

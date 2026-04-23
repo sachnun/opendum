@@ -14,7 +14,9 @@ const MAX_FETCH_ATTEMPTS = 3;
 // the ChatGPT-backed Codex account flow used by this project. Keep the synced
 // `codex` provider registry restricted to the subset we know works here.
 const CHATGPT_COMPATIBLE_CODEX_MODELS = new Set([
+  "gpt-5.5",
   "gpt-5.4",
+  "gpt-5.4-mini",
   "gpt-5.3-codex",
   "gpt-5.2",
 ]);
@@ -95,6 +97,13 @@ function buildModelMap(models) {
 
   for (const model of models) {
     map.set(model.slug, model.slug);
+  }
+
+  // GPT-5.5 is documented as rolling out to Codex ahead of the public models
+  // feed. Keep it in the local registry so ChatGPT-backed Codex accounts can
+  // use it during the rollout window.
+  if (!map.has("gpt-5.5")) {
+    map.set("gpt-5.5", "gpt-5.5");
   }
 
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));

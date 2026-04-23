@@ -1,6 +1,3 @@
 [opendum]
 family = "ByteDance"
-providers = ["kilo_code"]
-
-[kilo_code]
-upstream = "bytedance-seed/dola-seed-2.0-pro:free"
+providers = []

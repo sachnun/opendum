@@ -13,9 +13,6 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["meta-codellama-70b", "meta/codellama-70b"]
 ignored = true
-
-[nvidia_nim]
-upstream = "meta/codellama-70b"

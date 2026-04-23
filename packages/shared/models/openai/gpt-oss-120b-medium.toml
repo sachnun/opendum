@@ -13,14 +13,5 @@ output = ["text"]
 
 [opendum]
 family = "OpenAI"
-providers = ["antigravity", "ollama_cloud", "groq", "nvidia_nim"]
+providers = ["antigravity", "ollama_cloud"]
 aliases = ["gpt-oss-120b"]
-
-[groq]
-upstream = "openai/gpt-oss-120b"
-
-[nvidia_nim]
-upstream = "openai/gpt-oss-120b"
-
-[ollama_cloud]
-upstream = "gpt-oss:120b"

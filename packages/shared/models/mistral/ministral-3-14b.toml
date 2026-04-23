@@ -14,11 +14,5 @@ output = ["text"]
 
 [opendum]
 family = "Mistral"
-providers = ["ollama_cloud", "nvidia_nim"]
+providers = ["ollama_cloud"]
 ignored = true
-
-[nvidia_nim]
-upstream = "mistralai/ministral-14b-instruct-2512"
-
-[ollama_cloud]
-upstream = "ministral-3:14b"

@@ -14,10 +14,4 @@ output = ["text"]
 
 [opendum]
 family = "Mistral"
-providers = ["ollama_cloud", "nvidia_nim"]
-
-[nvidia_nim]
-upstream = "mistralai/devstral-2-123b-instruct-2512"
-
-[ollama_cloud]
-upstream = "devstral-2:123b"
+providers = ["ollama_cloud"]

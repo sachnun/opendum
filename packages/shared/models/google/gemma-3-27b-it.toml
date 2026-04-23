@@ -14,7 +14,4 @@ output = ["text"]
 
 [opendum]
 family = "Google"
-providers = ["openrouter"]
-
-[openrouter]
-upstream = "google/gemma-3-27b-it:free"
+providers = ["nvidia_nim", "openrouter"]
