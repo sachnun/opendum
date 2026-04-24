@@ -48,6 +48,7 @@ export interface ChatCompletionRequest {
   instructions?: string;
   include?: string[];
   previous_response_id?: string;
+  service_tier?: string;
   messages: Array<{
     role: string;
     content: string | Array<{ type: string; [key: string]: unknown }>;

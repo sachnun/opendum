@@ -37,6 +37,7 @@ export const SUPPORTED_PARAMS = new Set([
   "reasoning",
   "include",
   "previous_response_id",
+  "service_tier",
 ]);
 
 // Token refresh buffer (5 minutes before expiry)
