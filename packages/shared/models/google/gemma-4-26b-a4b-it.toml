@@ -13,10 +13,4 @@ output = ["text"]
 
 [opendum]
 family = "Google"
-providers = ["openrouter", "workers_ai"]
-
-[openrouter]
-upstream = "google/gemma-4-26b-a4b-it:free"
-
-[workers_ai]
-upstream = "@cf/google/gemma-4-26b-a4b-it"
+providers = ["gemini_cli", "openrouter", "workers_ai"]

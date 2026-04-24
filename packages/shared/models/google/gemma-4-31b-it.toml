@@ -1,9 +1,3 @@
 [opendum]
 family = "Google"
-providers = ["openrouter", "nvidia_nim"]
-
-[nvidia_nim]
-upstream = "google/gemma-4-31b-it"
-
-[openrouter]
-upstream = "google/gemma-4-31b-it:free"
+providers = ["gemini_cli", "nvidia_nim", "openrouter"]
