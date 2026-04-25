@@ -19,7 +19,7 @@ import {
   getProviderAccountPath,
 } from "@/lib/provider-accounts";
 
-const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
+const WARNING_INDICATOR_STALE_WINDOW_MS = 3 * 60 * 60 * 1000;
 const PROVIDER_STATS_DAYS = 30;
 const PROVIDER_DURATION_LOOKBACK_HOURS = 24;
 

@@ -33,7 +33,7 @@ import { PlaygroundPresetProvider } from "@/lib/playground-preset-context";
 import type { ProviderAccountKey } from "@/lib/provider-accounts";
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "@/lib/provider-accounts";
 
-const WARNING_INDICATOR_STALE_WINDOW_MS = 5 * 60 * 60 * 1000;
+const WARNING_INDICATOR_STALE_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 const PROVIDER_KEY_BY_PROVIDER_NAME = {
   antigravity: "antigravity",
