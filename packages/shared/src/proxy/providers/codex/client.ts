@@ -402,18 +402,26 @@ function convertMessagesToInput(
           }
           // Then add each tool call as a function_call item
           for (const tc of msg.tool_calls) {
-            const toolCall = tc as {
-              id: string;
-              type: string;
-              function: { name: string; arguments: string };
-            };
-            const fcId = toResponsesApiId(toolCall.id);
+            if (!tc || typeof tc !== "object") {
+              continue;
+            }
+
+            const toolCall = tc as Record<string, unknown>;
+            const fn = toolCall.function as Record<string, unknown> | undefined;
+            const name = fn?.name;
+            if (typeof name !== "string" || !name.trim()) {
+              continue;
+            }
+
+            const args = fn?.arguments;
+            const rawId = typeof toolCall.id === "string" ? toolCall.id : "";
+            const fcId = toResponsesApiId(rawId);
             input.push({
               type: "function_call",
               id: fcId,
               call_id: fcId,
-              name: toolCall.function.name,
-              arguments: toolCall.function.arguments,
+              name: name.trim(),
+              arguments: typeof args === "string" ? args : "{}",
             });
           }
         } else {
@@ -511,20 +519,75 @@ function extractInstructionsFromMessages(
   return combined || undefined;
 }
 
-/**
- * Convert Chat Completions tools to Responses API tools format
- */
 function convertTools(
   tools?: ChatCompletionRequest["tools"]
 ): Array<Record<string, unknown>> | undefined {
   if (!tools || tools.length === 0) return undefined;
 
-  return tools.map((tool) => ({
+  const converted = tools
+    .map((tool) => {
+      if (!tool || typeof tool !== "object") {
+        return null;
+      }
+
+      const rawTool = tool as Record<string, unknown>;
+      const fn = rawTool.function as Record<string, unknown> | undefined;
+      const source = fn && typeof fn === "object" ? fn : rawTool;
+      const name = source.name;
+
+      if (typeof name !== "string" || !name.trim()) {
+        return null;
+      }
+
+      const description = source.description;
+      const parameters = source.parameters;
+      const strict = source.strict;
+      const deferLoading = source.defer_loading;
+      const convertedTool: Record<string, unknown> = {
+        type: "function",
+        name: name.trim(),
+        description: typeof description === "string" ? description : "",
+        parameters:
+          parameters && typeof parameters === "object" && !Array.isArray(parameters)
+            ? parameters
+            : { type: "object", properties: {} },
+      };
+
+      if (typeof strict === "boolean") {
+        convertedTool.strict = strict;
+      }
+
+      if (typeof deferLoading === "boolean") {
+        convertedTool.defer_loading = deferLoading;
+      }
+
+      return convertedTool;
+    })
+    .filter((tool): tool is Record<string, unknown> => tool !== null);
+
+  return converted.length > 0 ? converted : undefined;
+}
+
+function convertToolChoice(toolChoice: ChatCompletionRequest["tool_choice"]): unknown {
+  if (!toolChoice || typeof toolChoice !== "object") {
+    return toolChoice;
+  }
+
+  const rawToolChoice = toolChoice as Record<string, unknown>;
+  if (rawToolChoice.type !== "function") {
+    return toolChoice;
+  }
+
+  const fn = rawToolChoice.function as Record<string, unknown> | undefined;
+  const name = fn && typeof fn === "object" ? fn.name : rawToolChoice.name;
+  if (typeof name !== "string" || !name.trim()) {
+    return toolChoice;
+  }
+
+  return {
     type: "function",
-    name: tool.function.name,
-    description: tool.function.description || "",
-    parameters: tool.function.parameters || { type: "object", properties: {} },
-  }));
+    name: name.trim(),
+  };
 }
 
 /**
@@ -639,7 +702,7 @@ function buildResponsesApiPayload(
 
   // Codex endpoint currently rejects sampling controls
   // like temperature/top_p; omit them to avoid 400 errors.
-  setIfCodexParamSupported(payload, "tool_choice", body.tool_choice);
+  setIfCodexParamSupported(payload, "tool_choice", convertToolChoice(body.tool_choice));
 
   let reasoningConfig: Record<string, unknown> | undefined;
   if (body.reasoning && typeof body.reasoning === "object") {
