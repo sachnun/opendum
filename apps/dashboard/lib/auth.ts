@@ -1,8 +1,5 @@
-import { cache } from "react";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { nextCookies } from "better-auth/next-js";
-import { headers } from "next/headers";
 import { db, schema } from "@opendum/shared/db";
 
 const githubClientId = process.env.GITHUB_CLIENT_ID;
@@ -40,38 +37,9 @@ export const auth = betterAuth({
       clientSecret: googleClientSecret,
     },
   },
-  plugins: [nextCookies()],
   pages: {
     signIn: "/",
   },
 });
 
-/**
- * Get the current session in server components and server actions.
- * Replaces the previous `auth()` pattern from NextAuth.
- * Wrapped with React.cache() to deduplicate calls within a single RSC render pass.
- */
-export const getSession = cache(async () => {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
-});
-
-/**
- * Sign in with a social provider from a server action.
- * Returns a redirect URL for the OAuth flow.
- */
-export async function signInSocial(
-  provider: "github" | "google",
-  redirectTo: string,
-) {
-  const response = await auth.api.signInSocial({
-    body: {
-      provider,
-      callbackURL: redirectTo,
-    },
-    headers: await headers(),
-  });
-  return response;
-}
+export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>;

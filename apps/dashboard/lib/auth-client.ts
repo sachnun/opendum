@@ -1,3 +1,4 @@
-import { createAuthClient } from "better-auth/react";
+import { createAuthClient } from "better-auth/vue";
 
-export const { signIn, signUp, signOut, useSession } = createAuthClient();
+export const authClient = createAuthClient();
+export const { signIn, signOut, useSession } = authClient;
