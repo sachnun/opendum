@@ -175,7 +175,7 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../packages/shared/models");
+  const modelsDir = resolve(scriptDir, "../packages/models");
 
   const allModels = await fetchCodexModels();
   const filtered = filterModels(allModels);

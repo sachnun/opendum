@@ -1,7 +1,7 @@
-import { db } from "@opendum/shared/db";
-import { disabledModel } from "@opendum/shared/db/schema";
-import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts } from "@opendum/shared/proxy/auth";
-import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "@opendum/shared/proxy/models";
+import { db } from "../../lib/db";
+import { disabledModel } from "../../lib/db/schema";
+import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts } from "../../lib/proxy/auth";
+import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "../../lib/proxy/models";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 

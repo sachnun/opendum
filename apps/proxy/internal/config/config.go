@@ -76,16 +76,16 @@ func resolveModelsDir(configured string) (string, error) {
 	}
 
 	candidates := []string{
-		"packages/shared/models",
-		"../../packages/shared/models",
-		"../../../packages/shared/models",
+		"packages/models",
+		"../../packages/models",
+		"../../../packages/models",
 	}
 
 	if executable, err := os.Executable(); err == nil {
 		execDir := filepath.Dir(executable)
 		candidates = append(candidates,
-			filepath.Join(execDir, "..", "packages", "shared", "models"),
-			filepath.Join(execDir, "..", "..", "packages", "shared", "models"),
+			filepath.Join(execDir, "..", "packages", "models"),
+			filepath.Join(execDir, "..", "..", "packages", "models"),
 		)
 	}
 
@@ -95,5 +95,5 @@ func resolveModelsDir(configured string) (string, error) {
 		}
 	}
 
-	return "", errors.New("MODELS_DIR is required when packages/shared/models cannot be auto-detected")
+	return "", errors.New("MODELS_DIR is required when packages/models cannot be auto-detected")
 }

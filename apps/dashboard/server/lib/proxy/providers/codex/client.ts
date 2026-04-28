@@ -1529,7 +1529,7 @@ export const codexProvider: Provider = {
         JSON.stringify({
           error: {
             message:
-              `Model \"${requestedModel}\" is not supported for Codex when using a ChatGPT account. ` +
+              `Model "${requestedModel}" is not supported for Codex when using a ChatGPT account. ` +
               `Use one of: ${supportedModels.join(", ")}.`,
             type: "invalid_request_error",
             param: "model",

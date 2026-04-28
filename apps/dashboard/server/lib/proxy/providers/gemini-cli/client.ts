@@ -346,6 +346,7 @@ export const geminiCliProvider: Provider = {
           })
           .where(eq(providerAccount.id, account.id));
       } catch {
+        // Best-effort account metadata update.
       }
     }
 
@@ -717,6 +718,7 @@ async function onboardGeminiCliUser(
         tier: tierId,
       };
     } catch {
+      continue;
     }
   }
 
@@ -738,6 +740,7 @@ async function fetchGeminiCliEmail(accessToken: string): Promise<string> {
       return userInfo.email ?? "";
     }
   } catch {
+    return "";
   }
 
   return "";

@@ -10,6 +10,7 @@ node_modules
 .next/
 .nuxt/
 .nitro/
+.cron/
 .cache/
 /out/
 

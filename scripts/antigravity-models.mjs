@@ -35,7 +35,7 @@ const PROVIDER_NAME = "antigravity";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "packages/shared/models");
+const modelsDir = resolve(rootDir, "packages/models");
 
 // ---------------------------------------------------------------------------
 // Paths to TS source files that contain hardcoded model references
@@ -43,17 +43,17 @@ const modelsDir = resolve(rootDir, "packages/shared/models");
 
 const QUOTA_TS_PATH = resolve(
   rootDir,
-  "packages/shared/src/proxy/providers/antigravity/quota.ts"
+  "apps/dashboard/server/lib/proxy/providers/antigravity/quota.ts"
 );
 
 const CLIENT_TS_PATH = resolve(
   rootDir,
-  "packages/shared/src/proxy/providers/antigravity/client.ts"
+  "apps/dashboard/server/lib/proxy/providers/antigravity/client.ts"
 );
 
 const CLAUDE_TRANSFORM_TS_PATH = resolve(
   rootDir,
-  "packages/shared/src/proxy/providers/antigravity/transform/claude.ts"
+  "apps/dashboard/server/lib/proxy/providers/antigravity/transform/claude.ts"
 );
 
 // ---------------------------------------------------------------------------

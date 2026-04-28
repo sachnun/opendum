@@ -4,7 +4,7 @@
     "buildCommand": "pnpm --filter @opendum/dashboard build",
     "watchPatterns": [
       "apps/dashboard/**",
-      "packages/shared/**",
+      "packages/models/**",
       "package.json",
       "pnpm-lock.yaml",
       "pnpm-workspace.yaml",

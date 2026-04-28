@@ -1,4 +1,4 @@
-// @opendum/shared - Main barrel export
+// Dashboard server internals
 
 // Database
 export { db, schema } from "./db/index.js";

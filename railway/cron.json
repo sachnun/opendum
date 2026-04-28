@@ -1,9 +1,11 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "buildCommand": "pnpm --filter @opendum/shared build",
+    "buildCommand": "pnpm --filter @opendum/dashboard build:cron",
     "watchPatterns": [
-      "packages/shared/**",
+      "apps/dashboard/server/lib/**",
+      "apps/dashboard/package.json",
+      "packages/models/**",
       "package.json",
       "pnpm-lock.yaml",
       "pnpm-workspace.yaml",
@@ -12,7 +14,7 @@
     ]
   },
   "deploy": {
-    "startCommand": "node packages/shared/dist/cron/run-refresh-tokens.js",
+    "startCommand": "pnpm --filter @opendum/dashboard cron",
     "cronSchedule": "0 */6 * * *"
   }
 }

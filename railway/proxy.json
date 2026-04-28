@@ -4,7 +4,7 @@
     "buildCommand": "mkdir -p dist && cd apps/proxy && go build -o ../../dist/proxy ./cmd/proxy",
     "watchPatterns": [
       "apps/proxy/**",
-      "packages/shared/models/**",
+      "packages/models/**",
       "package.json",
       "railway/proxy.json"
     ]

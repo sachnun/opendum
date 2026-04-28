@@ -743,6 +743,7 @@ async function onboardUser(
         return { projectId, tier };
       }
     } catch {
+      continue;
     }
   }
 

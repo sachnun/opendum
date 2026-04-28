@@ -33,7 +33,7 @@ const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = { ...MODEL_REGISTRY 
 
 // Filter out ignored models from the effective registry
 for (const model of IGNORED_MODELS) {
-  delete EFFECTIVE_MODEL_REGISTRY[model];
+  Reflect.deleteProperty(EFFECTIVE_MODEL_REGISTRY, model);
 }
 
 const aliasToCanonical: Record<string, string> = {};

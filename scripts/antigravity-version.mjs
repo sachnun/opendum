@@ -26,7 +26,7 @@ const MAX_FETCH_ATTEMPTS = 3;
 
 const CONSTANTS_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../packages/shared/src/proxy/providers/antigravity/constants.ts"
+  "../apps/dashboard/server/lib/proxy/providers/antigravity/constants.ts"
 );
 
 // Regex to extract version from the Antigravity User-Agent constant

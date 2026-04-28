@@ -126,19 +126,28 @@ function extractProviderConfigs(raw: TomlModel): ModelInfo["providerConfig"] {
 }
 
 function resolveModelsDir(): string {
-  // Try to find the models directory relative to this file's location.
-  // When built: dist/proxy/loader.js -> ../../models
-  // When running from source: src/proxy/loader.ts -> ../../models
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  const relativeModelsDir = join(__dirname, "..", "..", "models");
-
-  if (existsSync(relativeModelsDir)) {
-    return relativeModelsDir;
+  const configuredModelsDir = process.env.MODELS_DIR;
+  if (configuredModelsDir && existsSync(configuredModelsDir)) {
+    return configuredModelsDir;
   }
 
-  // Fallback: look in process.cwd()/models (backward compatibility)
-  return join(process.cwd(), "models");
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+
+  const candidates = [
+    join(__dirname, "..", "..", "..", "..", "packages", "models"),
+    join(__dirname, "..", "..", "..", "..", "..", "packages", "models"),
+    join(process.cwd(), "packages", "models"),
+    join(process.cwd(), "..", "..", "packages", "models"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return join(process.cwd(), "packages", "models");
 }
 
 function collectTomlFiles(dir: string): string[] {
