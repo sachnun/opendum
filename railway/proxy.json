@@ -1,18 +1,15 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "buildCommand": "pnpm --filter @opendum/proxy... build",
+    "buildCommand": "mkdir -p dist && cd apps/proxy && go build -o ../../dist/proxy ./cmd/proxy",
     "watchPatterns": [
       "apps/proxy/**",
-      "packages/shared/**",
+      "packages/shared/models/**",
       "package.json",
-      "pnpm-lock.yaml",
-      "pnpm-workspace.yaml",
-      "tsconfig.base.json",
       "railway/proxy.json"
     ]
   },
   "deploy": {
-    "startCommand": "node apps/proxy/dist/server.js"
+    "startCommand": "./dist/proxy"
   }
 }

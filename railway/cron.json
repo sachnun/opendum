@@ -3,7 +3,6 @@
   "build": {
     "buildCommand": "pnpm --filter @opendum/shared build",
     "watchPatterns": [
-      "apps/dashboard/app/api/cron/**",
       "packages/shared/**",
       "package.json",
       "pnpm-lock.yaml",

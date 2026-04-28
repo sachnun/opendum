@@ -6,16 +6,16 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev:dashboard": "pnpm --filter @opendum/dashboard dev",
-    "dev:proxy": "pnpm --filter @opendum/proxy dev",
-    "dev": "pnpm --filter @opendum/shared build && pnpm --parallel --filter @opendum/dashboard --filter @opendum/proxy dev",
+    "dev:proxy": "cd apps/proxy && go run ./cmd/proxy",
+    "dev": "pnpm --filter @opendum/shared build && (pnpm --filter @opendum/dashboard dev & pnpm dev:proxy)",
     "clean": "pnpm -r exec rm -rf dist .next tsconfig.tsbuildinfo",
     "build:shared": "pnpm --filter @opendum/shared build",
     "build:dashboard": "pnpm --filter @opendum/dashboard... build",
-    "build:proxy": "pnpm --filter @opendum/proxy... build",
-    "build": "pnpm -r --workspace-concurrency=1 build",
+    "build:proxy": "cd apps/proxy && go build ./...",
+    "build": "pnpm -r --workspace-concurrency=1 build && pnpm build:proxy",
     "db:push": "pnpm --filter @opendum/dashboard db:push",
     "db:studio": "pnpm --filter @opendum/dashboard db:studio",
-    "lint": "pnpm --filter @opendum/shared build && pnpm --filter @opendum/dashboard lint && pnpm --filter @opendum/proxy lint",
+    "lint": "pnpm --filter @opendum/shared build && pnpm --filter @opendum/dashboard lint && cd apps/proxy && go test ./...",
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {

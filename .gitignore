@@ -8,10 +8,15 @@ node_modules
 
 # next.js
 .next/
+.nuxt/
+.nitro/
+.cache/
 /out/
 
 # production
 /build
+.output/
+.data/
 dist/
 
 # misc
@@ -24,6 +29,7 @@ pnpm-debug.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!**/.env.example
 
 # vercel
 .vercel

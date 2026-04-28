@@ -1,7 +1,6 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/shared" },
-    { "path": "./apps/proxy" }
+    { "path": "./packages/shared" }
   ]
 }
