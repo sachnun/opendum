@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "nuxt dev --host 0.0.0.0",
+    "dev": "AUTH_OAUTH_EMULATOR=1 nuxt dev --host 0.0.0.0",
     "build": "nuxt build",
     "build:cron": "tsc -p tsconfig.cron.json",
     "cron": "node .cron/cron/run-refresh-tokens.js",

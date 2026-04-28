@@ -6,6 +6,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       proxyUrl: "",
+      authOauthEmulator: process.env.NODE_ENV === "development" || process.env.AUTH_OAUTH_EMULATOR === "1",
     },
   },
   ui: {

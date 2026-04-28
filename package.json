@@ -6,8 +6,9 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev:dashboard": "pnpm --filter @opendum/dashboard dev",
+    "dev:emulate": "emulate --service github,google --port 4001 --seed emulate.config.yaml",
     "dev:proxy": "cd apps/proxy && go run ./cmd/proxy",
-    "dev": "(pnpm --filter @opendum/dashboard dev & pnpm dev:proxy)",
+    "dev": "(pnpm dev:dashboard & pnpm dev:proxy)",
     "clean": "pnpm -r exec rm -rf dist .next .cron tsconfig.tsbuildinfo",
     "build:dashboard": "pnpm --filter @opendum/dashboard build",
     "build:proxy": "cd apps/proxy && go build ./...",
@@ -18,6 +19,7 @@
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {
+    "emulate": "^0.4.1",
     "typescript": "^5.9.3"
   },
   "pnpm": {

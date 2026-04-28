@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { authClient, signIn, useSession } from "../../lib/auth-client";
+import type { SocialProvider } from "../../lib/auth-client";
+import { getAuthProvider } from "../../lib/oauth-emulator";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -8,9 +10,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Local development sign in failed. Please try again.",
 };
 
-type SocialProvider = "github" | "google";
-
 const route = useRoute();
+const config = useRuntimeConfig();
 const { data: session } = await useSession(useFetch);
 
 if (session.value?.user) {
@@ -20,6 +21,7 @@ if (session.value?.user) {
 const loadingProvider = ref<SocialProvider | null>(null);
 const localDevLoading = ref(false);
 const isDevelopment = import.meta.dev;
+const useOAuthEmulator = import.meta.dev || config.public.authOauthEmulator;
 
 const authError = computed(() => {
   const error = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error;
@@ -37,7 +39,7 @@ async function continueWithProvider(provider: SocialProvider) {
 
   try {
     await signIn.social({
-      provider,
+      provider: getAuthProvider(provider, useOAuthEmulator),
       callbackURL: "/dashboard",
     });
   } finally {

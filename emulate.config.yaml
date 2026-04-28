@@ -1,0 +1,21 @@
+github:
+  users:
+    - login: opendum-dev
+      name: Opendum Dev
+      email: dev@opendum.local
+  oauth_apps:
+    - client_id: opendum-github-dev
+      client_secret: opendum-github-secret
+      name: Opendum Dashboard Dev
+      redirect_uris:
+        - http://localhost:3000/api/auth/oauth2/callback/github-emulator
+
+google:
+  users:
+    - email: dev@opendum.local
+      name: Opendum Dev
+  oauth_clients:
+    - client_id: opendum-google-dev.apps.googleusercontent.com
+      client_secret: opendum-google-secret
+      redirect_uris:
+        - http://localhost:3000/api/auth/oauth2/callback/google-emulator
