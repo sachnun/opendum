@@ -1,0 +1,483 @@
+package proxy
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/opendum/opendum/apps/proxy/internal/auth"
+	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+)
+
+func TestParseChatCompletionsBuildsProviderPayload(t *testing.T) {
+	messages := []any{map[string]any{"role": "user", "content": "hello"}}
+	body := map[string]any{
+		"model":               "alias-model",
+		"messages":            messages,
+		"stream":              false,
+		"provider_account_id": "acct_1",
+		"temperature":         0.7,
+		"reasoning_effort":    "high",
+	}
+
+	parsed, routeErr := parseChatCompletions(body)
+	if routeErr != nil {
+		t.Fatalf("parseChatCompletions returned error: %+v", routeErr)
+	}
+	if parsed.ModelParam != "alias-model" {
+		t.Fatalf("ModelParam = %q, want alias-model", parsed.ModelParam)
+	}
+	if parsed.Stream {
+		t.Fatal("Stream = true, want false")
+	}
+	if parsed.ProviderAccountID == nil || *parsed.ProviderAccountID != "acct_1" {
+		t.Fatalf("ProviderAccountID = %v, want acct_1", parsed.ProviderAccountID)
+	}
+	if !parsed.ReasoningRequested {
+		t.Fatal("ReasoningRequested = false, want true")
+	}
+	if parsed.ParamsForError["model"] != nil || parsed.ParamsForError["messages"] != nil {
+		t.Fatalf("ParamsForError contains request-only fields: %#v", parsed.ParamsForError)
+	}
+	if parsed.ParamsForError["provider_account_id"] != "acct_1" || parsed.ParamsForError["stream"] != false {
+		t.Fatalf("ParamsForError missing provider account or stream: %#v", parsed.ParamsForError)
+	}
+
+	payload := buildChatCompletions(parsed, "canonical-model", true, "sess_1")
+	if payload["model"] != "canonical-model" {
+		t.Fatalf("payload model = %q, want canonical-model", payload["model"])
+	}
+	if !reflect.DeepEqual(payload["messages"], parsed.RouteData["messages"]) {
+		t.Fatal("payload messages did not preserve parsed messages")
+	}
+	if payload["stream"] != true {
+		t.Fatalf("payload stream = %v, want true", payload["stream"])
+	}
+	if payload["_includeReasoning"] != true || payload["_sessionId"] != "sess_1" {
+		t.Fatalf("payload missing proxy metadata: %#v", payload)
+	}
+	if _, ok := payload["provider_account_id"]; ok {
+		t.Fatalf("payload leaked provider_account_id: %#v", payload)
+	}
+	if payload["temperature"] != 0.7 || payload["reasoning_effort"] != "high" {
+		t.Fatalf("payload dropped provider params: %#v", payload)
+	}
+}
+
+func TestParseChatCompletionsValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    map[string]any
+		message string
+	}{
+		{name: "missing model", body: map[string]any{"messages": []any{"hello"}}, message: "model is required"},
+		{name: "missing messages", body: map[string]any{"model": "test-model"}, message: "messages array is required"},
+		{name: "empty messages", body: map[string]any{"model": "test-model", "messages": []any{}}, message: "messages array is required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, routeErr := parseChatCompletions(tt.body)
+			if routeErr == nil {
+				t.Fatal("parseChatCompletions returned nil error")
+			}
+			if routeErr.Status != http.StatusBadRequest || routeErr.Message != tt.message || routeErr.Type != "invalid_request_error" {
+				t.Fatalf("routeErr = %+v", routeErr)
+			}
+		})
+	}
+}
+
+func TestParseResponsesConvertsInputAndParams(t *testing.T) {
+	input := []any{
+		map[string]any{"type": "message", "role": "developer", "content": "follow policy"},
+		map[string]any{"type": "message", "role": "user", "content": "what time is it?"},
+		map[string]any{"type": "function_call", "call_id": "fc_weather", "name": "weather", "arguments": `{"city":"Jakarta"}`},
+		map[string]any{"type": "function_call_output", "call_id": "fc_weather", "output": "sunny"},
+	}
+	body := map[string]any{
+		"model":               "responses-model",
+		"input":               input,
+		"instructions":        "system instructions",
+		"max_output_tokens":   123,
+		"stream":              false,
+		"provider_account_id": "acct_2",
+		"reasoning":           map[string]any{"effort": "medium"},
+	}
+
+	parsed, routeErr := parseResponses(body)
+	if routeErr != nil {
+		t.Fatalf("parseResponses returned error: %+v", routeErr)
+	}
+	if parsed.ModelParam != "responses-model" || parsed.Stream {
+		t.Fatalf("parsed request = %+v", parsed)
+	}
+	if !parsed.ReasoningRequested {
+		t.Fatal("ReasoningRequested = false, want true")
+	}
+	messages := parsed.RouteData["messages"].([]any)
+	if len(messages) != 5 {
+		t.Fatalf("converted messages len = %d, want 5: %#v", len(messages), messages)
+	}
+	assertMessage(t, messages[0], "system", "system instructions")
+	assertMessage(t, messages[1], "system", "follow policy")
+	assertMessage(t, messages[2], "user", "what time is it?")
+
+	assistant := messages[3].(map[string]any)
+	if assistant["role"] != "assistant" || assistant["content"] != "" {
+		t.Fatalf("assistant tool-call message = %#v", assistant)
+	}
+	toolCalls := assistant["tool_calls"].([]any)
+	if len(toolCalls) != 1 {
+		t.Fatalf("tool_calls len = %d, want 1", len(toolCalls))
+	}
+	call := toolCalls[0].(map[string]any)
+	if call["id"] != "call_weather" {
+		t.Fatalf("tool call id = %q, want call_weather", call["id"])
+	}
+	function := call["function"].(map[string]any)
+	if function["name"] != "weather" || function["arguments"] != `{"city":"Jakarta"}` {
+		t.Fatalf("tool call function = %#v", function)
+	}
+	assertMessage(t, messages[4], "tool", "sunny")
+	if messages[4].(map[string]any)["tool_call_id"] != "call_weather" {
+		t.Fatalf("tool result id = %q, want call_weather", messages[4].(map[string]any)["tool_call_id"])
+	}
+
+	params := parsed.RouteData["params"].(map[string]any)
+	if _, ok := params["max_output_tokens"]; ok {
+		t.Fatalf("params still contains max_output_tokens: %#v", params)
+	}
+	if params["max_tokens"] != 123 {
+		t.Fatalf("max_tokens = %v, want 123", params["max_tokens"])
+	}
+
+	payload := buildResponses(parsed, "canonical-responses-model", true, "sess_2")
+	if payload["model"] != "canonical-responses-model" || payload["stream"] != true {
+		t.Fatalf("payload = %#v", payload)
+	}
+	if payload["_responsesInput"] == nil || payload["_sessionId"] != "sess_2" || payload["_includeReasoning"] != true {
+		t.Fatalf("payload missing response metadata: %#v", payload)
+	}
+	if _, ok := payload["provider_account_id"]; ok {
+		t.Fatalf("payload leaked provider_account_id: %#v", payload)
+	}
+}
+
+func TestTransformAnthropicToOpenAI(t *testing.T) {
+	body := map[string]any{
+		"system": []any{
+			map[string]any{"type": "text", "text": "first"},
+			map[string]any{"type": "text", "text": "second"},
+		},
+		"messages": []any{
+			map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{"type": "text", "text": "look"},
+					map[string]any{"type": "image", "source": map[string]any{"url": "data:image/png;base64,abc"}},
+				},
+			},
+			map[string]any{
+				"role": "assistant",
+				"content": []any{
+					map[string]any{"type": "tool_use", "id": "toolu_1", "name": "lookup", "input": map[string]any{"city": "Jakarta"}},
+				},
+			},
+			map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{"type": "tool_result", "tool_use_id": "toolu_1", "content": map[string]any{"ok": true}},
+				},
+			},
+		},
+		"max_tokens":          100,
+		"thinking":            map[string]any{"type": "enabled", "budget_tokens": 2048},
+		"provider_account_id": "acct_3",
+	}
+
+	payload := transformAnthropicToOpenAI(body)
+	if _, ok := payload["provider_account_id"]; ok {
+		t.Fatalf("payload leaked provider_account_id: %#v", payload)
+	}
+	if payload["max_tokens"] != 100 || payload["thinking_budget"] != 2048 || payload["_includeReasoning"] != true {
+		t.Fatalf("payload missing params: %#v", payload)
+	}
+
+	messages := payload["messages"].([]any)
+	if len(messages) != 4 {
+		t.Fatalf("messages len = %d, want 4: %#v", len(messages), messages)
+	}
+	assertMessage(t, messages[0], "system", "first\nsecond")
+
+	user := messages[1].(map[string]any)
+	if user["role"] != "user" {
+		t.Fatalf("user role = %q", user["role"])
+	}
+	parts := user["content"].([]any)
+	if len(parts) != 2 {
+		t.Fatalf("user content parts len = %d, want 2", len(parts))
+	}
+	if parts[0].(map[string]any)["type"] != "text" || parts[1].(map[string]any)["type"] != "image_url" {
+		t.Fatalf("unexpected user parts: %#v", parts)
+	}
+
+	assistant := messages[2].(map[string]any)
+	if assistant["role"] != "assistant" || assistant["content"] != nil {
+		t.Fatalf("assistant message = %#v", assistant)
+	}
+	toolCalls := assistant["tool_calls"].([]any)
+	if len(toolCalls) != 1 {
+		t.Fatalf("tool_calls len = %d, want 1", len(toolCalls))
+	}
+	call := toolCalls[0].(map[string]any)
+	if call["id"] != "toolu_1" || call["type"] != "function" {
+		t.Fatalf("tool call = %#v", call)
+	}
+	fn := call["function"].(map[string]any)
+	if fn["name"] != "lookup" || fn["arguments"] != `{"city":"Jakarta"}` {
+		t.Fatalf("tool function = %#v", fn)
+	}
+
+	assertMessage(t, messages[3], "tool", `{"ok":true}`)
+	if messages[3].(map[string]any)["tool_call_id"] != "toolu_1" {
+		t.Fatalf("tool result id = %q, want toolu_1", messages[3].(map[string]any)["tool_call_id"])
+	}
+}
+
+func TestTransformOpenAIToAnthropic(t *testing.T) {
+	openAI := map[string]any{
+		"id": "chatcmpl_1",
+		"choices": []any{map[string]any{
+			"finish_reason": "tool_calls",
+			"message": map[string]any{
+				"reasoning_content": "thought process",
+				"content":           "final answer",
+				"tool_calls": []any{map[string]any{
+					"id": "call_1",
+					"function": map[string]any{
+						"name":      "search",
+						"arguments": `{"q":"go"}`,
+					},
+				}},
+			},
+		}},
+		"usage": map[string]any{"prompt_tokens": 9, "completion_tokens": 4},
+	}
+
+	response := transformOpenAIToAnthropic(openAI, "claude-test", true)
+	if response["id"] != "msg_chatcmpl_1" || response["model"] != "claude-test" || response["stop_reason"] != "tool_use" {
+		t.Fatalf("response metadata = %#v", response)
+	}
+	content := response["content"].([]any)
+	if len(content) != 3 {
+		t.Fatalf("content len = %d, want 3: %#v", len(content), content)
+	}
+	if content[0].(map[string]any)["type"] != "thinking" || content[0].(map[string]any)["thinking"] != "thought process" {
+		t.Fatalf("thinking block = %#v", content[0])
+	}
+	if content[1].(map[string]any)["type"] != "text" || content[1].(map[string]any)["text"] != "final answer" {
+		t.Fatalf("text block = %#v", content[1])
+	}
+	toolUse := content[2].(map[string]any)
+	if toolUse["type"] != "tool_use" || toolUse["id"] != "call_1" || toolUse["name"] != "search" {
+		t.Fatalf("tool use block = %#v", toolUse)
+	}
+	if !reflect.DeepEqual(toolUse["input"], map[string]any{"q": "go"}) {
+		t.Fatalf("tool input = %#v", toolUse["input"])
+	}
+	usage := response["usage"].(map[string]any)
+	if usage["input_tokens"] != 9 || usage["output_tokens"] != 4 {
+		t.Fatalf("usage = %#v", usage)
+	}
+}
+
+func TestStripImageContent(t *testing.T) {
+	payload := map[string]any{"messages": []any{
+		map[string]any{"role": "user", "content": []any{
+			map[string]any{"type": "text", "text": "keep"},
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "https://example.com/a.png"}},
+			"raw-part",
+		}},
+		map[string]any{"role": "user", "content": []any{
+			map[string]any{"type": "text", "text": "collapse me"},
+			map[string]any{"type": "input_image", "image_url": "ignored"},
+		}},
+	}}
+
+	stripImageContent(payload)
+	messages := payload["messages"].([]any)
+	first := messages[0].(map[string]any)["content"].([]any)
+	if len(first) != 2 || first[0].(map[string]any)["type"] != "text" || first[1] != "raw-part" {
+		t.Fatalf("first content = %#v", first)
+	}
+	second := messages[1].(map[string]any)["content"]
+	if second != "collapse me" {
+		t.Fatalf("second content = %#v, want collapse me", second)
+	}
+}
+
+func TestSanitizedProxyError(t *testing.T) {
+	tests := []struct {
+		name        string
+		status      int
+		body        string
+		wantMessage string
+		wantType    string
+	}{
+		{name: "client json error", status: http.StatusUnauthorized, body: `{"error":{"message":" invalid\napi key "}}`, wantMessage: "invalid api key", wantType: "invalid_request_error"},
+		{name: "server detail", status: http.StatusBadGateway, body: `{"detail":"upstream failed"}`, wantMessage: "upstream failed", wantType: "api_error"},
+		{name: "nested json string", status: http.StatusBadRequest, body: `{"error":"{\"message\":\"nested failure\"}"}`, wantMessage: "nested failure", wantType: "invalid_request_error"},
+		{name: "empty body fallback", status: http.StatusTeapot, body: ``, wantMessage: "I'm a teapot", wantType: "invalid_request_error"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			message, typ := sanitizedProxyError(tt.status, tt.body)
+			if message != tt.wantMessage || typ != tt.wantType {
+				t.Fatalf("sanitizedProxyError = (%q, %q), want (%q, %q)", message, typ, tt.wantMessage, tt.wantType)
+			}
+		})
+	}
+}
+
+func TestNormalizeClientErrorTruncatesLongMessages(t *testing.T) {
+	message := normalizeClientError("  " + strings.Repeat("a", 400) + "  ")
+	if len(message) != 334 {
+		t.Fatalf("len(message) = %d, want 334", len(message))
+	}
+	if !strings.HasSuffix(message, "...[truncated]") {
+		t.Fatalf("message does not include truncation suffix: %q", message)
+	}
+}
+
+func TestPassthroughUsageTrackerProcessesSplitSSE(t *testing.T) {
+	tracker := &passthroughUsageTracker{}
+	tracker.Process([]byte(`data: {"usage":{"prompt_tokens":3`))
+	tracker.Process([]byte(`,"completion_tokens":4}}` + "\n\n"))
+	tracker.Process([]byte(`data: {"usage":{"input_tokens":5,"output_tokens":6}}` + "\n\n"))
+	tracker.Process([]byte("data: [DONE]\n\n"))
+
+	if tracker.inputTokens != 5 || tracker.outputTokens != 6 {
+		t.Fatalf("tokens = (%d, %d), want (5, 6)", tracker.inputTokens, tracker.outputTokens)
+	}
+
+	incomplete := &passthroughUsageTracker{}
+	incomplete.Process([]byte(`data: {"usage":{"input_tokens":8,"output_tokens":9}}`))
+	incomplete.Flush()
+	if incomplete.inputTokens != 8 || incomplete.outputTokens != 9 {
+		t.Fatalf("flushed tokens = (%d, %d), want (8, 9)", incomplete.inputTokens, incomplete.outputTokens)
+	}
+}
+
+func TestWriteRouteErrorFormats(t *testing.T) {
+	param := "model"
+	code := "invalid_model"
+	retryAfter := "10s"
+	retryAfterMS := int64(10000)
+
+	openAIRecorder := httptest.NewRecorder()
+	(&Service{}).writeRouteError(openAIRecorder, routeConfig{Format: FormatOpenAI}, http.StatusTooManyRequests, "slow down", "rate_limit_error", &param, &code, &retryAfter, &retryAfterMS)
+	if openAIRecorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("openAI status = %d", openAIRecorder.Code)
+	}
+	var openAI openAIError
+	if err := json.Unmarshal(openAIRecorder.Body.Bytes(), &openAI); err != nil {
+		t.Fatalf("decode OpenAI error: %v", err)
+	}
+	if openAI.Error.Message != "slow down" || openAI.Error.Type != "rate_limit_error" || *openAI.Error.Param != param || *openAI.Error.Code != code || *openAI.Error.RetryAfter != retryAfter || *openAI.Error.RetryAfterMS != retryAfterMS {
+		t.Fatalf("OpenAI error = %#v", openAI.Error)
+	}
+
+	anthropicRecorder := httptest.NewRecorder()
+	(&Service{}).writeRouteError(anthropicRecorder, routeConfig{Format: FormatAnthropic}, http.StatusBadRequest, "bad request", "invalid_request_error", nil, nil, nil, nil)
+	if anthropicRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("anthropic status = %d", anthropicRecorder.Code)
+	}
+	var anthropic map[string]any
+	if err := json.Unmarshal(anthropicRecorder.Body.Bytes(), &anthropic); err != nil {
+		t.Fatalf("decode Anthropic error: %v", err)
+	}
+	if anthropic["type"] != "error" {
+		t.Fatalf("Anthropic error type = %#v", anthropic)
+	}
+	inner := anthropic["error"].(map[string]any)
+	if inner["type"] != "invalid_request_error" || inner["message"] != "bad request" {
+		t.Fatalf("Anthropic inner error = %#v", inner)
+	}
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	response := &http.Response{Header: http.Header{"Retry-After-Ms": []string{"1500"}}}
+	if got := parseRetryAfter(response); got != 1500*time.Millisecond {
+		t.Fatalf("retry-after-ms duration = %s", got)
+	}
+
+	response = &http.Response{Header: http.Header{"Retry-After": []string{"7"}}}
+	if got := parseRetryAfter(response); got != 7*time.Second {
+		t.Fatalf("retry-after duration = %s", got)
+	}
+
+	response = &http.Response{Header: http.Header{"Retry-After": []string{"bad"}}}
+	if got := parseRetryAfter(response); got != 0 {
+		t.Fatalf("invalid retry-after duration = %s", got)
+	}
+}
+
+func TestPrioritizeAccountsGroupsByProviderAndPaidTier(t *testing.T) {
+	paid := "paid"
+	accounts := []appdb.ProviderAccount{
+		{ID: "free-groq", Provider: "groq"},
+		{ID: "paid-groq", Provider: "groq", Tier: &paid},
+		{ID: "paid-openrouter", Provider: "openrouter", Tier: &paid},
+		{ID: "free-openrouter", Provider: "openrouter"},
+	}
+
+	prioritized := prioritizeAccounts(accounts, true, []string{"openrouter", "groq"})
+	ids := make([]string, 0, len(prioritized))
+	for _, account := range prioritized {
+		ids = append(ids, account.ID)
+	}
+	want := []string{"paid-openrouter", "free-openrouter", "paid-groq", "free-groq"}
+	if !reflect.DeepEqual(ids, want) {
+		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
+	}
+}
+
+func TestAccountAllowedHonorsAccessMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		access  auth.AccountAccess
+		wantErr bool
+	}{
+		{name: "all", access: auth.AccountAccess{Mode: "all"}},
+		{name: "whitelist allows", access: auth.AccountAccess{Mode: "whitelist", Accounts: []string{"acct_1", "acct_2"}}},
+		{name: "whitelist rejects", access: auth.AccountAccess{Mode: "whitelist", Accounts: []string{"acct_2"}}, wantErr: true},
+		{name: "blacklist allows", access: auth.AccountAccess{Mode: "blacklist", Accounts: []string{"acct_2"}}},
+		{name: "blacklist rejects", access: auth.AccountAccess{Mode: "blacklist", Accounts: []string{"acct_1"}}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := accountAllowed("acct_1", tt.access)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("accountAllowed error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func assertMessage(t *testing.T, raw any, role, content string) {
+	t.Helper()
+	message, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("message has type %T, want map[string]any", raw)
+	}
+	if message["role"] != role || message["content"] != content {
+		t.Fatalf("message = %#v, want role %q content %q", message, role, content)
+	}
+}
