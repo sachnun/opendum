@@ -1,57 +1,133 @@
 <script setup lang="ts">
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
-const { $client } = useNuxtApp();
-const range = ref("24h");
-const ranges = ["24h", "7d", "30d"];
+const config = useRuntimeConfig();
+const baseUrl = computed(() => {
+  const proxyUrl = String(config.public.proxyUrl || "").replace(/\/$/, "");
+  return proxyUrl ? `${proxyUrl}/v1` : "http://localhost:4000/v1";
+});
 
-type UsageRow = Awaited<ReturnType<typeof $client.analytics.usage.query>>[number];
+const copiedValue = ref<string | null>(null);
+let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const { data, error, pending, refresh } = await useAsyncData(
-  "dashboard-usage",
-  () => $client.analytics.usage.query({ range: range.value as "24h" | "7d" | "30d" }),
-  { watch: [range] }
-);
-const rows = computed<UsageRow[]>(() => data.value ?? []);
+async function copyInlineCode(value: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    copiedValue.value = value;
+
+    if (copyTimeout) {
+      clearTimeout(copyTimeout);
+    }
+
+    copyTimeout = setTimeout(() => {
+      copiedValue.value = null;
+    }, 1800);
+  } catch {
+    console.error("Failed to copy to clipboard");
+  }
+}
+
+onBeforeUnmount(() => {
+  if (copyTimeout) {
+    clearTimeout(copyTimeout);
+  }
+});
 </script>
 
 <template>
   <div class="space-y-6">
-    <DashboardPageHeader title="Usage" description="Inspect recent proxy requests and high-level usage windows.">
-      <template #actions>
-        <USelect v-model="range" :items="ranges" class="w-28" />
-        <UButton color="neutral" variant="soft" icon="i-lucide-refresh-cw" @click="refresh()">
-          Refresh
-        </UButton>
-      </template>
-    </DashboardPageHeader>
+    <DashboardPageHeader title="Usage" />
 
-    <DashboardDataNotice :error="error" />
-    <USkeleton v-if="pending" class="h-80 rounded-xl" />
-    <DashboardEmptyState v-else-if="rows.length === 0" title="No usage yet" description="Requests routed through the proxy will appear here." icon="i-lucide-book-open" />
-    <UCard v-else>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="text-left text-muted-foreground">
-            <tr class="border-b border-border">
-              <th class="py-3 pr-4 font-medium">Time</th>
-              <th class="py-3 pr-4 font-medium">Model</th>
-              <th class="py-3 pr-4 font-medium">Provider</th>
-              <th class="py-3 pr-4 font-medium">Status</th>
-              <th class="py-3 pr-4 text-right font-medium">Tokens</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in rows" :key="row.id ?? row.createdAt" class="border-b border-border/60 last:border-0">
-              <td class="py-3 pr-4 text-muted-foreground">{{ row.createdAt ? new Date(row.createdAt).toLocaleString() : '-' }}</td>
-              <td class="py-3 pr-4">{{ row.model ?? '-' }}</td>
-              <td class="py-3 pr-4">{{ row.provider ?? '-' }}</td>
-              <td class="py-3 pr-4">{{ row.statusCode ?? '-' }}</td>
-              <td class="py-3 pr-4 text-right tabular-nums">{{ row.totalTokens.toLocaleString() }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </UCard>
+    <UiCard class="bg-card">
+      <UiCardHeader>
+        <UiCardTitle>Start in 3 steps</UiCardTitle>
+      </UiCardHeader>
+      <UiCardContent class="space-y-4">
+        <ol class="space-y-3 text-sm">
+          <li class="flex gap-3">
+            <span class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border text-xs font-medium">1</span>
+            <span>
+              Create an API key from
+              <NuxtLink to="/dashboard/api-keys" class="font-medium text-primary underline-offset-4 hover:underline">
+                /dashboard/api-keys
+              </NuxtLink>
+              .
+            </span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border text-xs font-medium">2</span>
+            <span>
+              Set
+              <code class="inline-flex items-center gap-1 break-all rounded bg-muted px-1 py-0.5 text-xs">
+                {{ baseUrl }}
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                  :aria-label="copiedValue === baseUrl ? 'Copied' : 'Copy to clipboard'"
+                  @click="copyInlineCode(baseUrl)"
+                >
+                  <UIcon :name="copiedValue === baseUrl ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                </button>
+              </code>
+              as your API base URL.
+            </span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border text-xs font-medium">3</span>
+            <span>
+              Send your key as <code class="rounded bg-muted px-1 py-0.5 text-xs">Bearer</code>
+              for OpenAI-compatible requests or <code class="rounded bg-muted px-1 py-0.5 text-xs">x-api-key</code>
+              for Anthropic-compatible requests.
+            </span>
+          </li>
+        </ol>
+      </UiCardContent>
+    </UiCard>
+
+    <UiCard class="bg-card">
+      <UiCardHeader>
+        <UiCardTitle>Compatibility reference</UiCardTitle>
+      </UiCardHeader>
+      <UiCardContent class="grid gap-4 md:grid-cols-3">
+        <div class="min-w-0 space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+          <UiBadge variant="outline">OpenAI-compatible</UiBadge>
+          <div>
+            <p class="text-xs text-muted-foreground">Endpoint</p>
+            <code class="break-all text-sm">POST {{ baseUrl }}/chat/completions</code>
+          </div>
+          <div>
+            <p class="text-xs text-muted-foreground">Auth header</p>
+            <code class="break-all text-sm">Authorization: Bearer &lt;api_key&gt;</code>
+          </div>
+        </div>
+
+        <div class="min-w-0 space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+          <UiBadge variant="outline">Anthropic</UiBadge>
+          <div>
+            <p class="text-xs text-muted-foreground">Endpoint</p>
+            <code class="break-all text-sm">POST {{ baseUrl }}/messages</code>
+          </div>
+          <div>
+            <p class="text-xs text-muted-foreground">Auth headers</p>
+            <div class="space-y-1">
+              <code class="block break-all text-sm">x-api-key: &lt;api_key&gt;</code>
+              <code class="block break-all text-sm">anthropic-version: 2023-06-01</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="min-w-0 space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+          <UiBadge variant="outline">OpenAI Responses</UiBadge>
+          <div>
+            <p class="text-xs text-muted-foreground">Endpoint</p>
+            <code class="break-all text-sm">POST {{ baseUrl }}/responses</code>
+          </div>
+          <div>
+            <p class="text-xs text-muted-foreground">Auth header</p>
+            <code class="break-all text-sm">Authorization: Bearer &lt;api_key&gt;</code>
+          </div>
+        </div>
+      </UiCardContent>
+    </UiCard>
   </div>
 </template>

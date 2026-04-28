@@ -1,75 +1,158 @@
 <script setup lang="ts">
-import { signIn, useSession } from "../../lib/auth-client";
+import { authClient, signIn, useSession } from "../../lib/auth-client";
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthAccountNotLinked:
+    "We could not link this sign-in method to your existing account. Try your original provider once, then try again.",
+  AccessDenied: "Access denied. Please try signing in again.",
+  CredentialsSignin: "Local development sign in failed. Please try again.",
+};
+
+type SocialProvider = "github" | "google";
 
 const route = useRoute();
 const { data: session } = await useSession(useFetch);
 
 if (session.value?.user) {
-  await navigateTo((route.query.redirect as string) || "/dashboard");
+  await navigateTo("/dashboard");
 }
 
-const loading = ref(false);
+const loadingProvider = ref<SocialProvider | null>(null);
+const localDevLoading = ref(false);
+const isDevelopment = import.meta.dev;
 
-async function continueWithGoogle() {
-  loading.value = true;
-  await signIn.social({
-    provider: "google",
-    callbackURL: (route.query.redirect as string) || "/dashboard",
-  });
-  loading.value = false;
+const authError = computed(() => {
+  const error = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error;
+
+  if (!error) {
+    return null;
+  }
+
+  const decodedError = decodeURIComponent(error);
+  return AUTH_ERROR_MESSAGES[decodedError] ?? "Sign in failed. Please try again.";
+});
+
+async function continueWithProvider(provider: SocialProvider) {
+  loadingProvider.value = provider;
+
+  try {
+    await signIn.social({
+      provider,
+      callbackURL: "/dashboard",
+    });
+  } finally {
+    loadingProvider.value = null;
+  }
+}
+
+async function continueAsLocalDev() {
+  localDevLoading.value = true;
+
+  const email = "dev@localdev.test";
+  const password = "localdev";
+
+  try {
+    const signUpResult = await authClient.signUp.email({
+      email,
+      password,
+      name: "Local Dev",
+      callbackURL: "/dashboard",
+    });
+
+    if (signUpResult.error) {
+      const signInResult = await authClient.signIn.email({
+        email,
+        password,
+        callbackURL: "/dashboard",
+      });
+
+      if (signInResult.error) {
+        throw new Error(signInResult.error.message || "Local development sign in failed");
+      }
+    }
+
+    await navigateTo("/dashboard");
+  } catch {
+    await navigateTo({ path: "/", query: { error: "CredentialsSignin" } });
+  } finally {
+    localDevLoading.value = false;
+  }
 }
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-foreground">
-    <main class="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center gap-10 px-6 py-12 lg:grid lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-      <section class="space-y-8">
-        <UBadge color="neutral" variant="soft" class="w-fit">
-          Your accounts, one proxy
-        </UBadge>
-        <div class="space-y-5">
-          <h1 class="max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-            Route AI traffic through the accounts you already own.
-          </h1>
-          <p class="max-w-2xl text-base text-muted-foreground sm:text-lg">
-            Manage provider accounts, API keys, model access, and request analytics from a lightweight Nuxt dashboard.
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-3">
-          <UButton size="lg" :loading="loading" @click="continueWithGoogle">
-            Continue with Google
-          </UButton>
-          <UButton to="/dashboard" size="lg" color="neutral" variant="soft">
-            Open dashboard
-          </UButton>
-        </div>
-      </section>
+  <div class="flex min-h-screen flex-col items-center justify-center bg-background">
+    <div class="mx-auto max-w-md px-4 text-center">
+      <h1 class="text-3xl font-bold tracking-tighter sm:text-4xl">
+        Opendum
+      </h1>
+      <p class="mt-4 font-mono text-sm text-muted-foreground">
+        Your accounts, one proxy.
+      </p>
 
-      <UCard class="bg-card/80">
-        <div class="space-y-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-muted-foreground">Proxy status</p>
-              <p class="text-2xl font-semibold">Ready</p>
-            </div>
-            <UIcon name="i-lucide-activity" class="size-8 text-muted-foreground" />
-          </div>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <div class="rounded-lg border border-border bg-muted/30 p-3">
-              <p class="text-xs text-muted-foreground">Accounts</p>
-              <p class="mt-1 text-xl font-semibold">Many</p>
-            </div>
-            <div class="rounded-lg border border-border bg-muted/30 p-3">
-              <p class="text-xs text-muted-foreground">Keys</p>
-              <p class="mt-1 text-xl font-semibold">Scoped</p>
-            </div>
-            <div class="rounded-lg border border-border bg-muted/30 p-3">
-              <p class="text-xs text-muted-foreground">Models</p>
-              <p class="mt-1 text-xl font-semibold">Unified</p>
-            </div>
-          </div>
+      <div
+        v-if="authError"
+        role="alert"
+        class="relative mt-6 grid w-full grid-cols-[calc(var(--spacing)*4)_1fr] items-start gap-x-3 gap-y-0.5 rounded-lg border bg-card px-4 py-3 text-left text-sm text-destructive"
+      >
+        <UIcon name="i-lucide-circle-alert" class="size-4 translate-y-0.5 text-current" />
+        <div class="col-start-2 grid justify-items-start gap-1 text-sm text-destructive/90">
+          {{ authError }}
         </div>
-      </UCard>
-    </main>
+      </div>
+
+      <div class="mt-8 flex flex-col items-center gap-3">
+        <div class="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            aria-label="Continue with GitHub"
+            :disabled="loadingProvider !== null"
+            class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+            @click="continueWithProvider('github')"
+          >
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            aria-label="Continue with Google"
+            :disabled="loadingProvider !== null"
+            class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+            @click="continueWithProvider('google')"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">
+              <path
+                fill="#FFC107"
+                d="M43.611 20.083H42V20H24v8h11.303C33.652 32.657 29.193 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.27 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+              />
+              <path
+                fill="#FF3D00"
+                d="M6.306 14.691l6.571 4.819C14.655 16.108 19.001 13 24 13c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.27 4 24 4c-7.682 0-14.318 4.337-17.694 10.691z"
+              />
+              <path
+                fill="#4CAF50"
+                d="M24 44c5.067 0 9.77-1.939 13.332-5.101l-6.157-5.209C29.116 35.091 26.659 36 24 36c-5.173 0-9.625-3.316-11.302-7.946l-6.522 5.025C9.523 39.556 16.227 44 24 44z"
+              />
+              <path
+                fill="#1976D2"
+                d="M43.611 20.083H42V20H24v8h11.303c-.787 2.239-2.231 4.166-4.128 5.538l.003-.002 6.157 5.209C36.9 39.09 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <button
+          v-if="isDevelopment"
+          type="button"
+          :disabled="localDevLoading"
+          class="inline-flex h-9 min-w-52 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground outline-none transition-all hover:bg-secondary/80 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+          @click="continueAsLocalDev"
+        >
+          Continue as Local Dev
+        </button>
+      </div>
+    </div>
   </div>
 </template>
