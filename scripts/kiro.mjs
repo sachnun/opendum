@@ -382,7 +382,7 @@ async function main() {
 
   // 4. Sync into TOML files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../packages/models");
+  const modelsDir = resolve(scriptDir, "../models");
 
   const result = syncProviderToToml(modelsDir, PROVIDER_NAME, modelMap);
 

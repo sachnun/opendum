@@ -327,7 +327,7 @@ function enrichNewModels(modelsDir, addedKeys, apiModels) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../packages/models");
+  const modelsDir = resolve(scriptDir, "../models");
 
   // 1. Fetch and parse VALID_GEMINI_MODELS from Gemini CLI source
   const response = await fetchWithRetry(

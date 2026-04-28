@@ -35,7 +35,7 @@ const PROVIDER_NAME = "antigravity";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "packages/models");
+const modelsDir = resolve(rootDir, "models");
 
 // ---------------------------------------------------------------------------
 // Paths to TS source files that contain hardcoded model references

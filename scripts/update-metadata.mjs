@@ -18,7 +18,7 @@ import { buildTomlIndex, serializeToml } from "./toml-utils.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "packages/models");
+const modelsDir = resolve(rootDir, "models");
 
 // ---------------------------------------------------------------------------
 // Priority: authoritative provider for each model family prefix

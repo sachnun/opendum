@@ -6,7 +6,7 @@ The current implementation covers:
 
 - API key authentication against the existing PostgreSQL schema
 - Redis-backed API key and account rate limiting
-- TOML model registry loading from `packages/models`
+- TOML model registry loading from `models`
 - `/v1/models`
 - `/v1/chat/completions`
 - `/v1/responses`

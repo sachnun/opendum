@@ -193,7 +193,7 @@ function buildModelMap(groqModelIds, reverseMap) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../packages/models");
+  const modelsDir = resolve(scriptDir, "../models");
 
   // Build reverse map from existing TOMLs so we reuse canonical keys
   const reverseMap = buildReverseMap(modelsDir);

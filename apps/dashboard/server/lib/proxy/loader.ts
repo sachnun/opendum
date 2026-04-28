@@ -135,10 +135,10 @@ function resolveModelsDir(): string {
   const __dirname = dirname(__filename);
 
   const candidates = [
-    join(__dirname, "..", "..", "..", "..", "packages", "models"),
-    join(__dirname, "..", "..", "..", "..", "..", "packages", "models"),
-    join(process.cwd(), "packages", "models"),
-    join(process.cwd(), "..", "..", "packages", "models"),
+    join(__dirname, "..", "..", "..", "..", "models"),
+    join(__dirname, "..", "..", "..", "..", "..", "models"),
+    join(process.cwd(), "models"),
+    join(process.cwd(), "..", "..", "models"),
   ];
 
   for (const candidate of candidates) {
@@ -147,7 +147,7 @@ function resolveModelsDir(): string {
     }
   }
 
-  return join(process.cwd(), "packages", "models");
+  return join(process.cwd(), "models");
 }
 
 function collectTomlFiles(dir: string): string[] {

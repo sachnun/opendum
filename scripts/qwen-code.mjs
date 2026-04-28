@@ -241,7 +241,7 @@ function enrichNewModels(modelsDir, addedKeys, oauthModels) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../packages/models");
+  const modelsDir = resolve(scriptDir, "../models");
 
   // 1. Fetch and parse OAuth models from Qwen Code CLI source
   const source = await fetchConstantsSource();

@@ -5,7 +5,7 @@
     "watchPatterns": [
       "apps/dashboard/server/lib/**",
       "apps/dashboard/package.json",
-      "packages/models/**",
+      "models/**",
       "package.json",
       "pnpm-lock.yaml",
       "pnpm-workspace.yaml",
