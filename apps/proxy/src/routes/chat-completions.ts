@@ -99,7 +99,7 @@ export const chatCompletionsRoute: RouteHandlerMethod = createProxyRoute({
     };
   },
 
-  async buildRequest({ routeData, model, stream, reasoningRequested, providerImpl, account }) {
+  async buildRequest({ routeData, model, stream, reasoningRequested, providerImpl, account, sessionId }) {
     const { messages, params } = routeData as {
       messages: ChatCompletionRequest["messages"];
       params: Record<string, unknown>;
@@ -110,6 +110,7 @@ export const chatCompletionsRoute: RouteHandlerMethod = createProxyRoute({
       messages,
       stream,
       _includeReasoning: reasoningRequested,
+      _sessionId: sessionId,
       ...params,
     } as ChatCompletionRequest;
 

@@ -1,6 +1,8 @@
+import os from "node:os";
+
 // Codex Provider Constants
 // Based on OpenCode's codex plugin: https://github.com/anomalyco/opencode
-// Uses Device Code Flow for OAuth via auth.openai.com
+// Uses OAuth via auth.openai.com
 
 // OAuth Configuration
 export const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -9,17 +11,7 @@ export const AUTHORIZE_ENDPOINT = `${AUTH_ISSUER}/oauth/authorize`;
 export const BROWSER_REDIRECT_URI = "http://localhost:1455/auth/callback";
 export const SCOPE = "openid profile email offline_access";
 
-// OAuth Endpoints
-export const DEVICE_CODE_ENDPOINT =
-  "https://auth.openai.com/api/accounts/deviceauth/usercode";
-export const DEVICE_POLL_ENDPOINT =
-  "https://auth.openai.com/api/accounts/deviceauth/token";
 export const TOKEN_ENDPOINT = "https://auth.openai.com/oauth/token";
-export const DEVICE_VERIFICATION_URL =
-  "https://auth.openai.com/codex/device";
-// Device-code specific redirect URI (used when exchanging authorization_code)
-export const REDIRECT_URI =
-  "https://auth.openai.com/deviceauth/callback";
 
 // API Endpoint (Responses API format)
 export const API_BASE_URL =
@@ -43,11 +35,9 @@ export const SUPPORTED_PARAMS = new Set([
 // Token refresh buffer (5 minutes before expiry)
 export const REFRESH_BUFFER_SECONDS = 5 * 60;
 
-// Device code polling interval (seconds)
-export const POLLING_INTERVAL = 5;
-
-// Device code expiry timeout (seconds)
-export const DEVICE_CODE_EXPIRY = 600; // 10 minutes
-
 // Originator header value (identifies us to the API)
 export const ORIGINATOR = "opencode";
+
+// Match OpenCode's Codex plugin headers.
+export const OPENCODE_VERSION = "1.14.28";
+export const CODEX_CHAT_USER_AGENT = `opencode/${OPENCODE_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`;

@@ -95,6 +95,9 @@ export interface ChatCompletionRequest {
 
   // Internal header hint for Copilot requests
   _copilotXInitiator?: "user" | "agent";
+
+  // Internal header hint for Codex requests
+  _sessionId?: string;
 }
 
 export type ProxyEndpointType =
@@ -123,7 +126,7 @@ export interface Provider {
    * @param state CSRF protection state
    * @param codeVerifier PKCE code verifier (for Antigravity)
    */
-  getAuthUrl(state: string, codeVerifier?: string): string;
+  getAuthUrl(state: string, codeVerifier?: string): string | Promise<string>;
 
   /**
    * Exchange authorization code for tokens

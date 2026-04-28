@@ -144,6 +144,7 @@ export interface BuildRequestContext {
   reasoningRequested: boolean;
   providerImpl: Provider;
   account: ProviderAccount;
+  sessionId?: string;
 }
 
 export interface ParsedRequest {
@@ -265,6 +266,12 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
       }
 
       const { provider, model } = modelValidation;
+      const requestSessionId =
+        typeof request.headers["session_id"] === "string"
+          ? request.headers["session_id"]
+          : typeof request.headers["x-session-id"] === "string"
+            ? request.headers["x-session-id"]
+            : undefined;
 
       // 3b. Per-API-key rate limit check
       if (apiKeyId && rateLimitRules.length > 0) {
@@ -525,6 +532,7 @@ export function createProxyRoute(config: ProxyRouteConfig): RouteHandlerMethod {
             reasoningRequested,
             providerImpl,
             account,
+            ...(requestSessionId ? { sessionId: requestSessionId } : {}),
           });
 
           // Strip image/multimodal content for text-only models.

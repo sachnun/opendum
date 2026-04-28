@@ -6,11 +6,10 @@
  * - x-codex-* response headers from regular requests
  */
 
-import { ORIGINATOR } from "./constants.js";
+import { CODEX_CHAT_USER_AGENT, ORIGINATOR } from "./constants.js";
 import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
 
 const USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
-const DEFAULT_USER_AGENT = "codex-cli";
 
 export const QUOTA_STALE_MS = 15 * 60 * 1000;
 const CACHE_PREFIX = "opendum:quota:codex:snapshot";
@@ -404,7 +403,7 @@ export async function fetchCodexQuotaFromApi(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": DEFAULT_USER_AGENT,
+      "User-Agent": CODEX_CHAT_USER_AGENT,
       originator: ORIGINATOR,
     };
 

@@ -11,15 +11,15 @@ import type {
 } from "../types.js";
 import {
   CLIENT_ID,
-  DEVICE_CODE_ENDPOINT,
-  DEVICE_POLL_ENDPOINT,
   TOKEN_ENDPOINT,
-  REDIRECT_URI,
-  DEVICE_VERIFICATION_URL,
+  AUTHORIZE_ENDPOINT,
+  BROWSER_REDIRECT_URI,
+  SCOPE,
   API_BASE_URL,
   SUPPORTED_PARAMS,
   REFRESH_BUFFER_SECONDS,
   ORIGINATOR,
+  CODEX_CHAT_USER_AGENT,
 } from "./constants.js";
 import { getProviderModelSet, resolveModelAlias } from "../../models.js";
 import { updateCodexQuotaFromHeaders } from "./quota.js";
@@ -27,25 +27,6 @@ import {
   getChatGptCompatibleCodexModels,
   isChatGptAccountCompatibleCodexModel,
 } from "./compat.js";
-
-/**
- * Device code initiation response
- */
-export interface CodexDeviceCodeResponse {
-  device_auth_id: string;
-  user_code: string;
-  expires_in?: number | string;
-  expires_at?: string;
-  interval?: number | string;
-}
-
-/**
- * Device code poll response (when user has authorized)
- */
-interface CodexPollSuccessResponse {
-  authorization_code?: string;
-  code_verifier?: string;
-}
 
 /**
  * Token response from auth.openai.com/oauth/token
@@ -1344,14 +1325,27 @@ export const codexProvider: Provider = {
   config: codexConfig,
 
   /**
-   * Device Code Flow doesn't use redirect-based auth URL.
-   * Use initiateCodexDeviceCodeFlow() instead.
+   * Generate OAuth authorization URL.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getAuthUrl(_state: string, _codeVerifier?: string): string {
-    throw new Error(
-      "Codex uses Device Code Flow. Use initiateCodexDeviceCodeFlow() instead."
-    );
+  async getAuthUrl(state: string, codeVerifier?: string): Promise<string> {
+    if (!codeVerifier) {
+      throw new Error("Codex OAuth requires a PKCE code verifier.");
+    }
+
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    return `${AUTHORIZE_ENDPOINT}?${new URLSearchParams({
+      response_type: "code",
+      client_id: CLIENT_ID,
+      redirect_uri: BROWSER_REDIRECT_URI,
+      scope: SCOPE,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+      id_token_add_organizations: "true",
+      codex_cli_simplified_flow: "true",
+      state,
+      originator: ORIGINATOR,
+    })}`;
   },
 
   /**
@@ -1367,7 +1361,7 @@ export const codexProvider: Provider = {
       grant_type: "authorization_code",
       code,
       client_id: CLIENT_ID,
-      redirect_uri: redirectUri || REDIRECT_URI,
+      redirect_uri: redirectUri,
     };
 
     if (codeVerifier) {
@@ -1565,12 +1559,15 @@ export const codexProvider: Provider = {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
       originator: ORIGINATOR,
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "User-Agent": CODEX_CHAT_USER_AGENT,
     };
 
     if (account.accountId) {
       headers["ChatGPT-Account-Id"] = account.accountId;
+    }
+
+    if (body._sessionId) {
+      headers.session_id = body._sessionId;
     }
 
     const response = await fetch(API_BASE_URL, {
@@ -1648,232 +1645,6 @@ export const codexProvider: Provider = {
     return response;
   },
 };
-
-/**
- * Initiate Codex Device Code Flow
- */
-export async function initiateCodexDeviceCodeFlow(): Promise<{
-  deviceAuthId: string;
-  userCode: string;
-  verificationUrl: string;
-  expiresIn: number;
-  interval: number;
-  codeVerifier: string;
-}> {
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-  const response = await fetch(DEVICE_CODE_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      client_id: CLIENT_ID,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(
-      `Codex device code request failed: ${response.status} ${error}`
-    );
-  }
-
-  const data = await response.json() as CodexDeviceCodeResponse;
-
-  const intervalRaw =
-    typeof data.interval === "string"
-      ? Number.parseInt(data.interval, 10)
-      : data.interval;
-  const interval =
-    typeof intervalRaw === "number" && Number.isFinite(intervalRaw) && intervalRaw > 0
-      ? intervalRaw
-      : 5;
-
-  const expiresInRaw =
-    typeof data.expires_in === "string"
-      ? Number.parseInt(data.expires_in, 10)
-      : data.expires_in;
-  let expiresIn =
-    typeof expiresInRaw === "number" && Number.isFinite(expiresInRaw) && expiresInRaw > 0
-      ? expiresInRaw
-      : undefined;
-
-  if (!expiresIn && data.expires_at) {
-    const expiresAtMs = Date.parse(data.expires_at);
-    if (Number.isFinite(expiresAtMs)) {
-      const secondsLeft = Math.ceil((expiresAtMs - Date.now()) / 1000);
-      if (secondsLeft > 0) {
-        expiresIn = secondsLeft;
-      }
-    }
-  }
-
-  if (!expiresIn) {
-    expiresIn = 600;
-  }
-
-  return {
-    deviceAuthId: data.device_auth_id,
-    userCode: data.user_code,
-    verificationUrl: DEVICE_VERIFICATION_URL,
-    expiresIn,
-    interval,
-    codeVerifier,
-  };
-}
-
-/**
- * Poll for device code authorization
- * Returns authorization code when user completes auth, pending, or error
- */
-export async function pollCodexDeviceCodeAuthorization(
-  deviceAuthId: string,
-  userCode: string,
-  codeVerifier: string
-): Promise<
-  OAuthResult | { pending: true } | { error: string }
-> {
-  const pollResponse = await fetch(DEVICE_POLL_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      device_auth_id: deviceAuthId,
-      user_code: userCode,
-    }),
-  });
-
-  if (pollResponse.status === 200) {
-    const pollData = await pollResponse.json() as CodexPollSuccessResponse;
-
-    if (!pollData.authorization_code) {
-      return { pending: true };
-    }
-
-    const tokenCodeVerifier = pollData.code_verifier || codeVerifier;
-
-    const tokenResponse = await fetch(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code: pollData.authorization_code,
-        client_id: CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        code_verifier: tokenCodeVerifier,
-      }),
-    });
-
-    if (!tokenResponse.ok) {
-      const error = await tokenResponse.text();
-      return { error: `Token exchange failed: ${tokenResponse.status} ${error}` };
-    }
-
-    const tokens = await tokenResponse.json() as CodexTokenResponse;
-
-    // Extract account ID from JWT
-    const accountId =
-      (tokens.id_token ? extractAccountIdFromJwt(tokens.id_token) : null) ||
-      extractAccountIdFromJwt(tokens.access_token);
-    const workspaceId =
-      (tokens.id_token ? extractWorkspaceIdFromJwt(tokens.id_token) : null) ||
-      extractWorkspaceIdFromJwt(tokens.access_token) ||
-      accountId;
-
-    return {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-      email: "",
-      accountId: accountId || undefined,
-      workspaceId: workspaceId || undefined,
-    };
-  }
-
-  if (
-    pollResponse.status === 400 ||
-    pollResponse.status === 403 ||
-    pollResponse.status === 404
-  ) {
-    try {
-      const errorData = (await pollResponse.json()) as {
-        error?: string | { message?: string; code?: string; type?: string };
-        detail?: string;
-        error_description?: string;
-      };
-
-      const errorCode =
-        typeof errorData.error === "string"
-          ? errorData.error
-          : errorData.error?.code;
-      const errorMessage =
-        typeof errorData.error === "string"
-          ? errorData.error
-          : errorData.error?.message;
-      const detail =
-        typeof errorData.detail === "string"
-          ? errorData.detail
-          : "";
-
-      if (
-        errorCode === "authorization_pending" ||
-        errorCode === "slow_down" ||
-        errorCode === "deviceauth_authorization_unknown" ||
-        detail.toLowerCase().includes("pending") ||
-        errorMessage?.toLowerCase().includes("authorization is unknown")
-      ) {
-        return { pending: true };
-      }
-
-      if (errorCode === "expired_token") {
-        return { error: "Device code expired. Please start again." };
-      }
-
-      if (errorCode === "access_denied") {
-        return { error: "Authorization was denied by the user." };
-      }
-
-      // OpenAI currently returns 403/404 with "Device authorization is unknown"
-      // while the user is still authorizing. Match opencode behavior.
-      if (pollResponse.status === 403 || pollResponse.status === 404) {
-        return { pending: true };
-      }
-
-      const errorValue = errorData.error_description
-        || detail
-        || errorMessage
-        || errorCode
-        || "Unknown error";
-      return { error: errorValue };
-    } catch {
-      if (pollResponse.status === 403 || pollResponse.status === 404) {
-        return { pending: true };
-      }
-
-      return { error: "Failed to parse authentication response" };
-    }
-  }
-
-  // For other 4xx responses, treat as an error (not pending)
-  // 401 etc. indicate real problems, not authorization_pending
-  if (pollResponse.status >= 400 && pollResponse.status < 500) {
-    const errorBody = await pollResponse.text();
-    return { error: `Authentication failed (HTTP ${pollResponse.status}): ${errorBody || "Unknown error"}` };
-  }
-
-  const error = await pollResponse.text();
-  return { error: `Unexpected error: ${pollResponse.status} ${error}` };
-}
 
 // Export utilities
 export { generateCodeVerifier, generateCodeChallenge, extractAccountIdFromJwt };

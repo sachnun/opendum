@@ -1025,6 +1025,7 @@ export const messagesRoute: RouteHandlerMethod = createProxyRoute({
     stream,
     providerImpl,
     account,
+    sessionId,
   }) {
     const { body } = routeData as {
       body: Record<string, unknown>;
@@ -1036,6 +1037,7 @@ export const messagesRoute: RouteHandlerMethod = createProxyRoute({
 
     openaiPayload.model = model;
     openaiPayload.stream = stream;
+    openaiPayload._sessionId = sessionId;
 
     const normalizedOpenAIPayload =
       openaiPayload as unknown as ChatCompletionRequest;

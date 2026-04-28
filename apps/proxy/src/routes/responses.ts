@@ -270,6 +270,7 @@ export const responsesRoute: RouteHandlerMethod = createProxyRoute({
     reasoningRequested,
     providerImpl,
     account,
+    sessionId,
   }) {
     const { messages, responsesInput, instructionsText, chatParams } =
       routeData as {
@@ -286,6 +287,7 @@ export const responsesRoute: RouteHandlerMethod = createProxyRoute({
       stream,
       _includeReasoning: reasoningRequested,
       _responsesInput: responsesInput,
+      _sessionId: sessionId,
       ...chatParams,
     } as ChatCompletionRequest;
 
