@@ -2,32 +2,6 @@
 
 export const API_BASE_URL = "https://api.cloudflare.com/client/v4/accounts";
 
-export function getWorkersAiChatUrl(accountId: string): string {
-  return `${API_BASE_URL}/${accountId}/ai/v1/chat/completions`;
-}
-
-export function getWorkersAiModelsUrl(accountId: string): string {
-  return `${API_BASE_URL}/${accountId}/ai/v1/models`;
-}
-
 export function getWorkersAiValidationUrl(accountId: string): string {
   return `${API_BASE_URL}/${accountId}/ai/models/search`;
 }
-
-export const SUPPORTED_PARAMS = new Set([
-  "model",
-  "messages",
-  "temperature",
-  "top_p",
-  "max_tokens",
-  "stream",
-  "stream_options",
-  "tools",
-  "tool_choice",
-  "presence_penalty",
-  "frequency_penalty",
-  "stop",
-  "seed",
-  "response_format",
-  "n",
-]);

@@ -795,8 +795,7 @@ export const copilotProvider: Provider = {
     return preparedBody;
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getAuthUrl(_state: string, _codeVerifier?: string): string {
+  getAuthUrl(): string {
     throw new Error(
       "Copilot uses Device Code Flow. Use initiateCopilotDeviceCodeFlow() instead."
     );

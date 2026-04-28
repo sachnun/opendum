@@ -78,33 +78,14 @@ export {
   getModelsByFamily,
 } from "./proxy/models.js";
 
-// Proxy - Auth (API key validation)
+// Proxy - Dashboard cache/model helpers
 export {
-  validateApiKey,
-  validateModel,
-  validateModelForUser,
-  parseModelParam,
-  logUsage,
-  getDisabledModelSetForUser,
   invalidateDisabledModelsCache,
   invalidateApiKeyValidationCache,
   getAccountModelAvailability,
   isModelUsableByAccounts,
-  type ParsedModel,
-  type ModelValidationResult,
-  type ApiKeyModelAccessMode,
-  type ApiKeyModelAccess,
-  type ApiKeyAccountAccessMode,
-  type ApiKeyAccountAccess,
   type AccountModelAvailability,
-  type RateLimitRule,
 } from "./proxy/auth.js";
-
-// Proxy - Latency Tracking
-export { recordLatency } from "./proxy/latency.js";
-
-// Proxy - Message Sanitizer
-export { stripImageContent } from "./proxy/message-sanitizer.js";
 
 // Cron
 export {
@@ -117,15 +98,11 @@ export {
 // Proxy - Providers
 export {
   getProvider,
-  getAllProviders,
   isValidProvider,
 } from "./proxy/providers/registry.js";
 export {
   ProviderName,
   OAUTH_PROVIDER_NAMES,
-  API_KEY_PROVIDER_NAMES,
-  PROVIDER_ALIASES,
-  normalizeProviderAlias,
   type Provider,
   type ProviderConfig,
   type ProviderNameType,

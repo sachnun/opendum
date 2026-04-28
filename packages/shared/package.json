@@ -48,10 +48,6 @@
       "types": "./dist/proxy/auth.d.ts",
       "default": "./dist/proxy/auth.js"
     },
-    "./proxy/latency": {
-      "types": "./dist/proxy/latency.d.ts",
-      "default": "./dist/proxy/latency.js"
-    },
     "./proxy/providers": {
       "types": "./dist/proxy/providers/index.d.ts",
       "default": "./dist/proxy/providers/index.js"
@@ -67,10 +63,6 @@
     "./proxy/providers/*": {
       "types": "./dist/proxy/providers/*/index.d.ts",
       "default": "./dist/proxy/providers/*/index.js"
-    },
-    "./proxy/providers/*/client": {
-      "types": "./dist/proxy/providers/*/client.d.ts",
-      "default": "./dist/proxy/providers/*/client.js"
     },
     "./proxy/providers/*/constants": {
       "types": "./dist/proxy/providers/*/constants.d.ts",
