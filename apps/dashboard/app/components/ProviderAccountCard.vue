@@ -1,7 +1,20 @@
 <script setup lang="ts">
+import { formatDistanceToNowStrict } from "date-fns";
+
 type Account = Awaited<ReturnType<typeof useNuxtApp>["$client"]["accounts"]["byProviderDetailed"]["query"]>["accounts"][number];
+type ErrorHistoryResult = Awaited<ReturnType<typeof useNuxtApp>["$client"]["accounts"]["errorHistory"]["query"]>;
+type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
 
 type QuotaProvider = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter";
+
+type ParsedErrorDetails = {
+  error: string | null;
+  provider: string | null;
+  endpoint: string | null;
+  model: string | null;
+  parameters: string | null;
+  messageObjects: string[] | null;
+};
 
 interface QuotaGroupDisplay {
   name: string;
@@ -42,12 +55,20 @@ const editName = ref(props.account.name);
 const savingName = ref(false);
 const deleting = ref(false);
 const resolvingErrors = ref(false);
+const copiedErrorDetails = ref(false);
+const copiedAllErrors = ref(false);
+const copiedErrorPreview = ref(false);
+const copiedHistoryEntryId = ref<string | null>(null);
+const isHistoryLoading = ref(false);
+const historyError = ref<string | null>(null);
+const historyEntries = ref<ErrorHistoryEntry[] | null>(null);
 const cardRoot = ref<HTMLElement | null>(null);
 const quotaInfo = ref<AccountQuotaInfo | null>(null);
 const quotaError = ref<string | null>(null);
 const isQuotaLoading = ref(false);
 let quotaLoadTriggered = false;
 let quotaObserver: IntersectionObserver | null = null;
+let historyRequestId = 0;
 
 watch(
   () => props.account.name,
@@ -56,26 +77,111 @@ watch(
   }
 );
 
+watch(
+  () => props.account.id,
+  () => {
+    historyRequestId += 1;
+    historyEntries.value = null;
+    historyError.value = null;
+    isHistoryLoading.value = false;
+  }
+);
+
+watch(errorDialogOpen, (open) => {
+  if (!open || historyEntries.value !== null) return;
+
+  isHistoryLoading.value = true;
+  historyError.value = null;
+  loadErrorHistory();
+});
+
+function parseStoredErrorMessage(rawMessage: string): ParsedErrorDetails {
+  const sections: Record<"error" | "provider" | "endpoint" | "model" | "parameters" | "messages", string[]> = {
+    error: [],
+    provider: [],
+    endpoint: [],
+    model: [],
+    parameters: [],
+    messages: [],
+  };
+
+  const labels: Array<{ key: keyof typeof sections; prefix: string }> = [
+    { key: "error", prefix: "Error:" },
+    { key: "provider", prefix: "Provider:" },
+    { key: "endpoint", prefix: "Endpoint:" },
+    { key: "model", prefix: "Model:" },
+    { key: "parameters", prefix: "Parameters:" },
+    { key: "messages", prefix: "Messages (object keys only):" },
+  ];
+
+  let currentKey: keyof typeof sections | null = null;
+
+  for (const line of rawMessage.split("\n")) {
+    const matchedLabel = labels.find((label) => line.startsWith(label.prefix));
+    if (matchedLabel) {
+      currentKey = matchedLabel.key;
+      const initialValue = line.slice(matchedLabel.prefix.length).trimStart();
+      if (initialValue) sections[currentKey].push(initialValue);
+      continue;
+    }
+
+    if (currentKey) sections[currentKey].push(line);
+  }
+
+  const parsedMessageObjects = (() => {
+    const rawMessages = sections.messages.join("\n").trim();
+    if (!rawMessages) return null;
+
+    try {
+      const parsed = JSON.parse(rawMessages) as Array<{
+        index?: number;
+        keys?: unknown;
+        type?: unknown;
+      }>;
+
+      if (!Array.isArray(parsed)) return null;
+
+      return parsed.map((entry, fallbackIndex) => {
+        const entryIndex = typeof entry.index === "number" ? entry.index : fallbackIndex;
+        if (Array.isArray(entry.keys)) {
+          const normalizedKeys = entry.keys.filter((value): value is string => typeof value === "string");
+          return `#${entryIndex}: ${normalizedKeys.length > 0 ? normalizedKeys.join(", ") : "(no keys)"}`;
+        }
+
+        if (typeof entry.type === "string") return `#${entryIndex}: (${entry.type})`;
+
+        return `#${entryIndex}: (unknown)`;
+      });
+    } catch {
+      return rawMessages
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+    }
+  })();
+
+  return {
+    error: sections.error.join("\n").trim() || null,
+    provider: sections.provider.join("\n").trim() || null,
+    endpoint: sections.endpoint.join("\n").trim() || null,
+    model: sections.model.join("\n").trim() || null,
+    parameters: sections.parameters.join("\n").trim() || null,
+    messageObjects: parsedMessageObjects,
+  };
+}
+
 function formatDuration(duration: number | null): string {
   if (duration === null) return "-";
   if (duration >= 1000) return `${(duration / 1000).toFixed(2)}s`;
   return `${duration}ms`;
 }
 
-function formatRelativeTime(value: string | Date | null): string {
-  if (!value) return "Never";
+function formatRelativeTime(value: string | Date | number): string {
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "Never";
+  if (Number.isNaN(date.getTime())) return "-";
 
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return date.toLocaleDateString();
+  const relative = formatDistanceToNowStrict(date, { addSuffix: true });
+  return relative === "0 seconds ago" ? "just now" : relative;
 }
 
 function formatHourLabel(time: string): string {
@@ -167,6 +273,12 @@ const hasSuccessAfterLastError = computed(() => {
   return recoveredMs > errorMs;
 });
 const errorToneClass = computed(() => (hasSuccessAfterLastError.value ? "text-amber-400" : "text-red-500"));
+const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
+const errorPreview = computed(() => (currentErrorMessage.value.length > 150 ? `${currentErrorMessage.value.slice(0, 150)}...` : currentErrorMessage.value));
+const errorDetails = computed(() => (currentErrorMessage.value ? parseStoredErrorMessage(currentErrorMessage.value) : null));
+const errorDialogDescription = computed(() => {
+  return `${props.account.lastErrorCode ? `HTTP ${props.account.lastErrorCode}` : "No status code"}${props.account.lastErrorAt ? ` - ${formatRelativeTime(props.account.lastErrorAt)}` : ""}`;
+});
 
 function quotaPercentRemaining(group: QuotaGroupDisplay): number {
   return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
@@ -296,6 +408,92 @@ async function resolveErrors() {
     resolvingErrors.value = false;
   }
 }
+
+async function loadErrorHistory() {
+  const requestId = ++historyRequestId;
+
+  try {
+    const result = await $client.accounts.errorHistory.query({ accountId: props.account.id });
+    if (requestId !== historyRequestId) return;
+
+    if (!result.success) {
+      historyError.value = result.error;
+      historyEntries.value = [];
+      return;
+    }
+
+    historyEntries.value = result.data.entries;
+  } catch {
+    if (requestId !== historyRequestId) return;
+    historyError.value = "Failed to load error history";
+    historyEntries.value = [];
+  } finally {
+    if (requestId === historyRequestId) isHistoryLoading.value = false;
+  }
+}
+
+async function copyToClipboard(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resetFlag(flag: { value: boolean }) {
+  setTimeout(() => {
+    flag.value = false;
+  }, 1500);
+}
+
+async function copyErrorPreview(event: Event) {
+  event.stopPropagation();
+  event.preventDefault();
+
+  if (!(await copyToClipboard(currentErrorMessage.value))) return;
+  copiedErrorPreview.value = true;
+  resetFlag(copiedErrorPreview);
+}
+
+async function copyErrorDetails() {
+  if (!(await copyToClipboard(currentErrorMessage.value))) return;
+  copiedErrorDetails.value = true;
+  resetFlag(copiedErrorDetails);
+}
+
+async function copyAllErrors() {
+  const parts: string[] = [`[Current Error]\n${currentErrorMessage.value}`];
+
+  if (historyEntries.value && historyEntries.value.length > 0) {
+    for (const entry of historyEntries.value) {
+      parts.push(`[${entry.errorCode ? `HTTP ${entry.errorCode}` : "No code"} - ${new Date(entry.createdAt).toLocaleString()}]\n${entry.errorMessage}`);
+    }
+  }
+
+  if (!(await copyToClipboard(parts.join("\n\n---\n\n")))) return;
+  copiedAllErrors.value = true;
+  resetFlag(copiedAllErrors);
+}
+
+async function copyHistoryError(entry: ErrorHistoryEntry, event: Event) {
+  event.stopPropagation();
+
+  if (!(await copyToClipboard(entry.errorMessage))) return;
+  copiedHistoryEntryId.value = entry.id;
+  setTimeout(() => {
+    if (copiedHistoryEntryId.value === entry.id) copiedHistoryEntryId.value = null;
+  }, 1500);
+}
+
+function historyEntryRelativeTime(entry: ErrorHistoryEntry): string {
+  const createdAt = new Date(entry.createdAt);
+  return Number.isNaN(createdAt.getTime()) ? "Unknown time" : formatRelativeTime(createdAt);
+}
+
+function historyEntryPreview(errorMessage: string): string {
+  return errorMessage.length > 120 ? `${errorMessage.slice(0, 120)}...` : errorMessage;
+}
 </script>
 
 <template>
@@ -308,15 +506,26 @@ async function resolveErrors() {
             <UiBadge v-if="showTierBadge" variant="outline" :class="isPaidTierValue(normalizedTier) ? 'border-green-500 text-green-600' : ''">
               {{ formatTierLabel(normalizedTier) }}
             </UiBadge>
-            <UiBadge v-if="account.status !== 'active'" :variant="account.status === 'failed' ? 'destructive' : 'outline'" :class="account.status === 'degraded' ? 'border-yellow-500 text-yellow-600' : 'gap-1'">
-              <UiIcon :name="account.status === 'failed' ? 'i-lucide-alert-circle' : 'i-lucide-triangle-alert'" class="size-3" />
-              {{ account.status === 'failed' ? 'Failed' : `Degraded (${account.consecutiveErrors})` }}
+            <UiBadge v-if="account.status === 'failed'" variant="destructive" class="gap-1">
+              <UiIcon name="i-lucide-alert-circle" class="size-3" />
+              Failed
+            </UiBadge>
+            <UiBadge v-else-if="account.status === 'degraded'" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
+              <UiIcon name="i-lucide-triangle-alert" class="size-3" />
+              Degraded ({{ account.consecutiveErrors }})
             </UiBadge>
           </div>
         </div>
         <div v-if="subtitleDisplay" :class="['grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1', isSubtitleVisible ? 'items-start' : 'w-full items-center overflow-hidden']">
           <p :class="['min-w-0 font-mono text-sm text-muted-foreground', isSubtitleVisible ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ subtitleDisplay }}</p>
-          <UiButton variant="ghost" size="icon-sm" class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:text-foreground" @click="isSubtitleVisible = !isSubtitleVisible">
+          <UiButton
+            variant="ghost"
+            size="icon-sm"
+            class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:text-foreground"
+            :aria-label="isSubtitleVisible ? `Hide account email for ${accountTitle}` : `Show account email for ${accountTitle}`"
+            :title="isSubtitleVisible ? 'Hide email' : 'Show email'"
+            @click="isSubtitleVisible = !isSubtitleVisible"
+          >
             <UiIcon :name="isSubtitleVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
           </UiButton>
         </div>
@@ -351,7 +560,7 @@ async function resolveErrors() {
             <UsageSparkline :values="dailyValues" color="var(--chart-2)" :aria-label="`Requests trend for ${accountTitle}`" />
           </div>
 
-          <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ formatRelativeTime(account.lastUsedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : 'Never' }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">Total Errors</span><span :class="['font-medium', account.errorCount > 0 ? errorToneClass : 'text-muted-foreground']">{{ account.errorCount }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">Last Error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
 
@@ -359,11 +568,19 @@ async function resolveErrors() {
             <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[3.25rem] cursor-pointer rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
               <div class="flex items-center justify-between gap-1">
                 <span class="text-xs text-muted-foreground">Last Error Message:</span>
-                <UiButton type="button" variant="ghost" size="icon-xs" class="h-5 w-5" @click.stop="navigator.clipboard.writeText(account.lastErrorMessage ?? '')">
-                  <UiIcon name="i-lucide-copy" class="size-3" />
-                </UiButton>
+                <button
+                  type="button"
+                  class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
+                  aria-label="Copy last error message"
+                  title="Copy last error message"
+                  @click="copyErrorPreview"
+                >
+                  <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-green-600" />
+                  <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
+                </button>
               </div>
-              <span :class="['mt-1 line-clamp-2 block break-all text-xs', errorToneClass]">{{ account.lastErrorMessage }}</span>
+              <span :class="['mt-1 line-clamp-2 block break-all text-xs', errorToneClass]">{{ account.lastErrorCode ? `[${account.lastErrorCode}] ` : '' }}{{ errorPreview }}</span>
+              <span class="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </button>
             <div v-else class="w-full min-h-[3.25rem] rounded-sm pt-2 text-left">
               <span class="text-xs text-muted-foreground">Last Error Message:</span>
@@ -425,7 +642,7 @@ async function resolveErrors() {
           </div>
           <div class="flex shrink-0 items-center gap-1.5">
             <span class="text-[11px] text-muted-foreground">{{ account.isActive ? 'On' : 'Off' }}</span>
-            <UiSwitch :model-value="account.isActive" :disabled="isToggling" @update:model-value="toggleActive" />
+            <UiSwitch :model-value="account.isActive" :disabled="isToggling" :title="account.isActive ? 'Disable account' : 'Enable account'" @update:model-value="toggleActive" />
           </div>
         </div>
       </UiCardContent>
@@ -446,11 +663,89 @@ async function resolveErrors() {
       </template>
     </UiDialog>
 
-    <UiDialog v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-2xl' }">
+    <UiDialog v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-xl' }">
       <template #content>
-        <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Last Error Message</h2><p class="text-sm text-muted-foreground">Current stored error details for this provider account.</p></div>
-        <pre class="max-h-80 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-xs whitespace-pre-wrap">{{ account.lastErrorMessage }}</pre>
-        <div class="flex justify-end gap-2"><UiButton variant="outline" @click="navigator.clipboard.writeText(account.lastErrorMessage ?? '')"><UiIcon name="i-lucide-copy" class="size-4" />Copy</UiButton><UiButton :disabled="resolvingErrors" @click="resolveErrors">{{ resolvingErrors ? 'Resolving...' : 'Resolve errors' }}</UiButton></div>
+        <div class="flex items-start justify-between gap-3 pr-6">
+          <div>
+            <h2 class="text-lg font-semibold">Provider Error Details</h2>
+            <p class="text-sm text-muted-foreground">{{ errorDialogDescription }}</p>
+          </div>
+          <div class="flex items-center gap-1">
+            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy all errors" title="Copy all errors (current + history)" @click="copyAllErrors">
+              <UiIcon :name="copiedAllErrors ? 'i-lucide-check' : 'i-lucide-clipboard-list'" class="size-4" />
+            </UiButton>
+            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy error details" title="Copy error details" @click="copyErrorDetails">
+              <UiIcon :name="copiedErrorDetails ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+            </UiButton>
+            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" title="Resolve — clear all errors and error history for this account" :disabled="resolvingErrors" @click="resolveErrors">
+              <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
+            </UiButton>
+          </div>
+        </div>
+
+        <div class="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/20 p-3">
+          <div v-if="errorDetails && (errorDetails.provider || errorDetails.endpoint || errorDetails.model)" class="rounded-md border bg-background/70 p-2">
+            <p v-if="errorDetails.provider" class="text-xs">
+              <span class="text-muted-foreground">Provider:</span>
+              <span class="font-mono">{{ errorDetails.provider }}</span>
+            </p>
+            <p v-if="errorDetails.endpoint" class="text-xs">
+              <span class="text-muted-foreground">Endpoint:</span>
+              <span class="font-mono">{{ errorDetails.endpoint }}</span>
+            </p>
+            <p v-if="errorDetails.model" class="text-xs">
+              <span class="text-muted-foreground">Model:</span>
+              <span class="font-mono">{{ errorDetails.model }}</span>
+            </p>
+          </div>
+
+          <div v-if="errorDetails?.error">
+            <p class="mb-1 text-xs text-muted-foreground">Error</p>
+            <p class="whitespace-pre-wrap break-words font-mono text-xs text-foreground">{{ errorDetails.error }}</p>
+          </div>
+
+          <div v-if="errorDetails?.parameters">
+            <p class="mb-1 text-xs text-muted-foreground">Body Parameters</p>
+            <p class="whitespace-pre-wrap break-words font-mono text-xs text-foreground">{{ errorDetails.parameters }}</p>
+          </div>
+
+          <div v-if="errorDetails?.messageObjects && errorDetails.messageObjects.length > 0">
+            <p class="mb-1 text-xs text-muted-foreground">Messages (object keys only)</p>
+            <p class="whitespace-pre-wrap break-words font-mono text-xs text-foreground">{{ errorDetails.messageObjects.join('\n') }}</p>
+          </div>
+
+          <p v-if="errorDetails && !errorDetails.error && !errorDetails.parameters && (!errorDetails.messageObjects || errorDetails.messageObjects.length === 0)" class="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+            {{ currentErrorMessage }}
+          </p>
+
+          <div class="border-t pt-3">
+            <p class="mb-2 text-xs text-muted-foreground">Recent Error History (up to 200)</p>
+
+            <p v-if="isHistoryLoading" class="text-xs text-muted-foreground">Loading error history...</p>
+
+            <p v-else-if="historyError" class="text-xs text-red-500">{{ historyError }}</p>
+
+            <div v-else-if="historyEntries && historyEntries.length > 0" class="space-y-2">
+              <details v-for="entry in historyEntries" :key="entry.id" class="rounded-md border bg-background/70 p-2">
+                <summary class="cursor-pointer break-words text-xs text-foreground">
+                  <span class="font-medium">{{ historyEntryRelativeTime(entry) }}</span>
+                  <span class="mx-1 text-muted-foreground">-</span>
+                  <span class="font-mono text-[11px] text-muted-foreground">HTTP {{ entry.errorCode }}</span>
+                  <span class="mx-1 text-muted-foreground">-</span>
+                  <span class="text-muted-foreground">{{ historyEntryPreview(entry.errorMessage) }}</span>
+                </summary>
+                <div class="mt-2 flex items-start gap-2">
+                  <p class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-foreground">{{ entry.errorMessage }}</p>
+                  <UiButton type="button" variant="ghost" size="icon-sm" class="shrink-0" aria-label="Copy error message" title="Copy error message" @click="copyHistoryError(entry, $event)">
+                    <UiIcon :name="copiedHistoryEntryId === entry.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                  </UiButton>
+                </div>
+              </details>
+            </div>
+
+            <p v-else-if="historyEntries && historyEntries.length === 0" class="text-xs text-muted-foreground">No stored error history yet.</p>
+          </div>
+        </div>
       </template>
     </UiDialog>
   </div>
