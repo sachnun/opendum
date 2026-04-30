@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { cn } from "../../lib/utils";
+import type { ApiKeyListItem } from "../../lib/dashboard-api-types";
 
-type ApiKey = Awaited<ReturnType<typeof useNuxtApp>["$client"]["apiKeys"]["list"]["query"]>[number];
+type ApiKey = ApiKeyListItem;
 
 const props = defineProps<{
   apiKey: ApiKey;
@@ -11,7 +12,7 @@ const emit = defineEmits<{
   changed: [];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const isDeleting = ref(false);
 const isToggling = ref(false);
 const deleteDialogOpen = ref(false);
@@ -33,7 +34,7 @@ async function revealKey() {
   isLoading.value = true;
   errorMessage.value = "";
   try {
-    const result = await $client.apiKeys.reveal.query({ id: props.apiKey.id });
+    const result = await dashboardApi.apiKeys.reveal({ id: props.apiKey.id });
     if (!result.success) throw new Error(result.error);
     revealedKey.value = result.data.key;
     isRevealed.value = true;
@@ -50,7 +51,7 @@ async function copyKey() {
   errorMessage.value = "";
   try {
     if (!key) {
-      const result = await $client.apiKeys.reveal.query({ id: props.apiKey.id });
+      const result = await dashboardApi.apiKeys.reveal({ id: props.apiKey.id });
       if (!result.success) throw new Error(result.error);
       key = result.data.key;
     }
@@ -67,7 +68,7 @@ async function copyKey() {
 async function toggleKey() {
   isToggling.value = true;
   try {
-    const result = await $client.apiKeys.toggle.mutate({ id: props.apiKey.id });
+    const result = await dashboardApi.apiKeys.toggle({ id: props.apiKey.id });
     if (!result.success) throw new Error(result.error);
     emit("changed");
   } finally {
@@ -79,7 +80,7 @@ async function deleteKey() {
   isDeleting.value = true;
   errorMessage.value = "";
   try {
-    const result = await $client.apiKeys.delete.mutate({ id: props.apiKey.id });
+    const result = await dashboardApi.apiKeys.delete({ id: props.apiKey.id });
     if (!result.success) throw new Error(result.error);
     deleteDialogOpen.value = false;
     emit("changed");

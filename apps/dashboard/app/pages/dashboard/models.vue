@@ -5,11 +5,11 @@ import { getProviderLabel } from "../../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 
-type ModelListItem = Awaited<ReturnType<typeof $client.models.list.query>>[number];
+type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
 
-const { data, error, pending } = await useAsyncData("dashboard-models", () => $client.models.list.query());
+const { data, error, pending } = await useAsyncData("dashboard-models", () => dashboardApi.models.list());
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 const availableProviders = computed(() => {
   const entries = new Map<string, string>();
@@ -117,7 +117,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
   model.isEnabled = enabled;
 
   try {
-    const result = await $client.models.setEnabled.mutate({ modelId: model.id, enabled });
+    const result = await dashboardApi.models.setEnabled({ modelId: model.id, enabled });
     if (!result.success) throw new Error(result.error);
   } catch (error) {
     model.isEnabled = previousValue;

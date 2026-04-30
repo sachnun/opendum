@@ -5,7 +5,7 @@ const props = defineProps<{
   initialDisabledModels: string[];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const disabledModels = ref(new Set(props.initialDisabledModels));
 const togglingModels = ref(new Set<string>());
 const expanded = ref(false);
@@ -36,7 +36,7 @@ async function toggleModel(model: string) {
   togglingModels.value = new Set(togglingModels.value).add(model);
 
   try {
-    const result = await $client.accounts.setAccountModelEnabled.mutate({ accountId: props.accountId, modelId: model, enabled });
+    const result = await dashboardApi.accounts.setAccountModelEnabled({ accountId: props.accountId, modelId: model, enabled });
     if (!result.success) throw new Error(result.error);
   } catch {
     disabledModels.value = previous;

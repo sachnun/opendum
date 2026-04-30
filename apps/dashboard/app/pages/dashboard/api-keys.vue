@@ -1,14 +1,14 @@
 <script setup lang="ts">
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 
-type ApiKeyListItem = Awaited<ReturnType<typeof $client.apiKeys.list.query>>[number];
-type ApiKeyOptions = Awaited<ReturnType<typeof $client.apiKeys.options.query>>;
+type ApiKeyListItem = Awaited<ReturnType<typeof dashboardApi.apiKeys.list>>[number];
+type ApiKeyOptions = Awaited<ReturnType<typeof dashboardApi.apiKeys.options>>;
 type AccessMode = "all" | "whitelist" | "blacklist";
 
 const { data, error, pending, refresh } = await useAsyncData("dashboard-api-keys", async () => {
-  const [apiKeys, options] = await Promise.all([$client.apiKeys.list.query(), $client.apiKeys.options.query()]);
+  const [apiKeys, options] = await Promise.all([dashboardApi.apiKeys.list(), dashboardApi.apiKeys.options()]);
   return { apiKeys, options };
 });
 

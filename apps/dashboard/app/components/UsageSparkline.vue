@@ -5,13 +5,14 @@ const props = withDefaults(
   defineProps<{
     values: number[];
     color: string;
-    ariaLabel: string;
+    ariaLabel?: string;
     class?: string;
     emptyLabel?: string;
     height?: number;
   }>(),
   {
     class: "",
+    ariaLabel: "Usage trend",
     emptyLabel: "No activity yet",
     height: 32,
   }

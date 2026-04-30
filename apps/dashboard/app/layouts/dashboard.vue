@@ -26,11 +26,11 @@ const userInitial = computed(() => (session.value?.user?.name?.[0] || "U").toUpp
 
 const emptyAccountCounts = Object.fromEntries(
   PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, 0])
-) as ProviderAccountCounts;
+) as unknown as ProviderAccountCounts;
 
 const emptyAccountIndicators = Object.fromEntries(
   PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, "normal"])
-) as ProviderAccountIndicators;
+) as unknown as ProviderAccountIndicators;
 
 interface ShellAccountSummary {
   accountCounts: ProviderAccountCounts;
@@ -48,10 +48,10 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 
 const modelFamilyCounts = ref<ModelFamilyCounts>(Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])));
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 
 const { data: accountSummaryData, pending: accountSummaryPending } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
-  const summary = await $client.accounts.summary.query();
+  const summary = await dashboardApi.accounts.summary();
   const nextAccountCounts = { ...emptyAccountCounts };
   const nextActiveAccountCounts = { ...emptyAccountCounts };
   const nextAccountIndicators = { ...emptyAccountIndicators };
@@ -86,7 +86,7 @@ const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.val
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
 
 useAsyncData("dashboard-shell-model-family-counts", async () => {
-  const counts = await $client.models.familyCounts.query();
+  const counts = await dashboardApi.models.familyCounts();
   const anchorByFamily = new Map(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.name, family.anchorId]));
   const nextCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
 

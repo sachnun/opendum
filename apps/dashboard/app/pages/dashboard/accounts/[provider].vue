@@ -4,15 +4,15 @@ import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../.
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const route = useRoute();
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const selectedProvider = computed(() => getProviderFromSlug(String(route.params.provider)) ?? String(route.params.provider));
 const providerMeta = computed(() => selectedProvider.value in BY_KEY ? BY_KEY[selectedProvider.value as ProviderAccountKey] : null);
 
-type ProviderDetailData = Awaited<ReturnType<typeof $client.accounts.byProviderDetailed.query>>;
+type ProviderDetailData = Awaited<ReturnType<typeof dashboardApi.accounts.byProviderDetailed>>;
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
-  () => $client.accounts.byProviderDetailed.query({ provider: selectedProvider.value }),
+  () => dashboardApi.accounts.byProviderDetailed({ provider: selectedProvider.value }),
   { watch: [selectedProvider] }
 );
 

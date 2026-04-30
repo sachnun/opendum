@@ -1,0 +1,130 @@
+import type { ModelStats } from "./model-stats";
+import type { ProviderAccountKey } from "./provider-accounts";
+
+export type ActionResult<T = void> =
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+export interface ProviderStats {
+  totalRequests: number;
+  successRate: number | null;
+  dailyRequests: Array<{ date: string; count: number }>;
+  avgDurationLastDay: number | null;
+  durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
+}
+
+export interface ProviderAccountItem {
+  id: string;
+  provider: string;
+  name: string;
+  email: string | null;
+  isActive: boolean;
+  lastUsedAt: string | Date | null;
+  expiresAt: string | Date;
+  requestCount: number;
+  tier: string | null;
+  status: string;
+  statusReason: string | null;
+  errorCount: number;
+  consecutiveErrors: number;
+  lastErrorAt: string | Date | null;
+  lastSuccessAt: string | Date | null;
+  lastRecoveredByRotationAt: string | Date | null;
+  lastErrorMessage: string | null;
+  lastErrorCode: number | null;
+  successCount: number;
+  createdAt: string | Date;
+}
+
+export interface ProviderAccountDetailItem extends ProviderAccountItem {
+  stats: ProviderStats;
+}
+
+export interface AccountSummaryData {
+  summaries: Record<ProviderAccountKey, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
+  pinnedProviders: ProviderAccountKey[];
+}
+
+export interface ProviderDetailData {
+  accounts: ProviderAccountDetailItem[];
+  supportedModels: string[];
+  disabledModelsByAccountId: Record<string, string[]>;
+  pinnedProviders: ProviderAccountKey[];
+}
+
+export interface ErrorHistoryEntry {
+  id: string;
+  errorCode: number | null;
+  errorMessage: string;
+  createdAt: string | Date;
+}
+
+export type ErrorHistoryResult = ActionResult<{ entries: ErrorHistoryEntry[] }>;
+
+export interface ApiKeyListItem {
+  id: string;
+  name: string | null;
+  keyPreview: string;
+  isActive: boolean;
+  createdAt: string | Date;
+  expiresAt: string | Date | null;
+  lastUsedAt: string | Date | null;
+  modelAccessMode: string;
+  modelAccessList: string[];
+  accountAccessMode: string;
+  accountAccessList: string[];
+}
+
+export interface ApiKeyOptions {
+  availableModels: string[];
+  availableFamilies: string[];
+  providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null }>;
+  rateLimitsByKeyId: Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>;
+}
+
+export interface ModelListItem {
+  id: string;
+  name: string;
+  family: string;
+  providers: string[];
+  meta?: {
+    contextLength?: number;
+    outputLimit?: number;
+    knowledgeCutoff?: string;
+    reasoning?: boolean;
+    toolCall?: boolean;
+    vision?: boolean;
+  };
+  isEnabled: boolean;
+  stats?: ModelStats;
+}
+
+export type ModelSearchItem = Omit<ModelListItem, "name" | "family">;
+
+export interface PlaygroundOptions {
+  proxyBaseUrl?: string;
+  models: Array<{ id: string; name: string; family: string; providers: string[] }>;
+  providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; disabledModels: string[] }>;
+  apiKeyOptions: Array<{ id: string; name: string | null; keyPreview: string; decryptedKey: string; modelAccessMode: "all" | "whitelist" | "blacklist"; modelAccessList: string[] }>;
+}
+
+export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
+export type AnalyticsFilter = Period | { from: string; to: string };
+
+export interface AnalyticsData {
+  requestsOverTime: Array<{ date: string; count: number }>;
+  tokenUsage: Array<{ date: string; input: number; output: number }>;
+  requestsByModel: Array<{ model: string; count: number }>;
+  modelDistribution: Array<{ model: string; value: number; percentage: number }>;
+  successRate: Array<{ date: string; success: number; error: number; successRate?: number; errorRate?: number }>;
+  durationOverTime: Array<{ date: string; avg: number | null; p30: number | null; p50: number | null; p60: number | null; p75: number | null; p90: number | null; p95: number | null; p99: number | null }>;
+  granularity: "10s" | "1m" | "5m" | "15m" | "1h" | "1d";
+  totals: {
+    totalRequests: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    avgDuration: number;
+    durationPercentiles: { p30: number; p50: number; p60: number; p75: number; p90: number; p95: number; p99: number };
+    successRate: number;
+  };
+}

@@ -8,11 +8,11 @@ import {
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 
-type AccountSummaryData = Awaited<ReturnType<typeof $client.accounts.summary.query>>;
+type AccountSummaryData = Awaited<ReturnType<typeof dashboardApi.accounts.summary>>;
 
-const { data, error, pending, refresh } = await useAsyncData("dashboard-accounts-summary", () => $client.accounts.summary.query());
+const { data, error, pending, refresh } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
 const summaryData = computed<AccountSummaryData | null>(() => data.value ?? null);
 const pinnedProviderSet = computed(() => new Set(summaryData.value?.pinnedProviders ?? []));
 

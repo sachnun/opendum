@@ -16,7 +16,7 @@ const emit = defineEmits<{
   updated: [];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const editDialogOpen = ref(false);
 const newName = ref(props.name ?? "");
 const isUpdating = ref(false);
@@ -33,7 +33,7 @@ async function updateName() {
   isUpdating.value = true;
   errorMessage.value = "";
   try {
-    const result = await $client.apiKeys.updateName.mutate({ id: props.id, name: newName.value });
+    const result = await dashboardApi.apiKeys.updateName({ id: props.id, name: newName.value });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
     emit("updated");

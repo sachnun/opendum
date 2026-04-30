@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
 import { getProviderLabel } from "../../../lib/provider-accounts";
+import type { PlaygroundOptions } from "../../../lib/dashboard-api-types";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
@@ -34,10 +35,9 @@ interface Scenario {
   requestOverrides?: Record<string, unknown>;
 }
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const route = useRoute();
 
-type PlaygroundOptions = Awaited<ReturnType<typeof $client.playground.options.query>>;
 type ModelOption = PlaygroundOptions["models"][number];
 type ProviderAccountOption = PlaygroundOptions["providerAccounts"][number];
 type ApiKeyOption = PlaygroundOptions["apiKeyOptions"][number];
@@ -143,7 +143,7 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
   { value: "xhigh", label: "XHigh" },
 ];
 
-const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => $client.playground.options.query());
+const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => dashboardApi.playground.options());
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
 const models = computed<ModelOption[]>(() => options.value?.models ?? []);
 const providerAccounts = computed<ProviderAccountOption[]>(() => options.value?.providerAccounts ?? []);
@@ -301,7 +301,7 @@ function findApiKeyWithMostModels(apiKeys: ApiKeyOption[], modelOptions: ModelOp
 
 function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
   const availableProviders = new Set(accounts.map((account) => account.provider));
-  const grouped = new Map<string, ModelOption[]>();
+  const grouped = new Map<ReturnType<typeof categorizeModelFamily>, ModelOption[]>();
 
   for (const model of modelOptions) {
     if (!model.providers.some((provider) => availableProviders.has(provider))) continue;
@@ -365,7 +365,7 @@ function getPanelModels(panel: PanelState): ModelOption[] {
 }
 
 function getGroupedPanelModels(panel: PanelState) {
-  const groups = new Map<string, ModelOption[]>();
+  const groups = new Map<ReturnType<typeof categorizeModelFamily>, ModelOption[]>();
   for (const model of getPanelModels(panel)) {
     const family = categorizeModelFamily(model.family);
     groups.set(family, [...(groups.get(family) ?? []), model]);

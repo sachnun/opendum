@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ProviderAccountDefinition, ProviderAccountKey } from "../../lib/provider-accounts";
 import { getProviderAccountPath } from "../../lib/provider-accounts";
+import type { AccountSummaryData } from "../../lib/dashboard-api-types";
 
-type ProviderSummary = Awaited<ReturnType<typeof useNuxtApp>["$client"]["accounts"]["summary"]["query"]>["summaries"][ProviderAccountKey];
+type ProviderSummary = AccountSummaryData["summaries"][ProviderAccountKey];
 
 const props = defineProps<{
   provider: ProviderAccountDefinition;

@@ -11,7 +11,7 @@ const emit = defineEmits<{
   toggled: [providerKey: ProviderAccountKey, pinned: boolean];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const localPinned = ref(props.pinned);
 const pending = ref(false);
 
@@ -30,7 +30,7 @@ async function togglePin(event: Event) {
   localPinned.value = !previous;
   pending.value = true;
   try {
-    const result = await $client.accounts.togglePinned.mutate({ providerKey: props.providerKey });
+    const result = await dashboardApi.accounts.togglePinned({ providerKey: props.providerKey });
     if (!result.success) throw new Error(result.error);
     localPinned.value = result.data.pinned;
     emit("toggled", props.providerKey, result.data.pinned);

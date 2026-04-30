@@ -17,6 +17,12 @@ export default defineNuxtConfig({
   },
   nitro: {
     preset: process.env.NITRO_PRESET,
+    experimental: {
+      tasks: true,
+    },
+    scheduledTasks: {
+      "0 */6 * * *": ["refresh-tokens"],
+    },
   },
   vite: {
     plugins: [tailwindcss()],

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { formatDistanceToNowStrict } from "date-fns";
+import type { ErrorHistoryResult, ProviderDetailData } from "../../lib/dashboard-api-types";
 
-type Account = Awaited<ReturnType<typeof useNuxtApp>["$client"]["accounts"]["byProviderDetailed"]["query"]>["accounts"][number];
-type ErrorHistoryResult = Awaited<ReturnType<typeof useNuxtApp>["$client"]["accounts"]["errorHistory"]["query"]>;
+type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
 
 type QuotaProvider = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter";
@@ -45,7 +45,7 @@ const emit = defineEmits<{
   changed: [];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const isToggling = ref(false);
 const isSubtitleVisible = ref(false);
 const editDialogOpen = ref(false);
@@ -313,7 +313,7 @@ async function loadQuota(forceRefresh = false) {
   quotaError.value = null;
 
   try {
-    const result = await $client.accounts.quota.query({
+    const result = await dashboardApi.accounts.quota({
       provider: props.account.provider as QuotaProvider,
       accountId: props.account.id,
       forceRefresh,
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
 async function toggleActive() {
   isToggling.value = true;
   try {
-    const result = await $client.accounts.update.mutate({ id: props.account.id, isActive: !props.account.isActive });
+    const result = await dashboardApi.accounts.update({ id: props.account.id, isActive: !props.account.isActive });
     if (!result.success) throw new Error(result.error);
     emit("changed");
   } finally {
@@ -376,7 +376,7 @@ async function toggleActive() {
 async function renameAccount() {
   savingName.value = true;
   try {
-    const result = await $client.accounts.update.mutate({ id: props.account.id, name: editName.value });
+    const result = await dashboardApi.accounts.update({ id: props.account.id, name: editName.value });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
     emit("changed");
@@ -388,7 +388,7 @@ async function renameAccount() {
 async function deleteAccount() {
   deleting.value = true;
   try {
-    const result = await $client.accounts.delete.mutate({ id: props.account.id });
+    const result = await dashboardApi.accounts.delete({ id: props.account.id });
     if (!result.success) throw new Error(result.error);
     deleteDialogOpen.value = false;
     emit("changed");
@@ -400,7 +400,7 @@ async function deleteAccount() {
 async function resolveErrors() {
   resolvingErrors.value = true;
   try {
-    const result = await $client.accounts.resolveErrors.mutate({ accountId: props.account.id });
+    const result = await dashboardApi.accounts.resolveErrors({ accountId: props.account.id });
     if (!result.success) throw new Error(result.error);
     errorDialogOpen.value = false;
     emit("changed");
@@ -413,7 +413,7 @@ async function loadErrorHistory() {
   const requestId = ++historyRequestId;
 
   try {
-    const result = await $client.accounts.errorHistory.query({ accountId: props.account.id });
+    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id });
     if (requestId !== historyRequestId) return;
 
     if (!result.success) {

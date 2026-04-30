@@ -15,7 +15,7 @@ const props = defineProps<{
   initialAccounts: string[];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const accountPickerOpen = ref(false);
 const accountSearch = ref("");
 const isSaving = ref(false);
@@ -67,7 +67,7 @@ async function save() {
   isSaving.value = true;
   errorMessage.value = "";
   try {
-    const result = await $client.apiKeys.updateAccountAccess.mutate({ id: props.apiKeyId, mode: draftMode.value, accounts: accountsForSave });
+    const result = await dashboardApi.apiKeys.updateAccountAccess({ id: props.apiKeyId, mode: draftMode.value, accounts: accountsForSave });
     if (!result.success) throw new Error(result.error);
     savedMode.value = result.data.mode;
     savedAccounts.value = normalizeAccounts(result.data.accounts);

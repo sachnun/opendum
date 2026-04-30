@@ -22,7 +22,7 @@ const props = defineProps<{
   initialRules: RateLimitRuleInput[];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const isSaving = ref(false);
 const savedRules = ref<RateLimitRuleInput[]>(props.initialRules);
 const draftRules = ref<RateLimitRuleState[]>(props.initialRules.map(ruleToState));
@@ -82,7 +82,7 @@ async function save() {
   isSaving.value = true;
   errorMessage.value = "";
   try {
-    const result = await $client.apiKeys.updateRateLimits.mutate({ id: props.apiKeyId, rules });
+    const result = await dashboardApi.apiKeys.updateRateLimits({ id: props.apiKeyId, rules });
     if (!result.success) throw new Error(result.error);
     savedRules.value = result.data.rules;
     draftRules.value = result.data.rules.map(ruleToState);

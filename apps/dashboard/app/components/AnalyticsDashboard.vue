@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { endOfDay, format, startOfDay } from "date-fns";
+import type { AnalyticsData, ApiKeyListItem } from "../../lib/dashboard-api-types";
 
 type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 type AnalyticsFilter = Period | { from: string; to: string };
@@ -14,11 +15,8 @@ const props = withDefaults(
   }
 );
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const router = useRouter();
-
-type AnalyticsData = Awaited<ReturnType<typeof $client.analytics.data.query>>;
-type ApiKeyListItem = Awaited<ReturnType<typeof $client.apiKeys.list.query>>[number];
 
 const periods: { value: Period; label: string }[] = [
   { value: "5m", label: "Last 5 minutes" },
@@ -56,12 +54,12 @@ watch(isFilterOpen, (open) => {
   draftToDate.value = customRange.value?.to ? format(customRange.value.to, "yyyy-MM-dd") : "";
 });
 
-const { data: apiKeysData } = await useAsyncData("dashboard-analytics-api-keys", () => $client.apiKeys.list.query(), {
+const { data: apiKeysData } = await useAsyncData("dashboard-analytics-api-keys", () => dashboardApi.apiKeys.list(), {
   default: () => [] as ApiKeyListItem[],
 });
 const apiKeys = computed<ApiKeyListItem[]>(() => apiKeysData.value ?? []);
 
-const selectedPeriod = computed(() => periods.find((item) => item.value === period.value) ?? periods[5]);
+const selectedPeriod = computed(() => periods.find((item) => item.value === period.value) ?? periods[5]!);
 const customRangeLabel = computed(() => {
   if (!customRange.value) return "Custom range";
   return `${format(customRange.value.from, "dd MMM yyyy")} - ${format(customRange.value.to, "dd MMM yyyy")}`;
@@ -93,7 +91,7 @@ const { data, error, pending, refresh } = await useAsyncData<AnalyticsData>(
   async () => {
     const forceRefresh = forceRefreshNext.value;
     try {
-      return await $client.analytics.data.query({
+      return await dashboardApi.analytics.data({
         filter: activeFilter.value,
         apiKeyId: selectedApiKeyId.value === "all" ? undefined : selectedApiKeyId.value,
         forceRefresh,

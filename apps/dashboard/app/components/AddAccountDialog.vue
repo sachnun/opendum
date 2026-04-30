@@ -30,7 +30,7 @@ const emit = defineEmits<{
   connected: [];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 
 const providerConfigs: Record<Provider, ProviderConfig> = {
   antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", flowType: "oauth_redirect" },
@@ -107,7 +107,7 @@ watch([open, step, provider], async () => {
 
   try {
     if (selectedConfig.value.flowType === "oauth_redirect") {
-      const result = await $client.accounts.getAuthUrl.mutate({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro" });
+      const result = await dashboardApi.accounts.getAuthUrl({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro" });
       if (!result.success) throw new Error(result.error);
       authUrl.value = result.data.authUrl;
       oauthState.value = result.data.state;
@@ -116,7 +116,7 @@ watch([open, step, provider], async () => {
     }
 
     if (selectedConfig.value.flowType === "device_code") {
-      const result = await $client.accounts.initiateDeviceAuth.mutate({ provider: provider.value as "qwen_code" | "copilot" });
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: provider.value as "qwen_code" | "copilot" });
       if (!result.success) throw new Error(result.error);
       deviceCodeInfo.value = {
         provider: provider.value as "qwen_code" | "copilot",
@@ -255,7 +255,7 @@ function startDevicePolling(popup: Window | null) {
     }
 
     try {
-      const result = await $client.accounts.pollDeviceAuth.mutate({
+      const result = await dashboardApi.accounts.pollDeviceAuth({
         provider: deviceCodeInfo.value.provider,
         deviceCode: deviceCodeInfo.value.deviceCode,
         codeVerifier: deviceCodeInfo.value.codeVerifier,
@@ -306,7 +306,7 @@ async function handleConnectApiKey() {
 
   isLoading.value = true;
   try {
-    const result = await $client.accounts.create.mutate({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined });
+    const result = await dashboardApi.accounts.create({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined });
     if (!result.success) throw new Error(result.error);
     open.value = false;
     emit("connected");
@@ -334,7 +334,7 @@ async function handleExchangeOAuth() {
 
   isLoading.value = true;
   try {
-    const result = await $client.accounts.exchangeOAuth.mutate({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
+    const result = await dashboardApi.accounts.exchangeOAuth({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
     open.value = false;
     emit("connected");

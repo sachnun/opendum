@@ -6,8 +6,6 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
-    "build:cron": "tsc -p tsconfig.cron.json",
-    "cron": "node .cron/cron/run-refresh-tokens.js",
     "start": "node .output/server/index.mjs",
     "preview": "nuxt preview --host 0.0.0.0",
     "lint": "nuxt prepare && eslint .",
@@ -16,8 +14,6 @@
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",
-    "@trpc/client": "^11.16.0",
-    "@trpc/server": "^11.16.0",
     "better-auth": "^1.5.5",
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
@@ -32,7 +28,6 @@
     "reka-ui": "^2.9.6",
     "smol-toml": "^1.6.0",
     "tailwind-merge": "^3.5.0",
-    "trpc-nuxt": "^2.0.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

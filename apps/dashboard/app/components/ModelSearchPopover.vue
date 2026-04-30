@@ -1,28 +1,10 @@
 <script setup lang="ts">
 import { getProviderLabel } from "../../lib/provider-accounts";
+import type { ModelSearchItem } from "../../lib/dashboard-api-types";
 
-interface ModelListItem {
-  id: string;
-  providers: string[];
-  meta?: {
-    contextLength?: number;
-    outputLimit?: number;
-    knowledgeCutoff?: string;
-    reasoning?: boolean;
-    toolCall?: boolean;
-    vision?: boolean;
-  };
-  isEnabled: boolean;
-  stats: {
-    totalRequests: number;
-    successRate: number | null;
-    dailyRequests: Array<{ date: string; count: number }>;
-    avgDurationLastDay: number | null;
-    durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
-  };
-}
+type ModelListItem = ModelSearchItem;
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const route = useRoute();
 
 const desktopOpen = ref(false);
@@ -39,7 +21,7 @@ const detailOpen = computed({
   },
 });
 
-const { data, refresh } = await useAsyncData("layout-model-search", () => $client.models.search.query(), {
+const { data, refresh } = await useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
   default: () => [] as ModelListItem[],
 });
 
@@ -81,7 +63,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
   model.isEnabled = enabled;
 
   try {
-    const result = await $client.models.setEnabled.mutate({ modelId: model.id, enabled });
+    const result = await dashboardApi.models.setEnabled({ modelId: model.id, enabled });
     if (!result.success) throw new Error(result.error);
     await refresh();
     const updatedModel = models.value.find((item) => item.id === model.id);
@@ -237,7 +219,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           </div>
 
           <ModelFeatureBadges :meta="detailModel.meta" />
-          <ModelStatsPanel :stats="detailModel.stats" :label="detailModel.id" compact />
+          <ModelStatsPanel v-if="detailModel.stats" :stats="detailModel.stats" :label="detailModel.id" compact />
         </div>
       </template>
     </UiDialog>

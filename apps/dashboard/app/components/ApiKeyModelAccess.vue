@@ -8,7 +8,7 @@ const props = defineProps<{
   initialModels: string[];
 }>();
 
-const { $client } = useNuxtApp();
+const dashboardApi = useDashboardApi();
 const modelPickerOpen = ref(false);
 const modelSearch = ref("");
 const isSaving = ref(false);
@@ -60,7 +60,7 @@ async function save() {
   isSaving.value = true;
   errorMessage.value = "";
   try {
-    const result = await $client.apiKeys.updateModelAccess.mutate({ id: props.apiKeyId, mode: draftMode.value, models: modelsForSave });
+    const result = await dashboardApi.apiKeys.updateModelAccess({ id: props.apiKeyId, mode: draftMode.value, models: modelsForSave });
     if (!result.success) throw new Error(result.error);
     savedMode.value = result.data.mode;
     savedModels.value = normalizeModels(result.data.models);
