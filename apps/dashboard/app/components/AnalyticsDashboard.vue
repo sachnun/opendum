@@ -209,7 +209,7 @@ const successRateData = computed(() =>
     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <h3 class="text-sm font-semibold tracking-tight sm:text-base">Analytics</h3>
       <div class="flex min-w-0 items-center gap-2">
-        <UPopover v-model:open="isApiKeyFilterOpen" :content="{ align: 'end' }">
+        <UiPopover v-model:open="isApiKeyFilterOpen" :content="{ align: 'end' }">
           <UiButton
             variant="outline"
             size="sm"
@@ -217,10 +217,10 @@ const successRateData = computed(() =>
             class="h-8 min-w-0 justify-between overflow-hidden rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
           >
             <span class="inline-flex min-w-0 items-center gap-1.5">
-              <UIcon name="i-lucide-key-round" class="size-3.5 shrink-0 text-muted-foreground" />
+              <UiIcon name="i-lucide-key-round" class="size-3.5 shrink-0 text-muted-foreground" />
               <span class="truncate">{{ selectedApiKeyLabel }}</span>
             </span>
-            <UIcon name="i-lucide-chevron-down" class="size-3.5 shrink-0 text-muted-foreground" />
+            <UiIcon name="i-lucide-chevron-down" class="size-3.5 shrink-0 text-muted-foreground" />
           </UiButton>
 
           <template #content>
@@ -248,9 +248,9 @@ const successRateData = computed(() =>
               </UiButton>
             </div>
           </template>
-        </UPopover>
+        </UiPopover>
 
-        <UPopover v-model:open="isFilterOpen" :content="{ align: 'end', class: 'w-auto p-0' }">
+        <UiPopover v-model:open="isFilterOpen" :content="{ align: 'end', class: 'w-auto p-0' }">
           <UiButton
             variant="outline"
             size="sm"
@@ -258,11 +258,11 @@ const successRateData = computed(() =>
             class="h-8 min-w-0 justify-between overflow-hidden rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
           >
             <span class="inline-flex min-w-0 items-center gap-1.5">
-              <UIcon name="i-lucide-clock-3" class="size-3.5 shrink-0 text-muted-foreground" />
+              <UiIcon name="i-lucide-clock-3" class="size-3.5 shrink-0 text-muted-foreground" />
               <span class="hidden truncate sm:inline">{{ activeFilterLabel }}</span>
               <span class="sm:hidden">{{ isCustomRangeActive ? 'custom' : selectedPeriod.value }}</span>
             </span>
-            <UIcon name="i-lucide-chevron-down" class="size-3.5 shrink-0 text-muted-foreground" />
+            <UiIcon name="i-lucide-chevron-down" class="size-3.5 shrink-0 text-muted-foreground" />
           </UiButton>
 
           <template #content>
@@ -316,7 +316,7 @@ const successRateData = computed(() =>
               </div>
             </div>
           </template>
-        </UPopover>
+        </UiPopover>
 
         <UiButton
           variant="outline"
@@ -325,7 +325,7 @@ const successRateData = computed(() =>
           class="h-8 w-8 rounded-lg border-border bg-background sm:h-9 sm:w-9"
           @click="handleRefresh"
         >
-          <UIcon name="i-lucide-refresh-cw" :class="['size-4', pending ? 'animate-spin' : '']" />
+          <UiIcon name="i-lucide-refresh-cw" :class="['size-4', pending ? 'animate-spin' : '']" />
         </UiButton>
       </div>
     </div>

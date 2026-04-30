@@ -81,7 +81,7 @@ function keyRateLimits(apiKeyId: string) {
     <UiCard v-else-if="apiKeys.length === 0" class="bg-card">
       <UiCardContent class="flex flex-col items-center justify-center py-12">
         <div class="mb-4 rounded-full bg-muted p-4">
-          <UIcon name="i-lucide-key" class="size-8 text-muted-foreground" />
+          <UiIcon name="i-lucide-key" class="size-8 text-muted-foreground" />
         </div>
         <h3 class="text-lg font-semibold">No API keys</h3>
         <div class="mt-4">
@@ -139,7 +139,7 @@ function keyRateLimits(apiKeyId: string) {
                 title="View analytics"
               >
                 <span class="inline-flex items-center gap-1.5 text-muted-foreground">
-                  <UIcon name="i-lucide-bar-chart-3" class="size-3.5" />
+                  <UiIcon name="i-lucide-bar-chart-3" class="size-3.5" />
                   Analytics
                 </span>
                 <span class="text-right font-medium">Open usage details</span>

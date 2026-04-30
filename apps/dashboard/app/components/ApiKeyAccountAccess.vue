@@ -96,7 +96,7 @@ const filteredAccounts = computed(() => {
   <section class="flex h-full flex-col p-4 max-lg:p-0">
     <div class="hidden items-start justify-between gap-3 lg:flex">
       <div class="inline-flex items-center gap-2 text-sm font-semibold">
-        <UIcon name="i-lucide-shield-check" class="size-4 text-muted-foreground" />
+        <UiIcon name="i-lucide-shield-check" class="size-4 text-muted-foreground" />
         <span>Account Access</span>
       </div>
       <UiBadge variant="outline" class="shrink-0">{{ getModeLabel(savedMode) }}</UiBadge>
@@ -115,10 +115,10 @@ const filteredAccounts = computed(() => {
           <UiButton type="button" variant="ghost" size="sm" class="h-7 px-2 text-[11px]" :disabled="normalizedDraftAccounts.length === 0 || isSaving" @click="draftAccounts = []">Clear</UiButton>
         </div>
 
-        <UPopover v-model:open="accountPickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
+        <UiPopover v-model:open="accountPickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
           <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving">
             <span class="truncate">{{ normalizedDraftAccounts.length > 0 ? `${normalizedDraftAccounts.length} account selected` : 'Select accounts' }}</span>
-            <UIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
+            <UiIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
           </UiButton>
           <template #content>
             <div class="border-b border-border p-2">
@@ -126,7 +126,7 @@ const filteredAccounts = computed(() => {
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
               <button v-for="account in filteredAccounts" :key="account.id" type="button" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent" @click="toggleAccount(account.id)">
-                <UIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0']" />
+                <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0']" />
                 <div class="flex min-w-0 flex-col">
                   <span class="truncate text-xs font-medium">{{ account.name }}</span>
                   <span class="truncate text-[11px] text-muted-foreground">{{ account.provider }}{{ account.email ? ` - ${account.email}` : '' }}</span>
@@ -135,7 +135,7 @@ const filteredAccounts = computed(() => {
               <p v-if="filteredAccounts.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No account found.</p>
             </div>
           </template>
-        </UPopover>
+        </UiPopover>
 
         <div class="max-h-40 overflow-y-auto py-1">
           <p v-if="normalizedDraftAccounts.length === 0" class="px-1 text-[11px] text-muted-foreground">No accounts selected</p>
@@ -143,7 +143,7 @@ const filteredAccounts = computed(() => {
             <UiBadge v-for="accountId in normalizedDraftAccounts" :key="accountId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate">{{ accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId }}</span>
               <button type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleAccount(accountId)">
-                <UIcon name="i-lucide-x" class="size-2.5" />
+                <UiIcon name="i-lucide-x" class="size-2.5" />
               </button>
             </UiBadge>
           </div>
@@ -153,7 +153,7 @@ const filteredAccounts = computed(() => {
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraftState"><UIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraftState"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
       <UiButton size="sm" :disabled="isSaving || !hasChanges" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>

@@ -49,11 +49,11 @@ async function updateName() {
   <div class="flex min-w-0 items-center gap-1.5">
     <span v-if="showTitle" class="min-w-0 truncate text-lg font-semibold">{{ name ?? 'Unnamed key' }}</span>
     <UiButton v-if="showEditButton" variant="outline" size="icon" class="h-9 w-9" title="Edit name" @click="editDialogOpen = true">
-      <UIcon name="i-lucide-pencil" class="size-4" />
+      <UiIcon name="i-lucide-pencil" class="size-4" />
     </UiButton>
   </div>
 
-  <UModal v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
+  <UiDialog v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
     <template #content>
       <div class="space-y-1.5 pr-6">
         <h2 class="text-lg font-semibold leading-none tracking-tight">Edit API Key Name</h2>
@@ -78,5 +78,5 @@ async function updateName() {
         <UiButton size="sm" :disabled="isUpdating" @click="updateName">{{ isUpdating ? 'Saving...' : 'Save' }}</UiButton>
       </div>
     </template>
-  </UModal>
+  </UiDialog>
 </template>

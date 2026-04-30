@@ -51,7 +51,7 @@ async function saveExpiration(value: Date | null) {
 </script>
 
 <template>
-  <UPopover v-model:open="open" :content="{ align: 'start', class: 'w-72 p-0' }">
+  <UiPopover v-model:open="open" :content="{ align: 'start', class: 'w-72 p-0' }">
     <button
       type="button"
       :class="[
@@ -60,7 +60,7 @@ async function saveExpiration(value: Date | null) {
       ]"
       :disabled="isSaving"
     >
-      <UIcon name="i-lucide-calendar" class="size-3" />
+      <UiIcon name="i-lucide-calendar" class="size-3" />
       <span>{{ displayText }}</span>
     </button>
     <template #content>
@@ -72,7 +72,7 @@ async function saveExpiration(value: Date | null) {
         <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
         <div class="flex items-center justify-between gap-2 border-t pt-2">
           <UiButton variant="ghost" size="sm" class="h-7 gap-1 text-xs" :disabled="isSaving || !expiresAt" @click="saveExpiration(null)">
-            <UIcon name="i-lucide-x" class="size-3" />
+            <UiIcon name="i-lucide-x" class="size-3" />
             Remove expiration
           </UiButton>
           <UiButton size="sm" class="h-7 text-xs" :disabled="isSaving" @click="saveExpiration(parseDraftDate())">
@@ -81,5 +81,5 @@ async function saveExpiration(value: Date | null) {
         </div>
       </div>
     </template>
-  </UPopover>
+  </UiPopover>
 </template>

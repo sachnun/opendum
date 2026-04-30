@@ -109,7 +109,7 @@ const pickerItems = computed(() => {
   <section class="flex h-full flex-col p-4 max-lg:p-0">
     <div class="hidden items-start justify-between gap-3 lg:flex">
       <div class="inline-flex items-center gap-2 text-sm font-semibold">
-        <UIcon name="i-lucide-gauge" class="size-4 text-muted-foreground" />
+        <UiIcon name="i-lucide-gauge" class="size-4 text-muted-foreground" />
         <span>Rate Limits</span>
       </div>
       <UiBadge variant="outline" class="shrink-0">{{ savedRules.length }} rule{{ savedRules.length === 1 ? '' : 's' }}</UiBadge>
@@ -127,7 +127,7 @@ const pickerItems = computed(() => {
               <span class="truncate font-mono text-xs">{{ rule.target }}</span>
             </div>
             <UiButton variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving" @click="removeRule(index)">
-              <UIcon name="i-lucide-trash-2" class="size-3.5" />
+              <UiIcon name="i-lucide-trash-2" class="size-3.5" />
             </UiButton>
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2">
@@ -147,13 +147,13 @@ const pickerItems = computed(() => {
           </div>
         </div>
 
-        <UPopover v-model:open="pickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
+        <UiPopover v-model:open="pickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
           <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving || pickerItems.length === 0">
             <span class="flex items-center gap-1.5 text-muted-foreground">
-              <UIcon name="i-lucide-plus" class="size-3.5" />
+              <UiIcon name="i-lucide-plus" class="size-3.5" />
               {{ pickerItems.length === 0 ? `No ${addMode} left to add` : `Select ${addMode === 'model' ? 'model' : 'family'}` }}
             </span>
-            <UIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
+            <UiIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
           </UiButton>
           <template #content>
             <div class="border-b border-border p-2">
@@ -166,13 +166,13 @@ const pickerItems = computed(() => {
               <p v-if="pickerItems.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No {{ addMode }} found.</p>
             </div>
           </template>
-        </UPopover>
+        </UiPopover>
       </div>
       <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraft"><UIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraft"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
       <UiButton size="sm" :disabled="isSaving || !hasChanges" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>

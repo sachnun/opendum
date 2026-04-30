@@ -106,16 +106,16 @@ async function deleteKey() {
         @click="revealKey"
       >
         <span :class="['min-w-0 flex-1 pr-2', isRevealed ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ displayKey }}</span>
-        <UIcon :name="isRevealed ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4 shrink-0 text-muted-foreground" />
+        <UiIcon :name="isRevealed ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4 shrink-0 text-muted-foreground" />
       </button>
 
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <UiButton variant="outline" size="icon" class="h-9 w-9" title="Delete key" @click="deleteDialogOpen = true">
-            <UIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
+            <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
           </UiButton>
           <UiButton variant="outline" size="icon" class="h-9 w-9" :disabled="isLoading" title="Copy key" @click="copyKey">
-            <UIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />
+            <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />
           </UiButton>
           <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" @updated="emit('changed')" />
         </div>
@@ -126,7 +126,7 @@ async function deleteKey() {
       </div>
     </div>
 
-    <UModal v-model:open="deleteDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
+    <UiDialog v-model:open="deleteDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
       <template #content>
         <div class="space-y-1.5 pr-6">
           <h2 class="text-lg font-semibold leading-none tracking-tight">Delete API Key</h2>
@@ -138,6 +138,6 @@ async function deleteKey() {
           <UiButton variant="destructive" size="sm" :disabled="isDeleting" @click="deleteKey">{{ isDeleting ? 'Deleting...' : 'Delete' }}</UiButton>
         </div>
       </template>
-    </UModal>
+    </UiDialog>
   </div>
 </template>

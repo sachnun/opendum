@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
                   :aria-label="copiedValue === baseUrl ? 'Copied' : 'Copy to clipboard'"
                   @click="copyInlineCode(baseUrl)"
                 >
-                  <UIcon :name="copiedValue === baseUrl ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                  <UiIcon :name="copiedValue === baseUrl ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
                 </button>
               </code>
               as your API base URL.

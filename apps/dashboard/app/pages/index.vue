@@ -60,7 +60,7 @@ async function continueWithProvider(provider: SocialProvider) {
         role="alert"
         class="relative mt-6 grid w-full grid-cols-[calc(var(--spacing)*4)_1fr] items-start gap-x-3 gap-y-0.5 rounded-lg border bg-card px-4 py-3 text-left text-sm text-destructive"
       >
-        <UIcon name="i-lucide-circle-alert" class="size-4 translate-y-0.5 text-current" />
+        <UiIcon name="i-lucide-circle-alert" class="size-4 translate-y-0.5 text-current" />
         <div class="col-start-2 grid justify-items-start gap-1 text-sm text-destructive/90">
           {{ authError }}
         </div>

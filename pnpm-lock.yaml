@@ -26,9 +26,6 @@ importers:
       better-auth:
         specifier: ^1.5.5
         version: 1.5.5(drizzle-kit@0.31.10)(drizzle-orm@0.45.1(@types/pg@8.18.0)(kysely@0.28.13)(pg@8.20.0))(pg@8.20.0)(vue@3.5.33(typescript@5.9.3))
-      class-variance-authority:
-        specifier: ^0.7.1
-        version: 0.7.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -2857,9 +2854,6 @@ packages:
 
   citty@0.2.2:
     resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
-
-  class-variance-authority@0.7.1:
-    resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
 
   clean-regexp@1.0.0:
     resolution: {integrity: sha512-GfisEZEJvzKrmGWkvfhgzcz/BllN1USeqD2V6tg14OAOgaCD2Z/PUEuxnAZ/nPvmaHRG7a8y77p1T/IRQ4D1Hw==}
@@ -7872,10 +7866,6 @@ snapshots:
       consola: 3.4.2
 
   citty@0.2.2: {}
-
-  class-variance-authority@0.7.1:
-    dependencies:
-      clsx: 2.1.1
 
   clean-regexp@1.0.0:
     dependencies:

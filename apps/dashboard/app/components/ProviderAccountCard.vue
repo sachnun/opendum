@@ -309,7 +309,7 @@ async function resolveErrors() {
               {{ formatTierLabel(normalizedTier) }}
             </UiBadge>
             <UiBadge v-if="account.status !== 'active'" :variant="account.status === 'failed' ? 'destructive' : 'outline'" :class="account.status === 'degraded' ? 'border-yellow-500 text-yellow-600' : 'gap-1'">
-              <UIcon :name="account.status === 'failed' ? 'i-lucide-alert-circle' : 'i-lucide-triangle-alert'" class="size-3" />
+              <UiIcon :name="account.status === 'failed' ? 'i-lucide-alert-circle' : 'i-lucide-triangle-alert'" class="size-3" />
               {{ account.status === 'failed' ? 'Failed' : `Degraded (${account.consecutiveErrors})` }}
             </UiBadge>
           </div>
@@ -317,7 +317,7 @@ async function resolveErrors() {
         <div v-if="subtitleDisplay" :class="['grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1', isSubtitleVisible ? 'items-start' : 'w-full items-center overflow-hidden']">
           <p :class="['min-w-0 font-mono text-sm text-muted-foreground', isSubtitleVisible ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ subtitleDisplay }}</p>
           <UiButton variant="ghost" size="icon-sm" class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:text-foreground" @click="isSubtitleVisible = !isSubtitleVisible">
-            <UIcon :name="isSubtitleVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
+            <UiIcon :name="isSubtitleVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
           </UiButton>
         </div>
       </UiCardHeader>
@@ -325,7 +325,7 @@ async function resolveErrors() {
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
             <div class="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span class="inline-flex items-center gap-1"><UIcon name="i-lucide-bar-chart-3" class="size-3" />30d</span>
+              <span class="inline-flex items-center gap-1"><UiIcon name="i-lucide-bar-chart-3" class="size-3" />30d</span>
               <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
             </div>
             <div class="mb-2 grid grid-cols-3 gap-1.5">
@@ -360,7 +360,7 @@ async function resolveErrors() {
               <div class="flex items-center justify-between gap-1">
                 <span class="text-xs text-muted-foreground">Last Error Message:</span>
                 <UiButton type="button" variant="ghost" size="icon-xs" class="h-5 w-5" @click.stop="navigator.clipboard.writeText(account.lastErrorMessage ?? '')">
-                  <UIcon name="i-lucide-copy" class="size-3" />
+                  <UiIcon name="i-lucide-copy" class="size-3" />
                 </UiButton>
               </div>
               <span :class="['mt-1 line-clamp-2 block break-all text-xs', errorToneClass]">{{ account.lastErrorMessage }}</span>
@@ -384,7 +384,7 @@ async function resolveErrors() {
                 title="Refresh quota"
                 @click="refreshQuota"
               >
-                <UIcon name="i-lucide-refresh-cw" :class="['size-3.5', isQuotaLoading ? 'animate-spin' : '']" />
+                <UiIcon name="i-lucide-refresh-cw" :class="['size-3.5', isQuotaLoading ? 'animate-spin' : '']" />
               </UiButton>
             </div>
 
@@ -417,10 +417,10 @@ async function resolveErrors() {
         </div>
         <div class="mt-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
-            <UiButton variant="outline" size="sm" @click="editDialogOpen = true"><UIcon name="i-lucide-pencil" class="size-3" /></UiButton>
-            <UiButton variant="outline" size="sm" @click="deleteDialogOpen = true"><UIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
+            <UiButton variant="outline" size="sm" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
+            <UiButton variant="outline" size="sm" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
             <NuxtLink v-if="account.isActive" :to="`/dashboard/playground?accountId=${account.id}`">
-              <UiButton variant="outline" size="sm" title="Open in Playground"><UIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
+              <UiButton variant="outline" size="sm" title="Open in Playground"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
             </NuxtLink>
           </div>
           <div class="flex shrink-0 items-center gap-1.5">
@@ -431,27 +431,27 @@ async function resolveErrors() {
       </UiCardContent>
     </UiCard>
 
-    <UModal v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-md' }">
+    <UiDialog v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>
         <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Rename Account</h2><p class="text-sm text-muted-foreground">Enter a new name for this account.</p></div>
         <label class="grid gap-1 text-sm font-medium">Name<input v-model="editName" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" @keydown.enter.prevent="renameAccount"></label>
         <div class="flex justify-end gap-2"><UiButton variant="outline" @click="editDialogOpen = false">Cancel</UiButton><UiButton :disabled="savingName" @click="renameAccount">{{ savingName ? 'Saving...' : 'Save' }}</UiButton></div>
       </template>
-    </UModal>
+    </UiDialog>
 
-    <UModal v-model:open="deleteDialogOpen" :ui="{ content: 'sm:max-w-md' }">
+    <UiDialog v-model:open="deleteDialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>
         <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Delete Account</h2><p class="text-sm text-muted-foreground">Are you sure you want to delete "{{ account.name }}"? This action cannot be undone.</p></div>
         <div class="flex justify-end gap-2"><UiButton variant="outline" @click="deleteDialogOpen = false">Cancel</UiButton><UiButton variant="destructive" :disabled="deleting" @click="deleteAccount">{{ deleting ? 'Deleting...' : 'Delete' }}</UiButton></div>
       </template>
-    </UModal>
+    </UiDialog>
 
-    <UModal v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-2xl' }">
+    <UiDialog v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-2xl' }">
       <template #content>
         <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Last Error Message</h2><p class="text-sm text-muted-foreground">Current stored error details for this provider account.</p></div>
         <pre class="max-h-80 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-xs whitespace-pre-wrap">{{ account.lastErrorMessage }}</pre>
-        <div class="flex justify-end gap-2"><UiButton variant="outline" @click="navigator.clipboard.writeText(account.lastErrorMessage ?? '')"><UIcon name="i-lucide-copy" class="size-4" />Copy</UiButton><UiButton :disabled="resolvingErrors" @click="resolveErrors">{{ resolvingErrors ? 'Resolving...' : 'Resolve errors' }}</UiButton></div>
+        <div class="flex justify-end gap-2"><UiButton variant="outline" @click="navigator.clipboard.writeText(account.lastErrorMessage ?? '')"><UiIcon name="i-lucide-copy" class="size-4" />Copy</UiButton><UiButton :disabled="resolvingErrors" @click="resolveErrors">{{ resolvingErrors ? 'Resolving...' : 'Resolve errors' }}</UiButton></div>
       </template>
-    </UModal>
+    </UiDialog>
   </div>
 </template>

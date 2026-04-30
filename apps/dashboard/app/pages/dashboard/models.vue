@@ -188,7 +188,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                       @click="copyModelId(model.id)"
                     >
                       <span class="flex size-3 shrink-0 items-center justify-center">
-                        <UIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                        <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
                       </span>
                       <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="model.id">
                         {{ model.id }}
@@ -210,7 +210,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                     {{ getProviderLabel(provider) }}
                   </UiBadge>
                   <NuxtLink v-if="model.isEnabled" :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50" title="Try in Playground">
-                    <UIcon name="i-lucide-flask-conical" class="size-3" />
+                    <UiIcon name="i-lucide-flask-conical" class="size-3" />
                   </NuxtLink>
                 </div>
               </UiCardHeader>

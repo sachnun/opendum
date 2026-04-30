@@ -27,29 +27,34 @@ const userInitial = computed(() => (session.value?.user?.name?.[0] || "U").toUpp
 const emptyAccountCounts = Object.fromEntries(
   PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, 0])
 ) as ProviderAccountCounts;
-const accountCounts = ref<ProviderAccountCounts>({ ...emptyAccountCounts });
-const activeAccountCounts = ref<ProviderAccountCounts>({ ...emptyAccountCounts });
-const accountIndicators = ref<ProviderAccountIndicators>(
-  Object.fromEntries(
-    PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, "normal"])
-  ) as ProviderAccountIndicators
-);
-const pinnedProviders = ref<ProviderAccountKey[]>([]);
 
-const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
-const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
-const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
+const emptyAccountIndicators = Object.fromEntries(
+  PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, "normal"])
+) as ProviderAccountIndicators;
+
+interface ShellAccountSummary {
+  accountCounts: ProviderAccountCounts;
+  activeAccountCounts: ProviderAccountCounts;
+  accountIndicators: ProviderAccountIndicators;
+  pinnedProviders: ProviderAccountKey[];
+}
+
+const emptyShellAccountSummary: ShellAccountSummary = {
+  accountCounts: { ...emptyAccountCounts },
+  activeAccountCounts: { ...emptyAccountCounts },
+  accountIndicators: { ...emptyAccountIndicators },
+  pinnedProviders: [],
+};
+
 const modelFamilyCounts = ref<ModelFamilyCounts>(Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])));
 
 const { $client } = useNuxtApp();
 
-useAsyncData("dashboard-shell-accounts", async () => {
+const { data: accountSummaryData, pending: accountSummaryPending } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
   const summary = await $client.accounts.summary.query();
   const nextAccountCounts = { ...emptyAccountCounts };
   const nextActiveAccountCounts = { ...emptyAccountCounts };
-  const nextAccountIndicators = Object.fromEntries(
-    PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, "normal"])
-  ) as ProviderAccountIndicators;
+  const nextAccountIndicators = { ...emptyAccountIndicators };
 
   for (const definition of PROVIDER_ACCOUNT_DEFINITIONS) {
     const providerSummary = summary.summaries[definition.key];
@@ -58,13 +63,27 @@ useAsyncData("dashboard-shell-accounts", async () => {
     nextAccountIndicators[definition.key] = providerSummary.indicator;
   }
 
-  accountCounts.value = nextAccountCounts;
-  activeAccountCounts.value = nextActiveAccountCounts;
-  accountIndicators.value = nextAccountIndicators;
-  pinnedProviders.value = summary.pinnedProviders;
-
-  return true;
+  return {
+    accountCounts: nextAccountCounts,
+    activeAccountCounts: nextActiveAccountCounts,
+    accountIndicators: nextAccountIndicators,
+    pinnedProviders: summary.pinnedProviders,
+  };
+}, {
+  default: () => emptyShellAccountSummary,
 });
+
+const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptyShellAccountSummary.accountCounts);
+const activeAccountCounts = computed(() => accountSummaryData.value?.activeAccountCounts ?? emptyShellAccountSummary.activeAccountCounts);
+const accountIndicators = computed(
+  () => accountSummaryData.value?.accountIndicators ?? emptyShellAccountSummary.accountIndicators
+);
+const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? emptyShellAccountSummary.pinnedProviders);
+const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
+
+const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
+const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
+const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
 
 useAsyncData("dashboard-shell-model-family-counts", async () => {
   const counts = await $client.models.familyCounts.query();
@@ -182,7 +201,7 @@ async function handleSignOut() {
                 ]"
               >
                 <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item)">
-                  <UIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                  <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                   {{ item.name }}
                 </NuxtLink>
                 <button
@@ -191,7 +210,7 @@ async function handleSignOut() {
                   :aria-label="isModelsExpanded ? 'Collapse models' : 'Expand models'"
                   @click="isModelsExpanded = !isModelsExpanded"
                 >
-                  <UIcon :name="isModelsExpanded || isActive(item.href) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-3.5" />
+                  <UiIcon :name="isModelsExpanded || isActive(item.href) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-3.5" />
                 </button>
               </div>
 
@@ -204,7 +223,7 @@ async function handleSignOut() {
                 ]"
                 @click="handleNavClick(item)"
               >
-                <UIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                 {{ item.name }}
               </NuxtLink>
 
@@ -257,7 +276,7 @@ async function handleSignOut() {
                     </NuxtLink>
                   </template>
                 </template>
-                <p v-else-if="item.href === '/dashboard/accounts'" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                <p v-else-if="item.href === '/dashboard/accounts' && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
                   No pinned providers.
                 </p>
               </div>
@@ -277,7 +296,7 @@ async function handleSignOut() {
               ]"
               @click="handleNavClick(item)"
             >
-              <UIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+              <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
               {{ item.name }}
             </NuxtLink>
           </nav>
@@ -294,7 +313,7 @@ async function handleSignOut() {
               class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-sm font-medium outline-none transition-all hover:bg-accent/50 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:hidden"
               @click="mobileOpen = true"
             >
-              <UIcon name="i-lucide-menu" class="size-5" />
+              <UiIcon name="i-lucide-menu" class="size-5" />
               <span class="sr-only">Toggle menu</span>
             </button>
           </div>
@@ -304,7 +323,7 @@ async function handleSignOut() {
           </div>
 
           <div class="flex items-center gap-1.5 sm:gap-2">
-            <UPopover v-model:open="userMenuOpen" :content="{ align: 'end', sideOffset: 8 }">
+            <UiPopover v-model:open="userMenuOpen" :content="{ align: 'end', sideOffset: 8 }">
               <button
                 type="button"
                 class="flex cursor-pointer items-center justify-center rounded-full transition-opacity hover:opacity-80"
@@ -335,7 +354,7 @@ async function handleSignOut() {
                   </button>
                 </div>
               </template>
-            </UPopover>
+            </UiPopover>
           </div>
         </div>
       </header>
@@ -347,7 +366,7 @@ async function handleSignOut() {
       </main>
     </div>
 
-    <USlideover v-model:open="mobileOpen" side="left" :ui="{ content: 'w-[78vw] max-w-[18rem] p-0' }">
+    <UiSheet v-model:open="mobileOpen" side="left" :ui="{ content: 'w-[78vw] max-w-[18rem] p-0' }">
       <template #content>
         <div class="flex h-full flex-col bg-background">
           <div class="flex h-16 items-center justify-between border-b border-border px-5">
@@ -359,7 +378,7 @@ async function handleSignOut() {
               Opendum
             </NuxtLink>
             <button type="button" class="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus:outline-none" @click="mobileOpen = false">
-              <UIcon name="i-lucide-x" class="size-4" />
+              <UiIcon name="i-lucide-x" class="size-4" />
               <span class="sr-only">Close</span>
             </button>
           </div>
@@ -376,7 +395,7 @@ async function handleSignOut() {
                     ]"
                     @click="handleNavClick(item)"
                   >
-                    <UIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                     {{ item.name }}
                   </NuxtLink>
 
@@ -410,7 +429,7 @@ async function handleSignOut() {
                         </span>
                       </NuxtLink>
                     </template>
-                    <p v-else-if="item.href === '/dashboard/accounts'" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <p v-else-if="item.href === '/dashboard/accounts' && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
                       No pinned providers.
                     </p>
                   </div>
@@ -430,7 +449,7 @@ async function handleSignOut() {
                   ]"
                   @click="handleNavClick(item)"
                 >
-                  <UIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                  <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                   {{ item.name }}
                 </NuxtLink>
               </nav>
@@ -438,6 +457,6 @@ async function handleSignOut() {
           </div>
         </div>
       </template>
-    </USlideover>
+    </UiSheet>
   </div>
 </template>

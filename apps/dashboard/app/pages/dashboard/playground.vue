@@ -1027,7 +1027,7 @@ function formatToolArguments(value: string): string {
 
 <template>
   <div>
-  <UModal v-model:open="loopDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
+  <UiDialog v-model:open="loopDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
     <template #content>
       <div class="space-y-1.5 pr-6">
         <h2 class="text-lg font-semibold">Run Loop</h2>
@@ -1042,9 +1042,9 @@ function formatToolArguments(value: string): string {
         <UiButton size="sm" :disabled="!isLoopCountValid" @click="runLoop">Run loop</UiButton>
       </div>
     </template>
-  </UModal>
+  </UiDialog>
 
-  <USlideover v-model:open="settingsOpen" side="right" :ui="{ content: 'w-[88vw] max-w-sm overflow-y-auto p-0' }">
+  <UiSheet v-model:open="settingsOpen" side="right" :ui="{ content: 'w-[88vw] max-w-sm overflow-y-auto p-0' }">
     <template #content>
       <div class="flex min-h-full flex-col">
         <div class="border-b border-border px-5 py-4">
@@ -1142,24 +1142,24 @@ function formatToolArguments(value: string): string {
         </div>
         <div class="border-t border-border p-5">
           <UiButton variant="outline" class="w-full" :disabled="isAnyLoading" @click="resetSettings">
-            <UIcon name="i-lucide-rotate-ccw" class="size-4" />
+            <UiIcon name="i-lucide-rotate-ccw" class="size-4" />
             Reset to Defaults
           </UiButton>
         </div>
       </div>
     </template>
-  </USlideover>
+  </UiSheet>
 
   <div class="space-y-6">
     <div class="border-b border-border pb-4">
       <div class="flex items-center justify-between gap-4">
         <h1 class="text-xl font-semibold">Playground</h1>
         <div class="flex items-center gap-2">
-          <UPopover v-if="apiKeyOptions.length > 1" v-model:open="apiKeyPickerOpen" :content="{ align: 'end', class: 'w-[280px] p-0' }">
+          <UiPopover v-if="apiKeyOptions.length > 1" v-model:open="apiKeyPickerOpen" :content="{ align: 'end', class: 'w-[280px] p-0' }">
             <UiButton type="button" variant="outline" size="sm" class="gap-1.5 sm:max-w-[200px]" :disabled="isAnyLoading">
-              <UIcon name="i-lucide-key" class="size-3.5 shrink-0" />
+              <UiIcon name="i-lucide-key" class="size-3.5 shrink-0" />
               <span class="hidden truncate sm:inline">{{ selectedApiKeyLabel }}</span>
-              <UIcon name="i-lucide-chevron-down" class="hidden size-3 shrink-0 opacity-50 sm:block" />
+              <UiIcon name="i-lucide-chevron-down" class="hidden size-3 shrink-0 opacity-50 sm:block" />
             </UiButton>
             <template #content>
               <div class="space-y-1 p-2">
@@ -1176,14 +1176,14 @@ function formatToolArguments(value: string): string {
                     <p class="truncate text-xs font-medium">{{ getApiKeyLabel(apiKey) }}</p>
                     <p class="truncate font-mono text-[10px] text-muted-foreground">{{ apiKey.keyPreview }}</p>
                   </div>
-                  <UIcon v-if="selectedApiKeyId === apiKey.id" name="i-lucide-check" class="size-3.5 text-foreground" />
+                  <UiIcon v-if="selectedApiKeyId === apiKey.id" name="i-lucide-check" class="size-3.5 text-foreground" />
                 </button>
               </div>
             </template>
-          </UPopover>
+          </UiPopover>
           <UiButton v-if="isAnyLoading" type="button" variant="outline" size="sm" @click="stopAllRequests">
             <span class="relative inline-flex">
-              <UIcon name="i-lucide-square" class="size-3.5" />
+              <UiIcon name="i-lucide-square" class="size-3.5" />
               <span v-if="activeLoopBadgeLabel" class="absolute -right-3 -top-2 rounded-full bg-primary px-1 py-0.5 text-[9px] font-semibold leading-none text-primary-foreground">{{ activeLoopBadgeLabel }}</span>
             </span>
             Stop
@@ -1200,11 +1200,11 @@ function formatToolArguments(value: string): string {
             @pointerleave="handleStartPointerEnd"
             @pointercancel="handleStartPointerEnd"
           >
-            <UIcon name="i-lucide-play" class="size-4" />
+            <UiIcon name="i-lucide-play" class="size-4" />
             Start
           </UiButton>
           <UiButton type="button" variant="outline" size="icon" :disabled="isAnyLoading" @click="settingsOpen = true">
-            <UIcon name="i-lucide-settings" class="size-4" />
+            <UiIcon name="i-lucide-settings" class="size-4" />
             <span class="sr-only">Settings</span>
           </UiButton>
         </div>
@@ -1229,7 +1229,7 @@ function formatToolArguments(value: string): string {
             ]"
             @click="selectScenario(scenario)"
           >
-            <UIcon :name="scenario.icon" class="size-4" />
+            <UiIcon :name="scenario.icon" class="size-4" />
             <span class="text-xs">{{ scenario.name }}</span>
           </button>
         </div>
@@ -1259,11 +1259,11 @@ function formatToolArguments(value: string): string {
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
           <UiButton v-if="panels.length > 1" variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" :disabled="isAnyLoading || responses[panel.id]?.isLoading" title="Remove card" @click="removePanel(panel.id)">
-            <UIcon name="i-lucide-x" class="size-3.5" />
+            <UiIcon name="i-lucide-x" class="size-3.5" />
           </UiButton>
 
           <UiCardHeader class="flex-none gap-0 border-b py-2 pl-3 pr-11">
-            <UPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
+            <UiPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
               <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between px-2 font-normal" :disabled="isAnyLoading || responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
                 <span v-if="panel.modelId && modelsById.get(panel.modelId)" class="flex min-w-0 items-center gap-2">
                   <span class="truncate">{{ modelsById.get(panel.modelId)?.name }}</span>
@@ -1272,7 +1272,7 @@ function formatToolArguments(value: string): string {
                   </UiBadge>
                 </span>
                 <span v-else class="text-muted-foreground">Select model...</span>
-                <UIcon name="i-lucide-chevron-down" class="ml-1 size-3 shrink-0 opacity-50" />
+                <UiIcon name="i-lucide-chevron-down" class="ml-1 size-3 shrink-0 opacity-50" />
               </UiButton>
               <template #content>
                 <div v-if="selectionStepByPanel[panel.id] !== 'routing'" class="max-h-[420px] overflow-hidden">
@@ -1297,7 +1297,7 @@ function formatToolArguments(value: string): string {
                 <div v-else class="max-h-[420px] overflow-hidden">
                   <div class="flex items-center justify-between border-b px-2 py-1.5">
                     <UiButton type="button" variant="ghost" size="sm" class="h-7 gap-1 px-2 text-xs" @click="selectionStepByPanel[panel.id] = 'model'; pendingModelByPanel[panel.id] = null">
-                      <UIcon name="i-lucide-chevron-left" class="size-3.5" />
+                      <UiIcon name="i-lucide-chevron-left" class="size-3.5" />
                       Models
                     </UiButton>
                     <p class="max-w-[220px] truncate text-xs font-medium">{{ pendingModelByPanel[panel.id] }}</p>
@@ -1323,7 +1323,7 @@ function formatToolArguments(value: string): string {
                   </div>
                 </div>
               </template>
-            </UPopover>
+            </UiPopover>
           </UiCardHeader>
 
           <UiCardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
@@ -1333,9 +1333,9 @@ function formatToolArguments(value: string): string {
               <template v-if="panel.modelId && scenarioMessages.length > 0">
                 <div v-if="systemPromptText" class="mb-2">
                   <button type="button" class="flex w-full cursor-pointer items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/80" @click="systemCollapsedByPanel[panel.id] = !(systemCollapsedByPanel[panel.id] ?? true)">
-                    <UIcon name="i-lucide-settings" class="size-3 shrink-0 text-muted-foreground" />
+                    <UiIcon name="i-lucide-settings" class="size-3 shrink-0 text-muted-foreground" />
                     <span class="flex-1 text-[11px] font-medium text-muted-foreground">System</span>
-                    <UIcon :name="(systemCollapsedByPanel[panel.id] ?? true) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" class="size-3 shrink-0 text-muted-foreground" />
+                    <UiIcon :name="(systemCollapsedByPanel[panel.id] ?? true) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" class="size-3 shrink-0 text-muted-foreground" />
                   </button>
                   <div v-if="!(systemCollapsedByPanel[panel.id] ?? true)" class="mt-1 rounded-md bg-muted/30 px-2.5 py-2">
                     <pre class="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ systemPromptText }}</pre>
@@ -1344,7 +1344,7 @@ function formatToolArguments(value: string): string {
 
                 <div v-for="(message, index) in userScenarioMessages" :key="`${panel.id}-user-${index}`" class="mb-2 flex gap-2">
                   <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <UIcon name="i-lucide-user" class="size-3 text-primary" />
+                    <UiIcon name="i-lucide-user" class="size-3 text-primary" />
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="mb-1 text-[11px] font-medium text-primary">User</p>
@@ -1362,21 +1362,21 @@ function formatToolArguments(value: string): string {
 
               <div v-if="responses[panel.id]?.error" class="space-y-2">
                 <div role="alert" class="relative grid w-full grid-cols-[1rem_1fr] items-start gap-x-3 rounded-lg border border-destructive/40 bg-card px-4 py-3 text-sm text-destructive">
-                  <UIcon name="i-lucide-alert-circle" class="size-4 translate-y-0.5" />
+                  <UiIcon name="i-lucide-alert-circle" class="size-4 translate-y-0.5" />
                   <div>
                     <p class="font-medium">Error</p>
                     <p class="text-sm text-destructive/90">{{ responses[panel.id]?.error }}</p>
                   </div>
                 </div>
                 <UiButton v-if="panel.modelId" type="button" variant="outline" size="sm" class="w-full gap-1.5" :disabled="isAnyLoading || responses[panel.id]?.isLoading" @click="retryPanel(panel.id)">
-                  <UIcon name="i-lucide-rotate-cw" class="size-3.5" />
+                  <UiIcon name="i-lucide-rotate-cw" class="size-3.5" />
                   Retry
                 </UiButton>
               </div>
 
               <div v-if="panel.modelId && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.toolCalls?.length || responses[panel.id]?.isLoading)" class="mb-2 flex gap-2">
                 <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary">
-                  <UIcon name="i-lucide-bot" class="size-3 text-secondary-foreground" />
+                  <UiIcon name="i-lucide-bot" class="size-3 text-secondary-foreground" />
                 </div>
                 <div class="min-w-0 flex-1">
                   <p class="mb-1 text-[11px] font-medium text-muted-foreground">Assistant</p>
@@ -1397,7 +1397,7 @@ function formatToolArguments(value: string): string {
                     </div>
                     <div v-if="responses[panel.id]?.toolCalls?.length" class="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
                       <div class="mb-1.5 flex items-center gap-1.5">
-                        <UIcon name="i-lucide-wrench" class="size-3 text-muted-foreground" />
+                        <UiIcon name="i-lucide-wrench" class="size-3 text-muted-foreground" />
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tool Calls</p>
                       </div>
                       <div class="space-y-1.5">
@@ -1420,10 +1420,10 @@ function formatToolArguments(value: string): string {
                 <div class="flex items-center gap-2">
                   <span class="font-medium tabular-nums">{{ getPanelWaitLabel(panel.id) }}</span>
                   <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" :disabled="isAnyLoading" title="Run panel" @click="retryPanel(panel.id)">
-                    <UIcon name="i-lucide-play" class="size-3 fill-current" />
+                    <UiIcon name="i-lucide-play" class="size-3 fill-current" />
                   </UiButton>
                   <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.error)" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" :disabled="isAnyLoading" title="Retry" @click="retryPanel(panel.id)">
-                    <UIcon name="i-lucide-rotate-cw" class="size-3" />
+                    <UiIcon name="i-lucide-rotate-cw" class="size-3" />
                   </UiButton>
                 </div>
               </div>
@@ -1438,7 +1438,7 @@ function formatToolArguments(value: string): string {
         <UiCard v-if="canAddPanel" class="group h-[400px] overflow-hidden border-2 border-dashed border-border/80 bg-background p-0 transition-colors hover:border-muted-foreground/45">
           <button type="button" class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-50" :disabled="isAnyLoading" aria-label="Add comparison card" @click="addPanel">
             <span class="inline-flex size-10 items-center justify-center rounded-full border border-muted-foreground/30 transition-colors group-hover:border-muted-foreground/45">
-              <UIcon name="i-lucide-plus" class="size-4 transition-colors group-hover:text-foreground/80" />
+              <UiIcon name="i-lucide-plus" class="size-4 transition-colors group-hover:text-foreground/80" />
             </span>
             <span class="text-sm font-medium">Add comparison</span>
           </button>

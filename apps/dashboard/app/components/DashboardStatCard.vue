@@ -21,7 +21,7 @@ defineProps<{
           {{ hint }}
         </p>
       </div>
-      <UIcon v-if="icon" :name="icon" class="size-5 text-muted-foreground" />
+      <UiIcon v-if="icon" :name="icon" class="size-5 text-muted-foreground" />
     </div>
   </div>
 </template>

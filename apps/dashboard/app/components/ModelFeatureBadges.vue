@@ -29,17 +29,17 @@ function formatDate(dateStr: string): string {
     <div class="flex flex-wrap items-center gap-1.5">
       <span v-if="meta.contextLength" class="inline-flex items-center gap-1 tabular-nums" title="Input tokens">
         {{ formatTokens(meta.contextLength) }}
-        <UIcon name="i-lucide-arrow-down" class="size-3 shrink-0" />
+        <UiIcon name="i-lucide-arrow-down" class="size-3 shrink-0" />
       </span>
       <span v-if="meta.contextLength && meta.outputLimit">·</span>
       <span v-if="meta.outputLimit" class="inline-flex items-center gap-1 tabular-nums" title="Output tokens">
         {{ formatTokens(meta.outputLimit) }}
-        <UIcon name="i-lucide-arrow-up" class="size-3 shrink-0" />
+        <UiIcon name="i-lucide-arrow-up" class="size-3 shrink-0" />
       </span>
       <template v-if="meta.knowledgeCutoff">
         <span>·</span>
         <span class="inline-flex items-center gap-1">
-          <UIcon name="i-lucide-calendar" class="size-3 shrink-0" />
+          <UiIcon name="i-lucide-calendar" class="size-3 shrink-0" />
           {{ formatDate(meta.knowledgeCutoff) }}
         </span>
       </template>
@@ -47,13 +47,13 @@ function formatDate(dateStr: string): string {
 
     <div v-if="meta.reasoning || meta.toolCall || meta.vision" class="flex flex-wrap gap-1">
       <UiBadge v-if="meta.reasoning" variant="outline" class="h-5 py-0 text-[11px]">
-        <UIcon name="i-lucide-brain" class="mr-1 size-3" /> Reasoning
+        <UiIcon name="i-lucide-brain" class="mr-1 size-3" /> Reasoning
       </UiBadge>
       <UiBadge v-if="meta.toolCall" variant="outline" class="h-5 py-0 text-[11px]">
-        <UIcon name="i-lucide-wrench" class="mr-1 size-3" /> Tools
+        <UiIcon name="i-lucide-wrench" class="mr-1 size-3" /> Tools
       </UiBadge>
       <UiBadge v-if="meta.vision" variant="outline" class="h-5 py-0 text-[11px]">
-        <UIcon name="i-lucide-eye" class="mr-1 size-3" /> Vision
+        <UiIcon name="i-lucide-eye" class="mr-1 size-3" /> Vision
       </UiBadge>
     </div>
   </div>

@@ -96,8 +96,8 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-xl">
-    <UPopover v-model:open="desktopOpen" :content="{ align: 'start', sideOffset: 4 }" class="hidden md:block">
+  <div class="max-w-xl">
+    <UiPopover v-model:open="desktopOpen" :content="{ align: 'start', sideOffset: 4 }" class="hidden md:block">
       <button
         type="button"
         role="combobox"
@@ -105,16 +105,16 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
         class="hidden h-9 w-full cursor-pointer items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-2.5 text-xs font-normal shadow-xs outline-none transition-all hover:bg-input/50 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-3 sm:text-sm md:inline-flex"
       >
         <span class="flex min-w-0 items-center gap-2">
-          <UIcon name="i-lucide-search" class="size-4 text-muted-foreground" />
+          <UiIcon name="i-lucide-search" class="size-4 text-muted-foreground" />
           <span class="truncate text-muted-foreground">Search models...</span>
         </span>
-        <UIcon name="i-lucide-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
+        <UiIcon name="i-lucide-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
       </button>
 
       <template #content>
         <div class="w-[min(92vw,30rem)] p-0">
           <div class="flex h-11 items-center gap-2 border-b border-border px-3">
-            <UIcon name="i-lucide-search" class="size-4 shrink-0 text-muted-foreground" />
+            <UiIcon name="i-lucide-search" class="size-4 shrink-0 text-muted-foreground" />
             <input
               v-model="search"
               class="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
@@ -146,7 +146,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           </div>
         </div>
       </template>
-    </UPopover>
+    </UiPopover>
 
     <button
       type="button"
@@ -156,20 +156,20 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
       @click="mobileOpen = true"
     >
       <span class="flex min-w-0 items-center gap-2">
-        <UIcon name="i-lucide-search" class="size-4 text-muted-foreground" />
+        <UiIcon name="i-lucide-search" class="size-4 text-muted-foreground" />
         <span class="truncate text-muted-foreground">Search models...</span>
       </span>
-      <UIcon name="i-lucide-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
+      <UiIcon name="i-lucide-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
     </button>
 
-    <UModal v-model:open="mobileOpen" :ui="{ content: 'p-0 sm:max-w-md' }">
+    <UiDialog v-model:open="mobileOpen" :ui="{ content: 'p-0 sm:max-w-md' }">
       <template #content>
         <div class="border-b border-border px-4 py-3">
           <p class="text-sm font-semibold">Search Models</p>
           <p class="mt-1 text-xs text-muted-foreground">Find a model and tap to view details</p>
         </div>
         <div class="flex h-11 items-center gap-2 border-b border-border px-3">
-          <UIcon name="i-lucide-search" class="size-4 shrink-0 text-muted-foreground" />
+          <UiIcon name="i-lucide-search" class="size-4 shrink-0 text-muted-foreground" />
           <input v-model="search" class="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" placeholder="Search model ID or provider...">
         </div>
         <div class="max-h-[60vh] overflow-y-auto p-1">
@@ -192,9 +192,9 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           </button>
         </div>
       </template>
-    </UModal>
+    </UiDialog>
 
-    <UModal v-model:open="detailOpen" :ui="{ content: 'gap-0 sm:max-w-md' }">
+    <UiDialog v-model:open="detailOpen" :ui="{ content: 'gap-0 sm:max-w-md' }">
       <template #content>
         <div v-if="detailModel" class="space-y-3" :class="detailModel.isEnabled === false ? 'opacity-70' : ''">
           <div class="flex items-start justify-between gap-2">
@@ -206,7 +206,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
               @click="copyModelId(detailModel.id)"
             >
               <span class="flex size-3 shrink-0 items-center justify-center">
-                <UIcon :name="copiedModelId === detailModel.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                <UiIcon :name="copiedModelId === detailModel.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
               </span>
               <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="detailModel.id">
                 {{ detailModel.id }}
@@ -232,7 +232,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
               :to="`/dashboard/playground?model=${encodeURIComponent(detailModel.id)}`"
               class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50"
             >
-              <UIcon name="i-lucide-flask-conical" class="size-3" />
+              <UiIcon name="i-lucide-flask-conical" class="size-3" />
             </NuxtLink>
           </div>
 
@@ -240,6 +240,6 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           <ModelStatsPanel :stats="detailModel.stats" :label="detailModel.id" compact />
         </div>
       </template>
-    </UModal>
+    </UiDialog>
   </div>
 </template>

@@ -88,7 +88,7 @@ const filteredModels = computed(() => {
   <section class="flex h-full flex-col p-4 max-lg:p-0">
     <div class="hidden items-start justify-between gap-3 lg:flex">
       <div class="inline-flex items-center gap-2 text-sm font-semibold">
-        <UIcon name="i-lucide-list-filter" class="size-4 text-muted-foreground" />
+        <UiIcon name="i-lucide-list-filter" class="size-4 text-muted-foreground" />
         <span>Model Access</span>
       </div>
       <UiBadge variant="outline" class="shrink-0">{{ getModeLabel(savedMode) }}</UiBadge>
@@ -107,10 +107,10 @@ const filteredModels = computed(() => {
           <UiButton type="button" variant="ghost" size="sm" class="h-7 px-2 text-[11px]" :disabled="normalizedDraftModels.length === 0 || isSaving" @click="draftModels = []">Clear</UiButton>
         </div>
 
-        <UPopover v-model:open="modelPickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
+        <UiPopover v-model:open="modelPickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
           <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving">
             <span class="truncate">{{ normalizedDraftModels.length > 0 ? `${normalizedDraftModels.length} model selected` : 'Select models' }}</span>
-            <UIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
+            <UiIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
           </UiButton>
           <template #content>
             <div class="border-b border-border p-2">
@@ -118,13 +118,13 @@ const filteredModels = computed(() => {
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
               <button v-for="modelId in filteredModels" :key="modelId" type="button" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent" @click="toggleModel(modelId)">
-                <UIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftModels.includes(modelId) ? 'opacity-100' : 'opacity-0']" />
+                <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftModels.includes(modelId) ? 'opacity-100' : 'opacity-0']" />
                 <span class="truncate font-mono text-[11px]">{{ modelId }}</span>
               </button>
               <p v-if="filteredModels.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No model found.</p>
             </div>
           </template>
-        </UPopover>
+        </UiPopover>
 
         <div class="max-h-40 overflow-y-auto py-1">
           <p v-if="normalizedDraftModels.length === 0" class="px-1 text-[11px] text-muted-foreground">No models selected</p>
@@ -132,7 +132,7 @@ const filteredModels = computed(() => {
             <UiBadge v-for="modelId in normalizedDraftModels" :key="modelId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate font-mono">{{ modelId }}</span>
               <button type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleModel(modelId)">
-                <UIcon name="i-lucide-x" class="size-2.5" />
+                <UiIcon name="i-lucide-x" class="size-2.5" />
               </button>
             </UiBadge>
           </div>
@@ -142,7 +142,7 @@ const filteredModels = computed(() => {
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraftState"><UIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraftState"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
       <UiButton size="sm" :disabled="isSaving || !hasChanges" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>

@@ -53,11 +53,11 @@ function closeDialog() {
 
 <template>
   <UiButton size="sm" @click="open = true">
-    <UIcon name="i-lucide-plus" class="mr-1.5 size-3.5" />
+    <UiIcon name="i-lucide-plus" class="mr-1.5 size-3.5" />
     Create API Key
   </UiButton>
 
-  <UModal v-model:open="open" :ui="{ content: 'sm:max-w-[440px]' }">
+  <UiDialog v-model:open="open" :ui="{ content: 'sm:max-w-[440px]' }">
     <template #content>
       <template v-if="createdKey">
         <div class="space-y-1.5 pr-6">
@@ -69,7 +69,7 @@ function closeDialog() {
           <div class="mt-1.5 flex items-center gap-2">
             <code class="flex-1 break-all rounded bg-muted px-2.5 py-1.5 font-mono text-xs">{{ createdKey }}</code>
             <UiButton variant="outline" size="sm" class="h-8 w-8 shrink-0 p-0" title="Copy key" @click="copyCreatedKey">
-              <UIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-3.5', copied ? 'text-green-500' : '']" />
+              <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-3.5', copied ? 'text-green-500' : '']" />
             </UiButton>
           </div>
         </div>
@@ -103,5 +103,5 @@ function closeDialog() {
         </div>
       </template>
     </template>
-  </UModal>
+  </UiDialog>
 </template>
