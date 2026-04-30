@@ -4,7 +4,7 @@ import {
   OAUTH_DEFINITIONS,
   PROVIDER_ACCOUNT_DEFINITIONS,
   type ProviderAccountKey,
-} from "../../../lib/provider-accounts";
+} from "../../../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 

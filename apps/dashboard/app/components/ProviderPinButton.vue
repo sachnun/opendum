@@ -34,6 +34,7 @@ async function togglePin(event: Event) {
     if (!result.success) throw new Error(result.error);
     localPinned.value = result.data.pinned;
     emit("toggled", props.providerKey, result.data.pinned);
+    void refreshNuxtData("dashboard-shell-accounts");
   } catch {
     localPinned.value = previous;
   } finally {
@@ -53,6 +54,6 @@ async function togglePin(event: Event) {
     :title="localPinned ? 'Unpin from sidebar' : 'Pin to sidebar'"
     @click="togglePin"
   >
-    <UIcon :name="localPinned ? 'i-lucide-pin' : 'i-lucide-pin-off'" class="size-4" />
+    <UiIcon :name="localPinned ? 'i-lucide-pin' : 'i-lucide-pin-off'" class="size-4" />
   </button>
 </template>
