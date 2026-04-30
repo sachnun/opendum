@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { cn } from "../../lib/utils";
+
 withDefaults(
   defineProps<{
     variant?: "default" | "secondary" | "destructive" | "outline" | "ghost" | "link";
@@ -22,11 +24,11 @@ const variantClasses = {
 
 <template>
   <span
-    :class="[
+    :class="cn(
       'inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-transparent px-2 py-0.5 text-xs font-medium transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&>svg]:size-3',
       variantClasses[variant],
       $props.class,
-    ]"
+    )"
   >
     <slot />
   </span>

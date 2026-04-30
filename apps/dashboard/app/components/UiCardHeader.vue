@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { cn } from "../../lib/utils";
+
 withDefaults(
   defineProps<{
     class?: string;
@@ -10,7 +12,7 @@ withDefaults(
 </script>
 
 <template>
-  <div :class="['grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6', $props.class]">
+  <div :class="cn('grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6', $props.class)">
     <slot />
   </div>
 </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { cn } from "../../lib/utils";
+
 const props = withDefaults(
   defineProps<{
     values: number[];
@@ -79,7 +81,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="containerRef" :class="['relative h-8 w-full', $props.class]">
+  <div ref="containerRef" :class="cn('relative h-8 w-full', $props.class)">
     <svg :viewBox="`0 0 ${chartWidth} ${height}`" class="h-full w-full" role="img" :aria-label="ariaLabel">
       <path :d="`M0,${height} L${chartWidth},${height}`" stroke="var(--border)" stroke-width="1" fill="none" />
       <path v-if="hasUsage && areaPath" :d="areaPath" :fill="color" fill-opacity="0.18" stroke="none" />

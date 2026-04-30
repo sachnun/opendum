@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { cn } from "../../lib/utils";
+
 withDefaults(
   defineProps<{
     class?: string;
@@ -10,7 +12,7 @@ withDefaults(
 </script>
 
 <template>
-  <div :class="['font-semibold leading-none', $props.class]">
+  <div :class="cn('font-semibold leading-none', $props.class)">
     <slot />
   </div>
 </template>

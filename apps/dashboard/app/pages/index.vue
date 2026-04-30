@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { authClient, signIn, useSession } from "../../lib/auth-client";
-import type { SocialProvider } from "../../lib/auth-client";
-import { getAuthProvider } from "../../lib/oauth-emulator";
+import { signIn, useSession } from "../../lib/auth-client";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -10,8 +8,9 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Local development sign in failed. Please try again.",
 };
 
+type SocialProvider = "github" | "google";
+
 const route = useRoute();
-const config = useRuntimeConfig();
 const { data: session } = await useSession(useFetch);
 
 if (session.value?.user) {
@@ -19,9 +18,6 @@ if (session.value?.user) {
 }
 
 const loadingProvider = ref<SocialProvider | null>(null);
-const localDevLoading = ref(false);
-const isDevelopment = import.meta.dev;
-const useOAuthEmulator = import.meta.dev || config.public.authOauthEmulator;
 
 const authError = computed(() => {
   const error = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error;
@@ -39,7 +35,7 @@ async function continueWithProvider(provider: SocialProvider) {
 
   try {
     await signIn.social({
-      provider: getAuthProvider(provider, useOAuthEmulator),
+      provider,
       callbackURL: "/dashboard",
     });
   } finally {
@@ -47,39 +43,6 @@ async function continueWithProvider(provider: SocialProvider) {
   }
 }
 
-async function continueAsLocalDev() {
-  localDevLoading.value = true;
-
-  const email = "dev@localdev.test";
-  const password = "localdev";
-
-  try {
-    const signUpResult = await authClient.signUp.email({
-      email,
-      password,
-      name: "Local Dev",
-      callbackURL: "/dashboard",
-    });
-
-    if (signUpResult.error) {
-      const signInResult = await authClient.signIn.email({
-        email,
-        password,
-        callbackURL: "/dashboard",
-      });
-
-      if (signInResult.error) {
-        throw new Error(signInResult.error.message || "Local development sign in failed");
-      }
-    }
-
-    await navigateTo("/dashboard");
-  } catch {
-    await navigateTo({ path: "/", query: { error: "CredentialsSignin" } });
-  } finally {
-    localDevLoading.value = false;
-  }
-}
 </script>
 
 <template>
@@ -144,16 +107,6 @@ async function continueAsLocalDev() {
             </svg>
           </button>
         </div>
-
-        <button
-          v-if="isDevelopment"
-          type="button"
-          :disabled="localDevLoading"
-          class="inline-flex h-9 min-w-52 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground outline-none transition-all hover:bg-secondary/80 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
-          @click="continueAsLocalDev"
-        >
-          Continue as Local Dev
-        </button>
       </div>
     </div>
   </div>

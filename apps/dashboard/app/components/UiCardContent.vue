@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { cn } from "../../lib/utils";
+
 withDefaults(
   defineProps<{
     class?: string;
@@ -10,7 +12,7 @@ withDefaults(
 </script>
 
 <template>
-  <div :class="['px-6', $props.class]">
+  <div :class="cn('px-6', $props.class)">
     <slot />
   </div>
 </template>
