@@ -1,5 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 
+const nitroPreset = process.env.NITRO_PRESET;
+
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   modules: ["@nuxt/eslint"],
@@ -16,7 +18,13 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
-    preset: process.env.NITRO_PRESET,
+    preset: nitroPreset,
+    commonJS: {
+      ignoreTryCatch: true,
+    },
+    rollupConfig: {
+      external: ["pg-native"],
+    },
     experimental: {
       tasks: true,
     },
