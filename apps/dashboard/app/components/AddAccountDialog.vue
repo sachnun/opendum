@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProviderAccountKey } from "../../lib/provider-accounts";
+import { cn } from "../../lib/utils";
 
 type Provider = ProviderAccountKey;
 type FlowType = "oauth_redirect" | "device_code" | "api_key" | "api_key_with_account_id";
@@ -49,15 +50,14 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
 
 const oauthProviders: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot"];
 const apiKeyProviders: Provider[] = ["ollama_cloud", "openrouter", "nvidia_nim", "groq", "cerebras", "kilo_code", "workers_ai"];
-const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
 
 const open = ref(false);
+const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
 const step = ref(minimumStep.value);
 const provider = ref<Provider | null>(props.initialProvider);
 const callbackUrl = ref("");
 const apiKey = ref("");
 const cfAccountId = ref("");
-const accountName = ref("");
 const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
@@ -66,19 +66,33 @@ const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const isApiKeyVisible = ref(false);
 const isLoading = ref(false);
+const isFetchingUrl = ref(false);
 const isPolling = ref(false);
 const errorMessage = ref("");
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 
 const selectedConfig = computed(() => (provider.value ? providerConfigs[provider.value] : null));
-const selectedProviderLabel = computed(() => selectedConfig.value?.name ?? "provider");
-const dialogTitle = computed(() => {
-  if (step.value === 1) return "Add Provider Account";
-  return `Connect ${selectedProviderLabel.value}`;
+const dialogOpen = computed({
+  get: () => open.value,
+  set: (value: boolean) => {
+    if (!value && isLoading.value) return;
+    open.value = value;
+  },
+});
+const displayedSteps = computed(() => (props.initialProvider ? [2, 3] : [1, 2, 3]));
+const shouldPreventOutsideClose = computed(() => {
+  const flowType = selectedConfig.value?.flowType;
+  return isPolling.value || (step.value === 2 && (flowType === "api_key" || flowType === "api_key_with_account_id")) || (step.value === 3 && flowType === "oauth_redirect");
 });
 
 watch(open, (value) => {
-  if (!value) resetForm();
+  if (value) {
+    step.value = minimumStep.value;
+    provider.value = props.initialProvider;
+    return;
+  }
+
+  resetForm();
 });
 
 watch([open, step, provider], async () => {
@@ -86,11 +100,13 @@ watch([open, step, provider], async () => {
 
   errorMessage.value = "";
   authUrl.value = "";
+  oauthState.value = null;
+  oauthCodeVerifier.value = null;
   deviceCodeInfo.value = null;
+  isFetchingUrl.value = true;
 
   try {
     if (selectedConfig.value.flowType === "oauth_redirect") {
-      isLoading.value = true;
       const result = await $client.accounts.getAuthUrl.mutate({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro" });
       if (!result.success) throw new Error(result.error);
       authUrl.value = result.data.authUrl;
@@ -100,7 +116,6 @@ watch([open, step, provider], async () => {
     }
 
     if (selectedConfig.value.flowType === "device_code") {
-      isLoading.value = true;
       const result = await $client.accounts.initiateDeviceAuth.mutate({ provider: provider.value as "qwen_code" | "copilot" });
       if (!result.success) throw new Error(result.error);
       deviceCodeInfo.value = {
@@ -108,9 +123,8 @@ watch([open, step, provider], async () => {
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
-        codeVerifier: "codeVerifier" in result.data ? result.data.codeVerifier : undefined,
+        codeVerifier: "codeVerifier" in result.data && typeof result.data.codeVerifier === "string" ? result.data.codeVerifier : undefined,
       };
-      authUrl.value = deviceCodeInfo.value.verificationUrl;
       return;
     }
 
@@ -118,7 +132,7 @@ watch([open, step, provider], async () => {
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to start account connection";
   } finally {
-    isLoading.value = false;
+    isFetchingUrl.value = false;
   }
 });
 
@@ -128,7 +142,6 @@ function resetForm() {
   callbackUrl.value = "";
   apiKey.value = "";
   cfAccountId.value = "";
-  accountName.value = "";
   authUrl.value = "";
   oauthState.value = null;
   oauthCodeVerifier.value = null;
@@ -137,6 +150,7 @@ function resetForm() {
   copiedDeviceCode.value = false;
   isApiKeyVisible.value = false;
   isLoading.value = false;
+  isFetchingUrl.value = false;
   isPolling.value = false;
   errorMessage.value = "";
   if (pollingTimer) {
@@ -145,23 +159,43 @@ function resetForm() {
   }
 }
 
+function closeAndReset() {
+  open.value = false;
+  resetForm();
+}
+
 function selectProvider(providerKey: Provider) {
   provider.value = providerKey;
   step.value = 2;
 }
 
+function callbackPlaceholder(providerKey: Provider | null) {
+  if (providerKey === "kiro") return "http://localhost:49153/oauth/callback?code=...";
+  if (providerKey === "codex") return "http://localhost:1455/auth/callback?code=...";
+  return "http://localhost:1/oauth2callback?code=...";
+}
+
 async function copyText(value: string, target: "link" | "code") {
-  await navigator.clipboard.writeText(value);
-  if (target === "link") {
-    copiedLink.value = true;
-    setTimeout(() => (copiedLink.value = false), 1500);
-  } else {
-    copiedDeviceCode.value = true;
-    setTimeout(() => (copiedDeviceCode.value = false), 1500);
+  try {
+    await navigator.clipboard.writeText(value);
+    if (target === "link") {
+      copiedLink.value = true;
+      setTimeout(() => (copiedLink.value = false), 1800);
+    } else {
+      copiedDeviceCode.value = true;
+      setTimeout(() => (copiedDeviceCode.value = false), 1800);
+    }
+  } catch {
+    errorMessage.value = target === "link" ? "Failed to copy link" : "Failed to copy code";
+    return;
+  }
+
+  if (target === "link" && selectedConfig.value && ["api_key", "api_key_with_account_id"].includes(selectedConfig.value.flowType) && step.value === 2) {
+    step.value = 3;
   }
 
   if (target === "link" && selectedConfig.value?.flowType === "device_code") {
-    startDevicePolling();
+    startDevicePolling(null);
   }
 }
 
@@ -169,26 +203,33 @@ function openPopup(url: string, name: string, width: number, height: number) {
   const left = Math.round((window.screen.width - width) / 2);
   const top = Math.round((window.screen.height - height) / 2);
   const popup = window.open(url, name, `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`);
-  if (!popup || popup.closed) window.open(url, "_blank");
+  if (!popup || popup.closed) {
+    window.open(url, "_blank");
+    return null;
+  }
+
+  return popup;
 }
 
 function openOAuthUrl() {
   if (!authUrl.value) return;
   openPopup(authUrl.value, "oauth_popup", 600, 700);
+  setTimeout(() => (step.value = 3), 600);
 }
 
 function openDeviceAuthUrl() {
-  if (!authUrl.value) return;
-  openPopup(authUrl.value, "device_auth_popup", 600, 700);
-  startDevicePolling();
+  if (!deviceCodeInfo.value) return;
+  const popup = openPopup(deviceCodeInfo.value.verificationUrl, "device_auth_popup", 600, 700);
+  startDevicePolling(popup);
 }
 
 function openApiKeyPortal() {
-  if (!authUrl.value) return;
-  openPopup(authUrl.value, "api_key_portal_popup", 1100, 760);
+  if (!selectedConfig.value?.apiKeyPortalUrl) return;
+  openPopup(selectedConfig.value.apiKeyPortalUrl, "api_key_portal_popup", 1100, 760);
+  if (step.value === 2) setTimeout(() => (step.value = 3), 600);
 }
 
-function startDevicePolling() {
+function startDevicePolling(popup: Window | null) {
   if (!deviceCodeInfo.value || isPolling.value) return;
 
   isPolling.value = true;
@@ -223,9 +264,10 @@ function startDevicePolling() {
       if (!result.success) throw new Error(result.error);
 
       if (result.data.status === "success") {
-        stopPolling();
+        if (popup && !popup.closed) popup.close();
         open.value = false;
         emit("connected");
+        void refreshNuxtData("dashboard-shell-accounts");
         return;
       }
 
@@ -249,14 +291,26 @@ function startDevicePolling() {
 }
 
 async function handleConnectApiKey() {
-  if (!provider.value) return;
-  isLoading.value = true;
+  if (!provider.value || !selectedConfig.value) return;
+
   errorMessage.value = "";
+  if (!apiKey.value.trim()) {
+    errorMessage.value = selectedConfig.value.flowType === "api_key_with_account_id" ? "Please enter an API token" : "Please enter an API key";
+    return;
+  }
+
+  if (selectedConfig.value.flowType === "api_key_with_account_id" && !cfAccountId.value.trim()) {
+    errorMessage.value = `Please enter the ${selectedConfig.value.accountIdLabel}`;
+    return;
+  }
+
+  isLoading.value = true;
   try {
-    const result = await $client.accounts.create.mutate({ provider: provider.value, name: accountName.value || undefined, token: apiKey.value, cfAccountId: cfAccountId.value || undefined });
+    const result = await $client.accounts.create.mutate({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined });
     if (!result.success) throw new Error(result.error);
     open.value = false;
     emit("connected");
+    void refreshNuxtData("dashboard-shell-accounts");
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
   } finally {
@@ -266,18 +320,34 @@ async function handleConnectApiKey() {
 
 async function handleExchangeOAuth() {
   if (!provider.value) return;
-  isLoading.value = true;
+
   errorMessage.value = "";
+  if (!callbackUrl.value.trim()) {
+    errorMessage.value = "Please paste the callback URL";
+    return;
+  }
+
+  if (!callbackUrl.value.includes("code=")) {
+    errorMessage.value = "Invalid URL. Make sure the URL contains 'code=' parameter.";
+    return;
+  }
+
+  isLoading.value = true;
   try {
-    const result = await $client.accounts.exchangeOAuth.mutate({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro", callbackUrl: callbackUrl.value, state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
+    const result = await $client.accounts.exchangeOAuth.mutate({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
     open.value = false;
     emit("connected");
+    void refreshNuxtData("dashboard-shell-accounts");
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
   } finally {
     isLoading.value = false;
   }
+}
+
+function goBack() {
+  step.value = Math.max(minimumStep.value, step.value - 1);
 }
 
 onBeforeUnmount(() => {
@@ -289,131 +359,287 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <UiButton :class="triggerClass" @click="open = true">
-    <UIcon name="i-lucide-plus" class="size-4" />
-    Add account
+  <UiButton :class="cn('gap-2', triggerClass)" @click="open = true">
+    <UiIcon name="i-lucide-plus" class="size-4" />
+    Add Account
   </UiButton>
 
-  <UModal v-model:open="open" :ui="{ content: 'sm:max-w-[560px]' }">
+  <UiDialog
+    v-model:open="dialogOpen"
+    :prevent-outside-close="shouldPreventOutsideClose"
+    :prevent-escape-close="isPolling"
+    :ui="{ content: 'max-h-[calc(100dvh-1rem)] p-4 sm:max-w-md sm:p-6' }"
+  >
     <template #content>
       <div class="space-y-1.5 pr-6">
-        <h2 class="text-lg font-semibold leading-none tracking-tight">{{ dialogTitle }}</h2>
-        <p class="text-sm text-muted-foreground">
-          {{ step === 1 ? 'Choose a provider to connect.' : selectedConfig?.description }}
+        <h2 class="text-lg font-semibold leading-none tracking-tight">
+          {{ selectedConfig ? `Add ${selectedConfig.name} Account` : 'Add Provider Account' }}
+        </h2>
+        <p class="sr-only">
+          {{ selectedConfig ? `Connect a new ${selectedConfig.name} account for load balancing` : 'Connect a new AI provider account for load balancing' }}
         </p>
       </div>
 
-      <div v-if="errorMessage" class="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-        {{ errorMessage }}
-      </div>
-
-      <div v-if="step === 1" class="max-h-[60vh] space-y-5 overflow-y-auto pr-1">
-        <div>
-          <p class="mb-2 text-xs font-medium text-muted-foreground">OAuth Providers</p>
-          <div class="grid gap-2 sm:grid-cols-2">
-            <button v-for="providerKey in oauthProviders" :key="providerKey" type="button" class="rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/40" @click="selectProvider(providerKey)">
-              <p class="font-medium">{{ providerConfigs[providerKey].name }}</p>
-              <p class="mt-1 text-xs text-muted-foreground">{{ providerConfigs[providerKey].description }}</p>
-            </button>
-          </div>
-        </div>
-        <div>
-          <p class="mb-2 text-xs font-medium text-muted-foreground">API Key Providers</p>
-          <div class="grid gap-2 sm:grid-cols-2">
-            <button v-for="providerKey in apiKeyProviders" :key="providerKey" type="button" class="rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/40" @click="selectProvider(providerKey)">
-              <p class="font-medium">{{ providerConfigs[providerKey].name }}</p>
-              <p class="mt-1 text-xs text-muted-foreground">{{ providerConfigs[providerKey].description }}</p>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-else-if="selectedConfig" class="space-y-4">
-        <button v-if="!initialProvider" type="button" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground" @click="step = 1">
-          <UIcon name="i-lucide-arrow-left" class="size-4" />
-          Back
-        </button>
-
-        <template v-if="selectedConfig.flowType === 'oauth_redirect'">
-          <div class="space-y-2">
-            <UiButton as="a" type="button" variant="outline" class="w-full justify-between" :disabled="isLoading || !authUrl" @click="openOAuthUrl">
-              <span class="inline-flex items-center gap-2">
-                <UIcon name="i-lucide-external-link" class="size-4" />
-                Open login page
-              </span>
-              <UIcon v-if="isLoading" name="i-lucide-loader-2" class="size-4 animate-spin" />
-            </UiButton>
-            <UiButton variant="ghost" size="sm" class="w-full" :disabled="!authUrl" @click="copyText(authUrl, 'link')">
-              <UIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-              {{ copiedLink ? 'Copied login link' : 'Copy login link' }}
-            </UiButton>
-          </div>
-          <label class="grid gap-1 text-sm font-medium">
-            Callback URL
-            <textarea v-model="callbackUrl" rows="3" placeholder="Paste the localhost callback URL here" class="rounded-md border border-input bg-background px-3 py-2 text-sm font-mono outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
-          </label>
-          <div class="flex justify-end">
-            <UiButton :disabled="isLoading || !callbackUrl" @click="handleExchangeOAuth">
-              <UIcon v-if="isLoading" name="i-lucide-loader-2" class="size-4 animate-spin" />
-              Connect account
-            </UiButton>
-          </div>
-        </template>
-
-        <template v-else-if="selectedConfig.flowType === 'device_code'">
-          <div class="rounded-lg border border-border bg-muted/20 p-3">
-            <p class="text-sm text-muted-foreground">Open the verification link and enter this code. Authorization will be detected automatically.</p>
-            <div class="mt-3 flex items-center justify-between gap-3 rounded-md bg-background px-3 py-2 font-mono text-lg font-semibold tracking-wider">
-              <span>{{ deviceCodeInfo?.userCode ?? 'Loading...' }}</span>
-              <UiButton variant="ghost" size="icon-sm" :disabled="!deviceCodeInfo" @click="deviceCodeInfo && copyText(deviceCodeInfo.userCode, 'code')">
-                <UIcon :name="copiedDeviceCode ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-              </UiButton>
+      <div class="flex items-center justify-center">
+        <template v-for="(stepNumber, index) in displayedSteps" :key="stepNumber">
+          <div class="flex items-center">
+            <div
+              :class="cn(
+                'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors',
+                step >= stepNumber ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+              )"
+            >
+              <UiIcon v-if="step > stepNumber" name="i-lucide-check" class="size-4" />
+              <span v-else>{{ index + 1 }}</span>
             </div>
-          </div>
-          <div class="flex gap-2">
-            <UiButton variant="outline" class="flex-1" :disabled="isLoading || !authUrl || isPolling" @click="openDeviceAuthUrl">
-              <UIcon :name="isPolling ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isPolling ? 'animate-spin' : '']" />
-              {{ isPolling ? 'Waiting for login...' : 'Open verification page' }}
-            </UiButton>
-            <UiButton variant="outline" :disabled="!authUrl" :title="copiedLink ? 'Copied!' : 'Copy verification link'" @click="copyText(authUrl, 'link')">
-              <UIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-            </UiButton>
-          </div>
-          <div v-if="isPolling" class="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Complete the login in your browser. This dialog will close automatically when authorization is complete.
+            <div v-if="index < displayedSteps.length - 1" :class="cn('h-px w-10 transition-colors', step > stepNumber ? 'bg-primary' : 'bg-border')" />
           </div>
         </template>
+      </div>
 
-        <template v-else>
-          <UiButton v-if="authUrl" variant="outline" class="w-full" @click="openApiKeyPortal">
-            <UIcon name="i-lucide-external-link" class="size-4" />
-            Open API key portal
-          </UiButton>
-          <label class="grid gap-1 text-sm font-medium">
-            Account name
-            <input v-model="accountName" placeholder="Optional display name" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
-          </label>
-          <label v-if="selectedConfig.flowType === 'api_key_with_account_id'" class="grid gap-1 text-sm font-medium">
-            {{ selectedConfig.accountIdLabel }}
-            <input v-model="cfAccountId" :placeholder="selectedConfig.accountIdPlaceholder" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
-          </label>
-          <label class="grid gap-1 text-sm font-medium">
-            API key
-            <div class="relative">
-              <input v-model="apiKey" :type="isApiKeyVisible ? 'text' : 'password'" :placeholder="selectedConfig.apiKeyPlaceholder" class="h-9 w-full rounded-md border border-input bg-background px-3 pr-10 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
-              <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" @click="isApiKeyVisible = !isApiKeyVisible">
-                <UIcon :name="isApiKeyVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4" />
+      <div class="min-h-0 flex-1 space-y-4 overflow-y-auto">
+        <div v-if="step === 1" class="space-y-4">
+          <div class="space-y-2">
+            <p class="text-sm font-medium">OAuth Providers</p>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <button
+                v-for="providerKey in oauthProviders"
+                :key="providerKey"
+                type="button"
+                :class="cn(
+                  'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent',
+                  provider === providerKey ? 'border-primary bg-accent' : 'border-border',
+                )"
+                @click="selectProvider(providerKey)"
+              >
+                <span class="text-sm font-medium">{{ providerConfigs[providerKey].name }}</span>
               </button>
             </div>
-          </label>
-          <div class="flex justify-end">
-            <UiButton :disabled="isLoading || !apiKey || (selectedConfig.flowType === 'api_key_with_account_id' && !cfAccountId)" @click="handleConnectApiKey">
-              <UIcon v-if="isLoading" name="i-lucide-loader-2" class="size-4 animate-spin" />
-              Connect account
-            </UiButton>
           </div>
-        </template>
+
+          <div class="space-y-2">
+            <p class="text-sm font-medium">API Key Providers</p>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <button
+                v-for="providerKey in apiKeyProviders"
+                :key="providerKey"
+                type="button"
+                :class="cn(
+                  'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent',
+                  provider === providerKey ? 'border-primary bg-accent' : 'border-border',
+                )"
+                @click="selectProvider(providerKey)"
+              >
+                <span class="text-sm font-medium">{{ providerConfigs[providerKey].name }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="step === 2 && selectedConfig" class="space-y-4">
+          <template v-if="selectedConfig.flowType === 'oauth_redirect'">
+            <div class="space-y-2">
+              <p class="text-sm font-medium">Login to {{ selectedConfig.name }}</p>
+              <p class="text-sm text-muted-foreground">
+                Click the button below to open the login page in a new window. After logging in, you'll be redirected to a page that shows an error - this is expected.
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !authUrl" @click="openOAuthUrl">
+                <UiIcon :name="isFetchingUrl ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl ? 'animate-spin' : '']" />
+                Open {{ selectedConfig.name }} Login
+              </UiButton>
+              <UiButton variant="outline" :disabled="isFetchingUrl || !authUrl" :title="copiedLink ? 'Copied!' : 'Copy login link'" @click="copyText(authUrl, 'link')">
+                <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+              </UiButton>
+            </div>
+            <div class="relative w-full rounded-lg border px-4 py-3 text-sm">
+              <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
+              <div class="pl-7 text-xs">
+                After login, copy the URL from address bar:
+                <code class="rounded bg-muted px-1">{{ callbackPlaceholder(provider) }}</code>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="selectedConfig.flowType === 'device_code'">
+            <div class="space-y-2">
+              <p class="text-sm font-medium">Login to {{ selectedConfig.name }}</p>
+              <p class="text-sm text-muted-foreground">
+                Click the button below to open the provider login page. Enter the code shown below on the provider login page. After you complete the login, authorization will be detected automatically.
+              </p>
+            </div>
+            <div v-if="deviceCodeInfo?.userCode" class="rounded-md border border-border bg-muted/30 p-3">
+              <p class="text-xs text-muted-foreground">Enter this code on the provider page:</p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <code class="rounded bg-background px-2 py-1 font-mono text-sm font-semibold tracking-[0.15em]">{{ deviceCodeInfo.userCode }}</code>
+                <UiButton type="button" size="sm" variant="outline" :title="copiedDeviceCode ? 'Copied!' : 'Copy code'" @click="copyText(deviceCodeInfo.userCode, 'code')">
+                  <UiIcon :name="copiedDeviceCode ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                  {{ copiedDeviceCode ? 'Copied' : 'Copy code' }}
+                </UiButton>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !deviceCodeInfo || isPolling" @click="openDeviceAuthUrl">
+                <UiIcon :name="isFetchingUrl || isPolling ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl || isPolling ? 'animate-spin' : '']" />
+                {{ isPolling ? 'Waiting for login...' : `Open ${selectedConfig.name} Login` }}
+              </UiButton>
+              <UiButton variant="outline" :disabled="isFetchingUrl || !deviceCodeInfo" :title="copiedLink ? 'Copied!' : 'Copy login link'" @click="deviceCodeInfo && copyText(deviceCodeInfo.verificationUrl, 'link')">
+                <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+              </UiButton>
+            </div>
+            <div v-if="isPolling" class="relative w-full rounded-lg border px-4 py-3 text-sm">
+              <UiIcon name="i-lucide-loader-2" class="absolute left-4 top-4 size-4 animate-spin" />
+              <div class="pl-7 text-xs">
+                Complete the login in your browser. This dialog will close automatically when authorization is complete.
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="space-y-2">
+              <p class="text-sm font-medium">Get {{ selectedConfig.name }} API Key</p>
+              <p class="text-sm text-muted-foreground">
+                Open the provider page below and create or copy your API key. You will continue to the next step automatically.
+              </p>
+            </div>
+            <div class="rounded-md border border-border bg-muted/30 p-3">
+              <p class="break-all text-xs text-muted-foreground">{{ selectedConfig.apiKeyPortalUrl }}</p>
+            </div>
+            <div class="flex gap-2">
+              <UiButton type="button" variant="outline" class="flex-1" @click="openApiKeyPortal">
+                <UiIcon name="i-lucide-external-link" class="size-4" />
+                Open {{ selectedConfig.name }} Portal
+              </UiButton>
+              <UiButton type="button" variant="outline" :title="copiedLink ? 'Copied!' : 'Copy API key portal link'" @click="authUrl && copyText(authUrl, 'link')">
+                <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+              </UiButton>
+            </div>
+          </template>
+
+          <div v-if="errorMessage" class="relative w-full rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive">
+            <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
+            <div class="pl-7 text-xs">{{ errorMessage }}</div>
+          </div>
+        </div>
+
+        <form v-if="step === 3 && selectedConfig?.flowType === 'oauth_redirect'" class="space-y-4" @submit.prevent="handleExchangeOAuth">
+          <div class="space-y-2">
+            <label for="callback-url" class="text-sm font-medium">
+              Paste Callback URL <span aria-hidden="true" class="text-destructive">*</span>
+            </label>
+            <p class="text-sm text-muted-foreground">Paste the URL from your browser after the OAuth redirect.</p>
+            <input
+              id="callback-url"
+              v-model="callbackUrl"
+              type="text"
+              :placeholder="callbackPlaceholder(provider)"
+              :disabled="isLoading"
+              autofocus
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            >
+            <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
+          </div>
+          <UiButton type="submit" class="w-full" :disabled="isLoading">
+            <UiIcon v-if="isLoading" name="i-lucide-loader-2" class="size-4 animate-spin" />
+            {{ isLoading ? 'Connecting...' : `Connect ${selectedConfig.name} Account` }}
+          </UiButton>
+        </form>
+
+        <form
+          v-if="step === 3 && selectedConfig && (selectedConfig.flowType === 'api_key' || selectedConfig.flowType === 'api_key_with_account_id')"
+          class="space-y-4"
+          autocomplete="off"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          @submit.prevent="handleConnectApiKey"
+        >
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Connect {{ selectedConfig.name }}</p>
+            <p class="text-sm text-muted-foreground">
+              {{ selectedConfig.flowType === 'api_key_with_account_id' ? 'Paste your API token and Account ID. Credentials will be stored encrypted.' : 'Paste your provider API key directly. The key will be stored encrypted.' }}
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <label for="provider-api-key" class="text-sm font-medium">
+              {{ selectedConfig.flowType === 'api_key_with_account_id' ? 'API Token' : 'API Key' }} <span aria-hidden="true" class="text-destructive">*</span>
+            </label>
+            <div class="relative">
+              <input
+                id="provider-api-key"
+                v-model="apiKey"
+                type="text"
+                name="provider-token"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="none"
+                spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                :placeholder="selectedConfig.apiKeyPlaceholder"
+                :disabled="isLoading"
+                autofocus
+                :class="cn(
+                  'h-9 w-full rounded-md border border-input bg-background px-3 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50',
+                  isApiKeyVisible ? '' : '[text-security:disc] [-webkit-text-security:disc]',
+                )"
+              >
+              <button
+                type="button"
+                :disabled="isLoading"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                :aria-label="isApiKeyVisible ? 'Hide API key' : 'Show API key'"
+                @click="isApiKeyVisible = !isApiKeyVisible"
+              >
+                <UiIcon :name="isApiKeyVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4" />
+              </button>
+            </div>
+          </div>
+
+          <div v-if="selectedConfig.flowType === 'api_key_with_account_id'" class="space-y-2">
+            <label for="provider-account-id" class="text-sm font-medium">
+              {{ selectedConfig.accountIdLabel }} <span aria-hidden="true" class="text-destructive">*</span>
+            </label>
+            <input
+              id="provider-account-id"
+              v-model="cfAccountId"
+              type="text"
+              name="provider-account-id"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
+              spellcheck="false"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              :placeholder="selectedConfig.accountIdPlaceholder"
+              :disabled="isLoading"
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            >
+          </div>
+
+          <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
+
+          <UiButton type="submit" class="w-full" :disabled="isLoading">
+            <UiIcon v-if="isLoading" name="i-lucide-loader-2" class="size-4 animate-spin" />
+            {{ isLoading ? 'Connecting...' : `Connect ${selectedConfig.name} Account` }}
+          </UiButton>
+        </form>
+      </div>
+
+      <div class="flex flex-row items-center justify-between gap-2">
+        <UiButton v-if="isPolling" type="button" variant="ghost" @click="closeAndReset">Cancel</UiButton>
+
+        <UiButton v-if="step > minimumStep && !isPolling" type="button" variant="ghost" :disabled="isLoading" @click="goBack">
+          <UiIcon name="i-lucide-arrow-left" class="size-4" />
+          Back
+        </UiButton>
+
+        <UiButton v-if="step === 2 && selectedConfig && selectedConfig.flowType !== 'device_code'" type="button" variant="ghost" class="ml-auto" @click="step = 3">
+          Next
+          <UiIcon name="i-lucide-arrow-right" class="size-4" />
+        </UiButton>
       </div>
     </template>
-  </UModal>
+  </UiDialog>
 </template>
