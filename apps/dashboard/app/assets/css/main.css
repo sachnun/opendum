@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "@nuxt/ui";
 @import "tw-animate-css";
 
 @theme inline {

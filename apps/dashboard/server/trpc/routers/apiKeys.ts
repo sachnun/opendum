@@ -2,8 +2,8 @@ import { db } from "../../lib/db";
 import { providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "../../lib/db/schema";
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../../lib/proxy/auth";
-import { getAllFamilies, isModelSupported, resolveModelAlias } from "../../lib/proxy/models";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { getAllFamilies, getAllModels, isModelSupported, resolveModelAlias } from "../../lib/proxy/models";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure, router } from "../init";
@@ -28,6 +28,43 @@ async function getOwnedApiKey(userId: string, id: string) {
 }
 
 export const apiKeysRouter = router({
+  options: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      const apiKeys = await db
+        .select({ id: proxyApiKey.id })
+        .from(proxyApiKey)
+        .where(eq(proxyApiKey.userId, ctx.userId));
+      const apiKeyIds = apiKeys.map((key) => key.id);
+      const rateLimitRows = apiKeyIds.length > 0
+        ? await db
+            .select({ apiKeyId: proxyApiKeyRateLimit.apiKeyId, target: proxyApiKeyRateLimit.target, targetType: proxyApiKeyRateLimit.targetType, perMinute: proxyApiKeyRateLimit.perMinute, perHour: proxyApiKeyRateLimit.perHour, perDay: proxyApiKeyRateLimit.perDay })
+            .from(proxyApiKeyRateLimit)
+            .where(inArray(proxyApiKeyRateLimit.apiKeyId, apiKeyIds))
+        : [];
+      const providerAccounts = await db
+        .select({ id: providerAccount.id, provider: providerAccount.provider, name: providerAccount.name, email: providerAccount.email })
+        .from(providerAccount)
+        .where(eq(providerAccount.userId, ctx.userId))
+        .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
+
+      return {
+        availableModels: getAllModels().sort((a, b) => a.localeCompare(b)),
+        availableFamilies: getAllFamilies(),
+        providerAccounts,
+        rateLimitsByKeyId: rateLimitRows.reduce<Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>>((acc, row) => {
+          acc[row.apiKeyId] = [
+            ...(acc[row.apiKeyId] ?? []),
+            { target: row.target, targetType: row.targetType === "family" ? "family" : "model", perMinute: row.perMinute, perHour: row.perHour, perDay: row.perDay },
+          ];
+          return acc;
+        }, {}),
+      };
+    } catch (error) {
+      console.error("Failed to load API key options:", error);
+      throw new Error("Failed to load API key options");
+    }
+  }),
+
   list: protectedProcedure.query(async ({ ctx }) => {
     try {
       return await db

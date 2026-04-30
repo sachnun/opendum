@@ -205,6 +205,14 @@ async function getAnalyticsDataForUser(
 }
 
 export const analyticsRouter = router({
+  data: protectedProcedure
+    .input(z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional(), forceRefresh: z.boolean().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const result = await getAnalyticsDataForUser(ctx.userId, input?.filter ?? "24h", input?.apiKeyId, input?.forceRefresh);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    }),
+
   overview: protectedProcedure.query(async ({ ctx }) => {
     const result = await getAnalyticsDataForUser(ctx.userId, "24h");
     if (!result.success) throw new Error(result.error);

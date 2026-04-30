@@ -2,6 +2,7 @@
 import type { ProviderAccountIndicator } from "../../lib/navigation";
 
 const props = defineProps<{
+  accountCount?: number;
   activeAccountCount?: number;
   indicator?: ProviderAccountIndicator;
 }>();

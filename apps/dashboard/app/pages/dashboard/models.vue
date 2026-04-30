@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
+import type { ModelStats } from "../../../lib/model-stats";
 import { getProviderLabel } from "../../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
@@ -22,6 +23,8 @@ const availableProviders = computed(() => {
   return Array.from(entries, ([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
 });
 const activeProviders = ref<string[]>([]);
+const pendingModelId = ref<string | null>(null);
+const copiedModelId = ref<string | null>(null);
 
 watchEffect(() => {
   if (activeProviders.value.length === 0 && availableProviders.value.length > 0) {
@@ -100,21 +103,28 @@ function toggleProvider(providerId: string) {
   activeProviders.value = [...activeProviders.value, providerId];
 }
 
-function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K`;
-  return tokens.toString();
+async function copyModelId(modelId: string) {
+  await navigator.clipboard.writeText(modelId);
+  copiedModelId.value = modelId;
+  window.setTimeout(() => {
+    if (copiedModelId.value === modelId) copiedModelId.value = null;
+  }, 2000);
 }
 
-function formatDate(dateStr: string): string {
-  const parts = dateStr.split("-");
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthIndex = Number.parseInt(parts[1] ?? "1", 10) - 1;
-  return `${months[monthIndex] ?? parts[1]} ${parts[0]}`;
-}
+async function setModelEnabled(model: ModelListItem, enabled: boolean) {
+  pendingModelId.value = model.id;
+  const previousValue = model.isEnabled;
+  model.isEnabled = enabled;
 
-function dailyValues() {
-  return Array.from({ length: 30 }, () => 0);
+  try {
+    const result = await $client.models.setEnabled.mutate({ modelId: model.id, enabled });
+    if (!result.success) throw new Error(result.error);
+  } catch (error) {
+    model.isEnabled = previousValue;
+    console.error(error);
+  } finally {
+    pendingModelId.value = null;
+  }
 }
 </script>
 
@@ -167,24 +177,31 @@ function dailyValues() {
             <span class="text-xs text-muted-foreground">{{ section.models.length }} models</span>
           </div>
           <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-            <UiCard v-for="model in section.models" :key="model.id" class="flex flex-col bg-card py-4" :class="model.isEnabled === false ? 'opacity-70' : ''">
-              <UiCardHeader class="px-4 pb-2 sm:px-5">
-                <div class="flex items-start justify-between gap-2">
-                  <button
+              <UiCard v-for="model in section.models" :key="model.id" class="flex flex-col bg-card py-4" :class="model.isEnabled === false ? 'opacity-70' : ''">
+                <UiCardHeader class="px-4 pb-2 sm:px-5">
+                  <div class="flex items-start justify-between gap-2">
+                    <button
                     type="button"
                     class="-m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    @click="navigator.clipboard.writeText(model.id)"
-                  >
-                    <UIcon name="i-lucide-copy" class="size-3 shrink-0" />
-                    <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="model.id">
-                      {{ model.id }}
+                      :title="`Copy model ID ${model.id}`"
+                      :aria-label="`Copy model ID ${model.id}`"
+                      @click="copyModelId(model.id)"
+                    >
+                      <span class="flex size-3 shrink-0 items-center justify-center">
+                        <UIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                      </span>
+                      <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="model.id">
+                        {{ model.id }}
                     </span>
                   </button>
                   <div class="flex shrink-0 items-center gap-1.5">
-                    <span class="text-[11px] text-muted-foreground">{{ model.isEnabled === false ? 'Off' : 'On' }}</span>
-                    <span :class="['relative inline-flex h-5 w-9 rounded-full border border-transparent transition-colors', model.isEnabled === false ? 'bg-input' : 'bg-primary']">
-                      <span :class="['pointer-events-none block size-4 translate-y-0.5 rounded-full bg-background shadow-lg ring-0 transition-transform', model.isEnabled === false ? 'translate-x-0.5' : 'translate-x-4']" />
-                    </span>
+                    <span class="text-[11px] text-muted-foreground">{{ model.isEnabled ? 'On' : 'Off' }}</span>
+                    <UiSwitch
+                      :model-value="model.isEnabled"
+                      :disabled="pendingModelId === model.id"
+                      :title="model.isEnabled ? 'Disable model' : 'Enable model'"
+                      @update:model-value="setModelEnabled(model, $event)"
+                    />
                   </div>
                 </div>
 
@@ -192,7 +209,7 @@ function dailyValues() {
                   <UiBadge v-for="provider in model.providers" :key="provider" variant="secondary" class="text-xs">
                     {{ getProviderLabel(provider) }}
                   </UiBadge>
-                  <NuxtLink v-if="model.isEnabled !== false" to="/dashboard/playground" class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50" title="Try in Playground">
+                  <NuxtLink v-if="model.isEnabled" :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50" title="Try in Playground">
                     <UIcon name="i-lucide-flask-conical" class="size-3" />
                   </NuxtLink>
                 </div>
@@ -200,74 +217,8 @@ function dailyValues() {
 
               <UiCardContent class="flex flex-1 flex-col px-4 sm:px-5">
                 <div class="mt-auto space-y-2.5">
-                  <div v-if="model.meta" class="space-y-1.5 text-xs text-muted-foreground">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                      <span v-if="model.meta.contextLength" class="inline-flex items-center gap-1 tabular-nums" title="Input tokens">
-                        {{ formatTokens(model.meta.contextLength) }}
-                        <UIcon name="i-lucide-arrow-down" class="size-3 shrink-0" />
-                      </span>
-                      <span v-if="model.meta.contextLength && model.meta.outputLimit">·</span>
-                      <span v-if="model.meta.outputLimit" class="inline-flex items-center gap-1 tabular-nums" title="Output tokens">
-                        {{ formatTokens(model.meta.outputLimit) }}
-                        <UIcon name="i-lucide-arrow-up" class="size-3 shrink-0" />
-                      </span>
-                      <template v-if="model.meta.knowledgeCutoff">
-                        <span>·</span>
-                        <span class="inline-flex items-center gap-1">
-                          <UIcon name="i-lucide-calendar" class="size-3 shrink-0" />
-                          {{ formatDate(model.meta.knowledgeCutoff) }}
-                        </span>
-                      </template>
-                    </div>
-
-                    <div v-if="model.meta.reasoning || model.meta.toolCall || model.meta.vision" class="flex flex-wrap gap-1">
-                      <UiBadge v-if="model.meta.reasoning" variant="outline" class="h-5 py-0 text-[11px]">
-                        <UIcon name="i-lucide-brain" class="mr-1 size-3" /> Reasoning
-                      </UiBadge>
-                      <UiBadge v-if="model.meta.toolCall" variant="outline" class="h-5 py-0 text-[11px]">
-                        <UIcon name="i-lucide-wrench" class="mr-1 size-3" /> Tools
-                      </UiBadge>
-                      <UiBadge v-if="model.meta.vision" variant="outline" class="h-5 py-0 text-[11px]">
-                        <UIcon name="i-lucide-eye" class="mr-1 size-3" /> Vision
-                      </UiBadge>
-                    </div>
-                  </div>
-
-                  <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5">
-                    <div class="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span class="inline-flex items-center gap-1">
-                        <UIcon name="i-lucide-bar-chart-3" class="size-3 shrink-0" />
-                        30d
-                      </span>
-                      <span class="tabular-nums">0 peak</span>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-1.5">
-                      <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-                        <p class="truncate text-[10px] text-muted-foreground">Requests</p>
-                        <p class="truncate text-xs font-semibold tabular-nums text-foreground sm:text-sm">0</p>
-                      </div>
-                      <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-                        <p class="truncate text-[10px] text-muted-foreground">Success</p>
-                        <p class="truncate text-xs font-semibold tabular-nums text-foreground sm:text-sm">-</p>
-                      </div>
-                      <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-                        <p class="truncate text-[10px] text-muted-foreground">Latency</p>
-                        <p class="truncate text-xs font-semibold tabular-nums text-foreground sm:text-sm">-</p>
-                      </div>
-                    </div>
-
-                    <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-                      <UsageSparkline :values="dailyValues()" color="var(--chart-2)" :aria-label="`Average duration trend for ${model.id} over last 24 hours`" empty-label="No duration data" class="h-6" :height="24" />
-                      <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
-                        <span class="truncate text-center">00:00</span>
-                        <span class="truncate text-center">12:00</span>
-                        <span class="truncate text-center">23:00</span>
-                      </div>
-                    </div>
-
-                    <UsageSparkline :values="dailyValues()" color="var(--chart-1)" :aria-label="`Requests trend for ${model.id}`" />
-                  </div>
+                  <ModelFeatureBadges :meta="model.meta" />
+                  <ModelStatsPanel :stats="model.stats as ModelStats" :label="model.id" compact />
                 </div>
               </UiCardContent>
             </UiCard>

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type {
+  ModelFamilyCounts,
   NavItem,
   NavSubItem,
   ProviderAccountCounts,
-  ProviderAccountIndicator,
   ProviderAccountIndicators,
 } from "../../lib/navigation";
+import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
 import { primaryNavigation, supportNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
 import type { ProviderAccountKey } from "../../lib/provider-accounts";
@@ -36,65 +37,49 @@ const accountIndicators = ref<ProviderAccountIndicators>(
 const pinnedProviders = ref<ProviderAccountKey[]>([]);
 
 const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
+const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
-
-const INDICATOR_WEIGHT: Record<ProviderAccountIndicator, number> = {
-  normal: 0,
-  warning: 1,
-  error: 2,
-};
-
-function isKnownProvider(provider: string): provider is ProviderAccountKey {
-  return PROVIDER_ACCOUNT_DEFINITIONS.some((definition) => definition.key === provider);
-}
-
-function getAccountIndicator(lastErrorAt?: string | Date | null): ProviderAccountIndicator {
-  if (!lastErrorAt) {
-    return "normal";
-  }
-
-  return "warning";
-}
+const modelFamilyCounts = ref<ModelFamilyCounts>(Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])));
 
 const { $client } = useNuxtApp();
 
 useAsyncData("dashboard-shell-accounts", async () => {
-  const accounts = await $client.accounts.list.query();
+  const summary = await $client.accounts.summary.query();
   const nextAccountCounts = { ...emptyAccountCounts };
   const nextActiveAccountCounts = { ...emptyAccountCounts };
   const nextAccountIndicators = Object.fromEntries(
     PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, "normal"])
   ) as ProviderAccountIndicators;
-  const providersWithAccounts = new Set<ProviderAccountKey>();
 
-  for (const account of accounts) {
-    if (!isKnownProvider(account.provider)) {
-      continue;
-    }
-
-    nextAccountCounts[account.provider] += 1;
-    providersWithAccounts.add(account.provider);
-
-    if (!account.isActive) {
-      continue;
-    }
-
-    nextActiveAccountCounts[account.provider] += 1;
-    const nextIndicator = getAccountIndicator(account.lastErrorAt);
-
-    if (INDICATOR_WEIGHT[nextIndicator] > INDICATOR_WEIGHT[nextAccountIndicators[account.provider]]) {
-      nextAccountIndicators[account.provider] = nextIndicator;
-    }
+  for (const definition of PROVIDER_ACCOUNT_DEFINITIONS) {
+    const providerSummary = summary.summaries[definition.key];
+    nextAccountCounts[definition.key] = providerSummary.connected;
+    nextActiveAccountCounts[definition.key] = providerSummary.active;
+    nextAccountIndicators[definition.key] = providerSummary.indicator;
   }
 
   accountCounts.value = nextAccountCounts;
   activeAccountCounts.value = nextActiveAccountCounts;
   accountIndicators.value = nextAccountIndicators;
-  pinnedProviders.value = PROVIDER_ACCOUNT_DEFINITIONS
-    .filter((definition) => providersWithAccounts.has(definition.key))
-    .slice(0, 5)
-    .map((definition) => definition.key);
+  pinnedProviders.value = summary.pinnedProviders;
 
+  return true;
+});
+
+useAsyncData("dashboard-shell-model-family-counts", async () => {
+  const counts = await $client.models.familyCounts.query();
+  const anchorByFamily = new Map(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.name, family.anchorId]));
+  const nextCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
+
+  for (const [rawFamily, count] of Object.entries(counts)) {
+    const family = categorizeModelFamily(rawFamily);
+    const anchorId = anchorByFamily.get(family);
+    if (anchorId) {
+      nextCounts[anchorId] = (nextCounts[anchorId] ?? 0) + count;
+    }
+  }
+
+  modelFamilyCounts.value = nextCounts;
   return true;
 });
 
@@ -143,7 +128,15 @@ function visibleSubItems(item: NavItem) {
       .sort((a, b) => (pinnedHrefOrder.value.get(a.href) ?? 0) - (pinnedHrefOrder.value.get(b.href) ?? 0));
   }
 
+  if (item.href === "/dashboard/models") {
+    return item.children.filter((subItem) => subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) > 0 : true);
+  }
+
   return item.children;
+}
+
+function modelCountFor(subItem: NavSubItem) {
+  return subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) : 0;
 }
 
 function handleNavClick(item?: NavItem | NavSubItem) {
@@ -247,9 +240,19 @@ async function handleSignOut() {
                       </span>
                       <span v-if="item.href === '/dashboard/accounts'" class="flex items-center gap-2">
                         <AccountStatusIndicator
+                          :account-count="accountCountByHref[subItem.href]"
                           :active-account-count="activeAccountCountByHref[subItem.href]"
                           :indicator="accountIndicatorByHref[subItem.href]"
                         />
+                      </span>
+                      <span
+                        v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
+                        :class="[
+                          'rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                          isSubItemActive(subItem) ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
+                        ]"
+                      >
+                        {{ modelCountFor(subItem) }}
                       </span>
                     </NuxtLink>
                   </template>
@@ -392,9 +395,19 @@ async function handleSignOut() {
                         <span class="truncate">{{ subItem.name }}</span>
                         <AccountStatusIndicator
                           v-if="item.href === '/dashboard/accounts'"
+                          :account-count="accountCountByHref[subItem.href]"
                           :active-account-count="activeAccountCountByHref[subItem.href]"
                           :indicator="accountIndicatorByHref[subItem.href]"
                         />
+                        <span
+                          v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
+                          :class="[
+                            'rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                            isSubItemActive(subItem) ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
+                          ]"
+                        >
+                          {{ modelCountFor(subItem) }}
+                        </span>
                       </NuxtLink>
                     </template>
                     <p v-else-if="item.href === '/dashboard/accounts'" class="px-2.5 py-1 text-[11px] text-muted-foreground">

@@ -7,7 +7,7 @@ withDefaults(
     size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
     type?: "button" | "submit" | "reset";
     disabled?: boolean;
-    class?: string;
+    class?: string | string[];
   }>(),
   {
     variant: "default",

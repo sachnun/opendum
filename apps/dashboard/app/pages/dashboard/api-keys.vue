@@ -2,23 +2,18 @@
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const { $client } = useNuxtApp();
-const creating = ref(false);
-const newKeyName = ref("Default key");
 
 type ApiKeyListItem = Awaited<ReturnType<typeof $client.apiKeys.list.query>>[number];
+type ApiKeyOptions = Awaited<ReturnType<typeof $client.apiKeys.options.query>>;
+type AccessMode = "all" | "whitelist" | "blacklist";
 
-const { data, error, pending, refresh } = await useAsyncData("dashboard-api-keys", () => $client.apiKeys.list.query());
-const apiKeys = computed<ApiKeyListItem[]>(() => data.value ?? []);
+const { data, error, pending, refresh } = await useAsyncData("dashboard-api-keys", async () => {
+  const [apiKeys, options] = await Promise.all([$client.apiKeys.list.query(), $client.apiKeys.options.query()]);
+  return { apiKeys, options };
+});
 
-async function createKey() {
-  creating.value = true;
-  try {
-    await $client.apiKeys.create.mutate({ name: newKeyName.value });
-    await refresh();
-  } finally {
-    creating.value = false;
-  }
-}
+const apiKeys = computed<ApiKeyListItem[]>(() => data.value?.apiKeys ?? []);
+const options = computed<ApiKeyOptions | null>(() => data.value?.options ?? null);
 
 function getApiKeyStatus(apiKey: ApiKeyListItem) {
   const now = new Date();
@@ -32,6 +27,14 @@ function getApiKeyStatus(apiKey: ApiKeyListItem) {
   }
 
   return { label: "Active", variant: "default" as const };
+}
+
+function normalizeModelAccessMode(mode: string): AccessMode {
+  return mode === "whitelist" || mode === "blacklist" ? mode : "all";
+}
+
+function normalizeAccountAccessMode(mode: string): AccessMode {
+  return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
 function formatRelativeTime(value: string | Date) {
@@ -50,6 +53,18 @@ function formatRelativeTime(value: string | Date) {
 
   return date.toLocaleDateString();
 }
+
+function modelAccessExpanded(apiKey: ApiKeyListItem) {
+  return normalizeModelAccessMode(apiKey.modelAccessMode) !== "all" || apiKey.modelAccessList.length > 0;
+}
+
+function accountAccessExpanded(apiKey: ApiKeyListItem) {
+  return normalizeAccountAccessMode(apiKey.accountAccessMode) !== "all" || apiKey.accountAccessList.length > 0;
+}
+
+function keyRateLimits(apiKeyId: string) {
+  return options.value?.rateLimitsByKeyId[apiKeyId] ?? [];
+}
 </script>
 
 <template>
@@ -57,17 +72,7 @@ function formatRelativeTime(value: string | Date) {
     <div class="border-b border-border pb-4">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="text-xl font-semibold">API Keys</h2>
-        <div class="flex flex-wrap gap-2">
-          <input
-            v-model="newKeyName"
-            placeholder="Key name"
-            class="h-9 w-44 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-          <UiButton :disabled="creating" @click="createKey">
-            <UIcon name="i-lucide-plus" :class="['size-4', creating ? 'animate-spin' : '']" />
-            Create key
-          </UiButton>
-        </div>
+        <CreateApiKeyButton @created="refresh" />
       </div>
     </div>
 
@@ -80,10 +85,7 @@ function formatRelativeTime(value: string | Date) {
         </div>
         <h3 class="text-lg font-semibold">No API keys</h3>
         <div class="mt-4">
-          <UiButton :disabled="creating" @click="createKey">
-            <UIcon name="i-lucide-plus" :class="['size-4', creating ? 'animate-spin' : '']" />
-            Create key
-          </UiButton>
+          <CreateApiKeyButton @created="refresh" />
         </div>
       </UiCardContent>
     </UiCard>
@@ -95,27 +97,15 @@ function formatRelativeTime(value: string | Date) {
             <div class="flex flex-col gap-4">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h2 class="truncate text-base font-semibold">{{ apiKey.name ?? 'Untitled key' }}</h2>
+                  <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="refresh" />
                   <UiBadge v-if="getApiKeyStatus(apiKey).label !== 'Active'" :variant="getApiKeyStatus(apiKey).variant">
                     {{ getApiKeyStatus(apiKey).label }}
                   </UiBadge>
                 </div>
-                <p class="mt-1 font-mono text-xs text-muted-foreground">{{ apiKey.keyPreview }}</p>
               </div>
 
-              <div class="flex w-full max-w-[540px] flex-wrap gap-2">
-                <UiButton variant="outline" size="sm" disabled>
-                  <UIcon name="i-lucide-copy" class="size-3.5" />
-                  Copy
-                </UiButton>
-                <UiButton variant="outline" size="sm" disabled>
-                  <UIcon name="i-lucide-eye" class="size-3.5" />
-                  Reveal
-                </UiButton>
-                <UiButton variant="outline" size="sm" disabled>
-                  <UIcon name="i-lucide-power" class="size-3.5" />
-                  Toggle
-                </UiButton>
+              <div class="w-full max-w-[540px]">
+                <ApiKeyActions :api-key="apiKey" @changed="refresh" />
               </div>
             </div>
 
@@ -130,7 +120,9 @@ function formatRelativeTime(value: string | Date) {
 
                 <div class="flex items-center justify-between gap-4 py-3 text-sm">
                   <span class="text-muted-foreground">Expiration</span>
-                  <span class="text-right font-medium">{{ apiKey.expiresAt ? new Date(apiKey.expiresAt).toLocaleDateString() : 'Never' }}</span>
+                  <div class="text-right">
+                    <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" @updated="refresh" />
+                  </div>
                 </div>
 
                 <div class="border-t border-border/60" />
@@ -155,12 +147,32 @@ function formatRelativeTime(value: string | Date) {
             </div>
 
             <div class="grid gap-3.5">
-              <div v-for="title in ['Model Access', 'Account Access', 'Rate Limits']" :key="title" class="rounded-xl border border-border/70 bg-muted/20 lg:hidden">
-                <button type="button" class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold">
-                  <span>{{ title }}</span>
-                  <UIcon name="i-lucide-chevron-down" class="size-4 text-muted-foreground" />
-                </button>
-              </div>
+              <ApiKeyAccessSection title="Model Access" :default-open="modelAccessExpanded(apiKey)">
+                <ApiKeyModelAccess
+                  :api-key-id="apiKey.id"
+                  :available-models="options?.availableModels ?? []"
+                  :initial-mode="normalizeModelAccessMode(apiKey.modelAccessMode)"
+                  :initial-models="apiKey.modelAccessList"
+                />
+              </ApiKeyAccessSection>
+
+              <ApiKeyAccessSection title="Account Access" :default-open="accountAccessExpanded(apiKey)">
+                <ApiKeyAccountAccess
+                  :api-key-id="apiKey.id"
+                  :available-accounts="options?.providerAccounts ?? []"
+                  :initial-mode="normalizeAccountAccessMode(apiKey.accountAccessMode)"
+                  :initial-accounts="apiKey.accountAccessList"
+                />
+              </ApiKeyAccessSection>
+
+              <ApiKeyAccessSection title="Rate Limits" :default-open="keyRateLimits(apiKey.id).length > 0">
+                <ApiKeyRateLimit
+                  :api-key-id="apiKey.id"
+                  :available-models="options?.availableModels ?? []"
+                  :available-families="options?.availableFamilies ?? []"
+                  :initial-rules="keyRateLimits(apiKey.id)"
+                />
+              </ApiKeyAccessSection>
             </div>
           </div>
         </UiCardContent>
