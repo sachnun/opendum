@@ -1,2 +1,2 @@
 [opendum]
-providers = ["ollama_cloud"]
+providers = ["nvidia_nim", "ollama_cloud"]
