@@ -10,6 +10,10 @@ node_modules
 .next/
 /out/
 
+# nuxt
+.nuxt/
+.output/
+
 # production
 /build
 dist/
@@ -35,6 +39,9 @@ next-env.d.ts
 # OpenCode / OpenSpec
 .opencode/
 openspec/
+
+# local generated runtime artifacts
+.cron/
 
 # agent instructions
 AGENTS.md
