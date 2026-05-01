@@ -131,13 +131,24 @@ export function serializeToml(data) {
     }
   }
 
+  const providerTables = Object.fromEntries(
+    Object.entries(data).filter(([key, value]) =>
+      !["limit", "modalities", "opendum"].includes(key) &&
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    )
+  );
+
   const providersWithConfig = new Set([
+    ...Object.keys(providerTables),
     ...Object.keys(upstream),
     ...Object.keys(op.access || {}),
   ]);
   for (const provider of Array.from(providersWithConfig).sort((a, b) => a.localeCompare(b))) {
-    const providerUpstream = upstream[provider];
-    const accessRule = op.access?.[provider] || {};
+    const providerTable = providerTables[provider] || {};
+    const providerUpstream = upstream[provider] || providerTable.upstream;
+    const accessRule = { ...providerTable, ...(op.access?.[provider] || {}) };
     const minTier = accessRule.min_tier || accessRule.minTier;
     const aliases = Array.isArray(accessRule.aliases) ? accessRule.aliases.filter(Boolean) : [];
 

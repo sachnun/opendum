@@ -1,3 +1,6 @@
 [opendum]
 family = "OpenAI"
 providers = ["groq", "nvidia_nim", "ollama_cloud", "openrouter", "workers_ai"]
+
+[nvidia_nim]
+upstream = "openai/gpt-oss-120b"

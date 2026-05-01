@@ -13,6 +13,9 @@ output = ["text"]
 
 [opendum]
 family = "Google"
-providers = []
+providers = ["nvidia_nim"]
 aliases = ["google-codegemma-7b", "google/codegemma-7b"]
 ignored = true
+
+[nvidia_nim]
+upstream = "google/codegemma-7b"

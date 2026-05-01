@@ -1,2 +1,5 @@
 [opendum]
 providers = ["nvidia_nim", "ollama_cloud"]
+
+[nvidia_nim]
+upstream = "moonshotai/kimi-k2.6"

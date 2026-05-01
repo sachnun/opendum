@@ -1,2 +1,5 @@
 [opendum]
-providers = ["kilo_code", "openrouter"]
+providers = ["kilo_code", "nvidia_nim", "openrouter"]
+
+[nvidia_nim]
+upstream = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"

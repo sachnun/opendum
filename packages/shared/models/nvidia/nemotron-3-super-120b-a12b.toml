@@ -14,10 +14,13 @@ output = ["text"]
 
 [opendum]
 family = "NVIDIA"
-providers = ["kilo_code", "openrouter", "workers_ai"]
+providers = ["kilo_code", "nvidia_nim", "openrouter", "workers_ai"]
 
 [kilo_code]
 upstream = "nvidia/nemotron-3-super-120b-a12b:free"
+
+[nvidia_nim]
+upstream = "nvidia/nemotron-3-super-120b-a12b"
 
 [openrouter]
 upstream = "nvidia/nemotron-3-super-120b-a12b:free"

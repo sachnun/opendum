@@ -14,7 +14,10 @@ output = ["text"]
 
 [opendum]
 family = "StepFun"
-providers = ["kilo_code"]
+providers = ["kilo_code", "nvidia_nim"]
 
 [kilo_code]
 upstream = "stepfun/step-3.5-flash:free"
+
+[nvidia_nim]
+upstream = "stepfun-ai/step-3.5-flash"

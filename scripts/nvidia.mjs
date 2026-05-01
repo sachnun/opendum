@@ -4,7 +4,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderToToml } from "./toml-utils.mjs";
 
+const PROVIDER_NAME = "nvidia_nim";
 const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
+const NVIDIA_MODEL_DOCS_URLS = [
+  "https://docs.api.nvidia.com/nim/reference/llm-apis",
+  "https://docs.api.nvidia.com/nim/reference/multimodal-apis",
+  "https://docs.api.nvidia.com/nim/reference/visual-models-apis",
+];
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
@@ -15,40 +21,17 @@ const MODEL_KEY_OVERRIDES = {
   "qwen/qwen2.5-coder-7b-instruct": "qwen2.5-coder-7b",
 };
 
-const NON_CHAT_MODEL_TOKENS = [
+const EXCLUDED_MODEL_KEY_TOKENS = [
+  "detection",
   "embed",
-  "retriever",
-  "rerank",
-  "parse",
+  "embedding",
   "guard",
+  "nemoretriever",
+  "parse",
+  "rerank",
+  "retriever",
   "safety",
-  "reward",
-  "clip",
-  "translate",
-  "deplot",
-  "paligemma",
-  "kosmos",
-  "streampetr",
   "vila",
-];
-
-const CHAT_MODEL_PATTERNS = [
-  /(^|[\/-])(chat|instruct)([\/-]|$)/i,
-  /thinking/i,
-  /gpt-oss/i,
-  /-it($|[\/-])/i,
-  /deepseek-ai\/deepseek-v3\./i,
-  /minimaxai\/minimax-m2/i,
-  /moonshotai\/kimi-k2/i,
-  /z-ai\/glm/i,
-  /qwen\/qwq-/i,
-  /qwen\/qwen3-235b-a22b/i,
-  /mistralai\/mistral-large($|[-\/])/i,
-  /mistralai\/mistral-medium($|[-\/])/i,
-  /mistralai\/mistral-small($|[-\/])/i,
-  /mistralai\/magistral-small($|[-\/])/i,
-  /mistralai\/mistral-nemotron($|[-\/])/i,
-  /nvidia\/cosmos-reason/i,
 ];
 
 function sleep(ms) {
@@ -75,37 +58,144 @@ function toModelKey(modelId) {
     .replace(/-{2,}/g, "-");
 }
 
-function isNonChatModel(modelId) {
-  const normalized = modelId.toLowerCase();
-  return NON_CHAT_MODEL_TOKENS.some((token) => normalized.includes(token));
+function normalizeModelIdForMatch(modelId) {
+  return modelId
+    .replace(/^library\//, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
-function isLikelyChatModel(modelId) {
-  if (isNonChatModel(modelId)) {
+function decodeHtmlEntities(value) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function stripHtml(value) {
+  return decodeHtmlEntities(value.replace(/<[^>]*>/g, ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isChatCompletionEndpoint(description) {
+  const normalized = description.toLowerCase();
+  const nonChatMarkers = [
+    "embedding",
+    "classification",
+    "classify",
+    "detection",
+    "generate dna",
+    "generation",
+    "ranking",
+    "rerank",
+    "retrieval",
+    "search post",
+    "status polling",
+  ];
+
+  if (nonChatMarkers.some((marker) => normalized.includes(marker))) {
     return false;
   }
 
-  return CHAT_MODEL_PATTERNS.some((pattern) => pattern.test(modelId));
+  return normalized.includes("chat conversation") ||
+    normalized.includes("chat completion") ||
+    normalized.includes("create completion") ||
+    normalized.includes("request response from the model");
 }
 
-function buildModelMap(modelIds, existingKeys) {
+function isExcludedModelKey(modelId) {
+  const normalized = normalizeModelIdForMatch(modelId);
+  return EXCLUDED_MODEL_KEY_TOKENS.some((token) => normalized.includes(token));
+}
+
+function extractNvidiaGenerativeModelKeys(html) {
+  const articleStart = html.indexOf('data-testid="RDMD"');
+  const articleEnd = articleStart === -1 ? -1 : html.indexOf("</article>", articleStart);
+  const article = articleStart === -1
+    ? html
+    : html.slice(articleStart, articleEnd === -1 ? undefined : articleEnd);
+  const modelKeys = new Set();
+  const rowPattern = /<tr>([\s\S]*?)<\/tr>/g;
+  let rowMatch;
+
+  while ((rowMatch = rowPattern.exec(article)) !== null) {
+    const cells = [...rowMatch[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(
+      (match) => match[1]
+    );
+
+    if (cells.length < 2) {
+      continue;
+    }
+
+    const modelMatch = cells[0].match(/<a\b[^>]*>([\s\S]*?)<\/a>/);
+    const endpointMatch = cells[1].match(/<a\b[^>]*>([\s\S]*?)<\/a>/);
+    if (!modelMatch || !endpointMatch) {
+      continue;
+    }
+
+    const modelId = stripHtml(modelMatch[1]).replace(/\s*\/\s*/, "/");
+    const endpoint = stripHtml(endpointMatch[1]);
+    if (
+      modelId.includes("/") &&
+      !isExcludedModelKey(modelId) &&
+      isChatCompletionEndpoint(endpoint)
+    ) {
+      modelKeys.add(normalizeModelIdForMatch(modelId));
+    }
+  }
+
+  return modelKeys;
+}
+
+function getProviderUpstream(entry, providerName, modelId) {
+  const providerConfig = entry.data[providerName];
+  if (
+    providerConfig &&
+    typeof providerConfig === "object" &&
+    !Array.isArray(providerConfig) &&
+    typeof providerConfig.upstream === "string" &&
+    providerConfig.upstream.trim().length > 0
+  ) {
+    return providerConfig.upstream.trim();
+  }
+
+  return entry.data.opendum?.upstream?.[providerName] || modelId;
+}
+
+function buildModelMap(modelIds, existingKeys, llmModelKeys) {
   const allAvailableModels = [...new Set(modelIds)].sort((a, b) => a.localeCompare(b));
-  const availableChatCandidateSet = new Set(
-    allAvailableModels.filter((modelId) => !isNonChatModel(modelId))
-  );
-  const likelyChatSet = new Set(
-    allAvailableModels.filter((modelId) => isLikelyChatModel(modelId))
+  const availableModelSet = new Set(allAvailableModels);
+  const availableModelByKey = new Map();
+  for (const modelId of allAvailableModels) {
+    const modelKey = toModelKey(modelId);
+    if (!availableModelByKey.has(modelKey)) {
+      availableModelByKey.set(modelKey, modelId);
+    }
+  }
+
+  const availableLlmModelSet = new Set(
+    allAvailableModels.filter((modelId) =>
+      llmModelKeys.has(normalizeModelIdForMatch(modelId))
+    )
   );
 
   const nextMap = new Map();
 
   // Retain existing models that are still available
   for (const [modelKey, upstreamModel] of existingKeys.entries()) {
-    if (!availableChatCandidateSet.has(upstreamModel)) {
+    const resolvedUpstreamModel = availableModelSet.has(upstreamModel)
+      ? upstreamModel
+      : availableModelByKey.get(modelKey);
+
+    if (!resolvedUpstreamModel) {
       continue;
     }
 
-    nextMap.set(modelKey, upstreamModel);
+    nextMap.set(modelKey, resolvedUpstreamModel);
   }
 
   const mappedValues = new Set(nextMap.values());
@@ -116,7 +206,7 @@ function buildModelMap(modelIds, existingKeys) {
       continue;
     }
 
-    if (!likelyChatSet.has(upstreamModel)) {
+    if (!availableLlmModelSet.has(upstreamModel)) {
       continue;
     }
 
@@ -134,6 +224,51 @@ function buildModelMap(modelIds, existingKeys) {
   }
 
   return new Map([...nextMap.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+async function fetchNvidiaGenerativeModelKeys() {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const pages = await Promise.all(
+        NVIDIA_MODEL_DOCS_URLS.map(async (url) => {
+          const response = await fetch(url, {
+            headers: {
+              Accept: "text/html",
+            },
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch Nvidia model docs (${response.status} ${response.statusText})`
+            );
+          }
+
+          return response.text();
+        })
+      );
+      const modelKeys = new Set(
+        pages.flatMap((page) => [...extractNvidiaGenerativeModelKeys(page)])
+      );
+      if (modelKeys.size === 0) {
+        throw new Error("Unexpected Nvidia model docs payload format");
+      }
+
+      return modelKeys;
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < MAX_FETCH_ATTEMPTS) {
+        await sleep(attempt * 1_000);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Failed to fetch Nvidia generative model list");
 }
 
 async function fetchNvidiaModelIds() {
@@ -186,16 +321,19 @@ async function main() {
   const existingKeys = new Map();
   for (const [modelId, entry] of Object.entries(index)) {
     const providers = entry.data.opendum?.providers || [];
-    if (providers.includes("nvidia_nim")) {
-      const upstream = entry.data.opendum?.upstream?.nvidia_nim || modelId;
+    if (providers.includes(PROVIDER_NAME)) {
+      const upstream = getProviderUpstream(entry, PROVIDER_NAME, modelId);
       existingKeys.set(modelId, upstream);
     }
   }
 
-  const modelIds = await fetchNvidiaModelIds();
-  const nextMap = buildModelMap(modelIds, existingKeys);
+  const [modelIds, llmModelKeys] = await Promise.all([
+    fetchNvidiaModelIds(),
+    fetchNvidiaGenerativeModelKeys(),
+  ]);
+  const nextMap = buildModelMap(modelIds, existingKeys, llmModelKeys);
 
-  const result = syncProviderToToml(modelsDir, "nvidia_nim", nextMap);
+  const result = syncProviderToToml(modelsDir, PROVIDER_NAME, nextMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Nvidia NIM models are already up to date (${nextMap.size} models).`);

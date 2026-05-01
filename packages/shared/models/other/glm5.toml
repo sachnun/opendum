@@ -1,2 +1,5 @@
 [opendum]
 providers = ["nvidia_nim"]
+
+[nvidia_nim]
+upstream = "z-ai/glm5"

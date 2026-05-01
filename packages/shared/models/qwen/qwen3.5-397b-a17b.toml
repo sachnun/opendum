@@ -2,4 +2,4 @@
 providers = ["nvidia_nim"]
 
 [nvidia_nim]
-upstream = "z-ai/glm4.7"
+upstream = "qwen/qwen3.5-397b-a17b"
