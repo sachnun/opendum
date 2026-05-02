@@ -16,3 +16,6 @@ output = ["text"]
 family = "Mistral"
 providers = ["ollama_cloud"]
 ignored = true
+
+[ollama_cloud]
+upstream = "ministral-3:14b"

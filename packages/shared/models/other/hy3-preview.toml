@@ -1,2 +1,8 @@
 [opendum]
 providers = ["kilo_code", "openrouter"]
+
+[kilo_code]
+upstream = "tencent/hy3-preview:free"
+
+[openrouter]
+upstream = "tencent/hy3-preview:free"

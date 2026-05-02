@@ -1,2 +1,8 @@
 [opendum]
 providers = ["kilo_code", "openrouter"]
+
+[kilo_code]
+upstream = "inclusionai/ling-2.6-1t:free"
+
+[openrouter]
+upstream = "inclusionai/ling-2.6-1t:free"

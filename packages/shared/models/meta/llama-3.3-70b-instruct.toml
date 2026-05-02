@@ -19,3 +19,6 @@ aliases = ["meta-llama-3.3-70b-instruct", "meta/llama-3.3-70b-instruct"]
 
 [nvidia_nim]
 upstream = "meta/llama-3.3-70b-instruct"
+
+[openrouter]
+upstream = "meta-llama/llama-3.3-70b-instruct:free"

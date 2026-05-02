@@ -20,3 +20,6 @@ ignored = true
 
 [nvidia_nim]
 upstream = "nvidia/nvidia-nemotron-nano-9b-v2"
+
+[openrouter]
+upstream = "nvidia/nemotron-nano-9b-v2:free"

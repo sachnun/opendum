@@ -2,5 +2,14 @@
 family = "OpenAI"
 providers = ["groq", "nvidia_nim", "ollama_cloud", "openrouter", "workers_ai"]
 
+[groq]
+upstream = "openai/gpt-oss-120b"
+
 [nvidia_nim]
 upstream = "openai/gpt-oss-120b"
+
+[ollama_cloud]
+upstream = "gpt-oss:120b"
+
+[openrouter]
+upstream = "openai/gpt-oss-120b:free"

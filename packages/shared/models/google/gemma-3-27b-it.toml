@@ -18,3 +18,6 @@ providers = ["nvidia_nim", "openrouter"]
 
 [nvidia_nim]
 upstream = "google/gemma-3-27b-it"
+
+[openrouter]
+upstream = "google/gemma-3-27b-it:free"

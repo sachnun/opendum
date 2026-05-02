@@ -15,3 +15,6 @@ output = ["text"]
 family = "OpenAI"
 providers = ["antigravity", "ollama_cloud"]
 aliases = ["gpt-oss-120b"]
+
+[ollama_cloud]
+upstream = "gpt-oss:120b"
