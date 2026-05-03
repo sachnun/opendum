@@ -1,39 +1,59 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-node_modules
+node_modules/
+.pnpm-store/
 
-# testing
-/coverage
+# package manager logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# next.js
-.next/
+# build outputs
+dist/
+build/
+out/
+.output/
 .nuxt/
 .nitro/
 .cron/
 .cache/
-/out/
+.vite/
+.next/
 
-# production
-/build
-.output/
+# generated data
 .data/
-dist/
 
-# misc
-.DS_Store
-*.pem
+# testing and analysis
+coverage/
+coverage.out
+.nyc_output/
+.fallow/
+.fallowrc.json
 
-# debug
-pnpm-debug.log*
+# Go
+*.test
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (can opt-in for committing examples)
+.env
+.env.*
 !.env.example
 !**/.env.example
 
+# local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# misc
+.DS_Store
+Thumbs.db
+*.pem
+
 # vercel
-.vercel
+.vercel/
 
 # typescript
 *.tsbuildinfo
