@@ -36,7 +36,7 @@ interface CopilotUsageEntry {
 }
 
 /** Data source that produced the snapshot. */
-export type CopilotUsageSource =
+type CopilotUsageSource =
   | "internal_api"
   | "billing_api"
   | "both"

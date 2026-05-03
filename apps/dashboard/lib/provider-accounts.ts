@@ -136,7 +136,7 @@ export const BY_KEY: Record<ProviderAccountKey, ProviderAccountDefinition> =
     PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, definition])
   ) as Record<ProviderAccountKey, ProviderAccountDefinition>;
 
-export const BY_SLUG: Record<string, ProviderAccountDefinition> = Object.fromEntries(
+const BY_SLUG: Record<string, ProviderAccountDefinition> = Object.fromEntries(
   PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.slug, definition])
 );
 
@@ -175,60 +175,4 @@ export function getProviderFromSlug(providerSlug: string): ProviderAccountKey | 
   const normalizedSlug = providerSlug.trim().toLowerCase();
   const provider = BY_SLUG[normalizedSlug];
   return provider ? provider.key : null;
-}
-
-export function getProviderSuccessMessage(successParam: string): string {
-  if (successParam === "antigravity_added") {
-    return "Antigravity connected successfully!";
-  }
-
-  if (successParam === "qwen_code_added") {
-    return "Qwen Code connected successfully!";
-  }
-
-  if (successParam === "copilot_added") {
-    return "Copilot connected successfully!";
-  }
-
-  if (successParam === "gemini_cli_added") {
-    return "Gemini CLI connected successfully!";
-  }
-
-  if (successParam === "codex_added") {
-    return "Codex connected successfully!";
-  }
-
-  if (successParam === "kiro_added") {
-    return "Kiro connected successfully!";
-  }
-
-  if (successParam === "nvidia_nim_added") {
-    return "Nvidia connected successfully!";
-  }
-
-  if (successParam === "ollama_cloud_added") {
-    return "Ollama Cloud connected successfully!";
-  }
-
-  if (successParam === "openrouter_added") {
-    return "OpenRouter connected successfully!";
-  }
-
-  if (successParam === "groq_added") {
-    return "Groq account connected successfully!";
-  }
-
-  if (successParam === "kilo_code_added") {
-    return "Kilo Code account connected successfully!";
-  }
-
-  if (successParam === "cerebras_added") {
-    return "Cerebras account connected successfully!";
-  }
-
-  if (successParam === "workers_ai_added") {
-    return "Workers AI account connected successfully!";
-  }
-
-  return "Connected successfully!";
 }

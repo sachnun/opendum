@@ -1,6 +1,7 @@
 import type { H3Event } from "h3";
 import { createError, getQuery, readBody } from "h3";
-import { z, ZodError } from "zod";
+import { ZodError } from "zod";
+import type { z } from "zod";
 
 import { requireSession } from "./session";
 

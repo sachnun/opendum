@@ -26,7 +26,7 @@ import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
 /**
  * Device code response from Qwen API
  */
-export interface DeviceCodeResponse {
+interface DeviceCodeResponse {
   device_code: string;
   user_code: string;
   verification_uri: string;

@@ -170,7 +170,7 @@ function formatNumber(n) {
 // Filesystem helpers
 // ---------------------------------------------------------------------------
 
-export function collectTomlFiles(modelsDir) {
+function collectTomlFiles(modelsDir) {
   const files = [];
   for (const entry of readdirSync(modelsDir)) {
     const fullPath = join(modelsDir, entry);
@@ -219,7 +219,7 @@ const FAMILY_RULES = [
   { test: /^openrouter-/, folder: "openrouter" },
 ];
 
-export function inferFamily(modelKey) {
+function inferFamily(modelKey) {
   for (const rule of FAMILY_RULES) {
     if (rule.test.test(modelKey)) return rule.folder;
   }

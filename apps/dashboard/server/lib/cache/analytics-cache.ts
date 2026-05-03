@@ -2,10 +2,7 @@ import { getRedisClient } from "../redis.js";
 
 const ANALYTICS_CACHE_PREFIX = "opendum:analytics:v1";
 const ANALYTICS_VERSION_PREFIX = `${ANALYTICS_CACHE_PREFIX}:version`;
-const ANALYTICS_VERSION_BUMP_PREFIX = `${ANALYTICS_CACHE_PREFIX}:version-bump`;
 
-const ANALYTICS_VERSION_TTL_SECONDS = 30 * 24 * 60 * 60;
-const ANALYTICS_VERSION_BUMP_THROTTLE_SECONDS = 15;
 
 interface AnalyticsCacheKeyParams {
   userId: string;
@@ -27,10 +24,6 @@ const GRANULARITY_MS_BY_KEY: Record<string, number> = {
 
 function getVersionKey(userId: string): string {
   return `${ANALYTICS_VERSION_PREFIX}:${userId}`;
-}
-
-function getVersionBumpKey(userId: string): string {
-  return `${ANALYTICS_VERSION_BUMP_PREFIX}:${userId}`;
 }
 
 function alignTimestampToGranularityBoundary(timestampMs: number, granularity: string): number {
@@ -69,30 +62,5 @@ export async function getAnalyticsCacheVersion(userId: string): Promise<number> 
     return Number.isFinite(parsedVersion) && parsedVersion >= 0 ? parsedVersion : 0;
   } catch {
     return 0;
-  }
-}
-
-export async function bumpAnalyticsCacheVersionThrottled(userId: string): Promise<void> {
-  const redis = await getRedisClient();
-
-  try {
-    const shouldBump = await redis.set(
-      getVersionBumpKey(userId),
-      "1",
-      "EX",
-      ANALYTICS_VERSION_BUMP_THROTTLE_SECONDS,
-      "NX"
-    );
-
-    if (shouldBump !== "OK") {
-      return;
-    }
-
-    const nextVersion = await redis.incr(getVersionKey(userId));
-    if (nextVersion === 1) {
-      await redis.expire(getVersionKey(userId), ANALYTICS_VERSION_TTL_SECONDS);
-    }
-  } catch {
-    // Ignore version bump failures
   }
 }

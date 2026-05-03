@@ -41,7 +41,7 @@ export interface QuotaGroupDisplay {
   remainingLabel?: string;
 }
 
-export interface AccountQuotaInfo {
+interface AccountQuotaInfo {
   accountId: string;
   accountName: string;
   email: string | null;

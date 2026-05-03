@@ -50,23 +50,14 @@ export const ONBOARD_USER_ENDPOINTS = [
 
 // Default endpoint
 export const CODE_ASSIST_ENDPOINT = CODE_ASSIST_ENDPOINT_DAILY;
-export const CODE_ASSIST_API_VERSION = "v1internal";
 
 // Headers for Gemini CLI requests
 export const AUTH_HEADERS = {
   "User-Agent": `${USER_AGENT_BASE} (win32; x64)`,
 } as const;
 
-// Model aliases (map public names to internal names if different)
-export const MODEL_ALIASES: Record<string, string> = {
-  // Currently no aliases needed - names are same as Antigravity
-};
-
 // Token refresh buffer (30 minutes before expiry)
 export const REFRESH_BUFFER_SECONDS = 30 * 60;
-
-// Gemini 3 tool prefix for avoiding name conflicts
-export const GEMINI3_TOOL_PREFIX = "gemini3_";
 
 // Default thinking configuration for reasoning_effort mapping
 export const BUDGET_MAP = {

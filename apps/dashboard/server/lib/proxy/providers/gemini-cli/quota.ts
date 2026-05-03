@@ -3,8 +3,6 @@ import {
   AUTH_HEADERS,
 } from "./constants.js";
 
-export const QUOTA_STALE_MS = 15 * 60 * 1000;
-
 const DEFAULT_MAX_REQUESTS = 1000;
 
 const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
@@ -267,8 +265,4 @@ export async function fetchGeminiCliQuotaFromApi(
     fetchedAt: Date.now(),
     source: "api",
   };
-}
-
-export function isGeminiCliQuotaStale(snapshot: GeminiCliQuotaSnapshot): boolean {
-  return Date.now() - snapshot.fetchedAt > QUOTA_STALE_MS;
 }

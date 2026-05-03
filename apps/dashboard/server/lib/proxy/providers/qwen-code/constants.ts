@@ -33,9 +33,3 @@ export const SUPPORTED_PARAMS = new Set([
 
 // Token refresh buffer (3 hours before expiry)
 export const REFRESH_BUFFER_SECONDS = 3 * 60 * 60;
-
-// Device code polling interval (seconds)
-export const POLLING_INTERVAL = 5;
-
-// Device code expiry timeout (seconds)
-export const DEVICE_CODE_EXPIRY = 600; // 10 minutes

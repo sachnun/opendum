@@ -102,55 +102,6 @@ export function injectCopilotChatSystemTool(
   return result;
 }
 
-export function injectCopilotAnthropicSystemTool(
-  messages: Array<Record<string, unknown>>
-): Array<Record<string, unknown>> {
-  const currentYear = getCurrentYear();
-  const toolUseId = `toolu_init_${currentYear}`;
-
-  const assistantMessage: Record<string, unknown> = {
-    role: "assistant",
-    content: [
-      {
-        type: "tool_use",
-        id: toolUseId,
-        name: TOOL_NAME,
-        input: { query: "current year" },
-      },
-    ],
-  };
-
-  const toolResultMessage: Record<string, unknown> = {
-    role: "user",
-    content: [
-      {
-        type: "tool_result",
-        tool_use_id: toolUseId,
-        content: currentYear,
-      },
-    ],
-  };
-
-  const result: Array<Record<string, unknown>> = [];
-  let inserted = false;
-
-  for (const message of messages) {
-    const role = typeof message.role === "string" ? message.role : "";
-    if (!inserted && role === "user") {
-      result.push(assistantMessage, toolResultMessage);
-      inserted = true;
-    }
-
-    result.push(message);
-  }
-
-  if (!inserted) {
-    return [assistantMessage, toolResultMessage, ...result];
-  }
-
-  return result;
-}
-
 export function injectCopilotResponsesSystemTool(
   input: Array<Record<string, unknown>>
 ): Array<Record<string, unknown>> {

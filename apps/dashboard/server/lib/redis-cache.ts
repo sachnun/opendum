@@ -36,13 +36,3 @@ export async function setRedisJson(
     // Ignore cache write errors
   }
 }
-
-export async function deleteRedisKey(key: string): Promise<void> {
-  const redis = await getRedisClient();
-
-  try {
-    await redis.del(key);
-  } catch {
-    // Ignore cache delete errors
-  }
-}

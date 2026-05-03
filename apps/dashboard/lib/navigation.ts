@@ -86,10 +86,3 @@ export const primaryNavigation: NavItem[] = [
     })),
   },
 ];
-
-export const supportNavigation: NavItem[] = [
-  { name: "Usage", href: "/dashboard/usage", icon: "i-lucide-book-open" },
-  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
-];
-
-export const navigation: NavItem[] = [...primaryNavigation, ...supportNavigation];

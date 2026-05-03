@@ -38,11 +38,6 @@ export const db = new Proxy({} as Database, {
   },
 }) as Database;
 
-export async function closeDb() {
-  await globalForDb.pool?.end();
-  globalForDb.pool = undefined;
-}
-
 if (process.env.NODE_ENV !== "production") {
   globalForDb.db ??= getDb();
 }

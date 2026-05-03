@@ -103,34 +103,12 @@ export function apiToUserModel(apiModel: string): string {
 }
 
 /**
- * Get quota group for a model
- */
-export function getQuotaGroupForModel(model: string): string | null {
-  const cleanModel = model.includes("/") ? model.split("/").pop()! : model;
-  
-  for (const [groupName, group] of Object.entries(QUOTA_GROUPS)) {
-    if (group.models.includes(cleanModel)) {
-      return groupName;
-    }
-  }
-  return null;
-}
-
-/**
  * Get max requests for a model/tier combination
  */
 export function getMaxRequestsForModel(model: string, tier: string): number {
   const cleanModel = model.includes("/") ? model.split("/").pop()! : model;
   const tierLimits = QUOTA_MAX_REQUESTS[tier] ?? QUOTA_MAX_REQUESTS["free-tier"];
   return tierLimits[cleanModel] ?? QUOTA_MAX_REQUESTS_DEFAULT;
-}
-
-/**
- * Get quota cost per request (as percentage)
- */
-export function getQuotaCostPercent(model: string, tier: string): number {
-  const maxRequests = getMaxRequestsForModel(model, tier);
-  return maxRequests > 0 ? 100 / maxRequests : 100;
 }
 
 export interface ModelQuotaInfo {

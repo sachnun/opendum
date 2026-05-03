@@ -2,7 +2,7 @@
 // Caches thought block signatures for multi-turn conversations
 
 import { hashString } from "../../../encryption.js";
-import { deleteRedisKey, getRedisJson, setRedisJson } from "../../../redis-cache.js";
+import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
 import type { ModelFamily } from "./transform/types.js";
 
 const SIGNATURE_CACHE_PREFIX = "opendum:thought-signature";
@@ -57,15 +57,4 @@ export async function getCachedSignature(
     getSignatureCacheKey(family, sessionId, thoughtText)
   );
   return typeof cached?.signature === "string" ? cached.signature : null;
-}
-
-/**
- * Clears all cached signatures.
- */
-export async function clearSignatureCache(
-  family: ModelFamily,
-  sessionId: string,
-  thoughtText: string
-): Promise<void> {
-  await deleteRedisKey(getSignatureCacheKey(family, sessionId, thoughtText));
 }

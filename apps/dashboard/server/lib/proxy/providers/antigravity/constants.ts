@@ -65,16 +65,12 @@ export const ONBOARD_USER_ENDPOINTS = [
   CODE_ASSIST_ENDPOINT_PROD,
 ] as const;
 
-export const CODE_ASSIST_ENDPOINT = CODE_ASSIST_ENDPOINT_DAILY;
-
 // Headers for auth/discovery calls (loadCodeAssist, onboardUser)
 export const AUTH_HEADERS = {
   "User-Agent": USER_AGENT,
   "X-Goog-Api-Client": API_CLIENT,
   "Client-Metadata": CLIENT_METADATA,
 } as const;
-export const CODE_ASSIST_API_VERSION = "v1internal";
-
 export const CODE_ASSIST_HEADERS = {
   "User-Agent": USER_AGENT,
   "X-Goog-Api-Client": API_CLIENT,

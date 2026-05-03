@@ -346,10 +346,6 @@ export async function getCodexQuotaSnapshot(
   return snapshot;
 }
 
-export function isCodexQuotaStale(snapshot: CodexQuotaSnapshot): boolean {
-  return Date.now() - snapshot.fetchedAt > QUOTA_STALE_MS;
-}
-
 export async function setCodexQuotaSnapshot(
   accountId: string,
   snapshot: CodexQuotaSnapshot

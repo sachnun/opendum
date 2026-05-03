@@ -1,24 +1,14 @@
-import { search } from "fast-fuzzy";
-
 import {
   MODEL_REGISTRY,
   IGNORED_MODELS,
-  type ModelMeta,
   type ModelInfo,
 } from "./loader.js";
 
 // Re-export types and registry so existing consumers keep working
-export { MODEL_REGISTRY, IGNORED_MODELS };
-export type { ModelMeta, ModelInfo };
+export { MODEL_REGISTRY };
 
 export interface ProviderAccessRule {
   minTier?: string;
-}
-
-export interface ProviderModelConfig {
-  upstream?: string;
-  minTier?: string;
-  aliases?: string[];
 }
 
 function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
@@ -77,12 +67,6 @@ for (const [canonical, aliases] of Object.entries(canonicalToAliases)) {
   );
 }
 
-const SUGGESTION_THRESHOLD = 0.7;
-const SUGGESTION_CANDIDATES = Array.from(
-  new Set(getAllModelsWithAliases())
-).sort((a, b) => a.localeCompare(b));
-const suggestionCache = new Map<string, string[]>();
-
 /** Cached per-provider model map: canonical → upstream name. */
 const modelMapCache = new Map<string, Record<string, string>>();
 
@@ -138,15 +122,6 @@ export function getProviderAccessRule(
   return info?.access?.[provider] ?? null;
 }
 
-export function getProviderModelConfig(
-  model: string,
-  provider: string
-): ProviderModelConfig | null {
-  const canonical = resolveModelAlias(model);
-  const info = EFFECTIVE_MODEL_REGISTRY[canonical];
-  return info?.providerConfig?.[provider] ?? null;
-}
-
 /**
  * Resolve model alias to canonical name
  */
@@ -184,163 +159,12 @@ export function isModelSupported(model: string): boolean {
 }
 
 /**
- * Check if a model is supported by a specific provider
- */
-export function isModelSupportedByProvider(
-  model: string,
-  provider: string
-): boolean {
-  const providers = getProvidersForModel(model);
-  return providers.includes(provider);
-}
-
-/**
  * Get all supported models (canonical names only)
  */
 export function getAllModels(): string[] {
   return Object.keys(EFFECTIVE_MODEL_REGISTRY).filter(
     (model) => getProvidersForModel(model).length > 0
   );
-}
-
-/**
- * Get all supported models including aliases
- */
-export function getAllModelsWithAliases(): string[] {
-  const models: string[] = [];
-  for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
-    if (getProvidersForModel(canonical).length === 0) {
-      continue;
-    }
-
-    models.push(canonical);
-    if (info.aliases) {
-      models.push(...info.aliases);
-    }
-  }
-  return models;
-}
-
-export function getSuggestedModels(
-  model: string,
-  provider: string | null = null,
-  limit = 5
-): string[] {
-  const term = model.trim();
-  if (!term) {
-    return [];
-  }
-
-  let candidates = SUGGESTION_CANDIDATES;
-  let useProviderPrefix = false;
-
-  if (provider) {
-    let providerCandidates = suggestionCache.get(provider);
-    if (!providerCandidates) {
-      providerCandidates = Array.from(new Set(getModelsForProvider(provider))).sort(
-        (a, b) => a.localeCompare(b)
-      );
-      suggestionCache.set(provider, providerCandidates);
-    }
-
-    if (providerCandidates.length > 0) {
-      candidates = providerCandidates;
-      useProviderPrefix = true;
-    }
-  }
-
-  const matches = search(term, candidates, {
-    ignoreCase: true,
-    ignoreSymbols: true,
-    normalizeWhitespace: true,
-    threshold: SUGGESTION_THRESHOLD,
-  });
-
-  return Array.from(
-    new Set(
-      matches
-        .slice(0, limit)
-        .map((match) => (useProviderPrefix && provider ? `${provider}/${match}` : match))
-    )
-  );
-}
-
-/**
- * Get models for a specific provider
- */
-export function getModelsForProvider(provider: string): string[] {
-  const models: string[] = [];
-  for (const [model, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
-    if (info.providers.includes(provider)) {
-      models.push(model);
-      if (info.aliases) {
-        models.push(...info.aliases);
-      }
-    }
-  }
-  return models;
-}
-
-/**
- * Format models for OpenAI /v1/models response
- */
-export function formatModelsForOpenAI(): Array<{
-  id: string;
-  object: string;
-  created: number;
-  owned_by: string;
-}> {
-  const now = Math.floor(Date.now() / 1000);
-  const models: Array<{
-    id: string;
-    object: string;
-    created: number;
-    owned_by: string;
-  }> = [];
-
-  for (const model of Object.keys(EFFECTIVE_MODEL_REGISTRY)) {
-    const providers = getProvidersForModel(model);
-    if (providers.length === 0) {
-      continue;
-    }
-
-    const ownedBy = providers.join(",");
-
-    models.push({
-      id: model,
-      object: "model",
-      created: now,
-      owned_by: ownedBy,
-    });
-  }
-
-  return models;
-}
-
-/**
- * Get the full ModelInfo for a model from the TOML registry.
- * Returns undefined if the model is not found.
- */
-export function getModelInfo(modelId: string): ModelInfo | undefined {
-  const canonical = resolveModelAlias(modelId);
-  return EFFECTIVE_MODEL_REGISTRY[canonical];
-}
-
-/**
- * Check whether a model supports vision (image input).
- * A model is considered vision-capable if:
- *   - `meta.vision` is true (from `attachment = true` in TOML), OR
- *   - `meta.modalities.input` includes "image"
- */
-export function isVisionModel(modelId: string): boolean {
-  const info = getModelInfo(modelId);
-  if (!info?.meta) return false;
-
-  if (info.meta.vision === true) return true;
-
-  if (info.meta.modalities?.input?.includes("image")) return true;
-
-  return false;
 }
 
 /**
@@ -361,19 +185,4 @@ export function getAllFamilies(): string[] {
     if (info.family) families.add(info.family);
   }
   return Array.from(families).sort();
-}
-
-/**
- * Build a mapping of family name → array of canonical model IDs.
- * Models without a family are grouped under the key "Others".
- */
-export function getModelsByFamily(): Record<string, string[]> {
-  const result: Record<string, string[]> = {};
-  for (const [modelId, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
-    if (getProvidersForModel(modelId).length === 0) continue;
-    const family = info.family ?? "Others";
-    if (!result[family]) result[family] = [];
-    result[family].push(modelId);
-  }
-  return result;
 }

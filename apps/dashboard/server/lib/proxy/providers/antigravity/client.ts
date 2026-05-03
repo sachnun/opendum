@@ -37,28 +37,6 @@ import { cacheSignature } from "./cache.js";
 import { convertImageUrlsToBase64 } from "../../images.js";
 
 /**
- * Generate PKCE code verifier
- */
-function generateCodeVerifier(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return Array.from(array, (byte) =>
-    byte.toString(16).padStart(2, "0")
-  ).join("");
-}
-
-/**
- * Generate PKCE code challenge from verifier
- */
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-/**
  * Check if token needs refresh
  */
 function isTokenExpired(expiresAt: Date): boolean {
@@ -808,7 +786,6 @@ function createSignatureCachingTransform(
   });
 }
 
-export { generateCodeVerifier, generateCodeChallenge };
 
 /**
  * Buffer streaming response and merge into single Gemini response object.

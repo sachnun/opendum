@@ -1,9 +1,6 @@
 // Antigravity Provider Exports
 export {
   antigravityProvider,
-  antigravityConfig,
-  generateCodeVerifier,
-  generateCodeChallenge,
 } from "./client.js";
 export * from "./constants.js";
 export * from "./cache.js";

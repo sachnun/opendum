@@ -7,7 +7,7 @@ import type {
   ProviderAccountIndicators,
 } from "../../lib/navigation";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
-import { primaryNavigation, supportNavigation } from "../../lib/navigation";
+import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
 import type { ProviderAccountKey } from "../../lib/provider-accounts";
 import { buildProviderHrefMap, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
@@ -47,6 +47,11 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 };
 
 const modelFamilyCounts = ref<ModelFamilyCounts>(Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])));
+
+const supportNavigation: NavItem[] = [
+  { name: "Usage", href: "/dashboard/usage", icon: "i-lucide-book-open" },
+  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
+];
 
 const dashboardApi = useDashboardApi();
 
