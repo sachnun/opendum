@@ -1,9 +1,6 @@
 [opendum]
 family = "Google"
-providers = ["openrouter", "nvidia_nim"]
+providers = ["nvidia_nim"]
 
 [nvidia_nim]
 upstream = "google/gemma-3-4b-it"
-
-[openrouter]
-upstream = "google/gemma-3-4b-it:free"
