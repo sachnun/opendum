@@ -31,7 +31,7 @@ export async function setRedisJson(
   const redis = await getRedisClient();
 
   try {
-    await redis.set(key, JSON.stringify(value), "EX", Math.max(1, Math.floor(ttlSeconds)));
+    await redis.set(key, JSON.stringify(value), { EX: Math.max(1, Math.floor(ttlSeconds)) });
   } catch {
     // Ignore cache write errors
   }

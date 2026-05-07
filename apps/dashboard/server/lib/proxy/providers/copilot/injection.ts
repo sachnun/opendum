@@ -39,9 +39,7 @@ export async function getCopilotSystemToolMode(
     const setResult = await redis.set(
       getWindowKey(normalizedAccountId),
       "1",
-      "EX",
-      toTtlSeconds(X_INITIATOR_WINDOW_MS),
-      "NX"
+      { EX: toTtlSeconds(X_INITIATOR_WINDOW_MS), NX: true }
     );
 
     if (setResult === "OK") {

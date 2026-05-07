@@ -19,7 +19,12 @@ function createDb(): Database {
     throw new Error("DATABASE_URL is required");
   }
 
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({
+    connectionString,
+    max: Number.parseInt(process.env.POSTGRES_POOL_MAX ?? "1", 10),
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 10_000,
+  });
   globalForDb.pool = pool;
   return drizzleNodePg(pool, { schema: fullSchema });
 }

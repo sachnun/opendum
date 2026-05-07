@@ -1,19 +1,34 @@
-import Redis from "ioredis";
+import { createClient, type RedisClientType } from "redis";
 
 const globalKey = "__opendum_redis_client__";
 
-let redisClient: Redis | null = null;
+let redisClient: RedisClientType | null = null;
+let redisConnectPromise: Promise<RedisClientType> | null = null;
 
-export async function getRedisClient(): Promise<Redis> {
+async function ensureConnected(client: RedisClientType): Promise<RedisClientType> {
+  if (client.isOpen) {
+    return client;
+  }
+
+  redisConnectPromise ??= client.connect()
+    .then(() => client)
+    .finally(() => {
+      redisConnectPromise = null;
+    });
+
+  return redisConnectPromise;
+}
+
+export async function getRedisClient(): Promise<RedisClientType> {
   if (redisClient) {
-    return redisClient;
+    return ensureConnected(redisClient);
   }
 
   // Reuse cached client across HMR in dev
-  const cached = (globalThis as Record<string, unknown>)[globalKey] as Redis | undefined;
+  const cached = (globalThis as Record<string, unknown>)[globalKey] as RedisClientType | undefined;
   if (cached) {
     redisClient = cached;
-    return redisClient;
+    return ensureConnected(redisClient);
   }
 
   const redisUrl = process.env.REDIS_URL ?? null;
@@ -22,13 +37,10 @@ export async function getRedisClient(): Promise<Redis> {
     throw new Error("REDIS_URL is required");
   }
 
-  redisClient = new Redis(redisUrl, {
-    maxRetriesPerRequest: null,
-    lazyConnect: false,
-  });
+  redisClient = createClient({ url: redisUrl }) as RedisClientType;
   redisClient.on("error", () => undefined);
 
   (globalThis as Record<string, unknown>)[globalKey] = redisClient;
 
-  return redisClient;
+  return ensureConnected(redisClient);
 }

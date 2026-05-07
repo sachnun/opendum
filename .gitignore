@@ -1,15 +1,9 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 node_modules/
 .pnpm-store/
 
-# package manager logs
+# logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # build outputs
 dist/
@@ -21,17 +15,13 @@ out/
 .cron/
 .cache/
 .vite/
-.next/
 
 # generated data
 .data/
 
-# testing and analysis
+# test outputs
 coverage/
 coverage.out
-.nyc_output/
-.fallow/
-.fallowrc.json
 
 # Go
 *.test
@@ -55,15 +45,8 @@ Thumbs.db
 # vercel
 .vercel/
 
+# cloudflare
+.wrangler/
+
 # typescript
 *.tsbuildinfo
-next-env.d.ts
-
-# OpenCode / OpenSpec
-.opencode/
-openspec/
-
-# agent instructions
-AGENTS.md
-.agents/
-skills-lock.json
