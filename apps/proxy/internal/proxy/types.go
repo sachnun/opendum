@@ -9,18 +9,18 @@ const (
 	FormatAnthropic ErrorFormatter = "anthropic"
 )
 
-type routeConfig struct {
+type endpointAdapter struct {
 	Endpoint             string
 	Format               ErrorFormatter
 	RateLimitStatusCode  int
 	NoAccountsStatusCode int
-	Parse                func(map[string]any) (parsedRequest, *routeError)
-	Build                func(parsedRequest, string, bool, string) map[string]any
-	HandleStream         func(streamContext) error
-	HandleNonStream      func(nonStreamContext) error
+	Parse                func(map[string]any) (parsedEndpointRequest, *routeError)
+	Build                func(parsedEndpointRequest, string, bool, string) map[string]any
+	HandleStream         func(responseContext) error
+	HandleNonStream      func(responseContext) error
 }
 
-type parsedRequest struct {
+type parsedEndpointRequest struct {
 	ModelParam         string
 	Stream             bool
 	ProviderAccountID  *string
@@ -38,20 +38,7 @@ type routeError struct {
 	Code    *string
 }
 
-type streamContext struct {
-	Response       *http.Response
-	AccountID      string
-	Provider       string
-	Writer         http.ResponseWriter
-	Request        *http.Request
-	RequestStartMS int64
-	StartMS        int64
-	UserID         string
-	APIKeyID       string
-	Model          string
-}
-
-type nonStreamContext struct {
+type responseContext struct {
 	Response       *http.Response
 	AccountID      string
 	Provider       string

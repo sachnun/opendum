@@ -153,7 +153,7 @@ func (s *Service) getHealthByAccount(ctx context.Context, accountIDs, modelKeys 
 	return result, nil
 }
 
-func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, providerAccountID *string, accountAccess auth.AccountAccess, cfg routeConfig) (*appdb.ProviderAccount, *routeError) {
+func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, providerAccountID *string, accountAccess auth.AccountAccess, cfg endpointAdapter) (*appdb.ProviderAccount, *routeError) {
 	if providerAccountID == nil {
 		return nil, nil
 	}

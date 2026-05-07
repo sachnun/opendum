@@ -55,6 +55,19 @@ const PERIOD_CONFIG: Record<Period, PeriodConfig> = {
   "30d": { duration: 30 * 24 * 60 * 60 * 1000, granularity: "1d", granularityMs: 24 * 60 * 60 * 1000 },
   "90d": { duration: 90 * 24 * 60 * 60 * 1000, granularity: "1d", granularityMs: 24 * 60 * 60 * 1000 },
 };
+const CUSTOM_RANGE_CONFIGS = [PERIOD_CONFIG["5m"], PERIOD_CONFIG["30m"], PERIOD_CONFIG["1h"], PERIOD_CONFIG["6h"], PERIOD_CONFIG["24h"], PERIOD_CONFIG["7d"]] as const;
+const GRANULARITY_BUCKET_SECONDS: Record<Granularity, number> = { "10s": 10, "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400 };
+const GRANULARITY_ROUNDERS: Record<Granularity, (date: Date) => string | undefined> = {
+  "10s": (date) => { date.setSeconds(Math.floor(date.getSeconds() / 10) * 10, 0); return undefined; },
+  "1m": (date) => { date.setSeconds(0, 0); return undefined; },
+  "5m": (date) => { date.setMinutes(Math.floor(date.getMinutes() / 5) * 5, 0, 0); return undefined; },
+  "15m": (date) => { date.setMinutes(Math.floor(date.getMinutes() / 15) * 15, 0, 0); return undefined; },
+  "1h": (date) => { date.setMinutes(0, 0, 0); return undefined; },
+  "1d": (date) => {
+    date.setHours(0, 0, 0, 0);
+    return date.toISOString().split("T")[0] ?? "";
+  },
+};
 
 function getAnalyticsCacheTtlSeconds(durationMs: number): number {
   if (durationMs <= 60 * 60 * 1000) return 15;
@@ -78,38 +91,20 @@ function resolveFilterConfig(filter: AnalyticsFilter): ActionResult<{ startDate:
   const startDate = fromDate <= toDate ? fromDate : toDate;
   const endDate = toDate >= fromDate ? toDate : fromDate;
   const duration = Math.max(endDate.getTime() - startDate.getTime(), 0);
-  const config =
-    duration <= PERIOD_CONFIG["5m"].duration ? { ...PERIOD_CONFIG["5m"], duration }
-    : duration <= PERIOD_CONFIG["30m"].duration ? { ...PERIOD_CONFIG["30m"], duration }
-    : duration <= PERIOD_CONFIG["1h"].duration ? { ...PERIOD_CONFIG["1h"], duration }
-    : duration <= PERIOD_CONFIG["6h"].duration ? { ...PERIOD_CONFIG["6h"], duration }
-    : duration <= PERIOD_CONFIG["24h"].duration ? { ...PERIOD_CONFIG["24h"], duration }
-    : { ...PERIOD_CONFIG["7d"], duration };
+  const config = { ...(CUSTOM_RANGE_CONFIGS.find((entry) => duration <= entry.duration) ?? PERIOD_CONFIG["7d"]), duration };
 
   return { success: true, data: { startDate, endDate, config } };
 }
 
 function formatTimeSlot(date: Date, granularity: Granularity): string {
   const d = new Date(date);
-  if (granularity === "10s") d.setSeconds(Math.floor(d.getSeconds() / 10) * 10, 0);
-  if (granularity === "1m") d.setSeconds(0, 0);
-  if (granularity === "5m") d.setMinutes(Math.floor(d.getMinutes() / 5) * 5, 0, 0);
-  if (granularity === "15m") d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0);
-  if (granularity === "1h") d.setMinutes(0, 0, 0);
-  if (granularity === "1d") return d.toISOString().split("T")[0] ?? "";
-  return d.toISOString();
+  return GRANULARITY_ROUNDERS[granularity](d) || d.toISOString();
 }
 
 function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig): string[] {
   const slots: string[] = [];
   const current = new Date(startDate);
-  formatTimeSlot(current, config.granularity);
-  if (config.granularity === "1d") current.setHours(0, 0, 0, 0);
-  if (config.granularity === "1h") current.setMinutes(0, 0, 0);
-  if (config.granularity === "15m") current.setMinutes(Math.floor(current.getMinutes() / 15) * 15, 0, 0);
-  if (config.granularity === "5m") current.setMinutes(Math.floor(current.getMinutes() / 5) * 5, 0, 0);
-  if (config.granularity === "1m") current.setSeconds(0, 0);
-  if (config.granularity === "10s") current.setSeconds(Math.floor(current.getSeconds() / 10) * 10, 0);
+  GRANULARITY_ROUNDERS[config.granularity](current);
   while (current <= endDate) {
     slots.push(formatTimeSlot(current, config.granularity));
     current.setTime(current.getTime() + config.granularityMs);
@@ -118,7 +113,7 @@ function generateTimeSlots(startDate: Date, endDate: Date, config: PeriodConfig)
 }
 
 function getGranularityBucketSeconds(granularity: Granularity): number {
-  return granularity === "10s" ? 10 : granularity === "1m" ? 60 : granularity === "5m" ? 300 : granularity === "15m" ? 900 : granularity === "1h" ? 3600 : 86400;
+  return GRANULARITY_BUCKET_SECONDS[granularity];
 }
 
 function toRoundedValue(value: number | string | null | undefined): number {

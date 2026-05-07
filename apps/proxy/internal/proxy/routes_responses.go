@@ -2,8 +2,8 @@ package proxy
 
 import "net/http"
 
-func responsesConfig(s *Service) routeConfig {
-	return routeConfig{
+func responsesConfig(s *Service) endpointAdapter {
+	return endpointAdapter{
 		Endpoint:             "responses",
 		Format:               FormatOpenAI,
 		RateLimitStatusCode:  http.StatusTooManyRequests,
@@ -15,23 +15,17 @@ func responsesConfig(s *Service) routeConfig {
 	}
 }
 
-func parseResponses(body map[string]any) (parsedRequest, *routeError) {
-	model, _ := body["model"].(string)
-	if model == "" {
-		return parsedRequest{}, &routeError{Status: http.StatusBadRequest, Message: "model is required", Type: "invalid_request_error"}
+func parseResponses(body map[string]any) (parsedEndpointRequest, *routeError) {
+	model, routeErr := parseRequiredModel(body)
+	if routeErr != nil {
+		return parsedEndpointRequest{}, routeErr
 	}
 	input, ok := body["input"].([]any)
 	if !ok || len(input) == 0 {
-		return parsedRequest{}, &routeError{Status: http.StatusBadRequest, Message: "input array is required", Type: "invalid_request_error"}
+		return parsedEndpointRequest{}, &routeError{Status: http.StatusBadRequest, Message: "input array is required", Type: "invalid_request_error"}
 	}
-	stream := true
-	if value, ok := body["stream"].(bool); ok {
-		stream = value
-	}
-	var providerAccountID *string
-	if value, ok := body["provider_account_id"].(string); ok {
-		providerAccountID = &value
-	}
+	stream := parseStreamParam(body)
+	providerAccountID := parseProviderAccountID(body)
 	instructions, _ := body["instructions"].(string)
 	messages := convertResponsesInputToMessages(input, instructions)
 	params := cloneMapExcept(body, "model", "input", "instructions", "stream", "provider_account_id")
@@ -40,18 +34,14 @@ func parseResponses(body map[string]any) (parsedRequest, *routeError) {
 		delete(params, "max_output_tokens")
 	}
 	reasoning := params["reasoning"] != nil || params["reasoning_effort"] != nil
-	paramsForError := cloneMap(params)
-	paramsForError["stream"] = stream
+	paramsForError := buildParamsForError(params, stream, providerAccountID)
 	if instructions != "" {
 		paramsForError["instructions"] = instructions
 	}
-	if providerAccountID != nil && *providerAccountID != "" {
-		paramsForError["provider_account_id"] = *providerAccountID
-	}
-	return parsedRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "responsesInput": input, "instructions": instructions, "params": params}}, nil
+	return parsedEndpointRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "responsesInput": input, "instructions": instructions, "params": params}}, nil
 }
 
-func buildResponses(parsed parsedRequest, model string, stream bool, sessionID string) map[string]any {
+func buildResponses(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
 	params, _ := parsed.RouteData["params"].(map[string]any)
 	body := cloneMap(params)
 	body["model"] = model
@@ -62,9 +52,7 @@ func buildResponses(parsed parsedRequest, model string, stream bool, sessionID s
 	if instructions, _ := parsed.RouteData["instructions"].(string); instructions != "" {
 		body["instructions"] = instructions
 	}
-	if sessionID != "" {
-		body["_sessionId"] = sessionID
-	}
+	addSessionID(body, sessionID)
 	return body
 }
 

@@ -152,27 +152,9 @@ export function convertResponsesInputToChatMessages(
       const role = typeof item.role === "string" ? item.role : "user";
       const content = item.content;
 
-      if (role === "developer") {
-        messages.push({
-          role: "system",
-          content:
-            typeof content === "string"
-              ? content
-              : content === undefined
-                ? ""
-                : JSON.stringify(content),
-        });
-      } else {
-        messages.push({
-          role,
-          content:
-            typeof content === "string" || Array.isArray(content)
-              ? content
-              : content === undefined
-                ? ""
-                : JSON.stringify(content),
-        });
-      }
+      const normalizedRole = role === "developer" ? "system" : role;
+      const normalizedContent = typeof content === "string" || Array.isArray(content) ? content : content === undefined ? "" : JSON.stringify(content);
+      messages.push({ role: normalizedRole, content: normalizedContent });
 
       continue;
     }

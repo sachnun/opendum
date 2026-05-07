@@ -444,44 +444,7 @@ function convertMessagesToInput(
         break;
 
       case "assistant":
-        if (msg.tool_calls && msg.tool_calls.length > 0) {
-          // Assistant message with tool calls
-          // First add any content as a message
-          if (msg.content) {
-            input.push({
-              type: "message",
-              role: "assistant",
-              content:
-                typeof msg.content === "string"
-                  ? msg.content
-                  : convertContentBlockTypes(msg.content, "assistant"),
-            });
-          }
-          // Then add each tool call as a function_call item
-          for (const tc of msg.tool_calls) {
-            if (!tc || typeof tc !== "object") {
-              continue;
-            }
-
-            const toolCall = tc as Record<string, unknown>;
-            const fn = toolCall.function as Record<string, unknown> | undefined;
-            const name = fn?.name;
-            if (typeof name !== "string" || !name.trim()) {
-              continue;
-            }
-
-            const args = fn?.arguments;
-            const rawId = typeof toolCall.id === "string" ? toolCall.id : "";
-            const fcId = toResponsesApiId(rawId);
-            input.push({
-              type: "function_call",
-              id: fcId,
-              call_id: fcId,
-              name: name.trim(),
-              arguments: typeof args === "string" ? args : "{}",
-            });
-          }
-        } else {
+        if (!msg.tool_calls?.length || msg.content) {
           input.push({
             type: "message",
             role: "assistant",
@@ -489,6 +452,29 @@ function convertMessagesToInput(
               typeof msg.content === "string"
                 ? msg.content
                 : convertContentBlockTypes(msg.content, "assistant"),
+          });
+        }
+        for (const tc of msg.tool_calls ?? []) {
+          if (!tc || typeof tc !== "object") {
+            continue;
+          }
+
+          const toolCall = tc as Record<string, unknown>;
+          const fn = toolCall.function as Record<string, unknown> | undefined;
+          const name = fn?.name;
+          if (typeof name !== "string" || !name.trim()) {
+            continue;
+          }
+
+          const args = fn?.arguments;
+          const rawId = typeof toolCall.id === "string" ? toolCall.id : "";
+          const fcId = toResponsesApiId(rawId);
+          input.push({
+            type: "function_call",
+            id: fcId,
+            call_id: fcId,
+            name: name.trim(),
+            arguments: typeof args === "string" ? args : "{}",
           });
         }
         break;
@@ -770,14 +756,7 @@ function buildResponsesApiPayload(
     body.parallel_tool_calls
   );
 
-  let reasoningConfig: Record<string, unknown> | undefined;
-  if (body.reasoning && typeof body.reasoning === "object") {
-    reasoningConfig = { ...body.reasoning };
-  } else if (body.reasoning_effort) {
-    reasoningConfig = {
-      effort: body.reasoning_effort,
-    };
-  }
+  const reasoningConfig: Record<string, unknown> | undefined = body.reasoning && typeof body.reasoning === "object" ? { ...body.reasoning } : body.reasoning_effort ? { effort: body.reasoning_effort } : undefined;
 
   if (reasoningConfig && reasoningRequested && reasoningConfig.summary === undefined) {
     reasoningConfig.summary = "auto";
@@ -1162,33 +1141,21 @@ function convertResponseToCompletion(
   let toolCallIndex = 0;
 
   for (const item of output) {
-    if (item.type === "message") {
-      const itemContent = item.content as Array<Record<string, unknown>>;
-      if (Array.isArray(itemContent)) {
-        for (const part of itemContent) {
-          if (part.type === "output_text") {
-            content += (part.text as string) || "";
-          }
-        }
-      }
-    } else if (item.type === "reasoning") {
-      const extracted = extractReasoningText(item);
-      if (extracted) {
-        reasoningContent += reasoningContent ? `\n${extracted}` : extracted;
-      }
-    } else if (item.type === "function_call") {
-      toolCalls.push({
-        id: toChatCompletionsId(
-          (item.call_id as string) || (item.id as string) || `fc_${toolCallIndex}`
-        ),
-        type: "function",
-        function: {
-          name: item.name as string,
-          arguments: (item.arguments as string) || "{}",
-        },
-      });
-      toolCallIndex++;
-    }
+    const handlers = {
+      message: () => {
+        const itemContent = item.content as Array<Record<string, unknown>>;
+        if (Array.isArray(itemContent)) content += itemContent.filter((part) => part.type === "output_text").map((part) => (part.text as string) || "").join("");
+      },
+      reasoning: () => {
+        const extracted = extractReasoningText(item);
+        if (extracted) reasoningContent += reasoningContent ? `\n${extracted}` : extracted;
+      },
+      function_call: () => {
+        toolCalls.push({ id: toChatCompletionsId((item.call_id as string) || (item.id as string) || `fc_${toolCallIndex}`), type: "function", function: { name: item.name as string, arguments: (item.arguments as string) || "{}" } });
+        toolCallIndex++;
+      },
+    } satisfies Record<string, () => void>;
+    handlers[String(item.type)]?.();
   }
 
   // Extract usage
@@ -1629,9 +1596,7 @@ export const codexProvider: Provider = {
           `Failed to refresh token for Codex account ${account.id}:`,
           error
         );
-        if (new Date() < account.expiresAt) {
-          // Use existing token as fallback
-        } else {
+        if (new Date() >= account.expiresAt) {
           throw error;
         }
       }

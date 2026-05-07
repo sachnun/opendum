@@ -226,12 +226,8 @@ export const antigravityProvider: Provider = {
 
         accessToken = newTokens.accessToken;
       } catch (error) {
-        // If refresh fails but token not truly expired, use existing
-        if (new Date() < account.expiresAt) {
-          return accessToken;
-        } else {
-          throw error;
-        }
+        if (new Date() < account.expiresAt) return accessToken;
+        throw error;
       }
     }
 
@@ -884,51 +880,47 @@ function mergeGeminiChunks(
   let currentThought = "";
   let currentThoughtSignature: string | undefined;
 
+  const flushThought = () => {
+    if (!currentThought) return;
+    mergedParts.push({
+      thought: true,
+      text: currentThought,
+      ...(currentThoughtSignature && { thoughtSignature: currentThoughtSignature }),
+    });
+    currentThought = "";
+    currentThoughtSignature = undefined;
+  };
+
+  const flushText = () => {
+    if (!currentText) return;
+    mergedParts.push({ text: currentText });
+    currentText = "";
+  };
+
   for (const part of allParts) {
     if (part.thought === true && typeof part.text === "string") {
       currentThought += part.text;
       if (part.thoughtSignature) {
         currentThoughtSignature = part.thoughtSignature as string;
       }
-    } else if (typeof part.text === "string" && !part.functionCall) {
-      if (currentThought) {
-        mergedParts.push({
-          thought: true,
-          text: currentThought,
-          ...(currentThoughtSignature && { thoughtSignature: currentThoughtSignature }),
-        });
-        currentThought = "";
-        currentThoughtSignature = undefined;
-      }
+      continue;
+    }
+
+    if (typeof part.text === "string" && !part.functionCall) {
+      flushThought();
       currentText += part.text;
-    } else if (part.functionCall) {
-      if (currentThought) {
-        mergedParts.push({
-          thought: true,
-          text: currentThought,
-          ...(currentThoughtSignature && { thoughtSignature: currentThoughtSignature }),
-        });
-        currentThought = "";
-        currentThoughtSignature = undefined;
-      }
-      if (currentText) {
-        mergedParts.push({ text: currentText });
-        currentText = "";
-      }
+      continue;
+    }
+
+    if (part.functionCall) {
+      flushThought();
+      flushText();
       mergedParts.push(part);
     }
   }
 
-  if (currentThought) {
-    mergedParts.push({
-      thought: true,
-      text: currentThought,
-      ...(currentThoughtSignature && { thoughtSignature: currentThoughtSignature }),
-    });
-  }
-  if (currentText) {
-    mergedParts.push({ text: currentText });
-  }
+  flushThought();
+  flushText();
 
   if (mergedParts.length === 0) {
     mergedParts.push({ text: "" });

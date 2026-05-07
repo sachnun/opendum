@@ -64,11 +64,10 @@ export function applyAntigravitySystemInstruction(
   let existingParts: Array<Record<string, unknown>> = [];
   let existingRecord: Record<string, unknown> | undefined;
 
-  if (typeof existing === "string") {
-    if (existing.length > 0) {
-      existingParts = [{ text: existing }];
-    }
-  } else if (existing && typeof existing === "object") {
+  if (typeof existing === "string" && existing.length > 0) {
+    existingParts = [{ text: existing }];
+  }
+  if (existing && typeof existing === "object") {
     existingRecord = existing as Record<string, unknown>;
     const parts = existingRecord.parts;
     if (Array.isArray(parts)) {
@@ -187,24 +186,18 @@ export function normalizeToolCallArgs(
 
     if (expectedType === "string") {
       result[key] = processEscapeSequencesOnly(value);
-    } else if (
-      typeof value === "string" &&
-      (expectedType === "array" || expectedType === "object")
-    ) {
+      continue;
+    }
+    if (typeof value === "string" && (expectedType === "array" || expectedType === "object")) {
       // If we expect an array/object but got a string, try to parse it
       try {
-        const parsed = JSON.parse(value);
-        result[key] = parsed;
+        result[key] = JSON.parse(value);
       } catch {
         result[key] = processEscapeSequencesOnly(value);
       }
-    } else if (expectedType === undefined) {
-      // No schema info: be conservative and only unescape control characters
-      result[key] = processEscapeSequencesOnly(value);
-    } else {
-      // For other types, or if it's already an object, just process escapes
-      result[key] = processEscapeSequencesOnly(value);
+      continue;
     }
+    result[key] = processEscapeSequencesOnly(value);
   }
 
   return result;

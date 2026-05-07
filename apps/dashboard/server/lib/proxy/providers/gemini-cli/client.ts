@@ -284,12 +284,7 @@ export const geminiCliProvider: Provider = {
           `Failed to refresh token for Gemini CLI account ${account.id}:`,
           error
         );
-        // If refresh fails but token not truly expired, use existing
-        if (new Date() < account.expiresAt) {
-          // Use existing token as fallback
-        } else {
-          throw error;
-        }
+        if (new Date() >= account.expiresAt) throw error;
       }
     }
 
@@ -350,6 +345,15 @@ export const geminiCliProvider: Provider = {
     // Image generation models don't support thinking/reasoning
     const isImageModel = modelName.includes("image");
 
+    if (isImageModel) {
+      // Strip thinkingConfig if it was added by converter for image models
+      if (geminiPayload.generationConfig && typeof geminiPayload.generationConfig === "object") {
+        delete (geminiPayload.generationConfig as Record<string, unknown>).thinkingConfig;
+      }
+      // Strip tools for image models
+      delete (geminiPayload as Record<string, unknown>).tools;
+    }
+
     if (!isImageModel) {
       const reasoningEffort = body.reasoning?.effort || body.reasoning_effort;
       const thinkingConfig = getThinkingConfig(
@@ -365,13 +369,6 @@ export const geminiCliProvider: Provider = {
         (geminiPayload.generationConfig as Record<string, unknown>).thinkingConfig =
           thinkingConfig;
       }
-    } else {
-      // Strip thinkingConfig if it was added by converter for image models
-      if (geminiPayload.generationConfig && typeof geminiPayload.generationConfig === "object") {
-        delete (geminiPayload.generationConfig as Record<string, unknown>).thinkingConfig;
-      }
-      // Strip tools for image models
-      delete (geminiPayload as Record<string, unknown>).tools;
     }
 
     (geminiPayload as Record<string, unknown>).safetySettings = DEFAULT_SAFETY_SETTINGS;

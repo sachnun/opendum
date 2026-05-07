@@ -208,12 +208,7 @@ function parseCreditsFromApi(value: unknown): CodexCreditsInfo | null {
   const unlimited = toBoolean(record.unlimited);
   const balanceRaw = record.balance;
 
-  let balance: string | null = null;
-  if (typeof balanceRaw === "string") {
-    balance = balanceRaw;
-  } else if (typeof balanceRaw === "number" && Number.isFinite(balanceRaw)) {
-    balance = String(balanceRaw);
-  }
+  const balance = typeof balanceRaw === "string" ? balanceRaw : typeof balanceRaw === "number" && Number.isFinite(balanceRaw) ? String(balanceRaw) : null;
 
   if (hasCredits === null && unlimited === null && balance === null) {
     return null;

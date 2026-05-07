@@ -2,8 +2,8 @@ package proxy
 
 import "net/http"
 
-func chatCompletionsConfig(s *Service) routeConfig {
-	return routeConfig{
+func chatCompletionsConfig(s *Service) endpointAdapter {
+	return endpointAdapter{
 		Endpoint:             "chat_completions",
 		Format:               FormatOpenAI,
 		RateLimitStatusCode:  http.StatusTooManyRequests,
@@ -15,43 +15,31 @@ func chatCompletionsConfig(s *Service) routeConfig {
 	}
 }
 
-func parseChatCompletions(body map[string]any) (parsedRequest, *routeError) {
-	model, _ := body["model"].(string)
-	if model == "" {
-		return parsedRequest{}, &routeError{Status: http.StatusBadRequest, Message: "model is required", Type: "invalid_request_error"}
+func parseChatCompletions(body map[string]any) (parsedEndpointRequest, *routeError) {
+	model, routeErr := parseRequiredModel(body)
+	if routeErr != nil {
+		return parsedEndpointRequest{}, routeErr
 	}
 	messages, ok := body["messages"].([]any)
 	if !ok || len(messages) == 0 {
-		return parsedRequest{}, &routeError{Status: http.StatusBadRequest, Message: "messages array is required", Type: "invalid_request_error"}
+		return parsedEndpointRequest{}, &routeError{Status: http.StatusBadRequest, Message: "messages array is required", Type: "invalid_request_error"}
 	}
-	stream := true
-	if value, ok := body["stream"].(bool); ok {
-		stream = value
-	}
-	var providerAccountID *string
-	if value, ok := body["provider_account_id"].(string); ok {
-		providerAccountID = &value
-	}
+	stream := parseStreamParam(body)
+	providerAccountID := parseProviderAccountID(body)
 	params := cloneMapExcept(body, "model", "messages", "stream", "provider_account_id")
 	reasoning := body["reasoning"] != nil || body["reasoning_effort"] != nil || body["thinking_budget"] != nil || body["include_thoughts"] != nil
-	paramsForError := cloneMap(params)
-	paramsForError["stream"] = stream
-	if providerAccountID != nil && *providerAccountID != "" {
-		paramsForError["provider_account_id"] = *providerAccountID
-	}
-	return parsedRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "params": params}}, nil
+	paramsForError := buildParamsForError(params, stream, providerAccountID)
+	return parsedEndpointRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "params": params}}, nil
 }
 
-func buildChatCompletions(parsed parsedRequest, model string, stream bool, sessionID string) map[string]any {
+func buildChatCompletions(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
 	params, _ := parsed.RouteData["params"].(map[string]any)
 	body := cloneMap(params)
 	body["model"] = model
 	body["messages"] = parsed.RouteData["messages"]
 	body["stream"] = stream
 	body["_includeReasoning"] = parsed.ReasoningRequested
-	if sessionID != "" {
-		body["_sessionId"] = sessionID
-	}
+	addSessionID(body, sessionID)
 	return body
 }
 

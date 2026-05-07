@@ -23,6 +23,7 @@ const COPILOT_DEFAULT_MONTHLY_LIMIT = 300;
 type QuotaProviderKey = z.infer<typeof accountQuotaInputSchema>["provider"];
 type QuotaConfidence = "high" | "medium" | "low";
 type JsonRecord = Record<string, unknown>;
+type QuotaFetcher = (account: ProviderAccount) => Promise<AccountQuotaInfo>;
 
 interface QuotaGroupDisplay {
   name: string;
@@ -176,10 +177,7 @@ function copilotSnapshotToGroups(snapshot: CopilotUsageSnapshot, monthlyLimit: n
   const remainingFraction = monthlyLimit > 0 ? clampFraction(remaining / monthlyLimit) : 0;
   const percentUsed = monthlyLimit > 0 ? Math.max(0, Math.min(100, Math.round((used / monthlyLimit) * 100))) : 0;
   const monthLabel = formatMonthLabel(snapshot.year, snapshot.month);
-  let confidence: QuotaConfidence = "low";
-
-  if (!limitEstimated) confidence = "high";
-  else if (snapshot.source === "internal_api" || snapshot.source === "both" || snapshot.source === "billing_api") confidence = "medium";
+  const confidence: QuotaConfidence = !limitEstimated ? "high" : snapshot.source === "internal_api" || snapshot.source === "both" || snapshot.source === "billing_api" ? "medium" : "low";
 
   return [
     {
@@ -448,98 +446,86 @@ function buildOpenRouterQuotaGroups(keyData: JsonRecord | null, creditsData: Jso
   ];
 }
 
-async function getProviderQuota(account: ProviderAccount, provider: QuotaProviderKey): Promise<AccountQuotaInfo> {
-  if (provider === "antigravity") {
-    let accessToken: string;
-    try {
-      accessToken = await antigravityProvider.getValidCredentials(account);
-    } catch {
-      return expiredQuotaInfo(account, account.tier ?? "free", "Token expired - please re-authenticate");
-    }
-
-    const quota = await fetchAntigravityQuotaFromApi(accessToken, account.projectId ?? "", account.tier ?? "free");
-    if (quota.status === "error") return errorQuotaInfo(account, account.tier ?? "free", quota.error, quota.fetchedAt);
-    return toBaseQuotaInfo(account, account.tier ?? "free", "success", quota.groups.map(toAntigravityGroupDisplay), quota.fetchedAt);
+async function getValidQuotaCredentials(account: ProviderAccount, getCredentials: (account: ProviderAccount) => Promise<string>, fallbackTier: string): Promise<{ accessToken: string } | AccountQuotaInfo> {
+  try {
+    return { accessToken: await getCredentials(account) };
+  } catch {
+    return expiredQuotaInfo(account, fallbackTier, "Token expired - please re-authenticate");
   }
+}
 
-  if (provider === "copilot") {
-    let accessToken: string;
+async function getAntigravityQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
+  const tier = account.tier ?? "free";
+  const credentials = await getValidQuotaCredentials(account, antigravityProvider.getValidCredentials, tier);
+  if ("status" in credentials) return credentials;
+  const quota = await fetchAntigravityQuotaFromApi(credentials.accessToken, account.projectId ?? "", tier);
+  if (quota.status === "error") return errorQuotaInfo(account, tier, quota.error, quota.fetchedAt);
+  return toBaseQuotaInfo(account, tier, "success", quota.groups.map(toAntigravityGroupDisplay), quota.fetchedAt);
+}
+
+async function getCopilotQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
+  const tier = account.tier?.trim() || "free";
+  const credentials = await getValidQuotaCredentials(account, copilotProvider.getValidCredentials, tier);
+  if ("status" in credentials) return credentials;
+  const snapshot = await fetchCopilotUsageFromApi(credentials.accessToken);
+  if (snapshot.status !== "success") return errorQuotaInfo(account, tier, snapshot.error, snapshot.fetchedAt);
+  const { limit, estimated } = resolveCopilotMonthlyLimit(snapshot.planLimit);
+  return toBaseQuotaInfo(account, tier, "success", copilotSnapshotToGroups(snapshot, limit, estimated), snapshot.fetchedAt);
+}
+
+async function getCodexQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
+  const fallbackTier = account.tier?.trim() || "free";
+  const credentials = await getValidQuotaCredentials(account, codexProvider.getValidCredentials, fallbackTier);
+  if ("status" in credentials) return credentials;
+  const snapshot = await fetchCodexQuotaFromApi(credentials.accessToken, account.accountId);
+  if (snapshot.status !== "success") return errorQuotaInfo(account, fallbackTier, snapshot.error ?? "Failed to fetch Codex quota data", Date.now());
+  const tier = snapshot.planType?.trim() || fallbackTier;
+  return toBaseQuotaInfo(account, tier, "success", codexSnapshotToGroups(snapshot, false, "high"), snapshot.fetchedAt);
+}
+
+async function getGeminiCliQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
+  const credentials = await getValidQuotaCredentials(account, geminiCliProvider.getValidCredentials, account.tier ?? "free-tier");
+  if ("status" in credentials) return credentials;
+
+  let projectId = account.projectId;
+  let tier = account.tier ?? "free-tier";
+  let projectDiscoveryError: string | undefined;
+
+  if (!projectId) {
     try {
-      accessToken = await copilotProvider.getValidCredentials(account);
-    } catch {
-      return expiredQuotaInfo(account, account.tier?.trim() || "free", "Token expired - please re-authenticate");
-    }
-
-    const snapshot = await fetchCopilotUsageFromApi(accessToken);
-    if (snapshot.status !== "success") return errorQuotaInfo(account, account.tier?.trim() || "free", snapshot.error, snapshot.fetchedAt);
-    const { limit, estimated } = resolveCopilotMonthlyLimit(snapshot.planLimit);
-    return toBaseQuotaInfo(account, account.tier?.trim() || "free", "success", copilotSnapshotToGroups(snapshot, limit, estimated), snapshot.fetchedAt);
-  }
-
-  if (provider === "codex") {
-    let accessToken: string;
-    try {
-      accessToken = await codexProvider.getValidCredentials(account);
-    } catch {
-      return expiredQuotaInfo(account, account.tier?.trim() || "free", "Token expired - please re-authenticate");
-    }
-
-    const snapshot = await fetchCodexQuotaFromApi(accessToken, account.accountId);
-    if (snapshot.status !== "success") return errorQuotaInfo(account, account.tier?.trim() || "free", snapshot.error ?? "Failed to fetch Codex quota data", Date.now());
-    const tier = snapshot.planType?.trim() || account.tier?.trim() || "free";
-    return toBaseQuotaInfo(account, tier, "success", codexSnapshotToGroups(snapshot, false, "high"), snapshot.fetchedAt);
-  }
-
-  if (provider === "gemini_cli") {
-    let accessToken: string;
-    try {
-      accessToken = await geminiCliProvider.getValidCredentials(account);
-    } catch {
-      return expiredQuotaInfo(account, account.tier ?? "free-tier", "Token expired - please re-authenticate");
-    }
-
-    let projectId = account.projectId;
-    let tier = account.tier ?? "free-tier";
-    let projectDiscoveryError: string | undefined;
-
-    if (!projectId) {
-      try {
-        const accountInfo = await fetchGeminiCliAccountInfo(accessToken);
-        projectDiscoveryError = accountInfo.error;
-        if (accountInfo.projectId) {
-          projectId = accountInfo.projectId;
-          tier = accountInfo.tier || tier;
-          projectDiscoveryError = undefined;
-          await db.update(providerAccount).set({ projectId: accountInfo.projectId, tier, email: accountInfo.email || account.email }).where(eq(providerAccount.id, account.id));
-        }
-      } catch {
-        projectDiscoveryError = "Failed to discover Gemini CLI project ID";
+      const accountInfo = await fetchGeminiCliAccountInfo(credentials.accessToken);
+      projectDiscoveryError = accountInfo.error;
+      if (accountInfo.projectId) {
+        projectId = accountInfo.projectId;
+        tier = accountInfo.tier || tier;
+        projectDiscoveryError = undefined;
+        await db.update(providerAccount).set({ projectId: accountInfo.projectId, tier, email: accountInfo.email || account.email }).where(eq(providerAccount.id, account.id));
       }
-    }
-
-    if (!projectId) {
-      return errorQuotaInfo(account, tier, projectDiscoveryError ?? "Gemini CLI account is missing projectId. Re-authenticate this account or set GEMINI_CLI_PROJECT_ID.");
-    }
-
-    const snapshot = await fetchGeminiCliQuotaFromApi(accessToken, projectId, tier);
-    if (snapshot.status !== "success") return errorQuotaInfo(account, tier, snapshot.error ?? "Failed to fetch Gemini CLI quota data", snapshot.fetchedAt);
-    return toBaseQuotaInfo(account, snapshot.tier, "success", geminiCliSnapshotToGroups(snapshot, false, "high"), snapshot.fetchedAt);
-  }
-
-  if (provider === "kiro") {
-    let accessToken: string;
-    try {
-      accessToken = await kiroProvider.getValidCredentials(account);
     } catch {
-      return expiredQuotaInfo(account, account.tier?.trim() || "free", "Token expired - please re-authenticate");
+      projectDiscoveryError = "Failed to discover Gemini CLI project ID";
     }
-
-    const snapshot = await fetchKiroQuotaFromApi(accessToken, account.accountId);
-    const tier = snapshot.tier?.trim() || account.tier?.trim() || "free";
-    if (snapshot.status !== "success") return errorQuotaInfo(account, tier, snapshot.error ?? "Failed to fetch Kiro quota data", snapshot.fetchedAt);
-    return toBaseQuotaInfo(account, tier, "success", snapshot.metrics.map(toKiroGroupDisplay), snapshot.fetchedAt);
   }
 
+  if (!projectId) {
+    return errorQuotaInfo(account, tier, projectDiscoveryError ?? "Gemini CLI account is missing projectId. Re-authenticate this account or set GEMINI_CLI_PROJECT_ID.");
+  }
+
+  const snapshot = await fetchGeminiCliQuotaFromApi(credentials.accessToken, projectId, tier);
+  if (snapshot.status !== "success") return errorQuotaInfo(account, tier, snapshot.error ?? "Failed to fetch Gemini CLI quota data", snapshot.fetchedAt);
+  return toBaseQuotaInfo(account, snapshot.tier, "success", geminiCliSnapshotToGroups(snapshot, false, "high"), snapshot.fetchedAt);
+}
+
+async function getKiroQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
+  const fallbackTier = account.tier?.trim() || "free";
+  const credentials = await getValidQuotaCredentials(account, kiroProvider.getValidCredentials, fallbackTier);
+  if ("status" in credentials) return credentials;
+  const snapshot = await fetchKiroQuotaFromApi(credentials.accessToken, account.accountId);
+  const tier = snapshot.tier?.trim() || fallbackTier;
+  if (snapshot.status !== "success") return errorQuotaInfo(account, tier, snapshot.error ?? "Failed to fetch Kiro quota data", snapshot.fetchedAt);
+  return toBaseQuotaInfo(account, tier, "success", snapshot.metrics.map(toKiroGroupDisplay), snapshot.fetchedAt);
+}
+
+async function getOpenRouterQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
   let apiKey: string;
   try {
     apiKey = decrypt(account.accessToken);
@@ -556,6 +542,15 @@ async function getProviderQuota(account: ProviderAccount, provider: QuotaProvide
   return toBaseQuotaInfo(account, tier, "success", buildOpenRouterQuotaGroups(keyData, creditsData), Date.now());
 }
 
+const QUOTA_FETCHERS = {
+  antigravity: getAntigravityQuota,
+  copilot: getCopilotQuota,
+  codex: getCodexQuota,
+  gemini_cli: getGeminiCliQuota,
+  kiro: getKiroQuota,
+  openrouter: getOpenRouterQuota,
+} satisfies Record<QuotaProviderKey, QuotaFetcher>;
+
 export async function getAccountQuota(userId: string, input: z.infer<typeof accountQuotaInputSchema>) {
   try {
     const [account] = await db
@@ -566,7 +561,7 @@ export async function getAccountQuota(userId: string, input: z.infer<typeof acco
       .limit(1);
 
     if (!account) return { success: false, error: "Account not found" } as const;
-    return { success: true, data: await getProviderQuota(account, input.provider) } as const;
+    return { success: true, data: await QUOTA_FETCHERS[input.provider](account) } as const;
   } catch (error) {
     console.error("Failed to fetch provider quota:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota data" } as const;

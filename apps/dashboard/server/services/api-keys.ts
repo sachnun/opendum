@@ -6,6 +6,7 @@ import { providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "../lib/db/sc
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAllFamilies, getAllModels, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
+import type { ActionResult } from "../utils/api";
 
 export const apiKeyIdInputSchema = z.object({ id: z.string() });
 export const createApiKeyInputSchema = z.object({ name: z.string().optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
@@ -39,6 +40,19 @@ function normalizeModelList(models: string[]): string[] {
 async function getOwnedApiKey(userId: string, id: string) {
   const [apiKey] = await db.select().from(proxyApiKey).where(and(eq(proxyApiKey.id, id), eq(proxyApiKey.userId, userId))).limit(1);
   return apiKey ?? null;
+}
+
+type OwnedApiKey = NonNullable<Awaited<ReturnType<typeof getOwnedApiKey>>>;
+
+async function withOwnedApiKey<T>(userId: string, id: string, failureMessage: string, action: (apiKey: OwnedApiKey) => Promise<ActionResult<T>> | ActionResult<T>): Promise<ActionResult<T>> {
+  try {
+    const apiKey = await getOwnedApiKey(userId, id);
+    if (!apiKey) return { success: false, error: "API key not found" };
+    return await action(apiKey);
+  } catch (error) {
+    console.error(`${failureMessage}:`, error);
+    return { success: false, error: failureMessage };
+  }
 }
 
 export async function getApiKeyOptions(userId: string) {
@@ -113,75 +127,48 @@ export async function createApiKey(userId: string, input: CreateApiKeyInput) {
 }
 
 export async function toggleApiKey(userId: string, id: string) {
-  try {
-    const apiKey = await getOwnedApiKey(userId, id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, id, "Failed to toggle API key", async (apiKey) => {
     await db.update(proxyApiKey).set({ isActive: !apiKey.isActive }).where(eq(proxyApiKey.id, id));
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
-    return { success: true, data: undefined } as const;
-  } catch (error) {
-    console.error("Failed to toggle API key:", error);
-    return { success: false, error: "Failed to toggle API key" } as const;
-  }
+    return { success: true, data: undefined };
+  });
 }
 
 export async function deleteApiKey(userId: string, id: string) {
-  try {
-    const apiKey = await getOwnedApiKey(userId, id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, id, "Failed to delete API key", async (apiKey) => {
     await db.delete(proxyApiKey).where(eq(proxyApiKey.id, id));
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
-    return { success: true, data: undefined } as const;
-  } catch (error) {
-    console.error("Failed to delete API key:", error);
-    return { success: false, error: "Failed to delete API key" } as const;
-  }
+    return { success: true, data: undefined };
+  });
 }
 
 export async function revealApiKey(userId: string, id: string) {
-  try {
-    const apiKey = await getOwnedApiKey(userId, id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, id, "Failed to reveal API key", (apiKey) => {
     if (!apiKey.encryptedKey) return { success: false, error: "This API key was created before the reveal feature. Please generate a new key." } as const;
     return { success: true, data: { key: decrypt(apiKey.encryptedKey) } } as const;
-  } catch (error) {
-    console.error("Failed to reveal API key:", error);
-    return { success: false, error: "Failed to reveal API key" } as const;
-  }
+  });
 }
 
 export async function updateApiKeyName(userId: string, input: UpdateApiKeyNameInput) {
-  try {
-    const apiKey = await getOwnedApiKey(userId, input.id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, input.id, "Failed to update API key name", async () => {
     const [updated] = await db.update(proxyApiKey).set({ name: input.name.trim() || null }).where(eq(proxyApiKey.id, input.id)).returning({ name: proxyApiKey.name });
     if (!updated) return { success: false, error: "Failed to update API key name" } as const;
     return { success: true, data: { name: updated.name } } as const;
-  } catch (error) {
-    console.error("Failed to update API key name:", error);
-    return { success: false, error: "Failed to update API key name" } as const;
-  }
+  });
 }
 
 export async function updateApiKeyExpiration(userId: string, input: UpdateApiKeyExpirationInput) {
   if (input.expiresAt && input.expiresAt <= new Date()) return { success: false, error: "Expiration date must be in the future" } as const;
-  try {
-    const apiKey = await getOwnedApiKey(userId, input.id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, input.id, "Failed to update API key expiration", async (apiKey) => {
     const [updated] = await db.update(proxyApiKey).set({ expiresAt: input.expiresAt }).where(eq(proxyApiKey.id, input.id)).returning({ expiresAt: proxyApiKey.expiresAt });
     if (!updated) return { success: false, error: "Failed to update API key expiration" } as const;
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
     return { success: true, data: { expiresAt: updated.expiresAt } } as const;
-  } catch (error) {
-    console.error("Failed to update API key expiration:", error);
-    return { success: false, error: "Failed to update API key expiration" } as const;
-  }
+  });
 }
 
 export async function updateApiKeyModelAccess(userId: string, input: UpdateApiKeyModelAccessInput) {
-  try {
-    const apiKey = await getOwnedApiKey(userId, input.id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, input.id, "Failed to update API key model access", async (apiKey) => {
     const normalizedModels = input.mode === "all" ? [] : normalizeModelList(input.models);
     if (input.mode !== "all" && normalizedModels.length === 0) return { success: false, error: "Select at least one model" } as const;
     const invalidModel = normalizedModels.find((model) => !isModelSupported(model));
@@ -190,16 +177,11 @@ export async function updateApiKeyModelAccess(userId: string, input: UpdateApiKe
     if (!updated) return { success: false, error: "Failed to update API key model access" } as const;
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
     return { success: true, data: { mode: apiKeyModelAccessModeSchema.safeParse(updated.modelAccessMode).success ? updated.modelAccessMode as z.infer<typeof apiKeyModelAccessModeSchema> : "all", models: updated.modelAccessList } } as const;
-  } catch (error) {
-    console.error("Failed to update API key model access:", error);
-    return { success: false, error: "Failed to update API key model access" } as const;
-  }
+  });
 }
 
 export async function updateApiKeyAccountAccess(userId: string, input: UpdateApiKeyAccountAccessInput) {
-  try {
-    const apiKey = await getOwnedApiKey(userId, input.id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, input.id, "Failed to update API key account access", async (apiKey) => {
     const normalizedAccounts = input.mode === "all" ? [] : Array.from(new Set(input.accounts.map((account) => account.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
     if (input.mode !== "all" && normalizedAccounts.length === 0) return { success: false, error: "Select at least one account" } as const;
     if (normalizedAccounts.length > 0) {
@@ -212,16 +194,11 @@ export async function updateApiKeyAccountAccess(userId: string, input: UpdateApi
     if (!updated) return { success: false, error: "Failed to update API key account access" } as const;
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
     return { success: true, data: { mode: apiKeyAccountAccessModeSchema.safeParse(updated.accountAccessMode).success ? updated.accountAccessMode as z.infer<typeof apiKeyAccountAccessModeSchema> : "all", accounts: updated.accountAccessList } } as const;
-  } catch (error) {
-    console.error("Failed to update API key account access:", error);
-    return { success: false, error: "Failed to update API key account access" } as const;
-  }
+  });
 }
 
 export async function updateApiKeyRateLimits(userId: string, input: UpdateApiKeyRateLimitsInput) {
-  try {
-    const apiKey = await getOwnedApiKey(userId, input.id);
-    if (!apiKey) return { success: false, error: "API key not found" } as const;
+  return withOwnedApiKey(userId, input.id, "Failed to update API key rate limits", async (apiKey) => {
     const validFamilies = new Set(getAllFamilies());
     const seenTargets = new Set<string>();
     for (const rule of input.rules) {
@@ -238,8 +215,5 @@ export async function updateApiKeyRateLimits(userId: string, input: UpdateApiKey
     if (normalizedRules.length > 0) await db.insert(proxyApiKeyRateLimit).values(normalizedRules.map((rule) => ({ apiKeyId: apiKey.id, target: rule.target, targetType: rule.targetType, perMinute: rule.perMinute, perHour: rule.perHour, perDay: rule.perDay })));
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
     return { success: true, data: { rules: normalizedRules } } as const;
-  } catch (error) {
-    console.error("Failed to update API key rate limits:", error);
-    return { success: false, error: "Failed to update API key rate limits" } as const;
-  }
+  });
 }

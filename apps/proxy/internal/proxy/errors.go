@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func (s *Service) writeRouteError(w http.ResponseWriter, cfg routeConfig, status int, message, typ string, param, code *string, retryAfter *string, retryAfterMS *int64) {
+func (s *Service) writeRouteError(w http.ResponseWriter, cfg endpointAdapter, status int, message, typ string, param, code *string, retryAfter *string, retryAfterMS *int64) {
 	if typ == "" {
 		typ = "invalid_request_error"
 	}

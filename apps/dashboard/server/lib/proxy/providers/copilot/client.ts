@@ -72,11 +72,7 @@ function buildRequestPayload(
     }
   }
 
-  if (forceStream !== undefined) {
-    payload.stream = forceStream;
-  } else if (payload.stream === undefined) {
-    payload.stream = true;
-  }
+  payload.stream = forceStream ?? payload.stream ?? true;
 
   if (payload.stream === true) {
     payload.stream_options = { include_usage: true };
@@ -244,32 +240,24 @@ function convertChatMessagesToResponsesInput(
         break;
 
       case "assistant":
-        if (msg.tool_calls && msg.tool_calls.length > 0) {
-          if (msg.content) {
-            input.push({
-              type: "message",
-              role: "assistant",
-              content: convertMessageContentForResponses(msg.content, "assistant"),
-            });
-          }
-          for (const tc of msg.tool_calls) {
-            const toolCall = tc as {
-              id: string;
-              type: string;
-              function: { name: string; arguments: string };
-            };
-            input.push({
-              type: "function_call",
-              call_id: toolCall.id,
-              name: toolCall.function.name,
-              arguments: toolCall.function.arguments,
-            });
-          }
-        } else {
+        if (!msg.tool_calls?.length || msg.content) {
           input.push({
             type: "message",
             role: "assistant",
             content: convertMessageContentForResponses(msg.content, "assistant"),
+          });
+        }
+        for (const tc of msg.tool_calls ?? []) {
+          const toolCall = tc as {
+            id: string;
+            type: string;
+            function: { name: string; arguments: string };
+          };
+          input.push({
+            type: "function_call",
+            call_id: toolCall.id,
+            name: toolCall.function.name,
+            arguments: toolCall.function.arguments,
           });
         }
         break;
@@ -350,12 +338,8 @@ function buildCopilotResponsesPayload(
     payload.tool_choice = body.tool_choice;
   }
 
-  // Reasoning config
-  if (body.reasoning && typeof body.reasoning === "object") {
-    payload.reasoning = body.reasoning;
-  } else if (body.reasoning_effort) {
-    payload.reasoning = { effort: body.reasoning_effort };
-  }
+  const reasoningConfig = body.reasoning && typeof body.reasoning === "object" ? body.reasoning : body.reasoning_effort ? { effort: body.reasoning_effort } : undefined;
+  if (reasoningConfig) payload.reasoning = reasoningConfig;
 
   // max_output_tokens (Responses API equivalent of max_tokens)
   if (body.max_tokens !== undefined) {
@@ -579,40 +563,25 @@ function convertCopilotResponsesToCompletion(
   let toolCallIndex = 0;
 
   for (const item of output) {
-    if (item.type === "message") {
-      const itemContent = item.content as Array<Record<string, unknown>>;
-      if (Array.isArray(itemContent)) {
-        for (const part of itemContent) {
-          if (part.type === "output_text") {
-            content += (part.text as string) || "";
-          }
-        }
-      }
-    } else if (item.type === "reasoning") {
-      const summary = item.summary;
-      if (Array.isArray(summary)) {
+    const handlers = {
+      message: () => {
+        const itemContent = item.content as Array<Record<string, unknown>>;
+        if (Array.isArray(itemContent)) content += itemContent.filter((part) => part.type === "output_text").map((part) => (part.text as string) || "").join("");
+      },
+      reasoning: () => {
+        const summary = item.summary;
+        if (!Array.isArray(summary)) return;
         for (const part of summary) {
-          const text =
-            typeof part === "string"
-              ? part
-              : (part as { text?: string })?.text || "";
+          const text = typeof part === "string" ? part : (part as { text?: string })?.text || "";
           if (text) reasoningContent += (reasoningContent ? "\n" : "") + text;
         }
-      }
-    } else if (item.type === "function_call") {
-      toolCalls.push({
-        id:
-          (item.call_id as string) ||
-          (item.id as string) ||
-          `call_${toolCallIndex}`,
-        type: "function",
-        function: {
-          name: item.name as string,
-          arguments: (item.arguments as string) || "{}",
-        },
-      });
-      toolCallIndex++;
-    }
+      },
+      function_call: () => {
+        toolCalls.push({ id: (item.call_id as string) || (item.id as string) || `call_${toolCallIndex}`, type: "function", function: { name: item.name as string, arguments: (item.arguments as string) || "{}" } });
+        toolCallIndex++;
+      },
+    } satisfies Record<string, () => void>;
+    handlers[String(item.type)]?.();
   }
 
   const usage = responsesData.usage as Record<string, number> | undefined;

@@ -11,58 +11,42 @@ import (
 	"time"
 )
 
-type passthroughUsageTracker struct {
-	buffer       string
+type openAIStreamUsageTracker struct {
+	scanner      sseScanner
 	inputTokens  int
 	outputTokens int
 }
 
-func (t *passthroughUsageTracker) Process(chunk []byte) {
-	t.buffer += string(chunk)
-	events := strings.Split(t.buffer, "\n\n")
-	t.buffer = events[len(events)-1]
-	for _, event := range events[:len(events)-1] {
-		t.processLines(strings.Split(event, "\n"))
+func (t *openAIStreamUsageTracker) Process(chunk []byte) {
+	t.scanner.Process(string(chunk), t.processEvent)
+}
+
+func (t *openAIStreamUsageTracker) Flush() {
+	t.scanner.Flush(t.processEvent)
+}
+
+func (t *openAIStreamUsageTracker) processEvent(event sseEvent) {
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(event.Data), &parsed); err != nil {
+		return
+	}
+	usage, ok := parsed["usage"].(map[string]any)
+	if !ok {
+		return
+	}
+	if value := numberAsInt(usage["prompt_tokens"]); value > 0 {
+		t.inputTokens = value
+	} else if value := numberAsInt(usage["input_tokens"]); value > 0 {
+		t.inputTokens = value
+	}
+	if value := numberAsInt(usage["completion_tokens"]); value > 0 {
+		t.outputTokens = value
+	} else if value := numberAsInt(usage["output_tokens"]); value > 0 {
+		t.outputTokens = value
 	}
 }
 
-func (t *passthroughUsageTracker) Flush() {
-	if strings.TrimSpace(t.buffer) != "" {
-		t.processLines(strings.Split(t.buffer, "\n"))
-	}
-}
-
-func (t *passthroughUsageTracker) processLines(lines []string) {
-	for _, line := range lines {
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		if data == "" || data == "[DONE]" {
-			continue
-		}
-		var parsed map[string]any
-		if err := json.Unmarshal([]byte(data), &parsed); err != nil {
-			continue
-		}
-		usage, ok := parsed["usage"].(map[string]any)
-		if !ok {
-			continue
-		}
-		if value := numberAsInt(usage["prompt_tokens"]); value > 0 {
-			t.inputTokens = value
-		} else if value := numberAsInt(usage["input_tokens"]); value > 0 {
-			t.inputTokens = value
-		}
-		if value := numberAsInt(usage["completion_tokens"]); value > 0 {
-			t.outputTokens = value
-		} else if value := numberAsInt(usage["output_tokens"]); value > 0 {
-			t.outputTokens = value
-		}
-	}
-}
-
-func (s *Service) passthroughStream(ctx streamContext) error {
+func (s *Service) passthroughStream(ctx responseContext) error {
 	w := ctx.Writer
 	copyResponseHeaders(w.Header(), ctx.Response.Header)
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -73,7 +57,7 @@ func (s *Service) passthroughStream(ctx streamContext) error {
 	w.WriteHeader(http.StatusOK)
 
 	flusher, _ := w.(http.Flusher)
-	tracker := &passthroughUsageTracker{}
+	tracker := &openAIStreamUsageTracker{}
 	reader := bufio.NewReader(ctx.Response.Body)
 	buf := make([]byte, 32*1024)
 	for {
@@ -99,7 +83,7 @@ func (s *Service) passthroughStream(ctx streamContext) error {
 	return nil
 }
 
-func (s *Service) passthroughNonStream(ctx nonStreamContext) error {
+func (s *Service) passthroughNonStream(ctx responseContext) error {
 	body, err := io.ReadAll(ctx.Response.Body)
 	if err != nil {
 		return err

@@ -10,7 +10,7 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
-func (s *Service) tryProviders(ctx context.Context, r *http.Request, cfg routeConfig, parsed parsedRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount) (*appdb.ProviderAccount, *http.Response, int64, *routeError) {
+func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount) (*appdb.ProviderAccount, *http.Response, int64, *routeError) {
 	scope := rateLimitScope(validation.Model)
 	tried := []string{}
 	maxRetries := 5

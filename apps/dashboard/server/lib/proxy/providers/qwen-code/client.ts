@@ -155,12 +155,7 @@ function buildRequestPayload(
     }
   }
 
-  // Use stream value from params, or force if specified
-  if (forceStream !== undefined) {
-    payload.stream = forceStream;
-  } else if (payload.stream === undefined) {
-    payload.stream = true; // Default to streaming
-  }
+  payload.stream = forceStream ?? payload.stream ?? true;
 
   // Always include usage data in stream
   if (payload.stream === true) {
@@ -168,25 +163,12 @@ function buildRequestPayload(
   }
 
   // Clean tool schemas if present
-  if (payload.tools && Array.isArray(payload.tools)) {
-    if (payload.tools.length > 0) {
-      payload.tools = cleanToolSchemas(
-        payload.tools as Array<{ type: string; function: Record<string, unknown> }>
-      );
-    } else if (payload.stream === true) {
-      // Per Qwen Code API bug, injecting a dummy tool prevents stream corruption
-      // when no tools are provided
-      payload.tools = [
-        {
-          type: "function",
-          function: {
-            name: "do_not_call_me",
-            description: "Do not call this tool.",
-            parameters: { type: "object", properties: {} },
-          },
-        },
-      ];
-    }
+  if (payload.tools && Array.isArray(payload.tools) && payload.tools.length > 0) {
+    payload.tools = cleanToolSchemas(payload.tools as Array<{ type: string; function: Record<string, unknown> }>);
+  }
+  if (payload.tools && Array.isArray(payload.tools) && payload.tools.length === 0 && payload.stream === true) {
+    // Per Qwen Code API bug, injecting a dummy tool prevents stream corruption when no tools are provided.
+    payload.tools = [{ type: "function", function: { name: "do_not_call_me", description: "Do not call this tool.", parameters: { type: "object", properties: {} } } }];
   }
 
   return payload;
@@ -315,12 +297,7 @@ export const qwenCodeProvider: Provider = {
           `Failed to refresh token for Qwen Code account ${account.id}:`,
           error
         );
-        // If refresh fails but token not truly expired, try using existing
-        if (new Date() < account.expiresAt) {
-          // Use existing token as fallback
-        } else {
-          throw error;
-        }
+        if (new Date() >= account.expiresAt) throw error;
       }
     }
 
@@ -545,11 +522,9 @@ function createThinkTagTransform(): TransformStream<string, string> {
               if (inThinkingBlock && content.includes("</think>")) {
                 inThinkingBlock = false;
                 const parts = content.split("</think>");
-                if (!reasoningContent) {
-                  reasoningContent = parts[0];
-                } else {
-                  reasoningContent += parts[0];
-                }
+                reasoningContent = reasoningContent
+                  ? reasoningContent + parts[0]
+                  : parts[0];
                 processedContent = parts[1] || "";
               }
 

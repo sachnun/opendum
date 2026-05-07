@@ -9,19 +9,27 @@ import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getPr
 
 export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
 
+async function getAvailableModelsForUser(userId: string) {
+  const [disabledModels, availability] = await Promise.all([
+    db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
+    getAccountModelAvailability(userId),
+  ]);
+
+  return {
+    availability,
+    disabledModelSet: new Set(disabledModels.map((entry) => resolveModelAlias(entry.model))),
+    models: getAllModels()
+      .filter((model) => isModelUsableByAccounts(model, availability))
+      .sort((a, b) => a.localeCompare(b)),
+  };
+}
+
 export async function listModels(userId: string) {
   try {
-    const [disabledModels, availability] = await Promise.all([
-      db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
-      getAccountModelAvailability(userId),
-    ]);
-    const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
-    const allModels = getAllModels()
-      .filter((model) => isModelUsableByAccounts(model, availability))
-      .sort((a, b) => a.localeCompare(b));
-    const statsByModel = await getModelStatsByModel(userId, allModels);
+    const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
+    const statsByModel = await getModelStatsByModel(userId, models);
 
-    return allModels.map((model) => ({
+    return models.map((model) => ({
       id: model,
       name: model,
       family: getModelFamily(model),
@@ -38,16 +46,9 @@ export async function listModels(userId: string) {
 
 export async function searchModels(userId: string) {
   try {
-    const [disabledModels, availability] = await Promise.all([
-      db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
-      getAccountModelAvailability(userId),
-    ]);
-    const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
-    const allModels = getAllModels()
-      .filter((model) => isModelUsableByAccounts(model, availability))
-      .sort((a, b) => a.localeCompare(b));
+    const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
 
-    return allModels.map((model) => ({
+    return models.map((model) => ({
       id: model,
       providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
       meta: MODEL_REGISTRY[model]?.meta,
@@ -61,14 +62,12 @@ export async function searchModels(userId: string) {
 
 export async function getModelFamilyCounts(userId: string) {
   try {
-    const availability = await getAccountModelAvailability(userId);
-    return getAllModels()
-      .filter((model) => isModelUsableByAccounts(model, availability))
-      .reduce<Record<string, number>>((counts, model) => {
-        const family = getModelFamily(model) ?? "Others";
-        counts[family] = (counts[family] ?? 0) + 1;
-        return counts;
-      }, {});
+    const { models } = await getAvailableModelsForUser(userId);
+    return models.reduce<Record<string, number>>((counts, model) => {
+      const family = getModelFamily(model) ?? "Others";
+      counts[family] = (counts[family] ?? 0) + 1;
+      return counts;
+    }, {});
   } catch (error) {
     console.error("Failed to count model families:", error);
     throw new Error("Failed to count model families");
@@ -83,11 +82,8 @@ export async function setModelEnabled(userId: string, input: z.infer<typeof setM
   }
 
   try {
-    if (input.enabled) {
-      await db.delete(disabledModel).where(and(eq(disabledModel.userId, userId), inArray(disabledModel.model, getModelLookupKeys(normalizedModel))));
-    } else {
-      await db.insert(disabledModel).values({ userId, model: normalizedModel }).onConflictDoNothing({ target: [disabledModel.userId, disabledModel.model] });
-    }
+    await db.delete(disabledModel).where(and(eq(disabledModel.userId, userId), inArray(disabledModel.model, getModelLookupKeys(normalizedModel))));
+    if (!input.enabled) await db.insert(disabledModel).values({ userId, model: normalizedModel }).onConflictDoNothing({ target: [disabledModel.userId, disabledModel.model] });
 
     await invalidateDisabledModelsCache(userId);
 

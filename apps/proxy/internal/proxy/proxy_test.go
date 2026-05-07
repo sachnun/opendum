@@ -356,7 +356,7 @@ func TestNormalizeClientErrorTruncatesLongMessages(t *testing.T) {
 }
 
 func TestPassthroughUsageTrackerProcessesSplitSSE(t *testing.T) {
-	tracker := &passthroughUsageTracker{}
+	tracker := &openAIStreamUsageTracker{}
 	tracker.Process([]byte(`data: {"usage":{"prompt_tokens":3`))
 	tracker.Process([]byte(`,"completion_tokens":4}}` + "\n\n"))
 	tracker.Process([]byte(`data: {"usage":{"input_tokens":5,"output_tokens":6}}` + "\n\n"))
@@ -366,7 +366,7 @@ func TestPassthroughUsageTrackerProcessesSplitSSE(t *testing.T) {
 		t.Fatalf("tokens = (%d, %d), want (5, 6)", tracker.inputTokens, tracker.outputTokens)
 	}
 
-	incomplete := &passthroughUsageTracker{}
+	incomplete := &openAIStreamUsageTracker{}
 	incomplete.Process([]byte(`data: {"usage":{"input_tokens":8,"output_tokens":9}}`))
 	incomplete.Flush()
 	if incomplete.inputTokens != 8 || incomplete.outputTokens != 9 {
@@ -381,7 +381,7 @@ func TestWriteRouteErrorFormats(t *testing.T) {
 	retryAfterMS := int64(10000)
 
 	openAIRecorder := httptest.NewRecorder()
-	(&Service{}).writeRouteError(openAIRecorder, routeConfig{Format: FormatOpenAI}, http.StatusTooManyRequests, "slow down", "rate_limit_error", &param, &code, &retryAfter, &retryAfterMS)
+	(&Service{}).writeRouteError(openAIRecorder, endpointAdapter{Format: FormatOpenAI}, http.StatusTooManyRequests, "slow down", "rate_limit_error", &param, &code, &retryAfter, &retryAfterMS)
 	if openAIRecorder.Code != http.StatusTooManyRequests {
 		t.Fatalf("openAI status = %d", openAIRecorder.Code)
 	}
@@ -394,7 +394,7 @@ func TestWriteRouteErrorFormats(t *testing.T) {
 	}
 
 	anthropicRecorder := httptest.NewRecorder()
-	(&Service{}).writeRouteError(anthropicRecorder, routeConfig{Format: FormatAnthropic}, http.StatusBadRequest, "bad request", "invalid_request_error", nil, nil, nil, nil)
+	(&Service{}).writeRouteError(anthropicRecorder, endpointAdapter{Format: FormatAnthropic}, http.StatusBadRequest, "bad request", "invalid_request_error", nil, nil, nil, nil)
 	if anthropicRecorder.Code != http.StatusBadRequest {
 		t.Fatalf("anthropic status = %d", anthropicRecorder.Code)
 	}

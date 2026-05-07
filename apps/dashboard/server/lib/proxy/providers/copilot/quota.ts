@@ -523,15 +523,12 @@ export async function fetchCopilotUsageFromApi(
     const totalFromInternal = Math.max(0, entitlement - remaining);
 
     // Determine reset time — prefer internal API's reset date
-    let resetTimeIso: string;
-    if (internalResult.resetDateUtc) {
-      const parsed = new Date(internalResult.resetDateUtc);
-      resetTimeIso = Number.isFinite(parsed.getTime())
-        ? parsed.toISOString()
-        : getNextResetIso(year, month);
-    } else {
-      resetTimeIso = getNextResetIso(year, month);
-    }
+    const parsedResetTime = internalResult.resetDateUtc
+      ? new Date(internalResult.resetDateUtc)
+      : null;
+    const resetTimeIso = parsedResetTime && Number.isFinite(parsedResetTime.getTime())
+      ? parsedResetTime.toISOString()
+      : getNextResetIso(year, month);
 
     // Use billing API model breakdown if available, otherwise empty
     let modelUsage: CopilotUsageEntry[] = [];
@@ -584,16 +581,14 @@ export async function fetchCopilotUsageFromApi(
   const billingError =
     billingResult && !billingResult.ok ? billingResult.error : "";
 
-  let error: string;
-  if (billingResult && !billingResult.ok && billingResult.status === 404) {
-    error =
+  const error = billingResult && !billingResult.ok && billingResult.status === 404
+    ? (
       "Copilot usage data is unavailable for this account. " +
       "The billing API returned 404 (plan may not support it) " +
-      "and the internal Copilot API also failed.";
-  } else {
-    error = [internalError, billingError].filter(Boolean).join(" | ") ||
+      "and the internal Copilot API also failed."
+    )
+    : [internalError, billingError].filter(Boolean).join(" | ") ||
       "Failed to fetch Copilot usage from all sources.";
-  }
 
   return {
     status: "error",

@@ -16,6 +16,23 @@ function normalizeApiKeyModelAccessMode(mode: string): ApiKeyModelAccessMode {
   return mode === "whitelist" || mode === "blacklist" ? mode : "all";
 }
 
+function toPlaygroundApiKeyOption(apiKey: { id: string; name: string | null; keyPreview: string; encryptedKey: string | null; modelAccessMode: string; modelAccessList: string[] | null }) {
+  if (!apiKey.encryptedKey) return null;
+
+  try {
+    return {
+      id: apiKey.id,
+      name: apiKey.name,
+      keyPreview: apiKey.keyPreview,
+      decryptedKey: decrypt(apiKey.encryptedKey),
+      modelAccessMode: normalizeApiKeyModelAccessMode(apiKey.modelAccessMode),
+      modelAccessList: apiKey.modelAccessList ?? [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getPlaygroundOptions(userId: string) {
   try {
     const proxyBaseUrl = getProxyBaseUrl();
@@ -74,22 +91,7 @@ export async function getPlaygroundOptions(userId: string) {
           .from(proxyApiKey)
           .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.isActive, true)))
           .orderBy(desc(proxyApiKey.lastUsedAt)))
-          .flatMap((apiKey) => {
-            if (!apiKey.encryptedKey) return [];
-
-            try {
-              return [{
-                id: apiKey.id,
-                name: apiKey.name,
-                keyPreview: apiKey.keyPreview,
-                decryptedKey: decrypt(apiKey.encryptedKey),
-                modelAccessMode: normalizeApiKeyModelAccessMode(apiKey.modelAccessMode),
-                modelAccessList: apiKey.modelAccessList ?? [],
-              }];
-            } catch {
-              return [];
-            }
-          })
+          .flatMap((apiKey) => toPlaygroundApiKeyOption(apiKey) ?? [])
       : [];
 
     return {

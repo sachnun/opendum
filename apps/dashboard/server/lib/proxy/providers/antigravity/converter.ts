@@ -152,14 +152,18 @@ function getValidToolResultIds(messages: ChatCompletionRequest["messages"]): Set
           lastAssistantToolCallIds.add(tc.id);
         }
       }
-    } else if (message.role === "tool" && message.tool_call_id) {
+      continue;
+    }
+    if (message.role === "tool" && message.tool_call_id) {
       // Standard format: Check if this tool_result's ID was in the previous assistant's tool_calls
       if (lastAssistantToolCallIds.has(message.tool_call_id)) {
         validToolResultIds.add(message.tool_call_id);
       }
       // Note: Don't clear lastAssistantToolCallIds here - multiple tool results 
       // can follow a single assistant message with multiple tool calls
-    } else if (message.role === "user") {
+      continue;
+    }
+    if (message.role === "user") {
       // Check for tool_result blocks in content array (Anthropic style)
       if (Array.isArray(message.content)) {
         for (const block of message.content) {
@@ -180,7 +184,9 @@ function getValidToolResultIds(messages: ChatCompletionRequest["messages"]): Set
       if (!hasToolResults) {
         lastAssistantToolCallIds = new Set<string>();
       }
-    } else if (message.role === "system") {
+      continue;
+    }
+    if (message.role === "system") {
       // Reset when we see a system message (new context)
       lastAssistantToolCallIds = new Set<string>();
     }
@@ -255,24 +261,7 @@ function sanitizeGeminiContents(contents: Array<Record<string, unknown>>): Array
     const filteredParts: Array<Record<string, unknown>> = [];
     
     for (const part of parts) {
-      if (part.functionCall) {
-        const fc = part.functionCall as Record<string, unknown>;
-        const id = fc.id as string | undefined;
-        if (id && validFunctionCallIds.has(id)) {
-          filteredParts.push(part);
-        }
-        // Skip orphan functionCall
-      } else if (part.functionResponse) {
-        const fr = part.functionResponse as Record<string, unknown>;
-        const id = fr.id as string | undefined;
-        if (id && validFunctionResponseIds.has(id)) {
-          filteredParts.push(part);
-        }
-        // Skip orphan functionResponse
-      } else {
-        // Keep non-tool parts (text, thought, etc.)
-        filteredParts.push(part);
-      }
+      if (isValidGeminiPart(part, validFunctionCallIds, validFunctionResponseIds)) filteredParts.push(part);
     }
     
     // Only add message if it has valid parts
@@ -285,6 +274,18 @@ function sanitizeGeminiContents(contents: Array<Record<string, unknown>>): Array
   }
   
   return sanitizedContents;
+}
+
+function isValidGeminiPart(part: Record<string, unknown>, validFunctionCallIds: Set<string>, validFunctionResponseIds: Set<string>): boolean {
+  if (part.functionCall) {
+    const id = (part.functionCall as Record<string, unknown>).id as string | undefined;
+    return Boolean(id && validFunctionCallIds.has(id));
+  }
+  if (part.functionResponse) {
+    const id = (part.functionResponse as Record<string, unknown>).id as string | undefined;
+    return Boolean(id && validFunctionResponseIds.has(id));
+  }
+  return true;
 }
 
 /**
@@ -384,54 +385,40 @@ function separateTextAndToolParts(
     );
     
     if (content.role === "model") {
-      // For model messages: separate text/thought from functionCall
-      const hasFunctionCalls = functionCallParts.length > 0;
-      const hasTextOrThought = textParts.length > 0 || thoughtParts.length > 0;
-      
-      if (hasFunctionCalls && hasTextOrThought) {
-        // Split into two messages: text/thought first, then functionCalls
-        const textAndThoughtParts = [...thoughtParts, ...textParts, ...otherParts];
-        if (textAndThoughtParts.length > 0) {
-          result.push({
-            ...content,
-            parts: textAndThoughtParts,
-          });
-        }
-        
-        if (functionCallParts.length > 0) {
-          result.push({
-            ...content,
-            parts: functionCallParts,
-          });
-        }
-      } else {
-        // No need to split - keep as is
-        result.push(content);
-      }
-    } else if (content.role === "user") {
-      // For user messages with functionResponse: remove text parts
-      const hasFunctionResponses = functionResponseParts.length > 0;
-      
-      if (hasFunctionResponses) {
-        // Only keep functionResponse parts (and maybe other non-text parts)
-        const cleanParts = [...functionResponseParts, ...otherParts];
-        if (cleanParts.length > 0) {
-          result.push({
-            ...content,
-            parts: cleanParts,
-          });
-        }
-      } else {
-        // No functionResponse - keep as is
-        result.push(content);
-      }
-    } else {
-      // Other roles - keep as is
-      result.push(content);
+      pushSeparatedModelParts(result, content, { textParts, thoughtParts, functionCallParts, otherParts });
+      continue;
     }
+    if (content.role === "user") {
+      pushCleanUserParts(result, content, functionResponseParts, otherParts);
+      continue;
+    }
+    result.push(content);
   }
   
   return result;
+}
+
+function pushContentParts(target: Array<Record<string, unknown>>, content: Record<string, unknown>, parts: Array<Record<string, unknown>>) {
+  if (parts.length > 0) target.push({ ...content, parts });
+}
+
+function pushSeparatedModelParts(target: Array<Record<string, unknown>>, content: Record<string, unknown>, parts: { textParts: Array<Record<string, unknown>>; thoughtParts: Array<Record<string, unknown>>; functionCallParts: Array<Record<string, unknown>>; otherParts: Array<Record<string, unknown>> }) {
+  const hasFunctionCalls = parts.functionCallParts.length > 0;
+  const hasTextOrThought = parts.textParts.length > 0 || parts.thoughtParts.length > 0;
+  if (!hasFunctionCalls || !hasTextOrThought) {
+    target.push(content);
+    return;
+  }
+  pushContentParts(target, content, [...parts.thoughtParts, ...parts.textParts, ...parts.otherParts]);
+  pushContentParts(target, content, parts.functionCallParts);
+}
+
+function pushCleanUserParts(target: Array<Record<string, unknown>>, content: Record<string, unknown>, functionResponseParts: Array<Record<string, unknown>>, otherParts: Array<Record<string, unknown>>) {
+  if (functionResponseParts.length === 0) {
+    target.push(content);
+    return;
+  }
+  pushContentParts(target, content, [...functionResponseParts, ...otherParts]);
 }
 
 /**
@@ -734,14 +721,7 @@ export function convertGeminiToOpenAI(
       }
 
       const finishReason = candidate.finishReason as string | undefined;
-      let openaiFinishReason = "stop";
-      if (finishReason === "STOP") {
-        openaiFinishReason = "stop";
-      } else if (finishReason === "MAX_TOKENS") {
-        openaiFinishReason = "length";
-      } else if (finishReason === "TOOL_CALLS" || toolCalls.length > 0) {
-        openaiFinishReason = "tool_calls";
-      }
+      const openaiFinishReason = toolCalls.length > 0 ? "tool_calls" : ({ STOP: "stop", MAX_TOKENS: "length", TOOL_CALLS: "tool_calls" }[finishReason ?? ""] ?? "stop");
 
       choices.push({
         index: i,

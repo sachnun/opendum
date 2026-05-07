@@ -210,18 +210,10 @@ function buildKiroRequest(body: ChatCompletionRequest): JsonObject {
       if (fallbackHistory) {
         history.push(fallbackHistory);
       }
-    } else {
+    }
+    if (lastMessage.role !== "assistant") {
       currentContent = contentToText(lastMessage.content) || "Continue";
-
-      if (lastMessage.role === "tool") {
-        currentContext.toolResults = [
-          {
-            toolUseId: lastMessage.tool_call_id || crypto.randomUUID(),
-            status: "success",
-            content: [{ text: currentContent }],
-          },
-        ];
-      }
+      if (lastMessage.role === "tool") currentContext.toolResults = [{ toolUseId: lastMessage.tool_call_id || crypto.randomUUID(), status: "success", content: [{ text: currentContent }] }];
     }
   }
 

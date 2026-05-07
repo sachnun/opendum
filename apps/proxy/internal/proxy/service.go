@@ -50,7 +50,7 @@ func (s *Service) Messages(w http.ResponseWriter, r *http.Request) {
 	s.handle(w, r, messagesConfig(s))
 }
 
-func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg routeConfig) {
+func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAdapter) {
 	startMS := time.Now().UnixMilli()
 	ctx := r.Context()
 
@@ -110,7 +110,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg routeConfig
 		return
 	}
 
-	account, providerResp, requestStartMS, errInfo := s.tryProviders(ctx, r, cfg, parsed, authResult, validation, forced)
+	account, providerResp, requestStartMS, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced)
 	if errInfo != nil {
 		s.writeRouteError(w, cfg, errInfo.Status, errInfo.Message, errInfo.Type, errInfo.Param, errInfo.Code, nil, nil)
 		return
@@ -122,11 +122,11 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg routeConfig
 	defer providerResp.Body.Close()
 
 	if parsed.Stream {
-		_ = cfg.HandleStream(streamContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model})
+		_ = cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model})
 		return
 	}
 
-	_ = cfg.HandleNonStream(nonStreamContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model})
+	_ = cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model})
 }
 
 func (s *Service) makeProviderRequest(ctx context.Context, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {

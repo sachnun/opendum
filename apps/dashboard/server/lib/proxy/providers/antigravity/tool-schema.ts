@@ -39,7 +39,8 @@ function extractSchemaInfo(schema: unknown): SchemaInfo {
 
   if (type === "array" && record.items) {
     info.items = extractSchemaInfo(record.items);
-  } else if (type === "object" && record.properties) {
+  }
+  if (type === "object" && record.properties) {
     info.properties = {};
     const props = record.properties as Record<string, unknown>;
     for (const [key, value] of Object.entries(props)) {
