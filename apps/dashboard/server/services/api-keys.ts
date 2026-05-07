@@ -12,9 +12,9 @@ export const createApiKeyInputSchema = z.object({ name: z.string().optional(), e
 export const updateApiKeyNameInputSchema = z.object({ id: z.string(), name: z.string() });
 export const updateApiKeyExpirationInputSchema = z.object({ id: z.string(), expiresAt: z.coerce.date().nullable() });
 
-export const apiKeyModelAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
-export const apiKeyAccountAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
-export const rateLimitRuleSchema = z.object({
+const apiKeyModelAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
+const apiKeyAccountAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
+const rateLimitRuleSchema = z.object({
   target: z.string(),
   targetType: z.enum(["model", "family"]),
   perMinute: z.number().int().nullable(),

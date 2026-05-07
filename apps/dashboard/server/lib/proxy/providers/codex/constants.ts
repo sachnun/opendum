@@ -6,7 +6,7 @@ import os from "node:os";
 
 // OAuth Configuration
 export const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-export const AUTH_ISSUER = "https://auth.openai.com";
+const AUTH_ISSUER = "https://auth.openai.com";
 export const AUTHORIZE_ENDPOINT = `${AUTH_ISSUER}/oauth/authorize`;
 export const BROWSER_REDIRECT_URI = "http://localhost:1455/auth/callback";
 export const SCOPE = "openid profile email offline_access";
@@ -42,5 +42,5 @@ export const REFRESH_BUFFER_SECONDS = 5 * 60;
 export const ORIGINATOR = "opencode";
 
 // Match OpenCode's Codex plugin headers.
-export const OPENCODE_VERSION = "1.14.28";
+const OPENCODE_VERSION = "1.14.28";
 export const CODEX_CHAT_USER_AGENT = `opencode/${OPENCODE_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`;

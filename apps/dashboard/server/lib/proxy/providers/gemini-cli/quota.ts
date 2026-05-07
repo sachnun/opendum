@@ -29,7 +29,7 @@ const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
   },
 };
 
-export const QUOTA_GROUPS: Record<
+const QUOTA_GROUPS: Record<
   string,
   { displayName: string; models: string[] }
 > = {
@@ -105,7 +105,7 @@ function normalizeTier(tier: string | null | undefined): string {
   return normalized;
 }
 
-export function getMaxRequestsForModel(model: string, tier: string): number {
+function getMaxRequestsForModel(model: string, tier: string): number {
   const cleanModel = model.includes("/") ? model.split("/").pop() ?? model : model;
   const normalizedTier = normalizeTier(tier);
   const tierLimits =

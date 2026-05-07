@@ -95,7 +95,7 @@ function normalizeRequestForModel(
   return normalizedBody;
 }
 
-export const antigravityConfig: ProviderConfig = {
+const antigravityConfig: ProviderConfig = {
   name: "antigravity",
   displayName: "Antigravity (Google)",
   supportedModels: getProviderModelSet("antigravity"),

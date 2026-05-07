@@ -33,17 +33,17 @@ function getAntigravityPlatform(): string {
   return `${platform}/${arch}`;
 }
 
-export const USER_AGENT = `antigravity/1.23.2 ${getAntigravityPlatform()}`;
-export const API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1";
-export const CLIENT_METADATA =
+const USER_AGENT = `antigravity/1.23.2 ${getAntigravityPlatform()}`;
+const API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1";
+const CLIENT_METADATA =
   '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
 
 // Endpoint fallbacks (daily → autopush → prod)
-export const CODE_ASSIST_ENDPOINT_DAILY =
+const CODE_ASSIST_ENDPOINT_DAILY =
   "https://daily-cloudcode-pa.googleapis.com";
-export const CODE_ASSIST_ENDPOINT_AUTOPUSH =
+const CODE_ASSIST_ENDPOINT_AUTOPUSH =
   "https://autopush-cloudcode-pa.sandbox.googleapis.com";
-export const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
+const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
 export const ENDPOINT_FALLBACKS = [
   CODE_ASSIST_ENDPOINT_DAILY,

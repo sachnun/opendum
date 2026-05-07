@@ -1448,7 +1448,7 @@ function isTokenExpired(expiresAt: Date): boolean {
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
 
-export const codexConfig: ProviderConfig = {
+const codexConfig: ProviderConfig = {
   name: "codex",
   displayName: "Codex",
   supportedModels: getProviderModelSet("codex"),
@@ -1794,4 +1794,4 @@ export const codexProvider: Provider = {
 };
 
 // Export utilities
-export { generateCodeVerifier, generateCodeChallenge, extractAccountIdFromJwt };
+export { generateCodeVerifier, generateCodeChallenge };

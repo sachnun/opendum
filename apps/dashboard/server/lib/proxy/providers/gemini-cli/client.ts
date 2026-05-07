@@ -143,7 +143,7 @@ function getThinkingConfig(
   };
 }
 
-export const geminiCliConfig: ProviderConfig = {
+const geminiCliConfig: ProviderConfig = {
   name: "gemini_cli",
   displayName: "Gemini CLI",
   supportedModels: getProviderModelSet("gemini_cli"),

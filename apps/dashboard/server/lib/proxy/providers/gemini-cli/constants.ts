@@ -16,8 +16,8 @@ export const SCOPES: readonly string[] = [
 export const REDIRECT_URI = "http://localhost:1/oauth2callback";
 
 // User Agent format: GeminiCLI/${version}/${model} (${platform}; ${arch})
-export const VERSION = "0.34.0";
-export const USER_AGENT_BASE = `GeminiCLI/${VERSION}`;
+const VERSION = "0.34.0";
+const USER_AGENT_BASE = `GeminiCLI/${VERSION}`;
 
 // Build User-Agent for a specific model
 export function buildGeminiCliUserAgent(model: string): string {
@@ -26,9 +26,9 @@ export function buildGeminiCliUserAgent(model: string): string {
 }
 
 // API Endpoints (same as Antigravity - both use Google Code Assist)
-export const CODE_ASSIST_ENDPOINT_DAILY =
+const CODE_ASSIST_ENDPOINT_DAILY =
   "https://daily-cloudcode-pa.sandbox.googleapis.com";
-export const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
+const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
 export const ENDPOINT_FALLBACKS = [
   CODE_ASSIST_ENDPOINT_DAILY,

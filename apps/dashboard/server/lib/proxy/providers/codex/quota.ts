@@ -11,7 +11,7 @@ import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
 
 const USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
 
-export const QUOTA_STALE_MS = 15 * 60 * 1000;
+const QUOTA_STALE_MS = 15 * 60 * 1000;
 const CACHE_PREFIX = "opendum:quota:codex:snapshot";
 const CACHE_TTL_SECONDS = Math.ceil(QUOTA_STALE_MS / 1000);
 
@@ -332,7 +332,7 @@ function toSnapshot(
   };
 }
 
-export async function getCodexQuotaSnapshot(
+async function getCodexQuotaSnapshot(
   accountId: string
 ): Promise<CodexQuotaSnapshot | null> {
   const snapshot = await getRedisJson<CodexQuotaSnapshot>(
@@ -346,7 +346,7 @@ export async function getCodexQuotaSnapshot(
   return snapshot;
 }
 
-export async function setCodexQuotaSnapshot(
+async function setCodexQuotaSnapshot(
   accountId: string,
   snapshot: CodexQuotaSnapshot
 ): Promise<void> {

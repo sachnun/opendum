@@ -192,7 +192,7 @@ function buildRequestPayload(
   return payload;
 }
 
-export const qwenCodeConfig: ProviderConfig = {
+const qwenCodeConfig: ProviderConfig = {
   name: "qwen_code",
   displayName: "Qwen Code",
   supportedModels: getProviderModelSet("qwen_code"),
@@ -584,6 +584,3 @@ function createThinkTagTransform(): TransformStream<string, string> {
     },
   });
 }
-
-// Export utilities
-export { generateCodeVerifier, generateCodeChallenge };

@@ -24,7 +24,7 @@ type QuotaProviderKey = z.infer<typeof accountQuotaInputSchema>["provider"];
 type QuotaConfidence = "high" | "medium" | "low";
 type JsonRecord = Record<string, unknown>;
 
-export interface QuotaGroupDisplay {
+interface QuotaGroupDisplay {
   name: string;
   displayName: string;
   models: string[];

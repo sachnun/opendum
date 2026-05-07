@@ -1,7 +1,7 @@
 // Kiro OAuth and API constants
 
 export const REGION = "us-east-1";
-export const AUTH_ENDPOINT =
+const AUTH_ENDPOINT =
   `https://prod.${REGION}.auth.desktop.kiro.dev`;
 export const API_BASE_URL =
   `https://q.${REGION}.amazonaws.com/generateAssistantResponse`;

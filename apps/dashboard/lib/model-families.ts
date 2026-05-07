@@ -1,4 +1,4 @@
-export const FEATURED_MODEL_FAMILIES = [
+const FEATURED_MODEL_FAMILIES = [
   "OpenAI",
   "Claude",
   "Gemini",
@@ -13,7 +13,7 @@ export const FEATURED_MODEL_FAMILIES = [
 export type FeaturedModelFamily = (typeof FEATURED_MODEL_FAMILIES)[number];
 export type ModelFamily = FeaturedModelFamily | "Others";
 
-export const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
+const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   OpenAI: "openai-models",
   Claude: "claude-models",
   Gemini: "gemini-models",

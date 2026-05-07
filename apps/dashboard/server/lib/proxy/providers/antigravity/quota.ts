@@ -13,7 +13,7 @@ import { CODE_ASSIST_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants.js"
  * 
  * Verified empirically - see LLM-API-Key-Proxy quota testing guide
  */
-export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
+const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   "standard-tier": {
     "claude-opus-4-6": 150,
     "claude-sonnet-4-6": 150,
@@ -43,9 +43,9 @@ export const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   },
 };
 
-export const QUOTA_MAX_REQUESTS_DEFAULT = 100;
+const QUOTA_MAX_REQUESTS_DEFAULT = 100;
 
-export const QUOTA_GROUPS: Record<string, { displayName: string; models: string[] }> = {
+const QUOTA_GROUPS: Record<string, { displayName: string; models: string[] }> = {
   claude: {
     displayName: "Claude / GPT-OSS",
     models: [
@@ -91,21 +91,21 @@ const API_TO_USER_MODEL_MAP: Record<string, string> = {
 /**
  * Get API model name from user-facing model name
  */
-export function userToApiModel(userModel: string): string {
+function userToApiModel(userModel: string): string {
   return USER_TO_API_MODEL_MAP[userModel] ?? userModel;
 }
 
 /**
  * Get user-facing model name from API model name
  */
-export function apiToUserModel(apiModel: string): string {
+function apiToUserModel(apiModel: string): string {
   return API_TO_USER_MODEL_MAP[apiModel] ?? apiModel;
 }
 
 /**
  * Get max requests for a model/tier combination
  */
-export function getMaxRequestsForModel(model: string, tier: string): number {
+function getMaxRequestsForModel(model: string, tier: string): number {
   const cleanModel = model.includes("/") ? model.split("/").pop()! : model;
   const tierLimits = QUOTA_MAX_REQUESTS[tier] ?? QUOTA_MAX_REQUESTS["free-tier"];
   return tierLimits[cleanModel] ?? QUOTA_MAX_REQUESTS_DEFAULT;

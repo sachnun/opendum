@@ -7,8 +7,8 @@ import { z } from "zod";
 
 import type { ActionResult } from "../utils/api";
 
-export const periodSchema = z.enum(["5m", "15m", "30m", "1h", "6h", "24h", "7d", "30d", "90d"]);
-export const analyticsFilterSchema = z.union([
+const periodSchema = z.enum(["5m", "15m", "30m", "1h", "6h", "24h", "7d", "30d", "90d"]);
+const analyticsFilterSchema = z.union([
   periodSchema,
   z.object({ from: z.string(), to: z.string() }),
 ]);

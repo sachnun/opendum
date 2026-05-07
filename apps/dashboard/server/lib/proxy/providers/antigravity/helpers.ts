@@ -27,7 +27,7 @@ export function generateRequestId(): string {
 /**
  * Base Antigravity system instruction - required by the API
  */
-export const BASE_SYSTEM_INSTRUCTION =
+const BASE_SYSTEM_INSTRUCTION =
   "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**";
 
 /**
@@ -140,7 +140,7 @@ export function normalizeThinkingConfig(
  * Processes a value by only unescaping control characters (like \n, \t).
  * It does NOT attempt to parse JSON objects from strings.
  */
-export function processEscapeSequencesOnly(value: unknown): unknown {
+function processEscapeSequencesOnly(value: unknown): unknown {
   if (typeof value !== "string") {
     return value;
   }
@@ -158,90 +158,6 @@ export function processEscapeSequencesOnly(value: unknown): unknown {
       }
     } catch {
       // Fall back to original
-    }
-  }
-
-  return value;
-}
-
-/**
- * Recursively parses JSON strings nested within objects/arrays.
- */
-export function recursivelyParseJsonStrings(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => recursivelyParseJsonStrings(item));
-  }
-
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return Object.fromEntries(
-      Object.entries(record).map(([key, inner]) => [
-        key,
-        recursivelyParseJsonStrings(inner),
-      ])
-    );
-  }
-
-  if (typeof value !== "string") {
-    return value;
-  }
-
-  const stripped = value.trim();
-
-  const hasControlCharEscapes =
-    value.includes("\\n") || value.includes("\\t");
-  const hasIntentionalEscapes =
-    value.includes('\\"') || value.includes("\\\\");
-
-  if (hasControlCharEscapes && !hasIntentionalEscapes) {
-    try {
-      const unescaped = JSON.parse(`"${value.replaceAll('"', '\\"')}"`);
-      if (typeof unescaped === "string") {
-        return unescaped;
-      }
-    } catch {
-      // Fall through to other processing.
-    }
-  }
-
-  if (stripped && (stripped.startsWith("{") || stripped.startsWith("["))) {
-    const isWellFormed =
-      (stripped.startsWith("{") && stripped.endsWith("}")) ||
-      (stripped.startsWith("[") && stripped.endsWith("]"));
-
-    if (isWellFormed) {
-      try {
-        const parsed = JSON.parse(value);
-        return recursivelyParseJsonStrings(parsed);
-      } catch {
-        // Continue to malformed cases.
-      }
-    }
-
-    if (stripped.startsWith("[") && !stripped.endsWith("]")) {
-      try {
-        const lastBracket = stripped.lastIndexOf("]");
-        if (lastBracket > 0) {
-          const cleaned = stripped.slice(0, lastBracket + 1);
-          const parsed = JSON.parse(cleaned);
-          return recursivelyParseJsonStrings(parsed);
-        }
-      } catch {
-        // Ignore.
-      }
-    }
-
-    if (stripped.startsWith("{") && !stripped.endsWith("}")) {
-      try {
-        const lastBrace = stripped.lastIndexOf("}");
-        if (lastBrace > 0) {
-          const cleaned = stripped.slice(0, lastBrace + 1);
-          const parsed = JSON.parse(cleaned);
-          return recursivelyParseJsonStrings(parsed);
-        }
-      } catch {
-        // Ignore.
-      }
     }
   }
 

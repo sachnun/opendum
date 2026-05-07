@@ -748,7 +748,7 @@ function normalizeTokenExpiry(expiresIn?: number): Date {
   return new Date("2100-01-01T00:00:00.000Z");
 }
 
-export const copilotConfig: ProviderConfig = {
+const copilotConfig: ProviderConfig = {
   name: "copilot",
   displayName: "GitHub Copilot",
   supportedModels: getProviderModelSet("copilot"),

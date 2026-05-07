@@ -57,7 +57,7 @@ export function generateCodeVerifier(): string {
     .replace(/=+$/, "");
 }
 
-export async function generateCodeChallenge(verifier: string): Promise<string> {
+async function generateCodeChallenge(verifier: string): Promise<string> {
   const encoded = new TextEncoder().encode(verifier);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
@@ -432,7 +432,7 @@ function convertKiroEventsToCompletion(events: Array<JsonObject>, model: string)
   };
 }
 
-export const kiroConfig: ProviderConfig = {
+const kiroConfig: ProviderConfig = {
   name: "kiro",
   displayName: "Kiro",
   supportedModels: getProviderModelSet("kiro"),
