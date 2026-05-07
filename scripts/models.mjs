@@ -4,7 +4,7 @@ import { writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildTomlIndex } from "./toml-utils.mjs";
+import { buildModelIndex } from "./model-registry.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
@@ -62,7 +62,7 @@ function runScript(scriptName) {
 // ---------------------------------------------------------------------------
 
 function snapshotProviderModels() {
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
   const snapshot = new Map();
 
   for (const provider of REFRESHED_PROVIDERS) {

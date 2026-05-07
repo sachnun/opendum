@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
-import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml, buildTomlIndex, parseToml, serializeToml } from "./toml-utils.mjs";
+import { syncProviderModels, buildModelIndex, writeModelToml } from "./model-registry.mjs";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
@@ -125,11 +124,11 @@ function buildMetadataLookup(models) {
 }
 
 /**
- * After syncProviderToToml creates bare-bones TOML files for new models,
+ * After syncProviderModels creates bare-bones TOML files for new models,
  * enrich them with metadata from models.json.
  */
 function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
     const entry = index[modelKey];
@@ -165,7 +164,7 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
     if (!data.opendum) data.opendum = {};
     data.opendum.family = "OpenAI";
 
-    writeFileSync(entry.path, serializeToml(data));
+    writeModelToml(entry.path, data);
   }
 }
 
@@ -194,7 +193,7 @@ async function main() {
     );
   }
 
-  const result = syncProviderToToml(modelsDir, "codex", modelMap);
+  const result = syncProviderModels(modelsDir, "codex", modelMap);
 
   // Enrich newly created TOML files with metadata from models.json
   if (result.added.length > 0) {

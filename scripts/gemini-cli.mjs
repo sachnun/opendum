@@ -9,10 +9,9 @@
  * public Google Generative Language API.
  */
 
-import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildTomlIndex, serializeToml, syncProviderToToml } from "./toml-utils.mjs";
+import { buildModelIndex, syncProviderModels, writeModelToml } from "./model-registry.mjs";
 
 const PROVIDER_NAME = "gemini_cli";
 
@@ -262,7 +261,7 @@ function getFallbackMetadata(modelKey) {
  * Falls back to known model characteristics when the API is unavailable.
  */
 function enrichNewModels(modelsDir, addedKeys, apiModels) {
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
     const entry = index[modelKey];
@@ -317,7 +316,7 @@ function enrichNewModels(modelsDir, addedKeys, apiModels) {
     if (!data.opendum) data.opendum = {};
     data.opendum.family = "Gemini";
 
-    writeFileSync(entry.path, serializeToml(data));
+    writeModelToml(entry.path, data);
   }
 }
 
@@ -344,7 +343,7 @@ async function main() {
   const modelMap = buildModelMap(validModels);
 
   // 3. Sync to TOML
-  const result = syncProviderToToml(modelsDir, PROVIDER_NAME, modelMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
 
   // 4. Enrich newly created TOML files with metadata from public Gemini API
   if (result.added.length > 0) {

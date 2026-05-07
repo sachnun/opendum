@@ -10,6 +10,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      '@decimalturn/toml-patch':
+        specifier: ^1.2.1
+        version: 1.2.1
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -327,6 +331,10 @@ packages:
 
   '@colordx/core@5.4.3':
     resolution: {integrity: sha512-kIxYSfA5T8HXjav55UaaH/o/cKivF6jCCGIb8eqtcsfI46wsvlSiT8jMDyrl779qLec3c2c2oHBZo4oAhvbjrQ==}
+
+  '@decimalturn/toml-patch@1.2.1':
+    resolution: {integrity: sha512-IbKgsnKK5sk0wDcqZ9ZzJGejM9hlVwc6097HURfIpksiBe4dxrzbGAZlHsn4sHGh+RkFAUT85O/jNoQTBhHfdQ==}
+    engines: {node: '>=12'}
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -5688,6 +5696,8 @@ snapshots:
   '@cloudflare/kv-asset-handler@0.4.2': {}
 
   '@colordx/core@5.4.3': {}
+
+  '@decimalturn/toml-patch@1.2.1': {}
 
   '@drizzle-team/brocli@0.10.2': {}
 

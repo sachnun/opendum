@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml } from "./toml-utils.mjs";
+import { buildModelIndex, syncProviderModels } from "./model-registry.mjs";
 
 const PROVIDER_NAME = "nvidia_nim";
 const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
@@ -316,8 +316,7 @@ async function main() {
   const modelsDir = resolve(scriptDir, "../models");
 
   // Build existing model map from TOML files to preserve existing keys
-  const { buildTomlIndex } = await import("./toml-utils.mjs");
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
   const existingKeys = new Map();
   for (const [modelId, entry] of Object.entries(index)) {
     const providers = entry.data.opendum?.providers || [];
@@ -333,7 +332,7 @@ async function main() {
   ]);
   const nextMap = buildModelMap(modelIds, existingKeys, llmModelKeys);
 
-  const result = syncProviderToToml(modelsDir, PROVIDER_NAME, nextMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, nextMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Nvidia NIM models are already up to date (${nextMap.size} models).`);

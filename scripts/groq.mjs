@@ -15,7 +15,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml, buildTomlIndex } from "./toml-utils.mjs";
+import { syncProviderModels, buildModelIndex } from "./model-registry.mjs";
 
 const HF_PARTNERS_URL = "https://huggingface.co/api/partners/groq/models";
 const FETCH_TIMEOUT_MS = 20_000;
@@ -88,7 +88,7 @@ function toModelKey(groqModelId, reverseMap) {
 // ---------------------------------------------------------------------------
 
 function buildReverseMap(modelsDir) {
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
   const reverseMap = new Map();
 
   for (const [modelId, entry] of Object.entries(index)) {
@@ -201,7 +201,7 @@ async function main() {
   const groqModelIds = await fetchHfGroqModels();
   const modelMap = buildModelMap(groqModelIds, reverseMap);
 
-  const result = syncProviderToToml(modelsDir, "groq", modelMap);
+  const result = syncProviderModels(modelsDir, "groq", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Groq models are already up to date (${modelMap.size} models).`);

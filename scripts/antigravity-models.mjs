@@ -21,7 +21,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml, buildTomlIndex } from "./toml-utils.mjs";
+import { syncProviderModels, buildModelIndex } from "./model-registry.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -82,7 +82,7 @@ const MODEL_NAME_OVERRIDES = {
 };
 
 // Models present in Antigravity but NOT tracked by the plugin README.
-// These are preserved so syncProviderToToml() doesn't accidentally drop them.
+// These are preserved so syncProviderModels() doesn't accidentally drop them.
 // Map: canonical TOML key → upstream API name (same as key if no mapping needed)
 const KNOWN_EXTRAS = new Map([
   ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image"],
@@ -218,7 +218,7 @@ function syncToml(modelMap, dryRun) {
     console.log("[antigravity] Dry run — no TOML files modified.");
 
     // Show what would change
-    const index = buildTomlIndex(modelsDir);
+    const index = buildModelIndex(modelsDir);
     const wouldRemove = [];
     const wouldKeep = [];
 
@@ -254,7 +254,7 @@ function syncToml(modelMap, dryRun) {
     return { added: wouldAdd, removed: wouldRemove, updated: [] };
   }
 
-  return syncProviderToToml(modelsDir, PROVIDER_NAME, modelMap);
+  return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
 }
 
 // ---------------------------------------------------------------------------

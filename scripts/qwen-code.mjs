@@ -11,10 +11,9 @@
  * existing qwen_code models from TOML, only adds newly discovered ones.
  */
 
-import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildTomlIndex, serializeToml, syncProviderToToml } from "./toml-utils.mjs";
+import { buildModelIndex, syncProviderModels, writeModelToml } from "./model-registry.mjs";
 
 const PROVIDER_NAME = "qwen_code";
 
@@ -202,7 +201,7 @@ function buildModelMap(oauthModels, existingKeys) {
 // ---------------------------------------------------------------------------
 
 function enrichNewModels(modelsDir, addedKeys, oauthModels) {
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
   const lookup = new Map();
 
   for (const m of oauthModels) {
@@ -231,7 +230,7 @@ function enrichNewModels(modelsDir, addedKeys, oauthModels) {
     if (!data.opendum) data.opendum = {};
     data.opendum.family = "Qwen";
 
-    writeFileSync(entry.path, serializeToml(data));
+    writeModelToml(entry.path, data);
   }
 }
 
@@ -248,7 +247,7 @@ async function main() {
   const oauthModels = parseOAuthModels(source);
 
   // 2. Collect existing qwen_code models from TOML (to preserve them)
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
   const existingKeys = new Map();
 
   for (const [modelId, entry] of Object.entries(index)) {
@@ -264,7 +263,7 @@ async function main() {
   const modelMap = buildModelMap(oauthModels, existingKeys);
 
   // 4. Sync to TOML
-  const result = syncProviderToToml(modelsDir, PROVIDER_NAME, modelMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
 
   // 5. Enrich newly created TOML files
   if (result.added.length > 0) {

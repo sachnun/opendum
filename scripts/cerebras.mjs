@@ -15,7 +15,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml, buildTomlIndex } from "./toml-utils.mjs";
+import { syncProviderModels, buildModelIndex } from "./model-registry.mjs";
 
 const CEREBRAS_PUBLIC_MODELS_URL = "https://api.cerebras.ai/public/v1/models";
 const FETCH_TIMEOUT_MS = 15_000;
@@ -53,7 +53,7 @@ const MODEL_KEY_OVERRIDES = {
 // ---------------------------------------------------------------------------
 
 function buildReverseMap(modelsDir) {
-  const index = buildTomlIndex(modelsDir);
+  const index = buildModelIndex(modelsDir);
   const reverseMap = new Map();
 
   for (const [modelId, entry] of Object.entries(index)) {
@@ -177,7 +177,7 @@ async function main() {
   const merged = [...new Set([...liveModels, ...STATIC_MODELS])].sort();
   const modelMap = buildModelMap(merged, reverseMap);
 
-  const result = syncProviderToToml(modelsDir, "cerebras", modelMap);
+  const result = syncProviderModels(modelsDir, "cerebras", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Cerebras models are already up to date (${modelMap.size} models).`);

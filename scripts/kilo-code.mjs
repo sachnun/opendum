@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml } from "./toml-utils.mjs";
+import { syncProviderModels } from "./model-registry.mjs";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 const FETCH_TIMEOUT_MS = 20_000;
@@ -120,7 +120,7 @@ async function main() {
   const models = await fetchKiloCodeModels();
   const modelMap = buildModelMap(models);
 
-  const result = syncProviderToToml(modelsDir, "kilo_code", modelMap);
+  const result = syncProviderModels(modelsDir, "kilo_code", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Kilo Code models are already up to date (${modelMap.size} models).`);

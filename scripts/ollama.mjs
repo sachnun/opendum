@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml } from "./toml-utils.mjs";
+import { syncProviderModels } from "./model-registry.mjs";
 
 const OLLAMA_MODELS_URL = "https://ollama.com/v1/models";
 const FETCH_TIMEOUT_MS = 20_000;
@@ -92,7 +92,7 @@ async function main() {
   const modelIds = await fetchOllamaCloudModelIds();
   const modelMap = buildModelMap(modelIds);
 
-  const result = syncProviderToToml(modelsDir, "ollama_cloud", modelMap);
+  const result = syncProviderModels(modelsDir, "ollama_cloud", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Ollama Cloud models are already up to date (${modelMap.size} models).`);

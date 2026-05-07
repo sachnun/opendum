@@ -18,7 +18,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml } from "./toml-utils.mjs";
+import { syncProviderModels } from "./model-registry.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -384,7 +384,7 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 
-  const result = syncProviderToToml(modelsDir, PROVIDER_NAME, modelMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
 
   if (
     result.added.length === 0 &&

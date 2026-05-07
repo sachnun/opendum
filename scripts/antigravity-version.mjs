@@ -31,7 +31,7 @@ const CONSTANTS_PATH = resolve(
 
 // Regex to extract version from the Antigravity User-Agent constant
 const USER_AGENT_REGEX =
-  /^(export const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+\$\{getAntigravityPlatform\(\)\}`;)$/m;
+  /^((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+\$\{getAntigravityPlatform\(\)\}`;)$/m;
 
 // ---------------------------------------------------------------------------
 // Helpers

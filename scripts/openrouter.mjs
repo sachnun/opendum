@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderToToml } from "./toml-utils.mjs";
+import { syncProviderModels } from "./model-registry.mjs";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const FETCH_TIMEOUT_MS = 20_000;
@@ -145,7 +145,7 @@ async function main() {
   const modelIds = await fetchOpenRouterFreeModelIds();
   const modelMap = buildModelMap(modelIds);
 
-  const result = syncProviderToToml(modelsDir, "openrouter", modelMap);
+  const result = syncProviderModels(modelsDir, "openrouter", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`OpenRouter free models are already up to date (${modelMap.size} models).`);
