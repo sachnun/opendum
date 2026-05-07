@@ -1,2 +1,5 @@
 [opendum]
 providers = ["nvidia_nim"]
+
+[nvidia_nim]
+upstream = "mistralai/mistral-large-3-675b-instruct-2512"

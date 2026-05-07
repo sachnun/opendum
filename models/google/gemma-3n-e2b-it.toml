@@ -14,12 +14,9 @@ output = ["text"]
 
 [opendum]
 family = "Google"
-providers = ["openrouter", "nvidia_nim"]
+providers = ["nvidia_nim"]
 aliases = ["google-gemma-3n-e2b-it", "google/gemma-3n-e2b-it"]
 ignored = true
 
 [nvidia_nim]
 upstream = "google/gemma-3n-e2b-it"
-
-[openrouter]
-upstream = "google/gemma-3n-e2b-it:free"

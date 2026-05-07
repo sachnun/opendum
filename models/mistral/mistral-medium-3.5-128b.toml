@@ -2,4 +2,4 @@
 providers = ["nvidia_nim"]
 
 [nvidia_nim]
-upstream = "z-ai/glm4.7"
+upstream = "mistralai/mistral-medium-3.5-128b"

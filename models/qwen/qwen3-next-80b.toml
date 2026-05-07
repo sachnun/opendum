@@ -15,3 +15,6 @@ output = ["text"]
 [opendum]
 family = "Qwen"
 providers = ["ollama_cloud"]
+
+[ollama_cloud]
+upstream = "qwen3-next:80b"

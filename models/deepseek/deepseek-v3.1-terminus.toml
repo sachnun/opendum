@@ -14,8 +14,5 @@ output = ["text"]
 
 [opendum]
 family = "DeepSeek"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["deepseek-ai-deepseek-v3.1-terminus", "deepseek-ai/deepseek-v3.1-terminus"]
-
-[nvidia_nim]
-upstream = "deepseek-ai/deepseek-v3.1-terminus"

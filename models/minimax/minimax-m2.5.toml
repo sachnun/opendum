@@ -15,3 +15,9 @@ output = ["text"]
 [opendum]
 family = "MiniMax"
 providers = ["kiro", "ollama_cloud", "openrouter", "nvidia_nim"]
+
+[nvidia_nim]
+upstream = "minimaxai/minimax-m2.5"
+
+[openrouter]
+upstream = "minimax/minimax-m2.5:free"

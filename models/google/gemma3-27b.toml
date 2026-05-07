@@ -15,3 +15,6 @@ output = ["text"]
 [opendum]
 family = "Google"
 providers = ["ollama_cloud"]
+
+[ollama_cloud]
+upstream = "gemma3:27b"
