@@ -26,9 +26,12 @@ export const SUPPORTED_PARAMS = new Set([
   "stream",
   "tools",
   "tool_choice",
+  "parallel_tool_calls",
   "reasoning",
   "include",
   "previous_response_id",
+  "prompt_cache_key",
+  "client_metadata",
   "service_tier",
 ]);
 

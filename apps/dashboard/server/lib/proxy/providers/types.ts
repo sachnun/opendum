@@ -89,6 +89,9 @@ export interface ChatCompletionRequest {
   // Set automatically based on whether user requested reasoning
   _includeReasoning?: boolean;
 
+  // OpenAI Responses API parallel tool call control
+  parallel_tool_calls?: boolean;
+
   // Internal passthrough for Responses API input items
   // Used by providers that natively support the Responses API.
   _responsesInput?: Array<Record<string, unknown>>;

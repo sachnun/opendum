@@ -150,6 +150,10 @@ function toNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function toBooleanClaim(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -247,12 +251,11 @@ function extractAccountIdFromClaims(decoded: Record<string, unknown>): string | 
     }
   }
 
-  return extractWorkspaceIdFromClaims(decoded);
+  return null;
 }
 
 /**
  * Extract ChatGPT account ID from JWT token claims.
- * Falls back to workspace/org identifiers only when account ID is absent.
  */
 function extractAccountIdFromJwt(token: string): string | null {
   const decoded = parseJwtClaims(token);
@@ -273,6 +276,79 @@ function extractWorkspaceIdFromJwt(token: string): string | null {
   }
 
   return extractWorkspaceIdFromClaims(decoded);
+}
+
+function extractFedrampAccountFromClaims(decoded: Record<string, unknown>): boolean {
+  const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
+  return (
+    toBooleanClaim(authClaims?.chatgpt_account_is_fedramp) ||
+    toBooleanClaim(decoded.chatgpt_account_is_fedramp)
+  );
+}
+
+function extractFedrampAccountFromJwt(token: string): boolean {
+  const decoded = parseJwtClaims(token);
+  if (!decoded) {
+    return false;
+  }
+
+  return extractFedrampAccountFromClaims(decoded);
+}
+
+function buildCodexError(
+  message: string,
+  code = "codex_stream_error",
+  type = "api_error"
+): Record<string, unknown> {
+  return {
+    error: {
+      message,
+      type,
+      code,
+    },
+  };
+}
+
+function parseCodexSseError(event: Record<string, unknown>): Record<string, unknown> | null {
+  const eventType = event.type;
+  if (eventType !== "response.failed" && eventType !== "response.incomplete") {
+    return null;
+  }
+
+  const response = asRecord(event.response) ?? event;
+  const rawError = asRecord(response.error);
+  if (eventType === "response.incomplete") {
+    const incompleteDetails = asRecord(response.incomplete_details);
+    const reason = toNonEmptyString(incompleteDetails?.reason) ?? "unknown";
+    return buildCodexError(
+      `Incomplete Codex response returned, reason: ${reason}`,
+      "incomplete_response",
+      "api_error"
+    );
+  }
+
+  const code = toNonEmptyString(rawError?.code) ?? "response_failed";
+  const message = toNonEmptyString(rawError?.message) ?? "Codex response failed.";
+  const type = toNonEmptyString(rawError?.type) ?? "api_error";
+
+  return buildCodexError(message, code, type);
+}
+
+function errorStatusFromCode(code: unknown): number {
+  switch (code) {
+    case "context_length_exceeded":
+    case "invalid_prompt":
+    case "incomplete_response":
+      return 400;
+    case "insufficient_quota":
+    case "rate_limit_exceeded":
+      return 429;
+    case "server_is_overloaded":
+    case "slow_down":
+      return 503;
+    default:
+      return 502;
+  }
 }
 
 /**
@@ -683,7 +759,16 @@ function buildResponsesApiPayload(
 
   // Codex endpoint currently rejects sampling controls
   // like temperature/top_p; omit them to avoid 400 errors.
-  setIfCodexParamSupported(payload, "tool_choice", convertToolChoice(body.tool_choice));
+  setIfCodexParamSupported(
+    payload,
+    "tool_choice",
+    body.tool_choice === undefined && tools ? "auto" : convertToolChoice(body.tool_choice)
+  );
+  setIfCodexParamSupported(
+    payload,
+    "parallel_tool_calls",
+    body.parallel_tool_calls
+  );
 
   let reasoningConfig: Record<string, unknown> | undefined;
   if (body.reasoning && typeof body.reasoning === "object") {
@@ -730,6 +815,12 @@ function buildResponsesApiPayload(
     body.previous_response_id
   );
   setIfCodexParamSupported(payload, "service_tier", body.service_tier);
+  setIfCodexParamSupported(payload, "prompt_cache_key", body._sessionId);
+  if (body._sessionId) {
+    setIfCodexParamSupported(payload, "client_metadata", {
+      session_id: body._sessionId,
+    });
+  }
 
   return filterSupportedCodexPayload(payload);
 }
@@ -826,8 +917,32 @@ function createResponsesToChatCompletionsStream(
         }
 
         try {
-          const event = JSON.parse(jsonStr);
+          const event = JSON.parse(jsonStr) as Record<string, unknown>;
           const eventType = event.type;
+          const errorPayload = parseCodexSseError(event);
+          if (errorPayload) {
+            const error = asRecord(errorPayload.error);
+            const chunk = {
+              id: completionId,
+              object: "chat.completion.chunk",
+              created,
+              model,
+              choices: [
+                {
+                  index: 0,
+                  delta: {},
+                  finish_reason: "stop",
+                },
+              ],
+              error,
+            };
+            controller.enqueue(`data: ${JSON.stringify(chunk)}\n\n`);
+            if (!sentDone) {
+              sentDone = true;
+              controller.enqueue("data: [DONE]\n\n");
+            }
+            break;
+          }
 
           switch (eventType) {
             // Text content delta
@@ -848,6 +963,7 @@ function createResponsesToChatCompletionsStream(
 
             // Reasoning/thinking content
             case "response.reasoning.delta":
+            case "response.reasoning_text.delta":
             case "response.reasoning_summary_text.delta": {
               if (!sentRole) {
                 controller.enqueue(
@@ -865,16 +981,20 @@ function createResponsesToChatCompletionsStream(
 
             // Function call started
             case "response.output_item.added": {
-              if (event.item?.type === "function_call") {
+              const item = asRecord(event.item);
+              if (item?.type === "function_call") {
                 if (!sentRole) {
                   controller.enqueue(
                     makeChatChunk({ role: "assistant" })
                   );
                   sentRole = true;
                 }
-                currentFunctionCallName = event.item.name || "";
+                currentFunctionCallName =
+                  typeof item.name === "string" ? item.name : "";
                 currentFunctionCallId = toChatCompletionsId(
-                  event.item.call_id || event.item.id || `fc_${Date.now()}`
+                  (typeof item.call_id === "string" ? item.call_id : undefined) ||
+                    (typeof item.id === "string" ? item.id : undefined) ||
+                    `fc_${Date.now()}`
                 );
 
                 // Emit tool_calls delta with function name
@@ -898,7 +1018,8 @@ function createResponsesToChatCompletionsStream(
             }
 
             // Function call arguments delta
-            case "response.function_call_arguments.delta": {
+            case "response.function_call_arguments.delta":
+            case "response.custom_tool_call_input.delta": {
               if (event.delta) {
                 controller.enqueue(
                   makeChatChunk({
@@ -920,7 +1041,7 @@ function createResponsesToChatCompletionsStream(
             case "response.function_call_arguments.done":
             case "response.output_item.done": {
               if (
-                event.item?.type === "function_call" ||
+                asRecord(event.item)?.type === "function_call" ||
                 eventType === "response.function_call_arguments.done"
               ) {
                 functionCallIndex++;
@@ -933,16 +1054,17 @@ function createResponsesToChatCompletionsStream(
             // Response completed
             case "response.completed":
             case "response.done": {
-              const response = event.response || event;
+              const response = asRecord(event.response) ?? event;
               // Extract usage if available
-              if (response.usage) {
+              const usage = asRecord(response.usage);
+              if (usage) {
                 inputTokens =
-                  response.usage.input_tokens ||
-                  response.usage.prompt_tokens ||
+                  (typeof usage.input_tokens === "number" ? usage.input_tokens : 0) ||
+                  (typeof usage.prompt_tokens === "number" ? usage.prompt_tokens : 0) ||
                   0;
                 outputTokens =
-                  response.usage.output_tokens ||
-                  response.usage.completion_tokens ||
+                  (typeof usage.output_tokens === "number" ? usage.output_tokens : 0) ||
+                  (typeof usage.completion_tokens === "number" ? usage.completion_tokens : 0) ||
                   0;
               }
 
@@ -1138,6 +1260,7 @@ function convertChatCompletionSseToCompletion(
   let content = "";
   let reasoningContent = "";
   let finishReason: string | null = null;
+  let errorPayload: Record<string, unknown> | null = null;
   const toolCallsByIndex = new Map<number, AccumulatedToolCall>();
 
   let promptTokens = 0;
@@ -1165,6 +1288,7 @@ function convertChatCompletionSseToCompletion(
           delta?: Record<string, unknown>;
           finish_reason?: string | null;
         }>;
+        error?: Record<string, unknown>;
         usage?: {
           prompt_tokens?: number;
           completion_tokens?: number;
@@ -1180,6 +1304,11 @@ function convertChatCompletionSseToCompletion(
       }
       if (typeof chunk.model === "string") {
         model = chunk.model;
+      }
+
+      if (chunk.error) {
+        errorPayload = { error: chunk.error };
+        continue;
       }
 
       const choice = chunk.choices?.[0];
@@ -1260,6 +1389,10 @@ function convertChatCompletionSseToCompletion(
 
   if (!totalTokens) {
     totalTokens = promptTokens + completionTokens;
+  }
+
+  if (errorPayload) {
+    return errorPayload;
   }
 
   const toolCalls = Array.from(toolCallsByIndex.entries())
@@ -1562,8 +1695,13 @@ export const codexProvider: Provider = {
       "User-Agent": CODEX_CHAT_USER_AGENT,
     };
 
-    if (account.accountId) {
-      headers["ChatGPT-Account-Id"] = account.accountId;
+    const chatgptAccountId = extractAccountIdFromJwt(accessToken);
+    if (chatgptAccountId) {
+      headers["ChatGPT-Account-Id"] = chatgptAccountId;
+    }
+
+    if (extractFedrampAccountFromJwt(accessToken)) {
+      headers["X-OpenAI-Fedramp"] = "true";
     }
 
     if (body._sessionId) {
@@ -1616,6 +1754,15 @@ export const codexProvider: Provider = {
           .pipeThrough(new TextEncoderStream());
         const sseText = await new Response(transformedBody).text();
         completionData = convertChatCompletionSseToCompletion(sseText, modelName);
+        const completionError = asRecord(completionData.error);
+        if (completionError) {
+          return new Response(JSON.stringify(completionData), {
+            status: errorStatusFromCode(completionError.code),
+            headers: new Headers({
+              "Content-Type": "application/json",
+            }),
+          });
+        }
       } else {
         return new Response(
           JSON.stringify({
