@@ -1,0 +1,90 @@
+name: Deploy Proxy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-proxy.yml
+      - apps/proxy/**
+      - models/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railway-proxy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Proxy Railway
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    env:
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_PROXY_SERVICE_ID: ${{ vars.RAILWAY_PROXY_SERVICE_ID }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      DEPLOY_DIR: .railway-deploy/proxy
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/proxy/go.mod
+          cache-dependency-path: apps/proxy/go.sum
+
+      - name: Test proxy
+        run: go -C apps/proxy test ./...
+
+      - name: Prepare Railway bundle
+        run: |
+          rm -rf "$DEPLOY_DIR"
+          mkdir -p "$DEPLOY_DIR/dist"
+          cp -R models "$DEPLOY_DIR/models"
+          cat > "$DEPLOY_DIR/railway.json" <<'JSON'
+          {
+            "$schema": "https://railway.com/railway.schema.json",
+            "build": {
+              "buildCommand": null
+            },
+            "deploy": {
+              "startCommand": "./dist/proxy"
+            }
+          }
+          JSON
+
+      - name: Build proxy binary
+        run: go -C apps/proxy build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o "../../$DEPLOY_DIR/dist/proxy" ./cmd/proxy
+        env:
+          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: amd64
+
+      - name: Validate Railway configuration
+        run: |
+          test -n "$RAILWAY_PROJECT_ID"
+          test -n "$RAILWAY_ENVIRONMENT"
+          test -n "$RAILWAY_PROXY_SERVICE_ID"
+          test -n "$RAILWAY_TOKEN"
+          test -x "$DEPLOY_DIR/dist/proxy"
+          test -d "$DEPLOY_DIR/models"
+          test -f "$DEPLOY_DIR/railway.json"
+
+      - name: Deploy proxy to Railway
+        uses: docker://ghcr.io/railwayapp/cli:latest
+        with:
+          args: >-
+            up .railway-deploy/proxy
+            --path-as-root
+            --ci
+            --project ${{ env.RAILWAY_PROJECT_ID }}
+            --environment ${{ env.RAILWAY_ENVIRONMENT }}
+            --service ${{ env.RAILWAY_PROXY_SERVICE_ID }}
