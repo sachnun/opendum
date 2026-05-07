@@ -14,8 +14,5 @@ output = ["text"]
 
 [opendum]
 family = "Meta"
-providers = ["nvidia_nim"]
+providers = []
 aliases = ["meta-llama-3.1-405b-instruct", "meta/llama-3.1-405b-instruct"]
-
-[nvidia_nim]
-upstream = "meta/llama-3.1-405b-instruct"

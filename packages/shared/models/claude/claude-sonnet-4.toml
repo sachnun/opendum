@@ -14,5 +14,5 @@ output = ["text"]
 
 [opendum]
 family = "Claude"
-providers = ["kiro", "copilot"]
+providers = ["kiro"]
 aliases = ["claude-sonnet-4-0", "claude-sonnet-4.0", "claude-sonnet4.0"]
