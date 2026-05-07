@@ -1,8 +1,10 @@
 import { db } from "../lib/db";
+import { getAnalyticsCacheVersion } from "../lib/cache/analytics-cache";
 import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountErrorHistory, providerAccountModelHealth, usageLog } from "../lib/db/schema";
 import { encrypt, hashString } from "../lib/encryption";
 import { getModelLookupKeys, getProviderModelMap, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
+import { getRedisJson, setRedisJson } from "../lib/redis-cache";
 import { antigravityProvider } from "../lib/proxy/providers/antigravity";
 import { REDIRECT_URI as antigravityRedirectUri, CLIENT_ID as antigravityClientId, SCOPES as antigravityScopes } from "../lib/proxy/providers/antigravity/constants";
 import { API_BASE_URL as cerebrasApiBaseUrl } from "../lib/proxy/providers/cerebras/constants";
@@ -50,6 +52,7 @@ const WARNING_INDICATOR_STALE_WINDOW_MS = 3 * 60 * 60 * 1000;
 const INDICATOR_WEIGHT = { normal: 0, warning: 1, error: 2 } as const;
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const AUTO_PIN_SENTINEL = "_auto_pinned";
+const PROVIDER_SUMMARY_STATS_CACHE_TTL_SECONDS = 30;
 
 const apiKeyProviderSchema = z.enum(["nvidia_nim", "ollama_cloud", "openrouter", "groq", "cerebras", "kilo_code"]);
 export const providerInputSchema = z.object({ provider: z.string() });
@@ -330,6 +333,24 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
   return { dayKeys, hourKeys, statsByProvider };
 }
 
+async function getCachedProviderSummaryStats(userId: string): Promise<Record<ProviderAccountKey, ProviderStats>> {
+  const version = await getAnalyticsCacheVersion(userId);
+  const cacheKey = `opendum:accounts:summary-stats:${userId}:v${version}`;
+  const cached = await getRedisJson<Record<ProviderAccountKey, ProviderStats>>(cacheKey);
+  if (cached) return cached;
+
+  const providerUsage = await buildProviderStats(userId);
+  const stats = Object.fromEntries(
+    PROVIDER_ACCOUNT_KEYS.map((provider) => [
+      provider,
+      buildStatsFromRaw(providerUsage.statsByProvider.get(provider), providerUsage.dayKeys, providerUsage.hourKeys),
+    ])
+  ) as Record<ProviderAccountKey, ProviderStats>;
+
+  await setRedisJson(cacheKey, stats, PROVIDER_SUMMARY_STATS_CACHE_TTL_SECONDS);
+  return stats;
+}
+
 async function buildAccountStats(userId: string, accountIds: string[]): Promise<{ dayKeys: string[]; hourKeys: string[]; statsByAccountId: Map<string, RawProviderStats> }> {
   const dayKeys = buildDayKeys(PROVIDER_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
@@ -560,7 +581,7 @@ export async function createAccount(userId: string, input: z.infer<typeof create
 
 export async function getAccountSummary(userId: string) {
   try {
-    const [accounts, providerUsage] = await Promise.all([
+    const [accounts, providerStats] = await Promise.all([
       db
         .select({
           provider: providerAccount.provider,
@@ -571,7 +592,7 @@ export async function getAccountSummary(userId: string) {
         })
         .from(providerAccount)
         .where(eq(providerAccount.userId, userId)),
-      buildProviderStats(userId),
+      getCachedProviderSummaryStats(userId),
     ]);
     const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider));
 
@@ -582,7 +603,7 @@ export async function getAccountSummary(userId: string) {
           connected: 0,
           active: 0,
           indicator: "normal" as ProviderAccountIndicator,
-          stats: buildStatsFromRaw(providerUsage.statsByProvider.get(provider), providerUsage.dayKeys, providerUsage.hourKeys),
+          stats: providerStats[provider],
         },
       ])
     ) as Record<ProviderAccountKey, { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats }>;

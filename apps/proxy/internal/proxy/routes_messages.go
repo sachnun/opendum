@@ -173,13 +173,13 @@ func (s *Service) anthropicNonStream(ctx nonStreamContext) error {
 	_ = json.Unmarshal(body, &openAI)
 	response := transformOpenAIToAnthropic(openAI, ctx.Model, includeThinking(ctx.Request))
 	inputTokens, outputTokens := usageFromJSON(openAI)
-	s.markAccountSuccess(context.Background(), ctx.AccountID, ctx.Model)
-	s.recordLatency(context.Background(), ctx.Provider, ctx.Model, false, time.Now().UnixMilli()-ctx.RequestStartMS)
-	s.logUsage(context.Background(), usageParams{UserID: ctx.UserID, ProviderAccountID: ctx.AccountID, ProxyAPIKeyID: ctx.APIKeyID, Model: ctx.Model, InputTokens: inputTokens, OutputTokens: outputTokens, StatusCode: http.StatusOK, DurationMS: int(time.Now().UnixMilli() - ctx.StartMS), Provider: ctx.Provider})
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.Header().Set("X-Provider-Account-Id", ctx.AccountID)
 	ctx.Writer.WriteHeader(http.StatusOK)
-	return json.NewEncoder(ctx.Writer).Encode(response)
+	err = json.NewEncoder(ctx.Writer).Encode(response)
+	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, inputTokens, outputTokens, durationMS, false, ctx.RequestStartMS)
+	return err
 }
 
 func transformOpenAIToAnthropic(openAI map[string]any, model string, includeThinking bool) map[string]any {
@@ -244,9 +244,8 @@ func (s *Service) anthropicStream(ctx streamContext) error {
 		}
 	}
 	tracker.Finish()
-	s.markAccountSuccess(context.Background(), ctx.AccountID, ctx.Model)
-	s.recordLatency(context.Background(), ctx.Provider, ctx.Model, true, time.Now().UnixMilli()-ctx.RequestStartMS)
-	s.logUsage(context.Background(), usageParams{UserID: ctx.UserID, ProviderAccountID: ctx.AccountID, ProxyAPIKeyID: ctx.APIKeyID, Model: ctx.Model, InputTokens: tracker.inputTokens, OutputTokens: tracker.outputTokens, StatusCode: http.StatusOK, DurationMS: int(time.Now().UnixMilli() - ctx.StartMS), Provider: ctx.Provider})
+	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, durationMS, true, ctx.RequestStartMS)
 	return nil
 }
 

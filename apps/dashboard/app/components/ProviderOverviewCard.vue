@@ -15,6 +15,13 @@ const emit = defineEmits<{
   toggled: [providerKey: ProviderAccountKey, pinned: boolean];
 }>();
 
+function indicatorBadge(indicator: string, connectedAccounts: number) {
+  if (connectedAccounts === 0) return { label: "No Accounts", class: "" };
+  if (indicator === "error") return { label: "Needs Attention", class: "border-transparent bg-destructive/60 text-white" };
+  if (indicator === "warning") return { label: "Recovering", class: "border-yellow-500 text-yellow-600" };
+  return { label: "Healthy", class: "border-green-500 text-green-600" };
+}
+
 function formatDuration(duration: number | null): string {
   if (duration === null) return "-";
   if (duration >= 1000) return `${(duration / 1000).toFixed(2)}s`;
@@ -23,13 +30,6 @@ function formatDuration(duration: number | null): string {
 
 function formatHourLabel(time: string): string {
   return time.slice(11, 16);
-}
-
-function indicatorBadge(indicator: string, connectedAccounts: number) {
-  if (connectedAccounts === 0) return { label: "No Accounts", class: "" };
-  if (indicator === "error") return { label: "Needs Attention", class: "border-transparent bg-destructive/60 text-white" };
-  if (indicator === "warning") return { label: "Recovering", class: "border-yellow-500 text-yellow-600" };
-  return { label: "Healthy", class: "border-green-500 text-green-600" };
 }
 
 const dailyValues = computed(() => props.summary.stats.dailyRequests.map((point) => point.count));

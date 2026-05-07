@@ -94,9 +94,8 @@ func (s *Service) passthroughStream(ctx streamContext) error {
 		}
 	}
 	tracker.Flush()
-	s.markAccountSuccess(context.Background(), ctx.AccountID, ctx.Model)
-	s.recordLatency(context.Background(), ctx.Provider, ctx.Model, true, time.Now().UnixMilli()-ctx.RequestStartMS)
-	s.logUsage(context.Background(), usageParams{UserID: ctx.UserID, ProviderAccountID: ctx.AccountID, ProxyAPIKeyID: ctx.APIKeyID, Model: ctx.Model, InputTokens: tracker.inputTokens, OutputTokens: tracker.outputTokens, StatusCode: http.StatusOK, DurationMS: int(time.Now().UnixMilli() - ctx.StartMS), Provider: ctx.Provider})
+	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, durationMS, true, ctx.RequestStartMS)
 	return nil
 }
 
@@ -108,14 +107,13 @@ func (s *Service) passthroughNonStream(ctx nonStreamContext) error {
 	var parsed map[string]any
 	_ = json.Unmarshal(body, &parsed)
 	inputTokens, outputTokens := usageFromJSON(parsed)
-	s.markAccountSuccess(context.Background(), ctx.AccountID, ctx.Model)
-	s.recordLatency(context.Background(), ctx.Provider, ctx.Model, false, time.Now().UnixMilli()-ctx.RequestStartMS)
-	s.logUsage(context.Background(), usageParams{UserID: ctx.UserID, ProviderAccountID: ctx.AccountID, ProxyAPIKeyID: ctx.APIKeyID, Model: ctx.Model, InputTokens: inputTokens, OutputTokens: outputTokens, StatusCode: http.StatusOK, DurationMS: int(time.Now().UnixMilli() - ctx.StartMS), Provider: ctx.Provider})
 	copyResponseHeaders(ctx.Writer.Header(), ctx.Response.Header)
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.Header().Set("X-Provider-Account-Id", ctx.AccountID)
 	ctx.Writer.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(ctx.Writer, bytes.NewReader(body))
+	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, inputTokens, outputTokens, durationMS, false, ctx.RequestStartMS)
 	return nil
 }
 

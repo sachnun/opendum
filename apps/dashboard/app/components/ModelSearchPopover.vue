@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { getProviderLabel } from "../../lib/provider-accounts";
-import type { ModelSearchItem } from "../../lib/dashboard-api-types";
+import type { ModelListItem as DashboardModelListItem, ModelSearchItem } from "../../lib/dashboard-api-types";
+import type { ModelStats } from "../../lib/model-stats";
 
 type ModelListItem = ModelSearchItem;
 
@@ -24,8 +25,16 @@ const detailOpen = computed({
 const { data, refresh } = await useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
   default: () => [] as ModelListItem[],
 });
+const sharedFullModels = useNuxtData<DashboardModelListItem[]>("dashboard-models");
+const { data: fullModelData, execute: loadFullModels, status: fullModelStatus } = useAsyncData("dashboard-models", () => dashboardApi.models.list(), {
+  immediate: false,
+});
 
 const models = computed<ModelListItem[]>(() => data.value ?? []);
+const fullModels = computed(() => fullModelData.value ?? sharedFullModels.data.value ?? []);
+const fullModelById = computed(() => new Map(fullModels.value.map((model) => [model.id, model])));
+const detailModelStats = computed<ModelStats | undefined>(() => detailModel.value ? fullModelById.value.get(detailModel.value.id)?.stats : undefined);
+const isLoadingDetailStats = computed(() => detailModel.value !== null && !detailModelStats.value && fullModelStatus.value === "pending");
 const filteredModels = computed(() => {
   const term = search.value.trim().toLowerCase();
 
@@ -47,6 +56,7 @@ function selectModel(model: ModelListItem) {
   detailModel.value = model;
   desktopOpen.value = false;
   mobileOpen.value = false;
+  if (!fullModelById.value.get(model.id)?.stats) void loadFullModels();
 }
 
 async function copyModelId(modelId: string) {
@@ -219,7 +229,8 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           </div>
 
           <ModelFeatureBadges :meta="detailModel.meta" />
-          <ModelStatsPanel v-if="detailModel.stats" :stats="detailModel.stats" :label="detailModel.id" compact />
+          <UiSkeleton v-if="isLoadingDetailStats" class="h-24 rounded-lg" />
+          <ModelStatsPanel v-else-if="detailModelStats" :stats="detailModelStats" :label="detailModel.id" compact />
         </div>
       </template>
     </UiDialog>

@@ -54,7 +54,7 @@ func (s *Service) tryProviders(ctx context.Context, r *http.Request, cfg routeCo
 
 		tried = append(tried, account.ID)
 		if forced != nil {
-			_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"lastUsedAt\" = ?", time.Now()).Set("\"requestCount\" = \"requestCount\" + 1").Where("id = ?", account.ID).Exec(ctx)
+			go s.bumpAccountRequestCount(context.Background(), account.ID, time.Now())
 		}
 
 		payload := cfg.Build(parsed, validation.Model, parsed.Stream, sessionID(r))

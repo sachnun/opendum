@@ -99,7 +99,7 @@ export interface ModelListItem {
   stats?: ModelStats;
 }
 
-export type ModelSearchItem = Omit<ModelListItem, "name" | "family">;
+export type ModelSearchItem = Omit<ModelListItem, "name" | "family" | "stats">;
 
 export interface PlaygroundOptions {
   proxyBaseUrl?: string;

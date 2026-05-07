@@ -134,9 +134,15 @@ func (s *Service) makeProviderRequest(ctx context.Context, account appdb.Provide
 	if !ok {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
 	}
-	credentials, err := cryptojs.Decrypt(s.secret, account.AccessToken)
+	requestAccount := account
+	if requestAccount.AccessToken == "" {
+		if err := s.db.NewSelect().Model(&requestAccount).Column("id", "provider", "accessToken", "accountId").Where("id = ?", account.ID).Limit(1).Scan(ctx); err != nil {
+			return nil, err
+		}
+	}
+	credentials, err := cryptojs.Decrypt(s.secret, requestAccount.AccessToken)
 	if err != nil {
 		return nil, err
 	}
-	return providerImpl.MakeRequest(ctx, s.client, credentials, account, payload, stream)
+	return providerImpl.MakeRequest(ctx, s.client, credentials, requestAccount, payload, stream)
 }

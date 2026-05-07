@@ -46,14 +46,12 @@ export async function searchModels(userId: string) {
     const allModels = getAllModels()
       .filter((model) => isModelUsableByAccounts(model, availability))
       .sort((a, b) => a.localeCompare(b));
-    const statsByModel = await getModelStatsByModel(userId, allModels);
 
     return allModels.map((model) => ({
       id: model,
       providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
       meta: MODEL_REGISTRY[model]?.meta,
       isEnabled: !disabledModelSet.has(model),
-      stats: statsByModel[model],
     }));
   } catch (error) {
     console.error("Failed to search models:", error);

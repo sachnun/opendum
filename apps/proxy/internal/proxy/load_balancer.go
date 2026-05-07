@@ -35,6 +35,7 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	}
 
 	query := s.db.NewSelect().Model((*appdb.ProviderAccount)(nil)).
+		Column("id", "userId", "provider", "tier", "status", "lastUsedAt", "createdAt", "accountId").
 		Where("\"userId\" = ?", userID).
 		Where("provider IN (?)", bun.In(targetProviders)).
 		Where("\"isActive\" = TRUE")
@@ -129,8 +130,12 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 	if selected == nil {
 		return nil, nil
 	}
-	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"lastUsedAt\" = ?", now).Set("\"requestCount\" = \"requestCount\" + 1").Where("id = ?", selected.ID).Exec(ctx)
+	go s.bumpAccountRequestCount(context.Background(), selected.ID, now)
 	return selected, nil
+}
+
+func (s *Service) bumpAccountRequestCount(ctx context.Context, accountID string, usedAt time.Time) {
+	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"lastUsedAt\" = ?", usedAt).Set("\"requestCount\" = \"requestCount\" + 1").Where("id = ?", accountID).Exec(ctx)
 }
 
 func (s *Service) getHealthByAccount(ctx context.Context, accountIDs, modelKeys []string) (map[string]appdb.ProviderAccountModelHealth, error) {
@@ -158,7 +163,7 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "provider_account_id must be a non-empty string", Type: "invalid_request_error", Param: &param, Code: strPtr("invalid_provider_account")}
 	}
 	var account appdb.ProviderAccount
-	err := s.db.NewSelect().Model(&account).Where("id = ?", id).Where("\"userId\" = ?", userID).Limit(1).Scan(ctx)
+	err := s.db.NewSelect().Model(&account).Column("id", "userId", "provider", "tier", "status", "lastUsedAt", "createdAt", "accountId", "isActive").Where("id = ?", id).Where("\"userId\" = ?", userID).Limit(1).Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account was not found", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_not_found")}
@@ -202,6 +207,12 @@ func (s *Service) markAccountSuccess(ctx context.Context, accountID, model strin
 		query.Set("status = ?", "active").Set("\"statusReason\" = NULL").Set("\"statusChangedAt\" = ?", now)
 	}
 	_, _ = query.Exec(ctx)
+}
+
+func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, durationMS int, stream bool, requestStartMS int64) {
+	s.markAccountSuccess(ctx, accountID, model)
+	s.recordLatency(ctx, provider, model, stream, time.Now().UnixMilli()-requestStartMS)
+	s.logUsage(ctx, usageParams{UserID: userID, ProviderAccountID: accountID, ProxyAPIKeyID: apiKeyID, Model: model, InputTokens: inputTokens, OutputTokens: outputTokens, StatusCode: http.StatusOK, DurationMS: durationMS, Provider: provider})
 }
 
 func (s *Service) markAccountFailed(ctx context.Context, accountID, model string, statusCode int, message string) time.Time {
@@ -249,7 +260,10 @@ func (s *Service) markAccountFailed(ctx context.Context, accountID, model string
 
 func (s *Service) insertErrorHistory(ctx context.Context, accountID, userID string, model *string, statusCode int, message string, now time.Time) error {
 	row := appdb.ProviderAccountErrorHistory{ID: appdb.NewID(), ProviderAccountID: accountID, UserID: userID, Model: model, ErrorCode: statusCode, ErrorMessage: message, CreatedAt: now}
-	_, err := s.db.NewInsert().Model(&row).Exec(ctx)
+	if _, err := s.db.NewInsert().Model(&row).Exec(ctx); err != nil {
+		return err
+	}
+	_, err := s.db.NewDelete().Model((*appdb.ProviderAccountErrorHistory)(nil)).Where("\"providerAccountId\" = ?", accountID).Where("id NOT IN (?)", s.db.NewSelect().Model((*appdb.ProviderAccountErrorHistory)(nil)).Column("id").Where("\"providerAccountId\" = ?", accountID).OrderExpr("\"createdAt\" DESC").Limit(maxErrorHistoryRows)).Exec(ctx)
 	return err
 }
 
