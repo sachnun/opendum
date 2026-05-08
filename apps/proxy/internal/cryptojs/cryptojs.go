@@ -5,10 +5,12 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"io"
 )
 
 var opensslSaltHeader = []byte("Salted__")
@@ -49,6 +51,27 @@ func Decrypt(passphrase, ciphertext string) (string, error) {
 	return string(unpadded), nil
 }
 
+func Encrypt(passphrase, plaintext string) (string, error) {
+	salt := make([]byte, 8)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return "", err
+	}
+	key, iv := evpBytesToKey([]byte(passphrase), salt, 32, aes.BlockSize)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	padded := pkcs7Pad([]byte(plaintext), aes.BlockSize)
+	ciphertext := make([]byte, len(padded))
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(ciphertext, padded)
+
+	raw := make([]byte, 0, len(opensslSaltHeader)+len(salt)+len(ciphertext))
+	raw = append(raw, opensslSaltHeader...)
+	raw = append(raw, salt...)
+	raw = append(raw, ciphertext...)
+	return base64.StdEncoding.EncodeToString(raw), nil
+}
+
 func evpBytesToKey(password, salt []byte, keyLen, ivLen int) ([]byte, []byte) {
 	needed := keyLen + ivLen
 	derived := make([]byte, 0, needed)
@@ -80,4 +103,17 @@ func pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
 		}
 	}
 	return data[:len(data)-padding], nil
+}
+
+func pkcs7Pad(data []byte, blockSize int) []byte {
+	padding := blockSize - len(data)%blockSize
+	if padding == 0 {
+		padding = blockSize
+	}
+	padded := make([]byte, len(data)+padding)
+	copy(padded, data)
+	for i := len(data); i < len(padded); i++ {
+		padded[i] = byte(padding)
+	}
+	return padded
 }

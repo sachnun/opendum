@@ -20,3 +20,4 @@ ignored = true
 
 [antigravity]
 upstream = "gemini-3-pro-image"
+signature_family = "gemini-pro"

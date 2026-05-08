@@ -19,3 +19,4 @@ aliases = ["gemini-3.1-flash-image", "gemini-3-flash-image"]
 
 [antigravity]
 upstream = "gemini-3.1-flash-image"
+signature_family = "gemini-flash"

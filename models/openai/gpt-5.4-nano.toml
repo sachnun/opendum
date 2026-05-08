@@ -1,2 +1,5 @@
 [opendum]
 providers = ["copilot"]
+
+[copilot]
+responses_api = true

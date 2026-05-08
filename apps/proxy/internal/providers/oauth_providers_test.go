@@ -1,0 +1,259 @@
+package providers
+
+import (
+	"encoding/base64"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/opendum/opendum/apps/proxy/internal/models"
+)
+
+func TestCodexBuildPayloadConvertsChatToResponses(t *testing.T) {
+	provider := codexProvider{}
+	model := "unit-test-model"
+	payload := provider.buildPayload(map[string]any{
+		"model":             "codex/" + model,
+		"messages":          []any{map[string]any{"role": "system", "content": "be terse"}, map[string]any{"role": "user", "content": "hi"}},
+		"tools":             []any{map[string]any{"type": "function", "function": map[string]any{"name": "lookup", "parameters": map[string]any{"type": "object"}}}},
+		"reasoning_effort":  "medium",
+		"_includeReasoning": true,
+		"_sessionId":        "sess_1",
+	}, model, true)
+
+	if payload["model"] != model || payload["store"] != false || payload["stream"] != true {
+		t.Fatalf("bad codex payload base: %#v", payload)
+	}
+	if payload["instructions"] != "be terse" {
+		t.Fatalf("instructions = %q, want be terse", payload["instructions"])
+	}
+	input := payload["input"].([]any)
+	if len(input) != 2 || input[0].(map[string]any)["role"] != "developer" {
+		t.Fatalf("input = %#v", input)
+	}
+	reasoning := payload["reasoning"].(map[string]any)
+	if reasoning["effort"] != "medium" || reasoning["summary"] != "auto" {
+		t.Fatalf("reasoning = %#v", reasoning)
+	}
+	if payload["prompt_cache_key"] != "sess_1" {
+		t.Fatalf("session payload missing: %#v", payload)
+	}
+}
+
+func TestCopilotResponsesPayload(t *testing.T) {
+	provider := copilotProvider{}
+	model := "unit-test-model"
+	payload := provider.buildResponsesPayload(map[string]any{
+		"messages":         []any{map[string]any{"role": "developer", "content": "rules"}, map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens":       42,
+		"reasoning_effort": "high",
+	}, model, true)
+
+	if payload["model"] != model || payload["stream"] != true || payload["max_output_tokens"] != 42 {
+		t.Fatalf("bad copilot responses payload: %#v", payload)
+	}
+	if payload["instructions"] != "rules" {
+		t.Fatalf("instructions = %q, want rules", payload["instructions"])
+	}
+	reasoning := payload["reasoning"].(map[string]any)
+	if reasoning["effort"] != "high" {
+		t.Fatalf("reasoning = %#v", reasoning)
+	}
+}
+
+func TestGoogleCodeAssistConversion(t *testing.T) {
+	payload := openAIToGemini(map[string]any{
+		"messages":    []any{map[string]any{"role": "system", "content": "policy"}, map[string]any{"role": "user", "content": "hello"}},
+		"temperature": 0.3,
+		"max_tokens":  64,
+	})
+	if payload["systemInstruction"] == nil {
+		t.Fatalf("systemInstruction missing: %#v", payload)
+	}
+	contents := payload["contents"].([]any)
+	if len(contents) != 1 || contents[0].(map[string]any)["role"] != "user" {
+		t.Fatalf("contents = %#v", contents)
+	}
+	generation := payload["generationConfig"].(map[string]any)
+	if generation["temperature"] != 0.3 || generation["maxOutputTokens"] != 64 {
+		t.Fatalf("generation = %#v", generation)
+	}
+
+	completion := geminiToOpenAICompletion(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]any{"text": "thinking", "thought": true}, map[string]any{"text": "answer"}}}}}}, "unit-test-model", true)
+	message := completion["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
+	if message["content"] != "answer" || message["reasoning_content"] != "thinking" {
+		t.Fatalf("message = %#v", message)
+	}
+}
+
+func TestCopilotSystemToolInjection(t *testing.T) {
+	messages := injectCopilotChatSystemTool([]any{map[string]any{"role": "user", "content": "hello"}})
+	if len(messages) != 3 {
+		t.Fatalf("messages len = %d, want 3", len(messages))
+	}
+	assistant := messages[0].(map[string]any)
+	if assistant["role"] != "assistant" {
+		t.Fatalf("first message = %#v", assistant)
+	}
+	toolCalls := assistant["tool_calls"].([]any)
+	fn := toolCalls[0].(map[string]any)["function"].(map[string]any)
+	if fn["name"] != "get_context" {
+		t.Fatalf("tool call = %#v", fn)
+	}
+}
+
+func TestResponsesInputToChatMessages(t *testing.T) {
+	messages := responsesInputToChatMessages([]any{
+		map[string]any{"type": "function_call", "call_id": "fc_lookup", "name": "lookup", "arguments": `{"x":1}`},
+		map[string]any{"type": "function_call_output", "call_id": "fc_lookup", "output": "ok"},
+		map[string]any{"type": "message", "role": "developer", "content": "rules"},
+	}, "")
+	if len(messages) != 3 {
+		t.Fatalf("messages len = %d, want 3: %#v", len(messages), messages)
+	}
+	assistant := messages[0].(map[string]any)
+	call := assistant["tool_calls"].([]any)[0].(map[string]any)
+	if call["id"] != "call_lookup" {
+		t.Fatalf("call id = %q, want call_lookup", call["id"])
+	}
+	if messages[2].(map[string]any)["role"] != "system" {
+		t.Fatalf("developer role not converted: %#v", messages[2])
+	}
+}
+
+func TestAntigravitySystemInstructionAndThinking(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	systemModel := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool { return customBool(cfg, "system_instruction") })
+	thinkingModel := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool { return len(customMap(cfg, "thinking_levels")) > 0 })
+	payload := openAIToGemini(map[string]any{"messages": []any{map[string]any{"role": "system", "content": "user system"}, map[string]any{"role": "user", "content": "hi"}}})
+	provider.applyAntigravitySystemInstruction(payload, systemModel)
+	system := payload["systemInstruction"].(map[string]any)
+	parts := system["parts"].([]any)
+	if !strings.Contains(parts[0].(map[string]any)["text"].(string), "Antigravity") {
+		t.Fatalf("antigravity instruction missing: %#v", parts[0])
+	}
+	provider.applyThinkingConfig(payload, thinkingModel, "medium", 0)
+	generation := payload["generationConfig"].(map[string]any)
+	thinking := generation["thinkingConfig"].(map[string]any)
+	cfg, _ := registry.ProviderModelConfig(thinkingModel, "antigravity")
+	levels := customMap(cfg, "thinking_levels")
+	if thinking["thinkingLevel"] != levels["medium"] || thinking["includeThoughts"] != true {
+		t.Fatalf("thinking config = %#v", thinking)
+	}
+}
+
+func TestCodexModelGuardUsesRegistryWhenPresent(t *testing.T) {
+	provider := codexProvider{}
+	if !provider.isModelAllowed("anything-without-registry") {
+		t.Fatal("nil registry should allow caller-validated model")
+	}
+}
+
+func TestProviderCustomConfigDrivesCopilotResponsesAPI(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := copilotProvider{registry: registry}
+	responsesModel := firstProviderConfigModel(t, registry, "copilot", func(cfg models.ProviderModelConfig) bool { return customBool(cfg, "responses_api") })
+	if !provider.requiresResponsesAPI(responsesModel) {
+		t.Fatal("model should route through Responses API from TOML config")
+	}
+	if provider.requiresResponsesAPI("unit-test-model") {
+		t.Fatal("model without TOML config should not route through Responses API")
+	}
+}
+
+func TestProviderCustomUpstreamDrivesAntigravityOpusThinking(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
+		return cfg.Upstream != "" && customBool(cfg, "thinking_model")
+	})
+	cfg, _ := registry.ProviderModelConfig(model, "antigravity")
+	if got := provider.resolveModel(model); got != cfg.Upstream {
+		t.Fatalf("resolveModel = %q, want %q", got, cfg.Upstream)
+	}
+}
+
+func TestCodexExtractAccountIDFromJWT(t *testing.T) {
+	token := "x." + base64.RawURLEncoding.EncodeToString([]byte(`{"https://api.openai.com/auth":{"organizations":[{"id":"org_1","is_default":true}]}}`)) + ".y"
+	if got := extractAccountIDFromJWT(token); got != "org_1" {
+		t.Fatalf("account id = %q, want org_1", got)
+	}
+}
+
+func TestAntigravityTransformsToolPayload(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
+		return customBool(cfg, "system_instruction") && !customBool(cfg, "strict_tool_schema")
+	})
+	payload := openAIToGemini(map[string]any{
+		"messages": []any{map[string]any{"role": "user", "content": "hi"}},
+		"tools":    []any{map[string]any{"type": "function", "function": map[string]any{"name": "1bad", "description": "lookup", "parameters": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}, "required": []any{"query"}}}}},
+	})
+	provider.transformAntigravityPayload(t.Context(), payload, model, "sess")
+	toolConfig := payload["toolConfig"].(map[string]any)
+	calling := toolConfig["functionCallingConfig"].(map[string]any)
+	if calling["mode"] != "VALIDATED" {
+		t.Fatalf("tool mode = %#v", calling)
+	}
+	decl := payload["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
+	if decl["name"] != "t_1bad" || !strings.Contains(decl["description"].(string), "STRICT PARAMETERS") {
+		t.Fatalf("decl = %#v", decl)
+	}
+}
+
+func TestAntigravityScrubsToolTranscriptArtifacts(t *testing.T) {
+	text := "ok\nTool: read\n```\nthought: hidden\n```\ndone"
+	cleaned := scrubToolTranscriptArtifacts(text)
+	if strings.Contains(cleaned, "Tool:") || strings.Contains(cleaned, "thought:") {
+		t.Fatalf("artifact not scrubbed: %q", cleaned)
+	}
+}
+
+func TestAntigravityInjectsGeminiToolInstruction(t *testing.T) {
+	payload := map[string]any{"tools": []any{map[string]any{"functionDeclarations": []any{map[string]any{"name": "lookup"}}}}}
+	injectGeminiToolInstruction(payload)
+	system := payload["systemInstruction"].(map[string]any)
+	text := system["parts"].([]any)[0].(map[string]any)["text"].(string)
+	if !strings.Contains(text, "CRITICAL_TOOL_USAGE_INSTRUCTIONS") {
+		t.Fatalf("tool instruction missing: %q", text)
+	}
+}
+
+func TestUnsafeImageURLRejected(t *testing.T) {
+	if isSafeExternalURL("http://127.0.0.1/image.png") {
+		t.Fatal("loopback URL should be rejected")
+	}
+}
+
+func testModelsRegistry(t *testing.T) *models.Registry {
+	t.Helper()
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return registry
+}
+
+func firstProviderConfigModel(t *testing.T, registry *models.Registry, provider string, match func(models.ProviderModelConfig) bool) string {
+	t.Helper()
+	for _, model := range registry.AllModels() {
+		cfg, ok := registry.ProviderModelConfig(model, provider)
+		if ok && match(cfg) {
+			return model
+		}
+	}
+	t.Fatalf("missing provider config for %s", provider)
+	return ""
+}
+
+func customBool(cfg models.ProviderModelConfig, key string) bool {
+	value, _ := cfg.Custom[key].(bool)
+	return value
+}
+
+func customMap(cfg models.ProviderModelConfig, key string) map[string]any {
+	value, _ := cfg.Custom[key].(map[string]any)
+	return value
+}

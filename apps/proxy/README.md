@@ -12,15 +12,7 @@ The current implementation covers:
 - `/v1/responses`
 - `/v1/messages` with basic Anthropic/OpenAI transforms
 - API-key providers: OpenRouter, Groq, Cerebras, NVIDIA NIM, Ollama Cloud, Kilo Code, Workers AI
-
-OAuth providers still need full parity ports before this replaces the TypeScript proxy:
-
-- Antigravity
-- Copilot
-- Qwen Code
-- Gemini CLI
-- Codex
-- Kiro
+- OAuth providers: Antigravity, Copilot, Qwen Code, Gemini CLI, Codex, Kiro
 
 ## Development
 

@@ -15,3 +15,7 @@ output = ["text"]
 [opendum]
 family = "Gemini"
 providers = ["gemini_cli", "copilot"]
+
+[gemini_cli]
+thinking_format = "budget"
+thinking_budgets = { low = 8192, medium = 16384, high = 32768, xhigh = 32768 }

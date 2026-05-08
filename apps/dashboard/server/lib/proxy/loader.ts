@@ -49,6 +49,7 @@ export interface ModelInfo {
       upstream?: string;
       minTier?: string;
       aliases?: string[];
+      [key: string]: unknown;
     }
   >;
 }
@@ -106,8 +107,13 @@ function extractProviderConfigs(raw: TomlModel): ModelInfo["providerConfig"] {
       const aliases = Array.isArray(record.aliases)
         ? record.aliases.filter((alias): alias is string => typeof alias === "string" && alias.trim().length > 0)
         : undefined;
+      const custom = Object.fromEntries(
+        Object.entries(record).filter(
+          ([key]) => key !== "upstream" && key !== "min_tier" && key !== "aliases"
+        )
+      );
 
-      if (!upstream && !minTier && (!aliases || aliases.length === 0)) {
+      if (!upstream && !minTier && (!aliases || aliases.length === 0) && Object.keys(custom).length === 0) {
         return null;
       }
 
@@ -117,6 +123,7 @@ function extractProviderConfigs(raw: TomlModel): ModelInfo["providerConfig"] {
           ...(upstream ? { upstream } : {}),
           ...(minTier ? { minTier } : {}),
           ...(aliases && aliases.length > 0 ? { aliases } : {}),
+          ...custom,
         },
       ] as const;
     })

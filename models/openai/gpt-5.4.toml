@@ -15,3 +15,6 @@ output = ["text"]
 [opendum]
 family = "OpenAI"
 providers = ["codex", "copilot"]
+
+[copilot]
+responses_api = true

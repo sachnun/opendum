@@ -19,3 +19,13 @@ aliases = ["gemini-3.1-pro", "gemini-3.1-pro-high", "gemini-3.1-pro-low"]
 
 [antigravity]
 upstream = "gemini-3.1-pro-high"
+system_instruction = true
+thinking_format = "budget"
+signature_family = "gemini-pro"
+scrub_model_artifacts = true
+inject_thought_signature = true
+thinking_budgets = { low = 8192, medium = 16384, high = 32768, xhigh = 32768 }
+
+[gemini_cli]
+thinking_format = "budget"
+thinking_budgets = { low = 8192, medium = 16384, high = 32768, xhigh = 32768 }

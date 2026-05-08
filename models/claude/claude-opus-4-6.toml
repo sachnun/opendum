@@ -20,5 +20,18 @@ aliases = ["claude-opus-4.6", "claude-opus4.6"]
 [copilot]
 upstream = "claude-opus-4.6"
 
+[antigravity]
+upstream = "claude-opus-4-6-thinking"
+signature_family = "claude"
+system_instruction = true
+force_stream_non_stream = true
+convert_external_images = true
+strict_tool_schema = true
+strict_thought_signatures = true
+sanitize_tool_blocks = true
+thinking_model = true
+top_p_min_095 = true
+anthropic_beta_thinking = true
+
 [kiro]
 upstream = "claude-opus-4.6"

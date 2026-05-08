@@ -32,9 +32,10 @@ type ProviderAccessRule struct {
 }
 
 type ProviderModelConfig struct {
-	Upstream string   `toml:"upstream"`
-	MinTier  string   `toml:"min_tier"`
-	Aliases  []string `toml:"aliases"`
+	Upstream string
+	MinTier  string
+	Aliases  []string
+	Custom   map[string]any
 }
 
 type Info struct {
@@ -147,16 +148,8 @@ func convertRawModel(parsed rawModel, raw map[string]any) Info {
 		if _, ok := reserved[key]; ok {
 			continue
 		}
-		valueBytes, err := toml.Marshal(map[string]any{key: raw[key]})
-		if err != nil {
-			continue
-		}
-		var wrapper map[string]ProviderModelConfig
-		if err := toml.Unmarshal(valueBytes, &wrapper); err != nil {
-			continue
-		}
-		cfg := wrapper[key]
-		if cfg.Upstream != "" || cfg.MinTier != "" || len(cfg.Aliases) > 0 {
+		cfg := providerModelConfigFromRaw(raw[key])
+		if cfg.Upstream != "" || cfg.MinTier != "" || len(cfg.Aliases) > 0 || len(cfg.Custom) > 0 {
 			providerConfig[key] = cfg
 		}
 	}
@@ -213,6 +206,51 @@ func convertRawModel(parsed rawModel, raw map[string]any) Info {
 		Access:         access,
 		ProviderConfig: providerConfig,
 	}
+}
+
+func providerModelConfigFromRaw(value any) ProviderModelConfig {
+	table, ok := value.(map[string]any)
+	if !ok {
+		return ProviderModelConfig{}
+	}
+	cfg := ProviderModelConfig{Custom: map[string]any{}}
+	for key, raw := range table {
+		switch key {
+		case "upstream":
+			cfg.Upstream = strings.TrimSpace(stringFromRaw(raw))
+		case "min_tier":
+			cfg.MinTier = strings.TrimSpace(stringFromRaw(raw))
+		case "aliases":
+			cfg.Aliases = stringSliceFromRaw(raw)
+		default:
+			cfg.Custom[key] = raw
+		}
+	}
+	if len(cfg.Custom) == 0 {
+		cfg.Custom = nil
+	}
+	return cfg
+}
+
+func stringFromRaw(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
+}
+
+func stringSliceFromRaw(value any) []string {
+	items, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if text := strings.TrimSpace(stringFromRaw(item)); text != "" {
+			out = append(out, text)
+		}
+	}
+	return out
 }
 
 func (r *Registry) buildAliases() {
@@ -293,6 +331,15 @@ func (r *Registry) ProviderAccessRule(model, provider string) (ProviderAccessRul
 	}
 	rule, ok := info.Access[provider]
 	return rule, ok
+}
+
+func (r *Registry) ProviderModelConfig(model, provider string) (ProviderModelConfig, bool) {
+	info, ok := r.effective[r.ResolveAlias(model)]
+	if !ok {
+		return ProviderModelConfig{}, false
+	}
+	cfg, ok := info.ProviderConfig[provider]
+	return cfg, ok
 }
 
 func (r *Registry) ProviderModelMap(provider string) map[string]string {

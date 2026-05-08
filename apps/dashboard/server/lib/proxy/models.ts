@@ -11,6 +11,8 @@ export interface ProviderAccessRule {
   minTier?: string;
 }
 
+export type ProviderModelConfig = NonNullable<ModelInfo["providerConfig"]>[string];
+
 function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
   return upstreamModel
     .replace(/^library\//, "")
@@ -120,6 +122,15 @@ export function getProviderAccessRule(
   const canonical = resolveModelAlias(model);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
   return info?.access?.[provider] ?? null;
+}
+
+export function getProviderModelConfig(
+  model: string,
+  provider: string
+): ProviderModelConfig | null {
+  const canonical = resolveModelAlias(model);
+  const info = EFFECTIVE_MODEL_REGISTRY[canonical];
+  return info?.providerConfig?.[provider] ?? null;
 }
 
 /**

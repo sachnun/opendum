@@ -17,6 +17,15 @@ family = "Claude"
 providers = ["antigravity", "copilot", "kiro"]
 aliases = ["claude-sonnet-4.6", "claude-sonnet4.6"]
 
+[antigravity]
+signature_family = "claude"
+system_instruction = true
+force_stream_non_stream = true
+convert_external_images = true
+strict_tool_schema = true
+strict_thought_signatures = true
+sanitize_tool_blocks = true
+
 [copilot]
 upstream = "claude-sonnet-4.6"
 
