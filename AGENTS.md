@@ -8,7 +8,7 @@
 - Both dev servers: `pnpm dev` starts dashboard and proxy concurrently.
 - Focused dashboard lint: `pnpm --filter @opendum/dashboard lint`. It runs `nuxt prepare` first because ESLint imports generated `.nuxt/eslint.config.mjs`.
 - Focused Go proxy tests: `go -C apps/proxy test ./...`; single test: `go -C apps/proxy test ./internal/proxy -run TestName`.
-- Root `pnpm lint` means dashboard lint plus Go proxy tests. No separate JS test suite configured.
+- Root `pnpm lint` means dashboard lint plus Go proxy tests. No separate dashboard test or typecheck script is configured.
 - Dashboard Cloudflare build: `NITRO_PRESET=cloudflare_module pnpm --filter @opendum/dashboard build`.
 - Root `pnpm build` runs dashboard build then `go -C apps/proxy build ./...`. Do not build for verification when change clearly does not need it.
 - DB schema push/studio require `DATABASE_URL`: `pnpm db:push`, `pnpm db:studio`. There is no migrations directory; Drizzle pushes from `apps/dashboard/server/lib/db/schema.ts`.
@@ -18,8 +18,9 @@
 - Workspace only includes `apps/*` (`pnpm-workspace.yaml`). `packages/shared` has generated/legacy `dist` artifacts but no active package manifest or source in this workspace.
 - `apps/dashboard` is Nuxt 4/Vue app. UI lives in `app/`; API routes live in `server/api`; business logic in `server/services`; database schema/relations in `server/lib/db`.
 - `apps/proxy` is separate Go module (`go 1.26`) and runtime proxy. Entry point: `apps/proxy/cmd/proxy/main.go`; HTTP routes: `apps/proxy/internal/api/server.go`; proxy behavior: `apps/proxy/internal/proxy`.
+- Proxy public routes are `/v1/models`, `/v1/chat/completions`, `/v1/responses`, and Anthropic-style `/v1/messages`; provider adapters are registered in `apps/proxy/internal/providers/providers.go`.
 - `models/**/*.toml` is shared source of truth for model metadata. Both dashboard (`server/lib/proxy/loader.ts`) and Go proxy (`internal/models/registry.go`) load it at runtime.
-- Dashboard provider implementations are in `apps/dashboard/server/lib/proxy/providers`. Go proxy currently supports API-key providers; `apps/proxy/README.md` lists OAuth-provider parity gaps.
+- Dashboard provider metadata and OAuth helpers are in `apps/dashboard/server/lib/proxy/providers`; Go proxy runtime provider code is in `apps/proxy/internal/providers`.
 
 ## Env And Runtime
 - Dashboard env examples live in `apps/dashboard/.env.example`; proxy env examples in `apps/proxy/.env.example`.
