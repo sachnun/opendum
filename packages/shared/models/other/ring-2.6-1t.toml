@@ -1,0 +1,8 @@
+[opendum]
+providers = ["kilo_code", "openrouter"]
+
+[kilo_code]
+upstream = "inclusionai/ring-2.6-1t:free"
+
+[openrouter]
+upstream = "inclusionai/ring-2.6-1t:free"
