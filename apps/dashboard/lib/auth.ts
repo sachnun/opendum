@@ -1,45 +1,47 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, schema } from "../server/lib/db";
+import { db as defaultDb, schema, type Database } from "../server/lib/db";
 
-const githubClientId = process.env.GITHUB_CLIENT_ID;
-const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-if (!githubClientId || !githubClientSecret) {
-  throw new Error("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are required");
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required`);
+  return value;
 }
 
-if (!googleClientId || !googleClientSecret) {
-  throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required");
+export function createAuth(db: Database = defaultDb) {
+  const githubClientId = requireEnv("GITHUB_CLIENT_ID");
+  const githubClientSecret = requireEnv("GITHUB_CLIENT_SECRET");
+  const googleClientId = requireEnv("GOOGLE_CLIENT_ID");
+  const googleClientSecret = requireEnv("GOOGLE_CLIENT_SECRET");
+
+  return betterAuth({
+    database: drizzleAdapter(db, {
+      provider: "pg",
+      schema: {
+        ...schema,
+      },
+    }),
+    secret: process.env.BETTER_AUTH_SECRET,
+    baseURL: process.env.BETTER_AUTH_URL,
+    emailAndPassword: {
+      enabled: process.env.NODE_ENV === "development",
+    },
+    socialProviders: {
+      github: {
+        clientId: githubClientId,
+        clientSecret: githubClientSecret,
+      },
+      google: {
+        clientId: googleClientId,
+        clientSecret: googleClientSecret,
+      },
+    },
+    pages: {
+      signIn: "/",
+    },
+  });
 }
 
-export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    provider: "pg",
-    schema: {
-      ...schema,
-    },
-  }),
-  secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL,
-  emailAndPassword: {
-    enabled: process.env.NODE_ENV === "development",
-  },
-  socialProviders: {
-    github: {
-      clientId: githubClientId,
-      clientSecret: githubClientSecret,
-    },
-    google: {
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
-    },
-  },
-  pages: {
-    signIn: "/",
-  },
-});
+type AuthInstance = ReturnType<typeof createAuth>;
 
-export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>;
+export type AuthSession = Awaited<ReturnType<AuthInstance["api"]["getSession"]>>;

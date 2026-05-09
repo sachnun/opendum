@@ -1,9 +1,16 @@
 import type { H3Event } from "h3";
 
-import { auth, type AuthSession } from "../../lib/auth";
+import { createAuth, type AuthSession } from "../../lib/auth";
+import { createRequestDb } from "../lib/db";
 
 export async function getSessionFromEvent(event: H3Event): Promise<AuthSession> {
-  return auth.api.getSession({ headers: event.headers });
+  const { db, close } = await createRequestDb();
+
+  try {
+    return await createAuth(db).api.getSession({ headers: event.headers });
+  } finally {
+    await close();
+  }
 }
 
 export async function requireSession(event: H3Event): Promise<NonNullable<AuthSession>> {
