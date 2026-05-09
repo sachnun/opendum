@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "nuxt dev",
-    "build": "nuxt build",
+    "build": "node scripts/generate-model-registry.mjs && nuxt build",
     "start": "node .output/server/index.mjs",
     "preview": "nuxt preview --host 0.0.0.0",
     "lint": "nuxt prepare && eslint .",

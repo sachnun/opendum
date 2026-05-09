@@ -50,9 +50,8 @@ export function buildAnalyticsCacheKey(params: AnalyticsCacheKeyParams): string 
 }
 
 export async function getAnalyticsCacheVersion(userId: string): Promise<number> {
-  const redis = await getRedisClient();
-
   try {
+    const redis = await getRedisClient();
     const rawVersion = await redis.get(getVersionKey(userId));
     if (!rawVersion) {
       return 0;

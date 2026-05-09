@@ -13,9 +13,8 @@ function parseJsonValue<T>(rawValue: string | null): T | null {
 }
 
 export async function getRedisJson<T>(key: string): Promise<T | null> {
-  const redis = await getRedisClient();
-
   try {
+    const redis = await getRedisClient();
     const rawValue = await redis.get(key);
     return parseJsonValue<T>(rawValue);
   } catch {
@@ -28,9 +27,8 @@ export async function setRedisJson(
   value: unknown,
   ttlSeconds: number
 ): Promise<void> {
-  const redis = await getRedisClient();
-
   try {
+    const redis = await getRedisClient();
     await redis.set(key, JSON.stringify(value), { EX: Math.max(1, Math.floor(ttlSeconds)) });
   } catch {
     // Ignore cache write errors
