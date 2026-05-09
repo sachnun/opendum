@@ -8,8 +8,12 @@ import { getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias }
 
 type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
 
-function getProxyBaseUrl() {
-  return (process.env.NUXT_PUBLIC_PROXY_URL || "").replace(/\/$/, "") || undefined;
+function normalizeProxyBaseUrl(value: unknown) {
+  return typeof value === "string" ? value.trim().replace(/\/$/, "") || undefined : undefined;
+}
+
+function getProxyBaseUrl(proxyBaseUrl?: string) {
+  return normalizeProxyBaseUrl(proxyBaseUrl) ?? normalizeProxyBaseUrl(process.env.NUXT_PUBLIC_PROXY_URL);
 }
 
 function normalizeApiKeyModelAccessMode(mode: string): ApiKeyModelAccessMode {
@@ -33,9 +37,9 @@ function toPlaygroundApiKeyOption(apiKey: { id: string; name: string | null; key
   }
 }
 
-export async function getPlaygroundOptions(userId: string) {
+export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
   try {
-    const proxyBaseUrl = getProxyBaseUrl();
+    const proxyBaseUrl = getProxyBaseUrl(proxyUrl);
     const [disabledModels, availability] = await Promise.all([
       db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
       getAccountModelAvailability(userId),

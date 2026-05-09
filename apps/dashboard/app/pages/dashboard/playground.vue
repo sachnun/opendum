@@ -37,6 +37,8 @@ interface Scenario {
 
 const dashboardApi = useDashboardApi();
 const route = useRoute();
+const config = useRuntimeConfig();
+const runtimeProxyBaseUrl = normalizeProxyBaseUrl(config.public.proxyUrl);
 
 type ModelOption = PlaygroundOptions["models"][number];
 type ProviderAccountOption = PlaygroundOptions["providerAccounts"][number];
@@ -148,7 +150,7 @@ const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
 const models = computed<ModelOption[]>(() => options.value?.models ?? []);
 const providerAccounts = computed<ProviderAccountOption[]>(() => options.value?.providerAccounts ?? []);
 const apiKeyOptions = computed<ApiKeyOption[]>(() => options.value?.apiKeyOptions ?? []);
-const proxyBaseUrl = computed(() => options.value?.proxyBaseUrl);
+const proxyBaseUrl = computed(() => normalizeProxyBaseUrl(options.value?.proxyBaseUrl) ?? runtimeProxyBaseUrl);
 
 const selectedApiKeyId = ref<string | null>(null);
 const apiKeyPickerOpen = ref(false);
@@ -179,6 +181,7 @@ let startLongPressTriggered = false;
 const START_LONG_PRESS_DELAY_MS = 600;
 
 const selectedApiKey = computed(() => apiKeyOptions.value.find((key) => key.id === selectedApiKeyId.value) ?? null);
+const selectedApiKeyValue = computed(() => selectedApiKey.value?.decryptedKey.trim() || "");
 const selectedApiKeyLabel = computed(() => selectedApiKey.value ? getApiKeyLabel(selectedApiKey.value) : "Select key");
 const filteredModels = computed(() => filterModelsByApiKey(models.value, selectedApiKey.value));
 const filteredModelIds = computed(() => new Set(filteredModels.value.map((model) => model.id)));
@@ -193,6 +196,13 @@ const activePresetModelIds = computed(() => {
 const maxPanels = computed(() => Math.max(filteredModels.value.length, 1));
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
+const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && proxyBaseUrl.value && selectedApiKeyValue.value));
+const playgroundSetupMessage = computed(() => {
+  if (!proxyBaseUrl.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
+  if (apiKeyOptions.value.length === 0) return "Create an active API key before running Playground.";
+  if (!selectedApiKeyValue.value) return "Select an API key before running Playground.";
+  return "";
+});
 const parsedLoopCount = computed(() => Number(loopCountInput.value));
 const isLoopCountValid = computed(() => Number.isInteger(parsedLoopCount.value) && parsedLoopCount.value >= 1);
 const activeLoopBadgeLabel = computed(() => activeLoopProgress.value && activeLoopProgress.value.total > 1 ? `${activeLoopProgress.value.current}/${activeLoopProgress.value.total}` : null);
@@ -263,6 +273,12 @@ onBeforeUnmount(() => {
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 9);
+}
+
+function normalizeProxyBaseUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim().replace(/\/$/, "");
+  return trimmed || undefined;
 }
 
 function normalizeQueryParam(value: unknown): string | null {
@@ -869,15 +885,17 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     const requestBody = buildRequestBody(modelId, getScenarioMessages(scenario), currentSettings, accountId);
     const endpointOverrides = adaptRequestOverridesForEndpoint(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
+    if (!proxyBaseUrl.value) throw new Error("Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.");
+    const apiKey = selectedApiKeyValue.value;
+    if (!apiKey) throw new Error("Select an API key before running Playground.");
 
     const controller = new AbortController();
     controllers.set(panelId, controller);
-    const apiKey = selectedApiKey.value?.decryptedKey;
     const response = await fetch(getEndpointPath(currentSettings.endpoint), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(proxyBaseUrl.value && apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        Authorization: `Bearer ${apiKey}`,
       },
       signal: controller.signal,
       body: JSON.stringify(requestBody),
@@ -937,7 +955,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 }
 
 async function runSelectedScenario(requestedLoopCount = 1) {
-  if (!selectedScenario.value || isAnyLoading.value) return;
+  if (!selectedScenario.value || isAnyLoading.value || !canRunPlayground.value) return;
   let currentSettings = { ...settings };
   if (selectedScenario.value.isReasoning && currentSettings.reasoningEffort === "none") {
     settings.reasoningEffort = "medium";
@@ -974,7 +992,7 @@ function stopAllRequests() {
 
 async function retryPanel(panelId: string) {
   const panel = panels.value.find((item) => item.id === panelId);
-  if (!panel?.modelId || !selectedScenario.value) return;
+  if (!panel?.modelId || !selectedScenario.value || !canRunPlayground.value) return;
   isAnyLoading.value = true;
   try {
     await fetchFromModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, getValidAccountIdForPanel(panel));
@@ -1188,18 +1206,7 @@ function formatToolArguments(value: string): string {
             </span>
             Stop
           </UiButton>
-          <UiButton
-            v-else
-            type="button"
-            variant="outline"
-            size="sm"
-            :disabled="!selectedScenario || !hasSelectedModel"
-            @click="handleStartClick"
-            @pointerdown="handleStartPointerDown"
-            @pointerup="handleStartPointerEnd"
-            @pointerleave="handleStartPointerEnd"
-            @pointercancel="handleStartPointerEnd"
-          >
+          <UiButton v-else type="button" variant="outline" size="sm" :disabled="!canRunPlayground" @click="handleStartClick" @pointerdown="handleStartPointerDown" @pointerup="handleStartPointerEnd" @pointerleave="handleStartPointerEnd" @pointercancel="handleStartPointerEnd">
             <UiIcon name="i-lucide-play" class="size-4" />
             Start
           </UiButton>
@@ -1216,6 +1223,9 @@ function formatToolArguments(value: string): string {
 
     <template v-else>
       <div class="space-y-3">
+        <div v-if="playgroundSetupMessage" class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {{ playgroundSetupMessage }}
+        </div>
         <h2 class="text-sm font-medium text-muted-foreground">Scenario</h2>
         <div class="flex flex-wrap gap-2">
           <button
