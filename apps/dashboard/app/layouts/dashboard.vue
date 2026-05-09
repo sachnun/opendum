@@ -153,7 +153,7 @@ function visibleSubItems(item: NavItem) {
   }
 
   if (item.href === "/dashboard/models") {
-    return item.children.filter((subItem) => subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) > 0 : true);
+    return item.children;
   }
 
   return item.children;
@@ -392,7 +392,29 @@ async function handleSignOut() {
             <nav class="min-h-0 flex-1 overflow-y-auto pr-1">
               <div class="space-y-1">
                 <div v-for="item in primaryNavigation" :key="`mobile-${item.name}`" class="space-y-1">
+                  <div
+                    v-if="item.href === '/dashboard/models'"
+                    :class="[
+                      'group flex items-center rounded-lg text-sm font-medium transition-all',
+                      isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    ]"
+                  >
+                    <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item)">
+                      <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                      {{ item.name }}
+                    </NuxtLink>
+                    <button
+                      type="button"
+                      class="flex cursor-pointer items-center px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
+                      :aria-label="isModelsExpanded || isActive(item.href) ? 'Collapse models' : 'Expand models'"
+                      @click="isModelsExpanded = !isModelsExpanded"
+                    >
+                      <UiIcon :name="isModelsExpanded || isActive(item.href) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-3.5" />
+                    </button>
+                  </div>
+
                   <NuxtLink
+                    v-else
                     :to="item.href"
                     :class="[
                       'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
@@ -404,35 +426,53 @@ async function handleSignOut() {
                     {{ item.name }}
                   </NuxtLink>
 
-                  <div v-if="item.children?.length" class="ml-6 space-y-1 border-l border-border/60 pl-3">
+                  <div v-if="item.children?.length && (item.href !== '/dashboard/models' || isModelsExpanded || isActive(item.href))" class="ml-6 space-y-1 border-l border-border/60 pl-3">
                     <template v-if="visibleSubItems(item).length">
-                      <NuxtLink
-                        v-for="subItem in visibleSubItems(item)"
-                        :key="`mobile-${item.name}-${subItem.name}`"
-                        :to="subItemHref(subItem)"
-                        :class="[
-                          'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                          subItem.disabled ? 'text-muted-foreground/60' : isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                        ]"
-                        @click="handleNavClick(subItem)"
-                      >
-                        <span class="truncate">{{ subItem.name }}</span>
-                        <AccountStatusIndicator
-                          v-if="item.href === '/dashboard/accounts'"
-                          :account-count="accountCountByHref[subItem.href]"
-                          :active-account-count="activeAccountCountByHref[subItem.href]"
-                          :indicator="accountIndicatorByHref[subItem.href]"
-                        />
-                        <span
-                          v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
-                          :class="[
-                            'rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                            isSubItemActive(subItem) ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
-                          ]"
+                      <template v-for="subItem in visibleSubItems(item)" :key="`mobile-${item.name}-${subItem.name}`">
+                        <div
+                          v-if="subItem.disabled"
+                          class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
+                          aria-disabled="true"
                         >
-                          {{ modelCountFor(subItem) }}
-                        </span>
-                      </NuxtLink>
+                          <span class="flex min-w-0 items-center gap-2">
+                            <span class="truncate">{{ subItem.name }}</span>
+                            <UiBadge v-if="subItem.tag" variant="outline" class="px-1.5 py-0 text-[10px] lowercase">
+                              {{ subItem.tag }}
+                            </UiBadge>
+                          </span>
+                        </div>
+                        <NuxtLink
+                          v-else
+                          :to="subItemHref(subItem)"
+                          :class="[
+                            'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                            isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                          ]"
+                          @click="handleNavClick(subItem)"
+                        >
+                          <span class="flex min-w-0 items-center gap-2">
+                            <span class="truncate">{{ subItem.name }}</span>
+                            <UiBadge v-if="subItem.tag" variant="outline" class="px-1.5 py-0 text-[10px] lowercase">
+                              {{ subItem.tag }}
+                            </UiBadge>
+                          </span>
+                          <AccountStatusIndicator
+                            v-if="item.href === '/dashboard/accounts'"
+                            :account-count="accountCountByHref[subItem.href]"
+                            :active-account-count="activeAccountCountByHref[subItem.href]"
+                            :indicator="accountIndicatorByHref[subItem.href]"
+                          />
+                          <span
+                            v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
+                            :class="[
+                              'rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                              isSubItemActive(subItem) ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
+                            ]"
+                          >
+                            {{ modelCountFor(subItem) }}
+                          </span>
+                        </NuxtLink>
+                      </template>
                     </template>
                     <p v-else-if="item.href === '/dashboard/accounts' && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
                       No pinned providers.
