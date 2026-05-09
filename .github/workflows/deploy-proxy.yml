@@ -47,22 +47,30 @@ jobs:
       - name: Prepare Railway bundle
         run: |
           rm -rf "$DEPLOY_DIR"
-          mkdir -p "$DEPLOY_DIR/dist"
+          mkdir -p "$DEPLOY_DIR/bin"
           cp -R models "$DEPLOY_DIR/models"
+          cat > "$DEPLOY_DIR/Dockerfile" <<'DOCKERFILE'
+          FROM gcr.io/distroless/static-debian12:nonroot
+          WORKDIR /app
+          COPY bin/proxy ./proxy
+          COPY models ./models
+          EXPOSE 4001
+          CMD ["./proxy"]
+          DOCKERFILE
           cat > "$DEPLOY_DIR/railway.json" <<'JSON'
           {
             "$schema": "https://railway.com/railway.schema.json",
             "build": {
-              "buildCommand": null
+              "builder": "DOCKERFILE"
             },
             "deploy": {
-              "startCommand": "./dist/proxy"
+              "startCommand": null
             }
           }
           JSON
 
       - name: Build proxy binary
-        run: go -C apps/proxy build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o "../../$DEPLOY_DIR/dist/proxy" ./cmd/proxy
+        run: go -C apps/proxy build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o "../../$DEPLOY_DIR/bin/proxy" ./cmd/proxy
         env:
           CGO_ENABLED: 0
           GOOS: linux
@@ -74,17 +82,19 @@ jobs:
           test -n "$RAILWAY_ENVIRONMENT"
           test -n "$RAILWAY_PROXY_SERVICE_ID"
           test -n "$RAILWAY_TOKEN"
-          test -x "$DEPLOY_DIR/dist/proxy"
+          test -x "$DEPLOY_DIR/bin/proxy"
           test -d "$DEPLOY_DIR/models"
+          test -f "$DEPLOY_DIR/Dockerfile"
           test -f "$DEPLOY_DIR/railway.json"
 
+      - name: Install Railway CLI
+        run: bash <(curl -fsSL railway.com/install.sh) --yes
+
       - name: Deploy proxy to Railway
-        uses: docker://ghcr.io/railwayapp/cli:latest
-        with:
-          args: >-
-            up .railway-deploy/proxy
-            --path-as-root
-            --ci
-            --project ${{ env.RAILWAY_PROJECT_ID }}
-            --environment ${{ env.RAILWAY_ENVIRONMENT }}
-            --service ${{ env.RAILWAY_PROXY_SERVICE_ID }}
+        run: >-
+          "$HOME/.railway/bin/railway" up .railway-deploy/proxy
+          --path-as-root
+          --ci
+          --project "$RAILWAY_PROJECT_ID"
+          --environment "$RAILWAY_ENVIRONMENT"
+          --service "$RAILWAY_PROXY_SERVICE_ID"
