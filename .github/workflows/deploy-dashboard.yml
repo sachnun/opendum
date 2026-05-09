@@ -3,9 +3,9 @@ name: Deploy Dashboard
 on:
   push:
     branches:
-      - main
+      - migrate
     paths:
-      - .github/workflows/deploy.yml
+      - .github/workflows/deploy-dashboard.yml
       - apps/dashboard/**
       - package.json
       - pnpm-lock.yaml
