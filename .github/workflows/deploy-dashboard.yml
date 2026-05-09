@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: production
+      name: dashboard
 
     steps:
       - name: Checkout repository
