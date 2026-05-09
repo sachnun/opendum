@@ -76,7 +76,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
             <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5"><p class="truncate text-[10px] text-muted-foreground">Latency</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ formatDuration(summary.stats.avgDurationLastDay) }}</p></div>
           </div>
           <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-            <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" empty-label="No duration data" class="h-6" :height="24" />
+            <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
             <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
               <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
             </div>

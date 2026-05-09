@@ -552,7 +552,7 @@ function historyEntryPreview(errorMessage: string): string {
               </div>
             </div>
             <div class="mb-2 rounded border border-border/60 bg-background/70 px-2 py-1.5">
-              <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" empty-label="No duration data" class="h-6" :height="24" />
+              <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
               <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
                 <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
               </div>

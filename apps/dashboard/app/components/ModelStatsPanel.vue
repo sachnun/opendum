@@ -62,7 +62,6 @@ function formatHourLabel(time: string): string {
         :values="durationValues"
         color="var(--chart-2)"
         :aria-label="`Average duration trend for ${label} over last 24 hours`"
-        empty-label="No duration data"
         class="h-6"
         :height="24"
       />

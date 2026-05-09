@@ -7,13 +7,11 @@ const props = withDefaults(
     color: string;
     ariaLabel?: string;
     class?: string;
-    emptyLabel?: string;
     height?: number;
   }>(),
   {
     class: "",
     ariaLabel: "Usage trend",
-    emptyLabel: "No activity yet",
     height: 32,
   }
 );
@@ -24,7 +22,7 @@ let observer: ResizeObserver | null = null;
 
 function buildSparklinePath(values: number[], width: number, height: number): string {
   if (values.length === 0) {
-    return "";
+    return `M0,${height} L${width},${height}`;
   }
 
   const max = Math.max(...values);
@@ -50,7 +48,6 @@ function buildSparklinePath(values: number[], width: number, height: number): st
     .join(" ");
 }
 
-const hasUsage = computed(() => props.values.some((value) => value > 0));
 const sparklinePath = computed(() => buildSparklinePath(props.values, chartWidth.value, props.height));
 const areaPath = computed(() => {
   if (!sparklinePath.value) {
@@ -85,9 +82,9 @@ onBeforeUnmount(() => {
   <div ref="containerRef" :class="cn('relative h-8 w-full', $props.class)">
     <svg :viewBox="`0 0 ${chartWidth} ${height}`" class="h-full w-full" role="img" :aria-label="ariaLabel">
       <path :d="`M0,${height} L${chartWidth},${height}`" stroke="var(--border)" stroke-width="1" fill="none" />
-      <path v-if="hasUsage && areaPath" :d="areaPath" :fill="color" fill-opacity="0.18" stroke="none" />
+      <path v-if="areaPath" :d="areaPath" :fill="color" fill-opacity="0.18" stroke="none" />
       <path
-        v-if="hasUsage && sparklinePath"
+        v-if="sparklinePath"
         :d="sparklinePath"
         :stroke="color"
         stroke-width="2"
@@ -96,8 +93,5 @@ onBeforeUnmount(() => {
         stroke-linejoin="round"
       />
     </svg>
-    <span v-if="!hasUsage" class="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
-      {{ emptyLabel }}
-    </span>
   </div>
 </template>
