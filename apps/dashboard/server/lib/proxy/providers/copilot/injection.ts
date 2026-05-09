@@ -33,9 +33,8 @@ export async function getCopilotSystemToolMode(
     return { xInitiator: "user", injectSystemTool: false };
   }
 
-  const redis = await getRedisClient();
-
   try {
+    const redis = await getRedisClient();
     const setResult = await redis.set(
       getWindowKey(normalizedAccountId),
       "1",

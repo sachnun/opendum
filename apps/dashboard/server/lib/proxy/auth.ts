@@ -43,9 +43,8 @@ function doesAccountTierSatisfyRule(
 }
 
 export async function invalidateDisabledModelsCache(userId: string): Promise<void> {
-  const redis = await getRedisClient();
-
   try {
+    const redis = await getRedisClient();
     await redis.del(getDisabledModelsCacheKey(userId));
   } catch {
     // Ignore cache invalidation failures.
@@ -56,9 +55,8 @@ export async function invalidateApiKeyValidationCache(
   keyHash: string,
   apiKeyId?: string
 ): Promise<void> {
-  const redis = await getRedisClient();
-
   try {
+    const redis = await getRedisClient();
     await redis.del(getApiKeyValidationCacheKey(keyHash));
     if (apiKeyId) {
       await redis.del(getApiKeyLastUsedThrottleKey(apiKeyId));

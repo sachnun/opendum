@@ -1,4 +1,4 @@
-import { createClient, type RedisClientType } from "redis";
+import type { RedisClientType } from "redis";
 
 const globalKey = "__opendum_redis_client__";
 
@@ -37,6 +37,7 @@ export async function getRedisClient(): Promise<RedisClientType> {
     throw new Error("REDIS_URL is required");
   }
 
+  const { createClient } = await import("redis");
   redisClient = createClient({ url: redisUrl }) as RedisClientType;
   redisClient.on("error", () => undefined);
 

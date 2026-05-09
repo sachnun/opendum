@@ -6,6 +6,7 @@ import * as relations from "./relations.js";
 const fullSchema = { ...schema, ...relations };
 
 export type Database = ReturnType<typeof drizzleNodePg<typeof fullSchema>>;
+type PgQueryClient = Pick<Client, "query">;
 
 const globalForDb = globalThis as unknown as {
   db: Database | undefined;
@@ -19,6 +20,10 @@ function createDb(): Database {
     throw new Error("DATABASE_URL is required");
   }
 
+  if (isCloudflareRuntime()) {
+    return drizzleNodePg(createCloudflareQueryClient(connectionString), { schema: fullSchema });
+  }
+
   const pool = new Pool({
     connectionString,
     max: Number.parseInt(process.env.POSTGRES_POOL_MAX ?? "1", 10),
@@ -28,6 +33,29 @@ function createDb(): Database {
   });
   globalForDb.pool = pool;
   return drizzleNodePg(pool, { schema: fullSchema });
+}
+
+function isCloudflareRuntime(): boolean {
+  const userAgent = (globalThis as { navigator?: { userAgent?: string } }).navigator?.userAgent;
+  const processVersions = process.versions as Record<string, string | undefined>;
+  return process.env.NITRO_PRESET === "cloudflare_module" || userAgent === "Cloudflare-Workers" || Boolean(processVersions.workerd);
+}
+
+function createCloudflareQueryClient(connectionString: string): PgQueryClient {
+  return {
+    async query(config, values) {
+      const client = new Client({ connectionString });
+      await client.connect();
+
+      try {
+        return await client.query(config, values);
+      } finally {
+        await client.end().catch((error) => {
+          console.warn("Failed to close Postgres client:", error);
+        });
+      }
+    },
+  };
 }
 
 export async function createRequestDb(): Promise<{ db: Database; close: () => Promise<void> }> {

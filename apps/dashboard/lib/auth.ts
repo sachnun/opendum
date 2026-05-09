@@ -23,6 +23,11 @@ export function createAuth(db: Database = defaultDb) {
     }),
     secret: process.env.BETTER_AUTH_SECRET,
     baseURL: process.env.BETTER_AUTH_URL,
+    advanced: {
+      ipAddress: {
+        ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
+      },
+    },
     emailAndPassword: {
       enabled: process.env.NODE_ENV === "development",
     },
