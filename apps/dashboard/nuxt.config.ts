@@ -4,20 +4,6 @@ const redisXxhashStub = "\0redis-xxhash-stub";
 
 const nitroPreset = process.env.NITRO_PRESET;
 
-type RollupWarning = { code?: string; message?: string };
-type RollupWarn = (warning: unknown) => void;
-
-function ignoreKnownSourcemapWarnings(warning: RollupWarning, warn: RollupWarn): void {
-  if (
-    warning.code === "SOURCEMAP_BROKEN" ||
-    warning.message?.includes("Sourcemap is likely to be incorrect")
-  ) {
-    return;
-  }
-
-  warn(warning);
-}
-
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   sourcemap: false,
@@ -42,6 +28,9 @@ export default defineNuxtConfig({
       wrangler: {
         name: "opendum",
         compatibility_flags: ["nodejs_compat"],
+        triggers: {
+          crons: ["0 */6 * * *"],
+        },
       },
     },
     commonJS: {
@@ -73,24 +62,12 @@ export default defineNuxtConfig({
     build: {
       cssMinify: "lightningcss",
       reportCompressedSize: false,
-      rollupOptions: {
-        onwarn: ignoreKnownSourcemapWarnings,
-      },
       sourcemap: false,
     },
     esbuild: {
       legalComments: "none",
     },
     plugins: [tailwindcss()],
-  },
-  hooks: {
-    "vite:extendConfig"(config) {
-      config.build ??= {};
-      config.build.sourcemap = false;
-      config.build.reportCompressedSize = false;
-      config.build.rollupOptions ??= {};
-      config.build.rollupOptions.onwarn = ignoreKnownSourcemapWarnings;
-    },
   },
   typescript: {
     strict: true,

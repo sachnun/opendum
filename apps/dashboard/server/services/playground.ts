@@ -9,7 +9,7 @@ import { getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias }
 type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
 
 function getProxyBaseUrl() {
-  return (process.env.NUXT_PUBLIC_PROXY_URL || process.env.NEXT_PUBLIC_PROXY_URL || "").replace(/\/$/, "") || undefined;
+  return (process.env.NUXT_PUBLIC_PROXY_URL || "").replace(/\/$/, "") || undefined;
 }
 
 function normalizeApiKeyModelAccessMode(mode: string): ApiKeyModelAccessMode {
