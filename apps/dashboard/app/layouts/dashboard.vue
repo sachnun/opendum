@@ -18,6 +18,8 @@ const { data: session } = await useSession(useFetch);
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
 const isModelsExpanded = ref(route.path === "/dashboard/models" || route.path.startsWith("/dashboard/models/"));
+const mainContent = ref<HTMLElement | null>(null);
+const activeAnchorId = ref<string | null>(null);
 
 const userLabel = computed(() => session.value?.user?.name || session.value?.user?.email || "Account");
 const userEmail = computed(() => session.value?.user?.email || "");
@@ -46,7 +48,8 @@ const emptyShellAccountSummary: ShellAccountSummary = {
   pinnedProviders: [],
 };
 
-const modelFamilyCounts = ref<ModelFamilyCounts>(Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])));
+const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
+const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
 
 const supportNavigation: NavItem[] = [
   { name: "Usage", href: "/dashboard/usage", icon: "i-lucide-book-open" },
@@ -90,10 +93,9 @@ const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccou
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
 
-useAsyncData("dashboard-shell-model-family-counts", async () => {
-  const counts = await dashboardApi.models.familyCounts();
+function normalizeModelFamilyCounts(counts: Record<string, number>) {
+  const nextCounts = { ...emptyModelFamilyCounts };
   const anchorByFamily = new Map(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.name, family.anchorId]));
-  const nextCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
 
   for (const [rawFamily, count] of Object.entries(counts)) {
     const family = categorizeModelFamily(rawFamily);
@@ -103,9 +105,22 @@ useAsyncData("dashboard-shell-model-family-counts", async () => {
     }
   }
 
-  modelFamilyCounts.value = nextCounts;
-  return true;
+  return nextCounts;
+}
+
+const { data: defaultModelFamilyCounts } = await useAsyncData("dashboard-shell-model-family-counts", async () => {
+  const counts = await dashboardApi.models.familyCounts();
+  return normalizeModelFamilyCounts(counts);
+}, {
+  default: () => ({ ...emptyModelFamilyCounts }),
 });
+
+const modelFamilyCounts = computed(() => modelFamilyCountsOverride.value ?? defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
+
+const PENDING_NAV_ANCHOR_KEY = "opendum:pending-nav-anchor";
+const HEADER_OFFSET = 112;
+const PENDING_SCROLL_RETRIES = 20;
+const PENDING_SCROLL_DELAY_MS = 60;
 
 const pinnedHrefOrder = computed(() => {
   const order = new Map<string, number>();
@@ -135,7 +150,7 @@ function subItemHref(subItem: NavSubItem) {
 
 function isSubItemActive(subItem: NavSubItem) {
   if (subItem.anchorId) {
-    return route.path === subItem.href && route.hash === `#${subItem.anchorId}`;
+    return route.path === subItem.href && (activeAnchorId.value ? activeAnchorId.value === subItem.anchorId : route.hash === `#${subItem.anchorId}`);
   }
 
   return route.path === subItem.href || route.path.startsWith(`${subItem.href}/`);
@@ -153,7 +168,7 @@ function visibleSubItems(item: NavItem) {
   }
 
   if (item.href === "/dashboard/models") {
-    return item.children;
+    return item.children.filter((subItem) => subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) > 0 : true);
   }
 
   return item.children;
@@ -163,17 +178,138 @@ function modelCountFor(subItem: NavSubItem) {
   return subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) : 0;
 }
 
-function handleNavClick(item?: NavItem | NavSubItem) {
-  if (item && "anchorId" in item && item.anchorId) {
-    const target = document.getElementById(item.anchorId);
+const subNavigationAnchorIds = computed(() => primaryNavigation.flatMap((item) => visibleSubItems(item)
+  .filter((subItem) => subItem.href === route.path && subItem.anchorId)
+  .map((subItem) => subItem.anchorId as string)));
 
-    if (target && route.path === item.href) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
+function setPendingAnchor(path: string, anchorId: string) {
+  window.sessionStorage.setItem(PENDING_NAV_ANCHOR_KEY, JSON.stringify({ path, anchorId }));
+}
+
+function consumePendingAnchor(pathname: string) {
+  const rawValue = window.sessionStorage.getItem(PENDING_NAV_ANCHOR_KEY);
+  if (!rawValue) return null;
+
+  try {
+    const pendingAnchor = JSON.parse(rawValue) as { path?: string; anchorId?: string };
+    if (pendingAnchor.path !== pathname || !pendingAnchor.anchorId) return null;
+
+    window.sessionStorage.removeItem(PENDING_NAV_ANCHOR_KEY);
+    return pendingAnchor.anchorId;
+  } catch {
+    window.sessionStorage.removeItem(PENDING_NAV_ANCHOR_KEY);
+    return null;
+  }
+}
+
+function scrollToAnchor(anchorId: string) {
+  const section = document.getElementById(anchorId);
+  if (!section) return false;
+
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+  activeAnchorId.value = anchorId;
+  return true;
+}
+
+function getAnchorIdFromViewport(anchorIds: string[]) {
+  let firstAvailableAnchorId: string | null = null;
+  let lastPassedAnchorId: string | null = null;
+
+  for (const anchorId of anchorIds) {
+    const section = document.getElementById(anchorId);
+    if (!section) continue;
+
+    firstAvailableAnchorId ??= anchorId;
+
+    if (section.getBoundingClientRect().top <= HEADER_OFFSET) {
+      lastPassedAnchorId = anchorId;
+    }
+  }
+
+  return lastPassedAnchorId ?? firstAvailableAnchorId;
+}
+
+function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
+  if (item && "anchorId" in item && item.anchorId) {
+    if (route.path === item.href) {
+      event?.preventDefault();
+      scrollToAnchor(item.anchorId);
+    } else if (import.meta.client) {
+      setPendingAnchor(item.href, item.anchorId);
     }
   }
 
   mobileOpen.value = false;
 }
+
+onMounted(() => {
+  watch(subNavigationAnchorIds, (anchorIds, _previousAnchorIds, onCleanup) => {
+    if (anchorIds.length === 0) {
+      activeAnchorId.value = null;
+      return;
+    }
+
+    let rafId: number | null = null;
+    const scrollTarget = mainContent.value;
+
+    const syncActiveAnchor = () => {
+      activeAnchorId.value = getAnchorIdFromViewport(anchorIds);
+    };
+
+    const scheduleSync = () => {
+      if (rafId !== null) return;
+
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        syncActiveAnchor();
+      });
+    };
+
+    const observer = new IntersectionObserver(() => {
+      scheduleSync();
+    }, {
+      root: null,
+      rootMargin: `-${HEADER_OFFSET}px 0px -55% 0px`,
+      threshold: [0, 0.25, 0.5, 0.75, 1],
+    });
+
+    for (const anchorId of anchorIds) {
+      const section = document.getElementById(anchorId);
+      if (section) observer.observe(section);
+    }
+
+    scheduleSync();
+    window.addEventListener("scroll", scheduleSync, { passive: true });
+    window.addEventListener("resize", scheduleSync);
+    scrollTarget?.addEventListener("scroll", scheduleSync, { passive: true });
+
+    onCleanup(() => {
+      observer.disconnect();
+      window.removeEventListener("scroll", scheduleSync);
+      window.removeEventListener("resize", scheduleSync);
+      scrollTarget?.removeEventListener("scroll", scheduleSync);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+    });
+  }, { immediate: true });
+
+  watch(() => route.path, () => {
+    const pendingAnchorId = consumePendingAnchor(route.path);
+    if (!pendingAnchorId) return;
+
+    let retriesLeft = PENDING_SCROLL_RETRIES;
+
+    const tryScroll = () => {
+      if (scrollToAnchor(pendingAnchorId)) return;
+
+      retriesLeft -= 1;
+      if (retriesLeft <= 0) return;
+
+      window.setTimeout(tryScroll, PENDING_SCROLL_DELAY_MS);
+    };
+
+    tryScroll();
+  }, { immediate: true });
+});
 
 async function handleSignOut() {
   await signOut();
@@ -254,7 +390,7 @@ async function handleSignOut() {
                         'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
                         isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                       ]"
-                      @click="handleNavClick(subItem)"
+                      @click="handleNavClick(subItem, $event)"
                     >
                       <span class="flex min-w-0 items-center gap-2">
                         <span class="truncate">{{ subItem.name }}</span>
@@ -364,7 +500,7 @@ async function handleSignOut() {
         </div>
       </header>
 
-      <main class="flex-1 overflow-y-auto">
+      <main ref="mainContent" class="flex-1 overflow-y-auto">
         <div class="w-full px-5 pb-8 pt-5 sm:px-6 lg:px-8">
           <slot />
         </div>
@@ -448,7 +584,7 @@ async function handleSignOut() {
                             'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
                             isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                           ]"
-                          @click="handleNavClick(subItem)"
+                          @click="handleNavClick(subItem, $event)"
                         >
                           <span class="flex min-w-0 items-center gap-2">
                             <span class="truncate">{{ subItem.name }}</span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
+import type { ModelFamilyCounts } from "../../../lib/navigation";
 import type { ModelStats } from "../../../lib/model-stats";
 import { getProviderLabel } from "../../../lib/provider-accounts";
 
@@ -25,6 +26,7 @@ const availableProviders = computed(() => {
 const activeProviders = ref<string[]>([]);
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
+const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
 
 watchEffect(() => {
   if (activeProviders.value.length === 0 && availableProviders.value.length > 0) {
@@ -59,6 +61,16 @@ const modelSections = computed(() => {
       models: groupedModels.get(family) ?? [],
     }))
     .filter((section) => section.models.length > 0);
+});
+
+watchEffect(() => {
+  modelFamilyCountsOverride.value = Object.fromEntries(
+    modelSections.value.map((section) => [section.anchorId, section.models.length])
+  );
+});
+
+onUnmounted(() => {
+  modelFamilyCountsOverride.value = null;
 });
 
 function getFamilyAnchorId(family: string) {
