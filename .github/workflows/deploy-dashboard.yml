@@ -53,8 +53,10 @@ jobs:
           NITRO_PRESET: cloudflare_module
 
       - name: Deploy dashboard to Cloudflare Workers
-        run: pnpm dlx wrangler@4.85.0 deploy --keep-vars
-        working-directory: apps/dashboard
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: 4.85.0
+          workingDirectory: apps/dashboard
+          command: deploy --keep-vars
