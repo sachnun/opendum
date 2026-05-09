@@ -58,58 +58,8 @@ function handlePinnedToggled() {
 
     <DashboardDataNotice :error="error" />
 
-    <section v-if="isLoadingAccounts" class="space-y-4 md:space-y-2" aria-label="Loading provider accounts">
-      <div class="flex items-center gap-2">
-        <UiSkeleton class="h-6 w-32" />
-        <UiSkeleton class="h-5 w-20 rounded-full" />
-      </div>
-      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-        <UiCard v-for="index in 3" :key="index" class="flex h-full flex-col bg-card">
-          <UiCardHeader class="space-y-3 pb-2">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 flex-1 space-y-2">
-                <UiSkeleton class="h-5 w-40" />
-                <UiSkeleton class="h-4 w-56 max-w-full" />
-              </div>
-              <UiSkeleton class="h-5 w-16 rounded-full" />
-            </div>
-          </UiCardHeader>
-          <UiCardContent class="flex flex-1 flex-col">
-            <div class="flex-1 space-y-3 text-sm">
-              <div class="rounded-md border border-border/70 bg-muted/20 p-2.5">
-                <div class="mb-2 flex items-center justify-between">
-                  <UiSkeleton class="h-3 w-12" />
-                  <UiSkeleton class="h-3 w-14" />
-                </div>
-                <div class="mb-2 grid grid-cols-3 gap-1.5">
-                  <UiSkeleton class="h-12 rounded" />
-                  <UiSkeleton class="h-12 rounded" />
-                  <UiSkeleton class="h-12 rounded" />
-                </div>
-                <UiSkeleton class="mb-2 h-10 rounded" />
-                <UiSkeleton class="h-8 rounded" />
-              </div>
-              <UiSkeleton class="h-4 w-full" />
-              <UiSkeleton class="h-4 w-full" />
-              <UiSkeleton class="h-4 w-3/4" />
-              <div class="border-t pt-3">
-                <UiSkeleton class="h-12 rounded" />
-              </div>
-            </div>
-            <div class="mt-4 flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2">
-                <UiSkeleton class="h-8 w-9" />
-                <UiSkeleton class="h-8 w-9" />
-                <UiSkeleton class="h-8 w-9" />
-              </div>
-              <UiSkeleton class="h-5 w-16 rounded-full" />
-            </div>
-          </UiCardContent>
-        </UiCard>
-      </div>
-    </section>
     <DashboardEmptyState
-      v-else-if="accounts.length === 0"
+      v-if="!isLoadingAccounts && accounts.length === 0"
       title="No accounts connected"
       :description="providerMeta?.emptyMessage ?? 'No accounts connected yet.'"
       icon="i-lucide-user-plus"
@@ -120,7 +70,7 @@ function handlePinnedToggled() {
         @connected="refresh"
       />
     </DashboardEmptyState>
-    <section v-else class="scroll-mt-24 space-y-4 md:space-y-2">
+    <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="flex items-center gap-2">
         <h3 class="text-base font-semibold md:text-lg">{{ providerMeta?.label ?? selectedProvider }}</h3>
         <UiBadge variant="outline" class="text-xs">{{ accounts.length }} connected</UiBadge>

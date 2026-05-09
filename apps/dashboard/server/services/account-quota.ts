@@ -456,7 +456,7 @@ async function getValidQuotaCredentials(account: ProviderAccount, getCredentials
 
 async function getAntigravityQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
   const tier = account.tier ?? "free";
-  const credentials = await getValidQuotaCredentials(account, antigravityProvider.getValidCredentials, tier);
+  const credentials = await getValidQuotaCredentials(account, (account) => antigravityProvider.getValidCredentials(account), tier);
   if ("status" in credentials) return credentials;
   const quota = await fetchAntigravityQuotaFromApi(credentials.accessToken, account.projectId ?? "", tier);
   if (quota.status === "error") return errorQuotaInfo(account, tier, quota.error, quota.fetchedAt);
@@ -465,7 +465,7 @@ async function getAntigravityQuota(account: ProviderAccount): Promise<AccountQuo
 
 async function getCopilotQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
   const tier = account.tier?.trim() || "free";
-  const credentials = await getValidQuotaCredentials(account, copilotProvider.getValidCredentials, tier);
+  const credentials = await getValidQuotaCredentials(account, (account) => copilotProvider.getValidCredentials(account), tier);
   if ("status" in credentials) return credentials;
   const snapshot = await fetchCopilotUsageFromApi(credentials.accessToken);
   if (snapshot.status !== "success") return errorQuotaInfo(account, tier, snapshot.error, snapshot.fetchedAt);
@@ -475,7 +475,7 @@ async function getCopilotQuota(account: ProviderAccount): Promise<AccountQuotaIn
 
 async function getCodexQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
   const fallbackTier = account.tier?.trim() || "free";
-  const credentials = await getValidQuotaCredentials(account, codexProvider.getValidCredentials, fallbackTier);
+  const credentials = await getValidQuotaCredentials(account, (account) => codexProvider.getValidCredentials(account), fallbackTier);
   if ("status" in credentials) return credentials;
   const snapshot = await fetchCodexQuotaFromApi(credentials.accessToken, account.accountId);
   if (snapshot.status !== "success") return errorQuotaInfo(account, fallbackTier, snapshot.error ?? "Failed to fetch Codex quota data", Date.now());
@@ -484,7 +484,7 @@ async function getCodexQuota(account: ProviderAccount): Promise<AccountQuotaInfo
 }
 
 async function getGeminiCliQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
-  const credentials = await getValidQuotaCredentials(account, geminiCliProvider.getValidCredentials, account.tier ?? "free-tier");
+  const credentials = await getValidQuotaCredentials(account, (account) => geminiCliProvider.getValidCredentials(account), account.tier ?? "free-tier");
   if ("status" in credentials) return credentials;
 
   let projectId = account.projectId;
@@ -517,7 +517,7 @@ async function getGeminiCliQuota(account: ProviderAccount): Promise<AccountQuota
 
 async function getKiroQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
   const fallbackTier = account.tier?.trim() || "free";
-  const credentials = await getValidQuotaCredentials(account, kiroProvider.getValidCredentials, fallbackTier);
+  const credentials = await getValidQuotaCredentials(account, (account) => kiroProvider.getValidCredentials(account), fallbackTier);
   if ("status" in credentials) return credentials;
   const snapshot = await fetchKiroQuotaFromApi(credentials.accessToken, account.accountId);
   const tier = snapshot.tier?.trim() || fallbackTier;

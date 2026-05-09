@@ -605,29 +605,27 @@ function historyEntryPreview(errorMessage: string): string {
               </UiButton>
             </div>
 
-            <div v-if="isQuotaLoading && !quotaInfo" class="space-y-2">
-              <UiSkeleton class="h-1.5 w-full rounded-full" />
-              <UiSkeleton class="h-1.5 w-full rounded-full" />
-            </div>
-            <p v-else-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
-            <p v-else-if="!quotaInfo" class="text-xs text-muted-foreground">Quota data is not available yet.</p>
-            <div v-else-if="quotaInfo.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
-              <div v-for="group in quotaInfo.groups" :key="group.name" class="space-y-1">
-                <div class="flex items-center justify-between gap-2 text-xs">
-                  <span class="min-w-0 truncate text-muted-foreground">{{ group.displayName }}</span>
-                  <span class="flex items-center gap-2">
-                    <span v-if="group.resetInHuman" class="text-[10px] text-muted-foreground" :title="quotaResetTitle(group)">
-                      {{ group.resetInHuman }}
+            <template v-if="!isQuotaLoading || quotaInfo">
+              <p v-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
+              <p v-else-if="!quotaInfo" class="text-xs text-muted-foreground">Quota data is not available yet.</p>
+              <div v-else-if="quotaInfo.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
+                <div v-for="group in quotaInfo.groups" :key="group.name" class="space-y-1">
+                  <div class="flex items-center justify-between gap-2 text-xs">
+                    <span class="min-w-0 truncate text-muted-foreground">{{ group.displayName }}</span>
+                    <span class="flex items-center gap-2">
+                      <span v-if="group.resetInHuman" class="text-[10px] text-muted-foreground" :title="quotaResetTitle(group)">
+                        {{ group.resetInHuman }}
+                      </span>
+                      <span :class="['font-mono', quotaTextColor(group)]">{{ quotaPercentRemaining(group) }}%</span>
                     </span>
-                    <span :class="['font-mono', quotaTextColor(group)]">{{ quotaPercentRemaining(group) }}%</span>
-                  </span>
-                </div>
-                <div class="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
+                  </div>
+                  <div class="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
+                  </div>
                 </div>
               </div>
-            </div>
-            <p v-else class="text-xs text-red-500">{{ quotaInfo.error ?? 'Failed to fetch quota data.' }}</p>
+              <p v-else class="text-xs text-red-500">{{ quotaInfo.error ?? 'Failed to fetch quota data.' }}</p>
+            </template>
           </div>
 
           <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" />

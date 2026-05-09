@@ -58,8 +58,7 @@ function handlePinnedToggled() {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="pending" class="h-96 rounded-xl" />
-    <template v-else>
+    <template v-if="!pending">
       <section class="space-y-4 md:space-y-2">
         <div class="space-y-1">
           <h3 class="text-base font-semibold">OAuth Provider Accounts</h3>

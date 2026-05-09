@@ -18,6 +18,7 @@ out/
 
 # generated data
 .data/
+.fallow/
 
 # test outputs
 coverage/
