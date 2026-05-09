@@ -14,27 +14,10 @@ type AccountSummaryData = Awaited<ReturnType<typeof dashboardApi.accounts.summar
 
 const { data, error, pending, refresh } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
 const summaryData = computed<AccountSummaryData | null>(() => data.value ?? null);
-const pinnedProviderSet = computed(() => new Set(summaryData.value?.pinnedProviders ?? []));
-
-function fallbackSummary(): AccountSummaryData["summaries"][ProviderAccountKey] {
-  const emptyDays = Array.from({ length: 30 }, (_, index) => ({ date: String(index), count: 0 }));
-  const emptyHours = Array.from({ length: 24 }, (_, index) => ({ time: `${String(index).padStart(2, "0")}:00`, avgDuration: null }));
-  return {
-    connected: 0,
-    active: 0,
-    indicator: "normal",
-    stats: {
-      totalRequests: 0,
-      successRate: null,
-      dailyRequests: emptyDays,
-      avgDurationLastDay: null,
-      durationLast24Hours: emptyHours,
-    },
-  };
-}
+const pinnedProviderSet = computed(() => new Set(summaryData.value!.pinnedProviders));
 
 function summaryFor(provider: ProviderAccountKey): AccountSummaryData["summaries"][ProviderAccountKey] {
-  return summaryData.value?.summaries[provider] ?? fallbackSummary();
+  return summaryData.value!.summaries[provider];
 }
 
 function handlePinnedToggled() {
@@ -58,7 +41,7 @@ function handlePinnedToggled() {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <template v-if="!pending">
+    <template v-if="!pending && summaryData">
       <section class="space-y-4 md:space-y-2">
         <div class="space-y-1">
           <h3 class="text-base font-semibold">OAuth Provider Accounts</h3>

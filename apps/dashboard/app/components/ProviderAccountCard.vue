@@ -141,17 +141,17 @@ function parseStoredErrorMessage(rawMessage: string): ParsedErrorDetails {
 
       if (!Array.isArray(parsed)) return null;
 
-      return parsed.map((entry, fallbackIndex) => {
-        const entryIndex = typeof entry.index === "number" ? entry.index : fallbackIndex;
+      return parsed.map((entry) => {
+        if (typeof entry.index !== "number") return null;
         if (Array.isArray(entry.keys)) {
           const normalizedKeys = entry.keys.filter((value): value is string => typeof value === "string");
-          return `#${entryIndex}: ${normalizedKeys.length > 0 ? normalizedKeys.join(", ") : "(no keys)"}`;
+          return `#${entry.index}: ${normalizedKeys.length > 0 ? normalizedKeys.join(", ") : "(no keys)"}`;
         }
 
-        if (typeof entry.type === "string") return `#${entryIndex}: (${entry.type})`;
+        if (typeof entry.type === "string") return `#${entry.index}: (${entry.type})`;
 
-        return `#${entryIndex}: (unknown)`;
-      });
+        return `#${entry.index}: (unknown)`;
+      }).filter((entry): entry is string => entry !== null);
     } catch {
       return rawMessages
         .split("\n")
