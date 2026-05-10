@@ -1,7 +1,42 @@
+import { readdirSync } from "node:fs";
+import { basename, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 
 const redisXxhashStub = "\0redis-xxhash-stub";
+const modelRegistryVirtualModule = "virtual:opendum-model-registry";
+const modelRegistryVirtualModuleId = `\0${modelRegistryVirtualModule}`;
 const nitroPreset = process.env.NITRO_PRESET;
+
+function collectModelFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = resolve(dir, entry.name);
+    if (entry.isDirectory()) return collectModelFiles(fullPath);
+    if (entry.isFile() && entry.name.endsWith(".json")) return [fullPath];
+    return [];
+  }).sort((a, b) => a.localeCompare(b));
+}
+
+function buildModelRegistryModule(): string {
+  const modelsDir = fileURLToPath(new URL("../../models", import.meta.url));
+  const modelFiles = collectModelFiles(modelsDir);
+  const imports = modelFiles.map((filePath, index) => `import model${index} from ${JSON.stringify(filePath)};`);
+  const entries = modelFiles.map((filePath, index) => `  ${JSON.stringify(basename(filePath, ".json"))}: model${index},`);
+
+  return [
+    ...imports,
+    "",
+    "export const MODEL_REGISTRY = {",
+    ...entries,
+    "};",
+    "",
+    "export const IGNORED_MODELS = new Set(",
+    "  Object.entries(MODEL_REGISTRY)",
+    "    .filter(([, info]) => info.ignored)",
+    "    .map(([modelId]) => modelId)",
+    ");",
+  ].join("\n");
+}
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
@@ -43,6 +78,15 @@ export default defineNuxtConfig({
           load(id) {
             if (id !== redisXxhashStub) return null;
             return "export const xxh3 = { xxh64() { throw new Error('Redis digest commands are not supported in this build.'); } };";
+          },
+        },
+        {
+          name: "opendum-model-registry",
+          resolveId(id) {
+            return id === modelRegistryVirtualModule ? modelRegistryVirtualModuleId : null;
+          },
+          load(id) {
+            return id === modelRegistryVirtualModuleId ? buildModelRegistryModule() : null;
           },
         },
       ],
