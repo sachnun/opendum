@@ -12,7 +12,7 @@ const dashboardApi = useDashboardApi();
 
 type AccountSummaryData = Awaited<ReturnType<typeof dashboardApi.accounts.summary>>;
 
-const { data, error, pending, refresh } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
+const { data, error, refresh } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
 const summaryData = computed<AccountSummaryData | null>(() => data.value ?? null);
 const pinnedProviderSet = computed(() => new Set(summaryData.value!.pinnedProviders));
 
@@ -41,7 +41,7 @@ function handlePinnedToggled() {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <template v-if="!pending && summaryData">
+    <template v-if="summaryData">
       <section class="space-y-4 md:space-y-2">
         <div class="space-y-1">
           <h3 class="text-base font-semibold">OAuth Provider Accounts</h3>
