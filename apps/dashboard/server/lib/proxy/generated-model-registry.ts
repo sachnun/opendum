@@ -4302,7 +4302,8 @@ export const GENERATED_MODEL_REGISTRY = {
     },
     "providerConfig": {
       "kilo_code": {
-        "upstream": "x-ai/grok-code-fast-1:optimized:free"
+        "upstream": "x-ai/grok-code-fast-1:optimized:free",
+        "responses_api": true
       }
     }
   },

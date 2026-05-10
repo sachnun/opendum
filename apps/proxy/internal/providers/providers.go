@@ -79,7 +79,30 @@ type openAICompatibleProvider struct {
 }
 
 func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
-	payload := p.buildPayload(body, stream)
+	model := p.normalizeModel(stringValue(body["model"]))
+	modelName := p.resolveModel(model)
+	if p.requiresResponsesAPI(model) {
+		payload := p.buildResponsesPayload(body, modelName, stream)
+		resp, err := postJSON(ctx, client, p.baseURL+"/responses", credentials, payload, stream)
+		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return resp, err
+		}
+		if _, nativeResponses := body["_responsesInput"].([]any); nativeResponses {
+			return resp, nil
+		}
+		if stream {
+			return sseResponse(responsesSSEToChatSSEReader(resp.Body, modelName), resp.Body), nil
+		}
+		var data map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
+		_ = resp.Body.Close()
+		return jsonResponse(http.StatusOK, responsesJSONToChatCompletion(data, modelName)), nil
+	}
+
+	payload := p.buildPayload(body, modelName, stream)
 	if p.name == "ollama_cloud" {
 		if messages, ok := payload["messages"].([]any); ok {
 			payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
@@ -88,20 +111,78 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	return postJSON(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream)
 }
 
-func (p openAICompatibleProvider) buildPayload(body map[string]any, stream bool) map[string]any {
+func (p openAICompatibleProvider) buildPayload(body map[string]any, modelName string, stream bool) map[string]any {
 	payload := map[string]any{}
 	for key, value := range body {
 		if _, ok := p.supportedParams[key]; ok && value != nil {
 			payload[key] = value
 		}
 	}
-	model, _ := body["model"].(string)
-	if p.trimPrefix != "" && strings.HasPrefix(model, p.trimPrefix) {
-		model = strings.TrimPrefix(model, p.trimPrefix)
-	}
-	payload["model"] = p.registry.UpstreamModelName(model, p.name)
+	payload["model"] = modelName
 	payload["stream"] = stream
 	return payload
+}
+
+func (p openAICompatibleProvider) buildResponsesPayload(body map[string]any, modelName string, stream bool) map[string]any {
+	messages, _ := body["messages"].([]any)
+	payload := map[string]any{"model": modelName, "stream": stream}
+	if input, ok := body["_responsesInput"].([]any); ok {
+		payload["input"] = normalizeResponsesInput(input)
+	} else {
+		payload["input"] = messagesToResponsesInput(messages)
+	}
+	if instructions := stringValue(body["instructions"]); instructions != "" {
+		payload["instructions"] = instructions
+	}
+	if body["temperature"] != nil {
+		payload["temperature"] = body["temperature"]
+	}
+	if body["top_p"] != nil {
+		payload["top_p"] = body["top_p"]
+	}
+	if body["max_tokens"] != nil {
+		payload["max_output_tokens"] = body["max_tokens"]
+	} else if body["max_completion_tokens"] != nil {
+		payload["max_output_tokens"] = body["max_completion_tokens"]
+	}
+	if tools := convertToolsForResponses(body["tools"]); len(tools) > 0 {
+		payload["tools"] = tools
+	}
+	if body["tool_choice"] != nil {
+		payload["tool_choice"] = normalizeToolChoice(body["tool_choice"])
+	}
+	if body["parallel_tool_calls"] != nil {
+		payload["parallel_tool_calls"] = body["parallel_tool_calls"]
+	}
+	if reasoning, ok := body["reasoning"].(map[string]any); ok {
+		payload["reasoning"] = cloneAnyMap(reasoning)
+	} else if effort := stringValue(body["reasoning_effort"]); effort != "" {
+		payload["reasoning"] = map[string]any{"effort": effort}
+	}
+	for _, key := range []string{"include", "previous_response_id", "prompt_cache_key", "service_tier", "store", "text", "truncation", "user"} {
+		if body[key] != nil {
+			payload[key] = body[key]
+		}
+	}
+	return payload
+}
+
+func (p openAICompatibleProvider) normalizeModel(model string) string {
+	if p.trimPrefix != "" && strings.HasPrefix(model, p.trimPrefix) {
+		return strings.TrimPrefix(model, p.trimPrefix)
+	}
+	return model
+}
+
+func (p openAICompatibleProvider) resolveModel(model string) string {
+	if p.registry != nil {
+		return p.registry.UpstreamModelName(model, p.name)
+	}
+	return model
+}
+
+func (p openAICompatibleProvider) requiresResponsesAPI(model string) bool {
+	return providerConfigBool(p.registry, model, p.name, "responses_api")
 }
 
 type workersAIProvider struct {

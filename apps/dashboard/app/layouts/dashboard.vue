@@ -122,18 +122,18 @@ const HEADER_OFFSET = 112;
 const PENDING_SCROLL_RETRIES = 20;
 const PENDING_SCROLL_DELAY_MS = 60;
 
-const pinnedHrefOrder = computed(() => {
-  const order = new Map<string, number>();
+const pinnedProviderHrefs = computed(() => {
+  const hrefs = new Set<string>();
 
-  pinnedProviders.value.forEach((key, index) => {
+  pinnedProviders.value.forEach((key) => {
     const provider = PROVIDER_ACCOUNT_DEFINITIONS.find((definition) => definition.key === key);
 
     if (provider) {
-      order.set(`/dashboard/accounts/${provider.slug}`, index);
+      hrefs.add(`/dashboard/accounts/${provider.slug}`);
     }
   });
 
-  return order;
+  return hrefs;
 });
 
 function isActive(href: string) {
@@ -163,8 +163,8 @@ function visibleSubItems(item: NavItem) {
 
   if (item.href === "/dashboard/accounts") {
     return item.children
-      .filter((subItem) => pinnedHrefOrder.value.has(subItem.href))
-      .sort((a, b) => (pinnedHrefOrder.value.get(a.href) ?? 0) - (pinnedHrefOrder.value.get(b.href) ?? 0));
+      .filter((subItem) => pinnedProviderHrefs.value.has(subItem.href))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   if (item.href === "/dashboard/models") {

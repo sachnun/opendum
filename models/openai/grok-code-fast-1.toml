@@ -18,3 +18,4 @@ providers = ["copilot", "kilo_code"]
 
 [kilo_code]
 upstream = "x-ai/grok-code-fast-1:optimized:free"
+responses_api = true
