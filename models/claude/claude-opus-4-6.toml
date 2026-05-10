@@ -21,7 +21,6 @@ aliases = ["claude-opus-4.6", "claude-opus4.6"]
 upstream = "claude-opus-4.6"
 
 [antigravity]
-upstream = "claude-opus-4-6-thinking"
 signature_family = "claude"
 system_instruction = true
 force_stream_non_stream = true

@@ -15,9 +15,19 @@ function readModelToml(content) {
 }
 
 export function writeModelToml(filePath, data) {
-  const content = existsSync(filePath)
-    ? patch(readFileSync(filePath, "utf-8"), data, MODEL_TOML_FORMAT)
-    : stringify(data, MODEL_TOML_FORMAT);
+  let content;
+
+  if (existsSync(filePath)) {
+    const current = readFileSync(filePath, "utf-8");
+    try {
+      content = patch(current, data, MODEL_TOML_FORMAT);
+    } catch {
+      content = stringify(data, MODEL_TOML_FORMAT);
+    }
+  } else {
+    content = stringify(data, MODEL_TOML_FORMAT);
+  }
+
   const normalized = content.replace(/= \[[ \t]+\]/g, "= []");
   writeFileSync(filePath, normalized.endsWith("\n") ? normalized : `${normalized}\n`);
 }
