@@ -3,7 +3,7 @@ name: Deploy Dashboard
 on:
   push:
     branches:
-      - migrate
+      - main
     paths:
       - .github/workflows/deploy-dashboard.yml
       - apps/dashboard/**

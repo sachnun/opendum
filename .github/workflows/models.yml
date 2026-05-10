@@ -18,7 +18,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: migrate
+          ref: main
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -49,5 +49,5 @@ jobs:
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          branch: migrate
+          branch: main
           commit_message: ${{ steps.commit_msg.outputs.msg }}

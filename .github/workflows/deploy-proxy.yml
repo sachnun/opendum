@@ -3,7 +3,7 @@ name: Deploy Proxy
 on:
   push:
     branches:
-      - migrate
+      - main
     paths:
       - .github/workflows/deploy-proxy.yml
       - apps/proxy/**
