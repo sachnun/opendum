@@ -95,7 +95,6 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 	for _, account := range prioritized {
 		ids = append(ids, account.ID)
 	}
-	limited := s.getRateLimitedAccountIDs(ctx, ids, rateLimitScope(model))
 	health, err := s.getHealthByAccount(ctx, ids, s.registry.LookupKeys(model))
 	if err != nil {
 		return nil, err
@@ -105,9 +104,6 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 	var selected *appdb.ProviderAccount
 	for i := range prioritized {
 		account := &prioritized[i]
-		if _, ok := limited[account.ID]; ok {
-			continue
-		}
 		row, ok := health[account.ID]
 		if ok {
 			if row.Status == "failed" {
@@ -181,15 +177,6 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 	}
 	if validation.Provider != nil && account.Provider != *validation.Provider {
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
-	}
-	if s.isRateLimited(ctx, account.ID, rateLimitScope(validation.Model)) {
-		wait := s.getMinWaitTime(ctx, []string{account.ID}, rateLimitScope(validation.Model))
-		message := "Selected account is rate limited."
-		retryAfter, retryAfterMS := retryMetadata(wait)
-		if wait > 0 {
-			message = "Selected account is rate limited. Retry in " + formatWaitTime(wait) + "."
-		}
-		return nil, &routeError{Status: cfg.RateLimitStatusCode, Message: message, Type: "rate_limit_error", RetryAfter: retryAfter, RetryAfterMS: retryAfterMS}
 	}
 	return &account, nil
 }

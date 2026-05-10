@@ -143,11 +143,6 @@ func retryMetadata(d time.Duration) (*string, *int64) {
 	return &value, &ms
 }
 
-func rateLimitRouteError(cfg endpointAdapter, wait time.Duration) *routeError {
-	retryAfter, retryAfterMS := retryMetadata(wait)
-	return &routeError{Status: cfg.RateLimitStatusCode, Message: "All accounts are rate limited. Retry in " + formatWaitTime(wait) + ".", Type: "rate_limit_error", RetryAfter: retryAfter, RetryAfterMS: retryAfterMS}
-}
-
 func readBodyLimit(reader io.Reader, limit int64) string {
 	data, _ := io.ReadAll(io.LimitReader(reader, limit))
 	return string(data)

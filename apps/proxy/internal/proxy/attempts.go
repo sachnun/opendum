@@ -11,7 +11,6 @@ import (
 )
 
 func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, []accountRotationFailure, *routeError) {
-	scope := rateLimitScope(validation.Model)
 	tried := []string{}
 	recoverableFailures := []accountRotationFailure{}
 	maxRetries := 5
@@ -32,20 +31,7 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 
 		if account == nil {
 			if len(tried) == 0 {
-				eligible, _ := s.getEligibleAccounts(ctx, authResult.UserID, validation.Model, validation.Provider, nil, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
-				if len(eligible) > 0 {
-					ids := make([]string, 0, len(eligible))
-					for _, acc := range eligible {
-						ids = append(ids, acc.ID)
-					}
-					if wait := s.getMinWaitTime(ctx, ids, scope); wait > 0 {
-						return nil, nil, 0, recoverableFailures, rateLimitRouteError(cfg, wait)
-					}
-				}
 				return nil, nil, 0, recoverableFailures, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
-			}
-			if wait := s.getMinWaitTime(ctx, tried, scope); wait > 0 {
-				return nil, nil, 0, recoverableFailures, rateLimitRouteError(cfg, wait)
 			}
 			if lastFailure != nil {
 				return nil, nil, 0, recoverableFailures, lastFailure
@@ -78,21 +64,6 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 			return nil, nil, 0, recoverableFailures, lastFailure
 		}
 
-		if resp.StatusCode == http.StatusTooManyRequests {
-			bodyText := readBodyLimit(resp.Body, 1<<20)
-			retry := parseRetryAfter(resp, bodyText)
-			if retry == 0 {
-				retry = time.Hour
-				if account.Provider == "kiro" {
-					retry = time.Minute
-				}
-			}
-			_ = resp.Body.Close()
-			s.markRateLimited(ctx, account.ID, scope, retry, validation.Model, bodyText)
-			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: http.StatusTooManyRequests, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
-			continue
-		}
-
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			bodyText := readBodyLimit(resp.Body, 1<<20)
 			_ = resp.Body.Close()
@@ -116,9 +87,6 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 		return account, resp, requestStart, recoverableFailures, nil
 	}
 
-	if wait := s.getMinWaitTime(ctx, tried, scope); wait > 0 {
-		return nil, nil, 0, recoverableFailures, rateLimitRouteError(cfg, wait)
-	}
 	if lastFailure != nil {
 		return nil, nil, 0, recoverableFailures, lastFailure
 	}

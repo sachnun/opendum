@@ -316,8 +316,8 @@ export const antigravityProvider: Provider = {
         });
 
         // 429 = quota exhausted (per-account, not per-endpoint).
-        // Return immediately so the proxy rate-limit handler can parse
-        // the quotaResetDelay and mark the account as rate-limited.
+        // Return immediately so the proxy can record the provider failure
+        // through the normal account health/degradation path.
         if (response.status === 429) {
           const errorBody = await response.text();
           return new Response(errorBody, {

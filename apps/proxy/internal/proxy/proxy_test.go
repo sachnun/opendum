@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
@@ -602,36 +601,6 @@ func TestWriteRouteErrorFormats(t *testing.T) {
 	inner := anthropic["error"].(map[string]any)
 	if inner["type"] != "rate_limit_error" || inner["message"] != "slow down" || inner["retry_after"] != retryAfter || int64(inner["retry_after_ms"].(float64)) != retryAfterMS {
 		t.Fatalf("Anthropic inner error = %#v", inner)
-	}
-}
-
-func TestParseRetryAfter(t *testing.T) {
-	response := &http.Response{Header: http.Header{"Retry-After-Ms": []string{"1500"}}}
-	if got := parseRetryAfter(response, ``); got != 1500*time.Millisecond {
-		t.Fatalf("retry-after-ms duration = %s", got)
-	}
-
-	response = &http.Response{Header: http.Header{"Retry-After": []string{"7"}}}
-	if got := parseRetryAfter(response, ``); got != 7*time.Second {
-		t.Fatalf("retry-after duration = %s", got)
-	}
-
-	response = &http.Response{Header: http.Header{"Retry-After": []string{"bad"}}}
-	if got := parseRetryAfter(response, `{"error":{"retry_after_ms":2500}}`); got != 2500*time.Millisecond {
-		t.Fatalf("body retry-after-ms duration = %s", got)
-	}
-
-	response = &http.Response{Header: http.Header{}}
-	if got := parseRetryAfter(response, `{"error":{"details":{"retry_after":"9"}}}`); got != 9*time.Second {
-		t.Fatalf("body retry-after duration = %s", got)
-	}
-
-	if got := parseRetryAfter(response, `{"error":"{\"retryAfter\":3}"}`); got != 3*time.Second {
-		t.Fatalf("nested string retry-after duration = %s", got)
-	}
-
-	if got := parseRetryAfter(response, `{}`); got != 0 {
-		t.Fatalf("invalid retry-after duration = %s", got)
 	}
 }
 
