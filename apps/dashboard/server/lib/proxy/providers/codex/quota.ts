@@ -10,10 +10,19 @@ import { CODEX_CHAT_USER_AGENT, ORIGINATOR } from "./constants.js";
 import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
 
 const USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
+const CHATGPT_ORIGIN = "https://chatgpt.com";
 
 const QUOTA_STALE_MS = 15 * 60 * 1000;
 const CACHE_PREFIX = "opendum:quota:codex:snapshot";
 const CACHE_TTL_SECONDS = Math.ceil(QUOTA_STALE_MS / 1000);
+
+const CLOUDFLARE_CHALLENGE_MARKERS = [
+  "cf-mitigated",
+  "window._cf_chl_opt",
+  "/cdn-cgi/challenge-platform/",
+  "Enable JavaScript and cookies to continue",
+  "Just a moment",
+];
 
 export interface CodexRateLimitWindow {
   usedPercent: number;
@@ -293,6 +302,33 @@ function parseQuotaFromHeaders(headers: Headers | Record<string, string>): Parse
   };
 }
 
+function isLikelyCloudflareChallenge(
+  response: Response,
+  body: string
+): boolean {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const cfMitigated = response.headers.get("cf-mitigated")?.toLowerCase() ?? "";
+
+  return (
+    cfMitigated === "challenge" ||
+    contentType.includes("text/html") ||
+    CLOUDFLARE_CHALLENGE_MARKERS.some((marker) => body.includes(marker))
+  );
+}
+
+function formatQuotaFetchError(response: Response, body: string): string {
+  const cfRay = response.headers.get("cf-ray");
+  const cfRaySuffix = cfRay ? ` (cf-ray: ${cfRay})` : "";
+
+  if (isLikelyCloudflareChallenge(response, body)) {
+    return `Codex quota endpoint returned HTTP ${response.status} from ChatGPT/Cloudflare${cfRaySuffix}`;
+  }
+
+  return `Codex quota fetch failed: HTTP ${response.status}${
+    body ? ` ${body.slice(0, 300)}` : ""
+  }`;
+}
+
 function mergeQuotaData(
   apiData: ParsedCodexQuota | null,
   headerData: ParsedCodexQuota | null,
@@ -392,9 +428,10 @@ export async function fetchCodexQuotaFromApi(
   try {
     const requestHeaders: Record<string, string> = {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
       Accept: "application/json",
       "User-Agent": CODEX_CHAT_USER_AGENT,
+      Origin: CHATGPT_ORIGIN,
+      Referer: `${CHATGPT_ORIGIN}/`,
       originator: ORIGINATOR,
     };
 
@@ -419,9 +456,7 @@ export async function fetchCodexQuotaFromApi(
 
       return {
         status: "error",
-        error: `Codex quota fetch failed: HTTP ${response.status}${
-          errorBody ? ` ${errorBody.slice(0, 300)}` : ""
-        }`,
+        error: formatQuotaFetchError(response, errorBody),
         planType: null,
         primary: null,
         secondary: null,
