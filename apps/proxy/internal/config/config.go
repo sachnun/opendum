@@ -48,7 +48,7 @@ func Load() (Config, error) {
 		ReadTimeout:          30 * time.Second,
 		WriteTimeout:         0,
 		IdleTimeout:          120 * time.Second,
-		TokenRefreshInterval: durationSeconds("TOKEN_REFRESH_INTERVAL_SECONDS", 60*time.Second),
+		TokenRefreshInterval: durationSeconds("TOKEN_REFRESH_INTERVAL_SECONDS", 10*time.Minute),
 	}
 
 	if cfg.DatabaseURL == "" {
