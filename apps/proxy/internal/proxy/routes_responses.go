@@ -21,7 +21,7 @@ func parseResponses(body map[string]any) (parsedEndpointRequest, *routeError) {
 		return parsedEndpointRequest{}, routeErr
 	}
 	input, ok := body["input"].([]any)
-	if !ok || len(input) == 0 {
+	if !ok {
 		return parsedEndpointRequest{}, &routeError{Status: http.StatusBadRequest, Message: "input array is required", Type: "invalid_request_error"}
 	}
 	stream := parseStreamParam(body)

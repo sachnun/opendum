@@ -8,13 +8,23 @@ import (
 
 func transformAnthropicToOpenAI(body map[string]any) map[string]any {
 	payload := cloneMapExcept(body, "system", "provider_account_id")
+	if _, ok := payload["max_tokens"]; !ok {
+		payload["max_tokens"] = 4096
+	}
+	if tools, ok := body["tools"].([]any); ok {
+		payload["tools"] = convertAnthropicTools(tools)
+	}
+	if toolChoice, ok := body["tool_choice"]; ok {
+		payload["tool_choice"] = convertAnthropicToolChoice(toolChoice)
+	}
 	messages := []any{}
 	if system := body["system"]; system != nil {
 		messages = append(messages, map[string]any{"role": "system", "content": anthropicSystemToText(system)})
 	}
+	toolResultIDs := anthropicToolResultIDs(body["messages"])
 	if rawMessages, ok := body["messages"].([]any); ok {
 		for _, raw := range rawMessages {
-			messages = append(messages, convertAnthropicMessage(raw)...)
+			messages = append(messages, convertAnthropicMessage(raw, toolResultIDs)...)
 		}
 	}
 	payload["messages"] = messages
@@ -22,7 +32,7 @@ func transformAnthropicToOpenAI(body map[string]any) map[string]any {
 	return payload
 }
 
-func convertAnthropicMessage(raw any) []any {
+func convertAnthropicMessage(raw any, toolResultIDs map[string]struct{}) []any {
 	msg, ok := raw.(map[string]any)
 	if !ok {
 		return nil
@@ -32,7 +42,7 @@ func convertAnthropicMessage(raw any) []any {
 	case string:
 		return []any{map[string]any{"role": role, "content": content}}
 	case []any:
-		converted := convertAnthropicContentBlocks(content)
+		converted := convertAnthropicContentBlocks(content, toolResultIDs)
 		messages := append([]any{}, converted.extraMessages...)
 		if len(converted.parts) > 0 || len(converted.toolCalls) > 0 {
 			message := map[string]any{"role": role, "content": converted.contentValue()}
@@ -44,6 +54,68 @@ func convertAnthropicMessage(raw any) []any {
 		return messages
 	}
 	return nil
+}
+
+func convertAnthropicTools(tools []any) []any {
+	converted := make([]any, 0, len(tools))
+	for _, raw := range tools {
+		tool, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, ok := tool["function"]; ok {
+			converted = append(converted, tool)
+			continue
+		}
+		name := stringValue(tool["name"])
+		if name == "" {
+			continue
+		}
+		parameters := tool["input_schema"]
+		if parameters == nil {
+			parameters = map[string]any{}
+		}
+		function := map[string]any{
+			"name":        name,
+			"description": stringValue(tool["description"]),
+			"parameters":  parameters,
+		}
+		converted = append(converted, map[string]any{"type": "function", "function": function})
+	}
+	return converted
+}
+
+func convertAnthropicToolChoice(toolChoice any) any {
+	if choice, ok := toolChoice.(string); ok {
+		if choice == "auto" || choice == "none" || choice == "required" {
+			return choice
+		}
+		return toolChoice
+	}
+	choiceMap, ok := toolChoice.(map[string]any)
+	if !ok {
+		return toolChoice
+	}
+	if choiceMap["function"] != nil {
+		return choiceMap
+	}
+	switch stringValue(choiceMap["type"]) {
+	case "auto":
+		return "auto"
+	case "any", "required":
+		return "required"
+	case "tool", "function":
+		name := stringValue(choiceMap["name"])
+		if name == "" {
+			if fn, ok := choiceMap["function"].(map[string]any); ok {
+				name = stringValue(fn["name"])
+			}
+		}
+		return map[string]any{"type": "function", "function": map[string]any{"name": name}}
+	case "none":
+		return "none"
+	}
+	return toolChoice
 }
 
 func applyAnthropicThinkingParams(payload, body map[string]any) {
@@ -83,7 +155,7 @@ func (c convertedBlocks) contentValue() any {
 	return strings.Join(texts, "")
 }
 
-func convertAnthropicContentBlocks(blocks []any) convertedBlocks {
+func convertAnthropicContentBlocks(blocks []any, toolResultIDs map[string]struct{}) convertedBlocks {
 	result := convertedBlocks{}
 	for _, raw := range blocks {
 		block, ok := raw.(map[string]any)
@@ -102,17 +174,51 @@ func convertAnthropicContentBlocks(blocks []any) convertedBlocks {
 				}
 			}
 		case "tool_use":
+			id := stringValue(block["id"])
+			if id != "" {
+				if _, ok := toolResultIDs[id]; !ok {
+					continue
+				}
+			}
 			args := "{}"
 			if block["input"] != nil {
 				data, _ := json.Marshal(block["input"])
 				args = string(data)
 			}
-			result.toolCalls = append(result.toolCalls, map[string]any{"id": stringValue(block["id"]), "type": "function", "function": map[string]any{"name": stringValue(block["name"]), "arguments": args}})
+			result.toolCalls = append(result.toolCalls, map[string]any{"id": id, "type": "function", "function": map[string]any{"name": stringValue(block["name"]), "arguments": args}})
 		case "tool_result":
 			result.extraMessages = append(result.extraMessages, map[string]any{"role": "tool", "tool_call_id": stringValue(block["tool_use_id"]), "content": anthropicToolResultToText(block["content"])})
 		}
 	}
 	return result
+}
+
+func anthropicToolResultIDs(rawMessages any) map[string]struct{} {
+	ids := map[string]struct{}{}
+	messages, ok := rawMessages.([]any)
+	if !ok {
+		return ids
+	}
+	for _, raw := range messages {
+		msg, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		blocks, ok := msg["content"].([]any)
+		if !ok {
+			continue
+		}
+		for _, rawBlock := range blocks {
+			block, ok := rawBlock.(map[string]any)
+			if !ok || block["type"] != "tool_result" {
+				continue
+			}
+			if id := stringValue(block["tool_use_id"]); id != "" {
+				ids[id] = struct{}{}
+			}
+		}
+	}
+	return ids
 }
 
 func transformOpenAIToAnthropic(openAI map[string]any, model string, includeThinking bool) map[string]any {

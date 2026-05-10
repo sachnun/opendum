@@ -14,6 +14,10 @@ import (
 func (s *Service) ValidateModel(modelParam string) ModelValidationResult {
 	provider, rawModel := ParseModelParam(modelParam)
 	model := s.registry.ResolveAlias(rawModel)
+	if provider != nil && *provider == "codex" && !s.isCodexChatGPTModel(model) {
+		supported := strings.Join(s.codexChatGPTModels(), ", ")
+		return ModelValidationResult{Valid: false, Provider: provider, Model: model, Error: "Model \"" + rawModel + "\" is not supported for Codex when using a ChatGPT account. Use one of: " + supported + ".", Param: "model", Code: "unsupported_codex_chatgpt_model"}
+	}
 	if !s.registry.IsSupported(model) {
 		return ModelValidationResult{Valid: false, Provider: provider, Model: rawModel, Error: "Invalid model: " + modelParam + ". Use GET /v1/models for the full list.", Param: "model", Code: "invalid_model"}
 	}
@@ -22,6 +26,35 @@ func (s *Service) ValidateModel(modelParam string) ModelValidationResult {
 		return ModelValidationResult{Valid: false, Provider: provider, Model: model, Error: "Model \"" + model + "\" is not supported by provider \"" + *provider + "\". Supported providers: " + supported, Param: "model", Code: "invalid_provider_model"}
 	}
 	return ModelValidationResult{Valid: true, Provider: provider, Model: model}
+}
+
+func (s *Service) isCodexChatGPTModel(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	for canonical, upstream := range s.registry.ProviderModelMap("codex") {
+		if strings.ToLower(canonical) == normalized || strings.ToLower(upstream) == normalized {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) codexChatGPTModels() []string {
+	values := []string{}
+	seen := map[string]struct{}{}
+	for canonical, upstream := range s.registry.ProviderModelMap("codex") {
+		for _, value := range []string{canonical, upstream} {
+			if value == "" {
+				continue
+			}
+			if _, ok := seen[value]; ok {
+				continue
+			}
+			seen[value] = struct{}{}
+			values = append(values, value)
+		}
+	}
+	sort.Strings(values)
+	return values
 }
 
 func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam string, access ModelAccess) (ModelValidationResult, error) {

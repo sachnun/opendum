@@ -173,8 +173,8 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 	if !account.IsActive {
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is inactive", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_inactive")}
 	}
-	if err := accountAllowed(account.ID, accountAccess); err != nil {
-		return nil, &routeError{Status: http.StatusForbidden, Message: err.Error(), Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_not_allowed")}
+	if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
+		return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 	}
 	if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
@@ -185,10 +185,11 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 	if s.isRateLimited(ctx, account.ID, rateLimitScope(validation.Model)) {
 		wait := s.getMinWaitTime(ctx, []string{account.ID}, rateLimitScope(validation.Model))
 		message := "Selected account is rate limited."
+		retryAfter, retryAfterMS := retryMetadata(wait)
 		if wait > 0 {
 			message = "Selected account is rate limited. Retry in " + formatWaitTime(wait) + "."
 		}
-		return nil, &routeError{Status: cfg.RateLimitStatusCode, Message: message, Type: "rate_limit_error"}
+		return nil, &routeError{Status: cfg.RateLimitStatusCode, Message: message, Type: "rate_limit_error", RetryAfter: retryAfter, RetryAfterMS: retryAfterMS}
 	}
 	return &account, nil
 }
@@ -256,6 +257,22 @@ func (s *Service) markAccountFailed(ctx context.Context, accountID, model string
 		_ = s.insertErrorHistory(ctx, accountID, account.UserID, &modelValue, statusCode, message, now)
 	}
 	return now
+}
+
+func (s *Service) markAccountsRecoveredByRotation(ctx context.Context, failures []accountRotationFailure) {
+	latest := map[string]time.Time{}
+	for _, failure := range failures {
+		if existing, ok := latest[failure.AccountID]; !ok || failure.FailedAt.After(existing) {
+			latest[failure.AccountID] = failure.FailedAt
+		}
+	}
+	if len(latest) == 0 {
+		return
+	}
+	recoveredAt := time.Now()
+	for accountID, failedAt := range latest {
+		_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"lastRecoveredByRotationAt\" = ?", recoveredAt).Where("id = ?", accountID).Where("\"lastErrorAt\" <= ?", failedAt).Exec(ctx)
+	}
 }
 
 func (s *Service) insertErrorHistory(ctx context.Context, accountID, userID string, model *string, statusCode int, message string, now time.Time) error {
@@ -333,6 +350,14 @@ func nullableTimeBefore(a, b *time.Time) bool {
 }
 
 func accountAllowed(accountID string, access auth.AccountAccess) error {
+	message, _, denied := accountAccessDenial(accountID, access)
+	if denied {
+		return errors.New(message)
+	}
+	return nil
+}
+
+func accountAccessDenial(accountID string, access auth.AccountAccess) (string, string, bool) {
 	mode := normalizeAccessMode(access.Mode)
 	set := map[string]struct{}{}
 	for _, id := range normalizeAccountIDs(access.Accounts) {
@@ -340,15 +365,15 @@ func accountAllowed(accountID string, access auth.AccountAccess) error {
 	}
 	if mode == "whitelist" {
 		if _, ok := set[accountID]; !ok {
-			return errors.New("Selected provider account is not allowed for this API key.")
+			return "Selected provider account is not allowed for this API key.", "provider_account_not_whitelisted", true
 		}
 	}
 	if mode == "blacklist" {
 		if _, ok := set[accountID]; ok {
-			return errors.New("Selected provider account is blocked for this API key.")
+			return "Selected provider account is blocked for this API key.", "provider_account_blacklisted", true
 		}
 	}
-	return nil
+	return "", "", false
 }
 
 func normalizeAccessMode(mode string) string {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -225,7 +226,7 @@ func windowBucket(windowSeconds int) int64 {
 	return now - (now % int64(windowSeconds))
 }
 
-func parseRetryAfter(response *http.Response) time.Duration {
+func parseRetryAfter(response *http.Response, body string) time.Duration {
 	if value := response.Header.Get("retry-after-ms"); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil && parsed >= 0 {
 			return time.Duration(parsed) * time.Millisecond
@@ -236,7 +237,114 @@ func parseRetryAfter(response *http.Response) time.Duration {
 			return time.Duration(parsed) * time.Second
 		}
 	}
+	return parseRetryAfterFromBody(body)
+}
+
+func parseRetryAfterFromBody(body string) time.Duration {
+	trimmed := strings.TrimSpace(body)
+	if trimmed == "" {
+		return 0
+	}
+	var value any
+	if json.Unmarshal([]byte(trimmed), &value) != nil {
+		return 0
+	}
+	return findRetryAfter(value, 0)
+}
+
+func findRetryAfter(value any, depth int) time.Duration {
+	if depth > 6 || value == nil {
+		return 0
+	}
+	switch typed := value.(type) {
+	case string:
+		var nested any
+		if json.Unmarshal([]byte(typed), &nested) == nil {
+			if d := findRetryAfter(nested, depth+1); d > 0 {
+				return d
+			}
+		}
+		return parseDurationHint(typed)
+	case map[string]any:
+		for _, key := range []string{"retry_after_ms", "retryAfterMs", "retry-after-ms"} {
+			if d := retryValueDuration(typed[key], time.Millisecond, depth); d > 0 {
+				return d
+			}
+		}
+		for _, key := range []string{"retry_after", "retryAfter", "retry-after", "quotaResetDelay", "retryDelay"} {
+			if d := retryValueDuration(typed[key], time.Second, depth); d > 0 {
+				return d
+			}
+		}
+		if message := stringValue(typed["message"]); message != "" {
+			if d := parseDurationHint(message); d > 0 {
+				return d
+			}
+		}
+		for _, key := range []string{"error", "errors", "details", "detail", "metadata"} {
+			if d := findRetryAfter(typed[key], depth+1); d > 0 {
+				return d
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			if d := findRetryAfter(item, depth+1); d > 0 {
+				return d
+			}
+		}
+	}
 	return 0
+}
+
+func retryValueDuration(value any, unit time.Duration, depth int) time.Duration {
+	switch typed := value.(type) {
+	case float64:
+		if typed > 0 {
+			return time.Duration(typed * float64(unit))
+		}
+	case string:
+		if parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64); err == nil && parsed > 0 {
+			return time.Duration(parsed * float64(unit))
+		}
+		var nested any
+		if json.Unmarshal([]byte(typed), &nested) == nil {
+			if d := findRetryAfter(nested, depth+1); d > 0 {
+				return d
+			}
+		}
+		return parseDurationHint(typed)
+	case map[string]any, []any:
+		return findRetryAfter(typed, depth+1)
+	}
+	return 0
+}
+
+var durationHintPattern = regexp.MustCompile(`(?i)(?:retry\s+after\s+)?(\d+(?:\.\d+)?)\s*(ms|millisecond(?:s)?|s|sec(?:ond)?(?:s)?|m|min(?:ute)?(?:s)?|h|hour(?:s)?)`)
+
+func parseDurationHint(value string) time.Duration {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0
+	}
+	match := durationHintPattern.FindStringSubmatch(trimmed)
+	if len(match) != 3 {
+		return 0
+	}
+	amount, err := strconv.ParseFloat(match[1], 64)
+	if err != nil || amount <= 0 {
+		return 0
+	}
+	unit := strings.ToLower(match[2])
+	switch {
+	case unit == "ms" || strings.HasPrefix(unit, "millisecond"):
+		return time.Duration(amount * float64(time.Millisecond))
+	case unit == "h" || strings.HasPrefix(unit, "hour"):
+		return time.Duration(amount * float64(time.Hour))
+	case unit == "m" || strings.HasPrefix(unit, "min"):
+		return time.Duration(amount * float64(time.Minute))
+	default:
+		return time.Duration(amount * float64(time.Second))
+	}
 }
 
 func formatWaitTime(d time.Duration) string {

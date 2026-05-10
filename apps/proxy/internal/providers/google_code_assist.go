@@ -164,10 +164,8 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	modelName := p.resolveModel(stringValue(body["model"]))
 	body = p.normalizeBodyForModel(body, modelName)
 	includeReasoning := body["_includeReasoning"] == true || providerConfigBool(p.registry, modelName, p.name, "thinking_model")
-	if providerConfigBool(p.registry, modelName, p.name, "convert_external_images") {
-		if messages, ok := body["messages"].([]any); ok {
-			body["messages"] = convertImageURLsToBase64(ctx, client, messages)
-		}
+	if messages, ok := body["messages"].([]any); ok {
+		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
 	}
 	sessionID := stableSessionID(body)
 	geminiPayload := openAIToGemini(body)

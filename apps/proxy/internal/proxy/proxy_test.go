@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -76,7 +77,6 @@ func TestParseChatCompletionsValidation(t *testing.T) {
 	}{
 		{name: "missing model", body: map[string]any{"messages": []any{"hello"}}, message: "model is required"},
 		{name: "missing messages", body: map[string]any{"model": "test-model"}, message: "messages array is required"},
-		{name: "empty messages", body: map[string]any{"model": "test-model", "messages": []any{}}, message: "messages array is required"},
 	}
 
 	for _, tt := range tests {
@@ -89,6 +89,19 @@ func TestParseChatCompletionsValidation(t *testing.T) {
 				t.Fatalf("routeErr = %+v", routeErr)
 			}
 		})
+	}
+}
+
+func TestParseChatCompletionsAcceptsEmptyMessages(t *testing.T) {
+	parsed, routeErr := parseChatCompletions(map[string]any{"model": "test-model", "messages": []any{}})
+	if routeErr != nil {
+		t.Fatalf("parseChatCompletions returned error: %+v", routeErr)
+	}
+
+	payload := buildChatCompletions(parsed, "test-model", false, "")
+	messages, ok := payload["messages"].([]any)
+	if !ok || len(messages) != 0 {
+		t.Fatalf("payload messages = %#v, want empty array", payload["messages"])
 	}
 }
 
@@ -168,12 +181,50 @@ func TestParseResponsesConvertsInputAndParams(t *testing.T) {
 	}
 }
 
+func TestParseResponsesValidation(t *testing.T) {
+	_, routeErr := parseResponses(map[string]any{"model": "test-model"})
+	if routeErr == nil {
+		t.Fatal("parseResponses returned nil error")
+	}
+	if routeErr.Status != http.StatusBadRequest || routeErr.Message != "input array is required" || routeErr.Type != "invalid_request_error" {
+		t.Fatalf("routeErr = %+v", routeErr)
+	}
+}
+
+func TestParseResponsesAcceptsEmptyInput(t *testing.T) {
+	parsed, routeErr := parseResponses(map[string]any{"model": "test-model", "input": []any{}})
+	if routeErr != nil {
+		t.Fatalf("parseResponses returned error: %+v", routeErr)
+	}
+
+	payload := buildResponses(parsed, "test-model", false, "")
+	messages, ok := payload["messages"].([]any)
+	if !ok || len(messages) != 0 {
+		t.Fatalf("payload messages = %#v, want empty array", payload["messages"])
+	}
+	input, ok := payload["_responsesInput"].([]any)
+	if !ok || len(input) != 0 {
+		t.Fatalf("payload _responsesInput = %#v, want empty array", payload["_responsesInput"])
+	}
+}
+
 func TestTransformAnthropicToOpenAI(t *testing.T) {
 	body := map[string]any{
 		"system": []any{
 			map[string]any{"type": "text", "text": "first"},
 			map[string]any{"type": "text", "text": "second"},
 		},
+		"tools": []any{
+			map[string]any{
+				"name":        "lookup",
+				"description": "look up a city",
+				"input_schema": map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"city": map[string]any{"type": "string"}},
+				},
+			},
+		},
+		"tool_choice": map[string]any{"type": "tool", "name": "lookup"},
 		"messages": []any{
 			map[string]any{
 				"role": "user",
@@ -186,6 +237,7 @@ func TestTransformAnthropicToOpenAI(t *testing.T) {
 				"role": "assistant",
 				"content": []any{
 					map[string]any{"type": "tool_use", "id": "toolu_1", "name": "lookup", "input": map[string]any{"city": "Jakarta"}},
+					map[string]any{"type": "tool_use", "id": "toolu_unmatched", "name": "lookup", "input": map[string]any{"city": "Paris"}},
 				},
 			},
 			map[string]any{
@@ -206,6 +258,23 @@ func TestTransformAnthropicToOpenAI(t *testing.T) {
 	}
 	if payload["max_tokens"] != 100 || payload["thinking_budget"] != 2048 || payload["_includeReasoning"] != true {
 		t.Fatalf("payload missing params: %#v", payload)
+	}
+	tools := payload["tools"].([]any)
+	if len(tools) != 1 {
+		t.Fatalf("tools len = %d, want 1", len(tools))
+	}
+	tool := tools[0].(map[string]any)
+	function := tool["function"].(map[string]any)
+	if tool["type"] != "function" || function["name"] != "lookup" || function["description"] != "look up a city" {
+		t.Fatalf("converted tool = %#v", tool)
+	}
+	if !reflect.DeepEqual(function["parameters"], body["tools"].([]any)[0].(map[string]any)["input_schema"]) {
+		t.Fatalf("tool parameters = %#v", function["parameters"])
+	}
+	toolChoice := payload["tool_choice"].(map[string]any)
+	choiceFn := toolChoice["function"].(map[string]any)
+	if toolChoice["type"] != "function" || choiceFn["name"] != "lookup" {
+		t.Fatalf("tool_choice = %#v", toolChoice)
 	}
 
 	messages := payload["messages"].([]any)
@@ -246,6 +315,41 @@ func TestTransformAnthropicToOpenAI(t *testing.T) {
 	assertMessage(t, messages[3], "tool", `{"ok":true}`)
 	if messages[3].(map[string]any)["tool_call_id"] != "toolu_1" {
 		t.Fatalf("tool result id = %q, want toolu_1", messages[3].(map[string]any)["tool_call_id"])
+	}
+}
+
+func TestTransformAnthropicToOpenAIDefaultMaxTokens(t *testing.T) {
+	payload := transformAnthropicToOpenAI(map[string]any{
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	})
+
+	if payload["max_tokens"] != 4096 {
+		t.Fatalf("max_tokens = %v, want 4096", payload["max_tokens"])
+	}
+}
+
+func TestTransformAnthropicToolChoiceVariants(t *testing.T) {
+	tests := []struct {
+		name string
+		in   map[string]any
+		want any
+	}{
+		{name: "auto", in: map[string]any{"type": "auto"}, want: "auto"},
+		{name: "any", in: map[string]any{"type": "any"}, want: "required"},
+		{name: "none", in: map[string]any{"type": "none"}, want: "none"},
+		{name: "tool", in: map[string]any{"type": "tool", "name": "lookup"}, want: map[string]any{"type": "function", "function": map[string]any{"name": "lookup"}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := transformAnthropicToOpenAI(map[string]any{
+				"messages":    []any{map[string]any{"role": "user", "content": "hello"}},
+				"tool_choice": tt.in,
+			})
+			if !reflect.DeepEqual(payload["tool_choice"], tt.want) {
+				t.Fatalf("tool_choice = %#v, want %#v", payload["tool_choice"], tt.want)
+			}
+		})
 	}
 }
 
@@ -329,7 +433,8 @@ func TestSanitizedProxyError(t *testing.T) {
 		wantMessage string
 		wantType    string
 	}{
-		{name: "client json error", status: http.StatusUnauthorized, body: `{"error":{"message":" invalid\napi key "}}`, wantMessage: "invalid api key", wantType: "invalid_request_error"},
+		{name: "auth json error", status: http.StatusUnauthorized, body: `{"error":{"message":" invalid\napi key "}}`, wantMessage: "invalid api key", wantType: "authentication_error"},
+		{name: "rate limit json error", status: http.StatusTooManyRequests, body: `{"error":{"message":" slow down "}}`, wantMessage: "slow down", wantType: "rate_limit_error"},
 		{name: "server detail", status: http.StatusBadGateway, body: `{"detail":"upstream failed"}`, wantMessage: "upstream failed", wantType: "api_error"},
 		{name: "nested json string", status: http.StatusBadRequest, body: `{"error":"{\"message\":\"nested failure\"}"}`, wantMessage: "nested failure", wantType: "invalid_request_error"},
 		{name: "empty body fallback", status: http.StatusTeapot, body: ``, wantMessage: "I'm a teapot", wantType: "invalid_request_error"},
@@ -374,6 +479,95 @@ func TestPassthroughUsageTrackerProcessesSplitSSE(t *testing.T) {
 	}
 }
 
+func TestAnthropicStreamTrackerTransformsOpenAIContentBlocks(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	tracker := &anthropicStreamTracker{writer: recorder, includeThinking: true}
+
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"reasoning_content": "think"}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"content": "answer"}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"tool_calls": []any{map[string]any{"index": 0, "id": "call_1", "function": map[string]any{"name": "lookup", "arguments": `{"city"`}}}}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"tool_calls": []any{map[string]any{"index": 0, "function": map[string]any{"arguments": `:"Paris"}`}}}}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"usage": map[string]any{"prompt_tokens": 11, "completion_tokens": 5}, "choices": []any{map[string]any{"delta": map[string]any{}, "finish_reason": "tool_calls"}}}))
+	tracker.Finish()
+
+	events := parseRecordedSSE(t, recorder.Body.String())
+	if len(events) != 12 {
+		t.Fatalf("events len = %d, want 12: %#v", len(events), events)
+	}
+	assertSSEEvent(t, events[0], "content_block_start", "thinking", 0)
+	if delta := events[1].data["delta"].(map[string]any); delta["type"] != "thinking_delta" || delta["thinking"] != "think" {
+		t.Fatalf("thinking delta = %#v", delta)
+	}
+	if events[2].event != "content_block_stop" || int(events[2].data["index"].(float64)) != 0 {
+		t.Fatalf("thinking stop = %#v", events[2])
+	}
+	assertSSEEvent(t, events[3], "content_block_start", "text", 1)
+	if delta := events[4].data["delta"].(map[string]any); delta["type"] != "text_delta" || delta["text"] != "answer" {
+		t.Fatalf("text delta = %#v", delta)
+	}
+	if events[5].event != "content_block_stop" || int(events[5].data["index"].(float64)) != 1 {
+		t.Fatalf("text stop = %#v", events[5])
+	}
+	assertSSEEvent(t, events[6], "content_block_start", "tool_use", 2)
+	toolBlock := events[6].data["content_block"].(map[string]any)
+	if toolBlock["id"] != "call_1" || toolBlock["name"] != "lookup" {
+		t.Fatalf("tool block = %#v", toolBlock)
+	}
+	for i, want := range []string{`{"city"`, `:"Paris"}`} {
+		delta := events[7+i].data["delta"].(map[string]any)
+		if delta["type"] != "input_json_delta" || delta["partial_json"] != want || int(events[7+i].data["index"].(float64)) != 2 {
+			t.Fatalf("tool delta %d = %#v", i, events[7+i].data)
+		}
+	}
+	if events[9].event != "content_block_stop" || int(events[9].data["index"].(float64)) != 2 {
+		t.Fatalf("tool stop = %#v", events[9])
+	}
+	delta := events[10].data["delta"].(map[string]any)
+	usage := events[10].data["usage"].(map[string]any)
+	if events[10].event != "message_delta" || delta["stop_reason"] != "tool_use" || int(usage["input_tokens"].(float64)) != 11 || int(usage["output_tokens"].(float64)) != 5 {
+		t.Fatalf("message_delta = %#v", events[10])
+	}
+	if events[11].event != "message_stop" {
+		t.Fatalf("message_stop = %#v", events[11])
+	}
+}
+
+func TestAnthropicStreamTrackerFinishReasonMappingAndFlush(t *testing.T) {
+	tests := []struct {
+		finish string
+		want   string
+	}{
+		{finish: "stop", want: "end_turn"},
+		{finish: "length", want: "max_tokens"},
+		{finish: "function_call", want: "tool_use"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.finish, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			tracker := &anthropicStreamTracker{writer: recorder}
+			chunk := openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"content": "ok"}, "finish_reason": tt.finish}}})
+			tracker.Process(strings.TrimSuffix(chunk, "\n\n"))
+			tracker.Finish()
+
+			events := parseRecordedSSE(t, recorder.Body.String())
+			if len(events) != 5 {
+				t.Fatalf("events len = %d, want 5: %#v", len(events), events)
+			}
+			if events[2].event != "content_block_stop" {
+				t.Fatalf("content block was not closed before message_delta: %#v", events)
+			}
+			delta := events[3].data["delta"].(map[string]any)
+			if events[3].event != "message_delta" || delta["stop_reason"] != tt.want {
+				t.Fatalf("message_delta = %#v, want stop_reason %q", events[3], tt.want)
+			}
+			if events[4].event != "message_stop" {
+				t.Fatalf("message_stop = %#v", events[4])
+			}
+		})
+	}
+}
+
 func TestWriteRouteErrorFormats(t *testing.T) {
 	param := "model"
 	code := "invalid_model"
@@ -394,8 +588,8 @@ func TestWriteRouteErrorFormats(t *testing.T) {
 	}
 
 	anthropicRecorder := httptest.NewRecorder()
-	(&Service{}).writeRouteError(anthropicRecorder, endpointAdapter{Format: FormatAnthropic}, http.StatusBadRequest, "bad request", "invalid_request_error", nil, nil, nil, nil)
-	if anthropicRecorder.Code != http.StatusBadRequest {
+	(&Service{}).writeRouteError(anthropicRecorder, endpointAdapter{Format: FormatAnthropic}, http.StatusTooManyRequests, "slow down", "rate_limit_error", nil, nil, &retryAfter, &retryAfterMS)
+	if anthropicRecorder.Code != http.StatusTooManyRequests {
 		t.Fatalf("anthropic status = %d", anthropicRecorder.Code)
 	}
 	var anthropic map[string]any
@@ -406,25 +600,129 @@ func TestWriteRouteErrorFormats(t *testing.T) {
 		t.Fatalf("Anthropic error type = %#v", anthropic)
 	}
 	inner := anthropic["error"].(map[string]any)
-	if inner["type"] != "invalid_request_error" || inner["message"] != "bad request" {
+	if inner["type"] != "rate_limit_error" || inner["message"] != "slow down" || inner["retry_after"] != retryAfter || int64(inner["retry_after_ms"].(float64)) != retryAfterMS {
 		t.Fatalf("Anthropic inner error = %#v", inner)
 	}
 }
 
 func TestParseRetryAfter(t *testing.T) {
 	response := &http.Response{Header: http.Header{"Retry-After-Ms": []string{"1500"}}}
-	if got := parseRetryAfter(response); got != 1500*time.Millisecond {
+	if got := parseRetryAfter(response, ``); got != 1500*time.Millisecond {
 		t.Fatalf("retry-after-ms duration = %s", got)
 	}
 
 	response = &http.Response{Header: http.Header{"Retry-After": []string{"7"}}}
-	if got := parseRetryAfter(response); got != 7*time.Second {
+	if got := parseRetryAfter(response, ``); got != 7*time.Second {
 		t.Fatalf("retry-after duration = %s", got)
 	}
 
 	response = &http.Response{Header: http.Header{"Retry-After": []string{"bad"}}}
-	if got := parseRetryAfter(response); got != 0 {
+	if got := parseRetryAfter(response, `{"error":{"retry_after_ms":2500}}`); got != 2500*time.Millisecond {
+		t.Fatalf("body retry-after-ms duration = %s", got)
+	}
+
+	response = &http.Response{Header: http.Header{}}
+	if got := parseRetryAfter(response, `{"error":{"details":{"retry_after":"9"}}}`); got != 9*time.Second {
+		t.Fatalf("body retry-after duration = %s", got)
+	}
+
+	if got := parseRetryAfter(response, `{"error":"{\"retryAfter\":3}"}`); got != 3*time.Second {
+		t.Fatalf("nested string retry-after duration = %s", got)
+	}
+
+	if got := parseRetryAfter(response, `{}`); got != 0 {
 		t.Fatalf("invalid retry-after duration = %s", got)
+	}
+}
+
+func TestPassthroughDoesNotCopyProviderHeaders(t *testing.T) {
+	writer := &panicHeaderWriter{header: http.Header{}}
+	response := &http.Response{
+		Header: http.Header{
+			"Content-Type":       []string{"application/problem+json"},
+			"Retry-After":        []string{"60"},
+			"X-Provider-Secret":  []string{"secret"},
+			"X-Provider-Account": []string{"upstream"},
+		},
+		Body: io.NopCloser(strings.NewReader(`{"id":"ok"}`)),
+	}
+
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != errTestWriteHeader {
+				t.Fatalf("WriteHeader panic = %v, want sentinel", recovered)
+			}
+		}()
+		_ = (&Service{}).passthroughNonStream(responseContext{Response: response, Writer: writer, AccountID: "acct_1"})
+	}()
+
+	if writer.header.Get("Retry-After") != "" || writer.header.Get("X-Provider-Secret") != "" || writer.header.Get("X-Provider-Account") != "" {
+		t.Fatalf("provider headers leaked: %#v", writer.header)
+	}
+	if writer.header.Get("Content-Type") != "application/json" || writer.header.Get("X-Provider-Account-Id") != "acct_1" {
+		t.Fatalf("proxy headers missing: %#v", writer.header)
+	}
+}
+
+type panicHeaderWriter struct{ header http.Header }
+
+func (w *panicHeaderWriter) Header() http.Header { return w.header }
+func (w *panicHeaderWriter) Write([]byte) (int, error) {
+	panic("unexpected write")
+}
+func (w *panicHeaderWriter) WriteHeader(int) { panic(errTestWriteHeader) }
+
+var errTestWriteHeader = struct{}{}
+
+type recordedSSEEvent struct {
+	event string
+	data  map[string]any
+}
+
+func openAIStreamEvent(t *testing.T, payload map[string]any) string {
+	t.Helper()
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal stream payload: %v", err)
+	}
+	return "data: " + string(data) + "\n\n"
+}
+
+func parseRecordedSSE(t *testing.T, body string) []recordedSSEEvent {
+	t.Helper()
+	rawEvents := strings.Split(strings.TrimSpace(body), "\n\n")
+	events := make([]recordedSSEEvent, 0, len(rawEvents))
+	for _, raw := range rawEvents {
+		if raw == "" {
+			continue
+		}
+		var eventName string
+		var data string
+		for _, line := range strings.Split(raw, "\n") {
+			switch {
+			case strings.HasPrefix(line, "event: "):
+				eventName = strings.TrimPrefix(line, "event: ")
+			case strings.HasPrefix(line, "data: "):
+				data = strings.TrimPrefix(line, "data: ")
+			}
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(data), &parsed); err != nil {
+			t.Fatalf("decode SSE data %q: %v", data, err)
+		}
+		events = append(events, recordedSSEEvent{event: eventName, data: parsed})
+	}
+	return events
+}
+
+func assertSSEEvent(t *testing.T, event recordedSSEEvent, eventName, blockType string, index int) {
+	t.Helper()
+	if event.event != eventName || int(event.data["index"].(float64)) != index {
+		t.Fatalf("event = %#v, want %s index %d", event, eventName, index)
+	}
+	block := event.data["content_block"].(map[string]any)
+	if block["type"] != blockType {
+		t.Fatalf("content block = %#v, want type %s", block, blockType)
 	}
 }
 
@@ -468,6 +766,37 @@ func TestAccountAllowedHonorsAccessMode(t *testing.T) {
 				t.Fatalf("accountAllowed error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestAccountAccessDenialCodes(t *testing.T) {
+	_, code, denied := accountAccessDenial("acct_1", auth.AccountAccess{Mode: "whitelist", Accounts: []string{"acct_2"}})
+	if !denied || code != "provider_account_not_whitelisted" {
+		t.Fatalf("whitelist denial = denied %v code %q", denied, code)
+	}
+
+	_, code, denied = accountAccessDenial("acct_1", auth.AccountAccess{Mode: "blacklist", Accounts: []string{"acct_1"}})
+	if !denied || code != "provider_account_blacklisted" {
+		t.Fatalf("blacklist denial = denied %v code %q", denied, code)
+	}
+}
+
+func TestBuildAccountErrorMessageIncludesContext(t *testing.T) {
+	message := buildAccountErrorMessage("provider failed", accountErrorContext{
+		Model:    "test-model",
+		Provider: "openrouter",
+		Endpoint: "/v1/chat/completions",
+		Messages: []any{map[string]any{"role": "user", "content": "hello"}},
+		Parameters: map[string]any{
+			"stream": true,
+			"tools":  []any{map[string]any{"function": map[string]any{"name": "lookup"}}},
+		},
+	})
+
+	for _, want := range []string{"Error: provider failed", "Provider: openrouter", "Endpoint: /v1/chat/completions", "Model: test-model", "[1 tool(s): lookup]", "Messages (object keys only)"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("account error message missing %q:\n%s", want, message)
+		}
 	}
 }
 

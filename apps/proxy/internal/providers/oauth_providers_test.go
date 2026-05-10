@@ -2,10 +2,14 @@ package providers
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 )
 
@@ -83,6 +87,53 @@ func TestGoogleCodeAssistConversion(t *testing.T) {
 	message := completion["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
 	if message["content"] != "answer" || message["reasoning_content"] != "thinking" {
 		t.Fatalf("message = %#v", message)
+	}
+}
+
+func TestOpenAICompatibleProviderConvertsOllamaCloudImageURL(t *testing.T) {
+	var payload map[string]any
+	client := imageCaptureClient(t, &payload)
+	provider := openAICompatibleProvider{name: "ollama_cloud", baseURL: "https://ollama.com/v1", supportedParams: supportedOllama, registry: testModelsRegistry(t)}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, imageURLBody("ollama_cloud"), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	assertChatImageDataURI(t, payload)
+}
+
+func TestWorkersAIProviderConvertsImageURL(t *testing.T) {
+	accountID := "acct_123"
+	var payload map[string]any
+	client := imageCaptureClient(t, &payload)
+	provider := workersAIProvider{registry: testModelsRegistry(t)}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{AccountID: &accountID}, imageURLBody("workers_ai"), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	assertChatImageDataURI(t, payload)
+}
+
+func TestGoogleCodeAssistConvertsImageURLToInlineData(t *testing.T) {
+	projectID := "project_123"
+	var payload map[string]any
+	client := imageCaptureClient(t, &payload)
+	provider := googleCodeAssistProvider{name: "gemini_cli", endpoint: "https://cloudcode-pa.googleapis.com", registry: testModelsRegistry(t)}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{ProjectID: &projectID}, imageURLBody("gemini_cli"), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	request := payload["request"].(map[string]any)
+	contents := request["contents"].([]any)
+	parts := contents[0].(map[string]any)["parts"].([]any)
+	inlineData := parts[1].(map[string]any)["inlineData"].(map[string]any)
+	if inlineData["mimeType"] != "image/png" || inlineData["data"] == "" {
+		t.Fatalf("inlineData = %#v", inlineData)
 	}
 }
 
@@ -226,6 +277,43 @@ func TestUnsafeImageURLRejected(t *testing.T) {
 		t.Fatal("loopback URL should be rejected")
 	}
 }
+
+func imageURLBody(provider string) map[string]any {
+	return map[string]any{
+		"model": provider + "/unit-test-model",
+		"messages": []any{map[string]any{"role": "user", "content": []any{
+			map[string]any{"type": "text", "text": "describe"},
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "https://8.8.8.8/image.png"}},
+		}}},
+	}
+}
+
+func imageCaptureClient(t *testing.T, captured *map[string]any) *http.Client {
+	t.Helper()
+	return &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host == "8.8.8.8" {
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("png"))}, nil
+		}
+		if err := json.NewDecoder(req.Body).Decode(captured); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))}, nil
+	})}
+}
+
+func assertChatImageDataURI(t *testing.T, payload map[string]any) {
+	t.Helper()
+	messages := payload["messages"].([]any)
+	content := messages[0].(map[string]any)["content"].([]any)
+	imageURL := content[1].(map[string]any)["image_url"].(map[string]any)
+	if got := stringValue(imageURL["url"]); !strings.HasPrefix(got, "data:image/png;base64,") {
+		t.Fatalf("image url = %q", got)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
 func testModelsRegistry(t *testing.T) *models.Registry {
 	t.Helper()

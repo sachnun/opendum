@@ -76,7 +76,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 
 	parsed, routeErr := cfg.Parse(body)
 	if routeErr != nil {
-		s.writeRouteError(w, cfg, routeErr.Status, routeErr.Message, routeErr.Type, routeErr.Param, routeErr.Code, nil, nil)
+		s.writeRouteError(w, cfg, routeErr.Status, routeErr.Message, routeErr.Type, routeErr.Param, routeErr.Code, routeErr.RetryAfter, routeErr.RetryAfterMS)
 		return
 	}
 	r = r.WithContext(context.WithValue(ctx, requestBodyContextKey{}, body))
@@ -94,25 +94,30 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 
 	if authResult.APIKeyID != "" && len(authResult.RateLimitRules) > 0 {
 		rl, err := s.checkAndIncrementAPIKeyRateLimit(ctx, authResult.APIKeyID, validation.Model, authResult.RateLimitRules)
-		if err == nil && !rl.Allowed {
+		if err != nil {
+			s.writeRouteError(w, cfg, http.StatusInternalServerError, "Internal server error", "api_error", nil, nil, nil, nil)
+			return
+		}
+		if !rl.Allowed {
 			if rl.RetryAfterSeconds > 0 {
 				w.Header().Set("Retry-After", fmt.Sprint(rl.RetryAfterSeconds))
 			}
 			message := fmt.Sprintf("Rate limit exceeded for %s: %d/%d requests per %s. Retry after %ds.", validation.Model, rl.Current, rl.Limit, rl.ExceededWindow, rl.RetryAfterSeconds)
-			s.writeRouteError(w, cfg, cfg.RateLimitStatusCode, message, "rate_limit_error", nil, nil, nil, nil)
+			retryAfter, retryAfterMS := retryMetadata(time.Duration(rl.RetryAfterSeconds) * time.Second)
+			s.writeRouteError(w, cfg, cfg.RateLimitStatusCode, message, "rate_limit_error", nil, nil, retryAfter, retryAfterMS)
 			return
 		}
 	}
 
 	forced, forceErr := s.validateForcedAccount(ctx, authResult.UserID, validation, parsed.ProviderAccountID, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList}, cfg)
 	if forceErr != nil {
-		s.writeRouteError(w, cfg, forceErr.Status, forceErr.Message, forceErr.Type, forceErr.Param, forceErr.Code, nil, nil)
+		s.writeRouteError(w, cfg, forceErr.Status, forceErr.Message, forceErr.Type, forceErr.Param, forceErr.Code, forceErr.RetryAfter, forceErr.RetryAfterMS)
 		return
 	}
 
-	account, providerResp, requestStartMS, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced)
+	account, providerResp, requestStartMS, rotationFailures, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 	if errInfo != nil {
-		s.writeRouteError(w, cfg, errInfo.Status, errInfo.Message, errInfo.Type, errInfo.Param, errInfo.Code, nil, nil)
+		s.writeRouteError(w, cfg, errInfo.Status, errInfo.Message, errInfo.Type, errInfo.Param, errInfo.Code, errInfo.RetryAfter, errInfo.RetryAfterMS)
 		return
 	}
 	if account == nil || providerResp == nil {
@@ -122,11 +127,28 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	defer providerResp.Body.Close()
 
 	if parsed.Stream {
-		_ = cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model})
+		if err := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+			go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
+		} else {
+			s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)
+		}
 		return
 	}
 
-	_ = cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model})
+	if err := cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+		go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
+	} else {
+		s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)
+	}
+}
+
+func (s *Service) recordResponseHandlerFailure(ctx context.Context, account *appdb.ProviderAccount, model, userID, apiKeyID string, err error, startMS int64) {
+	if account == nil || err == nil {
+		return
+	}
+	message := err.Error()
+	s.markAccountFailed(ctx, account.ID, model, http.StatusInternalServerError, message)
+	s.logUsage(ctx, usageParams{UserID: userID, ProviderAccountID: account.ID, ProxyAPIKeyID: apiKeyID, Model: model, StatusCode: http.StatusInternalServerError, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 }
 
 func (s *Service) makeProviderRequest(ctx context.Context, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {

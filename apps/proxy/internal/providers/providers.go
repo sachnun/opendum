@@ -80,6 +80,11 @@ type openAICompatibleProvider struct {
 
 func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	payload := p.buildPayload(body, stream)
+	if p.name == "ollama_cloud" {
+		if messages, ok := payload["messages"].([]any); ok {
+			payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
+		}
+	}
 	return postJSON(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream)
 }
 
@@ -116,6 +121,9 @@ func (p workersAIProvider) MakeRequest(ctx context.Context, client *http.Client,
 	model, _ := body["model"].(string)
 	payload["model"] = p.registry.UpstreamModelName(model, "workers_ai")
 	payload["stream"] = stream
+	if messages, ok := payload["messages"].([]any); ok {
+		payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
+	}
 	url := "https://api.cloudflare.com/client/v4/accounts/" + strings.TrimSpace(*account.AccountID) + "/ai/v1/chat/completions"
 	return postJSON(ctx, client, url, credentials, payload, stream)
 }

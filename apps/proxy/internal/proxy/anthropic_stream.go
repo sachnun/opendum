@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
+	"strconv"
 	"time"
 )
 
@@ -57,18 +59,32 @@ func (s *Service) anthropicStream(ctx responseContext) error {
 }
 
 type anthropicStreamTracker struct {
-	writer          http.ResponseWriter
-	flusher         http.Flusher
-	scanner         sseScanner
-	blockStarted    bool
-	blockIndex      int
-	inputTokens     int
-	outputTokens    int
-	includeThinking bool
+	writer            http.ResponseWriter
+	flusher           http.Flusher
+	scanner           sseScanner
+	openBlockType     string
+	blockIndex        int
+	toolBlockByID     map[string]int
+	toolBlockByIndex  map[int]anthropicToolBlock
+	openToolBlocks    map[int]bool
+	inputTokens       int
+	outputTokens      int
+	finishReason      string
+	includeThinking   bool
+	generatedToolUses int
+}
+
+type anthropicToolBlock struct {
+	index int
+	id    string
 }
 
 func (t *anthropicStreamTracker) Process(chunk string) {
 	t.scanner.Process(chunk, t.processEvent)
+}
+
+func (t *anthropicStreamTracker) Flush() {
+	t.scanner.Flush(t.processEvent)
 }
 
 func (t *anthropicStreamTracker) processEvent(event sseEvent) {
@@ -79,8 +95,12 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 	if usage, ok := parsed["usage"].(map[string]any); ok {
 		if input := numberAsInt(usage["prompt_tokens"]); input > 0 {
 			t.inputTokens = input
+		} else if input := numberAsInt(usage["input_tokens"]); input > 0 {
+			t.inputTokens = input
 		}
 		if output := numberAsInt(usage["completion_tokens"]); output > 0 {
+			t.outputTokens = output
+		} else if output := numberAsInt(usage["output_tokens"]); output > 0 {
 			t.outputTokens = output
 		}
 	}
@@ -90,25 +110,143 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 	}
 	choice, _ := choices[0].(map[string]any)
 	delta, _ := choice["delta"].(map[string]any)
+	if t.includeThinking {
+		if reasoning := stringValue(delta["reasoning_content"]); reasoning != "" {
+			t.writeThinkingDelta(reasoning)
+		}
+	}
 	if text := stringValue(delta["content"]); text != "" {
 		t.writeTextDelta(text)
+	}
+	if calls, ok := delta["tool_calls"].([]any); ok {
+		for _, raw := range calls {
+			t.writeToolCallDelta(raw)
+		}
+	}
+	if finish := stringValue(choice["finish_reason"]); finish != "" {
+		t.finishReason = mapOpenAIFinishReasonToAnthropic(finish)
 	}
 }
 
 func (t *anthropicStreamTracker) writeTextDelta(text string) {
-	if !t.blockStarted {
+	if t.openBlockType != "text" {
+		t.closeOpenToolBlocks()
+		t.closeOpenBlock()
 		writeAnthropicEvent(t.writer, t.flusher, "content_block_start", map[string]any{"type": "content_block_start", "index": t.blockIndex, "content_block": map[string]any{"type": "text", "text": ""}})
-		t.blockStarted = true
+		t.openBlockType = "text"
 	}
 	writeAnthropicEvent(t.writer, t.flusher, "content_block_delta", map[string]any{"type": "content_block_delta", "index": t.blockIndex, "delta": map[string]any{"type": "text_delta", "text": text}})
 }
 
-func (t *anthropicStreamTracker) Finish() {
-	if t.blockStarted {
-		writeAnthropicEvent(t.writer, t.flusher, "content_block_stop", map[string]any{"type": "content_block_stop", "index": t.blockIndex})
+func (t *anthropicStreamTracker) writeThinkingDelta(thinking string) {
+	if t.openBlockType != "thinking" {
+		t.closeOpenToolBlocks()
+		t.closeOpenBlock()
+		writeAnthropicEvent(t.writer, t.flusher, "content_block_start", map[string]any{"type": "content_block_start", "index": t.blockIndex, "content_block": map[string]any{"type": "thinking", "thinking": ""}})
+		t.openBlockType = "thinking"
 	}
-	writeAnthropicEvent(t.writer, t.flusher, "message_delta", map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": "end_turn", "stop_sequence": nil}, "usage": map[string]any{"input_tokens": t.inputTokens, "output_tokens": t.outputTokens}})
+	writeAnthropicEvent(t.writer, t.flusher, "content_block_delta", map[string]any{"type": "content_block_delta", "index": t.blockIndex, "delta": map[string]any{"type": "thinking_delta", "thinking": thinking}})
+}
+
+func (t *anthropicStreamTracker) writeToolCallDelta(raw any) {
+	call, _ := raw.(map[string]any)
+	fn, _ := call["function"].(map[string]any)
+	openAIIndex := numberAsInt(call["index"])
+	id := stringValue(call["id"])
+	if id == "" {
+		id = stringValue(call["call_id"])
+	}
+	if id == "" && t.toolBlockByIndex != nil {
+		id = t.toolBlockByIndex[openAIIndex].id
+	}
+	if id == "" {
+		id = t.toolCallID(openAIIndex)
+	}
+	index := t.ensureToolBlock(openAIIndex, id, stringValue(fn["name"]))
+	if arguments := stringValue(fn["arguments"]); arguments != "" {
+		writeAnthropicEvent(t.writer, t.flusher, "content_block_delta", map[string]any{"type": "content_block_delta", "index": index, "delta": map[string]any{"type": "input_json_delta", "partial_json": arguments}})
+	}
+}
+
+func (t *anthropicStreamTracker) ensureToolBlock(openAIIndex int, id, name string) int {
+	t.closeOpenBlock()
+	if t.toolBlockByID == nil {
+		t.toolBlockByID = map[string]int{}
+	}
+	if t.toolBlockByIndex == nil {
+		t.toolBlockByIndex = map[int]anthropicToolBlock{}
+	}
+	if t.openToolBlocks == nil {
+		t.openToolBlocks = map[int]bool{}
+	}
+	if index, ok := t.toolBlockByID[id]; ok {
+		return index
+	}
+	index := t.blockIndex
+	t.blockIndex++
+	t.toolBlockByID[id] = index
+	t.toolBlockByIndex[openAIIndex] = anthropicToolBlock{index: index, id: id}
+	t.openToolBlocks[index] = true
+	writeAnthropicEvent(t.writer, t.flusher, "content_block_start", map[string]any{"type": "content_block_start", "index": index, "content_block": map[string]any{"type": "tool_use", "id": id, "name": name, "input": map[string]any{}}})
+	return index
+}
+
+func (t *anthropicStreamTracker) toolCallID(index int) string {
+	if index >= t.generatedToolUses {
+		t.generatedToolUses = index + 1
+	}
+	if index < 0 {
+		t.generatedToolUses++
+		index = t.generatedToolUses
+	}
+	return "toolu_" + time.Now().Format("20060102150405") + "_" + strconv.Itoa(index)
+}
+
+func (t *anthropicStreamTracker) closeOpenBlock() {
+	if t.openBlockType == "" {
+		return
+	}
+	writeAnthropicEvent(t.writer, t.flusher, "content_block_stop", map[string]any{"type": "content_block_stop", "index": t.blockIndex})
+	t.blockIndex++
+	t.openBlockType = ""
+}
+
+func (t *anthropicStreamTracker) closeOpenToolBlocks() {
+	if len(t.openToolBlocks) == 0 {
+		return
+	}
+	indexes := make([]int, 0, len(t.openToolBlocks))
+	for index := range t.openToolBlocks {
+		indexes = append(indexes, index)
+	}
+	sort.Ints(indexes)
+	for _, index := range indexes {
+		writeAnthropicEvent(t.writer, t.flusher, "content_block_stop", map[string]any{"type": "content_block_stop", "index": index})
+		delete(t.openToolBlocks, index)
+	}
+}
+
+func (t *anthropicStreamTracker) Finish() {
+	t.Flush()
+	t.closeOpenBlock()
+	t.closeOpenToolBlocks()
+	stopReason := t.finishReason
+	if stopReason == "" {
+		stopReason = "end_turn"
+	}
+	writeAnthropicEvent(t.writer, t.flusher, "message_delta", map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": stopReason, "stop_sequence": nil}, "usage": map[string]any{"input_tokens": t.inputTokens, "output_tokens": t.outputTokens}})
 	writeAnthropicEvent(t.writer, t.flusher, "message_stop", map[string]any{"type": "message_stop"})
+}
+
+func mapOpenAIFinishReasonToAnthropic(reason string) string {
+	switch reason {
+	case "length":
+		return "max_tokens"
+	case "tool_calls", "function_call":
+		return "tool_use"
+	default:
+		return "end_turn"
+	}
 }
 
 func writeAnthropicEvent(w http.ResponseWriter, flusher http.Flusher, event string, data any) {

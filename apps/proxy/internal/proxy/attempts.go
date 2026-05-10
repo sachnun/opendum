@@ -10,9 +10,10 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
-func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount) (*appdb.ProviderAccount, *http.Response, int64, *routeError) {
+func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, []accountRotationFailure, *routeError) {
 	scope := rateLimitScope(validation.Model)
 	tried := []string{}
+	recoverableFailures := []accountRotationFailure{}
 	maxRetries := 5
 	if forced != nil {
 		maxRetries = 1
@@ -24,7 +25,7 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 		if account == nil {
 			selected, err := s.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
 			if err != nil {
-				return nil, nil, 0, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
+				return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
 			account = selected
 		}
@@ -38,18 +39,18 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 						ids = append(ids, acc.ID)
 					}
 					if wait := s.getMinWaitTime(ctx, ids, scope); wait > 0 {
-						return nil, nil, 0, &routeError{Status: cfg.RateLimitStatusCode, Message: "All accounts are rate limited. Retry in " + formatWaitTime(wait) + ".", Type: "rate_limit_error"}
+						return nil, nil, 0, recoverableFailures, rateLimitRouteError(cfg, wait)
 					}
 				}
-				return nil, nil, 0, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
+				return nil, nil, 0, recoverableFailures, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
 			}
 			if wait := s.getMinWaitTime(ctx, tried, scope); wait > 0 {
-				return nil, nil, 0, &routeError{Status: cfg.RateLimitStatusCode, Message: "All accounts are rate limited. Retry in " + formatWaitTime(wait) + ".", Type: "rate_limit_error"}
+				return nil, nil, 0, recoverableFailures, rateLimitRouteError(cfg, wait)
 			}
 			if lastFailure != nil {
-				return nil, nil, 0, lastFailure
+				return nil, nil, 0, recoverableFailures, lastFailure
 			}
-			return nil, nil, 0, &routeError{Status: http.StatusServiceUnavailable, Message: "No available accounts for this request.", Type: "api_error"}
+			return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "No available accounts for this request.", Type: "api_error"}
 		}
 
 		tried = append(tried, account.ID)
@@ -66,55 +67,62 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 		if err != nil {
 			status := http.StatusInternalServerError
 			message := err.Error()
-			s.markAccountFailed(ctx, account.ID, validation.Model, status, message)
-			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: status, DurationMS: int(time.Now().UnixMilli() - requestStart), Provider: account.Provider})
+			detailed := buildAccountErrorMessage(message, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
+			failedAt := s.markAccountFailed(ctx, account.ID, validation.Model, status, detailed)
+			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: status, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 			lastFailure = &routeError{Status: status, Message: message, Type: "api_error"}
 			if attempt < maxRetries-1 {
+				recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: account.ID, FailedAt: failedAt})
 				continue
 			}
-			return nil, nil, 0, lastFailure
+			return nil, nil, 0, recoverableFailures, lastFailure
 		}
 
 		if resp.StatusCode == http.StatusTooManyRequests {
-			retry := parseRetryAfter(resp)
+			bodyText := readBodyLimit(resp.Body, 1<<20)
+			retry := parseRetryAfter(resp, bodyText)
 			if retry == 0 {
 				retry = time.Hour
 				if account.Provider == "kiro" {
 					retry = time.Minute
 				}
 			}
-			bodyText := readBodyLimit(resp.Body, 1<<20)
 			_ = resp.Body.Close()
 			s.markRateLimited(ctx, account.ID, scope, retry, validation.Model, bodyText)
-			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: http.StatusTooManyRequests, DurationMS: int(time.Now().UnixMilli() - requestStart), Provider: account.Provider})
+			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: http.StatusTooManyRequests, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 			continue
 		}
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			bodyText := readBodyLimit(resp.Body, 1<<20)
 			_ = resp.Body.Close()
+			var failedAt time.Time
 			if resp.StatusCode != http.StatusRequestTimeout {
-				s.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, bodyText)
+				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
+				failedAt = s.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, detailed)
 			}
-			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - requestStart), Provider: account.Provider})
+			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 			message, typ := sanitizedProxyError(resp.StatusCode, bodyText)
 			lastFailure = &routeError{Status: resp.StatusCode, Message: message, Type: typ}
 			if shouldRotate(resp.StatusCode) && attempt < maxRetries-1 {
+				if !failedAt.IsZero() {
+					recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: account.ID, FailedAt: failedAt})
+				}
 				continue
 			}
-			return nil, nil, 0, lastFailure
+			return nil, nil, 0, recoverableFailures, lastFailure
 		}
 
-		return account, resp, requestStart, nil
+		return account, resp, requestStart, recoverableFailures, nil
 	}
 
 	if wait := s.getMinWaitTime(ctx, tried, scope); wait > 0 {
-		return nil, nil, 0, &routeError{Status: cfg.RateLimitStatusCode, Message: "All accounts are rate limited. Retry in " + formatWaitTime(wait) + ".", Type: "rate_limit_error"}
+		return nil, nil, 0, recoverableFailures, rateLimitRouteError(cfg, wait)
 	}
 	if lastFailure != nil {
-		return nil, nil, 0, lastFailure
+		return nil, nil, 0, recoverableFailures, lastFailure
 	}
-	return nil, nil, 0, &routeError{Status: http.StatusServiceUnavailable, Message: fmt.Sprintf("No available accounts for %s.", validation.Model), Type: "api_error"}
+	return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: fmt.Sprintf("No available accounts for %s.", validation.Model), Type: "api_error"}
 }
 
 func sessionID(r *http.Request) string {

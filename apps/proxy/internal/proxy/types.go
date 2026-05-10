@@ -1,6 +1,9 @@
 package proxy
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 type ErrorFormatter string
 
@@ -31,11 +34,18 @@ type parsedEndpointRequest struct {
 }
 
 type routeError struct {
-	Status  int
-	Message string
-	Type    string
-	Param   *string
-	Code    *string
+	Status       int
+	Message      string
+	Type         string
+	Param        *string
+	Code         *string
+	RetryAfter   *string
+	RetryAfterMS *int64
+}
+
+type accountRotationFailure struct {
+	AccountID string
+	FailedAt  time.Time
 }
 
 type responseContext struct {

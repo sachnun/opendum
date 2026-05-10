@@ -21,7 +21,7 @@ func parseChatCompletions(body map[string]any) (parsedEndpointRequest, *routeErr
 		return parsedEndpointRequest{}, routeErr
 	}
 	messages, ok := body["messages"].([]any)
-	if !ok || len(messages) == 0 {
+	if !ok {
 		return parsedEndpointRequest{}, &routeError{Status: http.StatusBadRequest, Message: "messages array is required", Type: "invalid_request_error"}
 	}
 	stream := parseStreamParam(body)

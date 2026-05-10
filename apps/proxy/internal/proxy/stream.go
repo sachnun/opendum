@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -48,7 +47,6 @@ func (t *openAIStreamUsageTracker) processEvent(event sseEvent) {
 
 func (s *Service) passthroughStream(ctx responseContext) error {
 	w := ctx.Writer
-	copyResponseHeaders(w.Header(), ctx.Response.Header)
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -91,7 +89,6 @@ func (s *Service) passthroughNonStream(ctx responseContext) error {
 	var parsed map[string]any
 	_ = json.Unmarshal(body, &parsed)
 	inputTokens, outputTokens := usageFromJSON(parsed)
-	copyResponseHeaders(ctx.Writer.Header(), ctx.Response.Header)
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.Header().Set("X-Provider-Account-Id", ctx.AccountID)
 	ctx.Writer.WriteHeader(http.StatusOK)
@@ -99,18 +96,6 @@ func (s *Service) passthroughNonStream(ctx responseContext) error {
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, inputTokens, outputTokens, durationMS, false, ctx.RequestStartMS)
 	return nil
-}
-
-func copyResponseHeaders(dst, src http.Header) {
-	for key, values := range src {
-		lower := strings.ToLower(key)
-		if lower == "content-length" || lower == "content-encoding" || lower == "transfer-encoding" {
-			continue
-		}
-		for _, value := range values {
-			dst.Add(key, value)
-		}
-	}
 }
 
 func usageFromJSON(parsed map[string]any) (int, int) {
