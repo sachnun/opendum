@@ -25,6 +25,7 @@ import (
 const googleOAuthTokenEndpoint = "https://oauth2.googleapis.com/token"
 const antigravitySignatureCachePrefix = "opendum:thought-signature"
 const antigravitySignatureCacheTTL = 24 * time.Hour
+const antigravityClaudeBetaHeader = "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14"
 const geminiToolSchemaSystemInstruction = `<CRITICAL_TOOL_USAGE_INSTRUCTIONS>
 You are operating in a CUSTOM ENVIRONMENT where tool definitions COMPLETELY DIFFER from your training data.
 VIOLATION OF THESE RULES WILL CAUSE IMMEDIATE SYSTEM FAILURE.
@@ -82,7 +83,7 @@ func (p geminiCLIProvider) delegate() googleCodeAssistProvider {
 
 func (p antigravityProvider) delegate() googleCodeAssistProvider {
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "rising-fact-p41fc", userAgent: "antigravity/1.23.2 " + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
+	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "rising-fact-p41fc", userAgent: "antigravity/1.23.2 " + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
 }
 
 func (p geminiCLIProvider) RefreshBuffer() time.Duration   { return p.delegate().RefreshBuffer() }
@@ -193,14 +194,42 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		if err != nil {
 			return nil, err
 		}
-		p.setGoogleHeaders(req, accessToken, actualStream)
-		if p.name == "antigravity" && providerConfigBool(p.registry, modelName, p.name, "anthropic_beta_thinking") {
-			req.Header.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
+		p.setGoogleGenerationHeaders(req, accessToken, actualStream)
+		if p.name == "antigravity" && projectID != "" {
+			req.Header.Set("x-goog-user-project", projectID)
+		}
+		if p.name == "antigravity" && p.shouldSetAnthropicBeta(modelName) {
+			req.Header.Set("anthropic-beta", antigravityClaudeBetaHeader)
 		}
 		resp, err := client.Do(req)
 		if err != nil {
 			lastErr = err
 			continue
+		}
+		if resp.StatusCode == http.StatusForbidden && req.Header.Get("x-goog-user-project") != "" {
+			data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+			_ = resp.Body.Close()
+			retryEncoded := encoded
+			if isAntigravityProjectContextError(string(data)) {
+				retryPayload := cloneAnyMap(requestPayload)
+				delete(retryPayload, "project")
+				if nextEncoded, marshalErr := json.Marshal(retryPayload); marshalErr == nil {
+					retryEncoded = nextEncoded
+				}
+			}
+			retryReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:"+action, bytes.NewReader(retryEncoded))
+			if err != nil {
+				return nil, err
+			}
+			p.setGoogleGenerationHeaders(retryReq, accessToken, actualStream)
+			if p.name == "antigravity" && p.shouldSetAnthropicBeta(modelName) {
+				retryReq.Header.Set("anthropic-beta", antigravityClaudeBetaHeader)
+			}
+			resp, err = client.Do(retryReq)
+			if err != nil {
+				lastErr = err
+				continue
+			}
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			return resp, nil
@@ -247,7 +276,32 @@ func (p googleCodeAssistProvider) wrapCodeAssistPayload(projectID, model string,
 		return map[string]any{"model": model, "project": projectID, "user_prompt_id": randomID("prompt"), "request": geminiPayload}
 	}
 	requestID := randomID("agent")
-	return map[string]any{"project": projectID, "model": model, "userAgent": "antigravity", "requestType": "agent", "requestId": requestID, "request": geminiPayload}
+	requestType := "agent"
+	if isImageGenerationModel(p.registry, model) {
+		requestType = "image_gen"
+	}
+	userAgent := p.userAgent
+	if userAgent == "" {
+		userAgent = "antigravity"
+	}
+	payload := map[string]any{"project": projectID, "model": model, "userAgent": userAgent, "requestType": requestType, "requestId": requestID, "request": geminiPayload}
+	if requestType == "agent" {
+		payload["enabledCreditTypes"] = []any{"GOOGLE_ONE_AI"}
+	}
+	return payload
+}
+
+func (p googleCodeAssistProvider) shouldSetAnthropicBeta(model string) bool {
+	return providerConfigBool(p.registry, model, p.name, "anthropic_beta") || providerConfigBool(p.registry, model, p.name, "anthropic_beta_thinking")
+}
+
+func isAntigravityProjectContextError(text string) bool {
+	lower := strings.ToLower(text)
+	return strings.Contains(lower, "#3501") ||
+		(strings.Contains(lower, "google cloud project") && strings.Contains(lower, "code assist license")) ||
+		strings.Contains(lower, "invalid project resource name projects/") ||
+		(strings.Contains(lower, "resource projects/") && strings.Contains(lower, "could not be found")) ||
+		(strings.Contains(lower, "project") && strings.Contains(lower, "not found"))
 }
 
 func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Context, payload map[string]any, model, sessionID string) {
@@ -782,7 +836,11 @@ func (p googleCodeAssistProvider) fetchAccountInfo(ctx context.Context, client *
 		loadEndpoints = []string{"https://cloudcode-pa.googleapis.com", p.endpoint}
 	}
 	for _, endpoint := range loadEndpoints {
-		payload, _ := json.Marshal(map[string]any{"cloudaicompanionProject": nil, "metadata": map[string]any{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}})
+		metadata := map[string]any{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}
+		if p.name == "antigravity" {
+			metadata = map[string]any{"ideType": "ANTIGRAVITY"}
+		}
+		payload, _ := json.Marshal(map[string]any{"cloudaicompanionProject": nil, "metadata": metadata})
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:loadCodeAssist", bytes.NewReader(payload))
 		if err != nil {
 			continue
@@ -828,7 +886,11 @@ func (p googleCodeAssistProvider) onboardUser(ctx context.Context, client *http.
 	if len(onboardEndpoints) == 0 {
 		onboardEndpoints = []string{p.endpoint, "https://cloudcode-pa.googleapis.com"}
 	}
-	payload, _ := json.Marshal(map[string]any{"tierId": tier, "metadata": map[string]any{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}})
+	metadata := map[string]any{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}
+	if p.name == "antigravity" {
+		metadata = map[string]any{"ideType": "ANTIGRAVITY"}
+	}
+	payload, _ := json.Marshal(map[string]any{"tierId": tier, "metadata": metadata})
 	for _, endpoint := range onboardEndpoints {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:onboardUser", bytes.NewReader(payload))
 		if err != nil {
@@ -899,16 +961,24 @@ func extractGoogleTier(data map[string]any) string {
 }
 
 func (p googleCodeAssistProvider) setGoogleHeaders(req *http.Request, accessToken string, stream bool) {
+	p.setGoogleHeadersWithMetadata(req, accessToken, stream, true)
+}
+
+func (p googleCodeAssistProvider) setGoogleGenerationHeaders(req *http.Request, accessToken string, stream bool) {
+	p.setGoogleHeadersWithMetadata(req, accessToken, stream, p.name != "antigravity")
+}
+
+func (p googleCodeAssistProvider) setGoogleHeadersWithMetadata(req *http.Request, accessToken string, stream bool, includeClientMetadata bool) {
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", map[bool]string{true: "text/event-stream", false: "application/json"}[stream])
 	if p.userAgent != "" {
 		req.Header.Set("User-Agent", p.userAgent)
 	}
-	if p.apiClient != "" {
+	if includeClientMetadata && p.apiClient != "" {
 		req.Header.Set("X-Goog-Api-Client", p.apiClient)
 	}
-	if p.clientMetadata != "" {
+	if includeClientMetadata && p.clientMetadata != "" {
 		req.Header.Set("Client-Metadata", p.clientMetadata)
 	}
 }

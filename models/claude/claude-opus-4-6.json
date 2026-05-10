@@ -30,6 +30,7 @@
   },
   "providerConfig": {
     "antigravity": {
+      "anthropic_beta": true,
       "anthropic_beta_thinking": true,
       "convert_external_images": true,
       "force_stream_non_stream": true,
@@ -39,7 +40,8 @@
       "strict_tool_schema": true,
       "system_instruction": true,
       "thinking_model": true,
-      "top_p_min_095": true
+      "top_p_min_095": true,
+      "upstream": "claude-opus-4-6-thinking"
     },
     "copilot": {
       "upstream": "claude-opus-4.6"

@@ -21,8 +21,9 @@ import {
   ONBOARD_USER_ENDPOINTS,
   AUTH_HEADERS,
   DEFAULT_PROJECT_ID,
+  USER_AGENT,
 } from "./constants.js";
-import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
+import { getUpstreamModelName, getProviderModelSet, getProviderModelConfig } from "../../models.js";
 import { generateRequestId, isImageGenerationModel } from "./helpers.js";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform/index.js";
 import type { TransformContext } from "./transform/types.js";
@@ -47,32 +48,68 @@ function isTokenExpired(expiresAt: Date): boolean {
 }
 
 /**
- * Resolve model name using aliases and apply model-specific rules
+ * Resolve model name using aliases and provider registry upstream config.
  */
 function resolveModelName(rawModel: string): string {
-  let model = getUpstreamModelName(rawModel, "antigravity");
-  // Claude Opus models only exist as -thinking variants in Antigravity API
-  if (model === "claude-opus-4-6") {
-    model = "claude-opus-4-6-thinking";
-  }
-  
-  return model;
+  return getUpstreamModelName(rawModel, "antigravity");
 }
 
-function isOpusThinkingModel(model: string): boolean {
-  return model.startsWith("claude-opus-") && model.endsWith("-thinking");
+function hasAntigravityModelFlag(
+  rawModel: string,
+  effectiveModel: string,
+  key: string
+): boolean {
+  const rawConfig = getProviderModelConfig(rawModel, "antigravity") as
+    | Record<string, unknown>
+    | null;
+  const effectiveConfig = getProviderModelConfig(effectiveModel, "antigravity") as
+    | Record<string, unknown>
+    | null;
+  return Boolean(rawConfig?.[key] || effectiveConfig?.[key]);
+}
+
+function shouldSetClaudeBeta(rawModel: string, effectiveModel: string): boolean {
+  return (
+    hasAntigravityModelFlag(rawModel, effectiveModel, "anthropic_beta") ||
+    hasAntigravityModelFlag(rawModel, effectiveModel, "anthropic_beta_thinking")
+  );
+}
+
+const CLAUDE_BETA_HEADER =
+  "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14";
+
+function removeProjectFromWrappedBody(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    delete parsed.project;
+    return JSON.stringify(parsed);
+  } catch {
+    return body;
+  }
+}
+
+function isProjectContextErrorText(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    lower.includes("#3501") ||
+    (lower.includes("google cloud project") && lower.includes("code assist license")) ||
+    lower.includes("invalid project resource name projects/") ||
+    (lower.includes("resource projects/") && lower.includes("could not be found")) ||
+    (lower.includes("project") && lower.includes("not found"))
+  );
 }
 
 function normalizeRequestForModel(
   body: ChatCompletionRequest,
+  rawModel: string,
   effectiveModel: string
 ): ChatCompletionRequest {
   const normalizedBody: ChatCompletionRequest = { ...body };
 
-  // Antigravity/Claude Opus thinking models reject top_p < 0.95.
+  // Some Antigravity thinking models reject top_p < 0.95.
   // Drop invalid values so upstream can apply its default safely.
   if (
-    isOpusThinkingModel(effectiveModel) &&
+    hasAntigravityModelFlag(rawModel, effectiveModel, "top_p_min_095") &&
     typeof normalizedBody.top_p === "number" &&
     normalizedBody.top_p < 0.95
   ) {
@@ -246,7 +283,7 @@ export const antigravityProvider: Provider = {
 
     const rawModel = body.model;
     const effectiveModel = resolveModelName(rawModel);
-    const normalizedBody = normalizeRequestForModel(body, effectiveModel);
+    const normalizedBody = normalizeRequestForModel(body, rawModel, effectiveModel);
     const family = getModelFamily(effectiveModel);
     const sessionId = crypto.randomUUID();
     const requestId = generateRequestId();
@@ -259,7 +296,7 @@ export const antigravityProvider: Provider = {
         normalizedBody.thinking_budget ||
         normalizedBody.include_thoughts
       )) ||
-      isOpusThinkingModel(effectiveModel);
+      hasAntigravityModelFlag(rawModel, effectiveModel, "thinking_model");
 
     const context: TransformContext = {
       model: effectiveModel,
@@ -268,6 +305,7 @@ export const antigravityProvider: Provider = {
       streaming: stream,
       requestId,
       sessionId,
+      userAgent: USER_AGENT,
     };
 
     const isClaudeModel = effectiveModel.includes("claude");
@@ -300,8 +338,13 @@ export const antigravityProvider: Provider = {
       ...CODE_ASSIST_HEADERS,
     });
 
-    if (isClaudeModel && effectiveModel.includes("thinking")) {
-      headers.set("anthropic-beta", "interleaved-thinking-2025-05-14");
+    if (shouldSetClaudeBeta(rawModel, effectiveModel)) {
+      headers.set("anthropic-beta", CLAUDE_BETA_HEADER);
+    }
+
+    const headersWithProject = new Headers(headers);
+    if (projectId) {
+      headersWithProject.set("x-goog-user-project", projectId);
     }
 
     let lastError: Error | null = null;
@@ -309,11 +352,24 @@ export const antigravityProvider: Provider = {
       const url = `${endpoint}/v1internal:${action}`;
 
       try {
-        const response = await fetchInternalProvider(url, {
+        let response = await fetchInternalProvider(url, {
           method: "POST",
-          headers,
+          headers: headersWithProject,
           body: result.body,
         });
+
+        if (response.status === 403 && headersWithProject.has("x-goog-user-project")) {
+          const firstErrorBody = await response.text().catch(() => "");
+          const retryBody = isProjectContextErrorText(firstErrorBody)
+            ? removeProjectFromWrappedBody(result.body)
+            : result.body;
+
+          response = await fetchInternalProvider(url, {
+            method: "POST",
+            headers,
+            body: retryBody,
+          });
+        }
 
         // 429 = quota exhausted (per-account, not per-endpoint).
         // Return immediately so the proxy can record the provider failure

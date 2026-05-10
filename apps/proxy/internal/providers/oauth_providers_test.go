@@ -273,6 +273,47 @@ func TestProviderCustomUpstreamDrivesAntigravityModelResolution(t *testing.T) {
 	}
 }
 
+func TestAntigravityClaudeUpstreamsComeFromRegistry(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	cases := map[string]string{
+		"claude-opus-4-6":   "claude-opus-4-6-thinking",
+		"claude-sonnet-4-6": "claude-sonnet-4-6-thinking",
+	}
+	for model, want := range cases {
+		cfg, ok := registry.ProviderModelConfig(model, "antigravity")
+		if !ok || cfg.Upstream != want {
+			t.Fatalf("registry upstream for %s = %q, want %q", model, cfg.Upstream, want)
+		}
+		if got := provider.resolveModel(model); got != want {
+			t.Fatalf("resolveModel(%s) = %q, want %q", model, got, want)
+		}
+	}
+}
+
+func TestAntigravityWrapCodeAssistPayloadUsesOfficialFields(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	payload := provider.wrapCodeAssistPayload("project-1", "gemini-3-flash", map[string]any{"contents": []any{}})
+	if payload["userAgent"] != provider.userAgent {
+		t.Fatalf("userAgent = %q, want %q", payload["userAgent"], provider.userAgent)
+	}
+	if payload["requestType"] != "agent" {
+		t.Fatalf("requestType = %q, want agent", payload["requestType"])
+	}
+	credits, ok := payload["enabledCreditTypes"].([]any)
+	if !ok || len(credits) != 1 || credits[0] != "GOOGLE_ONE_AI" {
+		t.Fatalf("enabledCreditTypes = %#v", payload["enabledCreditTypes"])
+	}
+	imagePayload := provider.wrapCodeAssistPayload("project-1", "gemini-3.1-flash-image", map[string]any{"contents": []any{}})
+	if imagePayload["requestType"] != "image_gen" {
+		t.Fatalf("image requestType = %q, want image_gen", imagePayload["requestType"])
+	}
+	if _, exists := imagePayload["enabledCreditTypes"]; exists {
+		t.Fatalf("image payload should not include enabledCreditTypes: %#v", imagePayload)
+	}
+}
+
 func TestCodexExtractAccountIDFromJWT(t *testing.T) {
 	token := "x." + base64.RawURLEncoding.EncodeToString([]byte(`{"https://api.openai.com/auth":{"organizations":[{"id":"org_1","is_default":true}]}}`)) + ".y"
 	if got := extractAccountIDFromJWT(token); got != "org_1" {

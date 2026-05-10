@@ -33,12 +33,12 @@ function getAntigravityPlatform(): string {
   return `${platform}/${arch}`;
 }
 
-const USER_AGENT = `antigravity/1.23.2 ${getAntigravityPlatform()}`;
+export const USER_AGENT = `antigravity/1.23.2 ${getAntigravityPlatform()}`;
 const API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1";
 const CLIENT_METADATA =
   '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
 
-// Endpoint fallbacks (daily → autopush → prod)
+// Endpoint fallbacks (prod -> daily -> autopush)
 const CODE_ASSIST_ENDPOINT_DAILY =
   "https://daily-cloudcode-pa.googleapis.com";
 const CODE_ASSIST_ENDPOINT_AUTOPUSH =
@@ -46,16 +46,15 @@ const CODE_ASSIST_ENDPOINT_AUTOPUSH =
 const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
 export const ENDPOINT_FALLBACKS = [
+  CODE_ASSIST_ENDPOINT_PROD,
   CODE_ASSIST_ENDPOINT_DAILY,
   CODE_ASSIST_ENDPOINT_AUTOPUSH,
-  CODE_ASSIST_ENDPOINT_PROD,
 ] as const;
 
 // Endpoint order for loadCodeAssist (project discovery)
 // Production FIRST for better project resolution, then fallback to sandbox
-// (Different from API request order which uses sandbox first)
 export const LOAD_CODE_ASSIST_ENDPOINTS = [
-  CODE_ASSIST_ENDPOINT_PROD,  // Prod first for discovery
+  CODE_ASSIST_ENDPOINT_PROD, // Prod first for discovery
   CODE_ASSIST_ENDPOINT_DAILY, // Daily fallback
 ] as const;
 
@@ -73,8 +72,6 @@ export const AUTH_HEADERS = {
 } as const;
 export const CODE_ASSIST_HEADERS = {
   "User-Agent": USER_AGENT,
-  "X-Goog-Api-Client": API_CLIENT,
-  "Client-Metadata": CLIENT_METADATA,
 } as const;
 
 // Token refresh buffer (1 hour before expiry)

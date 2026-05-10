@@ -9,6 +9,7 @@ export interface TransformContext {
   streaming: boolean;
   requestId: string;
   sessionId: string;
+  userAgent: string;
 }
 
 export interface TransformResult {

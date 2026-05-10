@@ -11,6 +11,7 @@ import { buildToolSchemaMap } from "../tool-schema.js";
 import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
 const THOUGHT_SIGNATURE_BYPASS = "skip_thought_signature_validator";
+const AGENT_CREDIT_TYPES = ["GOOGLE_ONE_AI"] as const;
 
 const GEMINI_TOOL_SCHEMA_SYSTEM_INSTRUCTION = `<CRITICAL_TOOL_USAGE_INSTRUCTIONS>
 You are operating in a CUSTOM ENVIRONMENT where tool definitions COMPLETELY DIFFER from your training data.
@@ -650,14 +651,18 @@ export async function transformGeminiRequest(
 
   requestPayload.sessionId = context.sessionId;
 
-  const wrappedBody = {
+  const wrappedBody: Record<string, unknown> = {
     project: context.projectId,
     model: context.model,
-    userAgent: "antigravity",
-    requestType: "agent",
+    userAgent: context.userAgent,
+    requestType: isImageModel ? "image_gen" : "agent",
     requestId: context.requestId,
     request: requestPayload,
   };
+
+  if (!isImageModel) {
+    wrappedBody.enabledCreditTypes = [...AGENT_CREDIT_TYPES];
+  }
 
   const toolCount = countTools(requestPayload);
 

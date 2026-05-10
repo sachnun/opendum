@@ -9,6 +9,8 @@ import {
 import { buildToolSchemaMap } from "../tool-schema.js";
 import type { RequestPayload, TransformContext, TransformResult } from "./types.js";
 
+const AGENT_CREDIT_TYPES = ["GOOGLE_ONE_AI"] as const;
+
 /**
  * Final sanitization for Claude: ensure all functionCall/functionResponse blocks are properly paired.
  * 
@@ -442,10 +444,11 @@ export async function transformClaudeRequest(
   const wrappedBody = {
     project: context.projectId,
     model: context.model,
-    userAgent: "antigravity",
+    userAgent: context.userAgent,
     requestType: "agent",
     requestId: context.requestId,
     request: requestPayload,
+    enabledCreditTypes: [...AGENT_CREDIT_TYPES],
   };
 
   // Remove thinking config for Claude Sonnet 4.6 (non-thinking fallback)
