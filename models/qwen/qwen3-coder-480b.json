@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 262144,
+    "outputLimit": 65536,
+    "knowledgeCutoff": "2025-04",
+    "releaseDate": "2025-04",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "qwen3-coder:480b"
+    }
+  }
+}

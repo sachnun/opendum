@@ -1,6 +1,0 @@
-[opendum]
-providers = ["kilo_code"]
-ignored = true
-
-[kilo_code]
-upstream = "kilo-auto/small"

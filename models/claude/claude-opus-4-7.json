@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "copilot",
+    "kiro"
+  ],
+  "family": "Claude",
+  "providerConfig": {
+    "copilot": {
+      "upstream": "claude-opus-4.7"
+    },
+    "kiro": {
+      "upstream": "claude-opus-4.7"
+    }
+  }
+}

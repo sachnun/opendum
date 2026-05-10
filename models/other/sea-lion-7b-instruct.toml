@@ -1,7 +1,0 @@
-[opendum]
-family = "AI Singapore"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "aisingapore/sea-lion-7b-instruct"

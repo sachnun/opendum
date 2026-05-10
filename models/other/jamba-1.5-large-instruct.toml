@@ -1,7 +1,0 @@
-[opendum]
-family = "AI21"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "ai21labs/jamba-1.5-large-instruct"

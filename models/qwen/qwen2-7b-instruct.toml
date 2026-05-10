@@ -1,5 +1,0 @@
-[opendum]
-family = "Qwen"
-providers = []
-aliases = ["qwen-qwen2-7b-instruct", "qwen/qwen2-7b-instruct"]
-ignored = true

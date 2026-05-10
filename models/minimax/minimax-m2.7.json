@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "ollama_cloud",
+    "nvidia_nim"
+  ],
+  "family": "MiniMax",
+  "meta": {
+    "contextLength": 204800,
+    "outputLimit": 131072,
+    "releaseDate": "2026-03-18",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "minimaxai/minimax-m2.7"
+    }
+  }
+}

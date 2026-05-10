@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 262144,
+    "outputLimit": 65536,
+    "knowledgeCutoff": "2025-04",
+    "releaseDate": "2025-07-23",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "qwen/qwen3-coder:free"
+    }
+  }
+}

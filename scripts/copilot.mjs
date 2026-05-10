@@ -4,7 +4,7 @@
  * GitHub Copilot model discovery script.
  *
  * Fetches the official supported-models table from the GitHub docs repo and
- * syncs it into the TOML model registry.  No authentication is required — the
+ * syncs it into the JSON model registry.  No authentication is required — the
  * data is publicly available.
  *
  * Source: https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-release-status.yml
@@ -36,9 +36,9 @@ const PROVIDER_NAME = "copilot";
 // Display name → { canonicalKey, upstreamName }
 //
 // The YAML table uses human-readable display names like "Claude Opus 4.6".
-// The TOML registry uses dash-separated canonical keys like "claude-opus-4-6".
+// The JSON registry uses dash-separated canonical keys like "claude-opus-4-6".
 // The Copilot API uses upstream names like "claude-opus-4.6" (dots for Claude,
-// identical to the TOML key for most OpenAI/Gemini models).
+// identical to the JSON key for most OpenAI/Gemini models).
 //
 // We derive both from the display name via rules, with a manual override table
 // for edge cases.
@@ -49,7 +49,7 @@ const PROVIDER_NAME = "copilot";
  * Only needed when algorithmic derivation would produce the wrong result.
  */
 const DISPLAY_NAME_OVERRIDES = {
-  // Gemini models — Copilot naming doesn't match TOML key conventions
+  // Gemini models - Copilot naming doesn't match JSON key conventions
   "Gemini 2.5 Pro": { key: "gemini-2.5-pro", upstream: "gemini-2.5-pro" },
   "Gemini 3 Flash": { key: "gemini-3-flash-preview", upstream: "gemini-3-flash-preview" },
   "Gemini 3 Pro": { key: "gemini-3-pro-preview", upstream: "gemini-3-pro-preview" },
@@ -57,7 +57,7 @@ const DISPLAY_NAME_OVERRIDES = {
   // xAI
   "Grok Code Fast 1": { key: "grok-code-fast-1", upstream: "grok-code-fast-1" },
   // Microsoft fine-tuned — These are proprietary Copilot models without
-  // existing TOML counterparts. Use lowercase-dashed keys.
+  // existing JSON counterparts. Use lowercase-dashed keys.
   "Raptor mini": { key: "raptor-mini", upstream: "raptor-mini" },
   "Goldeneye": { key: "goldeneye", upstream: "goldeneye" },
   // Fast mode variant
@@ -152,7 +152,7 @@ function parseModelDisplayNames(yaml) {
 // ---------------------------------------------------------------------------
 
 /**
- * Derive the canonical TOML model key and Copilot upstream name from a
+  * Derive the canonical JSON model key and Copilot upstream name from a
  * display name.
  *
  * Algorithm (when no override exists):
@@ -234,11 +234,11 @@ async function main() {
   }
 
   if (dryRun) {
-    console.log("[copilot] Dry run — no TOML files modified.");
+    console.log("[copilot] Dry run - no JSON files modified.");
     return;
   }
 
-  // 4. Sync into TOML files
+  // 4. Sync into JSON files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 

@@ -1,0 +1,31 @@
+{
+  "providers": [
+    "codex",
+    "copilot"
+  ],
+  "family": "OpenAI",
+  "meta": {
+    "contextLength": 1050000,
+    "outputLimit": 128000,
+    "knowledgeCutoff": "2025-08-31",
+    "releaseDate": "2026-03-05",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "copilot": {
+      "responses_api": true
+    }
+  }
+}

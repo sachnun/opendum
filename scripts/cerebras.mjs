@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Sync Cerebras model availability into TOML registry.
+ * Sync Cerebras model availability into JSON registry.
  *
  * Data source: Cerebras public models API (no auth required)
  *   https://api.cerebras.ai/public/v1/models
@@ -15,7 +15,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels, buildModelIndex } from "./model-registry.mjs";
+import { syncProviderModels, buildModelIndex, getProviderUpstream } from "./model-registry.mjs";
 
 const CEREBRAS_PUBLIC_MODELS_URL = "https://api.cerebras.ai/public/v1/models";
 const FETCH_TIMEOUT_MS = 15_000;
@@ -24,7 +24,7 @@ const MAX_FETCH_ATTEMPTS = 3;
 // ---------------------------------------------------------------------------
 // Static baseline — kept in sync with Cerebras docs.
 // The public API may temporarily hide models under load pressure, so
-// these are always included to prevent accidental removal from TOMLs.
+// these are always included to prevent accidental removal from JSON files.
 // ---------------------------------------------------------------------------
 
 const STATIC_MODELS = [
@@ -38,7 +38,7 @@ const IGNORED_MODELS = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
-// Model key overrides: cerebras upstream ID → canonical TOML key
+// Model key overrides: cerebras upstream ID → canonical JSON key
 // Cerebras uses non-standard model IDs that don't match our canonical keys.
 // ---------------------------------------------------------------------------
 
@@ -49,7 +49,7 @@ const MODEL_KEY_OVERRIDES = {
 };
 
 // ---------------------------------------------------------------------------
-// Build reverse map: cerebrasUpstreamId → canonicalModelKey from TOMLs
+// Build reverse map: cerebrasUpstreamId → canonicalModelKey from JSON files
 // ---------------------------------------------------------------------------
 
 function buildReverseMap(modelsDir) {
@@ -57,10 +57,10 @@ function buildReverseMap(modelsDir) {
   const reverseMap = new Map();
 
   for (const [modelId, entry] of Object.entries(index)) {
-    const providers = entry.data.opendum?.providers || [];
+    const providers = entry.data.providers || [];
     if (!providers.includes("cerebras")) continue;
 
-    const upstream = entry.data.opendum?.upstream?.cerebras || modelId;
+    const upstream = getProviderUpstream(entry.data, "cerebras", modelId);
     reverseMap.set(upstream, modelId);
   }
 

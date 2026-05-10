@@ -1,0 +1,16 @@
+{
+  "providers": [
+    "gemini_cli",
+    "nvidia_nim",
+    "openrouter"
+  ],
+  "family": "Google",
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/gemma-4-31b-it"
+    },
+    "openrouter": {
+      "upstream": "google/gemma-4-31b-it:free"
+    }
+  }
+}

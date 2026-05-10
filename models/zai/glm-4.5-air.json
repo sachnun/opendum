@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "family": "Z.AI",
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 98304,
+    "knowledgeCutoff": "2025-04",
+    "releaseDate": "2025-07-28",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "z-ai/glm-4.5-air:free"
+    }
+  }
+}

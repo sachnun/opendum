@@ -1,0 +1,29 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "family": "Liquid AI",
+  "ignored": true,
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 32768,
+    "knowledgeCutoff": "2025-06",
+    "releaseDate": "2026-01-20",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "liquid/lfm-2.5-1.2b-instruct:free"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "baidu/cobuddy:free"
+    },
+    "openrouter": {
+      "upstream": "baidu/cobuddy:free"
+    }
+  }
+}

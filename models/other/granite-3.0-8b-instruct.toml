@@ -1,7 +1,0 @@
-[opendum]
-family = "IBM"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "ibm/granite-3.0-8b-instruct"

@@ -1,0 +1,37 @@
+{
+  "providers": [
+    "groq",
+    "workers_ai"
+  ],
+  "aliases": [
+    "meta-llama-4-scout-17b-16e-instruct",
+    "meta/llama-4-scout-17b-16e-instruct"
+  ],
+  "family": "Meta",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 8192,
+    "knowledgeCutoff": "2024-08",
+    "releaseDate": "2025-04-05",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "groq": {
+      "upstream": "meta-llama/llama-4-scout-17b-16e-instruct"
+    },
+    "workers_ai": {
+      "upstream": "@cf/meta/llama-4-scout-17b-16e-instruct"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "providers": [
+    "copilot",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-4.5",
+    "claude-sonnet4.5"
+  ],
+  "family": "Claude",
+  "meta": {
+    "contextLength": 200000,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2025-07-31",
+    "releaseDate": "2025-09-29",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "copilot": {
+      "upstream": "claude-sonnet-4.5"
+    },
+    "kiro": {
+      "upstream": "claude-sonnet-4.5"
+    }
+  }
+}

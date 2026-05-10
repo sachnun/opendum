@@ -1,30 +1,29 @@
 package models
 
 import (
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/pelletier/go-toml/v2"
 )
 
 type Meta struct {
-	ContextLength   *int
-	OutputLimit     *int
-	KnowledgeCutoff *string
-	ReleaseDate     *string
-	Reasoning       *bool
-	ToolCall        *bool
-	Vision          *bool
-	Modalities      *Modalities
+	ContextLength   *int        `json:"contextLength"`
+	OutputLimit     *int        `json:"outputLimit"`
+	KnowledgeCutoff *string     `json:"knowledgeCutoff"`
+	ReleaseDate     *string     `json:"releaseDate"`
+	Reasoning       *bool       `json:"reasoning"`
+	ToolCall        *bool       `json:"toolCall"`
+	Vision          *bool       `json:"vision"`
+	Modalities      *Modalities `json:"modalities"`
 }
 
 type Modalities struct {
-	Input  []string `toml:"input"`
-	Output []string `toml:"output"`
+	Input  []string `json:"input"`
+	Output []string `json:"output"`
 }
 
 type ProviderAccessRule struct {
@@ -39,14 +38,13 @@ type ProviderModelConfig struct {
 }
 
 type Info struct {
-	Providers      []string
-	Aliases        []string
-	Description    string
-	Family         string
-	Meta           *Meta
-	Upstream       map[string]string
-	Access         map[string]ProviderAccessRule
-	ProviderConfig map[string]ProviderModelConfig
+	Providers      []string                       `json:"providers"`
+	Aliases        []string                       `json:"aliases"`
+	Description    string                         `json:"description"`
+	Family         string                         `json:"family"`
+	Ignored        bool                           `json:"ignored"`
+	Meta           *Meta                          `json:"meta"`
+	ProviderConfig map[string]ProviderModelConfig `json:"providerConfig"`
 }
 
 type Registry struct {
@@ -57,37 +55,6 @@ type Registry struct {
 	canonicalToAliases map[string][]string
 	providerModelMap   map[string]map[string]string
 	providerModelSet   map[string]map[string]struct{}
-}
-
-type rawModel struct {
-	ReleaseDate string      `toml:"release_date"`
-	Knowledge   string      `toml:"knowledge"`
-	Reasoning   *bool       `toml:"reasoning"`
-	ToolCall    *bool       `toml:"tool_call"`
-	Attachment  *bool       `toml:"attachment"`
-	Limit       rawLimit    `toml:"limit"`
-	Modalities  *Modalities `toml:"modalities"`
-	Opendum     rawOpendum  `toml:"opendum"`
-	Extra       map[string]ProviderModelConfig
-}
-
-type rawLimit struct {
-	Context *int `toml:"context"`
-	Output  *int `toml:"output"`
-}
-
-type rawOpendum struct {
-	Family      string                           `toml:"family"`
-	Providers   []string                         `toml:"providers"`
-	Aliases     []string                         `toml:"aliases"`
-	Ignored     bool                             `toml:"ignored"`
-	Description string                           `toml:"description"`
-	Upstream    map[string]string                `toml:"upstream"`
-	Access      map[string]rawProviderAccessRule `toml:"access"`
-}
-
-type rawProviderAccessRule struct {
-	MinTier string `toml:"min_tier"`
 }
 
 func Load(dir string) (*Registry, error) {
@@ -105,7 +72,7 @@ func Load(dir string) (*Registry, error) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".toml") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			return nil
 		}
 
@@ -114,19 +81,16 @@ func Load(dir string) (*Registry, error) {
 			return err
 		}
 
-		var raw map[string]any
-		if err := toml.Unmarshal(content, &raw); err != nil {
-			return err
-		}
-		var parsed rawModel
-		if err := toml.Unmarshal(content, &parsed); err != nil {
+		var info Info
+		if err := json.Unmarshal(content, &info); err != nil {
 			return err
 		}
 
-		modelID := strings.TrimSuffix(filepath.Base(path), ".toml")
-		info := convertRawModel(parsed, raw)
+		info.Providers = compactStrings(info.Providers)
+		info.Aliases = compactStrings(info.Aliases)
+		modelID := strings.TrimSuffix(filepath.Base(path), ".json")
 		registry.models[modelID] = info
-		if parsed.Opendum.Ignored {
+		if info.Ignored {
 			registry.ignored[modelID] = struct{}{}
 		} else {
 			registry.effective[modelID] = info
@@ -141,116 +105,45 @@ func Load(dir string) (*Registry, error) {
 	return registry, nil
 }
 
-func convertRawModel(parsed rawModel, raw map[string]any) Info {
-	providerConfig := map[string]ProviderModelConfig{}
-	reserved := map[string]struct{}{"limit": {}, "modalities": {}, "opendum": {}}
-	for key := range raw {
-		if _, ok := reserved[key]; ok {
-			continue
-		}
-		cfg := providerModelConfigFromRaw(raw[key])
-		if cfg.Upstream != "" || cfg.MinTier != "" || len(cfg.Aliases) > 0 || len(cfg.Custom) > 0 {
-			providerConfig[key] = cfg
-		}
+func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
 	}
 
-	upstream := map[string]string{}
-	for key, value := range parsed.Opendum.Upstream {
-		if strings.TrimSpace(value) != "" {
-			upstream[key] = strings.TrimSpace(value)
-		}
-	}
-	for provider, cfg := range providerConfig {
-		if strings.TrimSpace(cfg.Upstream) != "" {
-			upstream[provider] = strings.TrimSpace(cfg.Upstream)
-		}
-	}
-
-	access := map[string]ProviderAccessRule{}
-	for provider, rule := range parsed.Opendum.Access {
-		if strings.TrimSpace(rule.MinTier) != "" {
-			access[provider] = ProviderAccessRule{MinTier: strings.TrimSpace(rule.MinTier)}
-		}
-	}
-	for provider, cfg := range providerConfig {
-		if strings.TrimSpace(cfg.MinTier) != "" {
-			access[provider] = ProviderAccessRule{MinTier: strings.TrimSpace(cfg.MinTier)}
-		}
-	}
-
-	var meta *Meta
-	if parsed.ReleaseDate != "" || parsed.Knowledge != "" || parsed.Reasoning != nil || parsed.ToolCall != nil || parsed.Attachment != nil || parsed.Limit.Context != nil || parsed.Limit.Output != nil || parsed.Modalities != nil {
-		meta = &Meta{
-			ContextLength: parsed.Limit.Context,
-			OutputLimit:   parsed.Limit.Output,
-			Reasoning:     parsed.Reasoning,
-			ToolCall:      parsed.ToolCall,
-			Vision:        parsed.Attachment,
-			Modalities:    parsed.Modalities,
-		}
-		if parsed.Knowledge != "" {
-			meta.KnowledgeCutoff = &parsed.Knowledge
-		}
-		if parsed.ReleaseDate != "" {
-			meta.ReleaseDate = &parsed.ReleaseDate
-		}
-	}
-
-	return Info{
-		Providers:      compactStrings(parsed.Opendum.Providers),
-		Aliases:        compactStrings(parsed.Opendum.Aliases),
-		Description:    parsed.Opendum.Description,
-		Family:         parsed.Opendum.Family,
-		Meta:           meta,
-		Upstream:       upstream,
-		Access:         access,
-		ProviderConfig: providerConfig,
-	}
-}
-
-func providerModelConfigFromRaw(value any) ProviderModelConfig {
-	table, ok := value.(map[string]any)
-	if !ok {
-		return ProviderModelConfig{}
-	}
-	cfg := ProviderModelConfig{Custom: map[string]any{}}
-	for key, raw := range table {
+	cfg.Custom = map[string]any{}
+	for key, value := range raw {
 		switch key {
 		case "upstream":
-			cfg.Upstream = strings.TrimSpace(stringFromRaw(raw))
-		case "min_tier":
-			cfg.MinTier = strings.TrimSpace(stringFromRaw(raw))
+			var upstream string
+			if err := json.Unmarshal(value, &upstream); err != nil {
+				return err
+			}
+			cfg.Upstream = strings.TrimSpace(upstream)
+		case "minTier":
+			var minTier string
+			if err := json.Unmarshal(value, &minTier); err != nil {
+				return err
+			}
+			cfg.MinTier = strings.TrimSpace(minTier)
 		case "aliases":
-			cfg.Aliases = stringSliceFromRaw(raw)
+			if err := json.Unmarshal(value, &cfg.Aliases); err != nil {
+				return err
+			}
+			cfg.Aliases = compactStrings(cfg.Aliases)
 		default:
-			cfg.Custom[key] = raw
+			var custom any
+			if err := json.Unmarshal(value, &custom); err != nil {
+				return err
+			}
+			cfg.Custom[key] = custom
 		}
 	}
+
 	if len(cfg.Custom) == 0 {
 		cfg.Custom = nil
 	}
-	return cfg
-}
-
-func stringFromRaw(value any) string {
-	if text, ok := value.(string); ok {
-		return text
-	}
-	return ""
-}
-
-func stringSliceFromRaw(value any) []string {
-	items, ok := value.([]any)
-	if !ok {
-		return nil
-	}
-	out := make([]string, 0, len(items))
-	for _, item := range items {
-		if text := strings.TrimSpace(stringFromRaw(item)); text != "" {
-			out = append(out, text)
-		}
-	}
-	return out
+	return nil
 }
 
 func (r *Registry) buildAliases() {
@@ -258,7 +151,13 @@ func (r *Registry) buildAliases() {
 		for _, alias := range info.Aliases {
 			r.aliasToCanonical[alias] = canonical
 		}
-		for _, upstreamName := range info.Upstream {
+		upstreamNames := map[string]struct{}{}
+		for _, cfg := range info.ProviderConfig {
+			if strings.TrimSpace(cfg.Upstream) != "" {
+				upstreamNames[strings.TrimSpace(cfg.Upstream)] = struct{}{}
+			}
+		}
+		for upstreamName := range upstreamNames {
 			if _, exists := r.aliasToCanonical[upstreamName]; !exists {
 				r.aliasToCanonical[upstreamName] = canonical
 			}
@@ -318,7 +217,7 @@ func (r *Registry) UpstreamModelName(model, provider string) string {
 	if !ok {
 		return canonical
 	}
-	if upstream := info.Upstream[provider]; upstream != "" {
+	if upstream := info.ProviderConfig[provider].Upstream; upstream != "" {
 		return upstream
 	}
 	return canonical
@@ -329,8 +228,10 @@ func (r *Registry) ProviderAccessRule(model, provider string) (ProviderAccessRul
 	if !ok {
 		return ProviderAccessRule{}, false
 	}
-	rule, ok := info.Access[provider]
-	return rule, ok
+	if minTier := info.ProviderConfig[provider].MinTier; minTier != "" {
+		return ProviderAccessRule{MinTier: minTier}, true
+	}
+	return ProviderAccessRule{}, false
 }
 
 func (r *Registry) ProviderModelConfig(model, provider string) (ProviderModelConfig, bool) {
@@ -350,8 +251,8 @@ func (r *Registry) ProviderModelMap(provider string) map[string]string {
 	for canonical, info := range r.effective {
 		if contains(info.Providers, provider) {
 			upstream := canonical
-			if info.Upstream[provider] != "" {
-				upstream = info.Upstream[provider]
+			if info.ProviderConfig[provider].Upstream != "" {
+				upstream = info.ProviderConfig[provider].Upstream
 			}
 			result[canonical] = upstream
 		}

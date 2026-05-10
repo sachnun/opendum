@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "copilot"
+  ],
+  "providerConfig": {
+    "copilot": {
+      "responses_api": true
+    }
+  }
+}

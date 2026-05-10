@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 256000,
+    "outputLimit": 16384,
+    "knowledgeCutoff": "2025-07",
+    "releaseDate": "2025-04-29",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "qwen3-next:80b"
+    }
+  }
+}

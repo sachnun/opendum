@@ -1,7 +1,0 @@
-[opendum]
-family = "NVIDIA"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "nvidia/cosmos-reason2-8b"

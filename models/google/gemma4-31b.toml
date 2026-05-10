@@ -1,6 +1,0 @@
-[opendum]
-family = "Google"
-providers = ["ollama_cloud"]
-
-[ollama_cloud]
-upstream = "gemma4:31b"

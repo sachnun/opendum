@@ -1,0 +1,34 @@
+{
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "claude-opus-4.6-1m",
+    "claude-opus-4-6-1m"
+  ],
+  "family": "Claude",
+  "meta": {
+    "contextLength": 1000000,
+    "outputLimit": 128000,
+    "knowledgeCutoff": "2025-05",
+    "releaseDate": "2026-02-05",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "claude-opus-4.6-1m"
+    }
+  }
+}

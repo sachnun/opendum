@@ -30,8 +30,12 @@ for (const model of IGNORED_MODELS) {
 
 const aliasToCanonical: Record<string, string> = {};
 
+function getProviderUpstream(info: ModelInfo, provider: string): string | undefined {
+  return info.providerConfig?.[provider]?.upstream;
+}
+
 for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
-  // Register TOML-declared aliases
+  // Register JSON-declared aliases
   if (info.aliases) {
     for (const alias of info.aliases) {
       aliasToCanonical[alias] = canonical;
@@ -40,8 +44,15 @@ for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
 
   // Register upstream names as reverse aliases so that a response
   // referencing an upstream name can be resolved back to canonical.
-  if (info.upstream) {
-    for (const upstreamName of Object.values(info.upstream)) {
+  const upstreamNames = new Set<string>();
+  if (info.providerConfig) {
+    for (const config of Object.values(info.providerConfig)) {
+      if (typeof config.upstream === "string") upstreamNames.add(config.upstream);
+    }
+  }
+
+  if (upstreamNames.size > 0) {
+    for (const upstreamName of upstreamNames) {
       if (!aliasToCanonical[upstreamName]) {
         aliasToCanonical[upstreamName] = canonical;
       }
@@ -73,7 +84,7 @@ for (const [canonical, aliases] of Object.entries(canonicalToAliases)) {
 const modelMapCache = new Map<string, Record<string, string>>();
 
 /**
- * Build (and cache) the full model map for a provider from the TOML registry.
+ * Build (and cache) the full model map for a provider from the JSON registry.
  * Keys are canonical model IDs, values are upstream model names.
  */
 export function getProviderModelMap(provider: string): Record<string, string> {
@@ -83,7 +94,7 @@ export function getProviderModelMap(provider: string): Record<string, string> {
   const map: Record<string, string> = {};
   for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
     if (!info.providers.includes(provider)) continue;
-    map[canonical] = info.upstream?.[provider] ?? canonical;
+    map[canonical] = getProviderUpstream(info, provider) ?? canonical;
   }
 
   modelMapCache.set(provider, map);
@@ -112,7 +123,7 @@ export function getProviderModelSet(provider: string): Set<string> {
 export function getUpstreamModelName(model: string, provider: string): string {
   const canonical = resolveModelAlias(model);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
-  return info?.upstream?.[provider] ?? canonical;
+  return info ? getProviderUpstream(info, provider) ?? canonical : canonical;
 }
 
 export function getProviderAccessRule(
@@ -121,7 +132,8 @@ export function getProviderAccessRule(
 ): ProviderAccessRule | null {
   const canonical = resolveModelAlias(model);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
-  return info?.access?.[provider] ?? null;
+  const minTier = info?.providerConfig?.[provider]?.minTier;
+  return minTier ? { minTier } : null;
 }
 
 export function getProviderModelConfig(
@@ -179,7 +191,7 @@ export function getAllModels(): string[] {
 }
 
 /**
- * Get the family of a model from the TOML registry.
+ * Get the family of a model from the JSON registry.
  * Returns undefined if the model is not found or has no family set.
  */
 export function getModelFamily(modelId: string): string | undefined {

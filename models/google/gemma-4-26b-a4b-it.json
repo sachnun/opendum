@@ -1,0 +1,30 @@
+{
+  "providers": [
+    "gemini_cli",
+    "openrouter",
+    "workers_ai"
+  ],
+  "family": "Google",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 8192,
+    "releaseDate": "2025-06",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "google/gemma-4-26b-a4b-it:free"
+    }
+  }
+}

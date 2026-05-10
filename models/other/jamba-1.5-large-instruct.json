@@ -1,0 +1,12 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "AI21",
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "ai21labs/jamba-1.5-large-instruct"
+    }
+  }
+}

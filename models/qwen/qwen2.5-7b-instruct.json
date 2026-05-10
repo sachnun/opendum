@@ -1,0 +1,26 @@
+{
+  "providers": [],
+  "aliases": [
+    "qwen-qwen2.5-7b-instruct",
+    "qwen/qwen2.5-7b-instruct"
+  ],
+  "family": "Qwen",
+  "ignored": true,
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 8192,
+    "knowledgeCutoff": "2024-04",
+    "releaseDate": "2024-09",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

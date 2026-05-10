@@ -1,0 +1,25 @@
+{
+  "providers": [],
+  "aliases": [
+    "nvidia-llama-3.1-nemotron-ultra-253b-v1",
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+  ],
+  "family": "Meta",
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 8192,
+    "knowledgeCutoff": "2024-07",
+    "releaseDate": "2024-07-01",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

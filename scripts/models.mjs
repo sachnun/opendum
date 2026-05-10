@@ -70,7 +70,7 @@ function snapshotProviderModels() {
   }
 
   for (const [modelId, entry] of Object.entries(index)) {
-    const providers = entry.data.opendum?.providers || [];
+    const providers = entry.data.providers || [];
     for (const provider of providers) {
       if (snapshot.has(provider)) {
         snapshot.get(provider).add(modelId);

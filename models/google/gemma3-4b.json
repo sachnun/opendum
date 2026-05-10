@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "aliases": [
+    "gemma-3-4b-it"
+  ],
+  "family": "Google",
+  "ignored": true,
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 131072,
+    "releaseDate": "2024-12-01",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": true
+  },
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "gemma3:4b"
+    }
+  }
+}

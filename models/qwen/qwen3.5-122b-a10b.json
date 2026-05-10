@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "qwen/qwen3.5-122b-a10b"
+    }
+  }
+}

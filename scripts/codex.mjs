@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels, buildModelIndex, writeModelToml } from "./model-registry.mjs";
+import { syncProviderModels, buildModelIndex, writeModelJson } from "./model-registry.mjs";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
@@ -109,7 +109,7 @@ function buildModelMap(models) {
 }
 
 // ---------------------------------------------------------------------------
-// Metadata enrichment for newly created TOML files
+// Metadata enrichment for newly created JSON files
 // ---------------------------------------------------------------------------
 
 /**
@@ -124,7 +124,7 @@ function buildMetadataLookup(models) {
 }
 
 /**
- * After syncProviderModels creates bare-bones TOML files for new models,
+ * After syncProviderModels creates bare-bones JSON files for new models,
  * enrich them with metadata from models.json.
  */
 function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
@@ -143,28 +143,27 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
     const hasReasoning =
       Array.isArray(meta.supported_reasoning_levels) &&
       meta.supported_reasoning_levels.length > 0;
-    if (hasReasoning) data.reasoning = true;
+    if (!data.meta) data.meta = {};
+    if (hasReasoning) data.meta.reasoning = true;
 
     // tool_call (if shell_type exists, model supports tool use)
-    if (meta.shell_type) data.tool_call = true;
+    if (meta.shell_type) data.meta.toolCall = true;
 
     // attachment / vision (input_modalities includes "image")
     const inputModalities = Array.isArray(meta.input_modalities)
       ? meta.input_modalities
       : [];
-    data.attachment = inputModalities.includes("image");
+    data.meta.vision = inputModalities.includes("image");
 
     // limits
     if (meta.context_window) {
-      if (!data.limit) data.limit = {};
-      data.limit.context = meta.context_window;
+      data.meta.contextLength = meta.context_window;
     }
 
     // family
-    if (!data.opendum) data.opendum = {};
-    data.opendum.family = "OpenAI";
+    data.family = "OpenAI";
 
-    writeModelToml(entry.path, data);
+    writeModelJson(entry.path, data);
   }
 }
 
@@ -195,7 +194,7 @@ async function main() {
 
   const result = syncProviderModels(modelsDir, "codex", modelMap);
 
-  // Enrich newly created TOML files with metadata from models.json
+  // Enrich newly created JSON files with metadata from models.json
   if (result.added.length > 0) {
     enrichNewModels(modelsDir, result.added, metadataLookup);
   }

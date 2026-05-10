@@ -1,0 +1,30 @@
+{
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-4-0",
+    "claude-sonnet-4.0",
+    "claude-sonnet4.0"
+  ],
+  "family": "Claude",
+  "meta": {
+    "contextLength": 1000000,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2025-03-31",
+    "releaseDate": "2025-05-22",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

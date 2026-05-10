@@ -1,0 +1,21 @@
+{
+  "providers": [],
+  "family": "Microsoft",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "knowledgeCutoff": "2023-10",
+    "releaseDate": "2024-08-20",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

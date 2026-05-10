@@ -5,7 +5,7 @@
  *
  * Fetches the supported model list from the opencode-antigravity-auth plugin
  * README — the de-facto source of truth for which models Google exposes via
- * the Antigravity (Cloud Code Assist) backend — and syncs it into the TOML
+ * the Antigravity (Cloud Code Assist) backend — and syncs it into the JSON
  * model registry.
  *
  * Source: https://raw.githubusercontent.com/NoeFabris/opencode-antigravity-auth/main/README.md
@@ -57,11 +57,11 @@ const CLAUDE_TRANSFORM_TS_PATH = resolve(
 );
 
 // ---------------------------------------------------------------------------
-// Plugin model name → { key: canonical TOML key, upstream: Antigravity API name }
+// Plugin model name -> { key: canonical JSON key, upstream: Antigravity API name }
 //
 // The plugin README uses `antigravity-` prefixed names. Gemini models need
-// explicit overrides because canonical TOML keys differ from the API names
-// (e.g. `gemini-3-flash-preview` in TOML vs `gemini-3-flash` in API).
+// explicit overrides because canonical JSON keys differ from the API names
+// (e.g. `gemini-3-flash-preview` in JSON vs `gemini-3-flash` in API).
 //
 // Claude models follow a simple rule: strip prefix + strip `-thinking` suffix.
 // ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ const MODEL_NAME_OVERRIDES = {
 
 // Models present in Antigravity but NOT tracked by the plugin README.
 // These are preserved so syncProviderModels() doesn't accidentally drop them.
-// Map: canonical TOML key → upstream API name (same as key if no mapping needed)
+// Map: canonical JSON key -> upstream API name (same as key if no mapping needed)
 const KNOWN_EXTRAS = new Map([
   ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image"],
   ["gemini-3-pro-image-preview", "gemini-3-pro-image"],
@@ -178,13 +178,13 @@ function parseAntigravityModels(readme) {
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a plugin model name to a canonical TOML key and upstream API name.
+  * Convert a plugin model name to a canonical JSON key and upstream API name.
  *
  * Rules:
  *   1. Check MODEL_NAME_OVERRIDES first (for Gemini models).
  *   2. Strip `antigravity-` prefix.
  *   3. Strip `-thinking` suffix for canonical key (Opus models only exist as
- *      -thinking in the API, but TOML keys don't include it).
+  *      -thinking in the API, but JSON keys don't include it).
  *   4. The upstream name is the prefix-stripped name (without -thinking,
  *      since client.ts adds -thinking dynamically at runtime).
  *
@@ -209,12 +209,12 @@ function toCanonical(pluginName) {
 }
 
 // ---------------------------------------------------------------------------
-// Sync TOML files
+// Sync JSON files
 // ---------------------------------------------------------------------------
 
-function syncToml(modelMap, dryRun) {
+function syncJson(modelMap, dryRun) {
   if (dryRun) {
-    console.log("[antigravity] Dry run — no TOML files modified.");
+    console.log("[antigravity] Dry run - no JSON files modified.");
 
     // Show what would change
     const index = buildModelIndex(modelsDir);
@@ -222,7 +222,7 @@ function syncToml(modelMap, dryRun) {
     const wouldKeep = [];
 
     for (const [modelId, entry] of Object.entries(index)) {
-      const providers = entry.data.opendum?.providers || [];
+      const providers = entry.data.providers || [];
       if (!providers.includes(PROVIDER_NAME)) continue;
 
       if (modelMap.has(modelId)) {
@@ -235,7 +235,7 @@ function syncToml(modelMap, dryRun) {
     const wouldAdd = [];
     for (const key of modelMap.keys()) {
       const existing = index[key];
-      if (!existing || !(existing.data.opendum?.providers || []).includes(PROVIDER_NAME)) {
+      if (!existing || !(existing.data.providers || []).includes(PROVIDER_NAME)) {
         wouldAdd.push(key);
       }
     }
@@ -469,7 +469,7 @@ async function main() {
     `[antigravity] Found ${pluginModels.length} models in README table.`
   );
 
-  // 3. Build model map: canonical TOML key → upstream API name
+  // 3. Build model map: canonical JSON key -> upstream API name
   const modelMap = new Map();
   const activeClaudeModels = new Set();
 
@@ -507,8 +507,8 @@ async function main() {
     console.log();
   }
 
-  // 5. Sync TOML files
-  const result = syncToml(modelMap, dryRun);
+  // 5. Sync JSON files
+  const result = syncJson(modelMap, dryRun);
 
   if (
     result.added.length === 0 &&
@@ -516,7 +516,7 @@ async function main() {
     result.updated.length === 0
   ) {
     console.log(
-      `[antigravity] TOML models are already up to date (${modelMap.size} models).`
+      `[antigravity] JSON models are already up to date (${modelMap.size} models).`
     );
   } else {
     console.log(

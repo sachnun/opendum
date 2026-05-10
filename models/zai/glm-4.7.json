@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "Z.AI",
+  "meta": {
+    "contextLength": 204800,
+    "outputLimit": 131072,
+    "knowledgeCutoff": "2025-04",
+    "releaseDate": "2025-12-22",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "providers": [
+    "cerebras"
+  ],
+  "aliases": [
+    "qwen-qwen3-235b-a22b",
+    "qwen/qwen3-235b-a22b"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 16384,
+    "knowledgeCutoff": "2025-04",
+    "releaseDate": "2025-04",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "cerebras": {
+      "upstream": "qwen-3-235b-a22b-instruct-2507"
+    }
+  }
+}

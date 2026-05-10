@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-nemotron"
+    }
+  }
+}

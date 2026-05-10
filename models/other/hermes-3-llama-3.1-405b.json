@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "family": "Nous Research",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 16384,
+    "knowledgeCutoff": "2024-04",
+    "releaseDate": "2025-09-25",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "nousresearch/hermes-3-llama-3.1-405b:free"
+    }
+  }
+}

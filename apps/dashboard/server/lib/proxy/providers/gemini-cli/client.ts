@@ -326,7 +326,7 @@ export const geminiCliProvider: Provider = {
     }
 
     const model = body.model;
-    // Resolve upstream model name: use TOML [opendum.upstream] mapping if available,
+    // Resolve upstream model name: use JSON registry mapping if available,
     // otherwise fall back to the canonical model name (stripping prefixes/suffixes).
     const upstreamName = getUpstreamModelName(model, "gemini_cli");
     const modelName = upstreamName !== model

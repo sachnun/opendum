@@ -1,5 +1,0 @@
-[opendum]
-providers = ["nvidia_nim", "ollama_cloud"]
-
-[nvidia_nim]
-upstream = "deepseek-ai/deepseek-v4-pro"

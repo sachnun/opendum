@@ -1,0 +1,18 @@
+{
+  "providers": [
+    "groq"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 40960,
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "groq": {
+      "upstream": "qwen/qwen3-32b"
+    }
+  }
+}

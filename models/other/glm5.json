@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "z-ai/glm5"
+    }
+  }
+}

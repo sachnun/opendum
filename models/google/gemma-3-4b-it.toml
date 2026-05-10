@@ -1,6 +1,0 @@
-[opendum]
-family = "Google"
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "google/gemma-3-4b-it"

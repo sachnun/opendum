@@ -1,0 +1,44 @@
+{
+  "providers": [
+    "gemini_cli"
+  ],
+  "aliases": [
+    "gemini-3-pro",
+    "gemini-3-pro-high",
+    "gemini-3-pro-low"
+  ],
+  "family": "Gemini",
+  "meta": {
+    "contextLength": 1000000,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2025-01",
+    "releaseDate": "2025-11-18",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "gemini_cli": {
+      "thinking_format": "level",
+      "thinking_levels": {
+        "high": "high",
+        "low": "low",
+        "medium": "high",
+        "none": "low",
+        "xhigh": "high"
+      }
+    }
+  }
+}

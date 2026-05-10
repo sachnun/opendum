@@ -254,10 +254,10 @@ func TestProviderCustomConfigDrivesCopilotResponsesAPI(t *testing.T) {
 	provider := copilotProvider{registry: registry}
 	responsesModel := firstProviderConfigModel(t, registry, "copilot", func(cfg models.ProviderModelConfig) bool { return customBool(cfg, "responses_api") })
 	if !provider.requiresResponsesAPI(responsesModel) {
-		t.Fatal("model should route through Responses API from TOML config")
+		t.Fatal("model should route through Responses API from JSON config")
 	}
 	if provider.requiresResponsesAPI("unit-test-model") {
-		t.Fatal("model without TOML config should not route through Responses API")
+		t.Fatal("model without JSON config should not route through Responses API")
 	}
 }
 

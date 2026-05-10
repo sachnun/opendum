@@ -1,6 +1,0 @@
-[opendum]
-family = "Mistral"
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "mistralai/mistral-nemotron"

@@ -71,7 +71,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 function normalizeModel(model: string): string {
   const rawModel = model.includes("/") ? model.split("/").pop() || model : model;
   const upstream = getUpstreamModelName(rawModel, "kiro");
-  // If model was not found in TOML, fall back to default model's upstream name
+  // If model was not found in JSON, fall back to default model's upstream name
   if (upstream === rawModel && !getProviderModelSet("kiro").has(rawModel)) {
     return getUpstreamModelName(DEFAULT_MODEL, "kiro");
   }

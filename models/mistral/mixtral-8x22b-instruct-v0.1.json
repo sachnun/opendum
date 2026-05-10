@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mixtral-8x22b-instruct-v0.1"
+    }
+  }
+}

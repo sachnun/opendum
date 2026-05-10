@@ -1,0 +1,48 @@
+{
+  "providers": [
+    "antigravity",
+    "copilot",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-4.6",
+    "claude-sonnet4.6"
+  ],
+  "family": "Claude",
+  "meta": {
+    "contextLength": 1000000,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2025-08",
+    "releaseDate": "2026-02-17",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "convert_external_images": true,
+      "force_stream_non_stream": true,
+      "sanitize_tool_blocks": true,
+      "signature_family": "claude",
+      "strict_thought_signatures": true,
+      "strict_tool_schema": true,
+      "system_instruction": true
+    },
+    "copilot": {
+      "upstream": "claude-sonnet-4.6"
+    },
+    "kiro": {
+      "upstream": "claude-sonnet-4.6"
+    }
+  }
+}

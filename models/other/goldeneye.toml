@@ -1,4 +1,0 @@
-[opendum]
-family = "OpenAI"
-providers = ["copilot"]
-ignored = true

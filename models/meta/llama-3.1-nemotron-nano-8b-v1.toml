@@ -1,5 +1,0 @@
-[opendum]
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "nvidia/llama-3.1-nemotron-nano-8b-v1"

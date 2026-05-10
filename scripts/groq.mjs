@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Sync Groq model availability into TOML registry.
+ * Sync Groq model availability into JSON registry.
  *
  * Data source: HuggingFace Partners API (public, no auth required)
  *   https://huggingface.co/api/partners/groq/models
@@ -15,7 +15,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels, buildModelIndex } from "./model-registry.mjs";
+import { syncProviderModels, buildModelIndex, getProviderUpstream } from "./model-registry.mjs";
 
 const HF_PARTNERS_URL = "https://huggingface.co/api/partners/groq/models";
 const FETCH_TIMEOUT_MS = 20_000;
@@ -31,7 +31,7 @@ const FORCED_GROQ_MODELS = {
 };
 
 // ---------------------------------------------------------------------------
-// Model key overrides: groq upstream ID → canonical TOML key
+// Model key overrides: groq upstream ID → canonical JSON key
 // Used when the derived key doesn't match the existing canonical key.
 // ---------------------------------------------------------------------------
 
@@ -60,7 +60,7 @@ function isNonChatModel(modelId) {
 
 // ---------------------------------------------------------------------------
 // Derive a canonical model key from a Groq upstream model ID.
-// Uses the existing TOML reverse map first, then falls back to stripping
+// Uses the existing JSON reverse map first, then falls back to stripping
 // the provider prefix (e.g. "openai/gpt-oss-120b" → "gpt-oss-120b").
 // ---------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ function toModelKey(groqModelId, reverseMap) {
     return MODEL_KEY_OVERRIDES[groqModelId];
   }
 
-  // Check if any existing TOML already maps to this Groq upstream ID
+  // Check if any existing JSON file already maps to this Groq upstream ID
   if (reverseMap.has(groqModelId)) {
     return reverseMap.get(groqModelId);
   }
@@ -86,7 +86,7 @@ function toModelKey(groqModelId, reverseMap) {
 }
 
 // ---------------------------------------------------------------------------
-// Build reverse map: groqUpstreamId → canonicalModelKey from existing TOMLs
+// Build reverse map: groqUpstreamId → canonicalModelKey from existing JSON files
 // ---------------------------------------------------------------------------
 
 function buildReverseMap(modelsDir) {
@@ -94,10 +94,10 @@ function buildReverseMap(modelsDir) {
   const reverseMap = new Map();
 
   for (const [modelId, entry] of Object.entries(index)) {
-    const providers = entry.data.opendum?.providers || [];
+    const providers = entry.data.providers || [];
     if (!providers.includes("groq")) continue;
 
-    const upstream = entry.data.opendum?.upstream?.groq || modelId;
+    const upstream = getProviderUpstream(entry.data, "groq", modelId);
     reverseMap.set(upstream, modelId);
   }
 
@@ -199,7 +199,7 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 
-  // Build reverse map from existing TOMLs so we reuse canonical keys
+  // Build reverse map from existing JSON files so we reuse canonical keys
   const reverseMap = buildReverseMap(modelsDir);
 
   const groqModelIds = await fetchHfGroqModels();

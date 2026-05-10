@@ -1,0 +1,31 @@
+{
+  "providers": [
+    "ollama_cloud",
+    "workers_ai"
+  ],
+  "family": "Kimi",
+  "meta": {
+    "contextLength": 262144,
+    "outputLimit": 262144,
+    "knowledgeCutoff": "2025-01",
+    "releaseDate": "2026-01",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/moonshotai/kimi-k2.5"
+    }
+  }
+}

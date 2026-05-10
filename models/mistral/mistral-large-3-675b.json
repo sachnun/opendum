@@ -1,0 +1,29 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "Mistral",
+  "meta": {
+    "contextLength": 262144,
+    "outputLimit": 262144,
+    "knowledgeCutoff": "2025-01",
+    "releaseDate": "2025-12-02",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "mistral-large-3:675b"
+    }
+  }
+}

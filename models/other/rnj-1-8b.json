@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "RNJ",
+  "ignored": true,
+  "meta": {
+    "contextLength": 32768,
+    "outputLimit": 4096,
+    "releaseDate": "2025-12-06",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "rnj-1:8b"
+    }
+  }
+}

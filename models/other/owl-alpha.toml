@@ -1,5 +1,0 @@
-[opendum]
-providers = ["kilo_code"]
-
-[kilo_code]
-upstream = "openrouter/owl-alpha"

@@ -1,7 +1,0 @@
-[opendum]
-family = "Upstage"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "upstage/solar-10.7b-instruct"

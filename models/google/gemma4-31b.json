@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "Google",
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "gemma4:31b"
+    }
+  }
+}

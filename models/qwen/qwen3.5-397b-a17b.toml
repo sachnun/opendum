@@ -1,5 +1,0 @@
-[opendum]
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "qwen/qwen3.5-397b-a17b"

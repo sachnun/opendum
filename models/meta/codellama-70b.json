@@ -1,0 +1,25 @@
+{
+  "providers": [],
+  "aliases": [
+    "meta-codellama-70b",
+    "meta/codellama-70b"
+  ],
+  "family": "Meta",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "releaseDate": "2024-01-29",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

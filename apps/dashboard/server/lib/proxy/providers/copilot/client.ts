@@ -92,7 +92,7 @@ function resolveCopilotModel(model: string): string {
 }
 
 /**
- * Check if a model is a reasoning model based on the TOML registry metadata.
+ * Check if a model is a reasoning model based on the JSON registry metadata.
  * Non-reasoning models (e.g. gpt-4.1) do not accept reasoning_effort or reasoning params.
  */
 function isReasoningModel(model: string): boolean {

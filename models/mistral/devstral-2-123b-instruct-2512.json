@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/devstral-2-123b-instruct-2512"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "kiro",
+    "ollama_cloud"
+  ],
+  "family": "MiniMax",
+  "meta": {
+    "contextLength": 204800,
+    "outputLimit": 131072,
+    "releaseDate": "2025-12-23",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

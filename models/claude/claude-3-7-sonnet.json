@@ -1,0 +1,28 @@
+{
+  "providers": [],
+  "aliases": [
+    "claude-3.7-sonnet",
+    "claude-3-7-sonnet-latest",
+    "claude-3.7-sonnet-latest"
+  ],
+  "family": "Claude",
+  "meta": {
+    "contextLength": 200000,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2024-10-31",
+    "releaseDate": "2025-02-19",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

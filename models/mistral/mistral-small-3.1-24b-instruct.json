@@ -1,0 +1,27 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "family": "Mistral",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "releaseDate": "2025-03-11",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/mistralai/mistral-small-3.1-24b-instruct"
+    }
+  }
+}

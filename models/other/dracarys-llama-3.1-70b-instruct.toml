@@ -1,7 +1,0 @@
-[opendum]
-family = "Abacus.AI"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "abacusai/dracarys-llama-3.1-70b-instruct"

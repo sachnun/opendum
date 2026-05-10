@@ -1,0 +1,22 @@
+{
+  "providers": [],
+  "family": "OpenAI",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 16384,
+    "knowledgeCutoff": "2023-09",
+    "releaseDate": "2024-05-13",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

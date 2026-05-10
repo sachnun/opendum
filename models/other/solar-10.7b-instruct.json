@@ -1,0 +1,12 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Upstage",
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "upstage/solar-10.7b-instruct"
+    }
+  }
+}

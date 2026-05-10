@@ -1,0 +1,21 @@
+{
+  "providers": [],
+  "family": "Trinity",
+  "meta": {
+    "contextLength": 131000,
+    "outputLimit": 131000,
+    "knowledgeCutoff": "2024-10",
+    "releaseDate": "2025-01",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

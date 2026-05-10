@@ -1,0 +1,24 @@
+{
+  "providers": [
+    "copilot"
+  ],
+  "family": "OpenAI",
+  "meta": {
+    "contextLength": 1047576,
+    "outputLimit": 32768,
+    "knowledgeCutoff": "2024-04",
+    "releaseDate": "2025-04-14",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

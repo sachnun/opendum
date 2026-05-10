@@ -4,14 +4,14 @@
  * Gemini CLI model refresh script.
  *
  * Fetches the supported model list from the google-gemini/gemini-cli GitHub
- * repository (VALID_GEMINI_MODELS in models.ts) and syncs them into the TOML
- * registry. Newly created TOML files are enriched with metadata from the
+ * repository (VALID_GEMINI_MODELS in models.ts) and syncs them into the JSON
+ * registry. Newly created JSON files are enriched with metadata from the
  * public Google Generative Language API.
  */
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, writeModelToml } from "./model-registry.mjs";
+import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
 
 const PROVIDER_NAME = "gemini_cli";
 
@@ -31,7 +31,7 @@ const EXCLUDED_PATTERNS = [
   /-customtools$/,  // internal custom-tools routing variant
 ];
 
-// Auto / alias model IDs that should not become TOML entries
+// Auto / alias model IDs that should not become JSON registry entries
 const EXCLUDED_IDS = new Set([
   "auto-gemini-3",
   "auto-gemini-2.5",
@@ -257,9 +257,9 @@ function getFallbackMetadata(modelKey) {
 }
 
 /**
- * Enrich newly created TOML files with metadata from the Gemini API.
- * Falls back to known model characteristics when the API is unavailable.
- */
+  * Enrich newly created JSON files with metadata from the Gemini API.
+  * Falls back to known model characteristics when the API is unavailable.
+  */
 function enrichNewModels(modelsDir, addedKeys, apiModels) {
   const index = buildModelIndex(modelsDir);
 
@@ -279,11 +279,12 @@ function enrichNewModels(modelsDir, addedKeys, apiModels) {
     }
 
     const data = entry.data;
+    if (!data.meta) data.meta = {};
 
     if (meta) {
       // Enrich from API metadata
       if (modelKey.match(/^gemini-(2\.5|3)/)) {
-        data.reasoning = true;
+        data.meta.reasoning = true;
       }
 
       const methods = meta.supportedGenerationMethods || [];
@@ -291,32 +292,31 @@ function enrichNewModels(modelsDir, addedKeys, apiModels) {
         methods.includes("generateContent") ||
         methods.includes("streamGenerateContent")
       ) {
-        data.tool_call = true;
+        data.meta.toolCall = true;
       }
 
-      data.attachment = true;
+      data.meta.vision = true;
 
       if (meta.inputTokenLimit || meta.outputTokenLimit) {
-        if (!data.limit) data.limit = {};
-        if (meta.inputTokenLimit) data.limit.context = meta.inputTokenLimit;
-        if (meta.outputTokenLimit) data.limit.output = meta.outputTokenLimit;
+        if (meta.inputTokenLimit) data.meta.contextLength = meta.inputTokenLimit;
+        if (meta.outputTokenLimit) data.meta.outputLimit = meta.outputTokenLimit;
       }
     } else {
       // Fallback enrichment based on known Gemini model patterns
       const fallback = getFallbackMetadata(modelKey);
-      data.reasoning = fallback.reasoning;
-      data.tool_call = fallback.tool_call;
-      data.attachment = fallback.attachment;
+      data.meta.reasoning = fallback.reasoning;
+      data.meta.toolCall = fallback.tool_call;
+      data.meta.vision = fallback.attachment;
       if (fallback.limit) {
-        data.limit = { ...fallback.limit };
+        data.meta.contextLength = fallback.limit.context;
+        data.meta.outputLimit = fallback.limit.output;
       }
     }
 
     // Family
-    if (!data.opendum) data.opendum = {};
-    data.opendum.family = "Gemini";
+    data.family = "Gemini";
 
-    writeModelToml(entry.path, data);
+    writeModelJson(entry.path, data);
   }
 }
 
@@ -342,10 +342,10 @@ async function main() {
   // 2. Build model map (filter out internal/alias models)
   const modelMap = buildModelMap(validModels);
 
-  // 3. Sync to TOML
+  // 3. Sync to JSON registry
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
 
-  // 4. Enrich newly created TOML files with metadata from public Gemini API
+  // 4. Enrich newly created JSON files with metadata from public Gemini API
   if (result.added.length > 0) {
     const apiModels = await fetchGeminiApiModels();
     enrichNewModels(modelsDir, result.added, apiModels);

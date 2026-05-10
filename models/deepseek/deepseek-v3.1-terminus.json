@@ -1,0 +1,25 @@
+{
+  "providers": [],
+  "aliases": [
+    "deepseek-ai-deepseek-v3.1-terminus",
+    "deepseek-ai/deepseek-v3.1-terminus"
+  ],
+  "family": "DeepSeek",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 16384,
+    "knowledgeCutoff": "2025-09",
+    "releaseDate": "2025-09-22",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-large-3-675b-instruct-2512"
+    }
+  }
+}

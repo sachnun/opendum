@@ -1,0 +1,22 @@
+{
+  "providers": [],
+  "family": "Mistral",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 16384,
+    "knowledgeCutoff": "2025-03",
+    "releaseDate": "2025-06-20",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/mistral-nemo-minitron-8b-8k-instruct"
+    }
+  }
+}

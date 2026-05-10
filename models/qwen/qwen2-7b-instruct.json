@@ -1,0 +1,9 @@
+{
+  "providers": [],
+  "aliases": [
+    "qwen-qwen2-7b-instruct",
+    "qwen/qwen2-7b-instruct"
+  ],
+  "family": "Qwen",
+  "ignored": true
+}

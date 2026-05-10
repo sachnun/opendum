@@ -1,0 +1,27 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "meta": {
+    "contextLength": 32768,
+    "outputLimit": 32768,
+    "releaseDate": "2025-04-01",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mixtral-8x7b-instruct-v0.1"
+    }
+  }
+}

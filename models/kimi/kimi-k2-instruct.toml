@@ -1,5 +1,0 @@
-[opendum]
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "moonshotai/kimi-k2-instruct"

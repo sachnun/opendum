@@ -1,8 +1,0 @@
-[opendum]
-providers = ["kilo_code", "openrouter"]
-
-[kilo_code]
-upstream = "poolside/laguna-m.1:free"
-
-[openrouter]
-upstream = "poolside/laguna-m.1:free"

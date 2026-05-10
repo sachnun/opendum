@@ -1,0 +1,30 @@
+{
+  "providers": [
+    "copilot",
+    "kilo_code"
+  ],
+  "family": "OpenAI",
+  "meta": {
+    "contextLength": 256000,
+    "outputLimit": 10000,
+    "knowledgeCutoff": "2023-10",
+    "releaseDate": "2025-08-28",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "x-ai/grok-code-fast-1:optimized:free",
+      "responses_api": true
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "qwen/qwen3-next-80b-a3b-thinking"
+    }
+  }
+}

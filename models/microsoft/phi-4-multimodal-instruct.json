@@ -1,0 +1,27 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Microsoft",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 16384,
+    "releaseDate": "2025-07-26",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "microsoft/phi-4-multimodal-instruct"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "qwen-qwen2.5-coder-32b-instruct",
+    "qwen/qwen2.5-coder-32b-instruct"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 32768,
+    "outputLimit": 32768,
+    "releaseDate": "2025-03-24",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "qwen/qwen2.5-coder-32b-instruct"
+    }
+  }
+}

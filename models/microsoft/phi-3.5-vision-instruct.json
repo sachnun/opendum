@@ -1,0 +1,26 @@
+{
+  "providers": [],
+  "aliases": [
+    "microsoft-phi-3.5-vision-instruct",
+    "microsoft/phi-3.5-vision-instruct"
+  ],
+  "family": "Microsoft",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "releaseDate": "2024-08-16",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

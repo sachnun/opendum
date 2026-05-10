@@ -1,0 +1,51 @@
+{
+  "providers": [
+    "antigravity",
+    "gemini_cli"
+  ],
+  "family": "Gemini",
+  "meta": {
+    "contextLength": 1048576,
+    "outputLimit": 65536,
+    "knowledgeCutoff": "2025-01",
+    "releaseDate": "2025-06-17",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "inject_thought_signature": true,
+      "scrub_model_artifacts": true,
+      "signature_family": "gemini-flash",
+      "thinking_budgets": {
+        "high": 24576,
+        "low": 6144,
+        "medium": 12288,
+        "xhigh": 24576
+      },
+      "thinking_format": "budget"
+    },
+    "gemini_cli": {
+      "thinking_budgets": {
+        "high": 24576,
+        "low": 6144,
+        "medium": 12288,
+        "xhigh": 24576
+      },
+      "thinking_format": "budget"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "openrouter"
+  ],
+  "family": "NVIDIA",
+  "meta": {
+    "contextLength": 131072,
+    "outputLimit": 131072,
+    "knowledgeCutoff": "2024-09",
+    "releaseDate": "2024-12",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3-nano-30b-a3b"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-nano-30b-a3b:free"
+    }
+  }
+}

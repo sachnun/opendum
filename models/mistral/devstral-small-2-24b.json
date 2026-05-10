@@ -1,0 +1,29 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "Mistral",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 128000,
+    "knowledgeCutoff": "2025-05",
+    "releaseDate": "2025-07-10",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "devstral-small-2:24b"
+    }
+  }
+}

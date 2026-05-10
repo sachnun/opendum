@@ -1,0 +1,33 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "meta-llama-3.2-1b-instruct",
+    "meta/llama-3.2-1b-instruct"
+  ],
+  "family": "Meta",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "knowledgeCutoff": "2023-12",
+    "releaseDate": "2024-09-18",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "meta/llama-3.2-1b-instruct"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "providers": [],
+  "aliases": [
+    "mistralai-mamba-codestral-7b-v0.1",
+    "mistralai/mamba-codestral-7b-v0.1"
+  ],
+  "family": "Mistral",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "releaseDate": "2024-07-16",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

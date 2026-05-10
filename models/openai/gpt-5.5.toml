@@ -1,3 +1,0 @@
-[opendum]
-family = "OpenAI"
-providers = ["codex", "copilot"]

@@ -1,7 +1,0 @@
-[opendum]
-family = "NVIDIA"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "nvidia/nemotron-mini-4b-instruct"

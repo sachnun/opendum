@@ -1,0 +1,34 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "aliases": [
+    "gemini-3-pro-image"
+  ],
+  "family": "Gemini",
+  "ignored": true,
+  "meta": {
+    "contextLength": 32768,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2025-06",
+    "releaseDate": "2025-11-20",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-3-pro-image",
+      "signature_family": "gemini-pro"
+    }
+  }
+}

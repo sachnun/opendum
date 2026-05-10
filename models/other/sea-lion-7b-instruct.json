@@ -1,0 +1,12 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "AI Singapore",
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "aisingapore/sea-lion-7b-instruct"
+    }
+  }
+}

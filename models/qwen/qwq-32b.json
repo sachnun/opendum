@@ -1,0 +1,25 @@
+{
+  "providers": [],
+  "aliases": [
+    "qwen-qwq-32b",
+    "qwen/qwq-32b"
+  ],
+  "family": "Qwen",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 32768,
+    "releaseDate": "2025-04-15",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

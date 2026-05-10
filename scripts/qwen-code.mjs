@@ -4,16 +4,16 @@
  * Qwen Code model refresh script.
  *
  * Fetches the model list from the QwenLM/qwen-code GitHub repository
- * (QWEN_OAUTH_MODELS in constants.ts) and syncs them into the TOML registry.
+ * (QWEN_OAUTH_MODELS in constants.ts) and syncs them into the JSON registry.
  *
  * Because the OAuth model list is a subset of what the portal.qwen.ai API
  * actually accepts, this script uses an additive strategy: it never removes
- * existing qwen_code models from TOML, only adds newly discovered ones.
+ * existing qwen_code models from JSON, only adds newly discovered ones.
  */
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, writeModelToml } from "./model-registry.mjs";
+import { buildModelIndex, syncProviderModels, writeModelJson, getProviderUpstream } from "./model-registry.mjs";
 
 const PROVIDER_NAME = "qwen_code";
 
@@ -25,10 +25,10 @@ const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
 // ---------------------------------------------------------------------------
-// Known mapping: Qwen OAuth model ID → canonical TOML model key
+// Known mapping: Qwen OAuth model ID → canonical JSON model key
 //
 // The Qwen Code CLI exposes abstract model IDs (e.g. "coder-model") that
-// don't match the standard Qwen model names used in the TOML registry.
+// don't match the standard Qwen model names used in the JSON registry.
 // This map translates them. When a new OAuth model appears that isn't in
 // this map, the script logs a warning so it can be added manually.
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ function parseOAuthModels(source) {
  * Build the modelKey → upstreamName map.
  *
  * Strategy (additive):
- *  1. Start with all existing qwen_code models from TOML (preserves them).
+ *  1. Start with all existing qwen_code models from JSON (preserves them).
  *  2. Add any new OAuth models found in the source (using OAUTH_MODEL_KEY_MAP).
  *  3. Never remove models – the OAuth list is incomplete by design.
  */
@@ -181,7 +181,7 @@ function buildModelMap(oauthModels, existingKeys) {
     }
 
     if (!map.has(canonicalKey)) {
-      // New model: key = canonical TOML key, value = upstream OAuth model id
+      // New model: key = canonical JSON key, value = upstream OAuth model id
       map.set(canonicalKey, model.id);
     }
   }
@@ -197,7 +197,7 @@ function buildModelMap(oauthModels, existingKeys) {
 }
 
 // ---------------------------------------------------------------------------
-// Metadata enrichment for newly created TOML files
+// Metadata enrichment for newly created JSON files
 // ---------------------------------------------------------------------------
 
 function enrichNewModels(modelsDir, addedKeys, oauthModels) {
@@ -217,20 +217,20 @@ function enrichNewModels(modelsDir, addedKeys, oauthModels) {
     if (!meta) continue;
 
     const data = entry.data;
+    if (!data.meta) data.meta = {};
 
     // Capabilities
     if (meta.capabilities?.vision) {
-      data.attachment = true;
+      data.meta.vision = true;
     }
 
     // Tool call (assumed true for coding models)
-    data.tool_call = true;
+    data.meta.toolCall = true;
 
     // Family
-    if (!data.opendum) data.opendum = {};
-    data.opendum.family = "Qwen";
+    data.family = "Qwen";
 
-    writeModelToml(entry.path, data);
+    writeModelJson(entry.path, data);
   }
 }
 
@@ -246,15 +246,14 @@ async function main() {
   const source = await fetchConstantsSource();
   const oauthModels = parseOAuthModels(source);
 
-  // 2. Collect existing qwen_code models from TOML (to preserve them)
+  // 2. Collect existing qwen_code models from JSON (to preserve them)
   const index = buildModelIndex(modelsDir);
   const existingKeys = new Map();
 
   for (const [modelId, entry] of Object.entries(index)) {
-    const providers = entry.data.opendum?.providers || [];
+    const providers = entry.data.providers || [];
     if (providers.includes(PROVIDER_NAME)) {
-      const upstream =
-        entry.data.opendum?.upstream?.[PROVIDER_NAME] || modelId;
+      const upstream = getProviderUpstream(entry.data, PROVIDER_NAME, modelId);
       existingKeys.set(modelId, upstream);
     }
   }
@@ -262,10 +261,10 @@ async function main() {
   // 3. Build combined model map (existing + new OAuth models)
   const modelMap = buildModelMap(oauthModels, existingKeys);
 
-  // 4. Sync to TOML
+  // 4. Sync to JSON registry
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
 
-  // 5. Enrich newly created TOML files
+  // 5. Enrich newly created JSON files
   if (result.added.length > 0) {
     enrichNewModels(modelsDir, result.added, oauthModels);
   }

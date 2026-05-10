@@ -1,0 +1,46 @@
+{
+  "providers": [
+    "groq",
+    "ollama_cloud",
+    "openrouter",
+    "workers_ai",
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "openai-gpt-oss-20b"
+  ],
+  "family": "OpenAI",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "releaseDate": "2025-08-06",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "groq": {
+      "upstream": "openai/gpt-oss-20b"
+    },
+    "nvidia_nim": {
+      "upstream": "openai/gpt-oss-20b"
+    },
+    "ollama_cloud": {
+      "upstream": "gpt-oss:20b"
+    },
+    "openrouter": {
+      "upstream": "openai/gpt-oss-20b:free"
+    },
+    "workers_ai": {
+      "upstream": "@cf/openai/gpt-oss-20b"
+    }
+  }
+}

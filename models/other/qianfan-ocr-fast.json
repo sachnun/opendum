@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "baidu/qianfan-ocr-fast:free"
+    },
+    "openrouter": {
+      "upstream": "baidu/qianfan-ocr-fast:free"
+    }
+  }
+}

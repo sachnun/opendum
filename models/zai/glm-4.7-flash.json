@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "family": "Z.AI",
+  "meta": {
+    "contextLength": 200000,
+    "outputLimit": 131072,
+    "knowledgeCutoff": "2025-04",
+    "releaseDate": "2026-01-19",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-4.7-flash"
+    }
+  }
+}

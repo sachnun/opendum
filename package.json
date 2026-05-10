@@ -35,8 +35,5 @@
       "sharp",
       "unrs-resolver"
     ]
-  },
-  "dependencies": {
-    "@decimalturn/toml-patch": "^1.2.1"
   }
 }

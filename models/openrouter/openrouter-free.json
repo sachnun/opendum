@@ -1,0 +1,17 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "description": "OpenRouter router that automatically selects a compatible free model.",
+  "meta": {
+    "contextLength": 200000,
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "openrouter/free"
+    }
+  }
+}

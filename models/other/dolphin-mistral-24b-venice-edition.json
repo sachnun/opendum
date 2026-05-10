@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "family": "Cognitive Computations",
+  "meta": {
+    "contextLength": 32768,
+    "outputLimit": 32768,
+    "knowledgeCutoff": "2025-06",
+    "releaseDate": "2025-07-09",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+    }
+  }
+}

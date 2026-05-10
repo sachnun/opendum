@@ -1,7 +1,0 @@
-[opendum]
-family = "Zyphra"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "zyphra/zamba2-7b-instruct"

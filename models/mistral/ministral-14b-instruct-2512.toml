@@ -1,5 +1,0 @@
-[opendum]
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "mistralai/ministral-14b-instruct-2512"

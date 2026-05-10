@@ -1,0 +1,32 @@
+{
+  "providers": [
+    "kilo_code",
+    "nvidia_nim"
+  ],
+  "family": "StepFun",
+  "meta": {
+    "contextLength": 256000,
+    "outputLimit": 256000,
+    "knowledgeCutoff": "2025-01",
+    "releaseDate": "2026-01-29",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "stepfun/step-3.5-flash:free"
+    },
+    "nvidia_nim": {
+      "upstream": "stepfun-ai/step-3.5-flash"
+    }
+  }
+}

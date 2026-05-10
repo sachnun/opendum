@@ -1,0 +1,38 @@
+{
+  "providers": [
+    "gemini_cli"
+  ],
+  "family": "Gemini",
+  "meta": {
+    "contextLength": 1048576,
+    "outputLimit": 65536,
+    "knowledgeCutoff": "2025-01",
+    "releaseDate": "2026-03-03",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "gemini_cli": {
+      "thinking_budgets": {
+        "high": 24576,
+        "low": 6144,
+        "medium": 12288,
+        "xhigh": 24576
+      },
+      "thinking_format": "budget"
+    }
+  }
+}

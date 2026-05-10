@@ -1,0 +1,25 @@
+{
+  "providers": [],
+  "aliases": [
+    "meta-llama3-8b-instruct",
+    "meta/llama3-8b-instruct"
+  ],
+  "family": "Meta",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "releaseDate": "2024-04-17",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

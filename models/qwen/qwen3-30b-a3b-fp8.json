@@ -1,0 +1,27 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "releaseDate": "2025-05",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/qwen/qwen3-30b-a3b-fp8"
+    }
+  }
+}

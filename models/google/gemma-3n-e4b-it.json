@@ -1,0 +1,34 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "google-gemma-3n-e4b-it",
+    "google/gemma-3n-e4b-it"
+  ],
+  "family": "Google",
+  "ignored": true,
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 4096,
+    "knowledgeCutoff": "2024-06",
+    "releaseDate": "2025-06-03",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/gemma-3n-e4b-it"
+    }
+  }
+}

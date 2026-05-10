@@ -1,45 +1,95 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { parse, patch, stringify, TomlFormat } from "@decimalturn/toml-patch";
 
-function createModelTomlFormat() {
-  const format = TomlFormat.default();
-  format.bracketSpacing = false;
-  return format;
+const MODEL_FILE_EXTENSION = ".json";
+
+const MODEL_PROPERTY_ORDER = [
+  "providers",
+  "aliases",
+  "description",
+  "family",
+  "ignored",
+  "meta",
+  "providerConfig",
+];
+
+const META_PROPERTY_ORDER = [
+  "contextLength",
+  "outputLimit",
+  "knowledgeCutoff",
+  "releaseDate",
+  "reasoning",
+  "toolCall",
+  "vision",
+  "modalities",
+];
+
+const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "minTier", "aliases"];
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-const MODEL_TOML_FORMAT = createModelTomlFormat();
+function orderObject(value, preferredKeys = []) {
+  const result = {};
+  const preferred = new Set(preferredKeys);
 
-function readModelToml(content) {
-  return parse(content, { integersAsBigInt: false });
-}
-
-export function writeModelToml(filePath, data) {
-  let content;
-
-  if (existsSync(filePath)) {
-    const current = readFileSync(filePath, "utf-8");
-    try {
-      content = patch(current, data, MODEL_TOML_FORMAT);
-    } catch {
-      content = stringify(data, MODEL_TOML_FORMAT);
+  for (const key of preferredKeys) {
+    if (value[key] !== undefined) {
+      result[key] = orderValue(value[key], key);
     }
-  } else {
-    content = stringify(data, MODEL_TOML_FORMAT);
   }
 
-  const normalized = content.replace(/= \[[ \t]+\]/g, "= []");
-  writeFileSync(filePath, normalized.endsWith("\n") ? normalized : `${normalized}\n`);
+  for (const key of Object.keys(value).filter((key) => !preferred.has(key)).sort()) {
+    if (value[key] !== undefined) {
+      result[key] = orderValue(value[key], key);
+    }
+  }
+
+  return result;
 }
 
-function collectTomlFiles(modelsDir) {
+function orderProviderMap(value, preferredKeys = []) {
+  const result = {};
+  for (const provider of Object.keys(value).sort()) {
+    result[provider] = isPlainObject(value[provider])
+      ? orderObject(value[provider], preferredKeys)
+      : orderValue(value[provider], provider);
+  }
+  return result;
+}
+
+function orderValue(value, key) {
+  if (Array.isArray(value)) return value.map((item) => orderValue(item));
+  if (!isPlainObject(value)) return value;
+
+  if (key === "meta") return orderObject(value, META_PROPERTY_ORDER);
+  if (key === "modalities") return orderObject(value, ["input", "output"]);
+  if (key === "providerConfig") return orderProviderMap(value, PROVIDER_CONFIG_PROPERTY_ORDER);
+  return orderObject(value);
+}
+
+function normalizeModelData(data) {
+  return orderObject(data, MODEL_PROPERTY_ORDER);
+}
+
+function readModelJson(content) {
+  return JSON.parse(content);
+}
+
+export function writeModelJson(filePath, data) {
+  const content = JSON.stringify(normalizeModelData(data), null, 2);
+  writeFileSync(filePath, `${content}\n`);
+}
+
+function collectModelFiles(modelsDir) {
   const files = [];
   for (const entry of readdirSync(modelsDir)) {
     const fullPath = join(modelsDir, entry);
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {
       for (const file of readdirSync(fullPath)) {
-        if (file.endsWith(".toml")) {
+        if (file.endsWith(MODEL_FILE_EXTENSION)) {
           files.push(join(fullPath, file));
         }
       }
@@ -51,10 +101,10 @@ function collectTomlFiles(modelsDir) {
 /** Build index: modelId -> { path, data } */
 export function buildModelIndex(modelsDir) {
   const index = {};
-  for (const filePath of collectTomlFiles(modelsDir)) {
-    const modelId = basename(filePath, ".toml");
+  for (const filePath of collectModelFiles(modelsDir)) {
+    const modelId = basename(filePath, MODEL_FILE_EXTENSION);
     const content = readFileSync(filePath, "utf-8");
-    index[modelId] = { path: filePath, data: readModelToml(content) };
+    index[modelId] = { path: filePath, data: readModelJson(content) };
   }
   return index;
 }
@@ -85,7 +135,7 @@ function inferModelFolder(modelKey) {
 }
 
 /**
- * Sync a provider's model map into the TOML registry.
+ * Sync a provider's model map into the JSON registry.
  *
  * @param {string} modelsDir Path to models/ directory
  * @param {string} providerName e.g. "nvidia_nim"
@@ -99,23 +149,20 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
   const updated = [];
 
   for (const [modelId, entry] of Object.entries(index)) {
-    const providers = entry.data.opendum?.providers || [];
+    const providers = entry.data.providers || [];
     if (!providers.includes(providerName)) continue;
     if (modelMap.has(modelId)) continue;
 
-    entry.data.opendum.providers = providers.filter(p => p !== providerName);
+    entry.data.providers = providers.filter((provider) => provider !== providerName);
 
-    if (entry.data.opendum?.upstream?.[providerName]) {
-      delete entry.data.opendum.upstream[providerName];
-      if (Object.keys(entry.data.opendum.upstream).length === 0) {
-        delete entry.data.opendum.upstream;
+    if (entry.data.providerConfig?.[providerName]) {
+      delete entry.data.providerConfig[providerName];
+      if (Object.keys(entry.data.providerConfig).length === 0) {
+        delete entry.data.providerConfig;
       }
     }
-    if (entry.data[providerName] && typeof entry.data[providerName] === "object") {
-      delete entry.data[providerName];
-    }
 
-    writeModelToml(entry.path, entry.data);
+    writeModelJson(entry.path, entry.data);
     removed.push(modelId);
   }
 
@@ -123,37 +170,38 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
     const existing = index[modelKey];
 
     if (existing) {
-      if (!existing.data.opendum) existing.data.opendum = {};
-      const providers = existing.data.opendum.providers || [];
+      const providers = existing.data.providers || [];
       let changed = false;
 
       if (!providers.includes(providerName)) {
         providers.push(providerName);
         providers.sort();
-        existing.data.opendum.providers = providers;
+        existing.data.providers = providers;
         changed = true;
       }
 
-      if (!existing.data[providerName] || typeof existing.data[providerName] !== "object") {
-        existing.data[providerName] = {};
-      }
+      const providerConfig = existing.data.providerConfig?.[providerName] || {};
 
       if (upstreamName !== modelKey) {
-        if (existing.data[providerName].upstream !== upstreamName) {
-          existing.data[providerName].upstream = upstreamName;
+        if (!existing.data.providerConfig) existing.data.providerConfig = {};
+        if (!existing.data.providerConfig[providerName]) existing.data.providerConfig[providerName] = {};
+        if (existing.data.providerConfig[providerName].upstream !== upstreamName) {
+          existing.data.providerConfig[providerName].upstream = upstreamName;
           changed = true;
         }
-      } else if (existing.data[providerName].upstream !== undefined) {
-        delete existing.data[providerName].upstream;
+      } else if (providerConfig.upstream !== undefined) {
+        delete providerConfig.upstream;
         changed = true;
-      }
-
-      if (Object.keys(existing.data[providerName]).length === 0) {
-        delete existing.data[providerName];
+        if (Object.keys(providerConfig).length === 0) {
+          delete existing.data.providerConfig[providerName];
+        }
+        if (existing.data.providerConfig && Object.keys(existing.data.providerConfig).length === 0) {
+          delete existing.data.providerConfig;
+        }
       }
 
       if (changed) {
-        writeModelToml(existing.path, existing.data);
+        writeModelJson(existing.path, existing.data);
         updated.push(modelKey);
       }
     } else {
@@ -162,20 +210,35 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
       if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
 
       const data = {
-        opendum: {
-          providers: [providerName],
-        },
+        providers: [providerName],
       };
 
       if (upstreamName !== modelKey) {
-        data[providerName] = { upstream: upstreamName };
+        data.providerConfig = {
+          [providerName]: { upstream: upstreamName },
+        };
       }
 
-      const filePath = join(folderPath, `${modelKey}.toml`);
-      writeModelToml(filePath, data);
+      const filePath = join(folderPath, `${modelKey}${MODEL_FILE_EXTENSION}`);
+      writeModelJson(filePath, data);
       added.push(modelKey);
     }
   }
 
   return { added, removed, updated };
+}
+
+export function getProviderUpstream(data, providerName, modelId) {
+  const providerConfig = data.providerConfig?.[providerName];
+  if (
+    providerConfig &&
+    typeof providerConfig === "object" &&
+    !Array.isArray(providerConfig) &&
+    typeof providerConfig.upstream === "string" &&
+    providerConfig.upstream.trim().length > 0
+  ) {
+    return providerConfig.upstream.trim();
+  }
+
+  return modelId;
 }

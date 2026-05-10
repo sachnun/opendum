@@ -1,5 +1,0 @@
-[opendum]
-providers = ["nvidia_nim"]
-
-[nvidia_nim]
-upstream = "meta/llama2-70b"

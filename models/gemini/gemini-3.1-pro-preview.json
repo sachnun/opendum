@@ -1,0 +1,59 @@
+{
+  "providers": [
+    "antigravity",
+    "copilot",
+    "gemini_cli"
+  ],
+  "aliases": [
+    "gemini-3.1-pro",
+    "gemini-3.1-pro-high",
+    "gemini-3.1-pro-low"
+  ],
+  "family": "Gemini",
+  "meta": {
+    "contextLength": 1048576,
+    "outputLimit": 65536,
+    "knowledgeCutoff": "2025-01",
+    "releaseDate": "2026-02-19",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-3.1-pro-high",
+      "inject_thought_signature": true,
+      "scrub_model_artifacts": true,
+      "signature_family": "gemini-pro",
+      "system_instruction": true,
+      "thinking_budgets": {
+        "high": 32768,
+        "low": 8192,
+        "medium": 16384,
+        "xhigh": 32768
+      },
+      "thinking_format": "budget"
+    },
+    "gemini_cli": {
+      "thinking_budgets": {
+        "high": 32768,
+        "low": 8192,
+        "medium": 16384,
+        "xhigh": 32768
+      },
+      "thinking_format": "budget"
+    }
+  }
+}

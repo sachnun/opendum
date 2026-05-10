@@ -1,11 +1,9 @@
 /**
  * Model registry consumed by the proxy layer.
  *
- * The registry is generated at build time from models/*.toml so Cloudflare
- * Workers never need runtime filesystem access.
+ * JSON model files are statically imported by the bundler so Cloudflare Workers
+ * never need runtime filesystem access.
  */
-import { GENERATED_IGNORED_MODELS, GENERATED_MODEL_REGISTRY } from "./generated-model-registry.js";
-
 export interface ModelMeta {
   contextLength?: number;
   outputLimit?: number;
@@ -24,17 +22,10 @@ export interface ModelInfo {
   providers: string[];
   aliases?: string[];
   description?: string;
-  /** Model family name (e.g. "Claude", "OpenAI"). Read from [opendum].family in TOML. */
+  /** Model family name (e.g. "Claude", "OpenAI"). */
   family?: string;
+  ignored?: boolean;
   meta?: ModelMeta;
-  /** Per-provider upstream model name. When absent, the canonical id is used. */
-  upstream?: Record<string, string>;
-  access?: Record<
-    string,
-    {
-      minTier?: string;
-    }
-  >;
   providerConfig?: Record<
     string,
     {
@@ -46,8 +37,26 @@ export interface ModelInfo {
   >;
 }
 
-/** All models loaded from TOML files. */
-export const MODEL_REGISTRY: Record<string, ModelInfo> = GENERATED_MODEL_REGISTRY;
+const MODEL_MODULES = import.meta.glob<ModelInfo>(
+  "../../../../../models/**/*.json",
+  {
+    eager: true,
+    import: "default",
+  }
+);
+
+function getModelIdFromPath(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1, -".json".length);
+}
+
+/** All models loaded from JSON files. */
+export const MODEL_REGISTRY: Record<string, ModelInfo> = Object.fromEntries(
+  Object.entries(MODEL_MODULES).map(([path, info]) => [getModelIdFromPath(path), info])
+);
 
 /** Model IDs marked as ignored (hidden from UI and API). */
-export const IGNORED_MODELS: Set<string> = GENERATED_IGNORED_MODELS;
+export const IGNORED_MODELS: Set<string> = new Set(
+  Object.entries(MODEL_REGISTRY)
+    .filter(([, info]) => info.ignored)
+    .map(([modelId]) => modelId)
+);

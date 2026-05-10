@@ -1,0 +1,7 @@
+{
+  "providers": [
+    "codex",
+    "copilot"
+  ],
+  "family": "OpenAI"
+}

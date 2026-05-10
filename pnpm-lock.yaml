@@ -10,10 +10,6 @@ overrides:
 importers:
 
   .:
-    dependencies:
-      '@decimalturn/toml-patch':
-        specifier: ^1.2.1
-        version: 1.2.1
     devDependencies:
       typescript:
         specifier: ^6.0.3
@@ -60,9 +56,6 @@ importers:
       reka-ui:
         specifier: ^2.9.7
         version: 2.9.7(vue@3.5.34(typescript@6.0.3))
-      smol-toml:
-        specifier: ^1.6.1
-        version: 1.6.1
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -386,10 +379,6 @@ packages:
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
-    engines: {node: '>=12'}
-
-  '@decimalturn/toml-patch@1.2.1':
-    resolution: {integrity: sha512-IbKgsnKK5sk0wDcqZ9ZzJGejM9hlVwc6097HURfIpksiBe4dxrzbGAZlHsn4sHGh+RkFAUT85O/jNoQTBhHfdQ==}
     engines: {node: '>=12'}
 
   '@drizzle-team/brocli@0.10.2':
@@ -5069,10 +5058,6 @@ packages:
     resolution: {integrity: sha512-KAkBqZl3c2GvNgNhcoyJae1aKldDW0LO279wF9bk1PnluRTETKBq0WyzRXxEhoQLk56yHaOY4JCBEKDuJIET5g==}
     engines: {node: '>=20.0.0'}
 
-  smol-toml@1.6.1:
-    resolution: {integrity: sha512-dWUG8F5sIIARXih1DTaQAX4SsiTXhInKf1buxdY9DIg4ZYPZK5nGM1VRIYmEbDbsHt7USo99xSLFu5Q1IqTmsg==}
-    engines: {node: '>= 18'}
-
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
@@ -6015,8 +6000,6 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
-
-  '@decimalturn/toml-patch@1.2.1': {}
 
   '@drizzle-team/brocli@0.10.2': {}
 
@@ -10474,8 +10457,6 @@ snapshots:
   slash@5.1.0: {}
 
   smob@1.6.1: {}
-
-  smol-toml@1.6.1: {}
 
   source-map-js@1.2.1: {}
 

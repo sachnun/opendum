@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels } from "./model-registry.mjs";
+import { buildModelIndex, syncProviderModels, getProviderUpstream } from "./model-registry.mjs";
 
 const PROVIDER_NAME = "nvidia_nim";
 const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
@@ -151,21 +151,6 @@ function extractNvidiaGenerativeModelKeys(html) {
   }
 
   return modelKeys;
-}
-
-function getProviderUpstream(entry, providerName, modelId) {
-  const providerConfig = entry.data[providerName];
-  if (
-    providerConfig &&
-    typeof providerConfig === "object" &&
-    !Array.isArray(providerConfig) &&
-    typeof providerConfig.upstream === "string" &&
-    providerConfig.upstream.trim().length > 0
-  ) {
-    return providerConfig.upstream.trim();
-  }
-
-  return entry.data.opendum?.upstream?.[providerName] || modelId;
 }
 
 function buildModelMap(modelIds, existingKeys, llmModelKeys) {
@@ -321,13 +306,13 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 
-  // Build existing model map from TOML files to preserve existing keys
+  // Build existing model map from JSON files to preserve existing keys
   const index = buildModelIndex(modelsDir);
   const existingKeys = new Map();
   for (const [modelId, entry] of Object.entries(index)) {
-    const providers = entry.data.opendum?.providers || [];
+    const providers = entry.data.providers || [];
     if (providers.includes(PROVIDER_NAME)) {
-      const upstream = getProviderUpstream(entry, PROVIDER_NAME, modelId);
+      const upstream = getProviderUpstream(entry.data, PROVIDER_NAME, modelId);
       existingKeys.set(modelId, upstream);
     }
   }

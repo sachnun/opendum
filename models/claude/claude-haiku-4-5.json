@@ -1,0 +1,38 @@
+{
+  "providers": [
+    "copilot",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-haiku-4.5",
+    "claude-haiku4.5"
+  ],
+  "family": "Claude",
+  "meta": {
+    "contextLength": 200000,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2025-02-28",
+    "releaseDate": "2025-10-15",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "copilot": {
+      "upstream": "claude-haiku-4.5"
+    },
+    "kiro": {
+      "upstream": "claude-haiku-4.5"
+    }
+  }
+}

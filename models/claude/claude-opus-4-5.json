@@ -1,0 +1,38 @@
+{
+  "providers": [
+    "copilot",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-opus-4.5",
+    "claude-opus4.5"
+  ],
+  "family": "Claude",
+  "meta": {
+    "contextLength": 200000,
+    "outputLimit": 64000,
+    "knowledgeCutoff": "2025-03-31",
+    "releaseDate": "2025-11-24",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "copilot": {
+      "upstream": "claude-opus-4.5"
+    },
+    "kiro": {
+      "upstream": "claude-opus-4.5"
+    }
+  }
+}

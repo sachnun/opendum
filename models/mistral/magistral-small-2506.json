@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "meta": {
+    "contextLength": 128000,
+    "outputLimit": 128000,
+    "knowledgeCutoff": "2025-06",
+    "releaseDate": "2025-03-17",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/magistral-small-2506"
+    }
+  }
+}

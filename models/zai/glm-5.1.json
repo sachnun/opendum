@@ -1,0 +1,12 @@
+{
+  "providers": [
+    "ollama_cloud",
+    "nvidia_nim"
+  ],
+  "family": "Z.AI",
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "z-ai/glm-5.1"
+    }
+  }
+}

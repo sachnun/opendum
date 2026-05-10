@@ -1,0 +1,29 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Google",
+  "meta": {
+    "contextLength": 40000,
+    "outputLimit": 8192,
+    "knowledgeCutoff": "2024-12",
+    "releaseDate": "2024-12-01",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/gemma-3-27b-it"
+    }
+  }
+}

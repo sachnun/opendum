@@ -1,7 +1,0 @@
-[opendum]
-family = "Databricks"
-providers = ["nvidia_nim"]
-ignored = true
-
-[nvidia_nim]
-upstream = "databricks/dbrx-instruct"

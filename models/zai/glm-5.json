@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "kiro",
+    "ollama_cloud"
+  ],
+  "family": "Z.AI",
+  "meta": {
+    "contextLength": 204800,
+    "outputLimit": 131072,
+    "releaseDate": "2026-02-11",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

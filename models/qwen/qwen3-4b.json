@@ -1,0 +1,21 @@
+{
+  "providers": [],
+  "family": "Qwen",
+  "meta": {
+    "contextLength": 32000,
+    "outputLimit": 4096,
+    "knowledgeCutoff": "2024-07",
+    "releaseDate": "2025-04-29",
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}

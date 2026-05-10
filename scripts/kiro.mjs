@@ -5,7 +5,7 @@
  *
  * Scrapes the official Kiro documentation page (https://kiro.dev/docs/models/)
  * to discover the current list of officially supported models, then syncs
- * them into the TOML model registry.
+ * them into the JSON model registry.
  *
  * This ensures only models actually listed in the official Kiro docs are
  * registered as Kiro-provided, preventing INVALID_MODEL_ID errors from
@@ -46,8 +46,8 @@ const MODELS_WITH_1M_VARIANT = new Set([
   "claude-sonnet-4.5",
 ]);
 
-// Kiro modelId → canonical TOML model key (only when they differ)
-const TOML_KEY_OVERRIDES = {};
+// Kiro modelId -> canonical JSON model key (only when they differ)
+const MODEL_KEY_OVERRIDES = {};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -278,11 +278,11 @@ function expandVariants(kiroId) {
 }
 
 // ---------------------------------------------------------------------------
-// Kiro model ID → canonical TOML key
+// Kiro model ID -> canonical JSON key
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a Kiro API model ID to a canonical TOML model key.
+  * Convert a Kiro API model ID to a canonical JSON model key.
  *
  * Kiro uses dots in version numbers:
  *   "claude-sonnet-4.5"  → "claude-sonnet-4-5"
@@ -294,9 +294,9 @@ function expandVariants(kiroId) {
  * @returns {{ key: string, upstream: string }}
  */
 function toCanonical(kiroModelId) {
-  if (TOML_KEY_OVERRIDES[kiroModelId]) {
+  if (MODEL_KEY_OVERRIDES[kiroModelId]) {
     return {
-      key: TOML_KEY_OVERRIDES[kiroModelId],
+      key: MODEL_KEY_OVERRIDES[kiroModelId],
       upstream: kiroModelId,
     };
   }
@@ -376,11 +376,11 @@ async function main() {
   }
 
   if (dryRun) {
-    console.log("[kiro] Dry run — no TOML files modified.");
+    console.log("[kiro] Dry run - no JSON files modified.");
     return;
   }
 
-  // 4. Sync into TOML files
+  // 4. Sync into JSON files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 

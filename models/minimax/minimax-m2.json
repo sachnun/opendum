@@ -1,0 +1,22 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "MiniMax",
+  "meta": {
+    "contextLength": 204800,
+    "outputLimit": 128000,
+    "releaseDate": "2025-10-23",
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  }
+}
