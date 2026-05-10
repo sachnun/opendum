@@ -565,7 +565,7 @@ function historyEntryPreview(errorMessage: string): string {
           <div class="flex justify-between"><span class="text-muted-foreground">Last Error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
 
           <div class="min-h-14 border-t">
-            <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[3.25rem] cursor-pointer rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
+            <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[4.5rem] cursor-pointer rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
               <div class="flex items-center justify-between gap-1">
                 <span class="text-xs text-muted-foreground">Last Error Message:</span>
                 <button
@@ -579,12 +579,17 @@ function historyEntryPreview(errorMessage: string): string {
                   <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
                 </button>
               </div>
-              <span :class="['mt-1 line-clamp-2 block break-all text-xs', errorToneClass]">{{ account.lastErrorCode ? `[${account.lastErrorCode}] ` : '' }}{{ errorPreview }}</span>
+              <div class="mt-1 flex min-h-8 items-center">
+                <span :class="['line-clamp-2 break-all text-xs', errorToneClass]">{{ account.lastErrorCode ? `[${account.lastErrorCode}] ` : '' }}{{ errorPreview }}</span>
+              </div>
               <span class="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </button>
-            <div v-else class="w-full min-h-[3.25rem] rounded-sm pt-2 text-left">
-              <span class="text-xs text-muted-foreground">Last Error Message:</span>
-              <span class="mt-1 line-clamp-2 block break-all text-xs text-muted-foreground">-</span>
+            <div v-else class="w-full min-h-[4.5rem] rounded-sm pt-2 text-left">
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-xs text-muted-foreground">Last Error Message:</span>
+              </div>
+              <div class="mt-1 flex min-h-8 items-center justify-center text-center text-xs text-muted-foreground">No data</div>
+              <span class="invisible mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </div>
           </div>
 
