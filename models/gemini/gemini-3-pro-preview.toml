@@ -14,17 +14,8 @@ output = ["text"]
 
 [opendum]
 family = "Gemini"
-providers = ["antigravity", "gemini_cli"]
+providers = ["gemini_cli"]
 aliases = ["gemini-3-pro", "gemini-3-pro-high", "gemini-3-pro-low"]
-
-[antigravity]
-upstream = "gemini-3-pro-high"
-system_instruction = true
-thinking_format = "level"
-signature_family = "gemini-pro"
-scrub_model_artifacts = true
-inject_thought_signature = true
-thinking_levels = { none = "low", low = "low", medium = "high", high = "high", xhigh = "high" }
 
 [gemini_cli]
 thinking_format = "level"

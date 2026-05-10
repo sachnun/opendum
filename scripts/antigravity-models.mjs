@@ -68,8 +68,8 @@ const CLAUDE_TRANSFORM_TS_PATH = resolve(
 
 const MODEL_NAME_OVERRIDES = {
   "antigravity-gemini-3-pro": {
-    key: "gemini-3-pro-preview",
-    upstream: "gemini-3-pro-high",
+    key: "gemini-3.1-pro-preview",
+    upstream: "gemini-3.1-pro-high",
   },
   "antigravity-gemini-3.1-pro": {
     key: "gemini-3.1-pro-preview",

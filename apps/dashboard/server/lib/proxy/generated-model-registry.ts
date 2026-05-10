@@ -855,7 +855,6 @@ export const GENERATED_MODEL_REGISTRY = {
   },
   "gemini-3-pro-preview": {
     "providers": [
-      "antigravity",
       "gemini_cli"
     ],
     "aliases": [
@@ -885,25 +884,7 @@ export const GENERATED_MODEL_REGISTRY = {
         ]
       }
     },
-    "upstream": {
-      "antigravity": "gemini-3-pro-high"
-    },
     "providerConfig": {
-      "antigravity": {
-        "upstream": "gemini-3-pro-high",
-        "system_instruction": true,
-        "thinking_format": "level",
-        "signature_family": "gemini-pro",
-        "scrub_model_artifacts": true,
-        "inject_thought_signature": true,
-        "thinking_levels": {
-          "none": "low",
-          "low": "low",
-          "medium": "high",
-          "high": "high",
-          "xhigh": "high"
-        }
-      },
       "gemini_cli": {
         "thinking_format": "level",
         "thinking_levels": {
