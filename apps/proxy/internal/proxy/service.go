@@ -10,7 +10,6 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
-	"github.com/opendum/opendum/apps/proxy/internal/cryptojs"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 	"github.com/opendum/opendum/apps/proxy/internal/providers"
@@ -156,59 +155,9 @@ func (s *Service) makeProviderRequest(ctx context.Context, account appdb.Provide
 	if !ok {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
 	}
-	requestAccount := account
-	if requestAccount.AccessToken == "" || requestAccount.RefreshToken == "" {
-		if err := s.db.NewSelect().Model(&requestAccount).Column("id", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email").Where("id = ?", account.ID).Limit(1).Scan(ctx); err != nil {
-			return nil, err
-		}
-	}
-	credentials, err := cryptojs.Decrypt(s.secret, requestAccount.AccessToken)
+	credentials, requestAccount, err := s.credentialsForAccount(ctx, account, providerImpl)
 	if err != nil {
 		return nil, err
-	}
-	refreshBuffer := 3 * time.Hour
-	if customBuffer, ok := providerImpl.(providers.RefreshBufferProvider); ok {
-		refreshBuffer = customBuffer.RefreshBuffer()
-	}
-	if refresher, ok := providerImpl.(providers.CredentialRefresher); ok && time.Now().After(requestAccount.ExpiresAt.Add(-refreshBuffer)) {
-		refreshToken, err := cryptojs.Decrypt(s.secret, requestAccount.RefreshToken)
-		if err != nil {
-			return nil, err
-		}
-		refreshed, err := refresher.RefreshCredentials(ctx, s.client, refreshToken, requestAccount)
-		if err != nil {
-			if time.Now().After(requestAccount.ExpiresAt) {
-				return nil, err
-			}
-		} else {
-			encryptedAccess, err := cryptojs.Encrypt(s.secret, refreshed.AccessToken)
-			if err != nil {
-				return nil, err
-			}
-			encryptedRefresh, err := cryptojs.Encrypt(s.secret, refreshed.RefreshToken)
-			if err != nil {
-				return nil, err
-			}
-			query := s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"accessToken\" = ?", encryptedAccess).Set("\"refreshToken\" = ?", encryptedRefresh).Set("\"expiresAt\" = ?", refreshed.ExpiresAt).Where("id = ?", requestAccount.ID)
-			if refreshed.ProjectID != "" {
-				query.Set("\"projectId\" = ?", refreshed.ProjectID)
-				requestAccount.ProjectID = &refreshed.ProjectID
-			}
-			if refreshed.Tier != "" {
-				query.Set("tier = ?", refreshed.Tier)
-				requestAccount.Tier = &refreshed.Tier
-			}
-			if refreshed.Email != "" {
-				query.Set("email = ?", refreshed.Email)
-				requestAccount.Email = &refreshed.Email
-			}
-			if refreshed.AccountID != "" {
-				query.Set("\"accountId\" = ?", refreshed.AccountID)
-				requestAccount.AccountID = &refreshed.AccountID
-			}
-			_, _ = query.Exec(ctx)
-			credentials = refreshed.AccessToken
-		}
 	}
 	return providerImpl.MakeRequest(ctx, s.client, credentials, requestAccount, payload, stream)
 }

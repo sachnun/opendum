@@ -49,6 +49,11 @@ func main() {
 
 	authSvc := auth.NewService(database, redisClient, registry)
 	proxySvc := proxy.NewService(database, redisClient, authSvc, registry, cfg.BetterAuthSecret)
+	refreshCtx, stopTokenRefresher := context.WithCancel(context.Background())
+	defer stopTokenRefresher()
+	if cfg.TokenRefreshInterval > 0 {
+		go proxySvc.StartTokenRefresher(refreshCtx, cfg.TokenRefreshInterval)
+	}
 	handler := api.NewServer(registry, authSvc, proxySvc)
 
 	server := &http.Server{
@@ -70,6 +75,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
+	stopTokenRefresher()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

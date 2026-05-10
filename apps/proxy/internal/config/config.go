@@ -12,15 +12,16 @@ import (
 )
 
 type Config struct {
-	Host             string
-	Port             int
-	DatabaseURL      string
-	RedisURL         string
-	BetterAuthSecret string
-	ModelsDir        string
-	ReadTimeout      time.Duration
-	WriteTimeout     time.Duration
-	IdleTimeout      time.Duration
+	Host                 string
+	Port                 int
+	DatabaseURL          string
+	RedisURL             string
+	BetterAuthSecret     string
+	ModelsDir            string
+	ReadTimeout          time.Duration
+	WriteTimeout         time.Duration
+	IdleTimeout          time.Duration
+	TokenRefreshInterval time.Duration
 }
 
 func Load() (Config, error) {
@@ -38,15 +39,16 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		Host:             getenv("HOST", "0.0.0.0"),
-		Port:             port,
-		DatabaseURL:      os.Getenv("DATABASE_URL"),
-		RedisURL:         os.Getenv("REDIS_URL"),
-		BetterAuthSecret: os.Getenv("BETTER_AUTH_SECRET"),
-		ModelsDir:        modelsDir,
-		ReadTimeout:      30 * time.Second,
-		WriteTimeout:     0,
-		IdleTimeout:      120 * time.Second,
+		Host:                 getenv("HOST", "0.0.0.0"),
+		Port:                 port,
+		DatabaseURL:          os.Getenv("DATABASE_URL"),
+		RedisURL:             os.Getenv("REDIS_URL"),
+		BetterAuthSecret:     os.Getenv("BETTER_AUTH_SECRET"),
+		ModelsDir:            modelsDir,
+		ReadTimeout:          30 * time.Second,
+		WriteTimeout:         0,
+		IdleTimeout:          120 * time.Second,
+		TokenRefreshInterval: durationSeconds("TOKEN_REFRESH_INTERVAL_SECONDS", 60*time.Second),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -68,6 +70,18 @@ func getenv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func durationSeconds(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	seconds, err := strconv.Atoi(value)
+	if err != nil || seconds < 0 {
+		return fallback
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 func resolveModelsDir(configured string) (string, error) {

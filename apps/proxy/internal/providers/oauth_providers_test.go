@@ -261,11 +261,11 @@ func TestProviderCustomConfigDrivesCopilotResponsesAPI(t *testing.T) {
 	}
 }
 
-func TestProviderCustomUpstreamDrivesAntigravityOpusThinking(t *testing.T) {
+func TestProviderCustomUpstreamDrivesAntigravityModelResolution(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()
 	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
-		return cfg.Upstream != "" && customBool(cfg, "thinking_model")
+		return cfg.Upstream != ""
 	})
 	cfg, _ := registry.ProviderModelConfig(model, "antigravity")
 	if got := provider.resolveModel(model); got != cfg.Upstream {

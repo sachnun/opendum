@@ -1,7 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 
 const redisXxhashStub = "\0redis-xxhash-stub";
-
 const nitroPreset = process.env.NITRO_PRESET;
 
 export default defineNuxtConfig({
@@ -28,9 +27,6 @@ export default defineNuxtConfig({
       wrangler: {
         name: "opendum",
         compatibility_flags: ["nodejs_compat"],
-        triggers: {
-          crons: ["0 */6 * * *"],
-        },
       },
     },
     commonJS: {
@@ -50,12 +46,6 @@ export default defineNuxtConfig({
           },
         },
       ],
-    },
-    experimental: {
-      tasks: true,
-    },
-    scheduledTasks: {
-      "0 */6 * * *": ["refresh-tokens"],
     },
   },
   vite: {

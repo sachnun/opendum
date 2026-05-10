@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -68,6 +69,27 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 func (r *Registry) Get(name string) (Provider, bool) {
 	provider, ok := r.providers[name]
 	return provider, ok
+}
+
+func (r *Registry) RefreshableProviderNames() []string {
+	if r == nil {
+		return nil
+	}
+	names := make([]string, 0, len(r.providers))
+	for name, provider := range r.providers {
+		if _, ok := provider.(CredentialRefresher); ok {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func RefreshBufferFor(provider Provider) time.Duration {
+	if customBuffer, ok := provider.(RefreshBufferProvider); ok {
+		return customBuffer.RefreshBuffer()
+	}
+	return oauthRefreshBuffer
 }
 
 type openAICompatibleProvider struct {
