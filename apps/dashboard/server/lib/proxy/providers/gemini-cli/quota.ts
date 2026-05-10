@@ -2,6 +2,7 @@ import {
   ENDPOINT_FALLBACKS,
   AUTH_HEADERS,
 } from "./constants.js";
+import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const DEFAULT_MAX_REQUESTS = 1000;
 
@@ -195,9 +196,7 @@ export async function fetchGeminiCliQuotaFromApi(
       if (!response.ok) {
         const errorBody = await response.text();
         errors.push(
-          `${baseEndpoint}: HTTP ${response.status}${
-            errorBody ? ` ${errorBody.slice(0, 250)}` : ""
-          }`
+          `${baseEndpoint}: ${formatQuotaHttpError("Gemini CLI", response, errorBody, { endpointLabel: "quota endpoint", bodyLimit: 250 })}`
         );
         continue;
       }

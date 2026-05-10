@@ -8,6 +8,7 @@
 
 import { CODEX_CHAT_USER_AGENT, ORIGINATOR } from "./constants.js";
 import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
+import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
 const CHATGPT_ORIGIN = "https://chatgpt.com";
@@ -15,14 +16,6 @@ const CHATGPT_ORIGIN = "https://chatgpt.com";
 const QUOTA_STALE_MS = 15 * 60 * 1000;
 const CACHE_PREFIX = "opendum:quota:codex:snapshot";
 const CACHE_TTL_SECONDS = Math.ceil(QUOTA_STALE_MS / 1000);
-
-const CLOUDFLARE_CHALLENGE_MARKERS = [
-  "cf-mitigated",
-  "window._cf_chl_opt",
-  "/cdn-cgi/challenge-platform/",
-  "Enable JavaScript and cookies to continue",
-  "Just a moment",
-];
 
 export interface CodexRateLimitWindow {
   usedPercent: number;
@@ -302,31 +295,10 @@ function parseQuotaFromHeaders(headers: Headers | Record<string, string>): Parse
   };
 }
 
-function isLikelyCloudflareChallenge(
-  response: Response,
-  body: string
-): boolean {
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-  const cfMitigated = response.headers.get("cf-mitigated")?.toLowerCase() ?? "";
-
-  return (
-    cfMitigated === "challenge" ||
-    contentType.includes("text/html") ||
-    CLOUDFLARE_CHALLENGE_MARKERS.some((marker) => body.includes(marker))
-  );
-}
-
 function formatQuotaFetchError(response: Response, body: string): string {
-  const cfRay = response.headers.get("cf-ray");
-  const cfRaySuffix = cfRay ? ` (cf-ray: ${cfRay})` : "";
-
-  if (isLikelyCloudflareChallenge(response, body)) {
-    return `Codex quota endpoint returned HTTP ${response.status} from ChatGPT/Cloudflare${cfRaySuffix}`;
-  }
-
-  return `Codex quota fetch failed: HTTP ${response.status}${
-    body ? ` ${body.slice(0, 300)}` : ""
-  }`;
+  return formatQuotaHttpError("Codex", response, body, {
+    endpointLabel: "quota endpoint",
+  }).replace(" from Cloudflare", " from ChatGPT/Cloudflare");
 }
 
 function mergeQuotaData(

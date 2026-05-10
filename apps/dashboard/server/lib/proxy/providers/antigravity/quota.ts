@@ -6,6 +6,7 @@
  */
 
 import { CODE_ASSIST_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants.js";
+import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 /**
  * Max requests per model per tier (source of truth)
@@ -260,7 +261,10 @@ export async function fetchQuotaFromApi(
       });
 
       if (!response.ok) {
-        errors.push(`${baseEndpoint}: HTTP ${response.status}`);
+        const errorBody = await response.text().catch(() => "");
+        errors.push(
+          `${baseEndpoint}: ${formatQuotaHttpError("Antigravity", response, errorBody, { endpointLabel: "quota endpoint" })}`
+        );
         continue;
       }
 

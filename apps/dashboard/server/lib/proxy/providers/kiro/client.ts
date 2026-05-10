@@ -20,6 +20,7 @@ import {
   REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
+import { formatProviderHttpError } from "../provider-http-errors.js";
 
 interface KiroTokenExchangeResponse {
   accessToken: string;
@@ -464,7 +465,7 @@ export const kiroProvider: Provider = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Kiro token exchange failed: ${response.status} ${errorText}`);
+      throw new Error(formatProviderHttpError("Kiro", response, errorText, { endpointLabel: "token exchange endpoint" }));
     }
 
     const data = (await response.json()) as KiroTokenExchangeResponse;
@@ -493,7 +494,7 @@ export const kiroProvider: Provider = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Kiro token refresh failed: ${response.status} ${errorText}`);
+      throw new Error(formatProviderHttpError("Kiro", response, errorText, { endpointLabel: "token refresh endpoint" }));
     }
 
     const data = (await response.json()) as KiroRefreshResponse;

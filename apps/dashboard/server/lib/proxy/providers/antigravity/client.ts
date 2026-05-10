@@ -26,6 +26,7 @@ import { generateRequestId, isImageGenerationModel } from "./helpers.js";
 import { transformClaudeRequest, transformGeminiRequest } from "./transform/index.js";
 import type { TransformContext } from "./transform/types.js";
 import type { ToolSchemaMap } from "./tool-schema.js";
+import { formatProviderHttpError } from "../provider-http-errors.js";
 import {
   convertOpenAIToGemini,
   convertGeminiToOpenAI,
@@ -148,7 +149,7 @@ export const antigravityProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(error);
+      throw new Error(formatProviderHttpError("Antigravity", response, error, { endpointLabel: "token exchange endpoint" }));
     }
 
     const tokens = (await response.json()) as {
@@ -183,7 +184,7 @@ export const antigravityProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(error);
+      throw new Error(formatProviderHttpError("Antigravity", response, error, { endpointLabel: "token refresh endpoint" }));
     }
 
     const tokens = (await response.json()) as {

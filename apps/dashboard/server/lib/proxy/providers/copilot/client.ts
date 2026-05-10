@@ -25,6 +25,7 @@ import {
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet, MODEL_REGISTRY, resolveModelAlias } from "../../models.js";
 import { convertImageUrlsToBase64, convertResponsesInputImageUrlsToBase64 } from "../../images.js";
+import { formatProviderHttpError } from "../provider-http-errors.js";
 import {
   convertResponsesInputToChatMessages,
   getCopilotSystemToolMode,
@@ -788,7 +789,7 @@ export const copilotProvider: Provider = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Copilot token exchange failed: ${response.status} ${errorText}`);
+      throw new Error(formatProviderHttpError("Copilot", response, errorText, { endpointLabel: "token exchange endpoint" }));
     }
 
     const tokenData = await response.json() as CopilotTokenResponse;
@@ -824,7 +825,7 @@ export const copilotProvider: Provider = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Copilot token refresh failed: ${response.status} ${errorText}`);
+      throw new Error(formatProviderHttpError("Copilot", response, errorText, { endpointLabel: "token refresh endpoint" }));
     }
 
     const tokenData = await response.json() as CopilotTokenResponse;
@@ -993,7 +994,7 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Copilot device code request failed: ${response.status} ${errorText}`);
+    throw new Error(formatProviderHttpError("Copilot", response, errorText, { endpointLabel: "device code endpoint" }));
   }
 
   const data = await response.json() as CopilotDeviceCodeResponse;
@@ -1028,7 +1029,7 @@ export async function pollCopilotDeviceCodeAuthorization(
 
   if (!response.ok) {
     const errorText = await response.text();
-    return { error: `Copilot auth failed (HTTP ${response.status}): ${errorText}` };
+    return { error: formatProviderHttpError("Copilot", response, errorText, { endpointLabel: "auth polling endpoint" }) };
   }
 
   const data = await response.json() as CopilotTokenResponse;

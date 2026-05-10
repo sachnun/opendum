@@ -11,6 +11,7 @@ import { API_BASE_URL as kiloCodeApiBaseUrl } from "../lib/proxy/providers/kilo-
 import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/proxy/providers/nvidia-nim/constants";
 import { API_BASE_URL as ollamaApiBaseUrl } from "../lib/proxy/providers/ollama-cloud/constants";
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/proxy/providers/openrouter/constants";
+import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/proxy/providers/provider-http-errors";
 import { getWorkersAiValidationUrl } from "../lib/proxy/providers/workers-ai/constants";
 import type { ActionResult } from "../utils/api";
 
@@ -57,9 +58,10 @@ async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string):
   try {
     const response = await fetch(url, { ...init, signal: controller.signal });
     let responseText = "";
-    if (response.status === 401 || response.status === 403 || (requireSuccessfulStatus && !response.ok)) {
+    if (!response.ok) {
       try { responseText = await response.text(); } catch { responseText = ""; }
     }
+    if (isLikelyCloudflareChallenge(response, responseText)) return { success: false, error: formatProviderHttpError(label, response, responseText, { endpointLabel: "API key validation endpoint" }) };
     if (response.status === 401 || response.status === 403) return { success: false, error: `${label} API key is invalid.` };
     if (requireSuccessfulStatus && !response.ok) {
       const normalizedBody = responseText.toLowerCase();
@@ -105,8 +107,12 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
   try {
     const response = await fetch(getWorkersAiValidationUrl(normalizedAccountId), { method: "GET", headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" }, signal: controller.signal, cache: "no-store" });
-    if (response.status === 401 || response.status === 403) return { success: false, error: "Workers AI API token is invalid." };
-    if (!response.ok) return { success: false, error: `Unable to validate Workers AI credentials (HTTP ${response.status}). Please try again.` };
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      if (isLikelyCloudflareChallenge(response, responseText)) return { success: false, error: formatProviderHttpError("Workers AI", response, responseText, { endpointLabel: "credentials validation endpoint" }) };
+      if (response.status === 401 || response.status === 403) return { success: false, error: "Workers AI API token is invalid." };
+      return { success: false, error: `Unable to validate Workers AI credentials (HTTP ${response.status}). Please try again.` };
+    }
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Workers AI validation timed out. Please try again." };
     return { success: false, error: "Unable to validate Workers AI credentials. Please check your network and try again." };

@@ -33,6 +33,7 @@ import {
 } from "../antigravity/converter.js";
 import { cacheSignature } from "../antigravity/cache.js";
 import { buildToolSchemaMap } from "../antigravity/tool-schema.js";
+import { formatProviderHttpError } from "../provider-http-errors.js";
 import { getProviderModelSet, getUpstreamModelName } from "../../models.js";
 
 /**
@@ -195,7 +196,7 @@ export const geminiCliProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Token exchange failed: ${response.status} ${error}`);
+      throw new Error(formatProviderHttpError("Gemini CLI", response, error, { endpointLabel: "token exchange endpoint" }));
     }
 
     const tokens = (await response.json()) as {
@@ -237,7 +238,7 @@ export const geminiCliProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Token refresh failed: ${response.status} ${error}`);
+      throw new Error(formatProviderHttpError("Gemini CLI", response, error, { endpointLabel: "token refresh endpoint" }));
     }
 
     const tokens = (await response.json()) as {
@@ -790,9 +791,7 @@ export async function fetchGeminiCliAccountInfo(
       if (!response.ok) {
         const errorBody = await response.text();
         errors.push(
-          `${baseEndpoint}: HTTP ${response.status}${
-            errorBody ? ` ${errorBody.slice(0, 250)}` : ""
-          }`
+          `${baseEndpoint}: ${formatProviderHttpError("Gemini CLI", response, errorBody, { endpointLabel: "account info endpoint", bodyLimit: 250 })}`
         );
         continue;
       }

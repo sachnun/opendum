@@ -1,4 +1,5 @@
 import { REGION } from "./constants.js";
+import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const USAGE_LIMITS_URL = `https://q.${REGION}.amazonaws.com/`;
 const REQUEST_TIMEOUT_MS = 10000;
@@ -330,9 +331,10 @@ export async function fetchKiroQuotaFromApi(
     if (!response.ok) {
       return {
         status: "error",
-        error: `Kiro usage limits request failed: HTTP ${response.status}${
-          rawBody ? ` ${rawBody.slice(0, 250)}` : ""
-        }`,
+        error: formatQuotaHttpError("Kiro", response, rawBody, {
+          endpointLabel: "usage limits quota endpoint",
+          bodyLimit: 250,
+        }),
         tier: null,
         metrics: [],
         fetchedAt: Date.now(),

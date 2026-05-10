@@ -1,3 +1,5 @@
+import { formatQuotaHttpError } from "../provider-http-errors.js";
+
 const GITHUB_API_BASE_URL = "https://api.github.com";
 const GITHUB_API_VERSION = "2022-11-28";
 const USER_AGENT = "opendum/copilot-quota";
@@ -237,9 +239,10 @@ async function fetchGithubUsername(
       const body = await response.text();
       return {
         ok: false,
-        error: `Failed to fetch GitHub user: HTTP ${response.status}${
-          body ? ` ${body.slice(0, 200)}` : ""
-        }`,
+        error: formatQuotaHttpError("GitHub", response, body, {
+          endpointLabel: "user endpoint",
+          bodyLimit: 200,
+        }),
       };
     }
 
@@ -292,9 +295,10 @@ async function fetchCopilotInternalUser(
       const body = await response.text().catch(() => "");
       return {
         ok: false,
-        error: `Internal Copilot API returned HTTP ${response.status}${
-          body ? ` ${body.slice(0, 200)}` : ""
-        }`,
+        error: formatQuotaHttpError("Copilot", response, body, {
+          endpointLabel: "internal quota endpoint",
+          bodyLimit: 200,
+        }),
       };
     }
 
@@ -429,9 +433,10 @@ async function fetchBillingUsage(
       return {
         ok: false,
         status: response.status,
-        error: `Billing API returned HTTP ${response.status}${
-          body ? ` ${body.slice(0, 200)}` : ""
-        }`,
+        error: formatQuotaHttpError("Copilot", response, body, {
+          endpointLabel: "billing quota endpoint",
+          bodyLimit: 200,
+        }),
       };
     }
 

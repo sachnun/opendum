@@ -22,6 +22,7 @@ import {
   REFRESH_BUFFER_SECONDS,
 } from "./constants.js";
 import { getUpstreamModelName, getProviderModelSet } from "../../models.js";
+import { formatProviderHttpError } from "../provider-http-errors.js";
 
 /**
  * Device code response from Qwen API
@@ -227,7 +228,7 @@ export const qwenCodeProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Token exchange failed: ${response.status} ${error}`);
+      throw new Error(formatProviderHttpError("Qwen Code", response, error, { endpointLabel: "token exchange endpoint" }));
     }
 
     const tokens = await response.json() as TokenResponse;
@@ -257,7 +258,7 @@ export const qwenCodeProvider: Provider = {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Token refresh failed: ${response.status} ${error}`);
+      throw new Error(formatProviderHttpError("Qwen Code", response, error, { endpointLabel: "token refresh endpoint" }));
     }
 
     const tokens = await response.json() as TokenResponse;
@@ -393,7 +394,7 @@ export async function initiateDeviceCodeFlow(): Promise<{
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Device code request failed: ${response.status} ${error}`);
+    throw new Error(formatProviderHttpError("Qwen Code", response, error, { endpointLabel: "device code endpoint" }));
   }
 
   const data = await response.json() as DeviceCodeResponse;
@@ -466,7 +467,7 @@ export async function pollDeviceCodeAuthorization(
   }
 
   const error = await response.text();
-  return { error: `Unexpected error: ${response.status} ${error}` };
+  return { error: formatProviderHttpError("Qwen Code", response, error, { endpointLabel: "auth polling endpoint" }) };
 }
 
 /**

@@ -23,6 +23,7 @@ import {
 } from "./constants.js";
 import { getProviderModelSet, resolveModelAlias } from "../../models.js";
 import { updateCodexQuotaFromHeaders } from "./quota.js";
+import { formatProviderHttpError } from "../provider-http-errors.js";
 import {
   getChatGptCompatibleCodexModels,
   isChatGptAccountCompatibleCodexModel,
@@ -1480,7 +1481,9 @@ export const codexProvider: Provider = {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(
-        `Codex token exchange failed: ${response.status} ${error}`
+        formatProviderHttpError("Codex", response, error, {
+          endpointLabel: "token exchange endpoint",
+        })
       );
     }
 
@@ -1524,7 +1527,9 @@ export const codexProvider: Provider = {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(
-        `Codex token refresh failed: ${response.status} ${error}`
+        formatProviderHttpError("Codex", response, error, {
+          endpointLabel: "token refresh endpoint",
+        })
       );
     }
 
