@@ -65,6 +65,14 @@ function accountAccessExpanded(apiKey: ApiKeyListItem) {
 function keyRateLimits(apiKeyId: string) {
   return options.value?.rateLimitsByKeyId[apiKeyId] ?? [];
 }
+
+function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
+  if (!data.value) return;
+  data.value = {
+    ...data.value,
+    apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, isActive } : apiKey)),
+  };
+}
 </script>
 
 <template>
@@ -105,7 +113,7 @@ function keyRateLimits(apiKeyId: string) {
               </div>
 
               <div class="w-full max-w-[540px]">
-                <ApiKeyActions :api-key="apiKey" @changed="refresh" />
+                <ApiKeyActions :api-key="apiKey" @changed="refresh" @toggled="updateApiKeyActive(apiKey.id, $event)" />
               </div>
             </div>
 

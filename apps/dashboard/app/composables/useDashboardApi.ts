@@ -53,7 +53,7 @@ export function useDashboardApi() {
       list: () => dashboardFetch<ApiKeyListItem[]>("/api/dashboard/api-keys"),
       options: () => dashboardFetch<ApiKeyOptions>("/api/dashboard/api-keys/options"),
       create: (body?: { name?: string; expiresAt?: Date | string | null }) => post<ActionResult<{ id: string; key: string; keyPreview: string; name: string | null; expiresAt: string | Date | null }>>(dashboardFetch, "/api/dashboard/api-keys/create", body),
-      toggle: (body: { id: string }) => post<ActionResult>(dashboardFetch, "/api/dashboard/api-keys/toggle", body),
+      toggle: (body: { id: string }) => post<ActionResult<{ id: string; isActive: boolean }>>(dashboardFetch, "/api/dashboard/api-keys/toggle", body),
       delete: (body: { id: string }) => post<ActionResult>(dashboardFetch, "/api/dashboard/api-keys/delete", body),
       reveal: (body: { id: string }) => post<ActionResult<{ key: string }>>(dashboardFetch, "/api/dashboard/api-keys/reveal", body),
       updateName: (body: { id: string; name: string }) => post<ActionResult<{ name: string | null }>>(dashboardFetch, "/api/dashboard/api-keys/update-name", body),

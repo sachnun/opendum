@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   changed: [];
+  toggled: [isActive: boolean];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -67,10 +68,13 @@ async function copyKey() {
 
 async function toggleKey() {
   isToggling.value = true;
+  errorMessage.value = "";
   try {
     const result = await dashboardApi.apiKeys.toggle({ id: props.apiKey.id });
     if (!result.success) throw new Error(result.error);
-    emit("changed");
+    emit("toggled", result.data.isActive);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "Failed to toggle API key";
   } finally {
     isToggling.value = false;
   }

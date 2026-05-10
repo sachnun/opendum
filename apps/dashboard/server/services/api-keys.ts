@@ -128,9 +128,10 @@ export async function createApiKey(userId: string, input: CreateApiKeyInput) {
 
 export async function toggleApiKey(userId: string, id: string) {
   return withOwnedApiKey(userId, id, "Failed to toggle API key", async (apiKey) => {
-    await db.update(proxyApiKey).set({ isActive: !apiKey.isActive }).where(eq(proxyApiKey.id, id));
+    const isActive = !apiKey.isActive;
+    await db.update(proxyApiKey).set({ isActive }).where(eq(proxyApiKey.id, id));
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
-    return { success: true, data: undefined };
+    return { success: true, data: { id, isActive } } as const;
   });
 }
 
