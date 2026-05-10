@@ -308,6 +308,7 @@ const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() 
 const showTierBadge = computed(() => props.showTier && normalizedTier.value !== "unknown" && normalizedTier.value !== "guest");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
 const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProvider] ?? []);
+const usageChartColor = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
 const hasSuccessAfterLastError = computed(() => {
   if (!props.account.lastErrorAt) return false;
   const errorMs = new Date(props.account.lastErrorAt).getTime();
@@ -333,6 +334,8 @@ function quotaResetTitle(group: QuotaGroupDisplay): string | undefined {
 }
 
 function quotaBarColor(group: QuotaGroupDisplay): string {
+  if (!props.account.isActive) return "bg-muted-foreground/50";
+
   const percentRemaining = quotaPercentRemaining(group);
   if (percentRemaining <= 10) return "bg-red-500";
   if (percentRemaining <= 25) return "bg-orange-500";
@@ -341,6 +344,8 @@ function quotaBarColor(group: QuotaGroupDisplay): string {
 }
 
 function quotaTextColor(group: QuotaGroupDisplay): string {
+  if (!props.account.isActive) return "text-muted-foreground";
+
   const percentRemaining = quotaPercentRemaining(group);
   if (percentRemaining <= 10) return "text-red-400";
   if (percentRemaining <= 25) return "text-orange-400";
@@ -594,12 +599,12 @@ function historyEntryPreview(errorMessage: string): string {
               </div>
             </div>
             <div class="mb-2 rounded border border-border/60 bg-background/70 px-2 py-1.5">
-              <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
+              <UsageSparkline :values="durationValues" :color="usageChartColor" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
               <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
                 <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
               </div>
             </div>
-            <UsageSparkline :values="dailyValues" color="var(--chart-2)" :aria-label="`Requests trend for ${accountTitle}`" />
+            <UsageSparkline :values="dailyValues" :color="usageChartColor" :aria-label="`Requests trend for ${accountTitle}`" />
           </div>
 
           <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : 'Never' }}</span></div>
