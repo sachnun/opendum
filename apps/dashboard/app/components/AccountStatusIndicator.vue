@@ -26,7 +26,7 @@ const indicatorClass = computed(() => {
 
 <template>
   <span v-if="hasActiveAccounts && indicator" class="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-    <span :class="['absolute inline-flex h-full w-full animate-ping rounded-full opacity-75', indicatorClass]" />
+    <span :class="['absolute inset-0 inline-flex h-full w-full animate-ping rounded-full opacity-75', indicatorClass]" />
     <span :class="['relative inline-flex h-2.5 w-2.5 rounded-full', indicatorClass]" />
   </span>
   <span v-else class="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
