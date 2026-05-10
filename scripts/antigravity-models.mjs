@@ -38,22 +38,12 @@ const rootDir = resolve(scriptDir, "..");
 const modelsDir = resolve(rootDir, "models");
 
 // ---------------------------------------------------------------------------
-// Paths to TS source files that contain hardcoded model references
+// Paths to dashboard quota files with hardcoded model references
 // ---------------------------------------------------------------------------
 
 const QUOTA_TS_PATH = resolve(
   rootDir,
-  "apps/dashboard/server/lib/proxy/providers/antigravity/quota.ts"
-);
-
-const CLIENT_TS_PATH = resolve(
-  rootDir,
-  "apps/dashboard/server/lib/proxy/providers/antigravity/client.ts"
-);
-
-const CLAUDE_TRANSFORM_TS_PATH = resolve(
-  rootDir,
-  "apps/dashboard/server/lib/proxy/providers/antigravity/transform/claude.ts"
+  "apps/dashboard/server/lib/providers/antigravity/quota.ts"
 );
 
 // ---------------------------------------------------------------------------
@@ -63,7 +53,7 @@ const CLAUDE_TRANSFORM_TS_PATH = resolve(
 // explicit overrides because canonical JSON keys differ from the API names
 // (e.g. `gemini-3-flash-preview` in JSON vs `gemini-3-flash` in API).
 //
-// Claude models follow a simple rule: strip prefix + strip `-thinking` suffix.
+// Claude canonical keys strip `-thinking`; upstream names keep it when present.
 // ---------------------------------------------------------------------------
 
 const MODEL_NAME_OVERRIDES = {
@@ -183,10 +173,8 @@ function parseAntigravityModels(readme) {
  * Rules:
  *   1. Check MODEL_NAME_OVERRIDES first (for Gemini models).
  *   2. Strip `antigravity-` prefix.
- *   3. Strip `-thinking` suffix for canonical key (Opus models only exist as
-  *      -thinking in the API, but JSON keys don't include it).
- *   4. The upstream name is the prefix-stripped name (without -thinking,
- *      since client.ts adds -thinking dynamically at runtime).
+ *   3. Strip `-thinking` suffix for the canonical key.
+ *   4. Keep the prefix-stripped plugin name as upstream, including `-thinking`.
  *
  * @param {string} pluginName  e.g. "antigravity-claude-opus-4-6-thinking"
  * @returns {{ key: string, upstream: string }}
@@ -196,16 +184,11 @@ function toCanonical(pluginName) {
     return MODEL_NAME_OVERRIDES[pluginName];
   }
 
-  // Strip `antigravity-` prefix
-  let name = pluginName.replace(/^antigravity-/, "");
+  const upstream = pluginName.replace(/^antigravity-/, "");
 
-  // The canonical key strips `-thinking` suffix
-  // (client.ts resolveModelName() adds it back dynamically for Opus models)
-  const key = name.replace(/-thinking$/, "");
+  const key = upstream.replace(/-thinking$/, "");
 
-  // Upstream = canonical key (no separate upstream needed for Claude models;
-  // client.ts handles the -thinking suffix addition at runtime)
-  return { key, upstream: key };
+  return { key, upstream };
 }
 
 // ---------------------------------------------------------------------------
@@ -365,82 +348,6 @@ function updateQuotaTs(activeClaudeModels, dryRun) {
 }
 
 // ---------------------------------------------------------------------------
-// Update client.ts — remove stale resolveModelName mappings
-// ---------------------------------------------------------------------------
-
-function updateClientTs(activeClaudeModels, dryRun) {
-  const source = readFileSync(CLIENT_TS_PATH, "utf-8");
-  let updated = source;
-
-  // Remove the claude-opus-4-5 → claude-opus-4-5-thinking block
-  // Matches:
-  //   if (model === "claude-opus-4-5") {
-  //     model = "claude-opus-4-5-thinking";
-  //   }
-  if (!activeClaudeModels.has("claude-opus-4-5")) {
-    const opusBlock =
-      /\s*\/\/\s*Claude Opus models only exist as -thinking variants.*\n\s*if \(model === "claude-opus-4-5"\) \{\n\s*model = "claude-opus-4-5-thinking";\n\s*\}\n/;
-    updated = updated.replace(opusBlock, "\n  // Claude Opus models only exist as -thinking variants in Antigravity API\n");
-
-    // If the comment-only approach doesn't match, try just the if-block
-    if (updated === source) {
-      const blockOnly =
-        /\s*if \(model === "claude-opus-4-5"\) \{\n\s*model = "claude-opus-4-5-thinking";\n\s*\}\n/;
-      updated = updated.replace(blockOnly, "\n");
-    }
-  }
-
-  if (updated !== source) {
-    if (dryRun) {
-      console.log("[antigravity] Would update client.ts");
-    } else {
-      writeFileSync(CLIENT_TS_PATH, updated);
-      console.log("[antigravity] Updated client.ts");
-    }
-  } else {
-    console.log("[antigravity] client.ts already up to date.");
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Update transform/claude.ts — update non-thinking model check
-// ---------------------------------------------------------------------------
-
-function updateClaudeTransformTs(activeClaudeModels, dryRun) {
-  const source = readFileSync(CLAUDE_TRANSFORM_TS_PATH, "utf-8");
-  let updated = source;
-
-  // Replace "claude-sonnet-4-5" → "claude-sonnet-4-6" in the non-thinking check
-  // if not already updated, and only if sonnet-4-6 is active and sonnet-4-5 is not
-  if (
-    activeClaudeModels.has("claude-sonnet-4-6") &&
-    !activeClaudeModels.has("claude-sonnet-4-5") &&
-    updated.includes('"claude-sonnet-4-5"')
-  ) {
-    // Update both the comment and the condition
-    updated = updated.replace(
-      /\/\/ Remove thinking config for Claude Sonnet 4\.5 \(non-thinking fallback\)/,
-      "// Remove thinking config for Claude Sonnet 4.6 (non-thinking fallback)"
-    );
-    updated = updated.replace(
-      /context\.model === "claude-sonnet-4-5"/,
-      'context.model === "claude-sonnet-4-6"'
-    );
-  }
-
-  if (updated !== source) {
-    if (dryRun) {
-      console.log("[antigravity] Would update transform/claude.ts");
-    } else {
-      writeFileSync(CLAUDE_TRANSFORM_TS_PATH, updated);
-      console.log("[antigravity] Updated transform/claude.ts");
-    }
-  } else {
-    console.log("[antigravity] transform/claude.ts already up to date.");
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
 
@@ -534,11 +441,9 @@ async function main() {
     }
   }
 
-  // 6. Update TS source files with hardcoded model references
+  // 6. Update dashboard quota source with hardcoded model references
   console.log();
   updateQuotaTs(activeClaudeModels, dryRun);
-  updateClientTs(activeClaudeModels, dryRun);
-  updateClaudeTransformTs(activeClaudeModels, dryRun);
 }
 
 main().catch((error) => {
