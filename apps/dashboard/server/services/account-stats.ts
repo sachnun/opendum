@@ -158,13 +158,13 @@ export async function getProviderSummaryStats(userId: string): Promise<Record<Pr
   return stats;
 }
 
-export async function buildAccountStats(userId: string, accountIds: string[]): Promise<{ dayKeys: string[]; hourKeys: string[]; statsByAccountId: Map<string, RawProviderStats> }> {
+export async function buildAccountStats(userId: string, accountIds: string[]): Promise<Record<string, ProviderStats>> {
   const dayKeys = buildDayKeys(PROVIDER_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
   const hourKeys = buildHourKeys(PROVIDER_DURATION_LOOKBACK_HOURS);
   const hourKeySet = new Set(hourKeys);
-  const statsByAccountId = new Map<string, RawProviderStats>();
-  if (accountIds.length === 0) return { dayKeys, hourKeys, statsByAccountId };
+  const rawStatsByAccountId = new Map<string, RawProviderStats>();
+  if (accountIds.length === 0) return {};
 
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
   const durationStartDate = new Date(hourKeys[0] ?? Date.now());
@@ -181,15 +181,15 @@ export async function buildAccountStats(userId: string, accountIds: string[]): P
     if (!date) continue;
     const dayKey = date.toISOString().split("T")[0] ?? "";
     if (!dayKeySet.has(dayKey)) continue;
-    const current = statsByAccountId.get(row.providerAccountId) ?? createRawStats();
+    const current = rawStatsByAccountId.get(row.providerAccountId) ?? createRawStats();
     const requestCount = toNumber(row.requestCount);
     current.totalRequests += requestCount;
     current.successfulRequests += toNumber(row.successCount);
     current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + requestCount);
-    statsByAccountId.set(row.providerAccountId, current);
+    rawStatsByAccountId.set(row.providerAccountId, current);
   }
   for (const row of durationRows) {
-    if (row.providerAccountId) addDurationBucket(statsByAccountId, row.providerAccountId, row.hourBucket, row.durationTotal, row.durationCount, hourKeySet);
+    if (row.providerAccountId) addDurationBucket(rawStatsByAccountId, row.providerAccountId, row.hourBucket, row.durationTotal, row.durationCount, hourKeySet);
   }
-  return { dayKeys, hourKeys, statsByAccountId };
+  return Object.fromEntries(accountIds.map((accountId) => [accountId, buildStatsFromRaw(rawStatsByAccountId.get(accountId), dayKeys, hourKeys)]));
 }

@@ -5,7 +5,7 @@ import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
-import { buildAccountStats, buildStatsFromRaw, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
+import { buildAccountStats, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
 
 export { exchangeOAuthAccount, exchangeOAuthInputSchema, getAccountAuthUrl, getAuthUrlInputSchema, initiateDeviceAuth, initiateDeviceAuthInputSchema, pollDeviceAuth, pollDeviceAuthInputSchema } from "./account-auth";
 export { createAccount, createAccountInputSchema } from "./account-connectors";
@@ -142,7 +142,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       .orderBy(desc(providerAccount.createdAt));
 
     const accountIds = accounts.map((account) => account.id);
-    const [accountUsage, disabledModelRows, pinnedProviders] = await Promise.all([
+    const [accountStatsById, disabledModelRows, pinnedProviders] = await Promise.all([
       buildAccountStats(userId, accountIds),
       accountIds.length > 0
         ? db
@@ -161,7 +161,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     return {
       accounts: accounts.map((account) => ({
         ...account,
-        stats: buildStatsFromRaw(accountUsage.statsByAccountId.get(account.id), accountUsage.dayKeys, accountUsage.hourKeys),
+        stats: accountStatsById[account.id],
       })),
       supportedModels: Array.from(getProviderModelSet(input.provider)).sort((a, b) => a.localeCompare(b)),
       disabledModelsByAccountId,
