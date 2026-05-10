@@ -1,5 +1,12 @@
 {
-  "providers": [],
+  "providers": [
+    "ollama_cloud"
+  ],
   "family": "OpenAI",
-  "ignored": true
+  "ignored": true,
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "gpt-oss:120b"
+    }
+  }
 }
