@@ -5,7 +5,7 @@ import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
-import { buildAccountStats, buildStatsFromRaw, getAccountIndicator, getCachedProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
+import { buildAccountStats, buildStatsFromRaw, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
 
 export { exchangeOAuthAccount, exchangeOAuthInputSchema, getAccountAuthUrl, getAuthUrlInputSchema, initiateDeviceAuth, initiateDeviceAuthInputSchema, pollDeviceAuth, pollDeviceAuthInputSchema } from "./account-auth";
 export { createAccount, createAccountInputSchema } from "./account-connectors";
@@ -95,7 +95,7 @@ export async function getAccountSummary(userId: string) {
         })
         .from(providerAccount)
         .where(eq(providerAccount.userId, userId)),
-      getCachedProviderSummaryStats(userId),
+      getProviderSummaryStats(userId),
     ]);
     const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider));
 

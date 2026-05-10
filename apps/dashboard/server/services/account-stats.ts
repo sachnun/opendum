@@ -1,15 +1,12 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
-import { getAnalyticsCacheVersion } from "../lib/cache/analytics-cache";
 import { db } from "../lib/db";
 import { providerAccount, usageLog } from "../lib/db/schema";
-import { getRedisJson, setRedisJson } from "../lib/redis-cache";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
 
 const PROVIDER_STATS_DAYS = 30;
 const PROVIDER_DURATION_LOOKBACK_HOURS = 24;
 const WARNING_INDICATOR_STALE_WINDOW_MS = 3 * 60 * 60 * 1000;
-const PROVIDER_SUMMARY_STATS_CACHE_TTL_SECONDS = 30;
 
 export const INDICATOR_WEIGHT = { normal: 0, warning: 1, error: 2 } as const;
 export type ProviderAccountIndicator = keyof typeof INDICATOR_WEIGHT;
@@ -155,14 +152,9 @@ function addDurationBucket(stats: Map<string, RawProviderStats>, key: string, ra
   stats.set(key, current);
 }
 
-export async function getCachedProviderSummaryStats(userId: string): Promise<Record<ProviderAccountKey, ProviderStats>> {
-  const version = await getAnalyticsCacheVersion(userId);
-  const cacheKey = `opendum:accounts:summary-stats:${userId}:v${version}`;
-  const cached = await getRedisJson<Record<ProviderAccountKey, ProviderStats>>(cacheKey);
-  if (cached) return cached;
+export async function getProviderSummaryStats(userId: string): Promise<Record<ProviderAccountKey, ProviderStats>> {
   const providerUsage = await buildProviderStats(userId);
   const stats = Object.fromEntries(PROVIDER_ACCOUNT_KEYS.map((provider) => [provider, buildStatsFromRaw(providerUsage.statsByProvider.get(provider), providerUsage.dayKeys, providerUsage.hourKeys)])) as Record<ProviderAccountKey, ProviderStats>;
-  await setRedisJson(cacheKey, stats, PROVIDER_SUMMARY_STATS_CACHE_TTL_SECONDS);
   return stats;
 }
 

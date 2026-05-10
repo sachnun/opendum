@@ -39,7 +39,6 @@ const draftToDate = ref("");
 const isCustomRangeActive = ref(false);
 const isFilterOpen = ref(false);
 const isApiKeyFilterOpen = ref(false);
-const forceRefreshNext = ref(false);
 
 watch(
   () => props.apiKeyId,
@@ -88,18 +87,10 @@ const activeFilterKey = computed(() => {
 
 const { data, error, pending, refresh } = await useAsyncData<AnalyticsData>(
   () => `dashboard-analytics-${selectedApiKeyId.value}-${activeFilterKey.value}`,
-  async () => {
-    const forceRefresh = forceRefreshNext.value;
-    try {
-      return await dashboardApi.analytics.data({
-        filter: activeFilter.value,
-        apiKeyId: selectedApiKeyId.value === "all" ? undefined : selectedApiKeyId.value,
-        forceRefresh,
-      });
-    } finally {
-      forceRefreshNext.value = false;
-    }
-  },
+  () => dashboardApi.analytics.data({
+    filter: activeFilter.value,
+    apiKeyId: selectedApiKeyId.value === "all" ? undefined : selectedApiKeyId.value,
+  }),
   { watch: [selectedApiKeyId, activeFilterKey] }
 );
 
@@ -153,7 +144,6 @@ function handleClearCustomRange(): void {
 }
 
 async function handleRefresh(): Promise<void> {
-  forceRefreshNext.value = true;
   await refresh();
 }
 

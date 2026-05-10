@@ -44,9 +44,9 @@ export function useDashboardApi() {
       quota: (body: { provider: "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter"; accountId: string; forceRefresh?: boolean }) => post<ActionResult<{ tier: string; status: "success" | "error" | "expired"; error?: string; groups: Array<{ name: string; displayName: string; remainingFraction: number; resetTimeIso: string | null; resetInHuman: string | null }> }>>(dashboardFetch, "/api/dashboard/accounts/quota", body),
     },
     analytics: {
-      data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string; forceRefresh?: boolean }) => post<AnalyticsData>(dashboardFetch, "/api/dashboard/analytics/data", body),
+      data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string }) => post<AnalyticsData>(dashboardFetch, "/api/dashboard/analytics/data", body),
       overview: () => dashboardFetch("/api/dashboard/analytics/overview"),
-      byApiKey: (body: { apiKeyId: string; filter?: AnalyticsFilter; forceRefresh?: boolean }) => post(dashboardFetch, "/api/dashboard/analytics/by-api-key", body),
+      byApiKey: (body: { apiKeyId: string; filter?: AnalyticsFilter }) => post(dashboardFetch, "/api/dashboard/analytics/by-api-key", body),
       usage: (query?: { range?: string }) => dashboardFetch("/api/dashboard/analytics/usage", { query }),
     },
     apiKeys: {

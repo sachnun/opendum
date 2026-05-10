@@ -1,7 +1,5 @@
-import { buildAnalyticsCacheKey, getAnalyticsCacheVersion } from "../lib/cache/analytics-cache";
 import { db } from "../lib/db";
 import { providerAccount, proxyApiKey, usageLog } from "../lib/db/schema";
-import { getRedisJson, setRedisJson } from "../lib/redis-cache";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -12,8 +10,8 @@ const analyticsFilterSchema = z.union([
   periodSchema,
   z.object({ from: z.string(), to: z.string() }),
 ]);
-export const analyticsDataInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional(), forceRefresh: z.boolean().optional() }).optional();
-export const analyticsByApiKeyInputSchema = z.object({ apiKeyId: z.string(), filter: analyticsFilterSchema.optional(), forceRefresh: z.boolean().optional() });
+export const analyticsDataInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional() }).optional();
+export const analyticsByApiKeyInputSchema = z.object({ apiKeyId: z.string(), filter: analyticsFilterSchema.optional() });
 export const analyticsUsageInputSchema = z.object({ range: periodSchema.default("24h") }).optional();
 
 type Period = z.infer<typeof periodSchema>;
@@ -68,13 +66,6 @@ const GRANULARITY_ROUNDERS: Record<Granularity, (date: Date) => string | undefin
     return date.toISOString().split("T")[0] ?? "";
   },
 };
-
-function getAnalyticsCacheTtlSeconds(durationMs: number): number {
-  if (durationMs <= 60 * 60 * 1000) return 15;
-  if (durationMs <= 24 * 60 * 60 * 1000) return 45;
-  if (durationMs <= 7 * 24 * 60 * 60 * 1000) return 120;
-  return 300;
-}
 
 function resolveFilterConfig(filter: AnalyticsFilter): ActionResult<{ startDate: Date; endDate: Date; config: PeriodConfig }> {
   if (typeof filter === "string") {
@@ -135,8 +126,7 @@ function toDateValue(value: Date | string | null): Date | null {
 export async function getAnalyticsDataForUser(
   userId: string,
   filter: AnalyticsFilter,
-  apiKeyId?: string,
-  forceRefresh = false
+  apiKeyId?: string
 ): Promise<ActionResult<AnalyticsData>> {
   const resolvedFilter = resolveFilterConfig(filter);
   if (!resolvedFilter.success) return resolvedFilter;
@@ -146,13 +136,6 @@ export async function getAnalyticsDataForUser(
     if (apiKeyId) {
       const [ownedApiKey] = await db.select({ id: proxyApiKey.id }).from(proxyApiKey).where(and(eq(proxyApiKey.id, apiKeyId), eq(proxyApiKey.userId, userId))).limit(1);
       if (!ownedApiKey) return { success: false, error: "API key not found" };
-    }
-
-    const version = await getAnalyticsCacheVersion(userId);
-    const cacheKey = buildAnalyticsCacheKey({ userId, apiKeyId, startDateMs: startDate.getTime(), endDateMs: endDate.getTime(), granularity: config.granularity, version });
-    if (!forceRefresh) {
-      const cachedAnalytics = await getRedisJson<AnalyticsData>(cacheKey);
-      if (cachedAnalytics) return { success: true, data: cachedAnalytics };
     }
 
     const conditions = [eq(usageLog.userId, userId), gte(usageLog.createdAt, startDate), lte(usageLog.createdAt, endDate)];
@@ -194,7 +177,6 @@ export async function getAnalyticsDataForUser(
       totals: { totalRequests, totalInputTokens: toRoundedValue(totalsRow?.totalInputTokens), totalOutputTokens: toRoundedValue(totalsRow?.totalOutputTokens), avgDuration: toRoundedNullableValue(totalsRow?.avgDuration) ?? 0, durationPercentiles: { p30: toRoundedValue(totalsRow?.p30), p50: toRoundedValue(totalsRow?.p50), p60: toRoundedValue(totalsRow?.p60), p75: toRoundedValue(totalsRow?.p75), p90: toRoundedValue(totalsRow?.p90), p95: toRoundedValue(totalsRow?.p95), p99: toRoundedValue(totalsRow?.p99) }, successRate: totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) : 0 },
     };
 
-    await setRedisJson(cacheKey, analyticsData, getAnalyticsCacheTtlSeconds(config.duration));
     return { success: true, data: analyticsData };
   } catch (error) {
     console.error("Failed to fetch analytics:", error);
@@ -203,7 +185,7 @@ export async function getAnalyticsDataForUser(
 }
 
 export async function getAnalyticsData(userId: string, input?: z.infer<typeof analyticsDataInputSchema>) {
-  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "24h", input?.apiKeyId, input?.forceRefresh);
+  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "24h", input?.apiKeyId);
   if (!result.success) throw new Error(result.error);
   return result.data;
 }
@@ -225,7 +207,7 @@ export async function getAnalyticsOverview(userId: string) {
 }
 
 export async function getAnalyticsByApiKey(userId: string, input: z.infer<typeof analyticsByApiKeyInputSchema>) {
-  const result = await getAnalyticsDataForUser(userId, input.filter ?? "24h", input.apiKeyId, input.forceRefresh);
+  const result = await getAnalyticsDataForUser(userId, input.filter ?? "24h", input.apiKeyId);
   if (!result.success) throw new Error(result.error);
 
   const totals = result.data.totals;
