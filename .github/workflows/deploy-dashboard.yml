@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-dashboard.yml
       - apps/dashboard/**
+      - models/**
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
