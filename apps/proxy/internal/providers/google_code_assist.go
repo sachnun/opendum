@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -26,6 +27,9 @@ const googleOAuthTokenEndpoint = "https://oauth2.googleapis.com/token"
 const antigravitySignatureCachePrefix = "opendum:thought-signature"
 const antigravitySignatureCacheTTL = 24 * time.Hour
 const antigravityClaudeBetaHeader = "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14"
+const antigravityAuthUserAgent = "google-api-nodejs-client/10.3.0"
+const antigravityAuthAPIClient = "gl-node/22.18.0"
+const antigravityAuthClientMetadata = `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`
 const geminiToolSchemaSystemInstruction = `<CRITICAL_TOOL_USAGE_INSTRUCTIONS>
 You are operating in a CUSTOM ENVIRONMENT where tool definitions COMPLETELY DIFFER from your training data.
 VIOLATION OF THESE RULES WILL CAUSE IMMEDIATE SYSTEM FAILURE.
@@ -83,7 +87,7 @@ func (p geminiCLIProvider) delegate() googleCodeAssistProvider {
 
 func (p antigravityProvider) delegate() googleCodeAssistProvider {
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "rising-fact-p41fc", userAgent: "antigravity/1.23.2 " + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
+	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "bamboo-precept-lgxtn", userAgent: "antigravity/1.23.2 " + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
 }
 
 func (p geminiCLIProvider) RefreshBuffer() time.Duration   { return p.delegate().RefreshBuffer() }
@@ -168,12 +172,18 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	if messages, ok := body["messages"].([]any); ok {
 		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
 	}
-	sessionID := stableSessionID(body)
+	sessionID := defaultStringValue(body["_sessionId"], stableSessionID(body))
 	geminiPayload := openAIToGemini(body)
 	if p.name == "antigravity" {
+		p.applyThinkingConfig(geminiPayload, modelName, stringValue(body["reasoning_effort"]), numberFromAny(body["thinking_budget"]))
 		p.transformAntigravityPayload(ctx, geminiPayload, modelName, sessionID)
+	} else {
+		p.applyThinkingConfig(geminiPayload, modelName, stringValue(body["reasoning_effort"]), numberFromAny(body["thinking_budget"]))
 	}
-	p.applyThinkingConfig(geminiPayload, modelName, stringValue(body["reasoning_effort"]), numberFromAny(body["thinking_budget"]))
+	toolSchemas := buildToolSchemaMap(geminiPayload["tools"])
+	if p.name == "antigravity" && !isImageGenerationModel(p.registry, modelName) && !providerConfigBool(p.registry, modelName, p.name, "strict_tool_schema") {
+		sanitizeToolSchemaKeys(toolSchemas)
+	}
 	requestPayload := p.wrapCodeAssistPayload(projectID, modelName, geminiPayload)
 	actualStream := stream
 	if providerConfigBool(p.registry, modelName, p.name, "force_stream_non_stream") && !stream {
@@ -253,10 +263,10 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		return resp, lastErr
 	}
 	if stream {
-		return sseResponse(p.geminiSSEToOpenAISSEReader(ctx, resp.Body, modelName, includeReasoning, sessionID), resp.Body), nil
+		return sseResponse(p.geminiSSEToOpenAISSEReader(ctx, resp.Body, modelName, includeReasoning, sessionID, toolSchemas), resp.Body), nil
 	}
 	if actualStream {
-		completion := p.geminiStreamToOpenAICompletion(ctx, resp.Body, modelName, includeReasoning, sessionID)
+		completion := p.geminiStreamToOpenAICompletion(ctx, resp.Body, modelName, includeReasoning, sessionID, toolSchemas)
 		_ = resp.Body.Close()
 		return jsonResponse(http.StatusOK, completion), nil
 	}
@@ -268,7 +278,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	_ = resp.Body.Close()
 	response := unwrapGeminiResponse(data)
 	p.cacheSignaturesFromResponse(ctx, response, modelName, sessionID)
-	return jsonResponse(http.StatusOK, geminiToOpenAICompletion(response, modelName, includeReasoning)), nil
+	return jsonResponse(http.StatusOK, geminiToOpenAICompletion(response, modelName, includeReasoning, toolSchemas)), nil
 }
 
 func (p googleCodeAssistProvider) wrapCodeAssistPayload(projectID, model string, geminiPayload map[string]any) map[string]any {
@@ -306,12 +316,20 @@ func isAntigravityProjectContextError(text string) bool {
 
 func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Context, payload map[string]any, model, sessionID string) {
 	delete(payload, "safetySettings")
+	if systemInstruction := payload["system_instruction"]; systemInstruction != nil {
+		payload["systemInstruction"] = systemInstruction
+		delete(payload, "system_instruction")
+	}
 	p.normalizeCachedContent(payload)
 	if isImageGenerationModel(p.registry, model) {
 		delete(payload, "tools")
 		delete(payload, "toolConfig")
+		if generation, ok := payload["generationConfig"].(map[string]any); ok {
+			delete(generation, "thinkingConfig")
+		}
 	} else {
 		ensureToolConfig(payload)
+		p.normalizeThinkingConfig(payload, model)
 		if providerConfigBool(p.registry, model, p.name, "strict_tool_schema") {
 			normalizeClaudeTools(payload)
 		} else {
@@ -322,7 +340,6 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	}
 	p.applyAntigravitySystemInstruction(payload, model)
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
-	p.ensureThinkingModelConfig(payload, model)
 	payload["sessionId"] = sessionID
 }
 
@@ -341,6 +358,86 @@ func (p googleCodeAssistProvider) normalizeCachedContent(payload map[string]any)
 		payload["cachedContent"] = value
 	}
 	delete(payload, "cached_content")
+}
+
+func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any, model string) {
+	generation, _ := payload["generationConfig"].(map[string]any)
+	if generation == nil {
+		if providerConfigBool(p.registry, model, p.name, "thinking_model") {
+			generation = map[string]any{}
+			payload["generationConfig"] = generation
+		} else {
+			return
+		}
+	}
+	thinking := normalizedThinkingMap(generation["thinkingConfig"])
+	if providerConfigBool(p.registry, model, p.name, "thinking_model") {
+		if thinking == nil {
+			thinking = map[string]any{"thinkingBudget": 16384, "include_thoughts": true}
+		}
+		if thinking["include_thoughts"] == nil && thinking["includeThoughts"] == nil {
+			thinking["include_thoughts"] = true
+		}
+		if thinking["thinkingBudget"] == nil && thinking["thinking_budget"] == nil {
+			thinking["thinkingBudget"] = 16384
+		}
+		finalThinking := thinking
+		if providerConfigBool(p.registry, model, p.name, "strict_tool_schema") {
+			finalThinking = map[string]any{"include_thoughts": defaultBool(thinking["include_thoughts"], defaultBool(thinking["includeThoughts"], true))}
+			if budget := numberFromAny(defaultAny(thinking["thinkingBudget"], thinking["thinking_budget"])); budget > 0 {
+				finalThinking["thinking_budget"] = budget
+			}
+		}
+		generation["thinkingConfig"] = finalThinking
+		budget := numberFromAny(defaultAny(thinking["thinkingBudget"], thinking["thinking_budget"]))
+		if budget > 0 {
+			if maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"])); maxTokens == 0 || maxTokens <= budget {
+				generation["maxOutputTokens"] = 64000
+				delete(generation, "max_output_tokens")
+			}
+		}
+		return
+	}
+	if thinking != nil {
+		generation["thinkingConfig"] = thinking
+	} else {
+		delete(generation, "thinkingConfig")
+	}
+}
+
+func normalizedThinkingMap(value any) map[string]any {
+	record, ok := value.(map[string]any)
+	if !ok || record == nil {
+		return nil
+	}
+	out := map[string]any{}
+	if budget := numberFromAny(defaultAny(record["thinkingBudget"], record["thinking_budget"])); budget > 0 {
+		out["thinkingBudget"] = budget
+	}
+	if level := defaultStringValue(record["thinkingLevel"], stringValue(record["thinking_level"])); level != "" {
+		out["thinkingLevel"] = strings.ToLower(level)
+	}
+	if include, ok := defaultAny(record["includeThoughts"], record["include_thoughts"]).(bool); ok {
+		out["include_thoughts"] = include
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func defaultAny(value, fallback any) any {
+	if value != nil {
+		return value
+	}
+	return fallback
+}
+
+func defaultBool(value any, fallback bool) bool {
+	if boolValue, ok := value.(bool); ok {
+		return boolValue
+	}
+	return fallback
 }
 
 func (p googleCodeAssistProvider) resolveModel(model string) string {
@@ -389,6 +486,18 @@ func numberAsFloat(value any) (float64, bool) {
 func anySlice(value any) []any {
 	items, _ := value.([]any)
 	return items
+}
+
+func mapSlice(value any) []map[string]any {
+	items, _ := value.([]any)
+	out := make([]map[string]any, 0, len(items))
+	for _, raw := range items {
+		item, _ := raw.(map[string]any)
+		if item != nil {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func stableSessionID(body map[string]any) string {
@@ -496,10 +605,7 @@ func sanitizeGeminiToolNames(payload map[string]any) {
 		decls, _ := tool["functionDeclarations"].([]any)
 		for _, rawDecl := range decls {
 			decl, _ := rawDecl.(map[string]any)
-			name := stringValue(decl["name"])
-			if name != "" && name[0] >= '0' && name[0] <= '9' {
-				decl["name"] = "t_" + name
-			}
+			decl["name"] = sanitizedToolName(stringValue(decl["name"]))
 		}
 	}
 }
@@ -588,8 +694,8 @@ func systemInstructionText(value any) string {
 
 func strictParamsSummary(schema map[string]any) string {
 	props, _ := schema["properties"].(map[string]any)
-	if len(props) == 0 {
-		return ""
+	if stringValue(schema["type"]) != "object" || len(props) == 0 {
+		return "(schema missing top-level object properties)"
 	}
 	required := map[string]struct{}{}
 	for _, raw := range anySlice(schema["required"]) {
@@ -597,23 +703,130 @@ func strictParamsSummary(schema map[string]any) string {
 			required[key] = struct{}{}
 		}
 	}
+	requiredKeys := []string{}
+	optionalKeys := []string{}
+	for key := range props {
+		if _, ok := required[key]; ok {
+			requiredKeys = append(requiredKeys, key)
+		} else {
+			optionalKeys = append(optionalKeys, key)
+		}
+	}
+	sort.Strings(requiredKeys)
+	sort.Strings(optionalKeys)
+	ordered := append(requiredKeys, optionalKeys...)
 	parts := []string{}
-	for key, rawProp := range props {
+	for _, key := range ordered {
+		rawProp := props[key]
 		prop, _ := rawProp.(map[string]any)
-		typ := defaultStringValue(prop["type"], "unknown")
+		typ := summarizeSchema(prop, 2)
 		if _, ok := required[key]; ok {
 			typ += " REQUIRED"
 		}
 		parts = append(parts, key+": "+typ)
 	}
-	return strings.Join(parts, ", ")
+	summary := strings.Join(parts, ", ")
+	if len(summary) > 900 {
+		return summary[:900] + "..."
+	}
+	return summary
+}
+
+func summarizeSchema(schema map[string]any, depth int) string {
+	if schema == nil {
+		return "unknown"
+	}
+	typ := normalizeSchemaType(schema["type"])
+	if typ == "" {
+		typ = "unknown"
+	}
+	if typ == "array" {
+		items, _ := schema["items"].(map[string]any)
+		itemSummary := "unknown"
+		if depth > 0 {
+			itemSummary = summarizeSchema(items, depth-1)
+		}
+		return "array[" + itemSummary + "]"
+	}
+	if typ == "object" {
+		props, _ := schema["properties"].(map[string]any)
+		if len(props) == 0 || depth <= 0 {
+			return "object"
+		}
+		required := map[string]bool{}
+		for _, raw := range anySlice(schema["required"]) {
+			if key := stringValue(raw); key != "" {
+				required[key] = true
+			}
+		}
+		keys := make([]string, 0, len(props))
+		for key := range props {
+			keys = append(keys, key)
+		}
+		sort.SliceStable(keys, func(i, j int) bool {
+			if required[keys[i]] != required[keys[j]] {
+				return required[keys[i]]
+			}
+			return keys[i] < keys[j]
+		})
+		shown := keys
+		if len(shown) > 8 {
+			shown = shown[:8]
+		}
+		parts := []string{}
+		for _, key := range shown {
+			prop, _ := props[key].(map[string]any)
+			text := key + ": " + summarizeSchema(prop, depth-1)
+			if required[key] {
+				text += " REQUIRED"
+			}
+			parts = append(parts, text)
+		}
+		extra := ""
+		if len(keys) > len(shown) {
+			extra = fmt.Sprintf(", ...+%d", len(keys)-len(shown))
+		}
+		return "{" + strings.Join(parts, ", ") + extra + "}"
+	}
+	if enumValues := anySlice(schema["enum"]); len(enumValues) > 0 {
+		preview := []string{}
+		for idx, value := range enumValues {
+			if idx >= 6 {
+				break
+			}
+			preview = append(preview, fmt.Sprint(value))
+		}
+		suffix := ""
+		if len(enumValues) > 6 {
+			suffix = "|..."
+		}
+		return typ + " enum(" + strings.Join(preview, "|") + suffix + ")"
+	}
+	return typ
+}
+
+func normalizeSchemaType(value any) string {
+	if text := stringValue(value); text != "" {
+		return text
+	}
+	for _, raw := range anySlice(value) {
+		text := stringValue(raw)
+		if text != "" && text != "null" {
+			return text
+		}
+	}
+	if values := anySlice(value); len(values) > 0 {
+		return stringValue(values[0])
+	}
+	return ""
 }
 
 func (p googleCodeAssistProvider) normalizeAntigravityContents(ctx context.Context, payload map[string]any, model, sessionID string) {
 	contents, _ := payload["contents"].([]any)
+	strictToolSchema := providerConfigBool(p.registry, model, p.name, "strict_tool_schema")
+	functionCallIDQueues := map[string][]string{}
 	for _, rawContent := range contents {
 		content, _ := rawContent.(map[string]any)
-		strictSignatures := providerConfigBool(p.registry, model, p.name, "strict_thought_signatures")
 		if providerConfigBool(p.registry, model, p.name, "scrub_model_artifacts") && content["role"] == "model" {
 			scrubConversationArtifacts(content)
 		}
@@ -628,13 +841,13 @@ func (p googleCodeAssistProvider) normalizeAntigravityContents(ctx context.Conte
 			if part["thought"] == true {
 				thoughtText := stringValue(part["text"])
 				signature := stringValue(part["thoughtSignature"])
-				if signature == "" || len(signature) < 50 {
-					if cached := p.getCachedSignature(ctx, model, sessionID, thoughtText); cached != "" {
-						signature = cached
-						part["thoughtSignature"] = cached
+				if strictToolSchema {
+					if signature == "" || len(signature) < 50 {
+						if cached := p.getCachedSignature(ctx, model, sessionID, thoughtText); cached != "" {
+							signature = cached
+							part["thoughtSignature"] = cached
+						}
 					}
-				}
-				if strictSignatures {
 					if len(signature) > 50 {
 						p.cacheSignature(ctx, model, sessionID, thoughtText, signature)
 						currentThoughtSignature = signature
@@ -642,8 +855,9 @@ func (p googleCodeAssistProvider) normalizeAntigravityContents(ctx context.Conte
 						continue
 					}
 				} else {
-					if signature != "" {
-						currentThoughtSignature = signature
+					if cached := p.getCachedSignature(ctx, model, sessionID, thoughtText); cached != "" {
+						part["thoughtSignature"] = cached
+						currentThoughtSignature = cached
 						filtered = append(filtered, rawPart)
 					}
 					continue
@@ -651,10 +865,14 @@ func (p googleCodeAssistProvider) normalizeAntigravityContents(ctx context.Conte
 			}
 			if part["functionCall"] != nil {
 				fn, _ := part["functionCall"].(map[string]any)
+				name := stringValue(fn["name"])
 				if fn["id"] == nil {
-					fn["id"] = randomID(stringValue(fn["name"]))
+					fn["id"] = randomID(name)
 				}
-				if providerConfigBool(p.registry, model, p.name, "inject_thought_signature") && part["thoughtSignature"] == nil {
+				if strictToolSchema && name != "" {
+					functionCallIDQueues[name] = append(functionCallIDQueues[name], stringValue(fn["id"]))
+				}
+				if !strictToolSchema && providerConfigBool(p.registry, model, p.name, "inject_thought_signature") && part["thoughtSignature"] == nil {
 					if currentThoughtSignature != "" {
 						part["thoughtSignature"] = currentThoughtSignature
 					} else {
@@ -665,14 +883,23 @@ func (p googleCodeAssistProvider) normalizeAntigravityContents(ctx context.Conte
 			if part["functionResponse"] != nil {
 				fn, _ := part["functionResponse"].(map[string]any)
 				if fn["id"] == nil {
-					fn["id"] = randomID(stringValue(fn["name"]))
+					name := stringValue(fn["name"])
+					if strictToolSchema && len(functionCallIDQueues[name]) > 0 {
+						fn["id"] = functionCallIDQueues[name][0]
+						functionCallIDQueues[name] = functionCallIDQueues[name][1:]
+					} else {
+						fn["id"] = randomID(name)
+					}
 				}
+			}
+			if !strictToolSchema && part["thoughtSignature"] != nil && part["functionCall"] == nil {
+				delete(part, "thoughtSignature")
 			}
 			filtered = append(filtered, rawPart)
 		}
 		content["parts"] = filtered
 	}
-	if providerConfigBool(p.registry, model, p.name, "sanitize_tool_blocks") {
+	if strictToolSchema || providerConfigBool(p.registry, model, p.name, "sanitize_tool_blocks") {
 		payload["contents"] = sanitizeToolBlocks(contents)
 	}
 }
@@ -798,31 +1025,6 @@ func sanitizeToolBlocks(contents []any) []any {
 	return out
 }
 
-func (p googleCodeAssistProvider) ensureThinkingModelConfig(payload map[string]any, model string) {
-	if !providerConfigBool(p.registry, model, p.name, "thinking_model") {
-		return
-	}
-	generation, _ := payload["generationConfig"].(map[string]any)
-	if generation == nil {
-		generation = map[string]any{}
-		payload["generationConfig"] = generation
-	}
-	thinking, _ := generation["thinkingConfig"].(map[string]any)
-	if thinking == nil {
-		thinking = map[string]any{}
-		generation["thinkingConfig"] = thinking
-	}
-	if thinking["include_thoughts"] == nil && thinking["includeThoughts"] == nil {
-		thinking["include_thoughts"] = true
-	}
-	if thinking["thinking_budget"] == nil && thinking["thinkingBudget"] == nil {
-		thinking["thinking_budget"] = 16384
-	}
-	if maxTokens := numberFromAny(generation["maxOutputTokens"]); maxTokens == 0 || maxTokens <= 16384 {
-		generation["maxOutputTokens"] = 64000
-	}
-}
-
 type googleCodeAssistAccountInfo struct {
 	projectID string
 	tier      string
@@ -836,10 +1038,7 @@ func (p googleCodeAssistProvider) fetchAccountInfo(ctx context.Context, client *
 		loadEndpoints = []string{"https://cloudcode-pa.googleapis.com", p.endpoint}
 	}
 	for _, endpoint := range loadEndpoints {
-		metadata := map[string]any{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}
-		if p.name == "antigravity" {
-			metadata = map[string]any{"ideType": "ANTIGRAVITY"}
-		}
+		metadata := codeAssistMetadata()
 		payload, _ := json.Marshal(map[string]any{"cloudaicompanionProject": nil, "metadata": metadata})
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:loadCodeAssist", bytes.NewReader(payload))
 		if err != nil {
@@ -886,11 +1085,11 @@ func (p googleCodeAssistProvider) onboardUser(ctx context.Context, client *http.
 	if len(onboardEndpoints) == 0 {
 		onboardEndpoints = []string{p.endpoint, "https://cloudcode-pa.googleapis.com"}
 	}
-	metadata := map[string]any{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}
+	onboardRequest := map[string]any{"tierId": tier, "metadata": codeAssistMetadata()}
 	if p.name == "antigravity" {
-		metadata = map[string]any{"ideType": "ANTIGRAVITY"}
+		onboardRequest["cloudaicompanionProject"] = nil
 	}
-	payload, _ := json.Marshal(map[string]any{"tierId": tier, "metadata": metadata})
+	payload, _ := json.Marshal(onboardRequest)
 	for _, endpoint := range onboardEndpoints {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:onboardUser", bytes.NewReader(payload))
 		if err != nil {
@@ -962,10 +1161,15 @@ func extractGoogleTier(data map[string]any) string {
 
 func (p googleCodeAssistProvider) setGoogleHeaders(req *http.Request, accessToken string, stream bool) {
 	p.setGoogleHeadersWithMetadata(req, accessToken, stream, true)
+	if p.name == "antigravity" {
+		req.Header.Set("User-Agent", antigravityAuthUserAgent)
+		req.Header.Set("X-Goog-Api-Client", antigravityAuthAPIClient)
+		req.Header.Set("Client-Metadata", antigravityAuthClientMetadata)
+	}
 }
 
 func (p googleCodeAssistProvider) setGoogleGenerationHeaders(req *http.Request, accessToken string, stream bool) {
-	p.setGoogleHeadersWithMetadata(req, accessToken, stream, p.name != "antigravity")
+	p.setGoogleHeadersWithMetadata(req, accessToken, stream, true)
 }
 
 func (p googleCodeAssistProvider) setGoogleHeadersWithMetadata(req *http.Request, accessToken string, stream bool, includeClientMetadata bool) {
@@ -981,6 +1185,10 @@ func (p googleCodeAssistProvider) setGoogleHeadersWithMetadata(req *http.Request
 	if includeClientMetadata && p.clientMetadata != "" {
 		req.Header.Set("Client-Metadata", p.clientMetadata)
 	}
+}
+
+func codeAssistMetadata() map[string]any {
+	return map[string]any{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}
 }
 
 func (p googleCodeAssistProvider) applyThinkingConfig(payload map[string]any, model, effort string, budget int) {
@@ -1044,20 +1252,34 @@ func openAIToGemini(body map[string]any) map[string]any {
 	messages, _ := body["messages"].([]any)
 	contents := []any{}
 	systemParts := []any{}
+	completedToolCallIDs := completedToolCallIDs(messages)
+	toolUseIDs := toolUseIDs(messages)
+	validToolResultIDs := validToolResultIDs(messages)
 	for _, raw := range messages {
 		msg, _ := raw.(map[string]any)
 		role := stringValue(msg["role"])
-		parts := openAIContentToGeminiParts(msg["content"])
 		if role == "system" || role == "developer" {
-			systemParts = append(systemParts, parts...)
+			systemParts = append(systemParts, openAIContentTextParts(msg["content"])...)
 			continue
+		}
+		parts := openAIContentToGeminiParts(msg["content"])
+		parts = append(parts, openAIToolCallsToGeminiParts(msg, completedToolCallIDs)...)
+		if role == "tool" {
+			toolCallID := stringValue(msg["tool_call_id"])
+			if toolCallID == "" || !validToolResultIDs[toolCallID] || !toolUseIDs[toolCallID] {
+				continue
+			}
+			parts = []any{map[string]any{"functionResponse": map[string]any{"name": defaultStringValue(msg["name"], "unknown"), "id": toolCallID, "response": map[string]any{"result": msg["content"]}}}}
 		}
 		geminiRole := "user"
 		if role == "assistant" {
 			geminiRole = "model"
 		}
-		contents = append(contents, map[string]any{"role": geminiRole, "parts": parts})
+		if len(parts) > 0 {
+			contents = append(contents, map[string]any{"role": geminiRole, "parts": parts})
+		}
 	}
+	contents = separateTextAndToolParts(groupConsecutiveToolResponses(sanitizeGeminiContents(contents)))
 	payload := map[string]any{"contents": contents}
 	if len(systemParts) > 0 {
 		payload["systemInstruction"] = map[string]any{"parts": systemParts}
@@ -1072,11 +1294,26 @@ func openAIToGemini(body map[string]any) map[string]any {
 	if body["max_tokens"] != nil {
 		generation["maxOutputTokens"] = body["max_tokens"]
 	}
+	if body["stop"] != nil {
+		if stops, ok := body["stop"].([]any); ok {
+			generation["stopSequences"] = stops
+		} else if stop := stringValue(body["stop"]); stop != "" {
+			generation["stopSequences"] = []any{stop}
+		}
+	}
+	if thinking := requestThinkingConfig(body); len(thinking) > 0 {
+		generation["thinkingConfig"] = thinking
+	}
 	if len(generation) > 0 {
 		payload["generationConfig"] = generation
 	}
 	if tools := geminiTools(body["tools"]); len(tools) > 0 {
 		payload["tools"] = []any{map[string]any{"functionDeclarations": tools}}
+	}
+	for _, key := range []string{"cached_content", "cachedContent", "extra_body", "system_instruction"} {
+		if body[key] != nil {
+			payload[key] = body[key]
+		}
 	}
 	payload["safetySettings"] = []any{
 		map[string]any{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "OFF"},
@@ -1085,6 +1322,308 @@ func openAIToGemini(body map[string]any) map[string]any {
 		map[string]any{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "OFF"},
 	}
 	return payload
+}
+
+func openAIContentTextParts(content any) []any {
+	if text, ok := content.(string); ok {
+		return []any{map[string]any{"text": text}}
+	}
+	parts := []any{}
+	for _, raw := range anySlice(content) {
+		item, _ := raw.(map[string]any)
+		if item["type"] != "text" {
+			continue
+		}
+		if text := stringValue(item["text"]); text != "" {
+			parts = append(parts, map[string]any{"text": text})
+		}
+	}
+	return parts
+}
+
+func completedToolCallIDs(messages []any) map[string]bool {
+	ids := map[string]bool{}
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		if msg == nil {
+			continue
+		}
+		if stringValue(msg["role"]) == "tool" {
+			if id := stringValue(msg["tool_call_id"]); id != "" {
+				ids[id] = true
+			}
+		}
+		if stringValue(msg["role"]) == "user" {
+			for _, rawBlock := range anySlice(msg["content"]) {
+				block, _ := rawBlock.(map[string]any)
+				if block["type"] == "tool_result" {
+					if id := stringValue(block["tool_use_id"]); id != "" {
+						ids[id] = true
+					}
+				}
+			}
+		}
+	}
+	return ids
+}
+
+func toolUseIDs(messages []any) map[string]bool {
+	ids := map[string]bool{}
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		if stringValue(msg["role"]) != "assistant" {
+			continue
+		}
+		for _, rawCall := range anySlice(msg["tool_calls"]) {
+			call, _ := rawCall.(map[string]any)
+			if id := stringValue(call["id"]); id != "" {
+				ids[id] = true
+			}
+		}
+	}
+	return ids
+}
+
+func validToolResultIDs(messages []any) map[string]bool {
+	valid := map[string]bool{}
+	lastAssistantToolCallIDs := map[string]bool{}
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		role := stringValue(msg["role"])
+		switch role {
+		case "assistant":
+			lastAssistantToolCallIDs = map[string]bool{}
+			for _, rawCall := range anySlice(msg["tool_calls"]) {
+				call, _ := rawCall.(map[string]any)
+				if id := stringValue(call["id"]); id != "" {
+					lastAssistantToolCallIDs[id] = true
+				}
+			}
+		case "tool":
+			if id := stringValue(msg["tool_call_id"]); id != "" && lastAssistantToolCallIDs[id] {
+				valid[id] = true
+			}
+		case "user":
+			hasToolResults := false
+			for _, rawBlock := range anySlice(msg["content"]) {
+				block, _ := rawBlock.(map[string]any)
+				if block["type"] != "tool_result" {
+					continue
+				}
+				hasToolResults = true
+				if id := stringValue(block["tool_use_id"]); id != "" && lastAssistantToolCallIDs[id] {
+					valid[id] = true
+				}
+			}
+			if !hasToolResults {
+				lastAssistantToolCallIDs = map[string]bool{}
+			}
+		case "system", "developer":
+			lastAssistantToolCallIDs = map[string]bool{}
+		}
+	}
+	return valid
+}
+
+func openAIToolCallsToGeminiParts(msg map[string]any, completed map[string]bool) []any {
+	parts := []any{}
+	for _, rawCall := range anySlice(msg["tool_calls"]) {
+		call, _ := rawCall.(map[string]any)
+		id := stringValue(call["id"])
+		if id != "" && !completed[id] {
+			continue
+		}
+		fn, _ := call["function"].(map[string]any)
+		name := stringValue(fn["name"])
+		if name == "" {
+			continue
+		}
+		args := map[string]any{}
+		if rawArgs := stringValue(fn["arguments"]); rawArgs != "" {
+			_ = json.Unmarshal([]byte(rawArgs), &args)
+		}
+		parts = append(parts, map[string]any{"functionCall": map[string]any{"name": name, "args": args, "id": id}})
+	}
+	return parts
+}
+
+func sanitizeGeminiContents(contents []any) []any {
+	callIdx := map[string]int{}
+	responseIdx := map[string]int{}
+	for idx, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		for _, rawPart := range anySlice(content["parts"]) {
+			part, _ := rawPart.(map[string]any)
+			if fn, ok := part["functionCall"].(map[string]any); ok {
+				if id := stringValue(fn["id"]); id != "" {
+					callIdx[id] = idx
+				}
+			}
+			if fn, ok := part["functionResponse"].(map[string]any); ok {
+				if id := stringValue(fn["id"]); id != "" {
+					responseIdx[id] = idx
+				}
+			}
+		}
+	}
+	validCalls := map[string]bool{}
+	validResponses := map[string]bool{}
+	for id, callAt := range callIdx {
+		if responseAt, ok := responseIdx[id]; ok && responseAt > callAt {
+			validCalls[id] = true
+			validResponses[id] = true
+		}
+	}
+	out := []any{}
+	for _, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		parts := []any{}
+		for _, rawPart := range anySlice(content["parts"]) {
+			part, _ := rawPart.(map[string]any)
+			if fn, ok := part["functionCall"].(map[string]any); ok {
+				if !validCalls[stringValue(fn["id"])] {
+					continue
+				}
+			}
+			if fn, ok := part["functionResponse"].(map[string]any); ok {
+				if !validResponses[stringValue(fn["id"])] {
+					continue
+				}
+			}
+			parts = append(parts, rawPart)
+		}
+		if len(parts) > 0 {
+			copyContent := cloneAnyMap(content)
+			copyContent["parts"] = parts
+			out = append(out, copyContent)
+		}
+	}
+	return out
+}
+
+func groupConsecutiveToolResponses(contents []any) []any {
+	out := []any{}
+	for _, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		parts := anySlice(content["parts"])
+		if content["role"] == "user" && hasFunctionResponsePart(parts) && len(out) > 0 {
+			last, _ := out[len(out)-1].(map[string]any)
+			lastParts := anySlice(last["parts"])
+			if last["role"] == "user" && hasFunctionResponsePart(lastParts) {
+				last["parts"] = append(lastParts, parts...)
+				continue
+			}
+		}
+		copyContent := cloneAnyMap(content)
+		copyContent["parts"] = append([]any{}, parts...)
+		out = append(out, copyContent)
+	}
+	return out
+}
+
+func hasFunctionResponsePart(parts []any) bool {
+	for _, rawPart := range parts {
+		part, _ := rawPart.(map[string]any)
+		if part["functionResponse"] != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func separateTextAndToolParts(contents []any) []any {
+	out := []any{}
+	for _, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		parts := anySlice(content["parts"])
+		if len(parts) == 0 {
+			out = append(out, rawContent)
+			continue
+		}
+		textParts, thoughtParts, callParts, responseParts, otherParts := splitGeminiParts(parts)
+		switch content["role"] {
+		case "model":
+			if len(callParts) > 0 && len(textParts)+len(thoughtParts) > 0 {
+				appendContentParts(&out, content, append(append(thoughtParts, textParts...), otherParts...))
+				appendContentParts(&out, content, callParts)
+			} else {
+				out = append(out, rawContent)
+			}
+		case "user":
+			if len(responseParts) > 0 {
+				appendContentParts(&out, content, append(responseParts, otherParts...))
+			} else {
+				out = append(out, rawContent)
+			}
+		default:
+			out = append(out, rawContent)
+		}
+	}
+	return out
+}
+
+func splitGeminiParts(parts []any) ([]any, []any, []any, []any, []any) {
+	textParts, thoughtParts, callParts, responseParts, otherParts := []any{}, []any{}, []any{}, []any{}, []any{}
+	for _, rawPart := range parts {
+		part, _ := rawPart.(map[string]any)
+		switch {
+		case part["functionCall"] != nil:
+			callParts = append(callParts, rawPart)
+		case part["functionResponse"] != nil:
+			responseParts = append(responseParts, rawPart)
+		case part["thought"] == true:
+			thoughtParts = append(thoughtParts, rawPart)
+		case part["text"] != nil:
+			textParts = append(textParts, rawPart)
+		default:
+			otherParts = append(otherParts, rawPart)
+		}
+	}
+	return textParts, thoughtParts, callParts, responseParts, otherParts
+}
+
+func appendContentParts(target *[]any, content map[string]any, parts []any) {
+	if len(parts) == 0 {
+		return
+	}
+	copyContent := cloneAnyMap(content)
+	copyContent["parts"] = parts
+	*target = append(*target, copyContent)
+}
+
+func requestThinkingConfig(body map[string]any) map[string]any {
+	config := map[string]any{}
+	budget := numberFromAny(body["thinking_budget"])
+	effort := defaultStringValue(reasoningEffort(body["reasoning"]), stringValue(body["reasoning_effort"]))
+	if budget > 0 {
+		config["thinkingBudget"] = budget
+	} else if effort != "" && effort != "none" {
+		if budget := defaultThinkingBudget(effort); budget > 0 {
+			config["thinkingBudget"] = budget
+		}
+	}
+	if len(config) > 0 && body["include_thoughts"] != nil {
+		config["include_thoughts"] = body["include_thoughts"]
+	}
+	return config
+}
+
+func reasoningEffort(value any) string {
+	reasoning, _ := value.(map[string]any)
+	return stringValue(reasoning["effort"])
+}
+
+func defaultThinkingBudget(effort string) int {
+	switch effort {
+	case "low":
+		return 1024
+	case "medium":
+		return 10000
+	case "high", "xhigh":
+		return 32000
+	default:
+		return 0
+	}
 }
 
 const antigravitySystemInstruction = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**"
@@ -1106,6 +1645,9 @@ func (p googleCodeAssistProvider) applyAntigravitySystemInstruction(payload map[
 }
 
 func openAIContentToGeminiParts(content any) []any {
+	if content == nil {
+		return nil
+	}
 	if text, ok := content.(string); ok {
 		return []any{map[string]any{"text": text}}
 	}
@@ -1119,15 +1661,58 @@ func openAIContentToGeminiParts(content any) []any {
 		}
 		if item["type"] == "image_url" {
 			imageURL, _ := item["image_url"].(map[string]any)
-			if part := dataURIToGeminiPart(stringValue(imageURL["url"])); part != nil {
+			url := stringValue(imageURL["url"])
+			if part := dataURIToGeminiPart(url); part != nil {
 				parts = append(parts, part)
+			} else if url != "" {
+				parts = append(parts, map[string]any{"fileData": map[string]any{"fileUri": url, "mimeType": inferMimeTypeFromURL(url)}})
 			}
 		}
 	}
-	if len(parts) == 0 {
-		parts = append(parts, map[string]any{"text": contentToText(content)})
-	}
 	return parts
+}
+
+func inferMimeTypeFromURL(value string) string {
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return "image/jpeg"
+	}
+	segments := strings.Split(strings.ToLower(parsed.Path), ".")
+	ext := segments[len(segments)-1]
+	switch ext {
+	case "png":
+		return "image/png"
+	case "gif":
+		return "image/gif"
+	case "webp":
+		return "image/webp"
+	case "svg":
+		return "image/svg+xml"
+	case "bmp":
+		return "image/bmp"
+	case "ico":
+		return "image/x-icon"
+	case "tiff", "tif":
+		return "image/tiff"
+	case "pdf":
+		return "application/pdf"
+	case "mp4":
+		return "video/mp4"
+	case "webm":
+		return "video/webm"
+	case "mov":
+		return "video/quicktime"
+	case "avi":
+		return "video/x-msvideo"
+	case "mp3":
+		return "audio/mpeg"
+	case "wav":
+		return "audio/wav"
+	case "ogg":
+		return "audio/ogg"
+	default:
+		return "image/jpeg"
+	}
 }
 
 func dataURIToGeminiPart(value string) map[string]any {
@@ -1165,6 +1750,98 @@ func geminiTools(raw any) []any {
 	return out
 }
 
+type schemaInfo struct {
+	typ string
+}
+
+type toolSchemaMap map[string]map[string]schemaInfo
+
+func buildToolSchemaMap(raw any) toolSchemaMap {
+	result := toolSchemaMap{}
+	for _, tool := range mapSlice(raw) {
+		for _, decl := range mapSlice(tool["functionDeclarations"]) {
+			originalName := stringValue(decl["name"])
+			if originalName == "" {
+				continue
+			}
+			schema, _ := defaultAny(decl["parametersJsonSchema"], decl["parameters"]).(map[string]any)
+			props, _ := schema["properties"].(map[string]any)
+			if len(props) == 0 {
+				continue
+			}
+			paramMap := map[string]schemaInfo{}
+			for paramName, rawParam := range props {
+				param, _ := rawParam.(map[string]any)
+				paramMap[paramName] = schemaInfo{typ: defaultEmpty(normalizeSchemaType(param["type"]), "unknown")}
+			}
+			sanitizedName := sanitizedToolName(originalName)
+			result[sanitizedName] = paramMap
+			if sanitizedName != originalName {
+				result[originalName] = paramMap
+			}
+		}
+	}
+	return result
+}
+
+func sanitizeToolSchemaKeys(schemas toolSchemaMap) {
+	for name, params := range schemas {
+		sanitized := sanitizedToolName(name)
+		if sanitized != name {
+			schemas[sanitized] = params
+		}
+	}
+}
+
+func sanitizedToolName(name string) string {
+	if name != "" && name[0] >= '0' && name[0] <= '9' {
+		return "t_" + name
+	}
+	return name
+}
+
+func normalizeToolCallArgs(args any, toolName string, schemas toolSchemaMap) any {
+	record, ok := args.(map[string]any)
+	if !ok || record == nil {
+		return args
+	}
+	params := schemas[toolName]
+	result := map[string]any{}
+	for key, value := range record {
+		expectedType := params[key].typ
+		if expectedType == "string" {
+			result[key] = processEscapeSequencesOnly(value)
+			continue
+		}
+		if text, ok := value.(string); ok && (expectedType == "array" || expectedType == "object") {
+			var parsed any
+			if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+				result[key] = parsed
+			} else {
+				result[key] = processEscapeSequencesOnly(value)
+			}
+			continue
+		}
+		result[key] = processEscapeSequencesOnly(value)
+	}
+	return result
+}
+
+func processEscapeSequencesOnly(value any) any {
+	text, ok := value.(string)
+	if !ok {
+		return value
+	}
+	if (!strings.Contains(text, `\n`) && !strings.Contains(text, `\t`)) || strings.Contains(text, `\"`) || strings.Contains(text, `\\`) {
+		return value
+	}
+	var unescaped string
+	if err := json.Unmarshal([]byte(`"`+strings.ReplaceAll(text, `"`, `\"`)+`"`), &unescaped); err == nil {
+		return unescaped
+	}
+	return value
+}
+
 func unwrapGeminiResponse(data any) map[string]any {
 	if items, ok := data.([]any); ok {
 		for _, item := range items {
@@ -1181,15 +1858,22 @@ func unwrapGeminiResponse(data any) map[string]any {
 	return obj
 }
 
-func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context, source io.Reader, model string, includeReasoning bool, sessionID string) io.Reader {
+func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context, source io.Reader, model string, includeReasoning bool, sessionID string, schemas toolSchemaMap) io.Reader {
 	reader, writer := io.Pipe()
 	go func() {
 		completionID := randomID("chatcmpl")
 		scanner := bufio.NewScanner(source)
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		sentRole := false
-		writeChunk := func(delta map[string]any, finish any) {
+		toolIndex := 0
+		hasToolCalls := false
+		sentFinal := false
+		var trackedUsage map[string]any
+		writeChunk := func(delta map[string]any, finish any, usage map[string]any) {
 			chunk := map[string]any{"id": completionID, "object": "chat.completion.chunk", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}}
+			if usage != nil {
+				chunk["usage"] = usage
+			}
 			encoded, _ := json.Marshal(chunk)
 			_, _ = writer.Write([]byte("data: " + string(encoded) + "\n\n"))
 		}
@@ -1208,26 +1892,42 @@ func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context
 			}
 			response := unwrapGeminiResponse(parsed)
 			p.cacheSignaturesFromResponse(ctx, response, model, sessionID)
-			for _, delta := range geminiDeltas(response, includeReasoning) {
+			if usage := geminiUsage(response); usage != nil {
+				trackedUsage = usage
+			}
+			for _, delta := range geminiDeltas(response, includeReasoning, schemas, &toolIndex) {
 				if !sentRole {
-					writeChunk(map[string]any{"role": "assistant", "content": ""}, nil)
+					writeChunk(map[string]any{"role": "assistant", "content": ""}, nil, nil)
 					sentRole = true
 				}
-				writeChunk(delta, nil)
+				if delta["tool_calls"] != nil {
+					hasToolCalls = true
+				}
+				writeChunk(delta, nil, nil)
+			}
+			if finish, ok := geminiFinishReason(response, hasToolCalls); ok {
+				writeChunk(map[string]any{}, finish, nil)
+				sentFinal = true
 			}
 		}
-		writeChunk(map[string]any{}, "stop")
+		if trackedUsage != nil {
+			writeChunk(map[string]any{}, nil, trackedUsage)
+		}
+		if !sentFinal {
+			writeChunk(map[string]any{}, map[bool]string{true: "tool_calls", false: "stop"}[hasToolCalls], nil)
+		}
 		_, _ = writer.Write([]byte("data: [DONE]\n\n"))
 		_ = writer.Close()
 	}()
 	return reader
 }
 
-func geminiToOpenAICompletion(response map[string]any, model string, includeReasoning bool) map[string]any {
+func geminiToOpenAICompletion(response map[string]any, model string, includeReasoning bool, schemas toolSchemaMap) map[string]any {
 	content := ""
 	reasoning := ""
 	toolCalls := []any{}
-	for _, delta := range geminiDeltas(response, includeReasoning) {
+	toolIndex := 0
+	for _, delta := range geminiDeltas(response, includeReasoning, schemas, &toolIndex) {
 		content += stringValue(delta["content"])
 		reasoning += stringValue(delta["reasoning_content"])
 		if calls, ok := delta["tool_calls"].([]any); ok {
@@ -1243,17 +1943,25 @@ func geminiToOpenAICompletion(response map[string]any, model string, includeReas
 	}
 	finish := "stop"
 	if len(toolCalls) > 0 {
-		message["tool_calls"] = toolCalls
+		message["tool_calls"] = stripToolCallIndexes(toolCalls)
 		finish = "tool_calls"
+	} else if mapped, ok := geminiFinishReason(response, false); ok {
+		finish = mapped
 	}
-	return map[string]any{"id": randomID("chatcmpl"), "object": "chat.completion", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": finish}}, "usage": map[string]any{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
+	usage := geminiUsage(response)
+	if usage == nil {
+		usage = map[string]any{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+	}
+	return map[string]any{"id": randomID("chatcmpl"), "object": "chat.completion", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": finish}}, "usage": usage}
 }
 
-func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Context, source io.Reader, model string, includeReasoning bool, sessionID string) map[string]any {
+func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Context, source io.Reader, model string, includeReasoning bool, sessionID string, schemas toolSchemaMap) map[string]any {
 	content := ""
 	reasoning := ""
 	toolCalls := []any{}
 	var usage map[string]any
+	finish := "stop"
+	toolIndex := 0
 	scanner := bufio.NewScanner(source)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -1271,15 +1979,18 @@ func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Con
 		}
 		response := unwrapGeminiResponse(parsed)
 		p.cacheSignaturesFromResponse(ctx, response, model, sessionID)
-		for _, delta := range geminiDeltas(response, includeReasoning) {
+		for _, delta := range geminiDeltas(response, includeReasoning, schemas, &toolIndex) {
 			content += stringValue(delta["content"])
 			reasoning += stringValue(delta["reasoning_content"])
 			if calls, ok := delta["tool_calls"].([]any); ok {
 				toolCalls = append(toolCalls, calls...)
 			}
 		}
-		if rawUsage, ok := response["usageMetadata"].(map[string]any); ok {
-			usage = map[string]any{"prompt_tokens": numberFromAny(rawUsage["promptTokenCount"]), "completion_tokens": numberFromAny(rawUsage["candidatesTokenCount"]), "total_tokens": numberFromAny(rawUsage["totalTokenCount"])}
+		if nextUsage := geminiUsage(response); nextUsage != nil {
+			usage = nextUsage
+		}
+		if mapped, ok := geminiFinishReason(response, len(toolCalls) > 0); ok {
+			finish = mapped
 		}
 	}
 	message := map[string]any{"role": "assistant", "content": nil}
@@ -1289,9 +2000,8 @@ func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Con
 	if reasoning != "" {
 		message["reasoning_content"] = reasoning
 	}
-	finish := "stop"
 	if len(toolCalls) > 0 {
-		message["tool_calls"] = toolCalls
+		message["tool_calls"] = stripToolCallIndexes(toolCalls)
 		finish = "tool_calls"
 	}
 	if usage == nil {
@@ -1317,19 +2027,19 @@ func (p googleCodeAssistProvider) cacheSignaturesFromResponse(ctx context.Contex
 	}
 }
 
-func geminiDeltas(response map[string]any, includeReasoning bool) []map[string]any {
+func geminiDeltas(response map[string]any, includeReasoning bool, schemas toolSchemaMap, toolIndex *int) []map[string]any {
 	deltas := []map[string]any{}
 	candidates, _ := response["candidates"].([]any)
 	for _, rawCandidate := range candidates {
 		candidate, _ := rawCandidate.(map[string]any)
 		content, _ := candidate["content"].(map[string]any)
 		parts, _ := content["parts"].([]any)
-		toolIndex := 0
+		localToolIndex := 0
 		for _, rawPart := range parts {
 			part, _ := rawPart.(map[string]any)
 			if fn, ok := part["functionCall"].(map[string]any); ok {
 				name := stringValue(fn["name"])
-				args := fn["args"]
+				args := normalizeToolCallArgs(fn["args"], name, schemas)
 				encodedArgs, _ := json.Marshal(args)
 				if len(encodedArgs) == 0 || string(encodedArgs) == "null" {
 					encodedArgs = []byte("{}")
@@ -1338,8 +2048,14 @@ func geminiDeltas(response map[string]any, includeReasoning bool) []map[string]a
 				if id == "" {
 					id = randomID("call")
 				}
-				deltas = append(deltas, map[string]any{"tool_calls": []any{map[string]any{"index": toolIndex, "id": id, "type": "function", "function": map[string]any{"name": name, "arguments": string(encodedArgs)}}}})
-				toolIndex++
+				idx := localToolIndex
+				if toolIndex != nil {
+					idx = *toolIndex
+					*toolIndex = *toolIndex + 1
+				} else {
+					localToolIndex++
+				}
+				deltas = append(deltas, map[string]any{"tool_calls": []any{map[string]any{"index": idx, "id": id, "type": "function", "function": map[string]any{"name": name, "arguments": string(encodedArgs)}}}})
 				continue
 			}
 			text := stringValue(part["text"])
@@ -1354,4 +2070,49 @@ func geminiDeltas(response map[string]any, includeReasoning bool) []map[string]a
 		}
 	}
 	return deltas
+}
+
+func stripToolCallIndexes(calls []any) []any {
+	out := make([]any, 0, len(calls))
+	for _, rawCall := range calls {
+		call, ok := rawCall.(map[string]any)
+		if !ok {
+			out = append(out, rawCall)
+			continue
+		}
+		copyCall := cloneAnyMap(call)
+		delete(copyCall, "index")
+		out = append(out, copyCall)
+	}
+	return out
+}
+
+func geminiUsage(response map[string]any) map[string]any {
+	rawUsage, ok := response["usageMetadata"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return map[string]any{"prompt_tokens": numberFromAny(rawUsage["promptTokenCount"]), "completion_tokens": numberFromAny(rawUsage["candidatesTokenCount"]), "total_tokens": numberFromAny(rawUsage["totalTokenCount"])}
+}
+
+func geminiFinishReason(response map[string]any, hasToolCalls bool) (string, bool) {
+	for _, rawCandidate := range anySlice(response["candidates"]) {
+		candidate, _ := rawCandidate.(map[string]any)
+		finish := stringValue(candidate["finishReason"])
+		if finish == "" {
+			continue
+		}
+		if hasToolCalls {
+			return "tool_calls", true
+		}
+		switch finish {
+		case "MAX_TOKENS":
+			return "length", true
+		case "TOOL_CALLS":
+			return "tool_calls", true
+		default:
+			return "stop", true
+		}
+	}
+	return "", false
 }

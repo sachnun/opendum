@@ -83,7 +83,7 @@ func TestGoogleCodeAssistConversion(t *testing.T) {
 		t.Fatalf("generation = %#v", generation)
 	}
 
-	completion := geminiToOpenAICompletion(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]any{"text": "thinking", "thought": true}, map[string]any{"text": "answer"}}}}}}, "unit-test-model", true)
+	completion := geminiToOpenAICompletion(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]any{"text": "thinking", "thought": true}, map[string]any{"text": "answer"}}}}}}, "unit-test-model", true, nil)
 	message := completion["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
 	if message["content"] != "answer" || message["reasoning_content"] != "thinking" {
 		t.Fatalf("message = %#v", message)
@@ -182,6 +182,91 @@ func TestGoogleCodeAssistConvertsImageURLToInlineData(t *testing.T) {
 	inlineData := parts[1].(map[string]any)["inlineData"].(map[string]any)
 	if inlineData["mimeType"] != "image/png" || inlineData["data"] == "" {
 		t.Fatalf("inlineData = %#v", inlineData)
+	}
+}
+
+func TestAntigravityGenerationHeadersIncludeCodeAssistMetadata(t *testing.T) {
+	provider := antigravityProvider{}.delegate()
+	req, err := http.NewRequest(http.MethodPost, "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider.setGoogleGenerationHeaders(req, " token ", true)
+
+	if req.Header.Get("Authorization") != "Bearer token" {
+		t.Fatalf("Authorization = %q", req.Header.Get("Authorization"))
+	}
+	if req.Header.Get("Accept") != "text/event-stream" {
+		t.Fatalf("Accept = %q", req.Header.Get("Accept"))
+	}
+	if !strings.HasPrefix(req.Header.Get("User-Agent"), "antigravity/1.23.2 ") {
+		t.Fatalf("User-Agent = %q", req.Header.Get("User-Agent"))
+	}
+	if req.Header.Get("X-Goog-Api-Client") != "google-cloud-sdk vscode_cloudshelleditor/0.1" {
+		t.Fatalf("X-Goog-Api-Client = %q", req.Header.Get("X-Goog-Api-Client"))
+	}
+	if req.Header.Get("Client-Metadata") != `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}` {
+		t.Fatalf("Client-Metadata = %q", req.Header.Get("Client-Metadata"))
+	}
+}
+
+func TestAntigravityDiscoveryUsesNodeClientProfile(t *testing.T) {
+	provider := antigravityProvider{}.delegate()
+	req, err := http.NewRequest(http.MethodPost, "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider.setGoogleHeaders(req, "token", false)
+
+	if req.Header.Get("User-Agent") != antigravityAuthUserAgent {
+		t.Fatalf("User-Agent = %q", req.Header.Get("User-Agent"))
+	}
+	if req.Header.Get("X-Goog-Api-Client") != antigravityAuthAPIClient {
+		t.Fatalf("X-Goog-Api-Client = %q", req.Header.Get("X-Goog-Api-Client"))
+	}
+	if req.Header.Get("Client-Metadata") != antigravityAuthClientMetadata {
+		t.Fatalf("Client-Metadata = %q", req.Header.Get("Client-Metadata"))
+	}
+}
+
+func TestAntigravityFetchAccountInfoUsesStandardDiscoveryMetadata(t *testing.T) {
+	provider := antigravityProvider{}.delegate()
+	provider.loadEndpoints = []string{"https://cloudcode-pa.googleapis.com"}
+
+	var loadPayload map[string]any
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.Host {
+		case "cloudcode-pa.googleapis.com":
+			if req.URL.Path != "/v1internal:loadCodeAssist" {
+				t.Fatalf("load path = %q", req.URL.Path)
+			}
+			if req.Header.Get("User-Agent") != antigravityAuthUserAgent {
+				t.Fatalf("discovery User-Agent = %q", req.Header.Get("User-Agent"))
+			}
+			if err := json.NewDecoder(req.Body).Decode(&loadPayload); err != nil {
+				t.Fatal(err)
+			}
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"cloudaicompanionProject":{"id":"project-1"},"currentTier":{"id":"standard-tier"}}`))}, nil
+		case "www.googleapis.com":
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"email":"user@example.com"}`))}, nil
+		default:
+			t.Fatalf("unexpected host = %q", req.URL.Host)
+			return nil, nil
+		}
+	})}
+
+	info := provider.fetchAccountInfo(t.Context(), client, "token")
+	if info.projectID != "project-1" || info.tier != "standard-tier" || info.email != "user@example.com" {
+		t.Fatalf("account info = %#v", info)
+	}
+	if loadPayload["cloudaicompanionProject"] != nil {
+		t.Fatalf("cloudaicompanionProject = %#v", loadPayload["cloudaicompanionProject"])
+	}
+	metadata := loadPayload["metadata"].(map[string]any)
+	if metadata["ideType"] != "IDE_UNSPECIFIED" || metadata["platform"] != "PLATFORM_UNSPECIFIED" || metadata["pluginType"] != "GEMINI" {
+		t.Fatalf("metadata = %#v", metadata)
 	}
 }
 
@@ -340,6 +425,110 @@ func TestAntigravityTransformsToolPayload(t *testing.T) {
 	decl := payload["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
 	if decl["name"] != "t_1bad" || !strings.Contains(decl["description"].(string), "STRICT PARAMETERS") {
 		t.Fatalf("decl = %#v", decl)
+	}
+}
+
+func TestAntigravityOpenAIToGeminiToolHistoryParity(t *testing.T) {
+	payload := openAIToGemini(map[string]any{
+		"messages": []any{
+			map[string]any{"role": "user", "content": "use tools"},
+			map[string]any{"role": "assistant", "content": "thinking", "tool_calls": []any{
+				map[string]any{"id": "call_keep", "type": "function", "function": map[string]any{"name": "lookup", "arguments": `{"items":"[1,2]"}`}},
+				map[string]any{"id": "call_orphan", "type": "function", "function": map[string]any{"name": "lookup", "arguments": `{}`}},
+			}},
+			map[string]any{"role": "tool", "tool_call_id": "call_keep", "name": "lookup", "content": "ok"},
+			map[string]any{"role": "tool", "tool_call_id": "missing", "name": "lookup", "content": "bad"},
+		},
+		"stop":             []any{"END"},
+		"reasoning_effort": "low",
+		"include_thoughts": true,
+	})
+
+	contents := payload["contents"].([]any)
+	if len(contents) != 4 {
+		t.Fatalf("contents len = %d, want 4: %#v", len(contents), contents)
+	}
+	callParts := contents[2].(map[string]any)["parts"].([]any)
+	if len(callParts) != 1 {
+		t.Fatalf("call parts = %#v", callParts)
+	}
+	call := callParts[0].(map[string]any)["functionCall"].(map[string]any)
+	if call["id"] != "call_keep" || call["name"] != "lookup" {
+		t.Fatalf("functionCall = %#v", call)
+	}
+	response := contents[3].(map[string]any)["parts"].([]any)[0].(map[string]any)["functionResponse"].(map[string]any)
+	if response["id"] != "call_keep" {
+		t.Fatalf("functionResponse = %#v", response)
+	}
+	generation := payload["generationConfig"].(map[string]any)
+	if generation["stopSequences"].([]any)[0] != "END" {
+		t.Fatalf("generation stop = %#v", generation)
+	}
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinkingBudget"] != 1024 || thinking["include_thoughts"] != true {
+		t.Fatalf("thinking = %#v", thinking)
+	}
+}
+
+func TestAntigravityTransformPreservesCachedContentAndClaudeThinking(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	payload := openAIToGemini(map[string]any{
+		"messages":        []any{map[string]any{"role": "user", "content": "hi"}},
+		"extra_body":      map[string]any{"cached_content": "cached/123"},
+		"tools":           []any{map[string]any{"type": "function", "function": map[string]any{"name": "lookup", "parameters": map[string]any{"$schema": "http://json-schema.org/draft-07/schema#", "properties": map[string]any{}}}}},
+		"thinking_budget": 2048,
+	})
+	provider.transformAntigravityPayload(t.Context(), payload, "claude-opus-4-6-thinking", "sess")
+	if payload["cachedContent"] != "cached/123" {
+		t.Fatalf("cachedContent = %#v", payload["cachedContent"])
+	}
+	if _, ok := payload["extra_body"]; ok {
+		t.Fatalf("extra_body leaked: %#v", payload["extra_body"])
+	}
+	generation := payload["generationConfig"].(map[string]any)
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinking_budget"] != 2048 || thinking["include_thoughts"] != true {
+		t.Fatalf("claude thinking = %#v", thinking)
+	}
+	if _, ok := thinking["thinkingBudget"]; ok {
+		t.Fatalf("claude thinking should use snake_case only: %#v", thinking)
+	}
+	decl := payload["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
+	params := decl["parameters"].(map[string]any)
+	if _, ok := params["$schema"]; ok || params["type"] != "object" {
+		t.Fatalf("claude params = %#v", params)
+	}
+}
+
+func TestAntigravityResponseNormalizesToolArgsFinishAndUsage(t *testing.T) {
+	schemas := toolSchemaMap{"lookup": map[string]schemaInfo{"items": {typ: "array"}, "query": {typ: "string"}}}
+	response := map[string]any{
+		"candidates": []any{map[string]any{
+			"finishReason": "MAX_TOKENS",
+			"content":      map[string]any{"parts": []any{map[string]any{"functionCall": map[string]any{"name": "lookup", "id": "call_1", "args": map[string]any{"items": "[1,2]", "query": `line\nbreak`}}}}},
+		}},
+		"usageMetadata": map[string]any{"promptTokenCount": 3, "candidatesTokenCount": 4, "totalTokenCount": 7},
+	}
+	completion := geminiToOpenAICompletion(response, "gemini-test", true, schemas)
+	choice := completion["choices"].([]any)[0].(map[string]any)
+	if choice["finish_reason"] != "tool_calls" {
+		t.Fatalf("finish_reason = %#v", choice["finish_reason"])
+	}
+	message := choice["message"].(map[string]any)
+	call := message["tool_calls"].([]any)[0].(map[string]any)
+	args := call["function"].(map[string]any)["arguments"].(string)
+	var parsedArgs map[string]any
+	if err := json.Unmarshal([]byte(args), &parsedArgs); err != nil {
+		t.Fatalf("arguments did not parse: %s", args)
+	}
+	items := parsedArgs["items"].([]any)
+	if len(items) != 2 || parsedArgs["query"] != "line\nbreak" {
+		t.Fatalf("arguments = %#v", parsedArgs)
+	}
+	usage := completion["usage"].(map[string]any)
+	if usage["prompt_tokens"] != 3 || usage["completion_tokens"] != 4 || usage["total_tokens"] != 7 {
+		t.Fatalf("usage = %#v", usage)
 	}
 }
 
