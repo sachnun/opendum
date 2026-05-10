@@ -7,6 +7,13 @@ type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"][
 
 type QuotaProvider = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter";
 
+type QuotaSkeletonRow = {
+  labelClass: string;
+  metaClass: string;
+  valueClass: string;
+  barClass: string;
+};
+
 type ParsedErrorDetails = {
   error: string | null;
   provider: string | null;
@@ -33,6 +40,40 @@ interface AccountQuotaInfo {
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const QUOTA_LAZY_LOAD_ROOT_MARGIN = "400px 0px";
+const QUOTA_SKELETON_ROWS: Record<QuotaProvider, QuotaSkeletonRow[]> = {
+  antigravity: [
+    { labelClass: "w-24", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
+    { labelClass: "w-20", metaClass: "w-12", valueClass: "w-7", barClass: "w-3/5" },
+    { labelClass: "w-24", metaClass: "w-9", valueClass: "w-8", barClass: "w-4/5" },
+    { labelClass: "w-28", metaClass: "w-11", valueClass: "w-7", barClass: "w-2/3" },
+    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-8", barClass: "w-5/6" },
+  ],
+  copilot: [
+    { labelClass: "w-36", metaClass: "w-12", valueClass: "w-16", barClass: "w-3/4" },
+  ],
+  codex: [
+    { labelClass: "w-32", metaClass: "w-10", valueClass: "w-8", barClass: "w-4/5" },
+    { labelClass: "w-36", metaClass: "w-12", valueClass: "w-8", barClass: "w-2/3" },
+  ],
+  gemini_cli: [
+    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-8", barClass: "w-5/6" },
+    { labelClass: "w-28", metaClass: "w-12", valueClass: "w-8", barClass: "w-2/3" },
+    { labelClass: "w-24", metaClass: "w-10", valueClass: "w-7", barClass: "w-3/4" },
+  ],
+  kiro: [
+    { labelClass: "w-24", metaClass: "w-10", valueClass: "w-8", barClass: "w-4/5" },
+    { labelClass: "w-28", metaClass: "w-12", valueClass: "w-8", barClass: "w-2/3" },
+    { labelClass: "w-24", metaClass: "w-9", valueClass: "w-7", barClass: "w-5/6" },
+    { labelClass: "w-16", metaClass: "w-10", valueClass: "w-8", barClass: "w-3/5" },
+    { labelClass: "w-14", metaClass: "w-11", valueClass: "w-7", barClass: "w-1/2" },
+    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-8", barClass: "w-3/4" },
+    { labelClass: "w-20", metaClass: "w-12", valueClass: "w-7", barClass: "w-2/3" },
+  ],
+  openrouter: [
+    { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
+    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
+  ],
+};
 
 const props = defineProps<{
   account: Account;
@@ -266,6 +307,7 @@ const effectiveTier = computed(() => {
 const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "free");
 const showTierBadge = computed(() => props.showTier && normalizedTier.value !== "unknown" && normalizedTier.value !== "guest");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
+const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProvider] ?? []);
 const hasSuccessAfterLastError = computed(() => {
   if (!props.account.lastErrorAt) return false;
   const errorMs = new Date(props.account.lastErrorAt).getTime();
@@ -610,7 +652,22 @@ function historyEntryPreview(errorMessage: string): string {
               </UiButton>
             </div>
 
-            <template v-if="!isQuotaLoading || quotaInfo">
+            <div v-if="isQuotaLoading && !quotaInfo" class="space-y-2" aria-hidden="true">
+              <div v-for="(row, index) in quotaSkeletonRows" :key="index" class="space-y-1">
+                <div class="flex items-center justify-between gap-2">
+                  <UiSkeleton :class="['h-3', row.labelClass]" />
+                  <span class="flex items-center gap-2">
+                    <UiSkeleton v-if="row.metaClass !== 'w-0'" :class="['h-2.5', row.metaClass]" />
+                    <UiSkeleton :class="['h-3', row.valueClass]" />
+                  </span>
+                </div>
+                <div class="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <UiSkeleton :class="['h-full rounded-full', row.barClass]" />
+                </div>
+              </div>
+            </div>
+
+            <template v-else>
               <p v-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
               <p v-else-if="!quotaInfo" class="text-xs text-muted-foreground">Quota data is not available yet.</p>
               <div v-else-if="quotaInfo.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
