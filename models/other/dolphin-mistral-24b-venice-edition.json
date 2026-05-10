@@ -2,6 +2,7 @@
   "providers": [
     "openrouter"
   ],
+  "ignored": true,
   "family": "Cognitive Computations",
   "meta": {
     "contextLength": 32768,

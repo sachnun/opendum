@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "ignored": true,
   "family": "Mistral",
   "meta": {
     "contextLength": 32768,

@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "ignored": true,
   "aliases": [
     "microsoft-phi-4-mini-instruct",
     "microsoft/phi-4-mini-instruct"

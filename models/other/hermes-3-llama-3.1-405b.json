@@ -2,6 +2,7 @@
   "providers": [
     "openrouter"
   ],
+  "ignored": true,
   "family": "Nous Research",
   "meta": {
     "contextLength": 128000,

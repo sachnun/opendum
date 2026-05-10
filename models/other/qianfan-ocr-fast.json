@@ -3,6 +3,7 @@
     "kilo_code",
     "openrouter"
   ],
+  "ignored": true,
   "providerConfig": {
     "kilo_code": {
       "upstream": "baidu/qianfan-ocr-fast:free"

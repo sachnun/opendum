@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "ignored": true,
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "meta/llama2-70b"

@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "ignored": true,
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "nvidia/riva-translate-4b-instruct-v1.1"

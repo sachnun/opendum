@@ -2,6 +2,7 @@
   "providers": [
     "workers_ai"
   ],
+  "ignored": true,
   "family": "IBM",
   "meta": {
     "contextLength": 128000,

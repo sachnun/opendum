@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "ignored": true,
   "aliases": [
     "mistralai-codestral-22b-instruct-v0.1",
     "mistralai/codestral-22b-instruct-v0.1"

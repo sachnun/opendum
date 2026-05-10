@@ -3,6 +3,7 @@
     "nvidia_nim",
     "openrouter"
   ],
+  "ignored": true,
   "family": "NVIDIA",
   "meta": {
     "contextLength": 131072,

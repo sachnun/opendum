@@ -2,6 +2,7 @@
   "providers": [
     "ollama_cloud"
   ],
+  "ignored": true,
   "family": "NVIDIA",
   "meta": {
     "contextLength": 131072,
