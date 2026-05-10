@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { db } from "../lib/db";
 import { providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "../lib/db/schema";
-import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
+import { decryptForReveal, encrypt, generateApiKey, getEncryptedPayloadFormat, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAllFamilies, getAllModels, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
 import type { ActionResult } from "../utils/api";
@@ -143,9 +143,14 @@ export async function deleteApiKey(userId: string, id: string) {
 }
 
 export async function revealApiKey(userId: string, id: string) {
-  return withOwnedApiKey(userId, id, "Failed to reveal API key", (apiKey) => {
+  return withOwnedApiKey(userId, id, "Failed to reveal API key", async (apiKey) => {
     if (!apiKey.encryptedKey) return { success: false, error: "This API key was created before the reveal feature. Please generate a new key." } as const;
-    return { success: true, data: { key: decrypt(apiKey.encryptedKey) } } as const;
+    try {
+      return { success: true, data: { key: await decryptForReveal(apiKey.encryptedKey) } } as const;
+    } catch (error) {
+      console.error("Unable to decrypt API key for reveal:", { apiKeyId: apiKey.id, format: getEncryptedPayloadFormat(apiKey.encryptedKey), error: error instanceof Error ? error.message : String(error) });
+      return { success: false, error: "Unable to decrypt this API key. Please generate a new key." } as const;
+    }
   });
 }
 

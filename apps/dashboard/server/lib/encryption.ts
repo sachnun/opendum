@@ -27,6 +27,21 @@ function decryptV1(ciphertext: string): string {
   return Buffer.concat([decipher.update(Buffer.from(encryptedText, "base64")), decipher.final()]).toString("utf8");
 }
 
+async function decryptV1WithWebCrypto(ciphertext: string): Promise<string> {
+  const [, ivText, tagText, encryptedText] = ciphertext.split(":");
+  if (!ivText || !tagText || !encryptedText) throw new Error("Invalid encrypted payload");
+  if (!globalThis.crypto?.subtle) throw new Error("WebCrypto is not available");
+
+  const key = await globalThis.crypto.subtle.importKey("raw", deriveV1EncryptionKey(), "AES-GCM", false, ["decrypt"]);
+  const decrypted = await globalThis.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: Buffer.from(ivText, "base64") },
+    key,
+    Buffer.concat([Buffer.from(encryptedText, "base64"), Buffer.from(tagText, "base64")])
+  );
+
+  return new TextDecoder().decode(decrypted);
+}
+
 function deriveCryptoJsKey(passphrase: string, salt: Buffer): { key: Buffer; iv: Buffer } {
   let derived = Buffer.alloc(0);
   let block = Buffer.alloc(0);
@@ -76,6 +91,26 @@ export function encrypt(text: string): string {
 export function decrypt(ciphertext: string): string {
   if (ciphertext.startsWith(`${ENCRYPTION_VERSION}:`)) return decryptV1(ciphertext);
   return decryptCryptoJsCompatible(ciphertext);
+}
+
+export async function decryptForReveal(ciphertext: string): Promise<string> {
+  try {
+    return decrypt(ciphertext);
+  } catch (error) {
+    if (ciphertext.startsWith(`${ENCRYPTION_VERSION}:`)) return decryptV1WithWebCrypto(ciphertext);
+    throw error;
+  }
+}
+
+export function getEncryptedPayloadFormat(ciphertext: string): "v1" | "crypto-js" | "unknown" {
+  if (ciphertext.startsWith(`${ENCRYPTION_VERSION}:`)) return "v1";
+
+  try {
+    const encrypted = Buffer.from(ciphertext, "base64");
+    return encrypted.subarray(0, OPENSSL_SALTED_PREFIX.length).toString("utf8") === OPENSSL_SALTED_PREFIX ? "crypto-js" : "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 /**
