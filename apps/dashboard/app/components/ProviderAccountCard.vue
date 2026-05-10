@@ -603,7 +603,6 @@ function historyEntryPreview(errorMessage: string): string {
           </div>
 
           <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : 'Never' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">Total Errors</span><span :class="['font-medium', account.errorCount > 0 ? errorToneClass : 'text-muted-foreground']">{{ account.errorCount }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">Last Error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
 
           <div class="min-h-14 border-t">
