@@ -87,7 +87,6 @@ const MODEL_NAME_OVERRIDES = {
 const KNOWN_EXTRAS = new Map([
   ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image"],
   ["gemini-3-pro-image-preview", "gemini-3-pro-image"],
-  ["gpt-oss-120b-medium", "gpt-oss-120b-medium"],
   ["gemini-2.5-flash", "gemini-2.5-flash"],
   ["gemini-2.5-flash-lite", "gemini-2.5-flash-lite"],
 ]);

@@ -4158,13 +4158,7 @@ export const GENERATED_MODEL_REGISTRY = {
     "family": "OpenAI"
   },
   "gpt-oss-120b-medium": {
-    "providers": [
-      "antigravity",
-      "ollama_cloud"
-    ],
-    "aliases": [
-      "gpt-oss-120b"
-    ],
+    "providers": [],
     "family": "OpenAI",
     "meta": {
       "contextLength": 128000,
@@ -4181,45 +4175,11 @@ export const GENERATED_MODEL_REGISTRY = {
           "text"
         ]
       }
-    },
-    "upstream": {
-      "ollama_cloud": "gpt-oss:120b"
-    },
-    "providerConfig": {
-      "ollama_cloud": {
-        "upstream": "gpt-oss:120b"
-      }
     }
   },
   "gpt-oss-120b": {
-    "providers": [
-      "groq",
-      "nvidia_nim",
-      "ollama_cloud",
-      "openrouter",
-      "workers_ai"
-    ],
-    "family": "OpenAI",
-    "upstream": {
-      "groq": "openai/gpt-oss-120b",
-      "nvidia_nim": "openai/gpt-oss-120b",
-      "ollama_cloud": "gpt-oss:120b",
-      "openrouter": "openai/gpt-oss-120b:free"
-    },
-    "providerConfig": {
-      "groq": {
-        "upstream": "openai/gpt-oss-120b"
-      },
-      "nvidia_nim": {
-        "upstream": "openai/gpt-oss-120b"
-      },
-      "ollama_cloud": {
-        "upstream": "gpt-oss:120b"
-      },
-      "openrouter": {
-        "upstream": "openai/gpt-oss-120b:free"
-      }
-    }
+    "providers": [],
+    "family": "OpenAI"
   },
   "gpt-oss-20b": {
     "providers": [
@@ -5908,6 +5868,8 @@ export const GENERATED_IGNORED_MODELS = new Set<string>([
   "nemotron-nano-9b-v2",
   "nim-llama-3.1-70b-instruct",
   "usdcode-llama-3.1-70b-instruct",
+  "gpt-oss-120b-medium",
+  "gpt-oss-120b",
   "baichuan2-13b-chat",
   "bielik-11b-v2.3-instruct",
   "bielik-11b-v2.6-instruct",

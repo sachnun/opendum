@@ -8,6 +8,8 @@ const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
+const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b"]);
+
 function toModelKey(modelId) {
   const normalizedModelId = modelId.replace(/^library\//, "");
   const providerStrippedModelId =
@@ -75,6 +77,10 @@ function buildModelMap(modelIds) {
 
   for (const modelId of modelIds) {
     const baseModelKey = toModelKey(modelId);
+    if (IGNORED_MODEL_KEYS.has(baseModelKey)) {
+      continue;
+    }
+
     let modelKey = baseModelKey;
     let suffix = 2;
 

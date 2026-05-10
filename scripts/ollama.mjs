@@ -9,7 +9,6 @@ const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
 const FORCED_MODEL_KEYS = {
-  "gpt-oss-120b-medium": "gpt-oss:120b",
   "kimi-k2": "kimi-k2:1t",
 };
 

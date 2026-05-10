@@ -34,6 +34,8 @@ const EXCLUDED_MODEL_KEY_TOKENS = [
   "vila",
 ];
 
+const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b"]);
+
 function sleep(ms) {
   return new Promise((resolvePromise) => {
     setTimeout(resolvePromise, ms);
@@ -211,6 +213,10 @@ function buildModelMap(modelIds, existingKeys, llmModelKeys) {
     }
 
     const baseModelKey = toModelKey(upstreamModel);
+    if (IGNORED_MODEL_KEYS.has(baseModelKey)) {
+      continue;
+    }
+
     let modelKey = baseModelKey;
     let suffix = 2;
 

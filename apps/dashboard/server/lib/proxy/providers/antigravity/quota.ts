@@ -19,7 +19,6 @@ const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   "standard-tier": {
     "claude-opus-4-6": 150,
     "claude-sonnet-4-6": 150,
-    "gpt-oss-120b-medium": 150,
     "gemini-3.1-pro-preview": 320,
     "gemini-3-flash-preview": 400,
     "gemini-2.5-flash": 3000,
@@ -28,7 +27,6 @@ const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   "free-tier": {
     "claude-opus-4-6": 50,
     "claude-sonnet-4-6": 50,
-    "gpt-oss-120b-medium": 50,
     "gemini-3.1-pro-preview": 150,
     "gemini-3-flash-preview": 500,
     "gemini-2.5-flash": 3000,
@@ -37,7 +35,6 @@ const QUOTA_MAX_REQUESTS: Record<string, Record<string, number>> = {
   "legacy-tier": {
     "claude-opus-4-6": 50,
     "claude-sonnet-4-6": 50,
-    "gpt-oss-120b-medium": 50,
     "gemini-3.1-pro-preview": 150,
     "gemini-3-flash-preview": 500,
     "gemini-2.5-flash": 3000,
@@ -49,11 +46,10 @@ const QUOTA_MAX_REQUESTS_DEFAULT = 100;
 
 const QUOTA_GROUPS: Record<string, { displayName: string; models: string[] }> = {
   claude: {
-    displayName: "Claude / GPT-OSS",
+    displayName: "Claude",
     models: [
       "claude-opus-4-6",
       "claude-sonnet-4-6",
-      "gpt-oss-120b-medium",
     ],
   },
   "g3-pro": {

@@ -39,6 +39,8 @@ const MODEL_KEY_OVERRIDES = {
   "moonshotai/kimi-k2-instruct-0905": "kimi-k2-0905",
 };
 
+const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b"]);
+
 // ---------------------------------------------------------------------------
 // Non-chat model patterns to exclude (whisper, TTS, guard, compound, etc.)
 // ---------------------------------------------------------------------------
@@ -174,6 +176,8 @@ function buildModelMap(groqModelIds, reverseMap) {
     if (isNonChatModel(groqId)) continue;
 
     const modelKey = toModelKey(groqId, reverseMap);
+    if (IGNORED_MODEL_KEYS.has(modelKey)) continue;
+
     map.set(modelKey, groqId);
   }
 
