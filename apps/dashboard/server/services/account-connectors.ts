@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../lib/db";
 import { providerAccount } from "../lib/db/schema";
 import { encrypt, hashString } from "../lib/encryption";
+import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { getProviderModelMap } from "../lib/proxy/models";
 import { API_BASE_URL as cerebrasApiBaseUrl } from "../lib/proxy/providers/cerebras/constants";
 import { API_BASE_URL as groqApiBaseUrl } from "../lib/proxy/providers/groq/constants";
@@ -17,6 +18,7 @@ import type { ActionResult } from "../utils/api";
 
 const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
+const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
 const apiKeyProviderSchema = z.enum(["nvidia_nim", "ollama_cloud", "openrouter", "groq", "cerebras", "kilo_code"]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional() });
@@ -30,7 +32,7 @@ const API_KEY_PROVIDER_SETTINGS = {
   groq: { label: "Groq", baseUrl: groqApiBaseUrl, modelMap: getProviderModelMap("groq"), validationPath: "/models", requireSuccessfulStatus: true },
   cerebras: { label: "Cerebras", baseUrl: cerebrasApiBaseUrl, modelMap: getProviderModelMap("cerebras"), validationPath: "/models", requireSuccessfulStatus: true },
   kilo_code: { label: "Kilo Code", baseUrl: kiloCodeApiBaseUrl, modelMap: getProviderModelMap("kilo_code"), validationPath: "/models", requireSuccessfulStatus: true },
-} satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: string; requireSuccessfulStatus: boolean }>;
+} satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
 
 function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {
   const { baseUrl, modelMap, validationPath } = API_KEY_PROVIDER_SETTINGS[provider];
@@ -39,24 +41,22 @@ function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {
   return {
     validationModel,
     url: `${baseUrl}${validationPath}`,
-    init: {
-      method: isChatValidation ? "POST" : "GET",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
-      cache: "no-store" as const,
-      body: isChatValidation ? JSON.stringify({ model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false }) : undefined,
-    },
+    method: isChatValidation ? "POST" as const : "GET" as const,
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: isChatValidation ? { model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false } : undefined,
   };
 }
 
 async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string): Promise<ActionResult<void>> {
   const { label, validationPath, requireSuccessfulStatus } = API_KEY_PROVIDER_SETTINGS[provider];
-  const { validationModel, url, init } = buildValidationRequest(provider, apiKey);
+  const { validationModel, url, method, headers, body } = buildValidationRequest(provider, apiKey);
   if (validationPath === "/chat/completions" && !validationModel) return { success: false, error: `${label} API key validation model is not configured.` };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetchInternalProvider(url, { method, headers, body, signal: controller.signal });
+    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: `Unable to validate ${label} API key through the proxy. Please try again.` };
     let responseText = "";
     if (!response.ok) {
       try { responseText = await response.text(); } catch { responseText = ""; }
@@ -70,6 +70,7 @@ async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string):
     }
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate external provider API keys. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: `${label} API key validation timed out. Please try again.` };
     return { success: false, error: `Unable to validate ${label} API key. Please check your network and try again.` };
   } finally {
@@ -106,7 +107,8 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
   try {
-    const response = await fetch(getWorkersAiValidationUrl(normalizedAccountId), { method: "GET", headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" }, signal: controller.signal, cache: "no-store" });
+    const response = await fetchInternalProvider(getWorkersAiValidationUrl(normalizedAccountId), { method: "GET", headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" }, signal: controller.signal });
+    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to validate Workers AI credentials through the proxy. Please try again." };
     if (!response.ok) {
       const responseText = await response.text().catch(() => "");
       if (isLikelyCloudflareChallenge(response, responseText)) return { success: false, error: formatProviderHttpError("Workers AI", response, responseText, { endpointLabel: "credentials validation endpoint" }) };
@@ -114,6 +116,7 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
       return { success: false, error: `Unable to validate Workers AI credentials (HTTP ${response.status}). Please try again.` };
     }
   } catch (error) {
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Workers AI credentials. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Workers AI validation timed out. Please try again." };
     return { success: false, error: "Unable to validate Workers AI credentials. Please check your network and try again." };
   } finally {

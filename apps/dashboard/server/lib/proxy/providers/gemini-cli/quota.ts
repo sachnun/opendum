@@ -2,6 +2,7 @@ import {
   ENDPOINT_FALLBACKS,
   AUTH_HEADERS,
 } from "./constants.js";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const DEFAULT_MAX_REQUESTS = 1000;
@@ -178,7 +179,7 @@ export async function fetchGeminiCliQuotaFromApi(
 
   for (const baseEndpoint of ENDPOINT_FALLBACKS) {
     try {
-      const response = await fetch(
+      const response = await fetchInternalProvider(
         `${baseEndpoint}/v1internal:retrieveUserQuota`,
         {
           method: "POST",
@@ -188,8 +189,7 @@ export async function fetchGeminiCliQuotaFromApi(
             Accept: "application/json",
             ...AUTH_HEADERS,
           },
-          body: JSON.stringify({ project: projectId }),
-          cache: "no-store",
+          body: { project: projectId },
         }
       );
 

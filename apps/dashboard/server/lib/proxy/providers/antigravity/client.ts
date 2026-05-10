@@ -3,6 +3,7 @@ import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
 import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import type {
   Provider,
   ProviderConfig,
@@ -141,7 +142,7 @@ export const antigravityProvider: Provider = {
       body.code_verifier = codeVerifier;
     }
 
-    const response = await fetch("https://oauth2.googleapis.com/token", {
+    const response = await fetchInternalProvider("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(body),
@@ -171,7 +172,7 @@ export const antigravityProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch("https://oauth2.googleapis.com/token", {
+    const response = await fetchInternalProvider("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -308,7 +309,7 @@ export const antigravityProvider: Provider = {
       const url = `${endpoint}/v1internal:${action}`;
 
       try {
-        const response = await fetch(url, {
+        const response = await fetchInternalProvider(url, {
           method: "POST",
           headers,
           body: result.body,
@@ -518,7 +519,7 @@ async function fetchAccountInfo(
 
   for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
     try {
-      const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
+      const response = await fetchInternalProvider(`${baseEndpoint}/v1internal:loadCodeAssist`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -589,7 +590,7 @@ async function fetchAccountInfo(
 
   let email = "";
   try {
-    const userInfoResponse = await fetch(
+    const userInfoResponse = await fetchInternalProvider(
       "https://www.googleapis.com/oauth2/v2/userinfo",
       {
         headers: {
@@ -672,7 +673,7 @@ async function onboardUser(
 
   for (const baseEndpoint of ONBOARD_USER_ENDPOINTS) {
     try {
-      const response = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+      const response = await fetchInternalProvider(`${baseEndpoint}/v1internal:onboardUser`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -691,7 +692,7 @@ async function onboardUser(
       for (let i = 0; i < 30 && !lroData.done; i++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const pollResponse = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+        const pollResponse = await fetchInternalProvider(`${baseEndpoint}/v1internal:onboardUser`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,

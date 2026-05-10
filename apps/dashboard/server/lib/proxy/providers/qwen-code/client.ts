@@ -6,6 +6,7 @@ import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
 import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import type {
   Provider,
   ProviderConfig,
@@ -216,7 +217,7 @@ export const qwenCodeProvider: Provider = {
       body.code_verifier = codeVerifier;
     }
 
-    const response = await fetch(TOKEN_ENDPOINT, {
+    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -242,7 +243,7 @@ export const qwenCodeProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(TOKEN_ENDPOINT, {
+    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -325,7 +326,7 @@ export const qwenCodeProvider: Provider = {
       stream
     );
 
-    const response = await fetch(`${API_BASE_URL}/chat/completions`, {
+    const response = await fetchInternalProvider(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -377,7 +378,7 @@ export async function initiateDeviceCodeFlow(): Promise<{
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  const response = await fetch(DEVICE_CODE_ENDPOINT, {
+  const response = await fetchInternalProvider(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -418,7 +419,7 @@ export async function pollDeviceCodeAuthorization(
   deviceCode: string,
   codeVerifier: string
 ): Promise<OAuthResult | { pending: true } | { error: string }> {
-  const response = await fetch(TOKEN_ENDPOINT, {
+  const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",

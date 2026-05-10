@@ -3,6 +3,7 @@ import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
 import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import type {
   ChatCompletionRequest,
   OAuthResult,
@@ -449,7 +450,7 @@ export const kiroProvider: Provider = {
       throw new Error("Code verifier is required for Kiro token exchange");
     }
 
-    const response = await fetch(TOKEN_ENDPOINT, {
+    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -482,7 +483,7 @@ export const kiroProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(REFRESH_ENDPOINT, {
+    const response = await fetchInternalProvider(REFRESH_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -547,7 +548,7 @@ export const kiroProvider: Provider = {
       payload.profileArn = account.accountId;
     }
 
-    const upstreamResponse = await fetch(API_BASE_URL, {
+    const upstreamResponse = await fetchInternalProvider(API_BASE_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${credentials}`,

@@ -3,6 +3,7 @@ import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
 import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import type {
   Provider,
   ProviderConfig,
@@ -690,7 +691,7 @@ function buildCopilotHeaders(
 
 async function fetchCopilotIdentity(accessToken: string): Promise<string> {
   try {
-    const response = await fetch(USER_ENDPOINT, {
+    const response = await fetchInternalProvider(USER_ENDPOINT, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
@@ -772,7 +773,7 @@ export const copilotProvider: Provider = {
   },
 
   async exchangeCode(code: string): Promise<OAuthResult> {
-    const response = await fetch(TOKEN_ENDPOINT, {
+    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -808,7 +809,7 @@ export const copilotProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(TOKEN_ENDPOINT, {
+    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -907,7 +908,7 @@ export const copilotProvider: Provider = {
         stream
       );
 
-      const response = await fetch(
+      const response = await fetchInternalProvider(
         `${API_BASE_URL}/responses`,
         {
           method: "POST",
@@ -962,7 +963,7 @@ export const copilotProvider: Provider = {
     }
     const requestPayload = buildRequestPayload(chatBody, stream);
 
-    return fetch(`${API_BASE_URL}/chat/completions`, {
+    return fetchInternalProvider(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: buildCopilotHeaders(accessToken, stream, xInitiator, visionRequest),
       body: JSON.stringify(requestPayload),
@@ -978,7 +979,7 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
   expiresIn: number;
   interval: number;
 }> {
-  const response = await fetch(DEVICE_CODE_ENDPOINT, {
+  const response = await fetchInternalProvider(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -1012,7 +1013,7 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
 export async function pollCopilotDeviceCodeAuthorization(
   deviceCode: string
 ): Promise<OAuthResult | { pending: true; retryAfterSeconds?: number } | { error: string }> {
-  const response = await fetch(TOKEN_ENDPOINT, {
+  const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       Accept: "application/json",

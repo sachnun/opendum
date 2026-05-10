@@ -1,3 +1,4 @@
+import { fetchInternalProvider } from "../../internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const GITHUB_API_BASE_URL = "https://api.github.com";
@@ -224,7 +225,7 @@ async function fetchGithubUsername(
   accessToken: string
 ): Promise<{ ok: true; username: string } | { ok: false; error: string }> {
   try {
-    const response = await fetch(`${GITHUB_API_BASE_URL}/user`, {
+    const response = await fetchInternalProvider(`${GITHUB_API_BASE_URL}/user`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -232,7 +233,6 @@ async function fetchGithubUsername(
         "X-GitHub-Api-Version": GITHUB_API_VERSION,
         "User-Agent": USER_AGENT,
       },
-      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -279,7 +279,7 @@ async function fetchCopilotInternalUser(
   accessToken: string
 ): Promise<InternalUserResult | InternalUserError> {
   try {
-    const response = await fetch(
+    const response = await fetchInternalProvider(
       `${GITHUB_API_BASE_URL}/copilot_internal/user`,
       {
         method: "GET",
@@ -287,7 +287,6 @@ async function fetchCopilotInternalUser(
           Authorization: `Bearer ${accessToken}`,
           ...INTERNAL_HEADERS,
         },
-        cache: "no-store",
       }
     );
 
@@ -412,7 +411,7 @@ async function fetchBillingUsage(
   });
 
   try {
-    const response = await fetch(
+    const response = await fetchInternalProvider(
       `${GITHUB_API_BASE_URL}/users/${encodeURIComponent(
         username
       )}/settings/billing/premium_request/usage?${query.toString()}`,
@@ -424,7 +423,6 @@ async function fetchBillingUsage(
           "X-GitHub-Api-Version": GITHUB_API_VERSION,
           "User-Agent": USER_AGENT,
         },
-        cache: "no-store",
       }
     );
 

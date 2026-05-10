@@ -39,6 +39,7 @@ func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy
 	r.Post("/v1/chat/completions", s.proxy.ChatCompletions)
 	r.Post("/v1/messages", s.proxy.Messages)
 	r.Post("/v1/responses", s.proxy.Responses)
+	r.Post("/internal", s.internalRoute)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/v1" {
 			WriteOpenAIError(w, http.StatusNotFound, ErrorInfo{Message: "Unknown API endpoint.", Type: "invalid_request_error"})

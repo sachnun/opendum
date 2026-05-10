@@ -6,6 +6,7 @@
  */
 
 import { CODE_ASSIST_HEADERS, LOAD_CODE_ASSIST_ENDPOINTS } from "./constants.js";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 /**
@@ -250,14 +251,14 @@ export async function fetchQuotaFromApi(
   // Try endpoints with fallback
   for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
     try {
-      const response = await fetch(`${baseEndpoint}/v1internal:fetchAvailableModels`, {
+      const response = await fetchInternalProvider(`${baseEndpoint}/v1internal:fetchAvailableModels`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
           ...CODE_ASSIST_HEADERS,
         },
-        body: JSON.stringify({ project: projectId }),
+        body: { project: projectId },
       });
 
       if (!response.ok) {

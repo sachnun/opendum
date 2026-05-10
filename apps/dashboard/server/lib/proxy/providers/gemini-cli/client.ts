@@ -5,6 +5,7 @@ import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
 import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import type {
   Provider,
   ProviderConfig,
@@ -188,7 +189,7 @@ export const geminiCliProvider: Provider = {
       body.code_verifier = codeVerifier;
     }
 
-    const response = await fetch("https://oauth2.googleapis.com/token", {
+    const response = await fetchInternalProvider("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(body),
@@ -225,7 +226,7 @@ export const geminiCliProvider: Provider = {
   },
 
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch("https://oauth2.googleapis.com/token", {
+    const response = await fetchInternalProvider("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -401,7 +402,7 @@ export const geminiCliProvider: Provider = {
       "User-Agent": buildGeminiCliUserAgent(model),
     });
 
-    const response = await fetch(
+    const response = await fetchInternalProvider(
       stream ? `${url}?alt=sse` : url,
       {
         method: "POST",
@@ -644,7 +645,7 @@ async function onboardGeminiCliUser(
 
   for (const baseEndpoint of ONBOARD_USER_ENDPOINTS) {
     try {
-      const response = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+      const response = await fetchInternalProvider(`${baseEndpoint}/v1internal:onboardUser`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -663,7 +664,7 @@ async function onboardGeminiCliUser(
       for (let i = 0; i < 30 && !lroData.done; i++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const pollResponse = await fetch(`${baseEndpoint}/v1internal:onboardUser`, {
+        const pollResponse = await fetchInternalProvider(`${baseEndpoint}/v1internal:onboardUser`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -707,7 +708,7 @@ async function onboardGeminiCliUser(
 
 async function fetchGeminiCliEmail(accessToken: string): Promise<string> {
   try {
-    const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    const userInfoResponse = await fetchInternalProvider("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -726,7 +727,7 @@ async function fetchGeminiCliProjectFromResourceManager(
   accessToken: string
 ): Promise<string> {
   try {
-    const response = await fetch(
+    const response = await fetchInternalProvider(
       "https://cloudresourcemanager.googleapis.com/v1/projects",
       {
         headers: {
@@ -775,7 +776,7 @@ export async function fetchGeminiCliAccountInfo(
 
   for (const baseEndpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
     try {
-      const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
+      const response = await fetchInternalProvider(`${baseEndpoint}/v1internal:loadCodeAssist`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,

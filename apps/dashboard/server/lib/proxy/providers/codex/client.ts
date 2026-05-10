@@ -3,6 +3,7 @@ import { encrypt, decrypt } from "../../../encryption.js";
 import { db } from "../../../db/index.js";
 import { providerAccount } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import type {
   Provider,
   ProviderConfig,
@@ -1469,7 +1470,7 @@ export const codexProvider: Provider = {
       body.code_verifier = codeVerifier;
     }
 
-    const response = await fetch(TOKEN_ENDPOINT, {
+    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -1511,7 +1512,7 @@ export const codexProvider: Provider = {
    * Refresh access token
    */
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    const response = await fetch(TOKEN_ENDPOINT, {
+    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -1678,7 +1679,7 @@ export const codexProvider: Provider = {
       headers.session_id = body._sessionId;
     }
 
-    const response = await fetch(API_BASE_URL, {
+    const response = await fetchInternalProvider(API_BASE_URL, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),

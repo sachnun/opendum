@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../lib/db";
 import { providerAccount, type ProviderAccount } from "../lib/db/schema";
 import { decrypt } from "../lib/encryption";
+import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { antigravityProvider } from "../lib/proxy/providers/antigravity";
 import { fetchQuotaFromApi as fetchAntigravityQuotaFromApi, type QuotaGroupInfo as AntigravityQuotaGroupInfo } from "../lib/proxy/providers/antigravity/quota";
 import { codexProvider } from "../lib/proxy/providers/codex";
@@ -318,12 +319,7 @@ async function fetchOpenRouterJson(path: "/key" | "/credits", apiKey: string): P
   const timeout = setTimeout(() => controller.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${openRouterApiBaseUrl}${path}`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    const response = await fetchInternalProvider(`${openRouterApiBaseUrl}${path}`, { method: "GET", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" }, signal: controller.signal });
     const rawBody = await response.text();
     let parsedBody: unknown = null;
     if (rawBody) {
@@ -343,6 +339,7 @@ async function fetchOpenRouterJson(path: "/key" | "/credits", apiKey: string): P
     if (!dataRecord) return { ok: false, error: `OpenRouter${path} response did not include a data object` };
     return { ok: true, data: dataRecord };
   } catch (error) {
+    if (error instanceof InternalRelayNotConfiguredError) return { ok: false, error: "Proxy URL is required to fetch OpenRouter quota. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { ok: false, error: `OpenRouter${path} request timed out` };
     return { ok: false, error: error instanceof Error ? error.message : `Failed to fetch OpenRouter${path}` };
   } finally {

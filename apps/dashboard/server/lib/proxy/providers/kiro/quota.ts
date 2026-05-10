@@ -1,4 +1,5 @@
 import { REGION } from "./constants.js";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const USAGE_LIMITS_URL = `https://q.${REGION}.amazonaws.com/`;
@@ -307,7 +308,7 @@ export async function fetchKiroQuotaFromApi(
       requestUrl.searchParams.set(key, String(value));
     }
 
-    const response = await fetch(requestUrl, {
+    const response = await fetchInternalProvider(requestUrl.toString(), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -322,7 +323,6 @@ export async function fetchKiroQuotaFromApi(
         "amz-sdk-request": "attempt=1; max=3",
       },
       body: JSON.stringify(requestPayload),
-      cache: "no-store",
       signal: controller.signal,
     });
 

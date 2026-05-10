@@ -8,6 +8,7 @@
 
 import { CODEX_CHAT_USER_AGENT, ORIGINATOR } from "./constants.js";
 import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
+import { fetchInternalProvider } from "../../internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
@@ -411,10 +412,9 @@ export async function fetchCodexQuotaFromApi(
       requestHeaders["ChatGPT-Account-Id"] = chatgptAccountId;
     }
 
-    const response = await fetch(USAGE_ENDPOINT, {
+    const response = await fetchInternalProvider(USAGE_ENDPOINT, {
       method: "GET",
       headers: requestHeaders,
-      cache: "no-store",
     });
 
     const headerData = parseQuotaFromHeaders(response.headers);
