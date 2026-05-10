@@ -49,25 +49,8 @@ jobs:
           rm -rf "$DEPLOY_DIR"
           mkdir -p "$DEPLOY_DIR/bin"
           cp -R models "$DEPLOY_DIR/models"
-          cat > "$DEPLOY_DIR/Dockerfile" <<'DOCKERFILE'
-          FROM gcr.io/distroless/static-debian12:nonroot
-          WORKDIR /app
-          COPY bin/proxy ./proxy
-          COPY models ./models
-          EXPOSE 4001
-          CMD ["./proxy"]
-          DOCKERFILE
-          cat > "$DEPLOY_DIR/railway.json" <<'JSON'
-          {
-            "$schema": "https://railway.com/railway.schema.json",
-            "build": {
-              "builder": "DOCKERFILE"
-            },
-            "deploy": {
-              "startCommand": null
-            }
-          }
-          JSON
+          cp apps/proxy/Dockerfile "$DEPLOY_DIR/Dockerfile"
+          cp apps/proxy/railway.json "$DEPLOY_DIR/railway.json"
 
       - name: Build proxy binary
         run: go -C apps/proxy build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o "../../$DEPLOY_DIR/bin/proxy" ./cmd/proxy
