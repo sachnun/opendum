@@ -70,6 +70,19 @@ function handleAccountConnected() {
       :description="providerMeta?.emptyMessage ?? 'No accounts connected yet.'"
       icon="i-lucide-user-plus"
     >
+      <div v-if="supportedModels.length" class="mx-auto max-w-2xl space-y-2 text-center">
+        <p class="text-xs font-medium text-muted-foreground">Supported models ({{ supportedModels.length }}):</p>
+        <div class="flex flex-wrap justify-center gap-1.5">
+          <UiBadge
+            v-for="model in supportedModels"
+            :key="model"
+            variant="secondary"
+            class="text-xs font-normal"
+          >
+            {{ model }}
+          </UiBadge>
+        </div>
+      </div>
       <AddAccountDialog
         v-if="providerMeta"
         :initial-provider="providerMeta.key"
