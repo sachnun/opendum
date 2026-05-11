@@ -58,13 +58,17 @@ async function updateName() {
       <div v-if="errorMessage" class="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
         {{ errorMessage }}
       </div>
-      <input
-        v-model="newName"
-        aria-label="API key name"
-        class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        placeholder="My API Key"
-        @keydown.enter.prevent="updateName"
-      >
+      <div class="py-3">
+        <label class="grid gap-1.5 text-sm font-medium">
+          Name
+          <input
+            v-model="newName"
+            class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            placeholder="My API Key"
+            @keydown.enter.prevent="updateName"
+          >
+        </label>
+      </div>
       <div class="flex justify-end gap-2">
         <UiButton variant="outline" size="sm" @click="editDialogOpen = false">Cancel</UiButton>
         <UiButton size="sm" :disabled="isUpdating" @click="updateName">{{ isUpdating ? 'Saving...' : 'Save' }}</UiButton>

@@ -871,7 +871,7 @@ function historyEntryPreview(errorMessage: string): string {
 
     <UiDialog v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>
-        <input v-model="editName" aria-label="Account name" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" @keydown.enter.prevent="renameAccount">
+        <label class="grid gap-1 text-sm font-medium">Name<input v-model="editName" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" @keydown.enter.prevent="renameAccount"></label>
         <div class="flex justify-end gap-2"><UiButton variant="outline" @click="editDialogOpen = false">Cancel</UiButton><UiButton :disabled="savingName" @click="renameAccount">{{ savingName ? 'Saving...' : 'Save' }}</UiButton></div>
       </template>
     </UiDialog>
