@@ -37,7 +37,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   gemini_cli: { name: "Gemini CLI", description: "Access Gemini 2.5 Pro & 3 models", flowType: "oauth_redirect" },
   qwen_code: { name: "Qwen Code", description: "Access Qwen Coder models", flowType: "device_code" },
   copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", flowType: "device_code" },
-  codex: { name: "Codex", description: "Access GPT-5 Codex models", flowType: "device_code" },
+  codex: { name: "Codex", description: "Access GPT-5 Codex models", flowType: "oauth_redirect" },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", flowType: "oauth_redirect" },
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", flowType: "api_key", apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
   ollama_cloud: { name: "Ollama Cloud", description: "Access Ollama Cloud via OpenAI-compatible API", flowType: "api_key", apiKeyPortalUrl: "https://ollama.com/settings/keys", apiKeyPlaceholder: "ollama_..." },
@@ -60,7 +60,7 @@ const cfAccountId = ref("");
 const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
-const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string } | null>(null);
+const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const isApiKeyVisible = ref(false);
@@ -115,10 +115,10 @@ watch([open, step, provider], async () => {
     }
 
     if (selectedConfig.value.flowType === "device_code") {
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: provider.value as "qwen_code" | "copilot" | "codex" });
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: provider.value as "qwen_code" | "copilot" });
       if (!result.success) throw new Error(result.error);
       deviceCodeInfo.value = {
-        provider: provider.value as "qwen_code" | "copilot" | "codex",
+        provider: provider.value as "qwen_code" | "copilot",
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
