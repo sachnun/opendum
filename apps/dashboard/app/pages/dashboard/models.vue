@@ -231,7 +231,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
               <UiCardContent class="flex flex-1 flex-col px-4 sm:px-5">
                 <div class="mt-auto space-y-2.5">
                   <ModelFeatureBadges :meta="model.meta" />
-                  <ModelStatsPanel :stats="model.stats as ModelStats" :label="model.id" compact />
+                  <ModelStatsPanel :stats="model.stats as ModelStats" :label="model.id" :disabled="!model.isEnabled" compact />
                 </div>
               </UiCardContent>
             </UiCard>

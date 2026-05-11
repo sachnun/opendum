@@ -5,10 +5,13 @@ const props = defineProps<{
   stats: ModelStats;
   label: string;
   compact?: boolean;
+  disabled?: boolean;
 }>();
 
 const dailyValues = computed(() => props.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
+const usageChartColor = computed(() => props.disabled ? "var(--muted-foreground)" : "var(--chart-1)");
+const durationChartColor = computed(() => props.disabled ? "var(--muted-foreground)" : "var(--chart-2)");
 const durationLabelPoints = computed(() => {
   const points = props.stats.durationLast24Hours;
   return [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
@@ -60,7 +63,7 @@ function formatHourLabel(time: string): string {
     <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
       <UsageSparkline
         :values="durationValues"
-        color="var(--chart-2)"
+        :color="durationChartColor"
         :aria-label="`Average duration trend for ${label} over last 24 hours`"
         class="h-6"
         :height="24"
@@ -72,6 +75,6 @@ function formatHourLabel(time: string): string {
       </div>
     </div>
 
-    <UsageSparkline :values="dailyValues" color="var(--chart-1)" :aria-label="`Requests trend for ${label}`" />
+    <UsageSparkline :values="dailyValues" :color="usageChartColor" :aria-label="`Requests trend for ${label}`" />
   </div>
 </template>
