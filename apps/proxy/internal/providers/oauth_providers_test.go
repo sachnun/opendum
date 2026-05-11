@@ -211,7 +211,7 @@ func TestAntigravityGenerationHeadersIncludeCodeAssistMetadata(t *testing.T) {
 	}
 }
 
-func TestAntigravityDiscoveryUsesNodeClientProfile(t *testing.T) {
+func TestAntigravityDiscoveryUsesAntigravityProfile(t *testing.T) {
 	provider := antigravityProvider{}.delegate()
 	req, err := http.NewRequest(http.MethodPost, "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", nil)
 	if err != nil {
@@ -220,13 +220,13 @@ func TestAntigravityDiscoveryUsesNodeClientProfile(t *testing.T) {
 
 	provider.setGoogleHeaders(req, "token", false)
 
-	if req.Header.Get("User-Agent") != antigravityAuthUserAgent {
+	if !strings.HasPrefix(req.Header.Get("User-Agent"), "antigravity/1.23.2 ") {
 		t.Fatalf("User-Agent = %q", req.Header.Get("User-Agent"))
 	}
-	if req.Header.Get("X-Goog-Api-Client") != antigravityAuthAPIClient {
+	if req.Header.Get("X-Goog-Api-Client") != "google-cloud-sdk vscode_cloudshelleditor/0.1" {
 		t.Fatalf("X-Goog-Api-Client = %q", req.Header.Get("X-Goog-Api-Client"))
 	}
-	if req.Header.Get("Client-Metadata") != antigravityAuthClientMetadata {
+	if req.Header.Get("Client-Metadata") != `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}` {
 		t.Fatalf("Client-Metadata = %q", req.Header.Get("Client-Metadata"))
 	}
 }
@@ -242,7 +242,7 @@ func TestAntigravityFetchAccountInfoUsesStandardDiscoveryMetadata(t *testing.T) 
 			if req.URL.Path != "/v1internal:loadCodeAssist" {
 				t.Fatalf("load path = %q", req.URL.Path)
 			}
-			if req.Header.Get("User-Agent") != antigravityAuthUserAgent {
+			if !strings.HasPrefix(req.Header.Get("User-Agent"), "antigravity/1.23.2 ") {
 				t.Fatalf("discovery User-Agent = %q", req.Header.Get("User-Agent"))
 			}
 			if err := json.NewDecoder(req.Body).Decode(&loadPayload); err != nil {
@@ -258,10 +258,10 @@ func TestAntigravityFetchAccountInfoUsesStandardDiscoveryMetadata(t *testing.T) 
 	})}
 
 	info := provider.fetchAccountInfo(t.Context(), client, "token")
-	if info.projectID != "project-1" || info.tier != "standard-tier" || info.email != "user@example.com" {
+	if info.projectID != "project-1" || info.tier != "free" || info.email != "user@example.com" {
 		t.Fatalf("account info = %#v", info)
 	}
-	if loadPayload["cloudaicompanionProject"] != nil {
+	if _, ok := loadPayload["cloudaicompanionProject"]; ok {
 		t.Fatalf("cloudaicompanionProject = %#v", loadPayload["cloudaicompanionProject"])
 	}
 	metadata := loadPayload["metadata"].(map[string]any)
@@ -363,11 +363,14 @@ func TestAntigravityClaudeUpstreamsComeFromRegistry(t *testing.T) {
 	provider := antigravityProvider{registry: registry}.delegate()
 	cases := map[string]string{
 		"claude-opus-4-6":   "claude-opus-4-6-thinking",
-		"claude-sonnet-4-6": "claude-sonnet-4-6-thinking",
+		"claude-sonnet-4-6": "claude-sonnet-4-6",
 	}
 	for model, want := range cases {
 		cfg, ok := registry.ProviderModelConfig(model, "antigravity")
-		if !ok || cfg.Upstream != want {
+		if !ok {
+			t.Fatalf("missing antigravity config for %s", model)
+		}
+		if cfg.Upstream != "" && cfg.Upstream != want {
 			t.Fatalf("registry upstream for %s = %q, want %q", model, cfg.Upstream, want)
 		}
 		if got := provider.resolveModel(model); got != want {
@@ -380,22 +383,21 @@ func TestAntigravityWrapCodeAssistPayloadUsesOfficialFields(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()
 	payload := provider.wrapCodeAssistPayload("project-1", "gemini-3-flash", map[string]any{"contents": []any{}})
-	if payload["userAgent"] != provider.userAgent {
-		t.Fatalf("userAgent = %q, want %q", payload["userAgent"], provider.userAgent)
+	if payload["userAgent"] != "antigravity" {
+		t.Fatalf("userAgent = %q, want antigravity", payload["userAgent"])
 	}
 	if payload["requestType"] != "agent" {
 		t.Fatalf("requestType = %q, want agent", payload["requestType"])
 	}
-	credits, ok := payload["enabledCreditTypes"].([]any)
-	if !ok || len(credits) != 1 || credits[0] != "GOOGLE_ONE_AI" {
-		t.Fatalf("enabledCreditTypes = %#v", payload["enabledCreditTypes"])
+	if requestID := stringValue(payload["requestId"]); !strings.HasPrefix(requestID, "agent-") {
+		t.Fatalf("requestId = %q, want agent-*", requestID)
+	}
+	if _, exists := payload["enabledCreditTypes"]; exists {
+		t.Fatalf("payload should not include enabledCreditTypes: %#v", payload)
 	}
 	imagePayload := provider.wrapCodeAssistPayload("project-1", "gemini-3.1-flash-image", map[string]any{"contents": []any{}})
-	if imagePayload["requestType"] != "image_gen" {
-		t.Fatalf("image requestType = %q, want image_gen", imagePayload["requestType"])
-	}
-	if _, exists := imagePayload["enabledCreditTypes"]; exists {
-		t.Fatalf("image payload should not include enabledCreditTypes: %#v", imagePayload)
+	if imagePayload["requestType"] != "agent" {
+		t.Fatalf("image requestType = %q, want agent", imagePayload["requestType"])
 	}
 }
 
@@ -470,7 +472,7 @@ func TestAntigravityOpenAIToGeminiToolHistoryParity(t *testing.T) {
 	}
 }
 
-func TestAntigravityTransformPreservesCachedContentAndClaudeThinking(t *testing.T) {
+func TestAntigravityTransformRemovesCachedContentAndSetsClaudeThinking(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()
 	payload := openAIToGemini(map[string]any{
@@ -480,8 +482,11 @@ func TestAntigravityTransformPreservesCachedContentAndClaudeThinking(t *testing.
 		"thinking_budget": 2048,
 	})
 	provider.transformAntigravityPayload(t.Context(), payload, "claude-opus-4-6-thinking", "sess")
-	if payload["cachedContent"] != "cached/123" {
-		t.Fatalf("cachedContent = %#v", payload["cachedContent"])
+	if _, ok := payload["cachedContent"]; ok {
+		t.Fatalf("cachedContent leaked: %#v", payload["cachedContent"])
+	}
+	if _, ok := payload["cached_content"]; ok {
+		t.Fatalf("cached_content leaked: %#v", payload["cached_content"])
 	}
 	if _, ok := payload["extra_body"]; ok {
 		t.Fatalf("extra_body leaked: %#v", payload["extra_body"])
@@ -498,6 +503,78 @@ func TestAntigravityTransformPreservesCachedContentAndClaudeThinking(t *testing.
 	params := decl["parameters"].(map[string]any)
 	if _, ok := params["$schema"]; ok || params["type"] != "object" {
 		t.Fatalf("claude params = %#v", params)
+	}
+}
+
+func TestAntigravityV1EndpointOrderAndDefaults(t *testing.T) {
+	provider := antigravityProvider{}.delegate()
+	wantEndpoints := []string{"https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}
+	if strings.Join(provider.endpoints, ",") != strings.Join(wantEndpoints, ",") {
+		t.Fatalf("endpoints = %#v, want %#v", provider.endpoints, wantEndpoints)
+	}
+	if provider.defaultProject != "rising-fact-p41fc" {
+		t.Fatalf("defaultProject = %q", provider.defaultProject)
+	}
+}
+
+func TestAntigravityFetchAccountInfoOnboardsWithAllowedTier(t *testing.T) {
+	provider := antigravityProvider{}.delegate()
+	provider.loadEndpoints = []string{"https://cloudcode-pa.googleapis.com"}
+	provider.onboardEndpoints = []string{"https://daily-cloudcode-pa.googleapis.com"}
+	var onboardPayload map[string]any
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.Host {
+		case "cloudcode-pa.googleapis.com":
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"allowedTiers":[{"id":"legacy-tier","isDefault":true}]}`))}, nil
+		case "daily-cloudcode-pa.googleapis.com":
+			if err := json.NewDecoder(req.Body).Decode(&onboardPayload); err != nil {
+				t.Fatal(err)
+			}
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"done":true,"response":{"cloudaicompanionProject":{"id":"onboard-project"}}}`))}, nil
+		case "www.googleapis.com":
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"email":"new@example.com"}`))}, nil
+		default:
+			t.Fatalf("unexpected host = %q", req.URL.Host)
+			return nil, nil
+		}
+	})}
+
+	info := provider.fetchAccountInfo(t.Context(), client, "token")
+	if info.projectID != "onboard-project" || info.tier != "free" || info.email != "new@example.com" {
+		t.Fatalf("account info = %#v", info)
+	}
+	if onboardPayload["tierId"] != "legacy-tier" {
+		t.Fatalf("onboard payload = %#v", onboardPayload)
+	}
+	if _, ok := onboardPayload["cloudaicompanionProject"]; ok {
+		t.Fatalf("onboard payload should omit project: %#v", onboardPayload)
+	}
+}
+
+func TestAntigravityMakeRequestUsesDefaultProjectWithoutDiscovery(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	var payload map[string]any
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host != "daily-cloudcode-pa.googleapis.com" {
+			t.Fatalf("unexpected discovery/fallback host = %q", req.URL.Host)
+		}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":    "antigravity/gemini-3-flash-preview",
+		"messages": []any{map[string]any{"role": "user", "content": "hi"}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if payload["project"] != "rising-fact-p41fc" {
+		t.Fatalf("project = %#v", payload["project"])
 	}
 }
 

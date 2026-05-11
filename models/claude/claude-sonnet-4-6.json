@@ -37,9 +37,7 @@
       "signature_family": "claude",
       "strict_thought_signatures": true,
       "strict_tool_schema": true,
-      "system_instruction": true,
-      "thinking_model": true,
-      "upstream": "claude-sonnet-4-6-thinking"
+      "system_instruction": true
     },
     "copilot": {
       "upstream": "claude-sonnet-4.6"

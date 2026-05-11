@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -26,7 +27,7 @@ import (
 const googleOAuthTokenEndpoint = "https://oauth2.googleapis.com/token"
 const antigravitySignatureCachePrefix = "opendum:thought-signature"
 const antigravitySignatureCacheTTL = 24 * time.Hour
-const antigravityClaudeBetaHeader = "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14"
+const antigravityClaudeBetaHeader = "interleaved-thinking-2025-05-14"
 const antigravityAuthUserAgent = "google-api-nodejs-client/10.3.0"
 const antigravityAuthAPIClient = "gl-node/22.18.0"
 const antigravityAuthClientMetadata = `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`
@@ -87,7 +88,7 @@ func (p geminiCLIProvider) delegate() googleCodeAssistProvider {
 
 func (p antigravityProvider) delegate() googleCodeAssistProvider {
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "bamboo-precept-lgxtn", userAgent: "antigravity/1.23.2 " + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
+	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "rising-fact-p41fc", userAgent: "antigravity/1.23.2 " + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
 }
 
 func (p geminiCLIProvider) RefreshBuffer() time.Duration   { return p.delegate().RefreshBuffer() }
@@ -153,6 +154,9 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	if account.ProjectID != nil {
 		projectID = strings.TrimSpace(*account.ProjectID)
 	}
+	if p.name == "antigravity" && projectID == "" {
+		projectID = p.defaultProject
+	}
 	if projectID == "" {
 		info := p.fetchAccountInfo(ctx, client, accessToken)
 		projectID = info.projectID
@@ -168,14 +172,19 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	}
 	modelName := p.resolveModel(stringValue(body["model"]))
 	body = p.normalizeBodyForModel(body, modelName)
-	includeReasoning := body["_includeReasoning"] == true || providerConfigBool(p.registry, modelName, p.name, "thinking_model")
-	if messages, ok := body["messages"].([]any); ok {
+	includeReasoning := false
+	if explicit, ok := body["_includeReasoning"].(bool); ok {
+		includeReasoning = explicit
+	} else {
+		includeReasoning = body["reasoning"] != nil || body["reasoning_effort"] != nil || body["thinking_budget"] != nil || body["include_thoughts"] != nil
+	}
+	includeReasoning = includeReasoning || isOpusThinkingModel(modelName)
+	if messages, ok := body["messages"].([]any); ok && (p.name != "antigravity" || strings.Contains(modelName, "claude")) {
 		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
 	}
-	sessionID := defaultStringValue(body["_sessionId"], stableSessionID(body))
+	sessionID := randomUUID()
 	geminiPayload := openAIToGemini(body)
 	if p.name == "antigravity" {
-		p.applyThinkingConfig(geminiPayload, modelName, stringValue(body["reasoning_effort"]), numberFromAny(body["thinking_budget"]))
 		p.transformAntigravityPayload(ctx, geminiPayload, modelName, sessionID)
 	} else {
 		p.applyThinkingConfig(geminiPayload, modelName, stringValue(body["reasoning_effort"]), numberFromAny(body["thinking_budget"]))
@@ -186,7 +195,9 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	}
 	requestPayload := p.wrapCodeAssistPayload(projectID, modelName, geminiPayload)
 	actualStream := stream
-	if providerConfigBool(p.registry, modelName, p.name, "force_stream_non_stream") && !stream {
+	if p.name == "antigravity" && !strings.Contains(modelName, "gemini") && !stream {
+		actualStream = true
+	} else if providerConfigBool(p.registry, modelName, p.name, "force_stream_non_stream") && !stream {
 		actualStream = true
 	}
 	action := "generateContent"
@@ -205,9 +216,6 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 			return nil, err
 		}
 		p.setGoogleGenerationHeaders(req, accessToken, actualStream)
-		if p.name == "antigravity" && projectID != "" {
-			req.Header.Set("x-goog-user-project", projectID)
-		}
 		if p.name == "antigravity" && p.shouldSetAnthropicBeta(modelName) {
 			req.Header.Set("anthropic-beta", antigravityClaudeBetaHeader)
 		}
@@ -215,31 +223,6 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		if err != nil {
 			lastErr = err
 			continue
-		}
-		if resp.StatusCode == http.StatusForbidden && req.Header.Get("x-goog-user-project") != "" {
-			data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-			_ = resp.Body.Close()
-			retryEncoded := encoded
-			if isAntigravityProjectContextError(string(data)) {
-				retryPayload := cloneAnyMap(requestPayload)
-				delete(retryPayload, "project")
-				if nextEncoded, marshalErr := json.Marshal(retryPayload); marshalErr == nil {
-					retryEncoded = nextEncoded
-				}
-			}
-			retryReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:"+action, bytes.NewReader(retryEncoded))
-			if err != nil {
-				return nil, err
-			}
-			p.setGoogleGenerationHeaders(retryReq, accessToken, actualStream)
-			if p.name == "antigravity" && p.shouldSetAnthropicBeta(modelName) {
-				retryReq.Header.Set("anthropic-beta", antigravityClaudeBetaHeader)
-			}
-			resp, err = client.Do(retryReq)
-			if err != nil {
-				lastErr = err
-				continue
-			}
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			return resp, nil
@@ -259,6 +242,11 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		break
 	}
 	resp := lastResp
+	if p.name == "antigravity" && resp != nil && resp.StatusCode == http.StatusNotFound && isImageGenerationModel(p.registry, modelName) {
+		data := readLimit(resp.Body, 1<<20)
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("model %q returned 404 (NOT_FOUND) from all Code Assist endpoints. This image generation model requires a paid Google account (Google AI Pro/Ultra or Gemini Code Assist subscription). Free-tier accounts do not have access to image generation models. Original error: %s", modelName, data)
+	}
 	if lastErr != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, lastErr
 	}
@@ -285,24 +273,29 @@ func (p googleCodeAssistProvider) wrapCodeAssistPayload(projectID, model string,
 	if p.name != "antigravity" {
 		return map[string]any{"model": model, "project": projectID, "user_prompt_id": randomID("prompt"), "request": geminiPayload}
 	}
-	requestID := randomID("agent")
-	requestType := "agent"
-	if isImageGenerationModel(p.registry, model) {
-		requestType = "image_gen"
-	}
-	userAgent := p.userAgent
-	if userAgent == "" {
-		userAgent = "antigravity"
-	}
-	payload := map[string]any{"project": projectID, "model": model, "userAgent": userAgent, "requestType": requestType, "requestId": requestID, "request": geminiPayload}
-	if requestType == "agent" {
-		payload["enabledCreditTypes"] = []any{"GOOGLE_ONE_AI"}
-	}
-	return payload
+	return map[string]any{"project": projectID, "model": model, "userAgent": "antigravity", "requestType": "agent", "requestId": randomHyphenID("agent"), "request": geminiPayload}
 }
 
 func (p googleCodeAssistProvider) shouldSetAnthropicBeta(model string) bool {
-	return providerConfigBool(p.registry, model, p.name, "anthropic_beta") || providerConfigBool(p.registry, model, p.name, "anthropic_beta_thinking")
+	return strings.Contains(model, "claude") && strings.Contains(model, "thinking")
+}
+
+func isOpusThinkingModel(model string) bool {
+	return strings.HasPrefix(model, "claude-opus-") && strings.HasSuffix(model, "-thinking")
+}
+
+func randomHyphenID(prefix string) string {
+	return prefix + "-" + randomUUID()
+}
+
+func randomUUID() string {
+	buf := make([]byte, 16)
+	if _, err := crand.Read(buf); err != nil {
+		return strings.TrimPrefix(randomID("uuid"), "uuid_")
+	}
+	buf[6] = (buf[6] & 0x0f) | 0x40
+	buf[8] = (buf[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", buf[0:4], buf[4:6], buf[6:8], buf[8:10], buf[10:16])
 }
 
 func isAntigravityProjectContextError(text string) bool {
@@ -321,6 +314,7 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 		delete(payload, "system_instruction")
 	}
 	p.normalizeCachedContent(payload)
+	delete(payload, "model")
 	if isImageGenerationModel(p.registry, model) {
 		delete(payload, "tools")
 		delete(payload, "toolConfig")
@@ -340,6 +334,11 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	}
 	p.applyAntigravitySystemInstruction(payload, model)
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
+	if model == "claude-sonnet-4-6" {
+		if generation, ok := payload["generationConfig"].(map[string]any); ok {
+			delete(generation, "thinkingConfig")
+		}
+	}
 	payload["sessionId"] = sessionID
 }
 
@@ -358,6 +357,7 @@ func (p googleCodeAssistProvider) normalizeCachedContent(payload map[string]any)
 		payload["cachedContent"] = value
 	}
 	delete(payload, "cached_content")
+	delete(payload, "cachedContent")
 }
 
 func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any, model string) {
@@ -1032,26 +1032,33 @@ type googleCodeAssistAccountInfo struct {
 }
 
 func (p googleCodeAssistProvider) fetchAccountInfo(ctx context.Context, client *http.Client, accessToken string) googleCodeAssistAccountInfo {
-	info := googleCodeAssistAccountInfo{tier: "free-tier"}
+	info := googleCodeAssistAccountInfo{tier: "free"}
 	loadEndpoints := p.loadEndpoints
 	if len(loadEndpoints) == 0 {
 		loadEndpoints = []string{"https://cloudcode-pa.googleapis.com", p.endpoint}
 	}
+	currentTierPresent := false
+	allowedTiers := []map[string]any{}
+	hadError := false
 	for _, endpoint := range loadEndpoints {
 		metadata := codeAssistMetadata()
-		payload, _ := json.Marshal(map[string]any{"cloudaicompanionProject": nil, "metadata": metadata})
+		payload, _ := json.Marshal(map[string]any{"metadata": metadata})
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:loadCodeAssist", bytes.NewReader(payload))
 		if err != nil {
+			hadError = true
 			continue
 		}
 		p.setGoogleHeaders(req, accessToken, false)
 		resp, err := client.Do(req)
 		if err != nil || resp == nil {
+			hadError = true
 			continue
 		}
 		var data map[string]any
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			_ = json.NewDecoder(resp.Body).Decode(&data)
+		} else {
+			hadError = true
 		}
 		_ = resp.Body.Close()
 		if len(data) == 0 {
@@ -1060,59 +1067,103 @@ func (p googleCodeAssistProvider) fetchAccountInfo(ctx context.Context, client *
 		if project := extractGoogleProjectID(data); project != "" {
 			info.projectID = project
 		}
-		if tier := extractGoogleTier(data); tier != "" {
+		if currentTier := data["currentTier"]; currentTier != nil {
+			currentTierPresent = true
+		}
+		if tiers := extractAllowedTiers(data); len(tiers) > 0 {
+			allowedTiers = tiers
+		}
+		if tier := detectAntigravityTier(data); tier != "" {
 			info.tier = tier
 		}
 		if info.projectID != "" {
 			break
 		}
 	}
-	if info.projectID == "" {
-		if onboard := p.onboardUser(ctx, client, accessToken, info.tier); onboard.projectID != "" {
+	if info.projectID == "" && !currentTierPresent {
+		if onboard := p.onboardUser(ctx, client, accessToken, info.tier, allowedTiers); onboard.projectID != "" {
 			info.projectID = onboard.projectID
 			info.tier = onboard.tier
 		}
+	}
+	if p.name == "antigravity" && info.projectID == "" && hadError {
+		info.projectID = p.defaultProject
 	}
 	info.email = p.fetchGoogleEmail(ctx, client, accessToken)
 	return info
 }
 
-func (p googleCodeAssistProvider) onboardUser(ctx context.Context, client *http.Client, accessToken, tier string) googleCodeAssistAccountInfo {
-	if tier == "" {
-		tier = "free-tier"
+func (p googleCodeAssistProvider) onboardUser(ctx context.Context, client *http.Client, accessToken, tier string, allowedTiers []map[string]any) googleCodeAssistAccountInfo {
+	if p.name == "antigravity" && len(allowedTiers) == 0 {
+		return googleCodeAssistAccountInfo{}
+	}
+	onboardTier := selectOnboardTier(tier, allowedTiers)
+	if onboardTier == "" {
+		return googleCodeAssistAccountInfo{}
 	}
 	onboardEndpoints := p.onboardEndpoints
 	if len(onboardEndpoints) == 0 {
 		onboardEndpoints = []string{p.endpoint, "https://cloudcode-pa.googleapis.com"}
 	}
-	onboardRequest := map[string]any{"tierId": tier, "metadata": codeAssistMetadata()}
-	if p.name == "antigravity" {
-		onboardRequest["cloudaicompanionProject"] = nil
-	}
+	onboardRequest := map[string]any{"tierId": onboardTier, "metadata": codeAssistMetadata()}
 	payload, _ := json.Marshal(onboardRequest)
 	for _, endpoint := range onboardEndpoints {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:onboardUser", bytes.NewReader(payload))
-		if err != nil {
+		data, ok := p.postOnboardUser(ctx, client, accessToken, endpoint, payload)
+		if !ok {
 			continue
 		}
-		p.setGoogleHeaders(req, accessToken, false)
-		resp, err := client.Do(req)
-		if err != nil || resp == nil {
+		for i := 0; i < 30 && data["done"] == false; i++ {
+			if !sleepContext(ctx, 2*time.Second) {
+				return googleCodeAssistAccountInfo{}
+			}
+			polled, pollOK := p.postOnboardUser(ctx, client, accessToken, endpoint, payload)
+			if pollOK {
+				data = polled
+			}
+		}
+		if done, ok := data["done"].(bool); ok && !done {
 			continue
 		}
-		var data map[string]any
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			_ = json.NewDecoder(resp.Body).Decode(&data)
-		}
-		_ = resp.Body.Close()
 		if response, ok := data["response"].(map[string]any); ok {
 			data = response
 		}
 		if project := extractGoogleProjectID(data); project != "" {
-			return googleCodeAssistAccountInfo{projectID: project, tier: tier}
+			return googleCodeAssistAccountInfo{projectID: project, tier: tierFromID(onboardTier)}
 		}
 	}
 	return googleCodeAssistAccountInfo{}
+}
+
+func (p googleCodeAssistProvider) postOnboardUser(ctx context.Context, client *http.Client, accessToken, endpoint string, payload []byte) (map[string]any, bool) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1internal:onboardUser", bytes.NewReader(payload))
+	if err != nil {
+		return nil, false
+	}
+	p.setGoogleHeaders(req, accessToken, false)
+	resp, err := client.Do(req)
+	if err != nil || resp == nil {
+		return nil, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, false
+	}
+	var data map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, false
+	}
+	return data, true
+}
+
+func sleepContext(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
 }
 
 func (p googleCodeAssistProvider) fetchGoogleEmail(ctx context.Context, client *http.Client, accessToken string) string {
@@ -1120,7 +1171,7 @@ func (p googleCodeAssistProvider) fetchGoogleEmail(ctx context.Context, client *
 	if err != nil {
 		return ""
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+	p.setGoogleHeaders(req, accessToken, false)
 	resp, err := client.Do(req)
 	if err != nil || resp == nil {
 		return ""
@@ -1159,13 +1210,66 @@ func extractGoogleTier(data map[string]any) string {
 	return ""
 }
 
+func extractAllowedTiers(data map[string]any) []map[string]any {
+	items := anySlice(data["allowedTiers"])
+	out := make([]map[string]any, 0, len(items))
+	for _, raw := range items {
+		item, _ := raw.(map[string]any)
+		if item != nil {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func detectAntigravityTier(data map[string]any) string {
+	detected := ""
+	for _, tier := range extractAllowedTiers(data) {
+		if tier["isDefault"] == true {
+			detected = tierFromID(stringValue(tier["id"]))
+			break
+		}
+	}
+	if paidTier, ok := data["paidTier"].(map[string]any); ok {
+		if id := stringValue(paidTier["id"]); id != "" && tierFromID(id) == "paid" {
+			return "paid"
+		}
+	}
+	return detected
+}
+
+func selectOnboardTier(fallback string, allowedTiers []map[string]any) string {
+	for _, tier := range allowedTiers {
+		if tier["isDefault"] == true {
+			if id := stringValue(tier["id"]); id != "" {
+				return id
+			}
+		}
+	}
+	for _, tier := range allowedTiers {
+		if stringValue(tier["id"]) == "legacy-tier" {
+			return "legacy-tier"
+		}
+	}
+	if len(allowedTiers) > 0 {
+		return stringValue(allowedTiers[0]["id"])
+	}
+	if fallback != "" {
+		return fallback
+	}
+	return "free-tier"
+}
+
+func tierFromID(id string) string {
+	lower := strings.ToLower(id)
+	if lower == "" || strings.Contains(lower, "free") || strings.Contains(lower, "zero") || strings.Contains(lower, "legacy") {
+		return "free"
+	}
+	return "paid"
+}
+
 func (p googleCodeAssistProvider) setGoogleHeaders(req *http.Request, accessToken string, stream bool) {
 	p.setGoogleHeadersWithMetadata(req, accessToken, stream, true)
-	if p.name == "antigravity" {
-		req.Header.Set("User-Agent", antigravityAuthUserAgent)
-		req.Header.Set("X-Goog-Api-Client", antigravityAuthAPIClient)
-		req.Header.Set("Client-Metadata", antigravityAuthClientMetadata)
-	}
 }
 
 func (p googleCodeAssistProvider) setGoogleGenerationHeaders(req *http.Request, accessToken string, stream bool) {
@@ -1632,16 +1736,24 @@ func (p googleCodeAssistProvider) applyAntigravitySystemInstruction(payload map[
 	if isImageGenerationModel(p.registry, model) {
 		return
 	}
-	if !providerConfigBool(p.registry, model, p.name, "system_instruction") {
+	normalizedModel := strings.ToLower(model)
+	needsInjection := strings.Contains(normalizedModel, "claude") || strings.Contains(normalizedModel, "gemini-3-pro") || strings.Contains(normalizedModel, "gemini-3.1-pro") || strings.Contains(normalizedModel, "gemini-3-flash")
+	if !needsInjection {
 		return
 	}
 	parts := []any{map[string]any{"text": antigravitySystemInstruction}}
-	if existing, ok := payload["systemInstruction"].(map[string]any); ok {
+	existingRecord := map[string]any{}
+	if text := stringValue(payload["systemInstruction"]); text != "" {
+		parts = append(parts, map[string]any{"text": text})
+	} else if existing, ok := payload["systemInstruction"].(map[string]any); ok {
+		existingRecord = cloneAnyMap(existing)
 		if existingParts, ok := existing["parts"].([]any); ok {
 			parts = append(parts, existingParts...)
 		}
 	}
-	payload["systemInstruction"] = map[string]any{"role": "user", "parts": parts}
+	existingRecord["role"] = "user"
+	existingRecord["parts"] = parts
+	payload["systemInstruction"] = existingRecord
 }
 
 func openAIContentToGeminiParts(content any) []any {
