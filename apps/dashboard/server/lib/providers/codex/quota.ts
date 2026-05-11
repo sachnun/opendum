@@ -7,7 +7,7 @@
  */
 
 import { CODEX_CHAT_USER_AGENT, ORIGINATOR } from "./constants.js";
-import { getRedisJson, setRedisJson } from "../../../redis-cache.js";
+import { getRedisJson, setRedisJson } from "../../redis-cache.js";
 import { fetchInternalProvider } from "../../proxy/internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
