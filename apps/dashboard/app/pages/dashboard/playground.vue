@@ -243,6 +243,33 @@ watch(options, (value) => {
   initializedFromRoute.value = true;
 }, { immediate: true });
 
+watch(() => route.query, (query) => {
+  if (!initializedFromRoute.value) return;
+  if (!options.value) return;
+
+  const modelId = normalizeQueryParam(query.model);
+  const accountId = normalizeQueryParam(query.accountId);
+
+  if (modelId && modelsById.value.has(modelId)) {
+    panels.value = [{ id: generateId(), modelId, accountId: null }];
+    responses.value = {};
+    return;
+  }
+
+  if (accountId) {
+    const account = providerAccountsById.value.get(accountId);
+    if (account) {
+      const disabledSet = new Set(account.disabledModels ?? []);
+      const compatibleModels = models.value.filter((m) => m.providers.includes(account.provider) && !disabledSet.has(m.id));
+      panels.value = compatibleModels.length > 0
+        ? compatibleModels.map((m) => ({ id: generateId(), modelId: m.id, accountId }))
+        : [{ id: generateId(), modelId: null, accountId }];
+      responses.value = {};
+      return;
+    }
+  }
+});
+
 watch(filteredModelIds, (availableIds) => {
   panels.value = panels.value.map((panel) => panel.modelId && !availableIds.has(panel.modelId) ? { ...panel, modelId: null, accountId: null } : panel);
 

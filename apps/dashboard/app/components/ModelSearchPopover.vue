@@ -50,6 +50,7 @@ watch(() => route.fullPath, () => {
   desktopOpen.value = false;
   mobileOpen.value = false;
   search.value = "";
+  detailModel.value = null;
 });
 
 function selectModel(model: ModelListItem) {
