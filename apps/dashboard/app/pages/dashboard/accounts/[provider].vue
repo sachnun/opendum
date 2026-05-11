@@ -18,6 +18,7 @@ const { data, error, pending, refresh } = await useAsyncData(
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
 const accounts = computed(() => detailData.value?.accounts ?? []);
+const activeAccountCount = computed(() => accounts.value.filter((account) => account.isActive).length);
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
@@ -46,6 +47,7 @@ function handleAccountConnected() {
                 @toggled="handlePinnedToggled"
               />
               {{ providerMeta?.label ?? selectedProvider.replaceAll('_', ' ') }}
+              <UiBadge v-if="accounts.length > 0" variant="outline" class="text-xs tabular-nums">{{ activeAccountCount }}/{{ accounts.length }}</UiBadge>
             </h2>
           </div>
           <div class="flex w-full items-center gap-2 sm:w-auto">
@@ -75,10 +77,6 @@ function handleAccountConnected() {
       />
     </DashboardEmptyState>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
-      <div class="flex items-center gap-2">
-        <h3 class="text-base font-semibold md:text-lg">{{ providerMeta?.label ?? selectedProvider }}</h3>
-        <UiBadge variant="outline" class="text-xs">{{ accounts.length }} connected</UiBadge>
-      </div>
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <ProviderAccountCard
           v-for="account in accounts"
