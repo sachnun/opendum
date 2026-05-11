@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../../db/index.js";
 import { providerAccount, type ProviderAccount } from "../../db/schema.js";
-import { decrypt, encrypt } from "../../encryption.js";
+import { decrypt, encrypt, hashString } from "../../encryption.js";
 import { fetchInternalProvider } from "../../proxy/internal-relay.js";
 import type { OAuthResult } from "../types.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
@@ -78,13 +78,12 @@ function extractTokenIdentity(accessToken: string): string | null {
   return null;
 }
 
-function buildKiroAccountIdentity(accessToken: string, profileArn: string) {
+function buildKiroAccountIdentity(accessToken: string, refreshToken: string, profileArn: string) {
   const tokenIdentity = extractTokenIdentity(accessToken);
-  const displayIdentifier = tokenIdentity
-    ? profileArn && tokenIdentity !== profileArn
-      ? `${profileArn}:${tokenIdentity}`
-      : tokenIdentity
-    : profileArn || crypto.randomUUID();
+  const credentialFingerprint = hashString(refreshToken || accessToken).slice(0, 16);
+  const displayIdentifier = [profileArn, tokenIdentity, credentialFingerprint]
+    .filter((value): value is string => Boolean(value))
+    .join(":") || credentialFingerprint;
 
   return {
     email: `kiro-${displayIdentifier}`,
@@ -145,7 +144,7 @@ export const kiroProvider = {
 
     const data = (await response.json()) as KiroTokenExchangeResponse;
     const profileArn = data.profileArn || "";
-    const identity = buildKiroAccountIdentity(data.accessToken, profileArn);
+    const identity = buildKiroAccountIdentity(data.accessToken, data.refreshToken, profileArn);
 
     return {
       accessToken: data.accessToken,
@@ -178,11 +177,12 @@ export const kiroProvider = {
 
     const data = (await response.json()) as KiroRefreshResponse;
     const profileArn = data.profileArn || "";
-    const identity = buildKiroAccountIdentity(data.accessToken, profileArn);
+    const nextRefreshToken = data.refreshToken || refreshToken;
+    const identity = buildKiroAccountIdentity(data.accessToken, nextRefreshToken, profileArn);
 
     return {
       accessToken: data.accessToken,
-      refreshToken: data.refreshToken || refreshToken,
+      refreshToken: nextRefreshToken,
       expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
       email: identity.email,
       accountId: identity.accountId,
@@ -205,7 +205,6 @@ export const kiroProvider = {
         refreshToken: encrypt(refreshed.refreshToken),
         expiresAt: refreshed.expiresAt,
         ...(refreshed.accountId ? { accountId: refreshed.accountId } : {}),
-        ...(refreshed.email ? { email: refreshed.email } : {}),
       })
       .where(eq(providerAccount.id, account.id));
 

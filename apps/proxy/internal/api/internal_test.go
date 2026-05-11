@@ -115,3 +115,33 @@ func TestInternalRouteForwardsPostBody(t *testing.T) {
 		t.Fatalf("body was not forwarded: %s", capturedBody)
 	}
 }
+
+func TestInternalRouteForwardsKiroTokenExchange(t *testing.T) {
+	previousClient := internalRelayClient
+	defer func() { internalRelayClient = previousClient }()
+
+	var capturedBody string
+	var capturedUserAgent string
+	internalRelayClient = &http.Client{Transport: internalRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		capturedUserAgent = req.Header.Get("User-Agent")
+		body, _ := io.ReadAll(req.Body)
+		capturedBody = string(body)
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"accessToken":"access","refreshToken":"refresh","expiresIn":3600}`))}, nil
+	})}
+
+	recorder := httptest.NewRecorder()
+	body := []byte(`{"url":"https://prod.us-east-1.auth.desktop.kiro.dev/oauth/token","method":"POST","headers":{"Content-Type":"application/json","Accept":"application/json","User-Agent":"KiroIDE"},"body":"{\"code\":\"abc\",\"code_verifier\":\"verifier\",\"redirect_uri\":\"http://localhost:49153/oauth/callback\"}"}`)
+	req := httptest.NewRequest(http.MethodPost, "/internal", bytes.NewReader(body))
+
+	(&Server{}).internalRoute(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if capturedUserAgent != "KiroIDE" {
+		t.Fatalf("user-agent = %q, want %q", capturedUserAgent, "KiroIDE")
+	}
+	if capturedBody != `{"code":"abc","code_verifier":"verifier","redirect_uri":"http://localhost:49153/oauth/callback"}` {
+		t.Fatalf("body = %q", capturedBody)
+	}
+}
