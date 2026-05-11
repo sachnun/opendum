@@ -52,7 +52,8 @@ const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
     for (const group of quota.groups) {
       if (![group.remainingRequests, group.maxRequests, group.usedRequests].every(Number.isFinite) || group.maxRequests <= 0) continue;
 
-      const current = groups.get(group.name) ?? {
+      const groupKey = `${group.name}:${group.displayName}`;
+      const current = groups.get(groupKey) ?? {
         name: group.name,
         displayName: group.displayName,
         remainingRequests: 0,
@@ -67,7 +68,7 @@ const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
       current.maxRequests += group.maxRequests;
       current.usedRequests += group.usedRequests;
       current.accounts += 1;
-      groups.set(group.name, current);
+      groups.set(groupKey, current);
     }
   }
 
@@ -225,9 +226,9 @@ function handleAccountConnected() {
       </div>
     </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
-      <div v-if="supportsProviderQuota" class="space-y-2">
+      <div v-if="supportsProviderQuota" class="space-y-2 pb-2">
         <div class="flex gap-2">
-          <UiIcon name="i-lucide-speedometer" class="size-4 text-muted-foreground" />
+          <UiIcon name="i-lucide-gauge" class="size-4 text-muted-foreground" />
         </div>
 
         <div v-if="quotaSummaryGroups.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -244,10 +245,20 @@ function handleAccountConnected() {
             </div>
           </div>
         </div>
-
-        <p v-else class="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          {{ activeQuotaAccounts.length === 0 ? 'No enabled accounts support quota summary.' : 'Loading quota summary from enabled accounts...' }}
-        </p>
+        <div v-else-if="activeQuotaAccounts.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+          <div v-for="index in Math.min(activeQuotaAccounts.length, 3)" :key="index" class="rounded-md border border-border/70 bg-muted/20 p-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-1.5">
+                <UiSkeleton class="h-3 w-24" />
+                <UiSkeleton class="h-2.5 w-14" />
+              </div>
+              <UiSkeleton class="h-3 w-8" />
+            </div>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+              <UiSkeleton class="h-full w-4/5 rounded-full" />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">

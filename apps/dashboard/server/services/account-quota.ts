@@ -211,13 +211,15 @@ function formatWindowDuration(windowMinutes: number | null): string | null {
   return `${windowMinutes}m`;
 }
 
-function getWindowDisplayName(name: "primary" | "secondary", windowMinutes: number | null): string {
+function getWindowDisplayName(name: "primary" | "secondary", windowMinutes: number | null, tier?: string | null): string {
   const base = name === "primary" ? "Primary window" : "Secondary window";
-  const duration = formatWindowDuration(windowMinutes);
+  const normalizedTier = tier?.trim().toLowerCase() ?? "";
+  const resolvedWindowMinutes = windowMinutes ?? (normalizedTier.includes("free") ? 7 * 24 * 60 : null);
+  const duration = formatWindowDuration(resolvedWindowMinutes);
   return duration ? `${base} (${duration})` : base;
 }
 
-function toCodexGroupDisplay(name: "primary" | "secondary", window: CodexRateLimitWindow, isEstimated: boolean, confidence: QuotaConfidence): QuotaGroupDisplay {
+function toCodexGroupDisplay(name: "primary" | "secondary", window: CodexRateLimitWindow, isEstimated: boolean, confidence: QuotaConfidence, tier?: string | null): QuotaGroupDisplay {
   const maxRequests = 100;
   const remainingRequests = Math.max(0, Math.min(maxRequests, Math.round(window.remainingPercent)));
   const usedRequests = Math.max(0, maxRequests - remainingRequests);
@@ -225,7 +227,7 @@ function toCodexGroupDisplay(name: "primary" | "secondary", window: CodexRateLim
 
   return {
     name,
-    displayName: getWindowDisplayName(name, window.windowMinutes),
+    displayName: getWindowDisplayName(name, window.windowMinutes, tier),
     models: [],
     remainingFraction: window.remainingFraction,
     remainingRequests,
@@ -240,10 +242,10 @@ function toCodexGroupDisplay(name: "primary" | "secondary", window: CodexRateLim
   };
 }
 
-function codexSnapshotToGroups(snapshot: CodexQuotaSnapshot, isEstimated: boolean, confidence: QuotaConfidence): QuotaGroupDisplay[] {
+function codexSnapshotToGroups(snapshot: CodexQuotaSnapshot, isEstimated: boolean, confidence: QuotaConfidence, tier?: string | null): QuotaGroupDisplay[] {
   const groups: QuotaGroupDisplay[] = [];
-  if (snapshot.primary) groups.push(toCodexGroupDisplay("primary", snapshot.primary, isEstimated, confidence));
-  if (snapshot.secondary) groups.push(toCodexGroupDisplay("secondary", snapshot.secondary, isEstimated, confidence));
+  if (snapshot.primary) groups.push(toCodexGroupDisplay("primary", snapshot.primary, isEstimated, confidence, tier));
+  if (snapshot.secondary) groups.push(toCodexGroupDisplay("secondary", snapshot.secondary, isEstimated, confidence, tier));
   return groups;
 }
 
@@ -477,7 +479,7 @@ async function getCodexQuota(account: ProviderAccount): Promise<AccountQuotaInfo
   const snapshot = await fetchCodexQuotaFromApi(credentials.accessToken, account.accountId);
   if (snapshot.status !== "success") return errorQuotaInfo(account, fallbackTier, snapshot.error ?? "Failed to fetch Codex quota data", Date.now());
   const tier = snapshot.planType?.trim() || fallbackTier;
-  return toBaseQuotaInfo(account, tier, "success", codexSnapshotToGroups(snapshot, false, "high"), snapshot.fetchedAt);
+  return toBaseQuotaInfo(account, tier, "success", codexSnapshotToGroups(snapshot, false, "high", tier), snapshot.fetchedAt);
 }
 
 async function getGeminiCliQuota(account: ProviderAccount): Promise<AccountQuotaInfo> {
