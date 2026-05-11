@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { formatDistanceToNowStrict } from "date-fns";
-import type { ErrorHistoryResult, ProviderDetailData } from "../../lib/dashboard-api-types";
+import type { AccountQuotaInfo, ErrorHistoryResult, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/dashboard-api-types";
 
 type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
 
-type QuotaProvider = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter";
 type TemporaryOffUnit = "minutes" | "hours" | "days";
 
 type QuotaSkeletonRow = {
@@ -24,30 +23,14 @@ type ParsedErrorDetails = {
   messageObjects: string[] | null;
 };
 
-interface QuotaGroupDisplay {
-  name: string;
-  displayName: string;
-  remainingFraction: number;
-  resetTimeIso: string | null;
-  resetInHuman: string | null;
-}
-
-interface AccountQuotaInfo {
-  tier: string;
-  status: "success" | "error" | "expired";
-  error?: string;
-  groups: QuotaGroupDisplay[];
-}
-
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
-const QUOTA_LAZY_LOAD_ROOT_MARGIN = "400px 0px";
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
   { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },
   { value: "hours", label: "Hours", multiplier: 60 * 60 * 1000 },
   { value: "days", label: "Days", multiplier: 24 * 60 * 60 * 1000 },
 ];
-const QUOTA_SKELETON_ROWS: Record<QuotaProvider, QuotaSkeletonRow[]> = {
+const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
   antigravity: [
     { labelClass: "w-24", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
     { labelClass: "w-20", metaClass: "w-12", valueClass: "w-7", barClass: "w-3/5" },
@@ -87,10 +70,14 @@ const props = defineProps<{
   showTier?: boolean;
   supportedModels?: string[];
   disabledModels?: string[];
+  quotaInfo?: AccountQuotaInfo | null;
+  quotaError?: string | null;
+  isQuotaLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
   changed: [];
+  refreshQuota: [accountId: string];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -116,11 +103,6 @@ const isHistoryLoading = ref(false);
 const historyError = ref<string | null>(null);
 const historyEntries = ref<ErrorHistoryEntry[] | null>(null);
 const cardRoot = ref<HTMLElement | null>(null);
-const quotaInfo = ref<AccountQuotaInfo | null>(null);
-const quotaError = ref<string | null>(null);
-const isQuotaLoading = ref(false);
-let quotaLoadTriggered = false;
-let quotaObserver: IntersectionObserver | null = null;
 let historyRequestId = 0;
 let temporaryOffLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 let suppressNextToggle = false;
@@ -322,14 +304,14 @@ const durationValues = computed(() => props.account.stats.durationLast24Hours.ma
 const durationLabelPoints = computed(() => [props.account.stats.durationLast24Hours[0], props.account.stats.durationLast24Hours[Math.floor(props.account.stats.durationLast24Hours.length / 2)], props.account.stats.durationLast24Hours[props.account.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
 const peakRequests = computed(() => Math.max(...dailyValues.value, 0));
 const effectiveTier = computed(() => {
-  const quotaTier = quotaInfo.value?.tier?.trim();
+  const quotaTier = props.quotaInfo?.tier?.trim();
   if (props.account.provider === "codex" && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
   return props.account.tier;
 });
 const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "free");
 const showTierBadge = computed(() => props.showTier && normalizedTier.value !== "unknown" && normalizedTier.value !== "guest");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
-const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProvider] ?? []);
+const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? []);
 const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
 const usageChartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
 const activeDisabledUntil = computed(() => {
@@ -440,60 +422,11 @@ function handleTemporaryOffToggleClick(event: Event) {
   }, 0);
 }
 
-async function loadQuota(forceRefresh = false) {
-  if (!supportsQuotaMonitor.value || isQuotaLoading.value) return;
-
-  isQuotaLoading.value = true;
-  quotaError.value = null;
-
-  try {
-    const result = await dashboardApi.accounts.quota({
-      provider: props.account.provider as QuotaProvider,
-      accountId: props.account.id,
-      forceRefresh,
-    });
-
-    if (!result.success) throw new Error(result.error);
-    quotaInfo.value = result.data;
-  } catch (error) {
-    quotaError.value = error instanceof Error ? error.message : "Failed to fetch quota data";
-  } finally {
-    isQuotaLoading.value = false;
-  }
-}
-
 function refreshQuota() {
-  quotaLoadTriggered = true;
-  loadQuota(true);
+  emit("refreshQuota", props.account.id);
 }
-
-onMounted(() => {
-  if (!supportsQuotaMonitor.value || quotaLoadTriggered) return;
-
-  const node = cardRoot.value;
-  if (!node || typeof IntersectionObserver === "undefined") {
-    quotaLoadTriggered = true;
-    loadQuota();
-    return;
-  }
-
-  quotaObserver = new IntersectionObserver(
-    (entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return;
-      quotaLoadTriggered = true;
-      loadQuota();
-      quotaObserver?.disconnect();
-      quotaObserver = null;
-    },
-    { rootMargin: QUOTA_LAZY_LOAD_ROOT_MARGIN, threshold: 0.01 }
-  );
-
-  quotaObserver.observe(node);
-});
 
 onBeforeUnmount(() => {
-  quotaObserver?.disconnect();
-  quotaObserver = null;
   clearTemporaryOffLongPress();
 });
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AccountQuotaInfo, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../../lib/dashboard-api-types";
 import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
@@ -8,7 +9,17 @@ const dashboardApi = useDashboardApi();
 const selectedProvider = computed(() => getProviderFromSlug(String(route.params.provider)) ?? String(route.params.provider));
 const providerMeta = computed(() => selectedProvider.value in BY_KEY ? BY_KEY[selectedProvider.value as ProviderAccountKey] : null);
 
-type ProviderDetailData = Awaited<ReturnType<typeof dashboardApi.accounts.byProviderDetailed>>;
+type Account = ProviderDetailData["accounts"][number];
+type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
+  remainingRequests: number;
+  maxRequests: number;
+  usedRequests: number;
+  remainingFraction: number;
+  percentUsed: number;
+  accounts: number;
+};
+
+const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
@@ -23,6 +34,147 @@ const isLoadingAccounts = computed(() => pending.value || (!detailData.value && 
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
+const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
+const quotaByAccountId = ref<Record<string, AccountQuotaInfo>>({});
+const quotaErrorByAccountId = ref<Record<string, string>>({});
+const quotaLoadingByAccountId = ref<Record<string, boolean>>({});
+let quotaQueueRunId = 0;
+
+const quotaCapableAccounts = computed(() => accounts.value.filter((account) => toQuotaProvider(account.provider)));
+const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
+const activeQuotaLoadedCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaByAccountId.value[account.id] || quotaErrorByAccountId.value[account.id]).length);
+const activeQuotaSuccessCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaByAccountId.value[account.id]?.status === "success").length);
+const activeQuotaFailedCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaErrorByAccountId.value[account.id] || quotaByAccountId.value[account.id]?.status === "error" || quotaByAccountId.value[account.id]?.status === "expired").length);
+const activeQuotaLoadingCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaLoadingByAccountId.value[account.id]).length);
+const isAnyQuotaLoading = computed(() => Object.values(quotaLoadingByAccountId.value).some(Boolean));
+const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
+  const groups = new Map<string, QuotaSummaryGroup>();
+
+  for (const account of activeQuotaAccounts.value) {
+    const quota = quotaByAccountId.value[account.id];
+    if (quota?.status !== "success") continue;
+
+    for (const group of quota.groups) {
+      if (![group.remainingRequests, group.maxRequests, group.usedRequests].every(Number.isFinite) || group.maxRequests <= 0) continue;
+
+      const current = groups.get(group.name) ?? {
+        name: group.name,
+        displayName: group.displayName,
+        remainingRequests: 0,
+        maxRequests: 0,
+        usedRequests: 0,
+        remainingFraction: 0,
+        percentUsed: 0,
+        accounts: 0,
+      };
+
+      current.remainingRequests += group.remainingRequests;
+      current.maxRequests += group.maxRequests;
+      current.usedRequests += group.usedRequests;
+      current.accounts += 1;
+      groups.set(group.name, current);
+    }
+  }
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      remainingFraction: group.maxRequests > 0 ? Math.max(0, Math.min(1, group.remainingRequests / group.maxRequests)) : 0,
+      percentUsed: group.maxRequests > 0 ? Math.round(Math.max(0, Math.min(100, (group.usedRequests / group.maxRequests) * 100))) : 0,
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+});
+
+function toQuotaProvider(provider: string): QuotaProviderKey | null {
+  return QUOTA_PROVIDERS.has(provider) ? provider as QuotaProviderKey : null;
+}
+
+function setQuotaLoading(accountId: string, loading: boolean) {
+  quotaLoadingByAccountId.value = loading
+    ? { ...quotaLoadingByAccountId.value, [accountId]: true }
+    : Object.fromEntries(Object.entries(quotaLoadingByAccountId.value).filter(([key]) => key !== accountId));
+}
+
+function pruneQuotaState() {
+  const accountIds = new Set(accounts.value.map((account) => account.id));
+  quotaByAccountId.value = Object.fromEntries(Object.entries(quotaByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
+  quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
+  quotaLoadingByAccountId.value = Object.fromEntries(Object.entries(quotaLoadingByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
+}
+
+async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number) {
+  const provider = toQuotaProvider(account.provider);
+  if (!provider || quotaLoadingByAccountId.value[account.id]) return;
+  if (!forceRefresh && (quotaByAccountId.value[account.id] || quotaErrorByAccountId.value[account.id])) return;
+
+  setQuotaLoading(account.id, true);
+  quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
+
+  try {
+    const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh });
+    if (runId !== undefined && runId !== quotaQueueRunId) return;
+    if (!result.success) throw new Error(result.error);
+
+    quotaByAccountId.value = { ...quotaByAccountId.value, [account.id]: result.data };
+    quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountId !== account.id));
+  } catch (error) {
+    if (runId !== undefined && runId !== quotaQueueRunId) return;
+    const message = error instanceof Error ? error.message : "Failed to fetch quota data";
+    quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: message };
+  } finally {
+    setQuotaLoading(account.id, false);
+  }
+}
+
+async function runQuotaQueue() {
+  const runId = ++quotaQueueRunId;
+  const enabledFirstAccounts = [
+    ...quotaCapableAccounts.value.filter((account) => account.isActive),
+    ...quotaCapableAccounts.value.filter((account) => !account.isActive),
+  ];
+
+  for (const account of enabledFirstAccounts) {
+    if (runId !== quotaQueueRunId) return;
+    if (quotaLoadingByAccountId.value[account.id]) {
+      while (quotaLoadingByAccountId.value[account.id] && runId === quotaQueueRunId) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (runId !== quotaQueueRunId) return;
+    }
+    await loadAccountQuota(account, false, runId);
+  }
+}
+
+function formatQuotaValue(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  return value.toLocaleString(undefined, { maximumFractionDigits: Math.abs(value - Math.round(value)) < 0.001 ? 0 : 2 });
+}
+
+function quotaPercentRemaining(group: QuotaSummaryGroup): number {
+  return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
+}
+
+function quotaBarColor(group: QuotaSummaryGroup): string {
+  const percentRemaining = quotaPercentRemaining(group);
+  if (percentRemaining <= 10) return "bg-red-500";
+  if (percentRemaining <= 25) return "bg-orange-500";
+  if (percentRemaining <= 50) return "bg-yellow-500";
+  return "bg-green-500";
+}
+
+function handleQuotaRefresh(accountId: string) {
+  const account = accounts.value.find((account) => account.id === accountId);
+  if (account) loadAccountQuota(account, true);
+}
+
+watch(
+  () => accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|"),
+  () => {
+    pruneQuotaState();
+    runQuotaQueue();
+  },
+  { immediate: true }
+);
 
 function handlePinnedToggled() {
   refresh();
@@ -83,6 +235,49 @@ function handleAccountConnected() {
       </div>
     </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
+      <UiCard v-if="supportsProviderQuota" class="overflow-hidden">
+        <UiCardContent class="space-y-4 p-4">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <UiIcon name="i-lucide-gauge" class="size-4 text-muted-foreground" />
+                <h3 class="text-sm font-semibold">Total quota from enabled accounts</h3>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                Loaded {{ activeQuotaLoadedCount }}/{{ activeQuotaAccounts.length }} enabled accounts<span v-if="activeQuotaLoadingCount > 0">, {{ activeQuotaLoadingCount }} loading</span><span v-if="activeQuotaFailedCount > 0">, {{ activeQuotaFailedCount }} failed</span>.
+              </p>
+            </div>
+            <UiBadge :variant="isAnyQuotaLoading ? 'secondary' : 'outline'" class="w-fit gap-1 text-xs">
+              <UiIcon v-if="isAnyQuotaLoading" name="i-lucide-loader-2" class="size-3 animate-spin" />
+              {{ activeQuotaSuccessCount }} successful
+            </UiBadge>
+          </div>
+
+          <div v-if="quotaSummaryGroups.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            <div v-for="group in quotaSummaryGroups" :key="group.name" class="rounded-md border border-border/70 bg-muted/20 p-3">
+              <div class="flex items-start justify-between gap-2 text-xs">
+                <div class="min-w-0">
+                  <p class="truncate font-medium text-foreground">{{ group.displayName }}</p>
+                  <p class="text-[10px] text-muted-foreground">{{ group.accounts }} account{{ group.accounts === 1 ? '' : 's' }}</p>
+                </div>
+                <span class="font-mono text-xs text-muted-foreground">{{ quotaPercentRemaining(group) }}%</span>
+              </div>
+              <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
+              </div>
+              <p class="mt-2 text-xs tabular-nums text-muted-foreground">
+                <span class="font-medium text-foreground">{{ formatQuotaValue(group.remainingRequests) }}</span>
+                / {{ formatQuotaValue(group.maxRequests) }} remaining
+              </p>
+            </div>
+          </div>
+
+          <p v-else class="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            {{ activeQuotaAccounts.length === 0 ? 'No enabled accounts support quota summary.' : 'Loading quota summary from enabled accounts...' }}
+          </p>
+        </UiCardContent>
+      </UiCard>
+
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <ProviderAccountCard
           v-for="account in accounts"
@@ -91,7 +286,11 @@ function handleAccountConnected() {
           :show-tier="providerMeta?.showTier"
           :supported-models="supportedModels"
           :disabled-models="disabledModelsByAccountId[account.id] ?? []"
+          :quota-info="quotaByAccountId[account.id] ?? null"
+          :quota-error="quotaErrorByAccountId[account.id] ?? null"
+          :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"
           @changed="refresh"
+          @refresh-quota="handleQuotaRefresh"
         />
       </div>
     </section>
