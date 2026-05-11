@@ -308,7 +308,8 @@ const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() 
 const showTierBadge = computed(() => props.showTier && normalizedTier.value !== "unknown" && normalizedTier.value !== "guest");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
 const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProvider] ?? []);
-const usageChartColor = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
+const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
+const usageChartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
 const hasSuccessAfterLastError = computed(() => {
   if (!props.account.lastErrorAt) return false;
   const errorMs = new Date(props.account.lastErrorAt).getTime();
@@ -603,7 +604,7 @@ function historyEntryPreview(errorMessage: string): string {
               </div>
             </div>
             <div class="mb-2 rounded border border-border/60 bg-background/70 px-2 py-1.5">
-              <UsageSparkline :values="durationValues" :color="usageChartColor" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
+              <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
               <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
                 <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
               </div>
