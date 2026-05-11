@@ -410,6 +410,11 @@ func TestStripImageContent(t *testing.T) {
 			map[string]any{"type": "text", "text": "collapse me"},
 			map[string]any{"type": "input_image", "image_url": "ignored"},
 		}},
+	}, "_responsesInput": []any{
+		map[string]any{"type": "message", "role": "user", "content": []any{
+			map[string]any{"type": "input_text", "text": "keep responses text"},
+			map[string]any{"type": "input_image", "image_url": "https://example.com/b.png"},
+		}},
 	}}
 
 	stripImageContent(payload)
@@ -421,6 +426,32 @@ func TestStripImageContent(t *testing.T) {
 	second := messages[1].(map[string]any)["content"]
 	if second != "collapse me" {
 		t.Fatalf("second content = %#v, want collapse me", second)
+	}
+	responsesInput := payload["_responsesInput"].([]any)
+	responsesContent := responsesInput[0].(map[string]any)["content"].([]any)
+	if len(responsesContent) != 1 || responsesContent[0].(map[string]any)["type"] != "input_text" {
+		t.Fatalf("responses content = %#v", responsesContent)
+	}
+}
+
+func TestStripToolCallParameters(t *testing.T) {
+	payload := map[string]any{
+		"model":               "test-model",
+		"messages":            []any{},
+		"tools":               []any{map[string]any{"type": "function"}},
+		"tool_choice":         "auto",
+		"parallel_tool_calls": true,
+	}
+
+	stripToolCallParameters(payload)
+
+	for _, key := range []string{"tools", "tool_choice", "parallel_tool_calls"} {
+		if _, ok := payload[key]; ok {
+			t.Fatalf("%s was not stripped: %#v", key, payload)
+		}
+	}
+	if payload["model"] != "test-model" || payload["messages"] == nil {
+		t.Fatalf("non-tool fields changed: %#v", payload)
 	}
 }
 

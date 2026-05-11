@@ -319,8 +319,7 @@ func (p copilotProvider) isReasoningModel(model string) bool {
 	if p.registry == nil {
 		return true
 	}
-	info, ok := p.registry.ModelInfo(model)
-	return ok && info.Meta != nil && info.Meta.Reasoning != nil && *info.Meta.Reasoning
+	return p.registry.IsReasoningModel(model)
 }
 
 func (p copilotProvider) requiresResponsesAPI(model string) bool {

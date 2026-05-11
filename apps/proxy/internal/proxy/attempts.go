@@ -16,6 +16,7 @@ type accountRotationRunner interface {
 	markAccountFailed(context.Context, string, string, int, string) time.Time
 	logUsage(context.Context, usageParams)
 	isVisionModel(string) bool
+	isToolCallModel(string) bool
 }
 
 func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, []accountRotationFailure, *routeError) {
@@ -61,6 +62,9 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 		if !runner.isVisionModel(validation.Model) {
 			stripImageContent(payload)
 		}
+		if !runner.isToolCallModel(validation.Model) {
+			stripToolCallParameters(payload)
+		}
 		requestStart := time.Now().UnixMilli()
 		resp, err := runner.makeProviderRequest(ctx, *account, payload, parsed.Stream)
 		if err != nil {
@@ -103,9 +107,16 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 
 func (s *Service) isVisionModel(model string) bool {
 	if s.registry == nil {
-		return false
+		return true
 	}
 	return s.registry.IsVisionModel(model)
+}
+
+func (s *Service) isToolCallModel(model string) bool {
+	if s.registry == nil {
+		return true
+	}
+	return s.registry.IsToolCallModel(model)
 }
 
 func sessionID(r *http.Request) string {

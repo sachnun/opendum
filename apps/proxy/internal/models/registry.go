@@ -311,18 +311,44 @@ func (r *Registry) FormatModelsForOpenAI() []map[string]any {
 	return data
 }
 
+func (r *Registry) IsReasoningModel(model string) bool {
+	return r.defaultEnabledBoolCapability(model, func(meta *Meta) *bool { return meta.Reasoning })
+}
+
+func (r *Registry) IsToolCallModel(model string) bool {
+	return r.defaultEnabledBoolCapability(model, func(meta *Meta) *bool { return meta.ToolCall })
+}
+
 func (r *Registry) IsVisionModel(model string) bool {
 	info, ok := r.ModelInfo(model)
-	if !ok || info.Meta == nil {
+	if !ok {
 		return false
 	}
-	if info.Meta.Vision != nil && *info.Meta.Vision {
+	if info.Meta == nil {
 		return true
 	}
-	if info.Meta.Modalities != nil {
-		return contains(info.Meta.Modalities.Input, "image")
+	if info.Meta.Vision != nil {
+		return *info.Meta.Vision
 	}
-	return false
+	if info.Meta.Modalities == nil {
+		return true
+	}
+	return contains(info.Meta.Modalities.Input, "image")
+}
+
+func (r *Registry) defaultEnabledBoolCapability(model string, getCapability func(*Meta) *bool) bool {
+	info, ok := r.ModelInfo(model)
+	if !ok {
+		return false
+	}
+	if info.Meta == nil {
+		return true
+	}
+	capability := getCapability(info.Meta)
+	if capability == nil {
+		return true
+	}
+	return *capability
 }
 
 func NormalizeProviderAlias(provider string) string {

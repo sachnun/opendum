@@ -114,3 +114,5 @@ func (r *testRotationRunner) markAccountFailed(context.Context, string, string, 
 func (r *testRotationRunner) logUsage(context.Context, usageParams) {}
 
 func (r *testRotationRunner) isVisionModel(string) bool { return false }
+
+func (r *testRotationRunner) isToolCallModel(string) bool { return true }

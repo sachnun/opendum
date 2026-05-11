@@ -1,5 +1,6 @@
 import type { ModelStats } from "./model-stats";
 import type { ProviderAccountKey } from "./provider-accounts";
+import type { ModelMeta } from "./model-capabilities";
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -87,14 +88,7 @@ export interface ModelListItem {
   name: string;
   family: string;
   providers: string[];
-  meta?: {
-    contextLength?: number;
-    outputLimit?: number;
-    knowledgeCutoff?: string;
-    reasoning?: boolean;
-    toolCall?: boolean;
-    vision?: boolean;
-  };
+  meta?: ModelMeta;
   isEnabled: boolean;
   stats?: ModelStats;
 }
