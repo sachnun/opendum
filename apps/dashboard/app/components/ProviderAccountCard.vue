@@ -707,7 +707,7 @@ function historyEntryPreview(errorMessage: string): string {
               </UiButton>
             </div>
 
-            <div v-if="isQuotaLoading && !quotaInfo" class="space-y-2" aria-hidden="true">
+            <div v-if="!quotaInfo && !quotaError" class="space-y-2" aria-hidden="true">
               <div v-for="(row, index) in quotaSkeletonRows" :key="index" class="space-y-1">
                 <div class="flex items-center justify-between gap-2">
                   <UiSkeleton :class="['h-3', row.labelClass]" />
@@ -724,7 +724,6 @@ function historyEntryPreview(errorMessage: string): string {
 
             <template v-else>
               <p v-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
-              <p v-else-if="!quotaInfo" class="text-xs text-muted-foreground">Quota data is not available yet.</p>
               <div v-else-if="quotaInfo.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
                 <div v-for="group in quotaInfo.groups" :key="group.name" class="space-y-1">
                   <div class="flex items-center justify-between gap-2 text-xs">
