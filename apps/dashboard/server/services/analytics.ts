@@ -24,7 +24,7 @@ interface PeriodConfig {
   granularityMs: number;
 }
 
-export interface AnalyticsData {
+interface AnalyticsData {
   requestsOverTime: Array<{ date: string; count: number }>;
   tokenUsage: Array<{ date: string; input: number; output: number }>;
   requestsByModel: Array<{ model: string; count: number }>;
@@ -123,7 +123,7 @@ function toDateValue(value: Date | string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export async function getAnalyticsDataForUser(
+async function getAnalyticsDataForUser(
   userId: string,
   filter: AnalyticsFilter,
   apiKeyId?: string

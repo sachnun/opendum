@@ -7,16 +7,11 @@
  */
 
 import { CODEX_CHAT_USER_AGENT, ORIGINATOR } from "./constants.js";
-import { getRedisJson, setRedisJson } from "../../redis-cache.js";
 import { fetchInternalProvider } from "../../proxy/internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const USAGE_ENDPOINT = "https://chatgpt.com/backend-api/wham/usage";
 const CHATGPT_ORIGIN = "https://chatgpt.com";
-
-const QUOTA_STALE_MS = 15 * 60 * 1000;
-const CACHE_PREFIX = "opendum:quota:codex:snapshot";
-const CACHE_TTL_SECONDS = Math.ceil(QUOTA_STALE_MS / 1000);
 
 export interface CodexRateLimitWindow {
   usedPercent: number;
@@ -50,10 +45,6 @@ interface ParsedCodexQuota {
   primary: CodexRateLimitWindow | null;
   secondary: CodexRateLimitWindow | null;
   credits: CodexCreditsInfo | null;
-}
-
-function getCodexQuotaCacheKey(accountId: string): string {
-  return `${CACHE_PREFIX}:${accountId}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -334,64 +325,6 @@ function toSnapshot(
     fetchedAt,
     source,
   };
-}
-
-async function getCodexQuotaSnapshot(
-  accountId: string
-): Promise<CodexQuotaSnapshot | null> {
-  const snapshot = await getRedisJson<CodexQuotaSnapshot>(
-    getCodexQuotaCacheKey(accountId)
-  );
-
-  if (!snapshot || snapshot.status !== "success") {
-    return null;
-  }
-
-  return snapshot;
-}
-
-async function setCodexQuotaSnapshot(
-  accountId: string,
-  snapshot: CodexQuotaSnapshot
-): Promise<void> {
-  if (snapshot.status !== "success") {
-    return;
-  }
-
-  await setRedisJson(
-    getCodexQuotaCacheKey(accountId),
-    snapshot,
-    CACHE_TTL_SECONDS
-  );
-}
-
-export async function updateCodexQuotaFromHeaders(
-  accountId: string,
-  headers: Headers | Record<string, string>
-): Promise<CodexQuotaSnapshot | null> {
-  const parsedFromHeaders = parseQuotaFromHeaders(headers);
-  if (!parsedFromHeaders) {
-    return null;
-  }
-
-  const existingSnapshot = await getCodexQuotaSnapshot(accountId);
-  const existingParsed: ParsedCodexQuota | null = existingSnapshot
-    ? {
-        planType: existingSnapshot.planType,
-        primary: existingSnapshot.primary,
-        secondary: existingSnapshot.secondary,
-        credits: existingSnapshot.credits,
-      }
-    : null;
-
-  const merged = mergeQuotaData(null, parsedFromHeaders, existingParsed);
-  if (!merged) {
-    return null;
-  }
-
-  const snapshot = toSnapshot(merged, "headers");
-  await setCodexQuotaSnapshot(accountId, snapshot);
-  return snapshot;
 }
 
 export async function fetchCodexQuotaFromApi(

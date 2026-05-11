@@ -69,7 +69,7 @@ function buildEmptyProviderStats(dayKeys: string[], hourKeys: string[]): Provide
   };
 }
 
-export function buildStatsFromRaw(raw: RawProviderStats | undefined, dayKeys: string[], hourKeys: string[]): ProviderStats {
+function buildStatsFromRaw(raw: RawProviderStats | undefined, dayKeys: string[], hourKeys: string[]): ProviderStats {
   if (!raw) return buildEmptyProviderStats(dayKeys, hourKeys);
   const durationTotalLastDay = Array.from(raw.durationByHour.values()).reduce((sum, bucket) => sum + bucket.total, 0);
   const durationCountLastDay = Array.from(raw.durationByHour.values()).reduce((sum, bucket) => sum + bucket.count, 0);

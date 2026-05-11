@@ -7,7 +7,6 @@ import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
 import { buildAccountStats, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
 
-export { exchangeOAuthAccount, exchangeOAuthInputSchema, getAccountAuthUrl, getAuthUrlInputSchema, initiateDeviceAuth, initiateDeviceAuthInputSchema, pollDeviceAuth, pollDeviceAuthInputSchema } from "./account-auth";
 export { createAccount, createAccountInputSchema } from "./account-connectors";
 
 const AUTO_PIN_SENTINEL = "_auto_pinned";

@@ -11,8 +11,6 @@ export interface ProviderAccessRule {
   minTier?: string;
 }
 
-export type ProviderModelConfig = NonNullable<ModelInfo["providerConfig"]>[string];
-
 function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
   return upstreamModel
     .replace(/^library\//, "")
@@ -116,16 +114,6 @@ export function getProviderModelSet(provider: string): Set<string> {
   return modelSet;
 }
 
-/**
- * Resolve a canonical model id to the upstream name for a specific provider.
- * Falls back to the canonical name when no upstream mapping exists.
- */
-export function getUpstreamModelName(model: string, provider: string): string {
-  const canonical = resolveModelAlias(model);
-  const info = EFFECTIVE_MODEL_REGISTRY[canonical];
-  return info ? getProviderUpstream(info, provider) ?? canonical : canonical;
-}
-
 export function getProviderAccessRule(
   model: string,
   provider: string
@@ -134,15 +122,6 @@ export function getProviderAccessRule(
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
   const minTier = info?.providerConfig?.[provider]?.minTier;
   return minTier ? { minTier } : null;
-}
-
-export function getProviderModelConfig(
-  model: string,
-  provider: string
-): ProviderModelConfig | null {
-  const canonical = resolveModelAlias(model);
-  const info = EFFECTIVE_MODEL_REGISTRY[canonical];
-  return info?.providerConfig?.[provider] ?? null;
 }
 
 /**

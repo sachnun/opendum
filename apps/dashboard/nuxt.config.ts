@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -18,7 +18,7 @@ function collectModelFiles(dir: string): string[] {
 }
 
 function buildModelRegistryModule(): string {
-  const modelsDir = fileURLToPath(new URL("../../models", import.meta.url));
+  const modelsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../models");
   const modelFiles = collectModelFiles(modelsDir);
   const imports = modelFiles.map((filePath, index) => `import model${index} from ${JSON.stringify(filePath)};`);
   const entries = modelFiles.map((filePath, index) => `  ${JSON.stringify(basename(filePath, ".json"))}: model${index},`);
