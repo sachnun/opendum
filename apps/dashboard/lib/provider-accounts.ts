@@ -1,6 +1,5 @@
 export type ProviderAccountKey =
   | "antigravity"
-  | "cerebras"
   | "codex"
   | "copilot"
   | "gemini_cli"
@@ -111,14 +110,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "Kilo Code",
     category: "api_key",
     emptyMessage: "No Kilo Code accounts connected yet.",
-    showTier: false,
-  },
-  {
-    key: "cerebras",
-    slug: "cerebras",
-    label: "Cerebras",
-    category: "api_key",
-    emptyMessage: "No Cerebras accounts connected yet.",
     showTier: false,
   },
   {

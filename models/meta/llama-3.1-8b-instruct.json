@@ -1,6 +1,5 @@
 {
   "providers": [
-    "cerebras",
     "groq",
     "nvidia_nim",
     "workers_ai"
@@ -24,9 +23,6 @@
     }
   },
   "providerConfig": {
-    "cerebras": {
-      "upstream": "llama3.1-8b"
-    },
     "groq": {
       "upstream": "llama-3.1-8b-instant"
     },

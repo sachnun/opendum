@@ -24,7 +24,6 @@ type internalRelayRequest struct {
 }
 
 var internalRelayAllowedHosts = map[string]struct{}{
-	"api.cerebras.ai":       {},
 	"api.cloudflare.com":    {},
 	"api.github.com":        {},
 	"api.githubcopilot.com": {},

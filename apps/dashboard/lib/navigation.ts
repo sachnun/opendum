@@ -18,7 +18,6 @@ export interface NavSubItem {
 
 export interface ProviderAccountCounts {
   antigravity: number;
-  cerebras: number;
   codex: number;
   copilot: number;
   gemini_cli: number;
@@ -57,7 +56,6 @@ export const primaryNavigation: NavItem[] = [
       { name: "OpenRouter", href: getProviderAccountPath("openrouter") },
       { name: "Groq", href: getProviderAccountPath("groq") },
       { name: "Kilo Code", href: getProviderAccountPath("kilo_code") },
-      { name: "Cerebras", href: getProviderAccountPath("cerebras") },
       { name: "Workers AI", href: getProviderAccountPath("workers_ai") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],

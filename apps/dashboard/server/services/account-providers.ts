@@ -10,7 +10,6 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "openrouter",
   "groq",
   "kilo_code",
-  "cerebras",
   "workers_ai",
 ] as const;
 

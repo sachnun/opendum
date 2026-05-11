@@ -43,13 +43,12 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   ollama_cloud: { name: "Ollama Cloud", description: "Access Ollama Cloud via OpenAI-compatible API", flowType: "api_key", apiKeyPortalUrl: "https://ollama.com/settings/keys", apiKeyPlaceholder: "ollama_..." },
   openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", flowType: "api_key", apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
   groq: { name: "Groq", description: "Access ultra-fast LLM inference via Groq API", flowType: "api_key", apiKeyPortalUrl: "https://console.groq.com/keys", apiKeyPlaceholder: "gsk_..." },
-  cerebras: { name: "Cerebras", description: "Access ultra-fast open-source models via Cerebras API", flowType: "api_key", apiKeyPortalUrl: "https://cloud.cerebras.ai", apiKeyPlaceholder: "csk-..." },
   kilo_code: { name: "Kilo Code", description: "Access free & auto-routed models via Kilo Gateway", flowType: "api_key", apiKeyPortalUrl: "https://app.kilo.ai", apiKeyPlaceholder: "sk-..." },
   workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", flowType: "api_key_with_account_id", apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
 };
 
 const oauthProviders: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot"];
-const apiKeyProviders: Provider[] = ["ollama_cloud", "openrouter", "nvidia_nim", "groq", "cerebras", "kilo_code", "workers_ai"];
+const apiKeyProviders: Provider[] = ["ollama_cloud", "openrouter", "nvidia_nim", "groq", "kilo_code", "workers_ai"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));

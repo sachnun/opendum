@@ -52,7 +52,6 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 	return &Registry{providers: map[string]Provider{
 		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
 		"groq":         openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.com/openai/v1", supportedParams: supportedGroq, registry: registry},
-		"cerebras":     openAICompatibleProvider{name: "cerebras", baseURL: "https://api.cerebras.ai/v1", supportedParams: supportedCerebras, registry: registry},
 		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
 		"ollama_cloud": openAICompatibleProvider{name: "ollama_cloud", baseURL: "https://ollama.com/v1", supportedParams: supportedOllama, registry: registry},
 		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
@@ -420,7 +419,6 @@ func set(values ...string) map[string]struct{} {
 
 var supportedOpenRouter = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedGroq = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "n")
-var supportedCerebras = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "stop", "seed", "response_format", "reasoning_effort", "n", "logprobs", "top_logprobs")
 var supportedNvidia = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 var supportedOllama = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 var supportedKilo = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
