@@ -42,11 +42,6 @@ let quotaQueueRunId = 0;
 
 const quotaCapableAccounts = computed(() => accounts.value.filter((account) => toQuotaProvider(account.provider)));
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
-const activeQuotaLoadedCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaByAccountId.value[account.id] || quotaErrorByAccountId.value[account.id]).length);
-const activeQuotaSuccessCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaByAccountId.value[account.id]?.status === "success").length);
-const activeQuotaFailedCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaErrorByAccountId.value[account.id] || quotaByAccountId.value[account.id]?.status === "error" || quotaByAccountId.value[account.id]?.status === "expired").length);
-const activeQuotaLoadingCount = computed(() => activeQuotaAccounts.value.filter((account) => quotaLoadingByAccountId.value[account.id]).length);
-const isAnyQuotaLoading = computed(() => Object.values(quotaLoadingByAccountId.value).some(Boolean));
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
   const groups = new Map<string, QuotaSummaryGroup>();
 
@@ -145,11 +140,6 @@ async function runQuotaQueue() {
   }
 }
 
-function formatQuotaValue(value: number): string {
-  if (!Number.isFinite(value)) return "0";
-  return value.toLocaleString(undefined, { maximumFractionDigits: Math.abs(value - Math.round(value)) < 0.001 ? 0 : 2 });
-}
-
 function quotaPercentRemaining(group: QuotaSummaryGroup): number {
   return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
 }
@@ -235,48 +225,30 @@ function handleAccountConnected() {
       </div>
     </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
-      <UiCard v-if="supportsProviderQuota" class="overflow-hidden">
-        <UiCardContent class="space-y-4 p-4">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <UiIcon name="i-lucide-gauge" class="size-4 text-muted-foreground" />
-                <h3 class="text-sm font-semibold">Total quota from enabled accounts</h3>
-              </div>
-              <p class="text-xs text-muted-foreground">
-                Loaded {{ activeQuotaLoadedCount }}/{{ activeQuotaAccounts.length }} enabled accounts<span v-if="activeQuotaLoadingCount > 0">, {{ activeQuotaLoadingCount }} loading</span><span v-if="activeQuotaFailedCount > 0">, {{ activeQuotaFailedCount }} failed</span>.
-              </p>
-            </div>
-            <UiBadge :variant="isAnyQuotaLoading ? 'secondary' : 'outline'" class="w-fit gap-1 text-xs">
-              <UiIcon v-if="isAnyQuotaLoading" name="i-lucide-loader-2" class="size-3 animate-spin" />
-              {{ activeQuotaSuccessCount }} successful
-            </UiBadge>
-          </div>
+      <div v-if="supportsProviderQuota" class="space-y-2">
+        <div class="flex gap-2">
+          <UiIcon name="i-lucide-speedometer" class="size-4 text-muted-foreground" />
+        </div>
 
-          <div v-if="quotaSummaryGroups.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            <div v-for="group in quotaSummaryGroups" :key="group.name" class="rounded-md border border-border/70 bg-muted/20 p-3">
-              <div class="flex items-start justify-between gap-2 text-xs">
-                <div class="min-w-0">
-                  <p class="truncate font-medium text-foreground">{{ group.displayName }}</p>
-                  <p class="text-[10px] text-muted-foreground">{{ group.accounts }} account{{ group.accounts === 1 ? '' : 's' }}</p>
-                </div>
-                <span class="font-mono text-xs text-muted-foreground">{{ quotaPercentRemaining(group) }}%</span>
+        <div v-if="quotaSummaryGroups.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div v-for="group in quotaSummaryGroups" :key="group.name" class="rounded-md border border-border/70 bg-muted/20 p-3">
+            <div class="flex items-start justify-between gap-2 text-xs">
+              <div class="flex min-w-0 items-center gap-1.5">
+                <p class="truncate font-medium text-foreground">{{ group.displayName }}</p>
+                <span class="shrink-0 text-[10px] text-muted-foreground">{{ group.accounts }} account{{ group.accounts === 1 ? '' : 's' }}</span>
               </div>
-              <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
-              </div>
-              <p class="mt-2 text-xs tabular-nums text-muted-foreground">
-                <span class="font-medium text-foreground">{{ formatQuotaValue(group.remainingRequests) }}</span>
-                / {{ formatQuotaValue(group.maxRequests) }} remaining
-              </p>
+              <span class="font-mono text-xs text-muted-foreground">{{ quotaPercentRemaining(group) }}%</span>
+            </div>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
             </div>
           </div>
+        </div>
 
-          <p v-else class="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            {{ activeQuotaAccounts.length === 0 ? 'No enabled accounts support quota summary.' : 'Loading quota summary from enabled accounts...' }}
-          </p>
-        </UiCardContent>
-      </UiCard>
+        <p v-else class="rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          {{ activeQuotaAccounts.length === 0 ? 'No enabled accounts support quota summary.' : 'Loading quota summary from enabled accounts...' }}
+        </p>
+      </div>
 
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <ProviderAccountCard
