@@ -20,6 +20,8 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
 };
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
+const ENABLED_QUOTA_FETCH_DELAY_MS = 750;
+const DISABLED_QUOTA_FETCH_DELAY_MS = 2000;
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
@@ -124,13 +126,19 @@ async function loadAccountQuota(account: Account, forceRefresh = false, runId?: 
 
 async function runQuotaQueue() {
   const runId = ++quotaQueueRunId;
-  const enabledFirstAccounts = [
+  const accountsToFetch = [
     ...quotaCapableAccounts.value.filter((account) => account.isActive),
     ...quotaCapableAccounts.value.filter((account) => !account.isActive),
   ];
 
-  for (const account of enabledFirstAccounts) {
+  for (const [index, account] of accountsToFetch.entries()) {
     if (runId !== quotaQueueRunId) return;
+    if (index > 0) {
+      const delay = account.isActive ? ENABLED_QUOTA_FETCH_DELAY_MS : DISABLED_QUOTA_FETCH_DELAY_MS;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      if (runId !== quotaQueueRunId) return;
+    }
+
     if (quotaLoadingByAccountId.value[account.id]) {
       while (quotaLoadingByAccountId.value[account.id] && runId === quotaQueueRunId) {
         await new Promise((resolve) => setTimeout(resolve, 100));
