@@ -55,6 +55,7 @@ const supportNavigation: NavItem[] = [
   { name: "Usage", href: "/dashboard/usage", icon: "i-lucide-book-open" },
   { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
 ];
+const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
 
@@ -164,7 +165,11 @@ function visibleSubItems(item: NavItem) {
   if (item.href === "/dashboard/accounts") {
     return item.children
       .filter((subItem) => pinnedProviderHrefs.value.has(subItem.href))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => {
+        const indicatorA = accountIndicatorByHref.value[a.href] ?? "normal";
+        const indicatorB = accountIndicatorByHref.value[b.href] ?? "normal";
+        return PROVIDER_STATUS_ORDER[indicatorA] - PROVIDER_STATUS_ORDER[indicatorB] || a.name.localeCompare(b.name);
+      });
   }
 
   if (item.href === "/dashboard/models") {

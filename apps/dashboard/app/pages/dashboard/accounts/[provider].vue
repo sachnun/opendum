@@ -22,6 +22,7 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const ENABLED_QUOTA_FETCH_DELAY_MS = 750;
 const DISABLED_QUOTA_FETCH_DELAY_MS = 2000;
+const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
@@ -30,7 +31,7 @@ const { data, error, pending, refresh } = await useAsyncData(
 );
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
-const accounts = computed(() => detailData.value?.accounts ?? []);
+const accounts = computed(() => [...(detailData.value?.accounts ?? [])].sort((a, b) => (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active)));
 const activeAccountCount = computed(() => accounts.value.filter((account) => account.isActive).length);
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));

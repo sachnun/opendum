@@ -12,6 +12,8 @@ const dashboardApi = useDashboardApi();
 
 type AccountSummaryData = Awaited<ReturnType<typeof dashboardApi.accounts.summary>>;
 
+const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
+
 const { data, error, refresh } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
 const summaryData = computed<AccountSummaryData | null>(() => data.value ?? null);
 const pinnedProviderSet = computed(() => new Set(summaryData.value!.pinnedProviders));
@@ -19,6 +21,13 @@ const pinnedProviderSet = computed(() => new Set(summaryData.value!.pinnedProvid
 function summaryFor(provider: ProviderAccountKey): AccountSummaryData["summaries"][ProviderAccountKey] {
   return summaryData.value!.summaries[provider];
 }
+
+function sortProvidersByStatus<T extends { key: ProviderAccountKey }>(providers: T[]): T[] {
+  return [...providers].sort((a, b) => PROVIDER_STATUS_ORDER[summaryFor(a.key).indicator] - PROVIDER_STATUS_ORDER[summaryFor(b.key).indicator]);
+}
+
+const sortedOauthProviders = computed(() => summaryData.value ? sortProvidersByStatus(OAUTH_DEFINITIONS) : []);
+const sortedApiKeyProviders = computed(() => summaryData.value ? sortProvidersByStatus(API_KEY_DEFINITIONS) : []);
 
 function handlePinnedToggled() {
   refresh();
@@ -52,7 +61,7 @@ function handleAccountConnected() {
         </div>
         <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
           <ProviderOverviewCard
-            v-for="provider in OAUTH_DEFINITIONS"
+            v-for="provider in sortedOauthProviders"
             :key="provider.key"
             :provider="provider"
             :summary="summaryFor(provider.key)"
@@ -68,7 +77,7 @@ function handleAccountConnected() {
         </div>
         <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
           <ProviderOverviewCard
-            v-for="provider in API_KEY_DEFINITIONS"
+            v-for="provider in sortedApiKeyProviders"
             :key="provider.key"
             :provider="provider"
             :summary="summaryFor(provider.key)"
