@@ -4,7 +4,7 @@
  * Antigravity version refresh script.
  *
  * Fetches the latest version from the Antigravity changelog and updates the
- * User-Agent used by the Go proxy Antigravity provider.
+ * User-Agent used by the Go proxy and dashboard Antigravity providers.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -22,9 +22,15 @@ const PROXY_PROVIDER_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../apps/proxy/internal/providers/google_code_assist.go"
 );
+const DASHBOARD_CONSTANTS_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../apps/dashboard/server/lib/providers/antigravity/constants.ts"
+);
 
-const USER_AGENT_REGEX =
+const PROXY_USER_AGENT_REGEX =
   /((?:userAgent:\s*)"antigravity\/)(\d+\.\d+\.\d+)(\s+"\s*\+\s*platform)/;
+const DASHBOARD_USER_AGENT_REGEX =
+  /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
 function sleep(ms) {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
@@ -99,14 +105,19 @@ function compareSemver(a, b) {
 
 function getCurrentVersion() {
   const source = readFileSync(PROXY_PROVIDER_PATH, "utf-8");
-  const match = source.match(USER_AGENT_REGEX);
+  const match = source.match(PROXY_USER_AGENT_REGEX);
   return match ? match[2] : null;
 }
 
 function updateVersion(newVersion) {
-  const source = readFileSync(PROXY_PROVIDER_PATH, "utf-8");
-  const updated = source.replace(USER_AGENT_REGEX, `$1${newVersion}$3`);
-  writeFileSync(PROXY_PROVIDER_PATH, updated);
+  for (const [filePath, regex] of [
+    [PROXY_PROVIDER_PATH, PROXY_USER_AGENT_REGEX],
+    [DASHBOARD_CONSTANTS_PATH, DASHBOARD_USER_AGENT_REGEX],
+  ]) {
+    const source = readFileSync(filePath, "utf-8");
+    const updated = source.replace(regex, `$1${newVersion}$3`);
+    writeFileSync(filePath, updated);
+  }
 }
 
 async function main() {
@@ -139,11 +150,9 @@ async function main() {
 
   if (compareSemver(latestVersion, currentVersion) > 0) {
     updateVersion(latestVersion);
-    console.log(
-      `Antigravity: updated proxy User-Agent version ${currentVersion} -> ${latestVersion}`
-    );
+    console.log(`Antigravity: updated User-Agent version ${currentVersion} -> ${latestVersion}`);
   } else {
-    console.log("Antigravity: proxy User-Agent version is already up to date.");
+    console.log("Antigravity: User-Agent version is already up to date.");
   }
 }
 
