@@ -64,31 +64,24 @@ function handleAccountConnected() {
 
     <DashboardDataNotice :error="error" />
 
-    <DashboardEmptyState
-      v-if="!isLoadingAccounts && accounts.length === 0"
-      title="No accounts connected"
-      :description="providerMeta?.emptyMessage ?? 'No accounts connected yet.'"
-      icon="i-lucide-user-plus"
-    >
-      <div v-if="supportedModels.length" class="mx-auto max-w-2xl space-y-2 text-center">
-        <p class="text-xs font-medium text-muted-foreground">Supported models ({{ supportedModels.length }}):</p>
-        <div class="flex flex-wrap justify-center gap-1.5">
-          <UiBadge
-            v-for="model in supportedModels"
-            :key="model"
-            variant="secondary"
-            class="text-xs font-normal"
-          >
-            {{ model }}
-          </UiBadge>
+    <section v-if="!isLoadingAccounts && accounts.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
+      <div class="space-y-3 pt-1">
+        <p class="text-sm text-muted-foreground">{{ providerMeta?.emptyMessage ?? 'No accounts connected yet.' }}</p>
+        <div v-if="supportedModels.length" class="space-y-2">
+          <p class="text-xs font-medium text-muted-foreground">Supported models ({{ supportedModels.length }}):</p>
+          <div class="flex flex-wrap gap-1.5">
+            <UiBadge
+              v-for="model in supportedModels"
+              :key="model"
+              variant="secondary"
+              class="text-xs font-normal"
+            >
+              {{ model }}
+            </UiBadge>
+          </div>
         </div>
       </div>
-      <AddAccountDialog
-        v-if="providerMeta"
-        :initial-provider="providerMeta.key"
-        @connected="handleAccountConnected"
-      />
-    </DashboardEmptyState>
+    </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <ProviderAccountCard
