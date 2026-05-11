@@ -50,8 +50,6 @@ jobs:
 
       - name: Build dashboard for Cloudflare Workers
         run: pnpm --filter @opendum/dashboard build
-        env:
-          NITRO_PRESET: cloudflare_module
 
       - name: Deploy dashboard to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3

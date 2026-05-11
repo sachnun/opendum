@@ -6,8 +6,6 @@ import tailwindcss from "@tailwindcss/vite";
 const redisXxhashStub = "\0redis-xxhash-stub";
 const modelRegistryVirtualModule = "virtual:opendum-model-registry";
 const modelRegistryVirtualModuleId = `\0${modelRegistryVirtualModule}`;
-const nitroPreset = process.env.NITRO_PRESET;
-
 function collectModelFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = resolve(dir, entry.name);
@@ -55,10 +53,10 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
-    preset: nitroPreset,
+    preset: "cloudflare_module",
     cloudflare: {
-      deployConfig: nitroPreset === "cloudflare_module" ? true : undefined,
-      nodeCompat: nitroPreset === "cloudflare_module" ? true : undefined,
+      deployConfig: true,
+      nodeCompat: true,
       wrangler: {
         name: "opendum",
         compatibility_flags: ["nodejs_compat"],
