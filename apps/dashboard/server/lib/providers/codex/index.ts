@@ -1,4 +1,4 @@
-export { codexProvider } from "./client.js";
+export { codexProvider, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "./client.js";
 export {
   generateCodeVerifier,
   generateCodeChallenge,

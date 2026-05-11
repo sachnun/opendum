@@ -7,7 +7,7 @@ import { encrypt } from "../lib/encryption";
 import { antigravityProvider } from "../lib/providers/antigravity";
 import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "../lib/providers/antigravity/constants";
 import { initiateCopilotDeviceCodeFlow, pollCopilotDeviceCodeAuthorization } from "../lib/providers/copilot";
-import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier } from "../lib/providers/codex";
+import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { geminiCliProvider } from "../lib/providers/gemini-cli";
 import { CLIENT_ID as geminiCliClientId, REDIRECT_URI as geminiCliRedirectUri, SCOPES as geminiCliScopes } from "../lib/providers/gemini-cli/constants";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
@@ -19,8 +19,8 @@ const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth
 
 export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "gemini_cli", "codex", "kiro"]) });
 export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "gemini_cli", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
-export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot"]) });
-export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot"]), deviceCode: z.string(), codeVerifier: z.string().optional() });
+export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]) });
+export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional() });
 
 type OAuthProviderKey = z.infer<typeof getAuthUrlInputSchema>["provider"];
 type DeviceProviderKey = z.infer<typeof initiateDeviceAuthInputSchema>["provider"];
@@ -105,6 +105,12 @@ const DEVICE_PROVIDERS = {
     emailPrefix: "qwen",
     initiate: initiateDeviceCodeFlow,
     poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollDeviceCodeAuthorization(input.deviceCode, input.codeVerifier ?? ""),
+  },
+  codex: {
+    label: "Codex",
+    emailPrefix: "codex",
+    initiate: initiateCodexDeviceCodeFlow,
+    poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
   },
 } satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: () => Promise<unknown>; poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => Promise<unknown> }>;
 
@@ -220,7 +226,7 @@ export async function pollDeviceAuth(userId: string, input: z.infer<typeof pollD
 
     const provider = input.provider;
     const email = result.email || `${config.emailPrefix}-${Date.now()}`;
-    const saved = await upsertOAuthAccount(userId, provider, config.label, result, { email });
+    const saved = await upsertOAuthAccount(userId, provider, config.label, result, provider === "codex" ? oauthAccountOptions(provider, OAUTH_PROVIDERS.codex, result) : { email });
     if (!saved.success) return saved;
     return { success: true, data: { status: "success" as const, ...saved.data } } as const;
   } catch (error) {

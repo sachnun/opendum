@@ -9,6 +9,11 @@ import { formatProviderHttpError } from "../provider-http-errors.js";
 import {
   BROWSER_REDIRECT_URI,
   CLIENT_ID,
+  CODEX_CHAT_USER_AGENT,
+  DEVICE_CODE_ENDPOINT,
+  DEVICE_REDIRECT_URI,
+  DEVICE_TOKEN_ENDPOINT,
+  DEVICE_VERIFICATION_URL,
   REFRESH_BUFFER_SECONDS,
   TOKEN_ENDPOINT,
 } from "./constants.js";
@@ -18,6 +23,18 @@ interface CodexTokenResponse {
   refresh_token: string;
   expires_in: number;
   id_token?: string;
+}
+
+interface CodexDeviceCodeResponse {
+  device_auth_id: string;
+  user_code: string;
+  interval?: string | number;
+  expires_in?: number;
+}
+
+interface CodexDeviceTokenResponse {
+  authorization_code: string;
+  code_verifier: string;
 }
 
 export function generateCodeVerifier(): string {
@@ -290,3 +307,62 @@ export const codexProvider = {
     return accessToken;
   },
 };
+
+export async function initiateCodexDeviceCodeFlow() {
+  const response = await fetchInternalProvider(DEVICE_CODE_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": CODEX_CHAT_USER_AGENT,
+    },
+    body: JSON.stringify({ client_id: CLIENT_ID }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(
+      formatProviderHttpError("Codex", response, error, {
+        endpointLabel: "device code endpoint",
+      })
+    );
+  }
+
+  const data = (await response.json()) as CodexDeviceCodeResponse;
+  return {
+    deviceCode: data.device_auth_id,
+    userCode: data.user_code,
+    verificationUrl: DEVICE_VERIFICATION_URL,
+    verificationUrlComplete: DEVICE_VERIFICATION_URL,
+    expiresIn: data.expires_in ?? 900,
+    interval: Number(data.interval) || 5,
+  };
+}
+
+export async function pollCodexDeviceCodeAuthorization(deviceAuthId: string, userCode: string) {
+  const response = await fetchInternalProvider(DEVICE_TOKEN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": CODEX_CHAT_USER_AGENT,
+    },
+    body: JSON.stringify({ device_auth_id: deviceAuthId, user_code: userCode }),
+  });
+
+  if (response.ok) {
+    const data = (await response.json()) as CodexDeviceTokenResponse;
+    return codexProvider.exchangeCode(data.authorization_code, DEVICE_REDIRECT_URI, data.code_verifier);
+  }
+
+  if (response.status === 403 || response.status === 404) {
+    return { pending: true, retryAfterSeconds: 8 };
+  }
+
+  const error = await response.text();
+  return {
+    error: formatProviderHttpError("Codex", response, error, {
+      endpointLabel: "device auth polling endpoint",
+    }),
+  };
+}
