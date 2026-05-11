@@ -25,6 +25,9 @@
   "providerConfig": {
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free"
+    },
+    "workers_ai": {
+      "upstream": "@cf/google/gemma-4-26b-a4b-it"
     }
   }
 }

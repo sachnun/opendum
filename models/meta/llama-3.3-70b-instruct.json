@@ -32,6 +32,9 @@
     },
     "openrouter": {
       "upstream": "meta-llama/llama-3.3-70b-instruct:free"
+    },
+    "workers_ai": {
+      "upstream": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
     }
   }
 }

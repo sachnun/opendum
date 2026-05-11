@@ -1,6 +1,10 @@
 package models
 
-import "testing"
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
 	visionFalse := false
@@ -50,5 +54,18 @@ func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
 				t.Fatalf("got %v, want %v", tt.got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWorkersAIModelsDeclareCloudflareUpstream(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for model, upstream := range registry.ProviderModelMap("workers_ai") {
+		if upstream == model || !strings.HasPrefix(upstream, "@") {
+			t.Fatalf("workers_ai model %q must declare a Cloudflare upstream, got %q", model, upstream)
+		}
 	}
 }
