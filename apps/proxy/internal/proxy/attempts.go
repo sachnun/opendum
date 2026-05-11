@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -10,20 +9,29 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
+type accountRotationRunner interface {
+	getNextAvailableAccount(context.Context, string, string, *string, []string, auth.AccountAccess) (*appdb.ProviderAccount, bool, error)
+	bumpAccountRequestCount(context.Context, string, time.Time)
+	makeProviderRequest(context.Context, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error)
+	markAccountFailed(context.Context, string, string, int, string) time.Time
+	logUsage(context.Context, usageParams)
+	isVisionModel(string) bool
+}
+
 func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, []accountRotationFailure, *routeError) {
+	return executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
+}
+
+func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, []accountRotationFailure, *routeError) {
 	tried := []string{}
 	recoverableFailures := []accountRotationFailure{}
-	maxRetries := 5
-	if forced != nil {
-		maxRetries = 1
-	}
 	var lastFailure *routeError
 	accountConfigured := false
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for {
 		account := forced
 		if account == nil {
-			selected, configured, err := s.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
+			selected, configured, err := runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
 			if err != nil {
 				return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
@@ -46,23 +54,23 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 
 		tried = append(tried, account.ID)
 		if forced != nil {
-			go s.bumpAccountRequestCount(context.Background(), account.ID, time.Now())
+			go runner.bumpAccountRequestCount(context.Background(), account.ID, time.Now())
 		}
 
 		payload := cfg.Build(parsed, validation.Model, parsed.Stream, sessionID(r))
-		if !s.registry.IsVisionModel(validation.Model) {
+		if !runner.isVisionModel(validation.Model) {
 			stripImageContent(payload)
 		}
 		requestStart := time.Now().UnixMilli()
-		resp, err := s.makeProviderRequest(ctx, *account, payload, parsed.Stream)
+		resp, err := runner.makeProviderRequest(ctx, *account, payload, parsed.Stream)
 		if err != nil {
 			status := http.StatusInternalServerError
 			message := err.Error()
 			detailed := buildAccountErrorMessage(message, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
-			failedAt := s.markAccountFailed(ctx, account.ID, validation.Model, status, detailed)
-			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: status, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
+			failedAt := runner.markAccountFailed(ctx, account.ID, validation.Model, status, detailed)
+			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: status, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 			lastFailure = &routeError{Status: status, Message: message, Type: "api_error"}
-			if attempt < maxRetries-1 {
+			if forced == nil {
 				recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: account.ID, FailedAt: failedAt})
 				continue
 			}
@@ -75,12 +83,12 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 			var failedAt time.Time
 			if resp.StatusCode != http.StatusRequestTimeout {
 				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
-				failedAt = s.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, detailed)
+				failedAt = runner.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, detailed)
 			}
-			s.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
+			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 			message, typ := sanitizedProxyError(resp.StatusCode, bodyText)
 			lastFailure = &routeError{Status: resp.StatusCode, Message: message, Type: typ}
-			if shouldRotate(resp.StatusCode) && attempt < maxRetries-1 {
+			if shouldRotate(resp.StatusCode) && forced == nil {
 				if !failedAt.IsZero() {
 					recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: account.ID, FailedAt: failedAt})
 				}
@@ -91,11 +99,13 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 
 		return account, resp, requestStart, recoverableFailures, nil
 	}
+}
 
-	if lastFailure != nil {
-		return nil, nil, 0, recoverableFailures, lastFailure
+func (s *Service) isVisionModel(model string) bool {
+	if s.registry == nil {
+		return false
 	}
-	return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: fmt.Sprintf("No available accounts for %s.", validation.Model), Type: "api_error"}
+	return s.registry.IsVisionModel(model)
 }
 
 func sessionID(r *http.Request) string {

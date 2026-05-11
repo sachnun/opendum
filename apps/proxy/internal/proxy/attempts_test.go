@@ -1,9 +1,63 @@
 package proxy
 
 import (
+	"context"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/opendum/opendum/apps/proxy/internal/auth"
+	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
+
+func TestExecuteAccountRotationContinuesPastFiveFailures(t *testing.T) {
+	runner := &testRotationRunner{accounts: []appdb.ProviderAccount{
+		{ID: "p1-a1", Provider: "provider_1"},
+		{ID: "p1-a2", Provider: "provider_1"},
+		{ID: "p1-a3", Provider: "provider_1"},
+		{ID: "p1-a4", Provider: "provider_1"},
+		{ID: "p1-a5", Provider: "provider_1"},
+		{ID: "p2-a1", Provider: "provider_2"},
+	}}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	account, resp, _, failures, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr != nil {
+		t.Fatalf("executeAccountRotation routeErr = %+v", routeErr)
+	}
+	if account == nil || account.ID != "p2-a1" {
+		t.Fatalf("selected account = %#v, want p2-a1", account)
+	}
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("response = %#v, want 200", resp)
+	}
+	if len(failures) != 5 {
+		t.Fatalf("recoverable failures = %d, want 5", len(failures))
+	}
+	if len(runner.requested) != 6 {
+		t.Fatalf("provider requests = %#v, want 6 attempts", runner.requested)
+	}
+}
 
 func TestSessionIDHeaderPrecedence(t *testing.T) {
 	request := httptest.NewRequest("POST", "/v1/chat/completions", nil)
@@ -23,3 +77,40 @@ func TestSessionIDFallsBackToXSessionID(t *testing.T) {
 		t.Fatalf("sessionID = %q, want fallback", got)
 	}
 }
+
+type testRotationRunner struct {
+	accounts  []appdb.ProviderAccount
+	requested []string
+}
+
+func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude []string, _ auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
+	excluded := map[string]struct{}{}
+	for _, id := range exclude {
+		excluded[id] = struct{}{}
+	}
+	for i := range r.accounts {
+		account := &r.accounts[i]
+		if _, ok := excluded[account.ID]; !ok {
+			return account, true, nil
+		}
+	}
+	return nil, false, nil
+}
+
+func (r *testRotationRunner) bumpAccountRequestCount(context.Context, string, time.Time) {}
+
+func (r *testRotationRunner) makeProviderRequest(_ context.Context, account appdb.ProviderAccount, _ map[string]any, _ bool) (*http.Response, error) {
+	r.requested = append(r.requested, account.ID)
+	if account.Provider == "provider_2" {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(http.NoBody)}, nil
+	}
+	return &http.Response{StatusCode: http.StatusTooManyRequests, Body: io.NopCloser(http.NoBody)}, nil
+}
+
+func (r *testRotationRunner) markAccountFailed(context.Context, string, string, int, string) time.Time {
+	return time.Now()
+}
+
+func (r *testRotationRunner) logUsage(context.Context, usageParams) {}
+
+func (r *testRotationRunner) isVisionModel(string) bool { return false }
