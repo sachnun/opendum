@@ -227,10 +227,6 @@ function handleAccountConnected() {
     </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div v-if="supportsProviderQuota" class="space-y-2 pb-2">
-        <div class="flex gap-2">
-          <UiIcon name="i-lucide-gauge" class="size-4 text-muted-foreground" />
-        </div>
-
         <div v-if="quotaSummaryGroups.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           <div v-for="group in quotaSummaryGroups" :key="group.name" class="rounded-md border border-border/70 bg-muted/20 p-3">
             <div class="flex items-start justify-between gap-2 text-xs">
