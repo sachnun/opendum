@@ -135,7 +135,7 @@ async function deleteKey() {
       <template #content>
         <div class="space-y-1.5 pr-6">
           <h2 class="text-lg font-semibold leading-none tracking-tight">Delete API Key</h2>
-          <p class="text-sm text-muted-foreground">Are you sure you want to delete "{{ apiKey.name ?? 'Unnamed key' }}"? This action cannot be undone.</p>
+          <p class="text-sm text-muted-foreground">Are you sure you want to delete <strong class="font-semibold text-foreground">{{ apiKey.name ?? 'Unnamed key' }}</strong>? This action cannot be undone.</p>
         </div>
         <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
         <div class="flex justify-end gap-2">

@@ -871,15 +871,14 @@ function historyEntryPreview(errorMessage: string): string {
 
     <UiDialog v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>
-        <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Rename Account</h2><p class="text-sm text-muted-foreground">Enter a new name for this account.</p></div>
-        <label class="grid gap-1 text-sm font-medium">Name<input v-model="editName" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" @keydown.enter.prevent="renameAccount"></label>
+        <input v-model="editName" aria-label="Account name" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" @keydown.enter.prevent="renameAccount">
         <div class="flex justify-end gap-2"><UiButton variant="outline" @click="editDialogOpen = false">Cancel</UiButton><UiButton :disabled="savingName" @click="renameAccount">{{ savingName ? 'Saving...' : 'Save' }}</UiButton></div>
       </template>
     </UiDialog>
 
     <UiDialog v-model:open="deleteDialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>
-        <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Delete Account</h2><p class="text-sm text-muted-foreground">Are you sure you want to delete "{{ account.name }}"? This action cannot be undone.</p></div>
+        <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Delete Account</h2><p class="text-sm text-muted-foreground">Are you sure you want to delete <strong class="font-semibold text-foreground">{{ account.name }}</strong>? This action cannot be undone.</p></div>
         <div class="flex justify-end gap-2"><UiButton variant="outline" @click="deleteDialogOpen = false">Cancel</UiButton><UiButton variant="destructive" :disabled="deleting" @click="deleteAccount">{{ deleting ? 'Deleting...' : 'Delete' }}</UiButton></div>
       </template>
     </UiDialog>
