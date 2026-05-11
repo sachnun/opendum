@@ -242,6 +242,9 @@ func (s *Service) markAccountFailed(ctx context.Context, accountID, model string
 		}
 		if newStatus != "" {
 			_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("status = ?", newStatus).Set("\"statusReason\" = ?", reason).Set("\"statusChangedAt\" = ?", now).Where("id = ?", health.ID).Exec(ctx)
+			if newStatus == "failed" {
+				s.disableAccountForFailedCooldown(ctx, accountID, now)
+			}
 		}
 	}
 
@@ -251,6 +254,17 @@ func (s *Service) markAccountFailed(ctx context.Context, accountID, model string
 		_ = s.insertErrorHistory(ctx, accountID, account.UserID, &modelValue, statusCode, message, now)
 	}
 	return now
+}
+
+func failedCooldownUntil(failedAt time.Time) time.Time {
+	return failedAt.Add(failedCooldown)
+}
+
+func (s *Service) disableAccountForFailedCooldown(ctx context.Context, accountID string, failedAt time.Time) {
+	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
+		Set("\"disabledUntil\" = ?", failedCooldownUntil(failedAt)).
+		Where("id = ?", accountID).
+		Exec(ctx)
 }
 
 func (s *Service) markAccountsRecoveredByRotation(ctx context.Context, failures []accountRotationFailure) {

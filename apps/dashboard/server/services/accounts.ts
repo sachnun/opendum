@@ -11,6 +11,8 @@ export { createAccount, createAccountInputSchema } from "./account-connectors";
 
 const AUTO_PIN_SENTINEL = "_auto_pinned";
 const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degraded: 1, half_open: 2, failed: 3 };
+const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
+const MANUAL_REENABLE_STATUS_REASON = "manually re-enabled after failure";
 
 export const providerInputSchema = z.object({ provider: z.string() });
 export const updateAccountInputSchema = z.object({ id: z.string(), name: z.string().optional(), isActive: z.boolean().optional(), disabledUntil: z.coerce.date().nullable().optional() });
@@ -243,6 +245,8 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
       if (!account) return { success: false, error: "Account not found" } as const;
 
       const updates: { name?: string; isActive?: boolean; disabledUntil?: Date | null } = {};
+      const manuallyReenabled = input.isActive === true || input.disabledUntil === null;
+      const now = new Date();
       if (input.name !== undefined) {
         const name = input.name.trim();
         if (!name) return { success: false, error: "Please enter a name" } as const;
@@ -250,7 +254,7 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
       }
 
       if (input.disabledUntil instanceof Date) {
-        if (input.disabledUntil <= new Date()) return { success: false, error: "Please choose a future time" } as const;
+        if (input.disabledUntil <= now) return { success: false, error: "Please choose a future time" } as const;
         updates.isActive = true;
         updates.disabledUntil = input.disabledUntil;
       } else {
@@ -264,6 +268,7 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
 
       if (Object.keys(updates).length > 0) {
         await db.update(providerAccount).set(updates).where(eq(providerAccount.id, input.id));
+        if (manuallyReenabled) await downgradeAccountFailureForManualEnable(input.id, now);
         if (updates.isActive !== undefined || updates.disabledUntil !== undefined) await invalidateDisabledModelsCache(userId);
       }
 
@@ -272,6 +277,19 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
       console.error("Failed to update account:", error);
       return { success: false, error: "Failed to update account" } as const;
     }
+}
+
+async function downgradeAccountFailureForManualEnable(accountId: string, now = new Date()): Promise<void> {
+  await Promise.all([
+    db
+      .update(providerAccount)
+      .set({ status: "degraded", statusReason: MANUAL_REENABLE_STATUS_REASON, statusChangedAt: now, consecutiveErrors: INITIAL_DEGRADED_CONSECUTIVE_ERRORS })
+      .where(and(eq(providerAccount.id, accountId), inArray(providerAccount.status, ["failed", "half_open", "degraded"]))),
+    db
+      .update(providerAccountModelHealth)
+      .set({ status: "degraded", statusReason: MANUAL_REENABLE_STATUS_REASON, statusChangedAt: now, consecutiveErrors: INITIAL_DEGRADED_CONSECUTIVE_ERRORS })
+      .where(and(eq(providerAccountModelHealth.providerAccountId, accountId), inArray(providerAccountModelHealth.status, ["failed", "half_open", "degraded"]))),
+  ]);
 }
 
 export async function deleteAccount(userId: string, input: z.infer<typeof deleteAccountInputSchema>) {

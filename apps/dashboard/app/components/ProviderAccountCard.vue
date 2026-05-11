@@ -340,7 +340,7 @@ const activeDisabledUntil = computed(() => {
   return disabledUntil;
 });
 const accountStatusLabel = computed(() => {
-  if (activeDisabledUntil.value) return `Off until ${formatDateTime(activeDisabledUntil.value)}`;
+  if (activeDisabledUntil.value) return `Cooldown ${formatRelativeTime(activeDisabledUntil.value).replace(/^in\s+/, "")}`;
   return props.account.isActive ? "On" : "Off";
 });
 const accountStatusTitle = computed(() => activeDisabledUntil.value ? `Temporarily disabled until ${activeDisabledUntil.value.toLocaleString()}` : undefined);

@@ -78,6 +78,15 @@ func TestSessionIDFallsBackToXSessionID(t *testing.T) {
 	}
 }
 
+func TestFailedCooldownUntilUsesConfiguredCooldown(t *testing.T) {
+	failedAt := time.Date(2026, 5, 11, 12, 0, 0, 0, time.UTC)
+	want := failedAt.Add(10 * time.Minute)
+
+	if got := failedCooldownUntil(failedAt); !got.Equal(want) {
+		t.Fatalf("failedCooldownUntil() = %v, want %v", got, want)
+	}
+}
+
 type testRotationRunner struct {
 	accounts  []appdb.ProviderAccount
 	requested []string
