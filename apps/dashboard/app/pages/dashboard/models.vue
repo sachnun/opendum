@@ -144,7 +144,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
   <div class="space-y-6">
     <div class="border-b border-border pb-4">
       <div class="flex flex-wrap items-center gap-2">
-        <h2 class="text-xl font-semibold">Available Models</h2>
+        <h2 class="text-xl font-semibold">Models</h2>
         <span class="text-sm text-muted-foreground">{{ models.length }} models</span>
       </div>
     </div>
@@ -179,7 +179,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
       </div>
 
       <p class="text-xs font-medium text-muted-foreground">
-        {{ filteredModels.length }} / {{ models.length }} models - {{ filteredEnabledCount }} enabled
+        {{ filteredEnabledCount }}/{{ filteredModels.length }}
       </p>
 
       <div v-if="modelSections.length > 0" class="space-y-8">

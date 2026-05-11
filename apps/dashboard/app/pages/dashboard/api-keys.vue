@@ -14,6 +14,7 @@ const { data, error, pending, refresh } = await useAsyncData("dashboard-api-keys
 
 const apiKeys = computed<ApiKeyListItem[]>(() => data.value?.apiKeys ?? []);
 const options = computed<ApiKeyOptions | null>(() => data.value?.options ?? null);
+const activeApiKeyCount = computed(() => apiKeys.value.filter((apiKey) => getApiKeyStatus(apiKey).label === "Active").length);
 
 function getApiKeyStatus(apiKey: ApiKeyListItem) {
   const now = new Date();
@@ -79,7 +80,10 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
   <div class="space-y-6">
     <div class="border-b border-border pb-4">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-xl font-semibold">API Keys</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="text-xl font-semibold">API Keys</h2>
+          <span class="text-sm text-muted-foreground">{{ activeApiKeyCount }}/{{ apiKeys.length }}</span>
+        </div>
         <CreateApiKeyButton @created="refresh" />
       </div>
     </div>
