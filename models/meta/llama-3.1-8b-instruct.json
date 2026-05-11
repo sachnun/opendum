@@ -1,8 +1,9 @@
 {
   "providers": [
-    "groq",
     "cerebras",
-    "nvidia_nim"
+    "groq",
+    "nvidia_nim",
+    "workers_ai"
   ],
   "family": "Meta",
   "meta": {
@@ -31,6 +32,9 @@
     },
     "nvidia_nim": {
       "upstream": "meta/llama-3.1-8b-instruct"
+    },
+    "workers_ai": {
+      "upstream": "@cf/meta/llama-3.1-8b-instruct-fast"
     }
   }
 }

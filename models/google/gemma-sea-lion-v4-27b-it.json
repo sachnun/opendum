@@ -1,0 +1,26 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "family": "Google",
+  "meta": {
+    "contextLength": 128000,
+    "releaseDate": "2025-09-23",
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/aisingapore/gemma-sea-lion-v4-27b-it"
+    }
+  }
+}

@@ -1,19 +1,17 @@
 {
   "providers": [
-    "ollama_cloud",
     "workers_ai"
   ],
-  "family": "Kimi",
+  "family": "DeepSeek",
   "meta": {
-    "contextLength": 262144,
-    "releaseDate": "2026-04-20",
+    "contextLength": 80000,
+    "releaseDate": "2025-01-22",
     "reasoning": true,
-    "toolCall": true,
-    "vision": true,
+    "toolCall": false,
+    "vision": false,
     "modalities": {
       "input": [
-        "text",
-        "image"
+        "text"
       ],
       "output": [
         "text"
@@ -22,7 +20,7 @@
   },
   "providerConfig": {
     "workers_ai": {
-      "upstream": "@cf/moonshotai/kimi-k2.6"
+      "upstream": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
     }
   }
 }
