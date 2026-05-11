@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "family": "Mistral",
   "meta": {
     "contextLength": 262144,
@@ -19,11 +17,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/mistral-medium-3-instruct"
     }
   }
 }

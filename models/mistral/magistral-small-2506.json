@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "family": "Mistral",
   "meta": {
     "contextLength": 128000,
@@ -18,11 +16,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/magistral-small-2506"
     }
   }
 }
