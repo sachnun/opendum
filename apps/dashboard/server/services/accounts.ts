@@ -11,6 +11,7 @@ export { exchangeOAuthAccount, exchangeOAuthInputSchema, getAccountAuthUrl, getA
 export { createAccount, createAccountInputSchema } from "./account-connectors";
 
 const AUTO_PIN_SENTINEL = "_auto_pinned";
+const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degraded: 1, half_open: 2, failed: 3 };
 
 export const providerInputSchema = z.object({ provider: z.string() });
 export const updateAccountInputSchema = z.object({ id: z.string(), name: z.string().optional(), isActive: z.boolean().optional() });
@@ -142,13 +143,30 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       .orderBy(desc(providerAccount.createdAt));
 
     const accountIds = accounts.map((account) => account.id);
-    const [accountStatsById, disabledModelRows, pinnedProviders] = await Promise.all([
+    const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => a.localeCompare(b));
+    const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
+    const [accountStatsById, disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
       buildAccountStats(userId, accountIds),
       accountIds.length > 0
         ? db
             .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
             .from(providerAccountDisabledModel)
             .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds))
+        : Promise.resolve([]),
+      accountIds.length > 0 && healthModelKeys.length > 0
+        ? db
+            .select({
+              providerAccountId: providerAccountModelHealth.providerAccountId,
+              status: providerAccountModelHealth.status,
+              statusReason: providerAccountModelHealth.statusReason,
+              consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
+              lastErrorAt: providerAccountModelHealth.lastErrorAt,
+              lastErrorMessage: providerAccountModelHealth.lastErrorMessage,
+              lastErrorCode: providerAccountModelHealth.lastErrorCode,
+              lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
+            })
+            .from(providerAccountModelHealth)
+            .where(and(inArray(providerAccountModelHealth.providerAccountId, accountIds), inArray(providerAccountModelHealth.model, healthModelKeys)))
         : Promise.resolve([]),
       getPinnedProviderKeys(userId),
     ]);
@@ -158,12 +176,40 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       return acc;
     }, {});
 
+    const healthByAccountId = healthRows.reduce<Record<string, (typeof healthRows)[number]>>((acc, row) => {
+      const current = acc[row.providerAccountId];
+      const currentWeight = current ? ACCOUNT_HEALTH_STATUS_WEIGHT[current.status] ?? 0 : 0;
+      const nextWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[row.status] ?? 0;
+      if (nextWeight > currentWeight || (nextWeight === currentWeight && row.consecutiveErrors > (current?.consecutiveErrors ?? 0))) {
+        acc[row.providerAccountId] = row;
+      }
+      return acc;
+    }, {});
+
     return {
-      accounts: accounts.map((account) => ({
-        ...account,
-        stats: accountStatsById[account.id],
-      })),
-      supportedModels: Array.from(getProviderModelSet(input.provider)).sort((a, b) => a.localeCompare(b)),
+      accounts: accounts.map((account) => {
+        const health = healthByAccountId[account.id];
+        const accountWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[account.status] ?? 0;
+        const healthWeight = health ? ACCOUNT_HEALTH_STATUS_WEIGHT[health.status] ?? 0 : 0;
+        const useModelHealth = health && (healthWeight > accountWeight || (healthWeight === accountWeight && health.consecutiveErrors > account.consecutiveErrors));
+
+        return {
+          ...account,
+          ...(useModelHealth
+            ? {
+                status: health.status,
+                statusReason: health.statusReason,
+                consecutiveErrors: health.consecutiveErrors,
+                lastErrorAt: health.lastErrorAt ?? account.lastErrorAt,
+                lastErrorMessage: health.lastErrorMessage ?? account.lastErrorMessage,
+                lastErrorCode: health.lastErrorCode ?? account.lastErrorCode,
+                lastSuccessAt: health.lastSuccessAt ?? account.lastSuccessAt,
+              }
+            : {}),
+          stats: accountStatsById[account.id],
+        };
+      }),
+      supportedModels,
       disabledModelsByAccountId,
       pinnedProviders,
     };

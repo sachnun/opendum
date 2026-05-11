@@ -561,6 +561,10 @@ function historyEntryPreview(errorMessage: string): string {
               <UiIcon name="i-lucide-triangle-alert" class="size-3" />
               Degraded ({{ account.consecutiveErrors }})
             </UiBadge>
+            <UiBadge v-else-if="account.status === 'half_open'" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
+              <UiIcon name="i-lucide-activity" class="size-3" />
+              Recovering
+            </UiBadge>
           </div>
         </div>
         <div v-if="subtitleDisplay" :class="['grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1', isSubtitleVisible ? 'items-start' : 'w-full items-center overflow-hidden']">

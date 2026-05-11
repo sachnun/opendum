@@ -85,10 +85,13 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	return enabled, nil
 }
 
-func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude []string, accountAccess auth.AccountAccess) (*appdb.ProviderAccount, error) {
+func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude []string, accountAccess auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
 	eligible, err := s.getEligibleAccounts(ctx, userID, model, provider, exclude, accountAccess)
-	if err != nil || len(eligible) == 0 {
-		return nil, err
+	if err != nil {
+		return nil, false, err
+	}
+	if len(eligible) == 0 {
+		return nil, false, nil
 	}
 	prioritized := prioritizeAccounts(eligible, provider == nil, s.registry.ProvidersForModel(model))
 	ids := make([]string, 0, len(prioritized))
@@ -97,7 +100,7 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 	}
 	health, err := s.getHealthByAccount(ctx, ids, s.registry.LookupKeys(model))
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 
 	now := time.Now()
@@ -124,10 +127,10 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 		break
 	}
 	if selected == nil {
-		return nil, nil
+		return nil, true, nil
 	}
 	go s.bumpAccountRequestCount(context.Background(), selected.ID, now)
-	return selected, nil
+	return selected, true, nil
 }
 
 func (s *Service) bumpAccountRequestCount(ctx context.Context, accountID string, usedAt time.Time) {

@@ -18,19 +18,24 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 		maxRetries = 1
 	}
 	var lastFailure *routeError
+	accountConfigured := false
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		account := forced
 		if account == nil {
-			selected, err := s.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
+			selected, configured, err := s.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
 			if err != nil {
 				return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
+			accountConfigured = accountConfigured || configured
 			account = selected
 		}
 
 		if account == nil {
 			if len(tried) == 0 {
+				if accountConfigured {
+					return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "This model is temporarily unavailable. Please try again later.", Type: "api_error"}
+				}
 				return nil, nil, 0, recoverableFailures, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
 			}
 			if lastFailure != nil {
