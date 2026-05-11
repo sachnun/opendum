@@ -39,7 +39,7 @@ const filteredModels = computed(() => {
   const active = new Set(activeProviders.value);
   return models.value.filter((model) => model.providers.some((provider) => active.has(provider)));
 });
-const filteredEnabledCount = computed(() => filteredModels.value.filter((model) => model.isEnabled !== false).length);
+const enabledModelCount = computed(() => models.value.filter((model) => model.isEnabled).length);
 const modelSections = computed(() => {
   const groupedModels = new Map<string, ModelListItem[]>();
 
@@ -145,7 +145,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     <div class="border-b border-border pb-4">
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-xl font-semibold">Models</h2>
-        <UiBadge variant="outline" class="tabular-nums">{{ filteredEnabledCount }}/{{ filteredModels.length }}</UiBadge>
+        <UiBadge variant="outline" class="tabular-nums">{{ enabledModelCount }}/{{ models.length }}</UiBadge>
       </div>
     </div>
 
