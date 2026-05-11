@@ -123,16 +123,21 @@ async function copyModelId(modelId: string) {
   }, 2000);
 }
 
+function updateModelEnabled(modelId: string, enabled: boolean) {
+  if (!data.value) return;
+  data.value = data.value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model));
+}
+
 async function setModelEnabled(model: ModelListItem, enabled: boolean) {
   pendingModelId.value = model.id;
   const previousValue = model.isEnabled;
-  model.isEnabled = enabled;
+  updateModelEnabled(model.id, enabled);
 
   try {
     const result = await dashboardApi.models.setEnabled({ modelId: model.id, enabled });
     if (!result.success) throw new Error(result.error);
   } catch (error) {
-    model.isEnabled = previousValue;
+    updateModelEnabled(model.id, previousValue);
     console.error(error);
   } finally {
     pendingModelId.value = null;
