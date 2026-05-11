@@ -82,7 +82,7 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="text-xl font-semibold">API Keys</h2>
-          <span class="text-sm text-muted-foreground">{{ activeApiKeyCount }}/{{ apiKeys.length }}</span>
+          <UiBadge variant="outline" class="tabular-nums">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
         </div>
         <CreateApiKeyButton @created="refresh" />
       </div>

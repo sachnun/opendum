@@ -145,7 +145,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     <div class="border-b border-border pb-4">
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-xl font-semibold">Models</h2>
-        <span class="text-sm text-muted-foreground">{{ models.length }} models</span>
+        <UiBadge variant="outline" class="tabular-nums">{{ filteredEnabledCount }}/{{ filteredModels.length }}</UiBadge>
       </div>
     </div>
 
@@ -177,10 +177,6 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           {{ provider.label }}
         </button>
       </div>
-
-      <p class="text-xs font-medium text-muted-foreground">
-        {{ filteredEnabledCount }}/{{ filteredModels.length }}
-      </p>
 
       <div v-if="modelSections.length > 0" class="space-y-8">
         <section v-for="section in modelSections" :id="section.anchorId" :key="section.name" class="scroll-mt-24 space-y-3">
