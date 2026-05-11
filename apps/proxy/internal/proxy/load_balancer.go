@@ -35,10 +35,11 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	}
 
 	query := s.db.NewSelect().Model((*appdb.ProviderAccount)(nil)).
-		Column("id", "userId", "provider", "tier", "status", "lastUsedAt", "createdAt", "accountId").
+		Column("id", "userId", "provider", "tier", "status", "lastUsedAt", "createdAt", "accountId", "disabledUntil").
 		Where("\"userId\" = ?", userID).
 		Where("provider IN (?)", bun.In(targetProviders)).
-		Where("\"isActive\" = TRUE")
+		Where("\"isActive\" = TRUE").
+		Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", time.Now())
 	if len(exclude) > 0 {
 		query.Where("id NOT IN (?)", bun.In(exclude))
 	}
@@ -162,7 +163,7 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "provider_account_id must be a non-empty string", Type: "invalid_request_error", Param: &param, Code: strPtr("invalid_provider_account")}
 	}
 	var account appdb.ProviderAccount
-	err := s.db.NewSelect().Model(&account).Column("id", "userId", "provider", "tier", "status", "lastUsedAt", "createdAt", "accountId", "isActive").Where("id = ?", id).Where("\"userId\" = ?", userID).Limit(1).Scan(ctx)
+	err := s.db.NewSelect().Model(&account).Column("id", "userId", "provider", "tier", "status", "lastUsedAt", "createdAt", "accountId", "isActive", "disabledUntil").Where("id = ?", id).Where("\"userId\" = ?", userID).Limit(1).Scan(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account was not found", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_not_found")}
@@ -171,6 +172,9 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 	}
 	if !account.IsActive {
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is inactive", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_inactive")}
+	}
+	if account.DisabledUntil != nil && account.DisabledUntil.After(time.Now()) {
+		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is temporarily disabled", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_temporarily_disabled")}
 	}
 	if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 		return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}

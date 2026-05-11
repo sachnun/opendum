@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 
 import { db } from "../lib/db";
 import { disabledModel, providerAccount, providerAccountDisabledModel, proxyApiKey } from "../lib/db/schema";
@@ -54,7 +54,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         email: providerAccount.email,
       })
       .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.isActive, true)))
+      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))))
       .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
 
     const disabledModelsByAccount = new Map<string, string[]>();

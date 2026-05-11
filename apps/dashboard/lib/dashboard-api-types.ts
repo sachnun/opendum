@@ -20,6 +20,7 @@ export interface ProviderAccountItem {
   name: string;
   email: string | null;
   isActive: boolean;
+  disabledUntil: string | Date | null;
   lastUsedAt: string | Date | null;
   expiresAt: string | Date;
   requestCount: number;

@@ -142,7 +142,7 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
   const existingAccount = foundByEmail ?? foundByAccountId ?? null;
 
   if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encrypt(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), ...(oauthResult.email ? { email: oauthResult.email } : {}), isActive: true }).where(eq(providerAccount.id, existingAccount.id));
+    await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encrypt(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), ...(oauthResult.email ? { email: oauthResult.email } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
     return { success: true, data: { email: existingAccount.email || email, isUpdate: true } };
   }
 

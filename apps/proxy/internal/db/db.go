@@ -46,6 +46,7 @@ type ProviderAccount struct {
 	AccountID                 *string    `bun:"accountId"`
 	Email                     *string    `bun:"email"`
 	IsActive                  bool       `bun:"isActive"`
+	DisabledUntil             *time.Time `bun:"disabledUntil"`
 	LastUsedAt                *time.Time `bun:"lastUsedAt"`
 	RequestCount              int        `bun:"requestCount"`
 	ErrorCount                int        `bun:"errorCount"`

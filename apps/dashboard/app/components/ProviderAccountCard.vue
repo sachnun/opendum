@@ -6,6 +6,7 @@ type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
 
 type QuotaProvider = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter";
+type TemporaryOffUnit = "minutes" | "hours" | "days";
 
 type QuotaSkeletonRow = {
   labelClass: string;
@@ -40,6 +41,12 @@ interface AccountQuotaInfo {
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const QUOTA_LAZY_LOAD_ROOT_MARGIN = "400px 0px";
+const TEMPORARY_OFF_LONG_PRESS_MS = 600;
+const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
+  { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },
+  { value: "hours", label: "Hours", multiplier: 60 * 60 * 1000 },
+  { value: "days", label: "Days", multiplier: 24 * 60 * 60 * 1000 },
+];
 const QUOTA_SKELETON_ROWS: Record<QuotaProvider, QuotaSkeletonRow[]> = {
   antigravity: [
     { labelClass: "w-24", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
@@ -92,9 +99,14 @@ const isSubtitleVisible = ref(false);
 const editDialogOpen = ref(false);
 const deleteDialogOpen = ref(false);
 const errorDialogOpen = ref(false);
+const temporaryOffDialogOpen = ref(false);
 const editName = ref(props.account.name);
+const temporaryOffAmount = ref(30);
+const temporaryOffUnit = ref<TemporaryOffUnit>("minutes");
+const temporaryOffError = ref("");
 const savingName = ref(false);
 const deleting = ref(false);
+const isTemporaryDisabling = ref(false);
 const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
@@ -110,6 +122,8 @@ const isQuotaLoading = ref(false);
 let quotaLoadTriggered = false;
 let quotaObserver: IntersectionObserver | null = null;
 let historyRequestId = 0;
+let temporaryOffLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+let suppressNextToggle = false;
 
 watch(
   () => props.account.name,
@@ -134,6 +148,14 @@ watch(errorDialogOpen, (open) => {
   isHistoryLoading.value = true;
   historyError.value = null;
   loadErrorHistory();
+});
+
+watch(temporaryOffDialogOpen, (open) => {
+  if (!open) return;
+
+  temporaryOffAmount.value = 30;
+  temporaryOffUnit.value = "minutes";
+  temporaryOffError.value = "";
 });
 
 function parseStoredErrorMessage(rawMessage: string): ParsedErrorDetails {
@@ -310,6 +332,23 @@ const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.pr
 const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProvider] ?? []);
 const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
 const usageChartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
+const activeDisabledUntil = computed(() => {
+  if (!props.account.disabledUntil) return null;
+
+  const disabledUntil = new Date(props.account.disabledUntil);
+  if (Number.isNaN(disabledUntil.getTime()) || disabledUntil <= new Date()) return null;
+  return disabledUntil;
+});
+const accountStatusLabel = computed(() => {
+  if (activeDisabledUntil.value) return `Off until ${formatDateTime(activeDisabledUntil.value)}`;
+  return props.account.isActive ? "On" : "Off";
+});
+const accountStatusTitle = computed(() => activeDisabledUntil.value ? `Temporarily disabled until ${activeDisabledUntil.value.toLocaleString()}` : undefined);
+const temporaryOffPreview = computed(() => {
+  const until = getTemporaryOffUntil();
+  if (!until) return "Select a valid future duration.";
+  return `${formatRelativeTime(until)} (${formatDateTime(until)})`;
+});
 const hasSuccessAfterLastError = computed(() => {
   if (!props.account.lastErrorAt) return false;
   const errorMs = new Date(props.account.lastErrorAt).getTime();
@@ -352,6 +391,53 @@ function quotaTextColor(group: QuotaGroupDisplay): string {
   if (percentRemaining <= 25) return "text-orange-400";
   if (percentRemaining <= 50) return "text-yellow-400";
   return "text-green-400";
+}
+
+function formatDateTime(value: Date): string {
+  return value.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function getTemporaryOffUntil(): Date | null {
+  const amount = Number(temporaryOffAmount.value);
+  if (!Number.isFinite(amount) || amount < 1) return null;
+
+  const unit = TEMPORARY_OFF_UNITS.find((entry) => entry.value === temporaryOffUnit.value);
+  if (!unit) return null;
+
+  return new Date(Date.now() + Math.floor(amount) * unit.multiplier);
+}
+
+function clearTemporaryOffLongPress() {
+  if (!temporaryOffLongPressTimer) return;
+
+  clearTimeout(temporaryOffLongPressTimer);
+  temporaryOffLongPressTimer = null;
+}
+
+function startTemporaryOffLongPress(event: PointerEvent) {
+  if (!props.account.isActive || isToggling.value || isTemporaryDisabling.value) return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+
+  clearTemporaryOffLongPress();
+  temporaryOffLongPressTimer = setTimeout(() => {
+    suppressNextToggle = true;
+    temporaryOffDialogOpen.value = true;
+    clearTemporaryOffLongPress();
+  }, TEMPORARY_OFF_LONG_PRESS_MS);
+}
+
+function finishTemporaryOffLongPress() {
+  clearTemporaryOffLongPress();
+}
+
+function handleTemporaryOffToggleClick(event: Event) {
+  if (!suppressNextToggle) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  setTimeout(() => {
+    suppressNextToggle = false;
+  }, 0);
 }
 
 async function loadQuota(forceRefresh = false) {
@@ -408,9 +494,15 @@ onMounted(() => {
 onBeforeUnmount(() => {
   quotaObserver?.disconnect();
   quotaObserver = null;
+  clearTemporaryOffLongPress();
 });
 
 async function toggleActive() {
+  if (suppressNextToggle) {
+    suppressNextToggle = false;
+    return;
+  }
+
   isToggling.value = true;
   try {
     const result = await dashboardApi.accounts.update({ id: props.account.id, isActive: !props.account.isActive });
@@ -418,6 +510,27 @@ async function toggleActive() {
     emit("changed");
   } finally {
     isToggling.value = false;
+  }
+}
+
+async function disableTemporarily() {
+  const disabledUntil = getTemporaryOffUntil();
+  if (!disabledUntil) {
+    temporaryOffError.value = "Please choose at least 1 minute, hour, or day.";
+    return;
+  }
+
+  isTemporaryDisabling.value = true;
+  temporaryOffError.value = "";
+  try {
+    const result = await dashboardApi.accounts.update({ id: props.account.id, disabledUntil: disabledUntil.toISOString() });
+    if (!result.success) throw new Error(result.error);
+    temporaryOffDialogOpen.value = false;
+    emit("changed");
+  } catch (error) {
+    temporaryOffError.value = error instanceof Error ? error.message : "Failed to disable account temporarily";
+  } finally {
+    isTemporaryDisabling.value = false;
   }
 }
 
@@ -710,12 +823,51 @@ function historyEntryPreview(errorMessage: string): string {
             </NuxtLink>
           </div>
           <div class="flex shrink-0 items-center gap-1.5">
-            <span class="text-[11px] text-muted-foreground">{{ account.isActive ? 'On' : 'Off' }}</span>
-            <UiSwitch :model-value="account.isActive" :disabled="isToggling" :title="account.isActive ? 'Disable account' : 'Enable account'" @update:model-value="toggleActive" />
+            <span class="max-w-32 truncate text-[11px] text-muted-foreground" :title="accountStatusTitle">{{ accountStatusLabel }}</span>
+            <UiSwitch
+              :model-value="account.isActive"
+              :disabled="isToggling || isTemporaryDisabling"
+              :title="account.isActive ? 'Disable account. Hold to choose duration.' : 'Enable account'"
+              @pointerdown="startTemporaryOffLongPress"
+              @pointerup="finishTemporaryOffLongPress"
+              @pointerleave="finishTemporaryOffLongPress"
+              @pointercancel="finishTemporaryOffLongPress"
+              @click.capture="handleTemporaryOffToggleClick"
+              @update:model-value="toggleActive"
+            />
           </div>
         </div>
       </UiCardContent>
     </UiCard>
+
+    <UiDialog v-model:open="temporaryOffDialogOpen" :ui="{ content: 'sm:max-w-md' }">
+      <template #content>
+        <div class="space-y-1.5 pr-6">
+          <h2 class="text-lg font-semibold">Disable Temporarily</h2>
+          <p class="text-sm text-muted-foreground">Choose how long "{{ account.name }}" should stay off.</p>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <label class="grid gap-1 text-sm font-medium">
+            Duration
+            <input v-model.number="temporaryOffAmount" type="number" min="1" step="1" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" @keydown.enter.prevent="disableTemporarily">
+          </label>
+          <label class="grid gap-1 text-sm font-medium">
+            Unit
+            <select v-model="temporaryOffUnit" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
+              <option v-for="unit in TEMPORARY_OFF_UNITS" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
+            </select>
+          </label>
+        </div>
+
+        <p class="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">This account will turn back on {{ temporaryOffPreview }}.</p>
+        <p v-if="temporaryOffError" class="text-sm text-red-500">{{ temporaryOffError }}</p>
+        <div class="flex justify-end gap-2">
+          <UiButton variant="outline" :disabled="isTemporaryDisabling" @click="temporaryOffDialogOpen = false">Cancel</UiButton>
+          <UiButton :disabled="isTemporaryDisabling" @click="disableTemporarily">{{ isTemporaryDisabling ? 'Disabling...' : 'Disable' }}</UiButton>
+        </div>
+      </template>
+    </UiDialog>
 
     <UiDialog v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>

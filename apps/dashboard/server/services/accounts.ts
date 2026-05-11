@@ -14,7 +14,7 @@ const AUTO_PIN_SENTINEL = "_auto_pinned";
 const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degraded: 1, half_open: 2, failed: 3 };
 
 export const providerInputSchema = z.object({ provider: z.string() });
-export const updateAccountInputSchema = z.object({ id: z.string(), name: z.string().optional(), isActive: z.boolean().optional() });
+export const updateAccountInputSchema = z.object({ id: z.string(), name: z.string().optional(), isActive: z.boolean().optional(), disabledUntil: z.coerce.date().nullable().optional() });
 export const deleteAccountInputSchema = z.object({ id: z.string() });
 export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string() });
 export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(), modelId: z.string(), enabled: z.boolean() });
@@ -27,6 +27,7 @@ const providerAccountListColumns = {
   name: providerAccount.name,
   email: providerAccount.email,
   isActive: providerAccount.isActive,
+  disabledUntil: providerAccount.disabledUntil,
   lastUsedAt: providerAccount.lastUsedAt,
   expiresAt: providerAccount.expiresAt,
   requestCount: providerAccount.requestCount,
@@ -43,6 +44,18 @@ const providerAccountListColumns = {
   successCount: providerAccount.successCount,
   createdAt: providerAccount.createdAt,
 };
+
+function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil: Date | string | null }, now = new Date()): boolean {
+  if (!account.isActive) return false;
+  if (!account.disabledUntil) return true;
+
+  const disabledUntil = account.disabledUntil instanceof Date ? account.disabledUntil : new Date(account.disabledUntil);
+  return Number.isNaN(disabledUntil.getTime()) || disabledUntil <= now;
+}
+
+function withEffectiveActive<T extends { isActive: boolean; disabledUntil: Date | string | null }>(account: T, now = new Date()): T {
+  return { ...account, isActive: accountIsEffectivelyActive(account, now) };
+}
 
 async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>): Promise<ProviderAccountKey[]> {
   const rows = await db.select({ providerKey: pinnedProvider.providerKey }).from(pinnedProvider).where(eq(pinnedProvider.userId, userId)).orderBy(asc(pinnedProvider.createdAt));
@@ -67,7 +80,9 @@ async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Ite
 
 export async function listAccounts(userId: string) {
   try {
-    return await db.select(providerAccountListColumns).from(providerAccount).where(eq(providerAccount.userId, userId)).orderBy(asc(providerAccount.createdAt));
+    const now = new Date();
+    const accounts = await db.select(providerAccountListColumns).from(providerAccount).where(eq(providerAccount.userId, userId)).orderBy(asc(providerAccount.createdAt));
+    return accounts.map((account) => withEffectiveActive(account, now));
   } catch (error) {
     console.error("Failed to list accounts:", error);
     throw new Error("Failed to list accounts");
@@ -76,7 +91,9 @@ export async function listAccounts(userId: string) {
 
 export async function listAccountsByProvider(userId: string, input: z.infer<typeof providerInputSchema>) {
   try {
-    return await db.select(providerAccountListColumns).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider))).orderBy(desc(providerAccount.createdAt));
+    const now = new Date();
+    const accounts = await db.select(providerAccountListColumns).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider))).orderBy(desc(providerAccount.createdAt));
+    return accounts.map((account) => withEffectiveActive(account, now));
   } catch (error) {
     console.error("Failed to list provider accounts:", error);
     throw new Error("Failed to list provider accounts");
@@ -90,6 +107,7 @@ export async function getAccountSummary(userId: string) {
         .select({
           provider: providerAccount.provider,
           isActive: providerAccount.isActive,
+          disabledUntil: providerAccount.disabledUntil,
           lastErrorAt: providerAccount.lastErrorAt,
           lastSuccessAt: providerAccount.lastSuccessAt,
           lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
@@ -118,7 +136,7 @@ export async function getAccountSummary(userId: string) {
       const summary = summaries[account.provider];
       summary.connected += 1;
 
-      if (!account.isActive) continue;
+      if (!accountIsEffectivelyActive(account)) continue;
 
       summary.active += 1;
       const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt);
@@ -136,6 +154,7 @@ export async function getAccountSummary(userId: string) {
 
 export async function getAccountsByProviderDetailed(userId: string, input: z.infer<typeof providerInputSchema>) {
   try {
+    const now = new Date();
     const accounts = await db
       .select(providerAccountListColumns)
       .from(providerAccount)
@@ -194,7 +213,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
         const useModelHealth = health && (healthWeight > accountWeight || (healthWeight === accountWeight && health.consecutiveErrors > account.consecutiveErrors));
 
         return {
-          ...account,
+          ...withEffectiveActive(account, now),
           ...(useModelHealth
             ? {
                 status: health.status,
@@ -224,17 +243,29 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
       const [account] = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
       if (!account) return { success: false, error: "Account not found" } as const;
 
-      const updates: { name?: string; isActive?: boolean } = {};
+      const updates: { name?: string; isActive?: boolean; disabledUntil?: Date | null } = {};
       if (input.name !== undefined) {
         const name = input.name.trim();
         if (!name) return { success: false, error: "Please enter a name" } as const;
         updates.name = name;
       }
-      if (input.isActive !== undefined) updates.isActive = input.isActive;
+
+      if (input.disabledUntil instanceof Date) {
+        if (input.disabledUntil <= new Date()) return { success: false, error: "Please choose a future time" } as const;
+        updates.isActive = true;
+        updates.disabledUntil = input.disabledUntil;
+      } else {
+        if (input.isActive !== undefined) {
+          updates.isActive = input.isActive;
+          updates.disabledUntil = null;
+        } else if (input.disabledUntil === null) {
+          updates.disabledUntil = null;
+        }
+      }
 
       if (Object.keys(updates).length > 0) {
         await db.update(providerAccount).set(updates).where(eq(providerAccount.id, input.id));
-        if (updates.isActive !== undefined) await invalidateDisabledModelsCache(userId);
+        if (updates.isActive !== undefined || updates.disabledUntil !== undefined) await invalidateDisabledModelsCache(userId);
       }
 
       return { success: true, data: undefined } as const;

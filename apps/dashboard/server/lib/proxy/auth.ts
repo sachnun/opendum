@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 
 import { db } from "../db/index.js";
 import { providerAccount, providerAccountDisabledModel } from "../db/schema.js";
@@ -110,7 +110,7 @@ export async function getAccountModelAvailability(
       tier: providerAccount.tier,
     })
     .from(providerAccount)
-    .where(and(eq(providerAccount.userId, userId), eq(providerAccount.isActive, true)));
+    .where(and(eq(providerAccount.userId, userId), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))));
 
   const activeProviders = new Set<string>();
   const accountCountByProvider = new Map<string, number>();

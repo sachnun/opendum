@@ -119,6 +119,7 @@ export const providerAccount = pgTable(
     // Account info
     email: text("email"),
     isActive: boolean("isActive").notNull().default(true),
+    disabledUntil: timestamp("disabledUntil"),
 
     // Usage tracking
     lastUsedAt: timestamp("lastUsedAt"),

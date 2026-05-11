@@ -105,6 +105,7 @@ func (s *Service) expiringRefreshableAccounts(ctx context.Context) ([]appdb.Prov
 		err := s.db.NewSelect().Model(&rows).
 			Column("id", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email").
 			Where("\"isActive\" = TRUE").
+			Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", now).
 			Where("provider = ?", name).
 			Where("\"expiresAt\" <= ?", now.Add(buffer)).
 			OrderExpr("\"expiresAt\" ASC").

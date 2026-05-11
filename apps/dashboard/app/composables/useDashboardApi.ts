@@ -31,7 +31,7 @@ export function useDashboardApi() {
       byProviderDetailed: (query: { provider: string }) => dashboardFetch<ProviderDetailData>("/api/dashboard/accounts/by-provider-detailed", { query }),
       summary: () => dashboardFetch<AccountSummaryData>("/api/dashboard/accounts/summary"),
       create: (body: { provider: string; name?: string; token: string; cfAccountId?: string }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/create", body),
-      update: (body: { id: string; name?: string; isActive?: boolean }) => post<ActionResult>(dashboardFetch, "/api/dashboard/accounts/update", body),
+      update: (body: { id: string; name?: string; isActive?: boolean; disabledUntil?: string | Date | null }) => post<ActionResult>(dashboardFetch, "/api/dashboard/accounts/update", body),
       delete: (body: { id: string }) => post<ActionResult>(dashboardFetch, "/api/dashboard/accounts/delete", body),
       togglePinned: (body: { providerKey: string }) => post<ActionResult<{ providerKey: string; pinned: boolean }>>(dashboardFetch, "/api/dashboard/accounts/toggle-pinned", body),
       setAccountModelEnabled: (body: { accountId: string; modelId: string; enabled: boolean }) => post<ActionResult<{ model: string; enabled: boolean }>>(dashboardFetch, "/api/dashboard/accounts/set-account-model-enabled", body),

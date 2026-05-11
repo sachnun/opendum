@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -137,7 +138,7 @@ func (s *Service) GetAccountModelAvailability(ctx context.Context, userID string
 	}
 
 	var accounts []appdb.ProviderAccount
-	if err := s.db.NewSelect().Model(&accounts).Column("id", "provider", "tier").Where("\"userId\" = ? AND \"isActive\" = TRUE", userID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&accounts).Column("id", "provider", "tier").Where("\"userId\" = ? AND \"isActive\" = TRUE", userID).Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", time.Now()).Scan(ctx); err != nil {
 		return availability, err
 	}
 
