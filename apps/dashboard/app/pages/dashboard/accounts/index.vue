@@ -23,6 +23,10 @@ function summaryFor(provider: ProviderAccountKey): AccountSummaryData["summaries
 function handlePinnedToggled() {
   refresh();
 }
+
+function handleAccountConnected() {
+  refresh();
+}
 </script>
 
 <template>
@@ -34,7 +38,7 @@ function handlePinnedToggled() {
             <h2 class="text-xl font-semibold">Provider Accounts</h2>
           </div>
           <div class="flex w-full items-center gap-2 sm:w-auto">
-            <AddAccountDialog trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refresh" />
+            <AddAccountDialog trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="handleAccountConnected" />
           </div>
         </div>
       </div>

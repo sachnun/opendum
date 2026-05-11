@@ -26,6 +26,11 @@ type OAuthProviderKey = z.infer<typeof getAuthUrlInputSchema>["provider"];
 type DeviceProviderKey = z.infer<typeof initiateDeviceAuthInputSchema>["provider"];
 type ProviderAccountKey = OAuthProviderKey | DeviceProviderKey;
 type AuthUrlResult = { authUrl: string; state: string | null; codeVerifier: string | null };
+type OAuthAccountOptions = {
+  email?: string;
+  accountId?: string | null;
+  dedupeByAccountId?: boolean;
+};
 
 const GOOGLE_OAUTH_CONFIG = {
   antigravity: { clientId: antigravityClientId, redirectUri: antigravityRedirectUri, scopes: antigravityScopes },
@@ -121,11 +126,11 @@ function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string): Acti
   return { success: true, data: { code, state: url.searchParams.get("state") } };
 }
 
-async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, label: string, oauthResult: OAuthResult, options: { email?: string; accountId?: string | null } = {}): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, label: string, oauthResult: OAuthResult, options: OAuthAccountOptions = {}): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
   const email = options.email || oauthResult.email || `${provider}-${Date.now()}`;
   const accountId = options.accountId ?? oauthResult.accountId ?? null;
   const [foundByEmail] = await db.select({ id: providerAccount.id, email: providerAccount.email }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, email))).limit(1);
-  const [foundByAccountId] = !foundByEmail && accountId
+  const [foundByAccountId] = !foundByEmail && accountId && options.dedupeByAccountId
     ? await db.select({ id: providerAccount.id, email: providerAccount.email }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.accountId, accountId))).limit(1)
     : [];
   const existingAccount = foundByEmail ?? foundByAccountId ?? null;
@@ -140,10 +145,28 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
   return { success: true, data: { email, isUpdate: false } };
 }
 
-function oauthAccountOptions(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], oauthResult: OAuthResult) {
+function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], oauthResult: OAuthResult): OAuthAccountOptions | undefined {
+  if (provider === "codex") {
+    const chatgptAccountId = oauthResult.accountId || null;
+    const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
+    return {
+      email: workspaceAccountId ? `codex-${workspaceAccountId}` : `codex-${Date.now()}`,
+      accountId: chatgptAccountId,
+      dedupeByAccountId: !workspaceAccountId || workspaceAccountId === chatgptAccountId,
+    };
+  }
+
+  if (provider === "kiro") {
+    return {
+      email: oauthResult.email || `kiro-${Date.now()}`,
+      accountId: oauthResult.accountId || null,
+      dedupeByAccountId: false,
+    };
+  }
+
   if (!config.accountIdPrefix) return undefined;
   const accountId = oauthResult.accountId || null;
-  return { email: accountId ? `${config.accountIdPrefix}-${accountId}` : `${config.accountIdPrefix}-${Date.now()}`, accountId };
+  return { email: accountId ? `${config.accountIdPrefix}-${accountId}` : `${config.accountIdPrefix}-${Date.now()}`, accountId, dedupeByAccountId: true };
 }
 
 function validateOAuthContext(config: (typeof OAUTH_PROVIDERS)[OAuthProviderKey], input: z.infer<typeof exchangeOAuthInputSchema>, parsedState: string | null): ActionResult<void> | null {
@@ -171,7 +194,7 @@ export async function exchangeOAuthAccount(userId: string, input: z.infer<typeof
     if (invalidContext) return invalidContext;
 
     const oauthResult = await config.exchangeCode(parsedUrl.data.code, input.codeVerifier);
-    return await upsertOAuthAccount(userId, input.provider, config.label, oauthResult, oauthAccountOptions(config, oauthResult));
+    return await upsertOAuthAccount(userId, input.provider, config.label, oauthResult, oauthAccountOptions(input.provider, config, oauthResult));
   } catch (error) {
     console.error("Failed to exchange provider OAuth code:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;

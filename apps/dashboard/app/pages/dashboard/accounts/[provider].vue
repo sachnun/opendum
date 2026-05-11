@@ -26,6 +26,10 @@ const disabledModelsByAccountId = computed(() => detailData.value?.disabledModel
 function handlePinnedToggled() {
   refresh();
 }
+
+function handleAccountConnected() {
+  refresh();
+}
 </script>
 
 <template>
@@ -49,7 +53,7 @@ function handlePinnedToggled() {
               v-if="providerMeta"
               :initial-provider="providerMeta.key"
               trigger-class="flex-1 sm:w-auto sm:flex-none"
-              @connected="refresh"
+              @connected="handleAccountConnected"
             />
           </div>
         </div>
@@ -67,7 +71,7 @@ function handlePinnedToggled() {
       <AddAccountDialog
         v-if="providerMeta"
         :initial-provider="providerMeta.key"
-        @connected="refresh"
+        @connected="handleAccountConnected"
       />
     </DashboardEmptyState>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">

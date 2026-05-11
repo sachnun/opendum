@@ -123,7 +123,7 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
     clearTimeout(timeout);
   }
 
-  const identifier = `workers_ai-${hashString(normalizedApiToken).slice(0, 16)}`;
+  const identifier = `workers_ai-${hashString(`${normalizedAccountId}:${normalizedApiToken}`).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "workers_ai"), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {

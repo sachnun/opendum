@@ -27,7 +27,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  connected: [];
+  connected: [result: { provider: Provider; email: string; isUpdate: boolean }];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -164,6 +164,33 @@ function closeAndReset() {
   resetForm();
 }
 
+async function refreshConnectedAccountData(providerKey: Provider) {
+  const keys = [
+    "dashboard-shell-accounts",
+    "dashboard-accounts-summary",
+    "dashboard-models",
+    "dashboard-shell-model-family-counts",
+    "layout-model-search",
+    "dashboard-playground-options",
+    "dashboard-api-keys",
+  ];
+
+  if (providerKey) {
+    keys.push(`dashboard-accounts-detail-${providerKey}`);
+  }
+
+  await refreshNuxtData(keys);
+}
+
+function finishConnection(result: { email: string; isUpdate: boolean }) {
+  const connectedProvider = provider.value;
+  if (!connectedProvider) return;
+
+  open.value = false;
+  emit("connected", { provider: connectedProvider, ...result });
+  void refreshConnectedAccountData(connectedProvider);
+}
+
 function selectProvider(providerKey: Provider) {
   provider.value = providerKey;
   step.value = 2;
@@ -265,9 +292,7 @@ function startDevicePolling(popup: Window | null) {
 
       if (result.data.status === "success") {
         if (popup && !popup.closed) popup.close();
-        open.value = false;
-        emit("connected");
-        void refreshNuxtData("dashboard-shell-accounts");
+        finishConnection({ email: result.data.email, isUpdate: result.data.isUpdate });
         return;
       }
 
@@ -308,9 +333,7 @@ async function handleConnectApiKey() {
   try {
     const result = await dashboardApi.accounts.create({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined });
     if (!result.success) throw new Error(result.error);
-    open.value = false;
-    emit("connected");
-    void refreshNuxtData("dashboard-shell-accounts");
+    finishConnection(result.data);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
   } finally {
@@ -336,9 +359,7 @@ async function handleExchangeOAuth() {
   try {
     const result = await dashboardApi.accounts.exchangeOAuth({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
-    open.value = false;
-    emit("connected");
-    void refreshNuxtData("dashboard-shell-accounts");
+    finishConnection(result.data);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
   } finally {

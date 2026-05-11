@@ -34,6 +34,64 @@ function isTokenExpired(expiresAt: Date): boolean {
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? value as Record<string, unknown> : null;
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parseJwtClaims(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
+    return asRecord(JSON.parse(atob(padded)));
+  } catch {
+    return null;
+  }
+}
+
+function extractTokenIdentity(accessToken: string): string | null {
+  const claims = parseJwtClaims(accessToken);
+  if (!claims) return null;
+
+  const candidates = [
+    claims.sub,
+    claims.email,
+    claims.username,
+    claims["cognito:username"],
+    claims.user_id,
+    claims.account_id,
+  ];
+
+  for (const candidate of candidates) {
+    const value = toNonEmptyString(candidate);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+function buildKiroAccountIdentity(accessToken: string, profileArn: string) {
+  const tokenIdentity = extractTokenIdentity(accessToken);
+  const displayIdentifier = tokenIdentity
+    ? profileArn && tokenIdentity !== profileArn
+      ? `${profileArn}:${tokenIdentity}`
+      : tokenIdentity
+    : profileArn || crypto.randomUUID();
+
+  return {
+    email: `kiro-${displayIdentifier}`,
+    accountId: profileArn || undefined,
+  };
+}
+
 export function generateCodeVerifier(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -87,14 +145,14 @@ export const kiroProvider = {
 
     const data = (await response.json()) as KiroTokenExchangeResponse;
     const profileArn = data.profileArn || "";
-    const accountIdentifier = profileArn || crypto.randomUUID();
+    const identity = buildKiroAccountIdentity(data.accessToken, profileArn);
 
     return {
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
       expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
-      email: `kiro-${accountIdentifier}`,
-      accountId: profileArn || undefined,
+      email: identity.email,
+      accountId: identity.accountId,
     };
   },
 
@@ -120,13 +178,14 @@ export const kiroProvider = {
 
     const data = (await response.json()) as KiroRefreshResponse;
     const profileArn = data.profileArn || "";
+    const identity = buildKiroAccountIdentity(data.accessToken, profileArn);
 
     return {
       accessToken: data.accessToken,
       refreshToken: data.refreshToken || refreshToken,
       expiresAt: new Date(Date.now() + (data.expiresIn || 3600) * 1000),
-      email: profileArn ? `kiro-${profileArn}` : "",
-      accountId: profileArn || undefined,
+      email: identity.email,
+      accountId: identity.accountId,
     };
   },
 
