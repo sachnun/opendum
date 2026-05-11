@@ -810,7 +810,7 @@ function historyEntryPreview(errorMessage: string): string {
 
     <UiDialog v-model:open="deleteDialogOpen" :ui="{ content: 'sm:max-w-md' }">
       <template #content>
-        <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Delete Account</h2><p class="text-sm text-muted-foreground">Are you sure you want to delete <strong class="font-semibold text-foreground">{{ account.name }}</strong>? This action cannot be undone.</p></div>
+        <div class="space-y-1.5 pr-6"><h2 class="text-lg font-semibold">Delete Account</h2><p class="text-sm text-muted-foreground">Delete <strong class="font-semibold text-foreground">{{ account.name }}</strong> &mdash; this cannot be undone.</p></div>
         <div class="flex justify-end gap-2"><UiButton variant="outline" @click="deleteDialogOpen = false">Cancel</UiButton><UiButton variant="destructive" :disabled="deleting" @click="deleteAccount">{{ deleting ? 'Deleting...' : 'Delete' }}</UiButton></div>
       </template>
     </UiDialog>
