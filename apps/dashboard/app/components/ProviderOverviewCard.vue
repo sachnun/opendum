@@ -66,8 +66,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
           <UiIcon name="i-lucide-arrow-right" class="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
         </div>
         <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
-          <div class="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span class="inline-flex items-center gap-1"><UiIcon name="i-lucide-bar-chart-3" class="size-3" />30d</span>
+          <div class="flex items-center justify-end text-[11px] text-muted-foreground">
             <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
           </div>
           <div class="grid grid-cols-3 gap-1.5">

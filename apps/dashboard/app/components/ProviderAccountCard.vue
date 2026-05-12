@@ -636,8 +636,7 @@ function historyEntryPreview(errorMessage: string): string {
       <UiCardContent class="flex flex-1 flex-col">
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
-            <div class="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span class="inline-flex items-center gap-1"><UiIcon name="i-lucide-bar-chart-3" class="size-3" />30d</span>
+            <div class="mb-2 flex items-center justify-end text-[11px] text-muted-foreground">
               <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
             </div>
             <div class="mb-2 grid grid-cols-3 gap-1.5">

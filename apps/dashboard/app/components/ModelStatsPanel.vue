@@ -31,11 +31,7 @@ function formatHourLabel(time: string): string {
 
 <template>
   <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5">
-    <div class="flex items-center justify-between text-[11px] text-muted-foreground">
-      <span class="inline-flex items-center gap-1">
-        <UiIcon name="i-lucide-bar-chart-3" class="size-3 shrink-0" />
-        30d
-      </span>
+    <div class="flex items-center justify-end text-[11px] text-muted-foreground">
       <span class="tabular-nums">{{ maxDailyRequests.toLocaleString() }} peak</span>
     </div>
 
