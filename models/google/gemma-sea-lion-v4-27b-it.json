@@ -3,6 +3,7 @@
     "workers_ai"
   ],
   "family": "Gemini",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": false,

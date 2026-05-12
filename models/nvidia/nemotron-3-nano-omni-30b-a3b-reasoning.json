@@ -4,6 +4,7 @@
     "nvidia_nim",
     "openrouter"
   ],
+  "family": "NVIDIA",
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"

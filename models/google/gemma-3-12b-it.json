@@ -3,6 +3,7 @@
     "nvidia_nim"
   ],
   "family": "Gemini",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": false,

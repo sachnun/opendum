@@ -3,6 +3,7 @@
     "ollama_cloud"
   ],
   "family": "Gemini",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,

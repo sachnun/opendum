@@ -2,6 +2,7 @@
   "providers": [
     "copilot"
   ],
+  "family": "OpenAI",
   "providerConfig": {
     "copilot": {
       "responses_api": true

@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "family": "Sarvam",
   "ignored": true,
   "providerConfig": {
     "nvidia_nim": {

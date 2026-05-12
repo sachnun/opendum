@@ -2,6 +2,7 @@
   "providers": [
     "kilo_code"
   ],
+  "family": "OpenRouter",
   "providerConfig": {
     "kilo_code": {
       "upstream": "openrouter/owl-alpha"

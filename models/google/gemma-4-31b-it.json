@@ -4,7 +4,7 @@
     "nvidia_nim",
     "openrouter"
   ],
-  "family": "Google",
+  "family": "Gemini",
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it"

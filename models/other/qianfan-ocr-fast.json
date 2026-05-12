@@ -3,6 +3,7 @@
     "kilo_code",
     "openrouter"
   ],
+  "family": "Baidu",
   "ignored": true,
   "providerConfig": {
     "kilo_code": {

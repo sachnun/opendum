@@ -2,7 +2,7 @@
   "providers": [
     "ollama_cloud"
   ],
-  "family": "Google",
+  "family": "Gemini",
   "providerConfig": {
     "ollama_cloud": {
       "upstream": "gemma4:31b"

@@ -69,3 +69,19 @@ func TestWorkersAIModelsDeclareCloudflareUpstream(t *testing.T) {
 		}
 	}
 }
+
+func TestSupportedModelsDeclareFamily(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for model, info := range registry.effective {
+		if len(info.Providers) == 0 {
+			continue
+		}
+		if strings.TrimSpace(info.Family) == "" {
+			t.Errorf("supported model %q must declare a family", model)
+		}
+	}
+}

@@ -3,6 +3,7 @@
     "kilo_code",
     "openrouter"
   ],
+  "family": "Baidu",
   "providerConfig": {
     "kilo_code": {
       "upstream": "baidu/cobuddy:free"

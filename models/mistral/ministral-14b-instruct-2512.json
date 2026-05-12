@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "family": "Mistral",
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/ministral-14b-instruct-2512"

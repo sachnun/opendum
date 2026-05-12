@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "family": "Mistral",
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/mistral-large-3-675b-instruct-2512"

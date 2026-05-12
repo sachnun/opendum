@@ -2,6 +2,7 @@
   "providers": [
     "kilo_code"
   ],
+  "family": "Kilo Code",
   "ignored": true,
   "providerConfig": {
     "kilo_code": {

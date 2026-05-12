@@ -3,6 +3,7 @@
     "kilo_code",
     "openrouter"
   ],
+  "family": "InclusionAI",
   "providerConfig": {
     "kilo_code": {
       "upstream": "inclusionai/ring-2.6-1t:free"

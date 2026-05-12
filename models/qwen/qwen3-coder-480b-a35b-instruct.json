@@ -2,6 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
+  "family": "Qwen",
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "qwen/qwen3-coder-480b-a35b-instruct"
