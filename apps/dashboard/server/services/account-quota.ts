@@ -217,6 +217,7 @@ function getWindowDisplayName(name: "primary" | "secondary", windowMinutes: numb
   if (name === "secondary") return normalizedTier.includes("free") ? "Weekly usage (free)" : "Weekly usage";
 
   const duration = formatWindowDuration(windowMinutes);
+  if (duration === "7d" && normalizedTier.includes("free")) return "Weekly usage (free)";
   return duration === "5h" ? "5 hour usage" : duration ? `${duration} usage` : "Usage";
 }
 
