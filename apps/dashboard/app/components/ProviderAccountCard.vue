@@ -334,10 +334,15 @@ const temporaryOffPreview = computed(() => {
 const hasSuccessAfterLastError = computed(() => {
   if (!props.account.lastErrorAt) return false;
   const errorMs = new Date(props.account.lastErrorAt).getTime();
-  const recoveredMs = Math.max(new Date(props.account.lastSuccessAt ?? 0).getTime() || 0, new Date(props.account.lastRecoveredByRotationAt ?? 0).getTime() || 0);
+  const recoveredMs = Math.max(new Date(props.account.lastSuccessAt ?? 0).getTime() || 0, new Date(props.account.lastRecoveredByRotationAt ?? 0).getTime() || 0, new Date(props.account.lastUsedAt ?? 0).getTime() || 0);
   return recoveredMs > errorMs;
 });
-const errorToneClass = computed(() => (hasSuccessAfterLastError.value ? "text-amber-400" : "text-red-500"));
+const errorToneClass = computed(() => {
+  if (!props.account.lastErrorAt) return "text-muted-foreground";
+  const errorMs = new Date(props.account.lastErrorAt).getTime();
+  if (hasSuccessAfterLastError.value && Date.now() - errorMs > 3 * 60 * 60 * 1000) return "text-foreground";
+  return hasSuccessAfterLastError.value ? "text-amber-400" : "text-red-500";
+});
 const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
 const errorPreview = computed(() => (currentErrorMessage.value.length > 150 ? `${currentErrorMessage.value.slice(0, 150)}...` : currentErrorMessage.value));
 const errorDetails = computed(() => (currentErrorMessage.value ? parseStoredErrorMessage(currentErrorMessage.value) : null));

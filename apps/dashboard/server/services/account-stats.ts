@@ -85,10 +85,10 @@ function buildStatsFromRaw(raw: RawProviderStats | undefined, dayKeys: string[],
   };
 }
 
-export function getAccountIndicator(lastErrorAt: Date | string | null, lastSuccessAt: Date | string | null, lastRecoveredByRotationAt: Date | string | null): ProviderAccountIndicator {
+export function getAccountIndicator(lastErrorAt: Date | string | null, lastSuccessAt: Date | string | null, lastRecoveredByRotationAt: Date | string | null, lastUsedAt: Date | string | null): ProviderAccountIndicator {
   const errorDate = toDate(lastErrorAt);
   if (!errorDate) return "normal";
-  const recoveredTimeMs = Math.max(toDate(lastSuccessAt)?.getTime() ?? 0, toDate(lastRecoveredByRotationAt)?.getTime() ?? 0);
+  const recoveredTimeMs = Math.max(toDate(lastSuccessAt)?.getTime() ?? 0, toDate(lastRecoveredByRotationAt)?.getTime() ?? 0, toDate(lastUsedAt)?.getTime() ?? 0);
   if (recoveredTimeMs <= errorDate.getTime()) return "error";
   if (Date.now() - errorDate.getTime() > WARNING_INDICATOR_STALE_WINDOW_MS) return "normal";
   return "warning";

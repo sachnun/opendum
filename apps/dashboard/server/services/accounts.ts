@@ -109,6 +109,7 @@ export async function getAccountSummary(userId: string) {
           provider: providerAccount.provider,
           isActive: providerAccount.isActive,
           disabledUntil: providerAccount.disabledUntil,
+          lastUsedAt: providerAccount.lastUsedAt,
           lastErrorAt: providerAccount.lastErrorAt,
           lastSuccessAt: providerAccount.lastSuccessAt,
           lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
@@ -140,7 +141,7 @@ export async function getAccountSummary(userId: string) {
       if (!accountIsEffectivelyActive(account)) continue;
 
       summary.active += 1;
-      const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt);
+      const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt, account.lastUsedAt);
       if (INDICATOR_WEIGHT[indicator] > INDICATOR_WEIGHT[summary.indicator]) {
         summary.indicator = indicator;
       }
