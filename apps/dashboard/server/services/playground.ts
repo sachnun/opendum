@@ -1,12 +1,9 @@
-import { and, asc, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 import { db } from "../lib/db";
-import { disabledModel, providerAccount, providerAccountDisabledModel, proxyApiKey } from "../lib/db/schema";
-import { decrypt } from "../lib/encryption";
+import { disabledModel, providerAccount, providerAccountDisabledModel } from "../lib/db/schema";
 import { getAccountModelAvailability, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";
-
-type ApiKeyModelAccessMode = "all" | "whitelist" | "blacklist";
 
 function normalizeProxyBaseUrl(value: unknown) {
   return typeof value === "string" ? value.trim().replace(/\/$/, "") || undefined : undefined;
@@ -14,27 +11,6 @@ function normalizeProxyBaseUrl(value: unknown) {
 
 function getProxyBaseUrl(proxyBaseUrl?: string) {
   return normalizeProxyBaseUrl(proxyBaseUrl) ?? normalizeProxyBaseUrl(process.env.NUXT_PUBLIC_PROXY_URL);
-}
-
-function normalizeApiKeyModelAccessMode(mode: string): ApiKeyModelAccessMode {
-  return mode === "whitelist" || mode === "blacklist" ? mode : "all";
-}
-
-function toPlaygroundApiKeyOption(apiKey: { id: string; name: string | null; keyPreview: string; encryptedKey: string | null; modelAccessMode: string; modelAccessList: string[] | null }) {
-  if (!apiKey.encryptedKey) return null;
-
-  try {
-    return {
-      id: apiKey.id,
-      name: apiKey.name,
-      keyPreview: apiKey.keyPreview,
-      decryptedKey: decrypt(apiKey.encryptedKey),
-      modelAccessMode: normalizeApiKeyModelAccessMode(apiKey.modelAccessMode),
-      modelAccessList: apiKey.modelAccessList ?? [],
-    };
-  } catch {
-    return null;
-  }
 }
 
 export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
@@ -45,6 +21,11 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
       getAccountModelAvailability(userId),
     ]);
     const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
+
+    const [accountCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(providerAccount)
+      .where(eq(providerAccount.userId, userId));
 
     const providerAccounts = await db
       .select({
@@ -82,30 +63,14 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    const apiKeyOptions = proxyBaseUrl
-      ? (await db
-          .select({
-            id: proxyApiKey.id,
-            name: proxyApiKey.name,
-            keyPreview: proxyApiKey.keyPreview,
-            encryptedKey: proxyApiKey.encryptedKey,
-            modelAccessMode: proxyApiKey.modelAccessMode,
-            modelAccessList: proxyApiKey.modelAccessList,
-          })
-          .from(proxyApiKey)
-          .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.isActive, true)))
-          .orderBy(desc(proxyApiKey.lastUsedAt)))
-          .flatMap((apiKey) => toPlaygroundApiKeyOption(apiKey) ?? [])
-      : [];
-
     return {
       proxyBaseUrl,
+      hasAnyProviderAccount: Number(accountCount?.count ?? 0) > 0,
       models,
       providerAccounts: providerAccounts.map((account) => ({
         ...account,
         disabledModels: disabledModelsByAccount.get(account.id) ?? [],
       })),
-      apiKeyOptions,
     };
   } catch (error) {
     console.error("Failed to load playground options:", error);

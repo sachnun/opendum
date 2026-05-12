@@ -51,10 +51,10 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
 
-const supportNavigation: NavItem[] = [
+const supportNavigation = computed<NavItem[]>(() => [
   { name: "Usage", href: "/dashboard/usage", icon: "i-lucide-book-open" },
-  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
-];
+  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical", disabled: playgroundNavigationDisabled.value },
+]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
@@ -94,6 +94,8 @@ const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value)
 const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
+const totalConnectedAccountCount = computed(() => Object.values(accountCounts.value).reduce((sum, count) => sum + count, 0));
+const playgroundNavigationDisabled = computed(() => hasLoadedAccountSummary.value && !accountSummaryPending.value && totalConnectedAccountCount.value === 0);
 
 function normalizeModelFamilyCounts(counts: Record<string, number>) {
   const nextCounts = { ...emptyModelFamilyCounts };
@@ -245,6 +247,11 @@ function getAnchorIdFromViewport(anchorIds: string[]) {
 }
 
 function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
+  if (item?.disabled) {
+    event?.preventDefault();
+    return;
+  }
+
   if (item && "anchorId" in item && item.anchorId) {
     if (route.path === item.href) {
       event?.preventDefault();
@@ -386,7 +393,7 @@ async function handleSignOut() {
                   isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 ]"
               >
-                <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item)">
+                <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item, $event)">
                   <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                   {{ item.name }}
                 </NuxtLink>
@@ -407,7 +414,7 @@ async function handleSignOut() {
                   'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
                   isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 ]"
-                @click="handleNavClick(item)"
+                @click="handleNavClick(item, $event)"
               >
                 <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                 {{ item.name }}
@@ -476,13 +483,14 @@ async function handleSignOut() {
               v-for="item in supportNavigation"
               :key="item.name"
               :to="item.href"
+              :aria-disabled="item.disabled ? true : undefined"
               :class="[
                 'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               ]"
-              @click="handleNavClick(item)"
+              @click="handleNavClick(item, $event)"
             >
-              <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+              <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
               {{ item.name }}
             </NuxtLink>
           </nav>
@@ -580,7 +588,7 @@ async function handleSignOut() {
                       isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                     ]"
                   >
-                    <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item)">
+                    <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item, $event)">
                       <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                       {{ item.name }}
                     </NuxtLink>
@@ -601,7 +609,7 @@ async function handleSignOut() {
                       'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
                       isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                     ]"
-                    @click="handleNavClick(item)"
+                    @click="handleNavClick(item, $event)"
                   >
                     <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                     {{ item.name }}
@@ -669,13 +677,14 @@ async function handleSignOut() {
                   v-for="item in supportNavigation"
                   :key="`mobile-${item.name}`"
                   :to="item.href"
+                  :aria-disabled="item.disabled ? true : undefined"
                   :class="[
                     'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                    isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                   ]"
-                  @click="handleNavClick(item)"
+                  @click="handleNavClick(item, $event)"
                 >
-                  <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                  <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
                   {{ item.name }}
                 </NuxtLink>
               </nav>

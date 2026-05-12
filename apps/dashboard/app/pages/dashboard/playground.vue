@@ -37,12 +37,9 @@ interface Scenario {
 
 const dashboardApi = useDashboardApi();
 const route = useRoute();
-const config = useRuntimeConfig();
-const runtimeProxyBaseUrl = normalizeProxyBaseUrl(config.public.proxyUrl);
 
 type ModelOption = PlaygroundOptions["models"][number];
 type ProviderAccountOption = PlaygroundOptions["providerAccounts"][number];
-type ApiKeyOption = PlaygroundOptions["apiKeyOptions"][number];
 type PanelState = { id: string; modelId: string | null; accountId: string | null };
 
 const DEFAULT_SETTINGS: PlaygroundSettings = {
@@ -146,14 +143,17 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
 ];
 
 const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => dashboardApi.playground.options());
+if (data.value && !data.value.hasAnyProviderAccount) {
+  await navigateTo("/dashboard/accounts", { replace: true });
+}
+
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
 const models = computed<ModelOption[]>(() => options.value?.models ?? []);
 const providerAccounts = computed<ProviderAccountOption[]>(() => options.value?.providerAccounts ?? []);
-const apiKeyOptions = computed<ApiKeyOption[]>(() => options.value?.apiKeyOptions ?? []);
-const proxyBaseUrl = computed(() => normalizeProxyBaseUrl(options.value?.proxyBaseUrl) ?? runtimeProxyBaseUrl);
+const hasAnyProviderAccount = computed(() => Boolean(options.value?.hasAnyProviderAccount));
+const isProxyConfigured = computed(() => Boolean(options.value?.proxyBaseUrl));
+const canUsePlayground = computed(() => hasAnyProviderAccount.value && isProxyConfigured.value && providerAccounts.value.length > 0 && models.value.length > 0);
 
-const selectedApiKeyId = ref<string | null>(null);
-const apiKeyPickerOpen = ref(false);
 const selectedScenario = ref<Scenario>(SCENARIOS[0]!);
 const settings = reactive<PlaygroundSettings>({ ...DEFAULT_SETTINGS });
 const settingsOpen = ref(false);
@@ -180,10 +180,7 @@ let startLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 let startLongPressTriggered = false;
 const START_LONG_PRESS_DELAY_MS = 600;
 
-const selectedApiKey = computed(() => apiKeyOptions.value.find((key) => key.id === selectedApiKeyId.value) ?? null);
-const selectedApiKeyValue = computed(() => selectedApiKey.value?.decryptedKey.trim() || "");
-const selectedApiKeyLabel = computed(() => selectedApiKey.value ? getApiKeyLabel(selectedApiKey.value) : "Select key");
-const filteredModels = computed(() => filterModelsByApiKey(models.value, selectedApiKey.value));
+const filteredModels = computed(() => models.value);
 const filteredModelIds = computed(() => new Set(filteredModels.value.map((model) => model.id)));
 const modelsById = computed(() => new Map(models.value.map((model) => [model.id, model])));
 const providerAccountsById = computed(() => new Map(providerAccounts.value.map((account) => [account.id, account])));
@@ -196,11 +193,12 @@ const activePresetModelIds = computed(() => {
 const maxPanels = computed(() => Math.max(filteredModels.value.length, 1));
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
-const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && proxyBaseUrl.value && selectedApiKeyValue.value));
+const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value));
 const playgroundSetupMessage = computed(() => {
-  if (!proxyBaseUrl.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
-  if (apiKeyOptions.value.length === 0) return "Create an active API key before running Playground.";
-  if (!selectedApiKeyValue.value) return "Select an API key before running Playground.";
+  if (!hasAnyProviderAccount.value) return "Connect a provider account before running Playground.";
+  if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
+  if (providerAccounts.value.length === 0) return "Enable at least one provider account before running Playground.";
+  if (models.value.length === 0) return "Enable at least one model supported by your provider accounts before running Playground.";
   return "";
 });
 const parsedLoopCount = computed(() => Number(loopCountInput.value));
@@ -210,10 +208,9 @@ const scenarioMessages = computed(() => getScenarioMessages(selectedScenario.val
 const systemPromptText = computed(() => scenarioMessages.value.filter((message) => message.role === "system").map((message) => extractMessageText(message.content)).filter(Boolean).join("\n\n"));
 const userScenarioMessages = computed(() => scenarioMessages.value.filter((message) => message.role !== "system"));
 
-watch([apiKeyOptions, models], () => {
-  if (selectedApiKeyId.value && apiKeyOptions.value.some((key) => key.id === selectedApiKeyId.value)) return;
-  selectedApiKeyId.value = findApiKeyWithMostModels(apiKeyOptions.value, models.value);
-}, { immediate: true });
+watch(options, (value) => {
+  if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard/accounts", { replace: true });
+});
 
 watch(options, (value) => {
   if (!value || initializedFromRoute.value) return;
@@ -302,44 +299,9 @@ function generateId(): string {
   return Math.random().toString(36).slice(2, 9);
 }
 
-function normalizeProxyBaseUrl(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim().replace(/\/$/, "");
-  return trimmed || undefined;
-}
-
 function normalizeQueryParam(value: unknown): string | null {
   if (Array.isArray(value)) return typeof value[0] === "string" ? value[0] : null;
   return typeof value === "string" ? value : null;
-}
-
-function getApiKeyLabel(apiKey: Pick<ApiKeyOption, "name">): string {
-  return apiKey.name?.trim() || "Unnamed key";
-}
-
-function filterModelsByApiKey(modelOptions: ModelOption[], apiKey: ApiKeyOption | null): ModelOption[] {
-  if (!apiKey || apiKey.modelAccessMode === "all") return modelOptions;
-  const modelSet = new Set(apiKey.modelAccessList);
-  return apiKey.modelAccessMode === "whitelist"
-    ? modelOptions.filter((model) => modelSet.has(model.id))
-    : modelOptions.filter((model) => !modelSet.has(model.id));
-}
-
-function findApiKeyWithMostModels(apiKeys: ApiKeyOption[], modelOptions: ModelOption[]): string | null {
-  if (apiKeys.length === 0) return null;
-
-  let bestId = apiKeys[0]!.id;
-  let bestCount = -1;
-
-  for (const apiKey of apiKeys) {
-    const count = filterModelsByApiKey(modelOptions, apiKey).length;
-    if (count > bestCount) {
-      bestId = apiKey.id;
-      bestCount = count;
-    }
-  }
-
-  return bestId;
 }
 
 function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
@@ -902,13 +864,6 @@ function adaptRequestOverridesForEndpoint(overrides: Record<string, unknown> | u
   return adapted;
 }
 
-function getEndpointPath(endpoint: PlaygroundEndpoint): string {
-  const base = proxyBaseUrl.value?.replace(/\/$/, "") ?? "";
-  if (endpoint === "messages") return `${base}/v1/messages`;
-  if (endpoint === "responses") return `${base}/v1/responses`;
-  return `${base}/v1/chat/completions`;
-}
-
 function setResponse(panelId: string, response: ResponseData) {
   responses.value = { ...responses.value, [panelId]: response };
 }
@@ -929,20 +884,17 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     const requestBody = buildRequestBody(modelId, getScenarioMessages(scenario), currentSettings, accountId);
     const endpointOverrides = adaptRequestOverridesForEndpoint(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
-    if (!proxyBaseUrl.value) throw new Error("Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.");
-    const apiKey = selectedApiKeyValue.value;
-    if (!apiKey) throw new Error("Select an API key before running Playground.");
+    if (!canUsePlayground.value) throw new Error(playgroundSetupMessage.value || "Playground is not ready.");
 
     const controller = new AbortController();
     controllers.set(panelId, controller);
-    const response = await fetch(getEndpointPath(currentSettings.endpoint), {
+    const response = await fetch("/api/dashboard/playground/run", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       signal: controller.signal,
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({ endpoint: currentSettings.endpoint, body: requestBody }),
     });
 
     waitMs = Date.now() - requestStartedAt;
@@ -1219,32 +1171,6 @@ function formatToolArguments(value: string): string {
       <div class="flex items-center justify-between gap-4">
         <h1 class="text-xl font-semibold">Playground</h1>
         <div class="flex items-center gap-2">
-          <UiPopover v-if="apiKeyOptions.length > 1" v-model:open="apiKeyPickerOpen" :content="{ align: 'end', class: 'w-[280px] p-0' }">
-            <UiButton type="button" variant="outline" size="sm" class="gap-1.5 sm:max-w-[200px]" :disabled="isAnyLoading">
-              <UiIcon name="i-lucide-key" class="size-3.5 shrink-0" />
-              <span class="hidden truncate sm:inline">{{ selectedApiKeyLabel }}</span>
-              <UiIcon name="i-lucide-chevron-down" class="hidden size-3 shrink-0 opacity-50 sm:block" />
-            </UiButton>
-            <template #content>
-              <div class="space-y-1 p-2">
-                <input class="mb-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none" placeholder="Search API keys..." disabled>
-                <button
-                  v-for="apiKey in apiKeyOptions"
-                  :key="apiKey.id"
-                  type="button"
-                  class="flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                  :class="selectedApiKeyId === apiKey.id ? 'bg-accent' : ''"
-                  @click="selectedApiKeyId = apiKey.id; apiKeyPickerOpen = false"
-                >
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-medium">{{ getApiKeyLabel(apiKey) }}</p>
-                    <p class="truncate font-mono text-[10px] text-muted-foreground">{{ apiKey.keyPreview }}</p>
-                  </div>
-                  <UiIcon v-if="selectedApiKeyId === apiKey.id" name="i-lucide-check" class="size-3.5 text-foreground" />
-                </button>
-              </div>
-            </template>
-          </UiPopover>
           <UiButton v-if="isAnyLoading" type="button" variant="outline" size="sm" @click="stopAllRequests">
             <span class="relative inline-flex">
               <UiIcon name="i-lucide-square" class="size-3.5" />

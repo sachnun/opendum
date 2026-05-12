@@ -2,9 +2,14 @@ package proxy
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,6 +18,13 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 	"github.com/opendum/opendum/apps/proxy/internal/providers"
+)
+
+const (
+	playgroundUserIDHeader    = "X-Opendum-Playground-User-Id"
+	playgroundTimestampHeader = "X-Opendum-Playground-Timestamp"
+	playgroundSignatureHeader = "X-Opendum-Playground-Signature"
+	playgroundAuthWindow      = 2 * time.Minute
 )
 
 type Service struct {
@@ -53,11 +65,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	startMS := time.Now().UnixMilli()
 	ctx := r.Context()
 
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		authHeader = r.Header.Get("X-Api-Key")
-	}
-	authResult, err := s.auth.ValidateAPIKey(ctx, authHeader)
+	authResult, err := s.authenticateRequest(ctx, r)
 	if err != nil {
 		s.writeRouteError(w, cfg, http.StatusInternalServerError, "Internal server error", "api_error", nil, nil, nil, nil)
 		return
@@ -148,6 +156,58 @@ func (s *Service) recordResponseHandlerFailure(ctx context.Context, account *app
 	message := err.Error()
 	s.markAccountFailed(ctx, account.ID, model, http.StatusInternalServerError, message)
 	s.logUsage(ctx, usageParams{UserID: userID, ProviderAccountID: account.ID, ProxyAPIKeyID: apiKeyID, Model: model, StatusCode: http.StatusInternalServerError, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
+}
+
+func (s *Service) authenticateRequest(ctx context.Context, r *http.Request) (auth.Result, error) {
+	if result, ok := s.validatePlaygroundAuth(r); ok {
+		return result, nil
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		authHeader = r.Header.Get("X-Api-Key")
+	}
+	return s.auth.ValidateAPIKey(ctx, authHeader)
+}
+
+func (s *Service) validatePlaygroundAuth(r *http.Request) (auth.Result, bool) {
+	userID := strings.TrimSpace(r.Header.Get(playgroundUserIDHeader))
+	timestampValue := strings.TrimSpace(r.Header.Get(playgroundTimestampHeader))
+	signature := strings.TrimSpace(r.Header.Get(playgroundSignatureHeader))
+	if userID == "" && timestampValue == "" && signature == "" {
+		return auth.Result{}, false
+	}
+	if userID == "" || timestampValue == "" || signature == "" || strings.TrimSpace(s.secret) == "" {
+		return auth.Result{Valid: false, Error: "Invalid playground session"}, true
+	}
+
+	timestamp, err := strconv.ParseInt(timestampValue, 10, 64)
+	if err != nil {
+		return auth.Result{Valid: false, Error: "Invalid playground session"}, true
+	}
+	requestTime := time.Unix(timestamp, 0)
+	if time.Since(requestTime) > playgroundAuthWindow || time.Until(requestTime) > playgroundAuthWindow {
+		return auth.Result{Valid: false, Error: "Invalid playground session"}, true
+	}
+
+	expectedSignature, err := hex.DecodeString(playgroundSignature(s.secret, userID, timestampValue, r.Method, r.URL.Path))
+	providedSignature, decodeErr := hex.DecodeString(signature)
+	if err != nil || decodeErr != nil || !hmac.Equal(providedSignature, expectedSignature) {
+		return auth.Result{Valid: false, Error: "Invalid playground session"}, true
+	}
+
+	return auth.Result{
+		Valid:             true,
+		UserID:            userID,
+		ModelAccessMode:   "all",
+		AccountAccessMode: "all",
+	}, true
+}
+
+func playgroundSignature(secret, userID, timestamp, method, path string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(userID + "\n" + timestamp + "\n" + method + "\n" + path))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func (s *Service) makeProviderRequest(ctx context.Context, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {

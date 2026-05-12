@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
@@ -677,6 +679,54 @@ func TestPassthroughDoesNotCopyProviderHeaders(t *testing.T) {
 	}
 	if writer.header.Get("Content-Type") != "application/json" || writer.header.Get("X-Provider-Account-Id") != "acct_1" {
 		t.Fatalf("proxy headers missing: %#v", writer.header)
+	}
+}
+
+func TestValidatePlaygroundAuthAcceptsSignedSession(t *testing.T) {
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	request.Header.Set(playgroundUserIDHeader, "user_1")
+	request.Header.Set(playgroundTimestampHeader, timestamp)
+	request.Header.Set(playgroundSignatureHeader, playgroundSignature("secret", "user_1", timestamp, http.MethodPost, "/v1/chat/completions"))
+
+	result, handled := (&Service{secret: "secret"}).validatePlaygroundAuth(request)
+	if !handled || !result.Valid || result.UserID != "user_1" || result.APIKeyID != "" || result.ModelAccessMode != "all" || result.AccountAccessMode != "all" {
+		t.Fatalf("playground auth result = %#v handled=%v", result, handled)
+	}
+}
+
+func TestValidatePlaygroundAuthRejectsInvalidSignature(t *testing.T) {
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	request.Header.Set(playgroundUserIDHeader, "user_1")
+	request.Header.Set(playgroundTimestampHeader, timestamp)
+	request.Header.Set(playgroundSignatureHeader, "invalid")
+
+	result, handled := (&Service{secret: "secret"}).validatePlaygroundAuth(request)
+	if !handled || result.Valid || result.Error == "" {
+		t.Fatalf("playground auth result = %#v handled=%v", result, handled)
+	}
+}
+
+func TestValidatePlaygroundAuthIgnoresMissingPlaygroundHeaders(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	result, handled := (&Service{secret: "secret"}).validatePlaygroundAuth(request)
+	if handled || result.Valid {
+		t.Fatalf("playground auth result = %#v handled=%v", result, handled)
+	}
+}
+
+func TestValidatePlaygroundAuthRejectsExpiredTimestamp(t *testing.T) {
+	timestamp := strconv.FormatInt(time.Now().Add(-playgroundAuthWindow-time.Second).Unix(), 10)
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	request.Header.Set(playgroundUserIDHeader, "user_1")
+	request.Header.Set(playgroundTimestampHeader, timestamp)
+	request.Header.Set(playgroundSignatureHeader, playgroundSignature("secret", "user_1", timestamp, http.MethodPost, "/v1/chat/completions"))
+
+	result, handled := (&Service{secret: "secret"}).validatePlaygroundAuth(request)
+	if !handled || result.Valid || result.Error == "" {
+		t.Fatalf("playground auth result = %#v handled=%v", result, handled)
 	}
 }
 

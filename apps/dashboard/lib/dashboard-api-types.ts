@@ -130,9 +130,9 @@ export type ModelSearchItem = Omit<ModelListItem, "name" | "family" | "stats">;
 
 export interface PlaygroundOptions {
   proxyBaseUrl?: string;
+  hasAnyProviderAccount: boolean;
   models: Array<{ id: string; name: string; family: string; providers: string[] }>;
   providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; disabledModels: string[] }>;
-  apiKeyOptions: Array<{ id: string; name: string | null; keyPreview: string; decryptedKey: string; modelAccessMode: "all" | "whitelist" | "blacklist"; modelAccessList: string[] }>;
 }
 
 export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";

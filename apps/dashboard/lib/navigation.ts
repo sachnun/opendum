@@ -5,6 +5,7 @@ export interface NavItem {
   name: string;
   href: string;
   icon: string;
+  disabled?: boolean;
   children?: NavSubItem[];
 }
 
