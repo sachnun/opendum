@@ -212,11 +212,12 @@ function formatWindowDuration(windowMinutes: number | null): string | null {
 }
 
 function getWindowDisplayName(name: "primary" | "secondary", windowMinutes: number | null, tier?: string | null): string {
-  const base = name === "primary" ? "Primary window" : "Secondary window";
   const normalizedTier = tier?.trim().toLowerCase() ?? "";
-  const resolvedWindowMinutes = windowMinutes ?? (normalizedTier.includes("free") ? 7 * 24 * 60 : null);
-  const duration = formatWindowDuration(resolvedWindowMinutes);
-  return duration ? `${base} (${duration})` : base;
+
+  if (name === "secondary") return normalizedTier.includes("free") ? "Weekly usage (free)" : "Weekly usage";
+
+  const duration = formatWindowDuration(windowMinutes);
+  return duration === "5h" ? "5 hour usage" : duration ? `${duration} usage` : "Usage";
 }
 
 function toCodexGroupDisplay(name: "primary" | "secondary", window: CodexRateLimitWindow, isEstimated: boolean, confidence: QuotaConfidence, tier?: string | null): QuotaGroupDisplay {
