@@ -168,6 +168,71 @@ func TestKiroBuildRequestInjectsSystemThinkingAndAnthropicTools(t *testing.T) {
 	}
 }
 
+func TestKiroBuildRequestUsesReasoningBudget(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model": "kiro/unit-test-model",
+		"reasoning": map[string]any{
+			"budget_tokens": 4321,
+		},
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
+	content := current["content"].(string)
+	if !strings.Contains(content, "<thinking_mode>enabled</thinking_mode><max_thinking_length>4321</max_thinking_length>") {
+		t.Fatalf("current content missing reasoning budget: %q", content)
+	}
+}
+
+func TestKiroBuildRequestMapsReasoningEffortLikeOtherProviders(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model":            "kiro/unit-test-model",
+		"reasoning_effort": "low",
+		"messages":         []any{map[string]any{"role": "user", "content": "hello"}},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
+	content := current["content"].(string)
+	if !strings.Contains(content, "<thinking_mode>enabled</thinking_mode><max_thinking_length>1024</max_thinking_length>") {
+		t.Fatalf("current content missing low effort budget: %q", content)
+	}
+}
+
+func TestKiroBuildRequestReasoningEffortNoneDisablesThinking(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model":            "kiro/unit-test-model",
+		"reasoning_effort": "none",
+		"messages":         []any{map[string]any{"role": "user", "content": "hello"}},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
+	if strings.Contains(current["content"].(string), "<thinking_mode>") {
+		t.Fatalf("current content contains thinking tags: %q", current["content"])
+	}
+}
+
+func TestKiroBuildRequestIncludeThoughtsFalseDisablesThinking(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model":             "kiro/unit-test-model",
+		"_includeReasoning": true,
+		"include_thoughts":  false,
+		"messages":          []any{map[string]any{"role": "user", "content": "hello"}},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
+	if strings.Contains(current["content"].(string), "<thinking_mode>") {
+		t.Fatalf("current content contains thinking tags: %q", current["content"])
+	}
+}
+
 func TestKiroJSONEventParsingAndCompletion(t *testing.T) {
 	events := parseKiroJSONEvents(`prefix {"content":"hello "}{"name":"lookup","toolUseId":"toolu_1","input":"{\"city\":"}{"input":"\"Jakarta\"}"}{"stop":true}`, &kiroParserState{})
 	if len(events) != 4 {
@@ -247,6 +312,21 @@ func TestKiroSSEReader(t *testing.T) {
 	}
 	if !strings.Contains(text, `"usage"`) {
 		t.Fatalf("missing usage chunk: %s", text)
+	}
+}
+
+func TestKiroSSEReaderExtractsReasoningContent(t *testing.T) {
+	reader := newKiroSSEReader(strings.NewReader(`{"content":"<thinking>plan</thinking>\n\nanswer"}{"stop":true}`), "unit-test-model")
+	out, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	if !strings.Contains(text, `"reasoning_content":"plan"`) {
+		t.Fatalf("missing reasoning chunk: %s", text)
+	}
+	if !strings.Contains(text, `"content":"answer"`) {
+		t.Fatalf("missing answer content chunk: %s", text)
 	}
 }
 

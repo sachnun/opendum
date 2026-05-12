@@ -1005,6 +1005,18 @@ func kiroToolResultText(result map[string]any) string {
 }
 
 func kiroThinkingRequested(body map[string]any) bool {
+	if kiroIncludeThoughtsFalse(body) || kiroReasoningEffort(body) == "none" {
+		return false
+	}
+	if kiroExplicitThinkingBudget(body) > 0 {
+		return true
+	}
+	if effort := kiroReasoningEffort(body); effort != "" {
+		return defaultThinkingBudget(effort) > 0
+	}
+	if include, ok := body["include_thoughts"].(bool); ok && include {
+		return true
+	}
 	if enabled, ok := body["_includeReasoning"].(bool); ok && enabled {
 		return true
 	}
@@ -1020,6 +1032,16 @@ func kiroThinkingRequested(body map[string]any) bool {
 }
 
 func kiroThinkingBudget(body map[string]any) int {
+	if budget := kiroExplicitThinkingBudget(body); budget > 0 {
+		return budget
+	}
+	if budget := defaultThinkingBudget(kiroReasoningEffort(body)); budget > 0 {
+		return budget
+	}
+	return 20000
+}
+
+func kiroExplicitThinkingBudget(body map[string]any) int {
 	if budget := numberFromAny(body["thinking_budget"]); budget > 0 {
 		return budget
 	}
@@ -1030,7 +1052,28 @@ func kiroThinkingBudget(body map[string]any) int {
 			}
 		}
 	}
-	return 20000
+	return 0
+}
+
+func kiroReasoningEffort(body map[string]any) string {
+	if reasoning, ok := body["reasoning"].(map[string]any); ok {
+		if effort := stringValue(reasoning["effort"]); effort != "" {
+			return effort
+		}
+	}
+	return stringValue(body["reasoning_effort"])
+}
+
+func kiroIncludeThoughtsFalse(body map[string]any) bool {
+	if include, ok := body["include_thoughts"].(bool); ok && !include {
+		return true
+	}
+	if reasoning, ok := body["reasoning"].(map[string]any); ok {
+		if include, ok := defaultAny(reasoning["include_thoughts"], reasoning["includeThoughts"]).(bool); ok && !include {
+			return true
+		}
+	}
+	return false
 }
 
 func nextKiroJSONStart(buffer string, offset int) int {
