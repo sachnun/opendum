@@ -1,39 +1,31 @@
 {
   "name": "opendum",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "packageManager": "pnpm@10.32.1",
+  "packageManager": "npm@11.14.1",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
-    "dev:dashboard": "pnpm --filter @opendum/dashboard dev",
+    "dev:dashboard": "npm run dev --workspace @opendum/dashboard",
     "dev:proxy": "go -C apps/proxy run ./cmd/proxy",
-    "dev": "(pnpm dev:dashboard & pnpm dev:proxy)",
-    "clean": "pnpm -r exec rm -rf dist .next .cron tsconfig.tsbuildinfo",
-    "build:dashboard": "pnpm --filter @opendum/dashboard build",
+    "dev": "(npm run dev:dashboard & npm run dev:proxy)",
+    "build:dashboard": "npm run build --workspace @opendum/dashboard",
     "build:proxy": "go -C apps/proxy build ./...",
-    "build": "pnpm build:dashboard && pnpm build:proxy",
-    "db:push": "pnpm --filter @opendum/dashboard db:push",
-    "db:studio": "pnpm --filter @opendum/dashboard db:studio",
-    "lint": "pnpm --filter @opendum/dashboard lint && go -C apps/proxy test ./...",
+    "build": "npm run build:dashboard && npm run build:proxy",
+    "db:push": "npm run db:push --workspace @opendum/dashboard",
+    "db:studio": "npm run db:studio --workspace @opendum/dashboard",
+    "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./...",
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
     "wrangler": "4.85.0"
   },
-  "pnpm": {
-    "overrides": {
-      "postcss": "^8.5.10"
-    },
-    "peerDependencyRules": {
-      "ignoreMissing": [
-        "mongodb"
-      ]
-    },
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp",
-      "unrs-resolver"
-    ]
+  "overrides": {
+    "postcss": "^8.5.10",
+    "typescript-eslint": "^8.59.3",
+    "@typescript-eslint/eslint-plugin": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.3"
   }
 }

@@ -20,20 +20,18 @@ jobs:
         with:
           ref: main
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Refresh provider models
-        run: pnpm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
+        run: npm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
 
       - name: Build commit message
         id: commit_msg

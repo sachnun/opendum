@@ -9,8 +9,7 @@ on:
       - apps/dashboard/**
       - models/**
       - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
+      - package-lock.json
   workflow_dispatch:
 
 permissions:
@@ -33,23 +32,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          version: 10.32.1
-
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build dashboard for Cloudflare Workers
-        run: pnpm --filter @opendum/dashboard build
+        run: npm run build --workspace @opendum/dashboard
 
       - name: Deploy dashboard to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
