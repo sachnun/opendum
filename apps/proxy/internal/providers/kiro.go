@@ -133,7 +133,7 @@ func (p kiroProvider) buildRequest(body map[string]any) map[string]any {
 			systemPrompt = joinNonEmpty("\n", prefix, systemPrompt)
 		}
 	}
-	messages = mergeAdjacentKiroMessages(messages)
+	messages = normalizeKiroToolMessages(mergeAdjacentKiroMessages(messages))
 
 	history := []any{}
 	if len(messages) > 1 {
@@ -155,15 +155,17 @@ func (p kiroProvider) buildRequest(body map[string]any) map[string]any {
 			}
 			currentContent = "[system: conversation continues]"
 		} else {
-			currentContent = contentToText(last["content"])
+			var toolResults []any
+			currentContent, toolResults = kiroUserContentAndToolResults(last["content"])
 			if currentContent == "" {
-				currentContent = "Continue"
+				if len(toolResults) > 0 {
+					currentContent = "Tool results provided."
+				} else {
+					currentContent = "Continue"
+				}
 			}
-			if role == "tool" {
-				currentContent = "Tool results provided."
-				currentContext["toolResults"] = dedupeKiroToolResults([]any{kiroToolResult(defaultStringValue(last["tool_call_id"], randomID("toolu")), contentToText(last["content"]))})
-			} else if toolResults := kiroToolResultsFromContent(last["content"]); len(toolResults) > 0 {
-				currentContext["toolResults"] = dedupeKiroToolResults(toolResults)
+			if len(toolResults) > 0 {
+				currentContext["toolResults"] = toolResults
 			}
 		}
 	}
@@ -175,6 +177,9 @@ func (p kiroProvider) buildRequest(body map[string]any) map[string]any {
 	if len(currentContext) > 0 {
 		userInput["userInputMessageContext"] = currentContext
 	}
+	if kiroUserInputHasToolResults(userInput) && stringValue(userInput["content"]) == "Continue" {
+		userInput["content"] = "Tool results provided."
+	}
 	history = reconcileKiroCurrentToolResults(history, rawMessages, userInput, modelID)
 	if len(history) > 0 {
 		if last, ok := history[len(history)-1].(map[string]any); ok {
@@ -185,9 +190,12 @@ func (p kiroProvider) buildRequest(body map[string]any) map[string]any {
 	}
 	if systemPrompt != "" {
 		if !injectKiroSystemPrompt(history, systemPrompt) {
-			userInput["content"] = joinNonEmpty("\n\n", systemPrompt, stringValue(userInput["content"]))
+			if !kiroUserInputHasToolResults(userInput) {
+				userInput["content"] = joinNonEmpty("\n\n", systemPrompt, stringValue(userInput["content"]))
+			}
 		}
 	}
+	history = sanitizeKiroToolPairing(history, userInput)
 
 	conversationState := map[string]any{"chatTriggerType": "MANUAL", "conversationId": conversationID, "currentMessage": map[string]any{"userInputMessage": userInput}}
 	if len(history) > 0 {
@@ -251,14 +259,26 @@ func convertKiroMessageToHistoryItem(raw any, modelID string) map[string]any {
 		return map[string]any{"assistantResponseMessage": assistant}
 	}
 
-	text := contentToText(message["content"])
 	if role == "tool" {
-		return map[string]any{"userInputMessage": map[string]any{"content": "Tool results provided.", "modelId": modelID, "origin": "AI_EDITOR", "userInputMessageContext": map[string]any{"toolResults": dedupeKiroToolResults([]any{kiroToolResult(defaultStringValue(message["tool_call_id"], randomID("toolu")), text)})}}}
+		text := contentToText(message["content"])
+		toolResults := kiroToolResultsFromContent(message["content"])
+		if len(toolResults) == 0 {
+			toolResults = []any{kiroToolResult(defaultStringValue(message["tool_call_id"], randomID("toolu")), text)}
+		}
+		return map[string]any{"userInputMessage": map[string]any{"content": "Tool results provided.", "modelId": modelID, "origin": "AI_EDITOR", "userInputMessageContext": map[string]any{"toolResults": dedupeKiroToolResults(toolResults)}}}
 	}
 	if role == "user" {
-		userInput := map[string]any{"content": defaultEmpty(text, "Continue"), "modelId": modelID, "origin": "AI_EDITOR"}
-		if toolResults := kiroToolResultsFromContent(message["content"]); len(toolResults) > 0 {
-			userInput["userInputMessageContext"] = map[string]any{"toolResults": dedupeKiroToolResults(toolResults)}
+		text, toolResults := kiroUserContentAndToolResults(message["content"])
+		if text == "" {
+			if len(toolResults) > 0 {
+				text = "Tool results provided."
+			} else {
+				text = "Continue"
+			}
+		}
+		userInput := map[string]any{"content": text, "modelId": modelID, "origin": "AI_EDITOR"}
+		if len(toolResults) > 0 {
+			userInput["userInputMessageContext"] = map[string]any{"toolResults": toolResults}
 		}
 		return map[string]any{"userInputMessage": userInput}
 	}
@@ -294,6 +314,33 @@ func contentToText(content any) string {
 		}
 	}
 	return strings.Join(chunks, "")
+}
+
+func kiroUserContentAndToolResults(content any) (string, []any) {
+	if _, ok := content.(string); ok {
+		return contentToText(content), nil
+	}
+	if _, ok := content.(map[string]any); ok {
+		return contentToText(content), nil
+	}
+	parts, _ := content.([]any)
+	if len(parts) == 0 {
+		return "", nil
+	}
+	textParts := []any{}
+	toolResults := []any{}
+	for _, raw := range parts {
+		part, _ := raw.(map[string]any)
+		if stringValue(part["type"]) == "tool_result" {
+			id := defaultStringValue(part["tool_use_id"], stringValue(part["tool_call_id"]))
+			if id != "" {
+				toolResults = append(toolResults, kiroToolResult(id, contentToText(part["content"])))
+			}
+			continue
+		}
+		textParts = append(textParts, raw)
+	}
+	return contentToText(textParts), dedupeKiroToolResults(toolResults)
 }
 
 type kiroParserState struct{ buffer string }
@@ -555,6 +602,47 @@ func splitKiroSystemMessages(rawMessages []any) (string, []any) {
 	return strings.Join(systemParts, "\n\n"), messages
 }
 
+func normalizeKiroToolMessages(messages []any) []any {
+	normalized := []any{}
+	pendingToolResults := []any{}
+	flushPending := func() {
+		if len(pendingToolResults) == 0 {
+			return
+		}
+		normalized = append(normalized, map[string]any{"role": "user", "content": pendingToolResults})
+		pendingToolResults = nil
+	}
+
+	for _, raw := range messages {
+		msg, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		role := stringValue(msg["role"])
+		if role == "tool" {
+			pendingToolResults = append(pendingToolResults, map[string]any{"type": "tool_result", "tool_call_id": defaultStringValue(msg["tool_call_id"], randomID("toolu")), "content": msg["content"]})
+			continue
+		}
+		if role == "assistant" {
+			flushPending()
+			normalized = append(normalized, raw)
+			continue
+		}
+		if role == "user" {
+			if len(pendingToolResults) > 0 {
+				copyMsg := cloneAnyMap(msg)
+				copyMsg["content"] = mergeKiroContent(pendingToolResults, msg["content"])
+				normalized = append(normalized, copyMsg)
+				pendingToolResults = nil
+				continue
+			}
+		}
+		normalized = append(normalized, raw)
+	}
+	flushPending()
+	return normalized
+}
+
 func mergeAdjacentKiroMessages(messages []any) []any {
 	merged := []any{}
 	for _, raw := range messages {
@@ -778,27 +866,118 @@ func kiroHistoryItemHasAssistant(raw any) bool {
 }
 
 func injectKiroSystemPrompt(history []any, systemPrompt string) bool {
-	var firstUser map[string]any
 	for _, raw := range history {
 		item, _ := raw.(map[string]any)
 		user, _ := item["userInputMessage"].(map[string]any)
 		if user == nil {
 			continue
 		}
-		if ctx, _ := user["userInputMessageContext"].(map[string]any); ctx != nil && ctx["toolResults"] != nil {
-			if firstUser == nil {
-				firstUser = user
-			}
+		if kiroUserInputHasToolResults(user) {
 			continue
 		}
-		firstUser = user
-		break
+		user["content"] = joinNonEmpty("\n\n", systemPrompt, stringValue(user["content"]))
+		return true
 	}
-	if firstUser == nil {
-		return false
+	return false
+}
+
+func kiroUserInputHasToolResults(userInput map[string]any) bool {
+	ctx, _ := userInput["userInputMessageContext"].(map[string]any)
+	results, _ := ctx["toolResults"].([]any)
+	return len(results) > 0
+}
+
+func sanitizeKiroToolPairing(history []any, currentUser map[string]any) []any {
+	sanitized := make([]any, 0, len(history))
+	var pendingAssistant map[string]any
+	var pendingToolIDs map[string]bool
+	for _, raw := range history {
+		item, _ := raw.(map[string]any)
+		assistant, _ := item["assistantResponseMessage"].(map[string]any)
+		if assistant != nil {
+			filterKiroAssistantToolUses(pendingAssistant, nil)
+			pendingAssistant = assistant
+			pendingToolIDs = kiroAssistantToolUseIDs(assistant)
+			sanitized = append(sanitized, raw)
+			continue
+		}
+
+		if user, _ := item["userInputMessage"].(map[string]any); user != nil {
+			resultIDs := sanitizeKiroUserToolResults(user, pendingToolIDs)
+			filterKiroAssistantToolUses(pendingAssistant, resultIDs)
+			pendingAssistant = nil
+			pendingToolIDs = nil
+		}
+		sanitized = append(sanitized, raw)
 	}
-	firstUser["content"] = joinNonEmpty("\n\n", systemPrompt, stringValue(firstUser["content"]))
-	return true
+	currentResultIDs := sanitizeKiroUserToolResults(currentUser, pendingToolIDs)
+	filterKiroAssistantToolUses(pendingAssistant, currentResultIDs)
+	return sanitized
+}
+
+func kiroAssistantToolUseIDs(assistant map[string]any) map[string]bool {
+	uses, _ := assistant["toolUses"].([]any)
+	if len(uses) == 0 {
+		return nil
+	}
+	ids := map[string]bool{}
+	for _, rawUse := range uses {
+		use, _ := rawUse.(map[string]any)
+		if id := stringValue(use["toolUseId"]); id != "" {
+			ids[id] = true
+		}
+	}
+	return ids
+}
+
+func sanitizeKiroUserToolResults(user map[string]any, allowed map[string]bool) map[string]bool {
+	ctx, _ := user["userInputMessageContext"].(map[string]any)
+	results, _ := ctx["toolResults"].([]any)
+	if len(results) == 0 {
+		return nil
+	}
+	if len(allowed) == 0 {
+		return nil
+	}
+	kept := []any{}
+	keptIDs := map[string]bool{}
+	for _, rawResult := range results {
+		result, _ := rawResult.(map[string]any)
+		id := stringValue(result["toolUseId"])
+		if id != "" && allowed[id] {
+			kept = append(kept, rawResult)
+			keptIDs[id] = true
+			continue
+		}
+		user["content"] = joinNonEmpty("\n\n", stringValue(user["content"]), fmt.Sprintf("[Output for tool call %s]:\n%s", defaultEmpty(id, "unknown"), kiroToolResultText(result)))
+	}
+	setKiroCurrentToolResults(user, kept)
+	if len(keptIDs) == 0 {
+		return nil
+	}
+	return keptIDs
+}
+
+func filterKiroAssistantToolUses(assistant map[string]any, resultIDs map[string]bool) {
+	if assistant == nil {
+		return
+	}
+	uses, _ := assistant["toolUses"].([]any)
+	if len(uses) == 0 {
+		return
+	}
+	kept := make([]any, 0, len(uses))
+	for _, rawUse := range uses {
+		use, _ := rawUse.(map[string]any)
+		if resultIDs[stringValue(use["toolUseId"])] {
+			kept = append(kept, rawUse)
+		}
+	}
+	if len(kept) > 0 {
+		assistant["toolUses"] = kept
+		return
+	}
+	delete(assistant, "toolUses")
 }
 
 func kiroToolResult(id, text string) map[string]any {

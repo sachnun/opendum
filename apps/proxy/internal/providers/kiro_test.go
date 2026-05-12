@@ -40,6 +40,108 @@ func TestKiroBuildRequestConvertsMessagesAndTools(t *testing.T) {
 	}
 }
 
+func TestKiroBuildRequestAttachesToolResultsToNextUser(t *testing.T) {
+	provider := kiroProvider{}
+	messages := []any{
+		map[string]any{"role": "user", "content": "read file"},
+		map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "toolu_1", "function": map[string]any{"name": "read", "arguments": `{"path":"a.txt"}`}}}},
+		map[string]any{"role": "tool", "tool_call_id": "toolu_1", "content": "file contents"},
+		map[string]any{"role": "user", "content": "summarize it"},
+	}
+	payload := provider.buildRequest(map[string]any{
+		"model":    "kiro/unit-test-model",
+		"messages": messages,
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	history := state["history"].([]any)
+	assistant := history[1].(map[string]any)["assistantResponseMessage"].(map[string]any)
+	if len(assistant["toolUses"].([]any)) != 1 {
+		t.Fatalf("assistant toolUses = %#v, want one matching tool use", assistant["toolUses"])
+	}
+	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
+	if current["content"] != "summarize it" {
+		t.Fatalf("current content = %#v, want user text", current["content"])
+	}
+	currentResults := current["userInputMessageContext"].(map[string]any)["toolResults"].([]any)
+	if len(currentResults) != 1 || currentResults[0].(map[string]any)["toolUseId"] != "toolu_1" {
+		t.Fatalf("current toolResults = %#v, want toolu_1", currentResults)
+	}
+}
+
+func TestKiroBuildRequestInsertsSyntheticUserForToolResultsBeforeAssistant(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model": "kiro/unit-test-model",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "read file"},
+			map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "toolu_1", "function": map[string]any{"name": "read", "arguments": `{"path":"a.txt"}`}}}},
+			map[string]any{"role": "tool", "tool_call_id": "toolu_1", "content": "file contents"},
+			map[string]any{"role": "assistant", "content": "I read it."},
+			map[string]any{"role": "user", "content": "continue"},
+		},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	history := state["history"].([]any)
+	if len(history) != 4 {
+		t.Fatalf("history len = %d, want 4: %#v", len(history), history)
+	}
+	toolResultUser := history[2].(map[string]any)["userInputMessage"].(map[string]any)
+	if toolResultUser["content"] != "Tool results provided." {
+		t.Fatalf("tool result user content = %#v", toolResultUser["content"])
+	}
+	results := toolResultUser["userInputMessageContext"].(map[string]any)["toolResults"].([]any)
+	if len(results) != 1 || results[0].(map[string]any)["toolUseId"] != "toolu_1" {
+		t.Fatalf("synthetic toolResults = %#v, want toolu_1", results)
+	}
+	secondAssistant := history[3].(map[string]any)["assistantResponseMessage"].(map[string]any)
+	if secondAssistant["content"] != "I read it." {
+		t.Fatalf("second assistant = %#v", secondAssistant)
+	}
+}
+
+func TestKiroBuildRequestStripsOrphanedToolUses(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model": "kiro/unit-test-model",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "read file"},
+			map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "toolu_missing", "function": map[string]any{"name": "read", "arguments": `{"path":"a.txt"}`}}}},
+			map[string]any{"role": "user", "content": "ignore that"},
+		},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	history := state["history"].([]any)
+	assistant := history[1].(map[string]any)["assistantResponseMessage"].(map[string]any)
+	if _, ok := assistant["toolUses"]; ok {
+		t.Fatalf("assistant retained orphaned toolUses: %#v", assistant)
+	}
+}
+
+func TestKiroBuildRequestDoesNotInjectThinkingIntoToolResults(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model":             "kiro/unit-test-model",
+		"_includeReasoning": true,
+		"messages": []any{
+			map[string]any{"role": "system", "content": "follow policy"},
+			map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "toolu_1", "function": map[string]any{"name": "read", "arguments": `{"path":"a.txt"}`}}}},
+			map[string]any{"role": "tool", "tool_call_id": "toolu_1", "content": "file contents"},
+		},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
+	if strings.Contains(current["content"].(string), "<thinking_mode>") {
+		t.Fatalf("current tool-result content contains thinking tags: %q", current["content"])
+	}
+	if current["content"] != "Tool results provided." {
+		t.Fatalf("current content = %#v, want tool-result placeholder", current["content"])
+	}
+}
+
 func TestKiroBuildRequestInjectsSystemThinkingAndAnthropicTools(t *testing.T) {
 	provider := kiroProvider{}
 	payload := provider.buildRequest(map[string]any{
