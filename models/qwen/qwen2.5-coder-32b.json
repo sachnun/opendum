@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "qwen-qwen2.5-coder-32b-instruct",
     "qwen/qwen2.5-coder-32b-instruct"
@@ -21,11 +19,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "qwen/qwen2.5-coder-32b-instruct"
     }
   }
 }

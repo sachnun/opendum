@@ -1,7 +1,6 @@
 {
   "providers": [
-    "ollama_cloud",
-    "nvidia_nim"
+    "ollama_cloud"
   ],
   "family": "Kimi",
   "meta": {
@@ -19,11 +18,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "moonshotai/kimi-k2-thinking"
     }
   }
 }
