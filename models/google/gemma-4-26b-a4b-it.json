@@ -4,11 +4,8 @@
     "openrouter",
     "workers_ai"
   ],
-  "family": "Google",
+  "family": "Gemini",
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 8192,
-    "releaseDate": "2025-06",
     "reasoning": true,
     "toolCall": true,
     "vision": true,

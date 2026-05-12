@@ -155,11 +155,6 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
       : [];
     data.meta.vision = inputModalities.includes("image");
 
-    // limits
-    if (meta.context_window) {
-      data.meta.contextLength = meta.context_window;
-    }
-
     // family
     data.family = "OpenAI";
 

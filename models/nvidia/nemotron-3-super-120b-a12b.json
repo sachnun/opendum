@@ -7,10 +7,6 @@
   ],
   "family": "NVIDIA",
   "meta": {
-    "contextLength": 262144,
-    "outputLimit": 262144,
-    "knowledgeCutoff": "2024-04",
-    "releaseDate": "2026-03-11",
     "reasoning": true,
     "toolCall": true,
     "vision": false,

@@ -9,9 +9,6 @@
   ],
   "family": "Microsoft",
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 16384,
-    "releaseDate": "2025-07-26",
     "reasoning": false,
     "toolCall": false,
     "vision": false,

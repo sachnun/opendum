@@ -1,11 +1,7 @@
 {
   "providers": [],
-  "family": "Google",
+  "family": "Gemini",
   "meta": {
-    "contextLength": 40000,
-    "outputLimit": 8192,
-    "knowledgeCutoff": "2024-12",
-    "releaseDate": "2024-12-01",
     "reasoning": true,
     "toolCall": true,
     "vision": true,

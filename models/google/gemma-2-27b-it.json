@@ -4,12 +4,9 @@
     "google-gemma-2-27b-it",
     "google/gemma-2-27b-it"
   ],
-  "family": "Google",
+  "family": "Gemini",
   "ignored": true,
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 4096,
-    "releaseDate": "2024-06-24",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

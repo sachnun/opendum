@@ -2,10 +2,6 @@
   "providers": [],
   "family": "Microsoft",
   "meta": {
-    "contextLength": 4096,
-    "outputLimit": 1024,
-    "knowledgeCutoff": "2023-10",
-    "releaseDate": "2024-04-23",
     "reasoning": false,
     "toolCall": false,
     "vision": false,

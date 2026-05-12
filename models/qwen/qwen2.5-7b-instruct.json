@@ -7,10 +7,6 @@
   "family": "Qwen",
   "ignored": true,
   "meta": {
-    "contextLength": 131072,
-    "outputLimit": 8192,
-    "knowledgeCutoff": "2024-04",
-    "releaseDate": "2024-09",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

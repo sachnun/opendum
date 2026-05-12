@@ -5,10 +5,6 @@
   "ignored": true,
   "family": "NVIDIA",
   "meta": {
-    "contextLength": 131072,
-    "outputLimit": 131072,
-    "knowledgeCutoff": "2024-09",
-    "releaseDate": "2024-12",
     "reasoning": true,
     "toolCall": true,
     "vision": false,

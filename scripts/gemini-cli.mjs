@@ -297,20 +297,12 @@ function enrichNewModels(modelsDir, addedKeys, apiModels) {
 
       data.meta.vision = true;
 
-      if (meta.inputTokenLimit || meta.outputTokenLimit) {
-        if (meta.inputTokenLimit) data.meta.contextLength = meta.inputTokenLimit;
-        if (meta.outputTokenLimit) data.meta.outputLimit = meta.outputTokenLimit;
-      }
     } else {
       // Fallback enrichment based on known Gemini model patterns
       const fallback = getFallbackMetadata(modelKey);
       data.meta.reasoning = fallback.reasoning;
       data.meta.toolCall = fallback.tool_call;
       data.meta.vision = fallback.attachment;
-      if (fallback.limit) {
-        data.meta.contextLength = fallback.limit.context;
-        data.meta.outputLimit = fallback.limit.output;
-      }
     }
 
     // Family

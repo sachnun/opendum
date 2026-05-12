@@ -5,10 +5,6 @@
   ],
   "family": "DeepSeek",
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 64000,
-    "knowledgeCutoff": "2024-12",
-    "releaseDate": "2025-01-01",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

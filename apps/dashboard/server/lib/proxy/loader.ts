@@ -5,10 +5,6 @@
  * never need runtime filesystem access.
  */
 export interface ModelMeta {
-  contextLength?: number;
-  outputLimit?: number;
-  knowledgeCutoff?: string;
-  releaseDate?: string;
   reasoning?: boolean;
   toolCall?: boolean;
   vision?: boolean;

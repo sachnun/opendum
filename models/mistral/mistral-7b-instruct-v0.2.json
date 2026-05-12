@@ -2,10 +2,6 @@
   "providers": [],
   "family": "Mistral",
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 128000,
-    "knowledgeCutoff": "2024-07",
-    "releaseDate": "2024-07-01",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

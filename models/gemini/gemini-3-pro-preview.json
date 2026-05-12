@@ -9,10 +9,6 @@
   ],
   "family": "Gemini",
   "meta": {
-    "contextLength": 1000000,
-    "outputLimit": 64000,
-    "knowledgeCutoff": "2025-01",
-    "releaseDate": "2025-11-18",
     "reasoning": true,
     "toolCall": true,
     "vision": true,

@@ -6,10 +6,6 @@
   "ignored": true,
   "family": "Meta",
   "meta": {
-    "contextLength": 16000,
-    "outputLimit": 4096,
-    "knowledgeCutoff": "2023-12",
-    "releaseDate": "2025-01-01",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

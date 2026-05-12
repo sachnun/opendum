@@ -2,12 +2,8 @@
   "providers": [
     "nvidia_nim"
   ],
-  "family": "Google",
+  "family": "Gemini",
   "meta": {
-    "contextLength": 131072,
-    "outputLimit": 8192,
-    "knowledgeCutoff": "2024-12",
-    "releaseDate": "2024-12-01",
     "reasoning": false,
     "toolCall": false,
     "vision": false,

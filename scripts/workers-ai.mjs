@@ -97,11 +97,6 @@ function isTrue(value) {
   return value === true || value === "true";
 }
 
-function parsePositiveInteger(value) {
-  const parsed = Number.parseInt(String(value ?? ""), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 function supportsMessagesInput(value, depth = 0) {
   if (depth > 64 || value === null || value === undefined) return false;
   if (Array.isArray(value)) {
@@ -138,7 +133,7 @@ function deriveFamily(modelKey) {
   if (/^kimi-/i.test(modelKey)) return "Kimi";
   if (/^glm-/i.test(modelKey)) return "Z.AI";
   if (/^gpt-|^o\d/i.test(modelKey)) return "OpenAI";
-  if (/^gemma/i.test(modelKey)) return "Google";
+  if (/^gemma/i.test(modelKey)) return "Gemini";
   if (/^llama|^meta-llama/i.test(modelKey)) return "Meta";
   if (/^qwen|^qwq-/i.test(modelKey)) return "Qwen";
   if (/^deepseek-/i.test(modelKey)) return "DeepSeek";
@@ -150,9 +145,7 @@ function deriveFamily(modelKey) {
 }
 
 function buildMeta(model) {
-  const contextLength = parsePositiveInteger(getProperty(model, "context_window"));
   const vision = isTrue(getProperty(model, "vision"));
-  const createdAt = typeof model?.created_at === "string" ? model.created_at.slice(0, 10) : undefined;
 
   const meta = {
     reasoning: isTrue(getProperty(model, "reasoning")),
@@ -163,9 +156,6 @@ function buildMeta(model) {
       output: ["text"],
     },
   };
-
-  if (contextLength !== undefined) meta.contextLength = contextLength;
-  if (createdAt) meta.releaseDate = createdAt;
 
   return meta;
 }

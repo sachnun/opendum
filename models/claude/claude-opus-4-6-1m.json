@@ -8,10 +8,6 @@
   ],
   "family": "Claude",
   "meta": {
-    "contextLength": 1000000,
-    "outputLimit": 128000,
-    "knowledgeCutoff": "2025-05",
-    "releaseDate": "2026-02-05",
     "reasoning": true,
     "toolCall": true,
     "vision": true,

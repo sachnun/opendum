@@ -2,10 +2,6 @@
   "providers": [],
   "family": "DeepSeek",
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 32000,
-    "knowledgeCutoff": "2024-07",
-    "releaseDate": "2025-08-19",
     "reasoning": true,
     "toolCall": true,
     "vision": false,

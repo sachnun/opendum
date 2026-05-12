@@ -3,9 +3,6 @@
   "family": "OpenAI",
   "ignored": true,
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 4096,
-    "releaseDate": "2025-08-06",
     "reasoning": true,
     "toolCall": true,
     "vision": false,

@@ -2,9 +2,6 @@
   "providers": [],
   "family": "AGI Nova",
   "meta": {
-    "contextLength": 1000000,
-    "outputLimit": 65536,
-    "releaseDate": "2026-03",
     "reasoning": true,
     "toolCall": true,
     "vision": true

@@ -3,8 +3,8 @@
     "openrouter"
   ],
   "description": "OpenRouter router that automatically selects a compatible free model.",
+  "family": "OpenRouter",
   "meta": {
-    "contextLength": 200000,
     "reasoning": true,
     "toolCall": true,
     "vision": true

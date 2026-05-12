@@ -4,10 +4,6 @@
   ],
   "family": "OpenAI",
   "meta": {
-    "contextLength": 400000,
-    "outputLimit": 128000,
-    "knowledgeCutoff": "2024-05-30",
-    "releaseDate": "2025-08-07",
     "reasoning": true,
     "toolCall": true,
     "vision": true,

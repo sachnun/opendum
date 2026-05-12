@@ -5,9 +5,6 @@
   "ignored": true,
   "family": "Mistral",
   "meta": {
-    "contextLength": 65536,
-    "outputLimit": 65536,
-    "releaseDate": "2025-04-01",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

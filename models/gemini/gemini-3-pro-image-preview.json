@@ -8,10 +8,6 @@
   "family": "Gemini",
   "ignored": true,
   "meta": {
-    "contextLength": 32768,
-    "outputLimit": 64000,
-    "knowledgeCutoff": "2025-06",
-    "releaseDate": "2025-11-20",
     "reasoning": false,
     "toolCall": false,
     "vision": true,

@@ -6,10 +6,6 @@
   ],
   "family": "MiniMax",
   "meta": {
-    "contextLength": 204800,
-    "outputLimit": 131072,
-    "knowledgeCutoff": "2025-01",
-    "releaseDate": "2026-02-12",
     "reasoning": true,
     "toolCall": true,
     "vision": false,

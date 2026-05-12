@@ -2,9 +2,6 @@
   "providers": [],
   "family": "Qwen",
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 32000,
-    "releaseDate": "2026-02-09",
     "reasoning": false,
     "toolCall": true,
     "vision": true,

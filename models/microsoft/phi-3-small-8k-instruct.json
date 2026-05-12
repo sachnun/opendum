@@ -7,10 +7,6 @@
   "family": "Microsoft",
   "ignored": true,
   "meta": {
-    "contextLength": 8192,
-    "outputLimit": 2048,
-    "knowledgeCutoff": "2023-10",
-    "releaseDate": "2024-04-23",
     "reasoning": false,
     "toolCall": false,
     "vision": false,

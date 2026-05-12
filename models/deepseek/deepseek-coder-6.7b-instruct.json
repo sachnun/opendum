@@ -9,9 +9,6 @@
   "family": "DeepSeek",
   "ignored": true,
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 4096,
-    "releaseDate": "2023-10-29",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

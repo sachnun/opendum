@@ -6,8 +6,6 @@
   "family": "NVIDIA",
   "ignored": true,
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 4096,
     "modalities": {
       "input": [
         "text"

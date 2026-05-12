@@ -11,14 +11,10 @@ import (
 )
 
 type Meta struct {
-	ContextLength   *int        `json:"contextLength"`
-	OutputLimit     *int        `json:"outputLimit"`
-	KnowledgeCutoff *string     `json:"knowledgeCutoff"`
-	ReleaseDate     *string     `json:"releaseDate"`
-	Reasoning       *bool       `json:"reasoning"`
-	ToolCall        *bool       `json:"toolCall"`
-	Vision          *bool       `json:"vision"`
-	Modalities      *Modalities `json:"modalities"`
+	Reasoning  *bool       `json:"reasoning"`
+	ToolCall   *bool       `json:"toolCall"`
+	Vision     *bool       `json:"vision"`
+	Modalities *Modalities `json:"modalities"`
 }
 
 type Modalities struct {

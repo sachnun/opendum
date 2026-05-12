@@ -10,10 +10,6 @@
   ],
   "family": "Meta",
   "meta": {
-    "contextLength": 128000,
-    "outputLimit": 4096,
-    "knowledgeCutoff": "2023-12",
-    "releaseDate": "2024-12-06",
     "reasoning": false,
     "toolCall": true,
     "vision": false,

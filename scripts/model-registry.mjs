@@ -14,10 +14,6 @@ const MODEL_PROPERTY_ORDER = [
 ];
 
 const META_PROPERTY_ORDER = [
-  "contextLength",
-  "outputLimit",
-  "knowledgeCutoff",
-  "releaseDate",
   "reasoning",
   "toolCall",
   "vision",

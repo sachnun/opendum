@@ -1,8 +1,4 @@
 export interface ModelMeta {
-  contextLength?: number;
-  outputLimit?: number;
-  knowledgeCutoff?: string;
-  releaseDate?: string;
   reasoning?: boolean;
   toolCall?: boolean;
   vision?: boolean;

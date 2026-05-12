@@ -5,9 +5,6 @@
   "family": "Deep Cogito",
   "ignored": true,
   "meta": {
-    "contextLength": 163840,
-    "outputLimit": 32000,
-    "releaseDate": "2025-11-19",
     "reasoning": true,
     "toolCall": true,
     "vision": false

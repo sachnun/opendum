@@ -4,8 +4,6 @@
   ],
   "family": "Meta",
   "meta": {
-    "contextLength": 32000,
-    "releaseDate": "2024-07-25",
     "reasoning": false,
     "toolCall": false,
     "vision": false,

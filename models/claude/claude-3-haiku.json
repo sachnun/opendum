@@ -2,10 +2,6 @@
   "providers": [],
   "family": "Claude",
   "meta": {
-    "contextLength": 200000,
-    "outputLimit": 4096,
-    "knowledgeCutoff": "2023-08-31",
-    "releaseDate": "2024-03-13",
     "reasoning": false,
     "toolCall": true,
     "vision": true,

@@ -4,8 +4,6 @@
   ],
   "family": "DeepSeek",
   "meta": {
-    "contextLength": 80000,
-    "releaseDate": "2025-01-22",
     "reasoning": true,
     "toolCall": false,
     "vision": false,

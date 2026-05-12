@@ -5,10 +5,6 @@
   ],
   "family": "Kimi",
   "meta": {
-    "contextLength": 262144,
-    "outputLimit": 262144,
-    "knowledgeCutoff": "2025-01",
-    "releaseDate": "2026-01",
     "reasoning": true,
     "toolCall": true,
     "vision": false,

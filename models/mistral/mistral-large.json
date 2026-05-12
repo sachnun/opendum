@@ -4,10 +4,6 @@
   ],
   "family": "Mistral",
   "meta": {
-    "contextLength": 262144,
-    "outputLimit": 262144,
-    "knowledgeCutoff": "2024-11",
-    "releaseDate": "2024-11-01",
     "reasoning": false,
     "toolCall": true,
     "vision": true,

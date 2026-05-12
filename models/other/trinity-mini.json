@@ -2,10 +2,6 @@
   "providers": [],
   "family": "Trinity",
   "meta": {
-    "contextLength": 131072,
-    "outputLimit": 131072,
-    "knowledgeCutoff": "2024-10",
-    "releaseDate": "2025-12",
     "reasoning": false,
     "toolCall": false,
     "vision": false,
