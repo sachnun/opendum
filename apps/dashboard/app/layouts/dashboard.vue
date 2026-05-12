@@ -55,6 +55,7 @@ const supportNavigation: NavItem[] = [
   { name: "Usage", href: "/dashboard/usage", icon: "i-lucide-book-open" },
   { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
 ];
+const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
@@ -171,9 +172,13 @@ function visibleSubItems(item: NavItem) {
     return item.children
       .filter((subItem) => pinnedProviderHrefs.value.has(subItem.href))
       .sort((a, b) => {
+        const availabilityA = (activeAccountCountByHref.value[a.href] ?? 0) > 0 ? "active" : "inactive";
+        const availabilityB = (activeAccountCountByHref.value[b.href] ?? 0) > 0 ? "active" : "inactive";
         const indicatorA = accountIndicatorByHref.value[a.href] ?? "normal";
         const indicatorB = accountIndicatorByHref.value[b.href] ?? "normal";
-        return PROVIDER_STATUS_ORDER[indicatorA] - PROVIDER_STATUS_ORDER[indicatorB] || a.name.localeCompare(b.name);
+        return PROVIDER_AVAILABILITY_ORDER[availabilityA] - PROVIDER_AVAILABILITY_ORDER[availabilityB]
+          || PROVIDER_STATUS_ORDER[indicatorA] - PROVIDER_STATUS_ORDER[indicatorB]
+          || a.name.localeCompare(b.name);
       });
   }
 
