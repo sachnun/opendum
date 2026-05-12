@@ -59,7 +59,7 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
 
-const { data: accountSummaryData, pending: accountSummaryPending } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
+const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
   const summary = await dashboardApi.accounts.summary();
   const nextAccountCounts = { ...emptyAccountCounts };
   const nextActiveAccountCounts = { ...emptyAccountCounts };
@@ -122,6 +122,11 @@ const PENDING_NAV_ANCHOR_KEY = "opendum:pending-nav-anchor";
 const HEADER_OFFSET = 112;
 const PENDING_SCROLL_RETRIES = 20;
 const PENDING_SCROLL_DELAY_MS = 60;
+const ACCOUNT_SUMMARY_REFRESH_MS = 30_000;
+let accountSummaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let stopAccountSummaryRefreshListener: (() => void) | null = null;
+let accountSummaryRefreshInFlight: Promise<void> | null = null;
+let accountSummaryRefreshQueued = false;
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
@@ -247,7 +252,32 @@ function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
   mobileOpen.value = false;
 }
 
+async function refreshAccountSummaryOnce() {
+  if (accountSummaryRefreshInFlight) {
+    accountSummaryRefreshQueued = true;
+    return;
+  }
+
+  accountSummaryRefreshInFlight = refreshAccountSummary().then(() => undefined);
+  try {
+    await accountSummaryRefreshInFlight;
+  } finally {
+    accountSummaryRefreshInFlight = null;
+    if (accountSummaryRefreshQueued) {
+      accountSummaryRefreshQueued = false;
+      void refreshAccountSummaryOnce();
+    }
+  }
+}
+
 onMounted(() => {
+  accountSummaryRefreshTimer = setInterval(() => {
+    void refreshAccountSummaryOnce();
+  }, ACCOUNT_SUMMARY_REFRESH_MS);
+  stopAccountSummaryRefreshListener = onDashboardAccountSummaryRefresh(() => {
+    void refreshAccountSummaryOnce();
+  });
+
   watch(subNavigationAnchorIds, (anchorIds, _previousAnchorIds, onCleanup) => {
     if (anchorIds.length === 0) {
       activeAnchorId.value = null;
@@ -314,6 +344,11 @@ onMounted(() => {
 
     tryScroll();
   }, { immediate: true });
+});
+
+onBeforeUnmount(() => {
+  if (accountSummaryRefreshTimer) clearInterval(accountSummaryRefreshTimer);
+  stopAccountSummaryRefreshListener?.();
 });
 
 async function handleSignOut() {

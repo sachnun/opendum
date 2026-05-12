@@ -183,6 +183,11 @@ function handlePinnedToggled() {
 function handleAccountConnected() {
   refresh();
 }
+
+function handleAccountChanged() {
+  refresh();
+  requestDashboardAccountSummaryRefresh();
+}
 </script>
 
 <template>
@@ -277,7 +282,7 @@ function handleAccountConnected() {
           :quota-info="quotaByAccountId[account.id] ?? null"
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
           :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"
-          @changed="refresh"
+          @changed="handleAccountChanged"
           @refresh-quota="handleQuotaRefresh"
         />
       </div>

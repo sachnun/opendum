@@ -34,7 +34,7 @@ async function togglePin(event: Event) {
     if (!result.success) throw new Error(result.error);
     localPinned.value = result.data.pinned;
     emit("toggled", props.providerKey, result.data.pinned);
-    void refreshNuxtData("dashboard-shell-accounts");
+    requestDashboardAccountSummaryRefresh();
   } catch {
     localPinned.value = previous;
   } finally {

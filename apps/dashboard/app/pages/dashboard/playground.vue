@@ -901,10 +901,15 @@ function setResponse(panelId: string, response: ResponseData) {
   responses.value = { ...responses.value, [panelId]: response };
 }
 
+function refreshAccountSummary() {
+  requestDashboardAccountSummaryRefresh();
+}
+
 async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, accountId: string | null) {
   const requestStartedAt = Date.now();
   let waitMs: number | null = null;
   let usedAccountId: string | null = null;
+  let shouldRefreshAccountSummary = false;
 
   setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: buildResponseMetrics(null, null, null), startedAt: requestStartedAt });
 
@@ -930,6 +935,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
     waitMs = Date.now() - requestStartedAt;
     usedAccountId = response.headers.get("x-provider-account-id");
+    shouldRefreshAccountSummary = true;
 
     if (!response.ok) {
       const clonedResponse = response.clone();
@@ -978,6 +984,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: error instanceof Error ? error.message : "Unknown error", metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
   } finally {
     controllers.delete(panelId);
+    if (shouldRefreshAccountSummary) refreshAccountSummary();
   }
 }
 
