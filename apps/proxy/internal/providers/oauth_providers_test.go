@@ -506,6 +506,50 @@ func TestAntigravityTransformRemovesCachedContentAndSetsClaudeThinking(t *testin
 	}
 }
 
+func TestAntigravitySanitizesUnsupportedToolSchemaFields(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	payload := openAIToGemini(map[string]any{
+		"messages": []any{map[string]any{"role": "user", "content": "hi"}},
+		"tools": []any{map[string]any{"type": "function", "function": map[string]any{
+			"name": "bash",
+			"parameters": map[string]any{
+				"$schema":              "http://json-schema.org/draft-07/schema#",
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"timeout": map[string]any{"type": "integer", "exclusiveMinimum": 0, "maximum": 120000},
+					"options": map[string]any{"type": "object", "properties": map[string]any{
+						"retries": map[string]any{"type": []any{"integer", "null"}, "minimum": 1, "exclusiveMaximum": 5},
+					}},
+				},
+				"required": []any{"timeout"},
+			},
+		}}},
+	})
+
+	provider.transformAntigravityPayload(t.Context(), payload, "claude-opus-4-6-thinking", "sess")
+
+	decl := payload["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
+	params := decl["parameters"].(map[string]any)
+	if _, ok := params["$schema"]; ok {
+		t.Fatalf("$schema leaked: %#v", params)
+	}
+	if _, ok := params["additionalProperties"]; ok {
+		t.Fatalf("additionalProperties leaked: %#v", params)
+	}
+	props := params["properties"].(map[string]any)
+	timeout := props["timeout"].(map[string]any)
+	if _, ok := timeout["exclusiveMinimum"]; ok || timeout["maximum"] != 120000 {
+		t.Fatalf("timeout schema not sanitized: %#v", timeout)
+	}
+	options := props["options"].(map[string]any)
+	retries := options["properties"].(map[string]any)["retries"].(map[string]any)
+	if _, ok := retries["exclusiveMaximum"]; ok || retries["minimum"] != 1 || retries["nullable"] != true {
+		t.Fatalf("nested schema not sanitized: %#v", retries)
+	}
+}
+
 func TestAntigravityV1EndpointOrderAndDefaults(t *testing.T) {
 	provider := antigravityProvider{}.delegate()
 	wantEndpoints := []string{"https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}

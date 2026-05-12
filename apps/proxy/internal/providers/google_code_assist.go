@@ -585,15 +585,15 @@ func normalizeClaudeTools(payload map[string]any) {
 			params, _ := decl["parameters"].(map[string]any)
 			if params == nil {
 				params = map[string]any{"type": "object", "properties": map[string]any{}}
-				decl["parameters"] = params
 			}
-			delete(params, "$schema")
+			params = sanitizeGoogleFunctionSchema(params)
 			if params["type"] == nil {
 				params["type"] = "object"
 			}
 			if params["properties"] == nil {
 				params["properties"] = map[string]any{}
 			}
+			decl["parameters"] = params
 		}
 	}
 }
@@ -1857,9 +1857,78 @@ func geminiTools(raw any) []any {
 		if !ok {
 			params = map[string]any{"type": "object", "properties": map[string]any{}}
 		}
+		params = sanitizeGoogleFunctionSchema(params)
 		out = append(out, map[string]any{"name": name, "description": defaultStringValue(fn["description"], ""), "parameters": params})
 	}
 	return out
+}
+
+func sanitizeGoogleFunctionSchema(schema map[string]any) map[string]any {
+	if schema == nil {
+		return nil
+	}
+	out := map[string]any{}
+	for key, value := range schema {
+		switch key {
+		case "type":
+			if typ := normalizeSchemaType(value); typ != "" {
+				out["type"] = typ
+			}
+		case "properties":
+			props, _ := value.(map[string]any)
+			if len(props) == 0 {
+				continue
+			}
+			cleaned := map[string]any{}
+			for name, rawProp := range props {
+				if prop, ok := rawProp.(map[string]any); ok {
+					cleaned[name] = sanitizeGoogleFunctionSchema(prop)
+				}
+			}
+			if len(cleaned) > 0 {
+				out["properties"] = cleaned
+			}
+		case "items":
+			if items, ok := value.(map[string]any); ok {
+				out["items"] = sanitizeGoogleFunctionSchema(items)
+			}
+		case "anyOf":
+			items := []any{}
+			for _, rawItem := range anySlice(value) {
+				if item, ok := rawItem.(map[string]any); ok {
+					items = append(items, sanitizeGoogleFunctionSchema(item))
+				}
+			}
+			if len(items) > 0 {
+				out["anyOf"] = items
+			}
+		case "description", "format", "nullable", "enum", "required", "propertyOrdering", "minimum", "maximum", "minItems", "maxItems", "minLength", "maxLength", "pattern", "title", "default", "example", "minProperties", "maxProperties":
+			out[key] = value
+		}
+	}
+	if schemaTypeAllowsNull(schema["type"]) && out["nullable"] == nil {
+		out["nullable"] = true
+	}
+	if value, ok := schema["const"]; ok && out["enum"] == nil {
+		out["enum"] = []any{value}
+	}
+	if out["type"] == nil {
+		if out["properties"] != nil {
+			out["type"] = "object"
+		} else if out["items"] != nil {
+			out["type"] = "array"
+		}
+	}
+	return out
+}
+
+func schemaTypeAllowsNull(value any) bool {
+	for _, raw := range anySlice(value) {
+		if stringValue(raw) == "null" {
+			return true
+		}
+	}
+	return false
 }
 
 type schemaInfo struct {
