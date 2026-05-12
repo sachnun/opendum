@@ -127,7 +127,7 @@ func (p kiroProvider) buildRequest(body map[string]any) map[string]any {
 	if instructions := strings.TrimSpace(stringValue(body["instructions"])); instructions != "" {
 		systemPrompt = joinNonEmpty("\n\n", instructions, systemPrompt)
 	}
-	if kiroThinkingRequested(body) {
+	if kiroThinkingRequested(body) && !kiroUsesAdaptiveThinking(modelID) {
 		prefix := fmt.Sprintf("<thinking_mode>enabled</thinking_mode><max_thinking_length>%d</max_thinking_length>", kiroThinkingBudget(body))
 		if !strings.Contains(systemPrompt, "<thinking_mode>") {
 			systemPrompt = joinNonEmpty("\n", prefix, systemPrompt)
@@ -1002,6 +1002,11 @@ func dedupeKiroToolResults(results []any) []any {
 func kiroToolResultText(result map[string]any) string {
 	content, _ := result["content"].([]any)
 	return contentToText(content)
+}
+
+func kiroUsesAdaptiveThinking(modelID string) bool {
+	modelID = strings.ToLower(lastModelSegment(strings.TrimSpace(modelID)))
+	return modelID == "claude-opus-4.7" || modelID == "claude-opus-4-7"
 }
 
 func kiroThinkingRequested(body map[string]any) bool {

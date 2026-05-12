@@ -788,6 +788,11 @@ function mapReasoningEffortToThinkingBudget(effort: ReasoningEffort): number {
   return 0;
 }
 
+function usesAdaptiveThinking(modelId: string): boolean {
+  const normalized = modelId.toLowerCase();
+  return normalized === "claude-opus-4-7" || normalized === "claude-opus-4.7";
+}
+
 function convertOpenAIContentToAnthropic(content: ScenarioMessage["content"]): string | Array<Record<string, unknown>> {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -840,7 +845,14 @@ function buildRequestBody(modelId: string, messages: ScenarioMessage[], currentS
     };
     if (anthropicPayload.system) requestBody.system = anthropicPayload.system;
     if (accountId) requestBody.provider_account_id = accountId;
-    if (currentSettings.reasoningEffort !== "none") requestBody.thinking = { type: "enabled", budget_tokens: mapReasoningEffortToThinkingBudget(currentSettings.reasoningEffort) };
+    if (currentSettings.reasoningEffort !== "none") {
+      if (usesAdaptiveThinking(modelId)) {
+        requestBody.thinking = { type: "adaptive" };
+        requestBody.output_config = { effort: currentSettings.reasoningEffort };
+      } else {
+        requestBody.thinking = { type: "enabled", budget_tokens: mapReasoningEffortToThinkingBudget(currentSettings.reasoningEffort) };
+      }
+    }
     return requestBody;
   }
 

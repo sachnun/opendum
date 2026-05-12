@@ -7,7 +7,7 @@ import (
 )
 
 func transformAnthropicToOpenAI(body map[string]any) map[string]any {
-	payload := cloneMapExcept(body, "system", "provider_account_id")
+	payload := cloneMapExcept(body, "system", "provider_account_id", "thinking", "output_config")
 	if _, ok := payload["max_tokens"]; !ok {
 		payload["max_tokens"] = 4096
 	}
@@ -123,7 +123,15 @@ func applyAnthropicThinkingParams(payload, body map[string]any) {
 		payload["max_tokens"] = maxTokens
 	}
 	thinking, ok := body["thinking"].(map[string]any)
-	if !ok || thinking["type"] != "enabled" {
+	if !ok {
+		return
+	}
+	if thinking["type"] == "adaptive" {
+		payload["reasoning_effort"] = anthropicEffort(body)
+		payload["_includeReasoning"] = true
+		return
+	}
+	if thinking["type"] != "enabled" {
 		return
 	}
 	if thinking["budget_tokens"] == nil {
@@ -132,6 +140,15 @@ func applyAnthropicThinkingParams(payload, body map[string]any) {
 		payload["thinking_budget"] = thinking["budget_tokens"]
 	}
 	payload["_includeReasoning"] = true
+}
+
+func anthropicEffort(body map[string]any) string {
+	if outputConfig, ok := body["output_config"].(map[string]any); ok {
+		if effort := stringValue(outputConfig["effort"]); effort != "" {
+			return effort
+		}
+	}
+	return "high"
 }
 
 type convertedBlocks struct {

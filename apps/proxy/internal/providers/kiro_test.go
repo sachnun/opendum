@@ -202,6 +202,21 @@ func TestKiroBuildRequestMapsReasoningEffortLikeOtherProviders(t *testing.T) {
 	}
 }
 
+func TestKiroBuildRequestSkipsManualThinkingForOpus47(t *testing.T) {
+	provider := kiroProvider{}
+	payload := provider.buildRequest(map[string]any{
+		"model":            "claude-opus-4-7",
+		"reasoning_effort": "xhigh",
+		"messages":         []any{map[string]any{"role": "user", "content": "hello"}},
+	})
+
+	state := payload["conversationState"].(map[string]any)
+	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
+	if strings.Contains(current["content"].(string), "<thinking_mode>") {
+		t.Fatalf("current content contains manual thinking tags: %q", current["content"])
+	}
+}
+
 func TestKiroBuildRequestReasoningEffortNoneDisablesThinking(t *testing.T) {
 	provider := kiroProvider{}
 	payload := provider.buildRequest(map[string]any{

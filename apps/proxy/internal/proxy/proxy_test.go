@@ -327,6 +327,22 @@ func TestTransformAnthropicToOpenAIDefaultMaxTokens(t *testing.T) {
 	}
 }
 
+func TestTransformAnthropicAdaptiveThinkingMapsToReasoningEffort(t *testing.T) {
+	payload := transformAnthropicToOpenAI(map[string]any{
+		"model":         "claude-opus-4-7",
+		"messages":      []any{map[string]any{"role": "user", "content": "hello"}},
+		"thinking":      map[string]any{"type": "adaptive"},
+		"output_config": map[string]any{"effort": "xhigh"},
+	})
+
+	if payload["reasoning_effort"] != "xhigh" || payload["_includeReasoning"] != true {
+		t.Fatalf("payload missing adaptive thinking metadata: %#v", payload)
+	}
+	if payload["thinking"] != nil || payload["output_config"] != nil || payload["thinking_budget"] != nil {
+		t.Fatalf("payload leaked Anthropic-only thinking params: %#v", payload)
+	}
+}
+
 func TestTransformAnthropicToolChoiceVariants(t *testing.T) {
 	tests := []struct {
 		name string

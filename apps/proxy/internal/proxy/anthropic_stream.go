@@ -263,5 +263,5 @@ func includeThinking(r *http.Request) bool {
 		return false
 	}
 	thinking, ok := body["thinking"].(map[string]any)
-	return ok && thinking["type"] == "enabled"
+	return ok && (thinking["type"] == "enabled" || thinking["type"] == "adaptive")
 }
