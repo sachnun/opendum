@@ -9,7 +9,6 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "ollama_cloud",
   "openrouter",
   "groq",
-  "kilo_code",
   "workers_ai",
 ] as const;
 

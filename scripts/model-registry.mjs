@@ -20,7 +20,7 @@ const META_PROPERTY_ORDER = [
   "modalities",
 ];
 
-const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "minTier", "aliases"];
+const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "authless", "minTier", "aliases"];
 const FIRST_PROVIDERS = new Set(["opencode"]);
 
 function isPlainObject(value) {

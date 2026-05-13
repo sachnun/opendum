@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "./model-registry.mjs";
+import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
 
-const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
+const KILO_CODE_MODELS_URL = "https://unroxy.koyeb.app/api.kilo.ai/api/gateway/models";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 
@@ -42,13 +42,7 @@ function isEligibleModel(model) {
   const id = typeof model.id === "string" ? model.id.trim() : "";
   if (!id) return false;
 
-  // Include all kilo-auto models (smart routing)
-  if (id.startsWith("kilo-auto/")) return true;
-
-  // Include all free models
-  if (model.isFree === true) return true;
-
-  return false;
+  return model.isFree === true;
 }
 
 function buildModelMap(models) {
@@ -121,12 +115,31 @@ async function main() {
   const modelMap = buildModelMap(models);
 
   const result = syncProviderModels(modelsDir, "kilo_code", modelMap);
+  const metadataUpdates = applyAuthlessMetadata(modelsDir, modelMap);
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
+  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0 && metadataUpdates === 0) {
     console.log(`Kilo Code models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`Kilo Code: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
+    console.log(`Kilo Code: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, metadata ${metadataUpdates}).`);
   }
+}
+
+function applyAuthlessMetadata(modelsDir, modelMap) {
+  const index = buildModelIndex(modelsDir);
+  let updated = 0;
+
+  for (const modelKey of modelMap.keys()) {
+    const entry = index[modelKey];
+    if (!entry?.data?.providerConfig?.kilo_code) continue;
+
+    if (entry.data.providerConfig.kilo_code.authless !== true) {
+      entry.data.providerConfig.kilo_code.authless = true;
+      writeModelJson(entry.path, entry.data);
+      updated += 1;
+    }
+  }
+
+  return updated;
 }
 
 main().catch((error) => {

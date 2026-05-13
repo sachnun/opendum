@@ -124,6 +124,29 @@ export function getProviderAccessRule(
   return minTier ? { minTier } : null;
 }
 
+export function isAuthlessProviderModel(model: string, provider: string): boolean {
+  const canonical = resolveModelAlias(model);
+  return EFFECTIVE_MODEL_REGISTRY[canonical]?.providerConfig?.[provider]?.authless === true;
+}
+
+export function getAuthlessProviderModels(): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+
+  for (const [model, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
+    for (const provider of info.providers) {
+      if (info.providerConfig?.[provider]?.authless !== true) continue;
+      result[provider] = [...(result[provider] ?? []), model];
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(result).map(([provider, models]) => [
+      provider,
+      models.sort((a, b) => a.localeCompare(b)),
+    ])
+  );
+}
+
 /**
  * Resolve model alias to canonical name
  */

@@ -5,9 +5,10 @@ import { db } from "../lib/db";
 import { providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "../lib/db/schema";
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
-import { getAuthlessProviderAccounts, isAuthlessProvider } from "../lib/proxy/authless-providers";
+import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "../lib/proxy/authless-providers";
 import { getAllFamilies, getAllModels, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
 import type { ActionResult } from "../utils/api";
+import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 
 export const apiKeyIdInputSchema = z.object({ id: z.string() });
 export const createApiKeyInputSchema = z.object({ name: z.string().optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
@@ -69,7 +70,7 @@ export async function getApiKeyOptions(userId: string) {
     const providerAccounts = await db
       .select({ id: providerAccount.id, provider: providerAccount.provider, name: providerAccount.name, email: providerAccount.email })
       .from(providerAccount)
-      .where(eq(providerAccount.userId, userId))
+      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS)))
       .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
 
     return {
@@ -191,7 +192,7 @@ export async function updateApiKeyAccountAccess(userId: string, input: UpdateApi
     if (input.mode !== "all" && normalizedAccounts.length === 0) return { success: false, error: "Select at least one account" } as const;
     if (normalizedAccounts.length > 0) {
       const rows = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, normalizedAccounts)));
-      const validIds = new Set([...rows.map((row) => row.id), ...normalizedAccounts.filter(isAuthlessProvider)]);
+      const validIds = new Set([...rows.map((row) => row.id), ...normalizedAccounts.filter(isSyntheticAuthlessAccount)]);
       const invalidId = normalizedAccounts.find((id) => !validIds.has(id));
       if (invalidId) return { success: false, error: `Unknown account: ${invalidId}` } as const;
     }

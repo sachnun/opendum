@@ -6,7 +6,8 @@
   "family": "Baidu",
   "providerConfig": {
     "kilo_code": {
-      "upstream": "baidu/cobuddy:free"
+      "upstream": "baidu/cobuddy:free",
+      "authless": true
     },
     "openrouter": {
       "upstream": "baidu/cobuddy:free"

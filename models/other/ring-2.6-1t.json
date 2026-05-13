@@ -7,7 +7,8 @@
   "family": "InclusionAI",
   "providerConfig": {
     "kilo_code": {
-      "upstream": "inclusionai/ring-2.6-1t:free"
+      "upstream": "inclusionai/ring-2.6-1t:free",
+      "authless": true
     },
     "opencode": {
       "upstream": "ring-2.6-1t-free"

@@ -7,7 +7,6 @@ import { encrypt, hashString } from "../lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { getProviderModelMap } from "../lib/proxy/models";
 import { API_BASE_URL as groqApiBaseUrl } from "../lib/providers/groq/constants";
-import { API_BASE_URL as kiloCodeApiBaseUrl } from "../lib/providers/kilo-code/constants";
 import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia-nim/constants";
 import { API_BASE_URL as ollamaApiBaseUrl } from "../lib/providers/ollama-cloud/constants";
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
@@ -19,7 +18,7 @@ const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const apiKeyProviderSchema = z.enum(["nvidia_nim", "ollama_cloud", "openrouter", "groq", "kilo_code"]);
+const apiKeyProviderSchema = z.enum(["nvidia_nim", "ollama_cloud", "openrouter", "groq"]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional() });
 type ApiKeyProvider = z.infer<typeof apiKeyProviderSchema>;
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
@@ -29,7 +28,6 @@ const API_KEY_PROVIDER_SETTINGS = {
   ollama_cloud: { label: "Ollama Cloud", baseUrl: ollamaApiBaseUrl, modelMap: getProviderModelMap("ollama_cloud"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
   groq: { label: "Groq", baseUrl: groqApiBaseUrl, modelMap: getProviderModelMap("groq"), validationPath: "/models", requireSuccessfulStatus: true },
-  kilo_code: { label: "Kilo Code", baseUrl: kiloCodeApiBaseUrl, modelMap: getProviderModelMap("kilo_code"), validationPath: "/models", requireSuccessfulStatus: true },
 } satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
 
 function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {

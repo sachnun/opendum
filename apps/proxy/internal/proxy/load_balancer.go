@@ -16,15 +16,16 @@ import (
 )
 
 const (
-	failedCooldown      = 10 * time.Minute
-	degradedThreshold   = 3
-	failedThreshold     = 7
-	maxStoredErrorLen   = 10000
-	maxErrorHistoryRows = 200
+	failedCooldown                     = 10 * time.Minute
+	degradedThreshold                  = 3
+	failedThreshold                    = 7
+	maxStoredErrorLen                  = 10000
+	maxErrorHistoryRows                = 200
+	providerModelAuthlessAccountPrefix = "authless:"
 )
 
 func isSyntheticProviderAccountID(accountID string) bool {
-	return auth.IsAuthlessProvider(accountID)
+	return auth.IsAuthlessProvider(accountID) || strings.HasPrefix(accountID, providerModelAuthlessAccountPrefix)
 }
 
 func syntheticAuthlessAccount(provider string) (appdb.ProviderAccount, bool) {
@@ -32,6 +33,18 @@ func syntheticAuthlessAccount(provider string) (appdb.ProviderAccount, bool) {
 		return appdb.ProviderAccount{}, false
 	}
 	return appdb.ProviderAccount{ID: provider, Provider: provider, IsActive: true, Status: "active"}, true
+}
+
+func syntheticProviderModelAuthlessAccount(provider string) appdb.ProviderAccount {
+	return appdb.ProviderAccount{ID: providerModelAuthlessAccountPrefix + provider, Provider: provider, IsActive: true, Status: "active"}
+}
+
+func syntheticProviderModelAuthlessAccountFromID(id, model string, registry interface{ IsAuthlessProviderModel(string, string) bool }) (appdb.ProviderAccount, bool) {
+	provider := strings.TrimPrefix(id, providerModelAuthlessAccountPrefix)
+	if provider == id || provider == "" || !registry.IsAuthlessProviderModel(model, provider) {
+		return appdb.ProviderAccount{}, false
+	}
+	return syntheticProviderModelAuthlessAccount(provider), true
 }
 
 func stringSliceContains(values []string, target string) bool {
@@ -57,6 +70,10 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	rows := []appdb.ProviderAccount{}
 	for _, targetProvider := range targetProviders {
 		account, ok := syntheticAuthlessAccount(targetProvider)
+		if !ok && s.registry.IsAuthlessProviderModel(model, targetProvider) {
+			account = syntheticProviderModelAuthlessAccount(targetProvider)
+			ok = true
+		}
 		if !ok {
 			continue
 		}
@@ -206,6 +223,18 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "provider_account_id must be a non-empty string", Type: "invalid_request_error", Param: &param, Code: strPtr("invalid_provider_account")}
 	}
 	if account, ok := syntheticAuthlessAccount(id); ok {
+		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
+			return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
+		}
+		if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
+			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
+		}
+		if validation.Provider != nil && account.Provider != *validation.Provider {
+			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
+		}
+		return &account, nil
+	}
+	if account, ok := syntheticProviderModelAuthlessAccountFromID(id, validation.Model, s.registry); ok {
 		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 			return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 		}
@@ -422,7 +451,9 @@ func paidFirst(accounts []appdb.ProviderAccount) []appdb.ProviderAccount {
 	paid := []appdb.ProviderAccount{}
 	free := []appdb.ProviderAccount{}
 	for _, account := range accounts {
-		if account.Tier != nil && *account.Tier == "paid" {
+		if isSyntheticProviderAccountID(account.ID) {
+			free = append(free, account)
+		} else if account.Tier != nil && *account.Tier == "paid" {
 			paid = append(paid, account)
 		} else {
 			free = append(free, account)

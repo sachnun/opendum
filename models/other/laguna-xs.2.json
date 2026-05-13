@@ -6,7 +6,8 @@
   "family": "Poolside",
   "providerConfig": {
     "kilo_code": {
-      "upstream": "poolside/laguna-xs.2:free"
+      "upstream": "poolside/laguna-xs.2:free",
+      "authless": true
     },
     "openrouter": {
       "upstream": "poolside/laguna-xs.2:free"

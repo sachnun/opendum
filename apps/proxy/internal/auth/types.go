@@ -45,6 +45,7 @@ type AccountModelAvailability struct {
 	DisabledCountByProviderModel map[string]int
 	ActiveAccountIDsByProvider   map[string][]string
 	AccountTierByID              map[string]string
+	AuthlessProviderModels       map[string]map[string]struct{}
 }
 
 type cacheValue struct {

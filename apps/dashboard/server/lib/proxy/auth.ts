@@ -4,11 +4,26 @@ import { db } from "../db/index.js";
 import { providerAccount, providerAccountDisabledModel } from "../db/schema.js";
 import { getRedisClient } from "../redis.js";
 import {
+  getAuthlessProviderModels,
   getProviderAccessRule,
   getProvidersForModel,
   resolveModelAlias,
 } from "./models.js";
 import { AUTHLESS_PROVIDER_KEYS } from "./authless-providers.js";
+
+const DASHBOARD_PROVIDER_ACCOUNT_KEYS = [
+  "antigravity",
+  "codex",
+  "copilot",
+  "gemini_cli",
+  "kiro",
+  "qwen_code",
+  "nvidia_nim",
+  "ollama_cloud",
+  "openrouter",
+  "groq",
+  "workers_ai",
+] as const;
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";
@@ -73,6 +88,7 @@ export interface AccountModelAvailability {
   disabledCountByProviderModel: Map<string, number>;
   activeAccountIdsByProvider: Map<string, string[]>;
   accountTierById: Map<string, string>;
+  authlessProviderModels: Map<string, Set<string>>;
 }
 
 export function isModelUsableByAccounts(
@@ -84,6 +100,12 @@ export function isModelUsableByAccounts(
   for (const provider of getProvidersForModel(canonical)) {
     const totalAccounts = availability.accountCountByProvider.get(provider) ?? 0;
     if (totalAccounts === 0) continue;
+    let effectiveTotalAccounts = totalAccounts;
+    const authlessModels = availability.authlessProviderModels.get(provider);
+    if (authlessModels && !authlessModels.has(canonical)) {
+      effectiveTotalAccounts -= 1;
+      if (effectiveTotalAccounts === 0) continue;
+    }
 
     const accessRule = getProviderAccessRule(canonical, provider);
     if (accessRule?.minTier) {
@@ -95,7 +117,7 @@ export function isModelUsableByAccounts(
     }
 
     const disabledCount = availability.disabledCountByProviderModel.get(`${provider}:${canonical}`) ?? 0;
-    if (disabledCount < totalAccounts) return true;
+    if (disabledCount < effectiveTotalAccounts) return true;
   }
 
   return false;
@@ -111,18 +133,26 @@ export async function getAccountModelAvailability(
       tier: providerAccount.tier,
     })
     .from(providerAccount)
-    .where(and(eq(providerAccount.userId, userId), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))));
+    .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, DASHBOARD_PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))));
 
   const activeProviders = new Set<string>();
   const accountCountByProvider = new Map<string, number>();
   const accountIdToProvider = new Map<string, string>();
   const activeAccountIdsByProvider = new Map<string, string[]>();
   const accountTierById = new Map<string, string>();
+  const authlessProviderModels = new Map<string, Set<string>>();
 
   for (const provider of AUTHLESS_PROVIDER_KEYS) {
     activeProviders.add(provider);
     accountCountByProvider.set(provider, 1);
     activeAccountIdsByProvider.set(provider, [provider]);
+  }
+
+  for (const [provider, models] of Object.entries(getAuthlessProviderModels())) {
+    activeProviders.add(provider);
+    accountCountByProvider.set(provider, (accountCountByProvider.get(provider) ?? 0) + 1);
+    activeAccountIdsByProvider.set(provider, [...(activeAccountIdsByProvider.get(provider) ?? []), `authless:${provider}`]);
+    authlessProviderModels.set(provider, new Set(models));
   }
 
   for (const account of activeAccounts) {
@@ -166,5 +196,6 @@ export async function getAccountModelAvailability(
     disabledCountByProviderModel,
     activeAccountIdsByProvider,
     accountTierById,
+    authlessProviderModels,
   };
 }

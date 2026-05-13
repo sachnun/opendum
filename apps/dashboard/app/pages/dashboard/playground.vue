@@ -234,8 +234,7 @@ watch(options, (value) => {
   if (accountId) {
     const account = providerAccountsById.value.get(accountId);
     if (account) {
-      const disabledSet = new Set(account.disabledModels ?? []);
-      const compatibleModels = models.value.filter((model) => model.providers.includes(account.provider) && !disabledSet.has(model.id));
+      const compatibleModels = models.value.filter((model) => accountSupportsModel(account, model));
       panels.value = compatibleModels.length > 0
         ? compatibleModels.map((model) => ({ id: generateId(), modelId: model.id, accountId }))
         : [{ id: generateId(), modelId: null, accountId }];
@@ -263,8 +262,7 @@ watch(() => route.query, (query) => {
   if (accountId) {
     const account = providerAccountsById.value.get(accountId);
     if (account) {
-      const disabledSet = new Set(account.disabledModels ?? []);
-      const compatibleModels = models.value.filter((m) => m.providers.includes(account.provider) && !disabledSet.has(m.id));
+      const compatibleModels = models.value.filter((m) => accountSupportsModel(account, m));
       panels.value = compatibleModels.length > 0
         ? compatibleModels.map((m) => ({ id: generateId(), modelId: m.id, accountId }))
         : [{ id: generateId(), modelId: null, accountId }];
@@ -315,6 +313,14 @@ function normalizeQueryParam(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function accountSupportsModel(account: ProviderAccountOption, model: ModelOption | string): boolean {
+  const modelId = typeof model === "string" ? model : model.id;
+  const modelOption = typeof model === "string" ? modelsById.value.get(model) : model;
+  if (!modelOption?.providers.includes(account.provider)) return false;
+  if (account.disabledModels?.includes(modelId)) return false;
+  return !account.supportedModels || account.supportedModels.includes(modelId);
+}
+
 function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
   const availableProviders = new Set(accounts.map((account) => account.provider));
   const grouped = new Map<ReturnType<typeof categorizeModelFamily>, ModelOption[]>();
@@ -346,12 +352,12 @@ function buildProviderPresets(modelOptions: ModelOption[], accounts: ProviderAcc
   }
 
   return Array.from(accountsByProvider.entries()).flatMap(([provider, providerAccountsForProvider]) => {
-    const modelsForProvider = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => !account.disabledModels?.includes(model.id)));
+    const modelsForProvider = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => accountSupportsModel(account, model)));
     const presetPanels: Array<{ modelId: string; accountId: string }> = [];
 
     for (const model of modelsForProvider) {
       for (const account of providerAccountsForProvider) {
-        if (!account.disabledModels?.includes(model.id)) {
+        if (accountSupportsModel(account, model)) {
           presetPanels.push({ modelId: model.id, accountId: account.id });
         }
       }
@@ -373,7 +379,7 @@ function getValidAccountIdForPanel(panel: PanelState): string | null {
   if (!panel.accountId || !panel.modelId) return null;
   const model = modelsById.value.get(panel.modelId);
   const account = providerAccountsById.value.get(panel.accountId);
-  if (!model || !account || !model.providers.includes(account.provider)) return null;
+  if (!model || !account || !accountSupportsModel(account, model)) return null;
   return account.id;
 }
 
@@ -395,6 +401,11 @@ function getPanelModels(panel: PanelState): ModelOption[] {
   if (account?.disabledModels?.length) {
     const disabled = new Set(account.disabledModels);
     nextModels = nextModels.filter((model) => !disabled.has(model.id));
+  }
+
+  if (account?.supportedModels) {
+    const supported = new Set(account.supportedModels);
+    nextModels = nextModels.filter((model) => supported.has(model.id));
   }
 
   const search = modelSearchByPanel[panel.id]?.trim().toLowerCase();
@@ -427,7 +438,7 @@ function getPendingModelAccounts(panel: PanelState): ProviderAccountOption[] {
   const routeSearch = routeSearchByPanel[panel.id]?.trim().toLowerCase();
   const providerOrder = new Map(pendingModel.providers.map((provider, index) => [provider, index]));
   return providerAccounts.value
-    .filter((account) => pendingModel.providers.includes(account.provider) && !account.disabledModels?.includes(pendingModel.id))
+    .filter((account) => accountSupportsModel(account, pendingModel))
     .filter((account) => !routeSearch || `${account.provider} ${account.name} ${account.email ?? ""}`.toLowerCase().includes(routeSearch))
     .sort((a, b) => {
       const orderA = providerOrder.get(a.provider) ?? Number.MAX_SAFE_INTEGER;

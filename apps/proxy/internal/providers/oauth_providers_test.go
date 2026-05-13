@@ -151,6 +151,52 @@ func TestOpenAICompatibleProviderRoutesKiloResponsesModel(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleProviderOmitsAuthForAuthlessKiloModel(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
+	var authorization string
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		authorization = req.Header.Get("Authorization")
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"ok"}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "", appdb.ProviderAccount{}, map[string]any{
+		"model":    "kilo_code/laguna-m.1",
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if authorization != "" {
+		t.Fatalf("Authorization = %q, want empty", authorization)
+	}
+}
+
+func TestOpenAICompatibleProviderKeepsAuthForKiloAccount(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
+	var authorization string
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		authorization = req.Header.Get("Authorization")
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"ok"}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":    "kilo_code/laguna-m.1",
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if authorization != "Bearer token" {
+		t.Fatalf("Authorization = %q, want Bearer token", authorization)
+	}
+}
+
 func TestWorkersAIProviderConvertsImageURL(t *testing.T) {
 	accountID := "acct_123"
 	var payload map[string]any

@@ -1,12 +1,5 @@
 {
-  "providers": [
-    "kilo_code"
-  ],
+  "providers": [],
   "family": "Kilo Code",
-  "ignored": true,
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "kilo-auto/frontier"
-    }
-  }
+  "ignored": true
 }

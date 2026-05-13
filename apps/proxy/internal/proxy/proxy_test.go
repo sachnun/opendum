@@ -863,6 +863,19 @@ func TestSyntheticAuthlessAccountAccess(t *testing.T) {
 	}
 }
 
+func TestProviderModelAuthlessSyntheticAccountAccess(t *testing.T) {
+	account := syntheticProviderModelAuthlessAccount("kilo_code")
+	if account.ID != "authless:kilo_code" || account.Provider != "kilo_code" || !isSyntheticProviderAccountID(account.ID) {
+		t.Fatalf("synthetic account = %#v, want authless:kilo_code", account)
+	}
+	if err := accountAllowed(account.ID, auth.AccountAccess{Mode: "whitelist", Accounts: []string{account.ID}}); err != nil {
+		t.Fatalf("authless:kilo_code whitelist allow error = %v", err)
+	}
+	if err := accountAllowed(account.ID, auth.AccountAccess{Mode: "blacklist", Accounts: []string{account.ID}}); err == nil {
+		t.Fatal("authless:kilo_code blacklist should reject synthetic account")
+	}
+}
+
 func TestBuildAccountErrorMessageIncludesContext(t *testing.T) {
 	message := buildAccountErrorMessage("provider failed", accountErrorContext{
 		Model:    "test-model",

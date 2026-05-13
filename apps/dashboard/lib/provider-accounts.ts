@@ -7,7 +7,6 @@ export type ProviderAccountKey =
   | "kiro"
   | "nvidia_nim"
   | "ollama_cloud"
-  | "kilo_code"
   | "openrouter"
   | "qwen_code"
   | "workers_ai";
@@ -105,14 +104,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     showTier: false,
   },
   {
-    key: "kilo_code",
-    slug: "kilo-code",
-    label: "Kilo Code",
-    category: "api_key",
-    emptyMessage: "No Kilo Code accounts connected yet.",
-    showTier: false,
-  },
-  {
     key: "workers_ai",
     slug: "workers-ai",
     label: "Workers AI",
@@ -141,6 +132,7 @@ export const API_KEY_DEFINITIONS = PROVIDER_ACCOUNT_DEFINITIONS.filter(
 
 export function getProviderLabel(provider: string): string {
   if (provider === "opencode") return "OpenCode";
+  if (provider === "kilo_code") return "Kilo Code";
 
   if (provider in BY_KEY) {
     return BY_KEY[provider as ProviderAccountKey].label;

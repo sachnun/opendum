@@ -1,3 +1,5 @@
+import { getAuthlessProviderModels } from "./models.js";
+
 export const AUTHLESS_PROVIDER_KEYS = ["opencode"] as const;
 
 const AUTHLESS_PROVIDER_SET = new Set<string>(AUTHLESS_PROVIDER_KEYS);
@@ -7,11 +9,28 @@ export function isAuthlessProvider(provider: string): boolean {
 }
 
 export function getAuthlessProviderAccounts() {
-  return AUTHLESS_PROVIDER_KEYS.map((provider) => ({
-    id: provider,
+  const providerModelAuthlessAccounts = Object.entries(getAuthlessProviderModels()).map(([provider, models]) => ({
+    id: `authless:${provider}`,
     provider,
-    name: "OpenCode",
+    name: provider === "kilo_code" ? "Kilo Code" : provider,
     email: null,
     disabledModels: [] as string[],
+    supportedModels: models,
   }));
+
+  return [
+    ...AUTHLESS_PROVIDER_KEYS.map((provider) => ({
+      id: provider,
+      provider,
+      name: "OpenCode",
+      email: null,
+      disabledModels: [] as string[],
+      supportedModels: null as string[] | null,
+    })),
+    ...providerModelAuthlessAccounts,
+  ];
+}
+
+export function isSyntheticAuthlessAccount(accountId: string): boolean {
+  return isAuthlessProvider(accountId) || accountId.startsWith("authless:");
 }

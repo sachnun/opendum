@@ -6,7 +6,8 @@
   "ignored": true,
   "providerConfig": {
     "kilo_code": {
-      "upstream": "openrouter/free"
+      "upstream": "openrouter/free",
+      "authless": true
     }
   }
 }

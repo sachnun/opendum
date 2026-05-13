@@ -5,7 +5,8 @@
   "family": "OpenRouter",
   "providerConfig": {
     "kilo_code": {
-      "upstream": "openrouter/owl-alpha"
+      "upstream": "openrouter/owl-alpha",
+      "authless": true
     }
   }
 }

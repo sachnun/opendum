@@ -29,6 +29,7 @@ type ProviderAccessRule struct {
 type ProviderModelConfig struct {
 	Upstream string
 	MinTier  string
+	Authless bool
 	Aliases  []string
 	Custom   map[string]any
 }
@@ -122,6 +123,10 @@ func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			cfg.MinTier = strings.TrimSpace(minTier)
+		case "authless":
+			if err := json.Unmarshal(value, &cfg.Authless); err != nil {
+				return err
+			}
 		case "aliases":
 			if err := json.Unmarshal(value, &cfg.Aliases); err != nil {
 				return err
@@ -237,6 +242,37 @@ func (r *Registry) ProviderModelConfig(model, provider string) (ProviderModelCon
 	}
 	cfg, ok := info.ProviderConfig[provider]
 	return cfg, ok
+}
+
+func (r *Registry) IsAuthlessProviderModel(model, provider string) bool {
+	cfg, ok := r.ProviderModelConfig(model, provider)
+	return ok && cfg.Authless
+}
+
+func (r *Registry) AuthlessProvidersForModel(model string) []string {
+	canonical := r.ResolveAlias(model)
+	providers := []string{}
+	for _, provider := range r.ProvidersForModel(canonical) {
+		if r.IsAuthlessProviderModel(canonical, provider) {
+			providers = append(providers, provider)
+		}
+	}
+	return providers
+}
+
+func (r *Registry) AuthlessProviderModels() map[string][]string {
+	result := map[string][]string{}
+	for model, info := range r.effective {
+		for _, provider := range info.Providers {
+			if r.IsAuthlessProviderModel(model, provider) {
+				result[provider] = append(result[provider], model)
+			}
+		}
+	}
+	for provider := range result {
+		sort.Strings(result[provider])
+	}
+	return result
 }
 
 func (r *Registry) ProviderModelMap(provider string) map[string]string {

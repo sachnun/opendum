@@ -59,7 +59,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"groq":         openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.com/openai/v1", supportedParams: supportedGroq, registry: registry},
 		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
 		"ollama_cloud": openAICompatibleProvider{name: "ollama_cloud", baseURL: "https://ollama.com/v1", supportedParams: supportedOllama, registry: registry},
-		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
+		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
 		"workers_ai":   workersAIProvider{registry: registry},
 		"qwen_code":    qwenCodeProvider{registry: registry},
 		"kiro":         kiroProvider{registry: registry},
@@ -109,7 +109,7 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	modelName := p.resolveModel(model)
 	if p.requiresResponsesAPI(model) {
 		payload := p.buildResponsesPayload(body, modelName, stream)
-		resp, err := postJSON(ctx, client, p.baseURL+"/responses", credentials, payload, stream)
+		resp, err := p.post(ctx, client, p.baseURL+"/responses", credentials, payload, stream, model)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
 		}
@@ -134,7 +134,14 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 			payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
 		}
 	}
-	return postJSON(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream)
+	return p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model)
+}
+
+func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, model string) (*http.Response, error) {
+	if strings.TrimSpace(credentials) == "" && p.registry != nil && p.registry.IsAuthlessProviderModel(model, p.name) {
+		return postJSONWithoutAuth(ctx, client, url, payload, stream)
+	}
+	return postJSON(ctx, client, url, credentials, payload, stream)
 }
 
 func (p openAICompatibleProvider) buildPayload(body map[string]any, modelName string, stream bool) map[string]any {

@@ -98,3 +98,25 @@ func TestSupportedModelsDeclareFamily(t *testing.T) {
 		}
 	}
 }
+
+func TestKiloCodeOnlyExposesFreeAuthlessModels(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, model := range []string{"kilo-auto-free", "kilo-auto-small", "kilo-auto-balanced", "kilo-auto-frontier"} {
+		if registry.IsSupportedByProvider(model, "kilo_code") {
+			t.Fatalf("%s should remain ignored for kilo_code", model)
+		}
+	}
+
+	for model, upstream := range registry.ProviderModelMap("kilo_code") {
+		if !strings.HasSuffix(upstream, ":free") && upstream != "openrouter/free" && upstream != "openrouter/owl-alpha" {
+			t.Fatalf("kilo_code model %q must use free upstream, got %q", model, upstream)
+		}
+		if !registry.IsAuthlessProviderModel(model, "kilo_code") {
+			t.Fatalf("kilo_code model %q must be authless", model)
+		}
+	}
+}

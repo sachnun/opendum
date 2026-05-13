@@ -5,6 +5,7 @@ import { disabledModel, providerAccount, providerAccountDisabledModel } from "..
 import { getAccountModelAvailability, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts } from "../lib/proxy/authless-providers";
 import { getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";
+import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 
 function normalizeProxyBaseUrl(value: unknown) {
   return typeof value === "string" ? value.trim().replace(/\/$/, "") || undefined : undefined;
@@ -37,7 +38,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         email: providerAccount.email,
       })
       .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))))
+      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))))
       .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
 
     const disabledModelsByAccount = new Map<string, string[]>();
@@ -74,6 +75,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         ...providerAccounts.map((account) => ({
         ...account,
         disabledModels: disabledModelsByAccount.get(account.id) ?? [],
+        supportedModels: null,
         })),
       ],
     };

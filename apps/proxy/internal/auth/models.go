@@ -135,11 +135,26 @@ func (s *Service) GetAccountModelAvailability(ctx context.Context, userID string
 		DisabledCountByProviderModel: map[string]int{},
 		ActiveAccountIDsByProvider:   map[string][]string{},
 		AccountTierByID:              map[string]string{},
+		AuthlessProviderModels:       map[string]map[string]struct{}{},
 	}
 	for _, provider := range authlessProviderNames {
 		availability.ActiveProviders[provider] = struct{}{}
 		availability.AccountCountByProvider[provider] = 1
 		availability.ActiveAccountIDsByProvider[provider] = []string{provider}
+	}
+	for provider, models := range s.registry.AuthlessProviderModels() {
+		if len(models) == 0 {
+			continue
+		}
+		availability.ActiveProviders[provider] = struct{}{}
+		availability.AccountCountByProvider[provider] = 1
+		availability.ActiveAccountIDsByProvider[provider] = []string{provider}
+		if availability.AuthlessProviderModels[provider] == nil {
+			availability.AuthlessProviderModels[provider] = map[string]struct{}{}
+		}
+		for _, model := range models {
+			availability.AuthlessProviderModels[provider][model] = struct{}{}
+		}
 	}
 
 	var accounts []appdb.ProviderAccount
@@ -186,6 +201,14 @@ func (s *Service) IsModelUsableByAccounts(model string, availability AccountMode
 		total := availability.AccountCountByProvider[provider]
 		if total == 0 {
 			continue
+		}
+		if authlessModels := availability.AuthlessProviderModels[provider]; len(authlessModels) > 0 {
+			if _, ok := authlessModels[canonical]; !ok {
+				if total == 1 {
+					continue
+				}
+				total--
+			}
 		}
 		if rule, ok := s.registry.ProviderAccessRule(canonical, provider); ok && rule.MinTier != "" {
 			eligible := false
