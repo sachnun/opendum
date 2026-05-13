@@ -689,7 +689,7 @@ function historyEntryPreview(errorMessage: string): string {
               <div class="flex items-center justify-between gap-1">
                 <span class="text-xs text-muted-foreground">Last Error Message:</span>
               </div>
-              <div class="mt-1 flex min-h-16 items-center justify-center text-center text-xs text-muted-foreground">No data</div>
+              <div class="mt-3 flex min-h-16 items-center justify-center pt-2 text-center text-xs text-muted-foreground">No data</div>
               <span class="invisible mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </div>
           </div>
