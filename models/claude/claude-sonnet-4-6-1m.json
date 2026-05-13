@@ -6,6 +6,7 @@
     "claude-sonnet-4.6-1m",
     "claude-sonnet-4-6-1m"
   ],
+  "ignored": true,
   "family": "Claude",
   "meta": {
     "reasoning": true,
