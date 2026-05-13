@@ -216,7 +216,7 @@ func TestKiroBuildRequestMapsReasoningEffortLikeOtherProviders(t *testing.T) {
 	}
 }
 
-func TestKiroBuildRequestSkipsManualThinkingForOpus47(t *testing.T) {
+func TestKiroBuildRequestInjectsThinkingForOpus47(t *testing.T) {
 	provider := kiroProvider{}
 	payload := provider.buildRequest(map[string]any{
 		"model":            "claude-opus-4-7",
@@ -226,8 +226,8 @@ func TestKiroBuildRequestSkipsManualThinkingForOpus47(t *testing.T) {
 
 	state := payload["conversationState"].(map[string]any)
 	current := state["currentMessage"].(map[string]any)["userInputMessage"].(map[string]any)
-	if strings.Contains(current["content"].(string), "<thinking_mode>") {
-		t.Fatalf("current content contains manual thinking tags: %q", current["content"])
+	if !strings.Contains(current["content"].(string), "<thinking_mode>enabled</thinking_mode><max_thinking_length>32000</max_thinking_length>") {
+		t.Fatalf("current content missing thinking tags: %q", current["content"])
 	}
 }
 
@@ -294,6 +294,32 @@ func TestKiroCompletionExtractsThinkingAndUsage(t *testing.T) {
 	}
 }
 
+func TestKiroCompletionExtractsReasoningContentEvent(t *testing.T) {
+	events := parseKiroJSONEvents(`{"reasoningContentEvent":{"text":"plan","signature":"sig"}}{"content":"answer"}`, &kiroParserState{})
+	if len(events) != 2 {
+		t.Fatalf("events len = %d, want 2: %#v", len(events), events)
+	}
+	completion := convertKiroEventsToCompletion(events, "unit-test-model")
+	choice := completion["choices"].([]any)[0].(map[string]any)
+	message := choice["message"].(map[string]any)
+	if message["content"] != "answer" || message["reasoning_content"] != "plan" {
+		t.Fatalf("message = %#v", message)
+	}
+}
+
+func TestKiroCompletionExtractsDirectReasoningContentEvent(t *testing.T) {
+	events := parseKiroJSONEvents(`{"text":"plan","signature":"sig"}{"content":"answer"}`, &kiroParserState{})
+	if len(events) != 2 {
+		t.Fatalf("events len = %d, want 2: %#v", len(events), events)
+	}
+	completion := convertKiroEventsToCompletion(events, "unit-test-model")
+	choice := completion["choices"].([]any)[0].(map[string]any)
+	message := choice["message"].(map[string]any)
+	if message["content"] != "answer" || message["reasoning_content"] != "plan" {
+		t.Fatalf("message = %#v", message)
+	}
+}
+
 func TestKiroCompletionParsesBracketToolCalls(t *testing.T) {
 	events := parseKiroJSONEvents(`{"content":"I will call [Called lookup with args: {\"city\":\"Jakarta\"}]"}`, &kiroParserState{})
 	completion := convertKiroEventsToCompletion(events, "unit-test-model")
@@ -353,6 +379,21 @@ func TestKiroSSEReaderExtractsReasoningContent(t *testing.T) {
 	text := string(out)
 	if !strings.Contains(text, `"reasoning_content":"plan"`) {
 		t.Fatalf("missing reasoning chunk: %s", text)
+	}
+	if !strings.Contains(text, `"content":"answer"`) {
+		t.Fatalf("missing answer content chunk: %s", text)
+	}
+}
+
+func TestKiroSSEReaderExtractsReasoningContentEvent(t *testing.T) {
+	reader := newKiroSSEReader(strings.NewReader(`{"reasoningContentEvent":{"text":"plan","signature":"sig"}}{"content":"answer"}{"stop":true}`), "unit-test-model")
+	out, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	if !strings.Contains(text, `"reasoning_content":"plan"`) {
+		t.Fatalf("missing reasoning event chunk: %s", text)
 	}
 	if !strings.Contains(text, `"content":"answer"`) {
 		t.Fatalf("missing answer content chunk: %s", text)

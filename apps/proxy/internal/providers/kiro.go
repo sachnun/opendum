@@ -128,7 +128,7 @@ func (p kiroProvider) buildRequest(body map[string]any) map[string]any {
 	if instructions := strings.TrimSpace(stringValue(body["instructions"])); instructions != "" {
 		systemPrompt = joinNonEmpty("\n\n", instructions, systemPrompt)
 	}
-	if kiroThinkingRequested(body) && !kiroUsesAdaptiveThinking(modelID) {
+	if kiroThinkingRequested(body) {
 		prefix := fmt.Sprintf("<thinking_mode>enabled</thinking_mode><max_thinking_length>%d</max_thinking_length>", kiroThinkingBudget(body))
 		if !strings.Contains(systemPrompt, "<thinking_mode>") {
 			systemPrompt = joinNonEmpty("\n", prefix, systemPrompt)
@@ -448,6 +448,10 @@ func newKiroSSEReader(source io.Reader, model string) io.Reader {
 				contextUsagePercentage = kiroNumberAsFloat(value)
 				return
 			}
+			if reasoning := kiroReasoningContent(event); reasoning != "" {
+				emitContent("", reasoning)
+				return
+			}
 			if content, ok := event["content"].(string); ok && event["followupPrompt"] == nil {
 				totalContent += content
 				emitContent(splitter.Process(content, false))
@@ -534,6 +538,10 @@ func convertKiroEventsToCompletion(events []map[string]any, model string) map[st
 	for _, event := range events {
 		if value, ok := event["contextUsagePercentage"]; ok {
 			contextUsagePercentage = kiroNumberAsFloat(value)
+		}
+		if reasoningDelta := kiroReasoningContent(event); reasoningDelta != "" {
+			reasoning += reasoningDelta
+			outputText += reasoningDelta
 		}
 		if value, ok := event["content"].(string); ok && event["followupPrompt"] == nil {
 			textDelta, reasoningDelta := splitter.Process(value, false)
@@ -1013,11 +1021,6 @@ func kiroToolResultText(result map[string]any) string {
 	return contentToText(content)
 }
 
-func kiroUsesAdaptiveThinking(modelID string) bool {
-	modelID = strings.ToLower(lastModelSegment(strings.TrimSpace(modelID)))
-	return modelID == "claude-opus-4.7" || modelID == "claude-opus-4-7"
-}
-
 func kiroThinkingRequested(body map[string]any) bool {
 	if kiroIncludeThoughtsFalse(body) || kiroReasoningEffort(body) == "none" {
 		return false
@@ -1091,7 +1094,7 @@ func kiroIncludeThoughtsFalse(body map[string]any) bool {
 }
 
 func nextKiroJSONStart(buffer string, offset int) int {
-	patterns := []string{`{"content":`, `{"name":`, `{"followupPrompt":`, `{"input":`, `{"stop":`, `{"contextUsagePercentage":`}
+	patterns := []string{`{"content":`, `{"name":`, `{"followupPrompt":`, `{"input":`, `{"stop":`, `{"contextUsagePercentage":`, `{"reasoningContentEvent":`, `{"type":"reasoningContentEvent"`, `{"text":`}
 	best := -1
 	for _, pattern := range patterns {
 		if idx := strings.Index(buffer[offset:], pattern); idx >= 0 {
@@ -1132,6 +1135,9 @@ func completeKiroUTF8Chunk(chunk []byte) ([]byte, []byte) {
 }
 
 func isKiroResponseEvent(parsed map[string]any) bool {
+	if kiroReasoningContent(parsed) != "" {
+		return true
+	}
 	if _, ok := parsed["content"].(string); ok && parsed["followupPrompt"] == nil {
 		return true
 	}
@@ -1148,6 +1154,16 @@ func isKiroResponseEvent(parsed map[string]any) bool {
 		return true
 	}
 	return false
+}
+
+func kiroReasoningContent(event map[string]any) string {
+	if nested, ok := event["reasoningContentEvent"].(map[string]any); ok {
+		return defaultStringValue(nested["text"], stringValue(nested["reasoning_content"]))
+	}
+	if text := stringValue(event["text"]); text != "" && (event["signature"] != nil || event["redactedContent"] != nil || event["redacted_content"] != nil || event["type"] == "reasoningContentEvent") {
+		return text
+	}
+	return ""
 }
 
 type kiroThinkingSplitter struct {
