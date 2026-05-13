@@ -256,8 +256,8 @@ function handleAccountChanged() {
     </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div v-if="supportsProviderQuota" class="space-y-2 pb-2">
-        <div v-if="quotaSummaryGroups.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          <div v-for="group in quotaSummaryGroups" :key="group.name" class="rounded-md border border-border/70 bg-muted/20 p-3">
+        <div v-if="quotaSummaryGroups.length > 0" class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3">
+          <div v-for="group in quotaSummaryGroups" :key="group.name" class="space-y-1.5">
             <div class="flex items-start justify-between gap-2 text-xs">
               <div class="flex min-w-0 items-center gap-1.5">
                 <p class="truncate font-medium text-foreground">{{ group.displayName }}</p>
@@ -265,13 +265,13 @@ function handleAccountChanged() {
               </div>
               <span class="font-mono text-xs text-muted-foreground">{{ quotaPercentRemaining(group) }}%</span>
             </div>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div class="h-1.5 overflow-hidden rounded-full bg-muted">
               <div class="h-full transition-all duration-300" :class="quotaBarColor(group)" :style="{ width: `${quotaPercentRemaining(group)}%` }" />
             </div>
           </div>
         </div>
-        <div v-else-if="activeQuotaAccounts.length > 0" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
-          <div v-for="index in Math.min(activeQuotaAccounts.length, 3)" :key="index" class="rounded-md border border-border/70 bg-muted/20 p-3">
+        <div v-else-if="activeQuotaAccounts.length > 0" class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+          <div v-for="index in Math.min(activeQuotaAccounts.length, 3)" :key="index" class="space-y-1.5">
             <div class="flex items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-1.5">
                 <UiSkeleton class="h-3 w-24" />
@@ -279,7 +279,7 @@ function handleAccountChanged() {
               </div>
               <UiSkeleton class="h-3 w-8" />
             </div>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div class="h-1.5 overflow-hidden rounded-full bg-muted">
               <UiSkeleton class="h-full w-4/5 rounded-full" />
             </div>
           </div>
