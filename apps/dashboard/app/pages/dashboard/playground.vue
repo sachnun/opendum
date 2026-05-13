@@ -165,6 +165,7 @@ const loopCountInput = ref("2");
 const loopCount = ref(2);
 const activeLoopProgress = ref<{ current: number; total: number } | null>(null);
 const activeFamilyPreset = ref<string | null>(null);
+const activeProviderPreset = ref<string | null>(null);
 const selectionOpenByPanel = reactive<Record<string, boolean>>({});
 const selectionStepByPanel = reactive<Record<string, "model" | "routing">>({});
 const pendingModelByPanel = reactive<Record<string, string | null>>({});
@@ -185,12 +186,18 @@ const filteredModelIds = computed(() => new Set(filteredModels.value.map((model)
 const modelsById = computed(() => new Map(models.value.map((model) => [model.id, model])));
 const providerAccountsById = computed(() => new Map(providerAccounts.value.map((account) => [account.id, account])));
 const familyPresets = computed(() => buildFamilyPresets(filteredModels.value, providerAccounts.value));
+const providerPresets = computed(() => buildProviderPresets(filteredModels.value, providerAccounts.value));
 const activePresetModelIds = computed(() => {
-  if (!activeFamilyPreset.value) return null;
-  const preset = familyPresets.value.find((item) => item.family === activeFamilyPreset.value);
+  if (activeFamilyPreset.value) {
+    const preset = familyPresets.value.find((item) => item.family === activeFamilyPreset.value);
+    return preset ? new Set(preset.models.map((model) => model.id)) : null;
+  }
+
+  if (!activeProviderPreset.value) return null;
+  const preset = providerPresets.value.find((item) => item.provider === activeProviderPreset.value);
   return preset ? new Set(preset.models.map((model) => model.id)) : null;
 });
-const maxPanels = computed(() => Math.max(filteredModels.value.length, 1));
+const maxPanels = computed(() => Math.max(filteredModels.value.length, providerPresets.value.reduce((total, preset) => total + preset.panels.length, 0), 1));
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
 const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value));
@@ -267,11 +274,15 @@ watch(() => route.query, (query) => {
   }
 });
 
-watch(filteredModelIds, (availableIds) => {
+watch([filteredModelIds, familyPresets, providerPresets], ([availableIds]) => {
   panels.value = panels.value.map((panel) => panel.modelId && !availableIds.has(panel.modelId) ? { ...panel, modelId: null, accountId: null } : panel);
 
   if (activeFamilyPreset.value && !familyPresets.value.some((preset) => preset.family === activeFamilyPreset.value)) {
     activeFamilyPreset.value = null;
+  }
+
+  if (activeProviderPreset.value && !providerPresets.value.some((preset) => preset.provider === activeProviderPreset.value)) {
+    activeProviderPreset.value = null;
   }
 });
 
@@ -326,6 +337,28 @@ function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccou
       return orderA === orderB ? familyA.localeCompare(familyB) : orderA - orderB;
     })
     .map(([family, familyModels]) => ({ family, models: familyModels }));
+}
+
+function buildProviderPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
+  const accountsByProvider = new Map<string, ProviderAccountOption[]>();
+  for (const account of accounts) {
+    accountsByProvider.set(account.provider, [...(accountsByProvider.get(account.provider) ?? []), account]);
+  }
+
+  return Array.from(accountsByProvider.entries()).flatMap(([provider, providerAccountsForProvider]) => {
+    const modelsForProvider = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => !account.disabledModels?.includes(model.id)));
+    const presetPanels: Array<{ modelId: string; accountId: string }> = [];
+
+    for (const model of modelsForProvider) {
+      for (const account of providerAccountsForProvider) {
+        if (!account.disabledModels?.includes(model.id)) {
+          presetPanels.push({ modelId: model.id, accountId: account.id });
+        }
+      }
+    }
+
+    return presetPanels.length > 0 ? [{ provider, accounts: providerAccountsForProvider, models: modelsForProvider, panels: presetPanels }] : [];
+  });
 }
 
 function getAccountLabel(account: ProviderAccountOption): string {
@@ -467,6 +500,24 @@ function applyFamilyPreset(family: string) {
   panels.value = preset.models.map((model) => ({ id: generateId(), modelId: model.id, accountId: accountByModel.get(model.id) ?? null }));
   responses.value = {};
   activeFamilyPreset.value = family;
+  activeProviderPreset.value = null;
+}
+
+function applyProviderPreset(provider: string) {
+  if (activeProviderPreset.value === provider) {
+    panels.value = [{ id: generateId(), modelId: null, accountId: null }];
+    responses.value = {};
+    activeProviderPreset.value = null;
+    return;
+  }
+
+  const preset = providerPresets.value.find((item) => item.provider === provider);
+  if (!preset) return;
+
+  panels.value = preset.panels.map((panel) => ({ id: generateId(), modelId: panel.modelId, accountId: panel.accountId }));
+  responses.value = {};
+  activeProviderPreset.value = provider;
+  activeFamilyPreset.value = null;
 }
 
 function selectScenario(scenario: Scenario) {
@@ -1236,6 +1287,27 @@ function formatToolArguments(value: string): string {
           </button>
         </div>
         <p v-else class="text-xs text-muted-foreground">Connect at least one provider account to use family presets.</p>
+      </div>
+
+      <div class="space-y-3">
+        <h2 class="text-sm font-medium text-muted-foreground">Provider Preset</h2>
+        <div v-if="providerPresets.length > 0" class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button
+            v-for="preset in providerPresets"
+            :key="preset.provider"
+            type="button"
+            :disabled="isAnyLoading"
+            :class="[
+              'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
+              activeProviderPreset === preset.provider ? 'bg-primary text-primary-foreground' : 'border-input bg-input/30 hover:bg-input/50',
+            ]"
+            @click="applyProviderPreset(preset.provider)"
+          >
+            <span class="whitespace-normal break-words text-xs leading-tight">{{ getProviderLabel(preset.provider) }}</span>
+            <span :class="activeProviderPreset === preset.provider ? 'text-[10px] leading-none text-primary-foreground/85' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.accounts.length }} accounts · {{ preset.panels.length }} panels</span>
+          </button>
+        </div>
+        <p v-else class="text-xs text-muted-foreground">Connect at least one provider account to use provider presets.</p>
       </div>
 
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
