@@ -23,7 +23,7 @@ type ParsedErrorDetails = {
   messageObjects: string[] | null;
 };
 
-const QUOTA_PROVIDERS = new Set<string>(["copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
+const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
   { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },
@@ -311,7 +311,7 @@ const effectiveTier = computed(() => {
 const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "free");
 const showTierBadge = computed(() => props.showTier && normalizedTier.value !== "unknown" && normalizedTier.value !== "guest");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
-const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? []);
+const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? QUOTA_SKELETON_ROWS.copilot);
 const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
 const usageChartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
 const activeDisabledUntil = computed(() => {
