@@ -194,10 +194,9 @@ const successRateData = computed(() =>
 
 <template>
   <div class="space-y-6">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <h3 class="text-sm font-semibold tracking-tight sm:text-base">Analytics</h3>
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-start">
       <div class="flex min-w-0 items-center gap-2">
-        <UiPopover v-model:open="isApiKeyFilterOpen" :content="{ align: 'end' }">
+        <UiPopover v-model:open="isApiKeyFilterOpen" :content="{ align: 'start' }">
           <UiButton
             variant="outline"
             size="sm"
