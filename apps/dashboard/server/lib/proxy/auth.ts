@@ -124,8 +124,13 @@ export function isModelUsableByAccounts(
 }
 
 export async function getAccountModelAvailability(
-  userId: string
+  userId: string,
+  options: { includeInactiveAccounts?: boolean } = {}
 ): Promise<AccountModelAvailability> {
+  const accountWhere = options.includeInactiveAccounts
+    ? and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, DASHBOARD_PROVIDER_ACCOUNT_KEYS))
+    : and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, DASHBOARD_PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date())));
+
   const activeAccounts = await db
     .select({
       id: providerAccount.id,
@@ -133,7 +138,7 @@ export async function getAccountModelAvailability(
       tier: providerAccount.tier,
     })
     .from(providerAccount)
-    .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, DASHBOARD_PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))));
+    .where(accountWhere);
 
   const activeProviders = new Set<string>();
   const accountCountByProvider = new Map<string, number>();

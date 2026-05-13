@@ -730,6 +730,32 @@ func TestValidatePlaygroundAuthRejectsExpiredTimestamp(t *testing.T) {
 	}
 }
 
+func TestValidateForcedAccountAvailabilityRejectsInactiveForAPIKeys(t *testing.T) {
+	param := "provider_account_id"
+	err := validateForcedAccountAvailability(appdb.ProviderAccount{ID: "acct_1", IsActive: false}, false, param)
+	if err == nil || err.Code == nil || *err.Code != "provider_account_inactive" {
+		t.Fatalf("availability error = %+v, want inactive", err)
+	}
+}
+
+func TestValidateForcedAccountAvailabilityRejectsTemporarilyDisabledForAPIKeys(t *testing.T) {
+	param := "provider_account_id"
+	disabledUntil := time.Now().Add(time.Hour)
+	err := validateForcedAccountAvailability(appdb.ProviderAccount{ID: "acct_1", IsActive: true, DisabledUntil: &disabledUntil}, false, param)
+	if err == nil || err.Code == nil || *err.Code != "provider_account_temporarily_disabled" {
+		t.Fatalf("availability error = %+v, want temporarily disabled", err)
+	}
+}
+
+func TestValidateForcedAccountAvailabilityAllowsInactiveForPlayground(t *testing.T) {
+	param := "provider_account_id"
+	disabledUntil := time.Now().Add(time.Hour)
+	err := validateForcedAccountAvailability(appdb.ProviderAccount{ID: "acct_1", IsActive: false, DisabledUntil: &disabledUntil}, true, param)
+	if err != nil {
+		t.Fatalf("availability error = %+v, want nil", err)
+	}
+}
+
 type panicHeaderWriter struct{ header http.Header }
 
 func (w *panicHeaderWriter) Header() http.Header { return w.header }

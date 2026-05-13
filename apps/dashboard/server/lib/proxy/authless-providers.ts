@@ -14,6 +14,8 @@ export function getAuthlessProviderAccounts() {
     provider,
     name: provider === "kilo_code" ? "Kilo Code" : provider,
     email: null,
+    isActive: true,
+    disabledUntil: null as Date | null,
     disabledModels: [] as string[],
     supportedModels: models,
   }));
@@ -24,6 +26,8 @@ export function getAuthlessProviderAccounts() {
       provider,
       name: "OpenCode",
       email: null,
+      isActive: true,
+      disabledUntil: null as Date | null,
       disabledModels: [] as string[],
       supportedModels: null as string[] | null,
     })),

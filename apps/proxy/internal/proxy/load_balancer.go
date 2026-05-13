@@ -213,7 +213,7 @@ func (s *Service) getHealthByAccount(ctx context.Context, accountIDs, modelKeys 
 	return result, nil
 }
 
-func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, providerAccountID *string, accountAccess auth.AccountAccess, cfg endpointAdapter) (*appdb.ProviderAccount, *routeError) {
+func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, providerAccountID *string, accountAccess auth.AccountAccess, allowInactive bool, cfg endpointAdapter) (*appdb.ProviderAccount, *routeError) {
 	if providerAccountID == nil {
 		return nil, nil
 	}
@@ -254,11 +254,8 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		}
 		return nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 	}
-	if !account.IsActive {
-		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is inactive", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_inactive")}
-	}
-	if account.DisabledUntil != nil && account.DisabledUntil.After(time.Now()) {
-		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is temporarily disabled", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_temporarily_disabled")}
+	if availabilityErr := validateForcedAccountAvailability(account, allowInactive, param); availabilityErr != nil {
+		return nil, availabilityErr
 	}
 	if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 		return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
@@ -270,6 +267,19 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
 	}
 	return &account, nil
+}
+
+func validateForcedAccountAvailability(account appdb.ProviderAccount, allowInactive bool, param string) *routeError {
+	if allowInactive {
+		return nil
+	}
+	if !account.IsActive {
+		return &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is inactive", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_inactive")}
+	}
+	if account.DisabledUntil != nil && account.DisabledUntil.After(time.Now()) {
+		return &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is temporarily disabled", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_temporarily_disabled")}
+	}
+	return nil
 }
 
 func (s *Service) markAccountSuccess(ctx context.Context, accountID, model string) {

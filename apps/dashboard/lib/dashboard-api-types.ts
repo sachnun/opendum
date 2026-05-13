@@ -132,7 +132,7 @@ export interface PlaygroundOptions {
   proxyBaseUrl?: string;
   hasAnyProviderAccount: boolean;
   models: Array<{ id: string; name: string; family: string; providers: string[] }>;
-  providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; disabledModels: string[]; supportedModels?: string[] | null }>;
+  providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; isActive: boolean; disabledUntil: string | Date | null; disabledModels: string[]; supportedModels?: string[] | null }>;
 }
 
 export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";

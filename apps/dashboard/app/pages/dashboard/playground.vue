@@ -375,6 +375,15 @@ function getAccountLabel(account: ProviderAccountOption): string {
   return `${name} (${email})`;
 }
 
+function getAccountPlaygroundStatus(account: ProviderAccountOption): string | null {
+  if (!account.isActive) return "Off";
+  if (!account.disabledUntil) return null;
+
+  const disabledUntil = account.disabledUntil instanceof Date ? account.disabledUntil : new Date(account.disabledUntil);
+  if (Number.isNaN(disabledUntil.getTime()) || disabledUntil <= new Date(liveNow.value)) return null;
+  return "Disabled";
+}
+
 function getValidAccountIdForPanel(panel: PanelState): string | null {
   if (!panel.accountId || !panel.modelId) return null;
   const model = modelsById.value.get(panel.modelId);
@@ -1383,7 +1392,10 @@ function formatToolArguments(value: string): string {
                         <p class="truncate text-xs font-medium">{{ getAccountLabel(account) }}</p>
                         <p class="truncate text-[10px] text-muted-foreground">{{ getProviderLabel(account.provider) }}</p>
                       </div>
-                      <UiBadge variant="outline" class="ml-2 text-[10px]">{{ getProviderLabel(account.provider) }}</UiBadge>
+                      <div class="ml-2 flex shrink-0 items-center gap-1">
+                        <UiBadge v-if="getAccountPlaygroundStatus(account)" variant="secondary" class="text-[10px]">{{ getAccountPlaygroundStatus(account) }}</UiBadge>
+                        <UiBadge variant="outline" class="text-[10px]">{{ getProviderLabel(account.provider) }}</UiBadge>
+                      </div>
                     </button>
                   </div>
                 </div>

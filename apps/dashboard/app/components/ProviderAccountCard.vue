@@ -754,7 +754,7 @@ function historyEntryPreview(errorMessage: string): string {
           <div class="flex items-center gap-2">
             <UiButton variant="outline" size="sm" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
             <UiButton variant="outline" size="sm" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
-            <NuxtLink v-if="account.isActive" :to="`/dashboard/playground?accountId=${account.id}`">
+            <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
               <UiButton variant="outline" size="sm" title="Open in Playground"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
             </NuxtLink>
           </div>

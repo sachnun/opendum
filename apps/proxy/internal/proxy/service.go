@@ -65,7 +65,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	startMS := time.Now().UnixMilli()
 	ctx := r.Context()
 
-	authResult, err := s.authenticateRequest(ctx, r)
+	authResult, playgroundAuth, err := s.authenticateRequest(ctx, r)
 	if err != nil {
 		s.writeRouteError(w, cfg, http.StatusInternalServerError, "Internal server error", "api_error", nil, nil, nil, nil)
 		return
@@ -116,7 +116,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		}
 	}
 
-	forced, forceErr := s.validateForcedAccount(ctx, authResult.UserID, validation, parsed.ProviderAccountID, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList}, cfg)
+	forced, forceErr := s.validateForcedAccount(ctx, authResult.UserID, validation, parsed.ProviderAccountID, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList}, playgroundAuth, cfg)
 	if forceErr != nil {
 		s.writeRouteError(w, cfg, forceErr.Status, forceErr.Message, forceErr.Type, forceErr.Param, forceErr.Code, forceErr.RetryAfter, forceErr.RetryAfterMS)
 		return
@@ -158,16 +158,17 @@ func (s *Service) recordResponseHandlerFailure(ctx context.Context, account *app
 	s.logUsage(ctx, usageParams{UserID: userID, ProviderAccountID: account.ID, ProxyAPIKeyID: apiKeyID, Model: model, StatusCode: http.StatusInternalServerError, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 }
 
-func (s *Service) authenticateRequest(ctx context.Context, r *http.Request) (auth.Result, error) {
+func (s *Service) authenticateRequest(ctx context.Context, r *http.Request) (auth.Result, bool, error) {
 	if result, ok := s.validatePlaygroundAuth(r); ok {
-		return result, nil
+		return result, true, nil
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		authHeader = r.Header.Get("X-Api-Key")
 	}
-	return s.auth.ValidateAPIKey(ctx, authHeader)
+	result, err := s.auth.ValidateAPIKey(ctx, authHeader)
+	return result, false, err
 }
 
 func (s *Service) validatePlaygroundAuth(r *http.Request) (auth.Result, bool) {

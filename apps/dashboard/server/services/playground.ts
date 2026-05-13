@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../lib/db";
 import { disabledModel, providerAccount, providerAccountDisabledModel } from "../lib/db/schema";
@@ -20,7 +20,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
     const proxyBaseUrl = getProxyBaseUrl(proxyUrl);
     const [disabledModels, availability] = await Promise.all([
       db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
-      getAccountModelAvailability(userId),
+      getAccountModelAvailability(userId, { includeInactiveAccounts: true }),
     ]);
     const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
 
@@ -36,9 +36,11 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         provider: providerAccount.provider,
         name: providerAccount.name,
         email: providerAccount.email,
+        isActive: providerAccount.isActive,
+        disabledUntil: providerAccount.disabledUntil,
       })
       .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date()))))
+      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS)))
       .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
 
     const disabledModelsByAccount = new Map<string, string[]>();
