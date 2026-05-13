@@ -35,6 +35,8 @@ const { data, error, pending, refresh } = await useAsyncData(
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
 const accountDisplayOrder = ref<Record<string, number>>({});
+const highlightedAccountIds = ref<Set<string>>(new Set());
+let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
   return [...currentAccounts].sort((a, b) => {
@@ -58,19 +60,47 @@ const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvide
 watch(
   detailData,
   (value) => {
-    if (!value || Object.keys(accountDisplayOrder.value).length > 0) return;
+    if (!value) return;
 
-    accountDisplayOrder.value = Object.fromEntries(
-      [...value.accounts]
-        .sort(compareAccounts)
-        .map((account, index) => [account.id, index])
-    );
+    const orderedAccounts = [...value.accounts].sort(compareAccounts);
+    const currentOrder = accountDisplayOrder.value;
+    if (Object.keys(currentOrder).length === 0) {
+      accountDisplayOrder.value = Object.fromEntries(
+        orderedAccounts.map((account, index) => [account.id, index])
+      );
+      return;
+    }
+
+    const knownAccountIds = new Set(Object.keys(currentOrder));
+    const newAccounts = orderedAccounts.filter((account) => !knownAccountIds.has(account.id));
+    if (newAccounts.length === 0) return;
+
+    accountDisplayOrder.value = Object.fromEntries([
+      ...newAccounts.map((account, index) => [account.id, index] as const),
+      ...Object.entries(currentOrder).map(([accountId, order]) => [accountId, order + newAccounts.length] as const),
+    ]);
+
+    highlightedAccountIds.value = new Set(newAccounts.map((account) => account.id));
+    if (highlightTimer) clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      highlightedAccountIds.value = new Set();
+      highlightTimer = null;
+    }, 5000);
   },
   { immediate: true }
 );
 
 watch(selectedProvider, () => {
   accountDisplayOrder.value = {};
+  highlightedAccountIds.value = new Set();
+  if (highlightTimer) {
+    clearTimeout(highlightTimer);
+    highlightTimer = null;
+  }
+});
+
+onBeforeUnmount(() => {
+  if (highlightTimer) clearTimeout(highlightTimer);
 });
 
 const quotaCapableAccounts = computed(() => accounts.value.filter((account) => toQuotaProvider(account.provider)));
@@ -172,8 +202,10 @@ function handlePinnedToggled() {
   refresh();
 }
 
-function handleAccountConnected() {
-  refresh();
+async function handleAccountConnected() {
+  await refresh();
+  await hydrateQuotaCache();
+  runQuotaQueue();
 }
 
 function handleAccountChanged() {
@@ -274,6 +306,7 @@ function handleAccountChanged() {
           :quota-info="quotaByAccountId[account.id] ?? null"
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
           :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"
+          :highlight="highlightedAccountIds.has(account.id)"
           @changed="handleAccountChanged"
           @refresh-quota="handleQuotaRefresh"
         />

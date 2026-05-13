@@ -73,6 +73,7 @@ const props = defineProps<{
   quotaInfo?: AccountQuotaInfo | null;
   quotaError?: string | null;
   isQuotaLoading?: boolean;
+  highlight?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -597,7 +598,10 @@ function historyEntryPreview(errorMessage: string): string {
 
 <template>
   <div ref="cardRoot" class="h-full">
-    <UiCard class="flex h-full flex-col bg-card" :class="!account.isActive ? 'opacity-65' : ''">
+    <UiCard
+      class="flex h-full flex-col bg-card transition-[border-color,box-shadow] duration-[1800ms] ease-out"
+      :class="`${!account.isActive ? 'opacity-65 ' : ''}${highlight ? 'border-primary shadow-[0_0_0_3px_var(--primary)]' : 'border-border shadow-sm'}`"
+    >
       <UiCardHeader class="pb-2">
         <div class="flex min-w-0 items-center justify-between gap-2">
           <UiCardTitle class="min-w-0 truncate text-lg">{{ accountTitle }}</UiCardTitle>

@@ -105,7 +105,7 @@ export function useAccountQuotaMonitor(options: {
   async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number) {
     const provider = options.toQuotaProvider(account.provider);
     if (!provider || quotaLoadingByAccountId.value[account.id]) return;
-    if (!forceRefresh && quotaByAccountId.value[account.id] && !runId) return;
+    if (!forceRefresh && quotaByAccountId.value[account.id]) return;
 
     const hadQuota = Boolean(quotaByAccountId.value[account.id]);
     setQuotaLoading(account.id, true);
