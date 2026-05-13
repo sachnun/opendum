@@ -30,13 +30,44 @@ const { data, error, pending, refresh } = await useAsyncData(
 );
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
-const accounts = computed(() => [...(detailData.value?.accounts ?? [])].sort(compareAccounts));
+const accountDisplayOrder = ref<Record<string, number>>({});
+const accounts = computed(() => {
+  const currentAccounts = detailData.value?.accounts ?? [];
+  return [...currentAccounts].sort((a, b) => {
+    const aOrder = accountDisplayOrder.value[a.id];
+    const bOrder = accountDisplayOrder.value[b.id];
+
+    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+
+    return compareAccounts(a, b);
+  });
+});
 const activeAccountCount = computed(() => accounts.value.filter((account) => account.isActive).length);
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
+
+watch(
+  detailData,
+  (value) => {
+    if (!value || Object.keys(accountDisplayOrder.value).length > 0) return;
+
+    accountDisplayOrder.value = Object.fromEntries(
+      [...value.accounts]
+        .sort(compareAccounts)
+        .map((account, index) => [account.id, index])
+    );
+  },
+  { immediate: true }
+);
+
+watch(selectedProvider, () => {
+  accountDisplayOrder.value = {};
+});
 
 const quotaCapableAccounts = computed(() => accounts.value.filter((account) => toQuotaProvider(account.provider)));
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
