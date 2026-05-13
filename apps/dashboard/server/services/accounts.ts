@@ -11,8 +11,8 @@ export { createAccount, createAccountInputSchema } from "./account-connectors";
 
 const AUTO_PIN_SENTINEL = "_auto_pinned";
 const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degraded: 1, half_open: 2, failed: 3 };
+const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
-const MANUAL_REENABLE_STATUS_REASON = "manually re-enabled after failure";
 
 export const providerInputSchema = z.object({
   provider: z.string().refine(isKnownProvider, "Invalid provider"),
@@ -36,7 +36,7 @@ const providerAccountListColumns = {
   requestCount: providerAccount.requestCount,
   tier: providerAccount.tier,
   status: providerAccount.status,
-  statusReason: providerAccount.statusReason,
+  statusChangedAt: providerAccount.statusChangedAt,
   errorCount: providerAccount.errorCount,
   consecutiveErrors: providerAccount.consecutiveErrors,
   lastErrorAt: providerAccount.lastErrorAt,
@@ -58,6 +58,15 @@ function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil:
 
 function withEffectiveActive<T extends { isActive: boolean; disabledUntil: Date | string | null }>(account: T, now = new Date()): T {
   return { ...account, isActive: accountIsEffectivelyActive(account, now) };
+}
+
+function withEffectiveHealthStatus<T extends { status: string; statusChangedAt?: Date | string | null }>(row: T, now = new Date()): T {
+  if (row.status !== "failed" || !row.statusChangedAt) return row;
+
+  const statusChangedAt = row.statusChangedAt instanceof Date ? row.statusChangedAt : new Date(row.statusChangedAt);
+  if (Number.isNaN(statusChangedAt.getTime()) || now.getTime() - statusChangedAt.getTime() < FAILED_COOLDOWN_MS) return row;
+
+  return { ...row, status: "degraded" };
 }
 
 async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>): Promise<ProviderAccountKey[]> {
@@ -181,7 +190,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
             .select({
               providerAccountId: providerAccountModelHealth.providerAccountId,
               status: providerAccountModelHealth.status,
-              statusReason: providerAccountModelHealth.statusReason,
+              statusChangedAt: providerAccountModelHealth.statusChangedAt,
               consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
               lastErrorAt: providerAccountModelHealth.lastErrorAt,
               lastErrorMessage: providerAccountModelHealth.lastErrorMessage,
@@ -199,7 +208,8 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       return acc;
     }, {});
 
-    const healthByAccountId = healthRows.reduce<Record<string, (typeof healthRows)[number]>>((acc, row) => {
+    const effectiveHealthRows = healthRows.map((row) => withEffectiveHealthStatus(row, now));
+    const healthByAccountId = effectiveHealthRows.reduce<Record<string, (typeof effectiveHealthRows)[number]>>((acc, row) => {
       const current = acc[row.providerAccountId];
       const currentWeight = current ? ACCOUNT_HEALTH_STATUS_WEIGHT[current.status] ?? 0 : 0;
       const nextWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[row.status] ?? 0;
@@ -211,17 +221,18 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
 
     return {
       accounts: accounts.map((account) => {
-        const health = healthByAccountId[account.id];
-        const accountWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[account.status] ?? 0;
+        const effectiveAccount = withEffectiveHealthStatus(account, now);
+        const health = healthByAccountId[effectiveAccount.id];
+        const accountWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[effectiveAccount.status] ?? 0;
         const healthWeight = health ? ACCOUNT_HEALTH_STATUS_WEIGHT[health.status] ?? 0 : 0;
-        const useModelHealth = health && (healthWeight > accountWeight || (healthWeight === accountWeight && health.consecutiveErrors > account.consecutiveErrors));
+        const useModelHealth = health && (healthWeight > accountWeight || (healthWeight === accountWeight && health.consecutiveErrors > effectiveAccount.consecutiveErrors));
 
         return {
-          ...withEffectiveActive(account, now),
+          ...withEffectiveActive(effectiveAccount, now),
           ...(useModelHealth
             ? {
                 status: health.status,
-                statusReason: health.statusReason,
+                statusChangedAt: health.statusChangedAt,
                 consecutiveErrors: health.consecutiveErrors,
                 lastErrorAt: health.lastErrorAt ?? account.lastErrorAt,
                 lastErrorMessage: health.lastErrorMessage ?? account.lastErrorMessage,
@@ -286,11 +297,11 @@ async function downgradeAccountFailureForManualEnable(accountId: string, now = n
   await Promise.all([
     db
       .update(providerAccount)
-      .set({ status: "degraded", statusReason: MANUAL_REENABLE_STATUS_REASON, statusChangedAt: now, consecutiveErrors: INITIAL_DEGRADED_CONSECUTIVE_ERRORS })
+      .set({ status: "degraded", statusChangedAt: now, consecutiveErrors: INITIAL_DEGRADED_CONSECUTIVE_ERRORS })
       .where(and(eq(providerAccount.id, accountId), inArray(providerAccount.status, ["failed", "half_open", "degraded"]))),
     db
       .update(providerAccountModelHealth)
-      .set({ status: "degraded", statusReason: MANUAL_REENABLE_STATUS_REASON, statusChangedAt: now, consecutiveErrors: INITIAL_DEGRADED_CONSECUTIVE_ERRORS })
+      .set({ status: "degraded", statusChangedAt: now, consecutiveErrors: INITIAL_DEGRADED_CONSECUTIVE_ERRORS })
       .where(and(eq(providerAccountModelHealth.providerAccountId, accountId), inArray(providerAccountModelHealth.status, ["failed", "half_open", "degraded"]))),
   ]);
 }
@@ -386,7 +397,7 @@ export async function resolveAccountErrors(userId: string, input: z.infer<typeof
         lastErrorMessage: null,
         lastErrorCode: null,
         lastRecoveredByRotationAt: null,
-        ...(account.status === "degraded" || account.status === "failed" ? { status: "active", statusReason: null, statusChangedAt: new Date() } : {}),
+        ...(account.status === "degraded" || account.status === "failed" ? { status: "active", statusChangedAt: new Date() } : {}),
       })
       .where(eq(providerAccount.id, input.accountId));
     await db.delete(providerAccountErrorHistory).where(eq(providerAccountErrorHistory.providerAccountId, input.accountId));

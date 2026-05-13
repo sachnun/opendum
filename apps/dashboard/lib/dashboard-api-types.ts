@@ -26,7 +26,7 @@ export interface ProviderAccountItem {
   requestCount: number;
   tier: string | null;
   status: string;
-  statusReason: string | null;
+  statusChangedAt: string | Date | null;
   errorCount: number;
   consecutiveErrors: number;
   lastErrorAt: string | Date | null;

@@ -56,7 +56,6 @@ type ProviderAccount struct {
 	LastErrorCode             *int       `bun:"lastErrorCode"`
 	LastRecoveredByRotationAt *time.Time `bun:"lastRecoveredByRotationAt"`
 	Status                    string     `bun:"status"`
-	StatusReason              *string    `bun:"statusReason"`
 	StatusChangedAt           *time.Time `bun:"statusChangedAt"`
 	SuccessCount              int        `bun:"successCount"`
 	LastSuccessAt             *time.Time `bun:"lastSuccessAt"`
@@ -142,7 +141,6 @@ type ProviderAccountModelHealth struct {
 	Model             string     `bun:"model"`
 	ConsecutiveErrors int        `bun:"consecutiveErrors"`
 	Status            string     `bun:"status"`
-	StatusReason      *string    `bun:"statusReason"`
 	StatusChangedAt   *time.Time `bun:"statusChangedAt"`
 	LastErrorAt       *time.Time `bun:"lastErrorAt"`
 	LastErrorCode     *int       `bun:"lastErrorCode"`

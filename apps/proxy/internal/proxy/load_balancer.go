@@ -167,12 +167,15 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 		account := &prioritized[i]
 		row, ok := health[account.ID]
 		if ok {
+			updatedRow := effectiveHealthStatus(row, now)
+			if updatedRow.Status != row.Status {
+				_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("status = ?", updatedRow.Status).Set("\"statusChangedAt\" = ?", now).Where("id = ?", row.ID).Exec(ctx)
+			}
+			row = updatedRow
 			if row.Status == "failed" {
 				if row.StatusChangedAt != nil && now.Sub(*row.StatusChangedAt) < failedCooldown {
 					continue
 				}
-				reason := "cooldown expired, probing"
-				_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("status = ?", "half_open").Set("\"statusReason\" = ?", reason).Set("\"statusChangedAt\" = ?", now).Where("id = ?", row.ID).Exec(ctx)
 			}
 			if row.Status == "half_open" || row.Status == "degraded" {
 				if selected == nil {
@@ -189,6 +192,14 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 	}
 	go s.bumpAccountRequestCount(context.Background(), selected.ID, now)
 	return selected, true, nil
+}
+
+func effectiveHealthStatus(row appdb.ProviderAccountModelHealth, now time.Time) appdb.ProviderAccountModelHealth {
+	if row.Status != "failed" || row.StatusChangedAt == nil || now.Sub(*row.StatusChangedAt) < failedCooldown {
+		return row
+	}
+	row.Status = "degraded"
+	return row
 }
 
 func (s *Service) bumpAccountRequestCount(ctx context.Context, accountID string, usedAt time.Time) {
@@ -294,9 +305,17 @@ func (s *Service) markAccountSuccess(ctx context.Context, accountID, model strin
 	if err != nil {
 		return
 	}
-	query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("\"consecutiveErrors\" = 0").Set("\"lastSuccessAt\" = ?", now).Where("id = ?", health.ID)
+	nextErrors := health.ConsecutiveErrors
+	if nextErrors > 0 {
+		nextErrors--
+	}
+	query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("\"consecutiveErrors\" = ?", nextErrors).Set("\"lastSuccessAt\" = ?", now).Where("id = ?", health.ID)
 	if health.Status == "degraded" || health.Status == "failed" || health.Status == "half_open" {
-		query.Set("status = ?", "active").Set("\"statusReason\" = NULL").Set("\"statusChangedAt\" = ?", now)
+		if nextErrors > 0 {
+			query.Set("status = ?", "degraded").Set("\"statusChangedAt\" = ?", now)
+		} else {
+			query.Set("status = ?", "active").Set("\"statusChangedAt\" = ?", now)
+		}
 	}
 	_, _ = query.Exec(ctx)
 }
@@ -329,19 +348,15 @@ func (s *Service) markAccountFailed(ctx context.Context, accountID, model string
 	var health appdb.ProviderAccountModelHealth
 	if err := s.db.NewSelect().Model(&health).Where("\"providerAccountId\" = ?", accountID).Where("model = ?", resolved).Limit(1).Scan(ctx); err == nil {
 		newStatus := ""
-		reason := ""
 		if health.Status == "half_open" {
 			newStatus = "failed"
-			reason = "probe failed during half-open (" + resolved + ")"
 		} else if health.ConsecutiveErrors >= failedThreshold && health.Status != "failed" {
 			newStatus = "failed"
-			reason = "consecutive errors on " + resolved
 		} else if health.ConsecutiveErrors >= degradedThreshold && health.Status == "active" {
 			newStatus = "degraded"
-			reason = "consecutive errors on " + resolved
 		}
 		if newStatus != "" {
-			_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("status = ?", newStatus).Set("\"statusReason\" = ?", reason).Set("\"statusChangedAt\" = ?", now).Where("id = ?", health.ID).Exec(ctx)
+			_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("status = ?", newStatus).Set("\"statusChangedAt\" = ?", now).Where("id = ?", health.ID).Exec(ctx)
 			if newStatus == "failed" {
 				s.disableAccountForFailedCooldown(ctx, accountID, now)
 			}
@@ -374,7 +389,6 @@ func (s *Service) markAccountUsageLimited(ctx context.Context, accountID, model 
 	if isSyntheticProviderAccountID(accountID) {
 		return
 	}
-	reason := "usage limit reached until " + disabledUntil.UTC().Format(time.RFC3339)
 	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
 		Set("\"disabledUntil\" = ?", disabledUntil).
 		Where("id = ?", accountID).
@@ -383,7 +397,6 @@ func (s *Service) markAccountUsageLimited(ctx context.Context, accountID, model 
 	resolved := s.registry.ResolveAlias(model)
 	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).
 		Set("status = ?", "failed").
-		Set("\"statusReason\" = ?", reason).
 		Set("\"statusChangedAt\" = ?", failedAt).
 		Where("\"providerAccountId\" = ?", accountID).
 		Where("model = ?", resolved).
