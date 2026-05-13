@@ -9,8 +9,6 @@ type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
 type StatMetric = { key: string; label: string; value: string; numericValue: number; hint?: string; formatDelta?: (delta: number) => string };
 
-const AUTO_REFRESH_INTERVAL_MS = 5000;
-
 const props = withDefaults(
   defineProps<{
     apiKeyId?: string;
@@ -46,8 +44,6 @@ const isFilterOpen = ref(false);
 const isApiKeyFilterOpen = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
-
-let analyticsRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let analyticsRefreshInFlight: Promise<void> | null = null;
 
 watch(
@@ -252,16 +248,6 @@ watch([selectedApiKeyId, activeFilterKey], () => {
   statHitEffects.value = {};
 });
 
-onMounted(() => {
-  analyticsRefreshTimer = setInterval(() => {
-    void refreshAnalyticsOnce();
-  }, AUTO_REFRESH_INTERVAL_MS);
-});
-
-onBeforeUnmount(() => {
-  if (analyticsRefreshTimer) clearInterval(analyticsRefreshTimer);
-});
-
 const requestsSeries = [{ key: "count", label: "Requests", color: "var(--chart-1)", area: true }];
 const tokenSeries = [
   { key: "input", label: "Input Tokens", color: "var(--chart-1)", area: true },
@@ -391,6 +377,16 @@ const successRateData = computed(() =>
             </div>
           </template>
         </UiPopover>
+
+        <UiButton
+          variant="outline"
+          size="icon-sm"
+          :disabled="pending"
+          class="h-8 w-8 rounded-lg border-border bg-background sm:h-9 sm:w-9"
+          @click="refreshAnalyticsOnce"
+        >
+          <UiIcon name="i-lucide-refresh-cw" :class="['size-4', pending ? 'animate-spin' : '']" />
+        </UiButton>
       </div>
     </div>
 
