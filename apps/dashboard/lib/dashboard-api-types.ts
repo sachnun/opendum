@@ -42,6 +42,13 @@ export interface ProviderAccountDetailItem extends ProviderAccountItem {
   stats: ProviderStats;
 }
 
+export interface ProviderAccountModelHealthItem {
+  status: string;
+  consecutiveErrors: number;
+  lastErrorAt: string | Date | null;
+  lastSuccessAt: string | Date | null;
+}
+
 export interface AccountSummaryData {
   summaries: Record<ProviderAccountKey, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
   pinnedProviders: ProviderAccountKey[];
@@ -51,6 +58,7 @@ export interface ProviderDetailData {
   accounts: ProviderAccountDetailItem[];
   supportedModels: string[];
   disabledModelsByAccountId: Record<string, string[]>;
+  modelHealthByAccountId: Record<string, Record<string, ProviderAccountModelHealthItem>>;
   pinnedProviders: ProviderAccountKey[];
 }
 

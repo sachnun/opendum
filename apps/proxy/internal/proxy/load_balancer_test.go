@@ -16,3 +16,27 @@ func TestEffectiveHealthStatusDowngradesExpiredFailed(t *testing.T) {
 		t.Fatalf("expired failed health status = %q, want degraded", health.Status)
 	}
 }
+
+func TestSuccessRecoveryState(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     string
+		errors     int
+		wantErrors int
+		wantStatus string
+		wantUpdate bool
+	}{
+		{name: "degraded counts down", status: "degraded", errors: 3, wantErrors: 2, wantStatus: "degraded", wantUpdate: true},
+		{name: "degraded recovers", status: "degraded", errors: 1, wantErrors: 0, wantStatus: "active", wantUpdate: true},
+		{name: "active only counts down", status: "active", errors: 2, wantErrors: 1, wantStatus: "active", wantUpdate: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotErrors, gotStatus, gotUpdate := successRecoveryState(tt.status, tt.errors)
+			if gotErrors != tt.wantErrors || gotStatus != tt.wantStatus || gotUpdate != tt.wantUpdate {
+				t.Fatalf("successRecoveryState(%q, %d) = (%d, %q, %v), want (%d, %q, %v)", tt.status, tt.errors, gotErrors, gotStatus, gotUpdate, tt.wantErrors, tt.wantStatus, tt.wantUpdate)
+			}
+		})
+	}
+}

@@ -56,6 +56,7 @@ const isLoadingAccounts = computed(() => pending.value || (!detailData.value && 
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
+const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
 const selectedAccountId = computed(() => decodeAccountHash(route.hash));
 
@@ -346,6 +347,7 @@ function decodeAccountHash(hash: string): string | null {
           :show-tier="providerMeta?.showTier"
           :supported-models="supportedModels"
           :disabled-models="disabledModelsByAccountId[account.id] ?? []"
+          :model-health="modelHealthByAccountId[account.id] ?? {}"
           :quota-info="quotaByAccountId[account.id] ?? null"
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
           :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"

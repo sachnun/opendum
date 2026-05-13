@@ -305,19 +305,26 @@ func (s *Service) markAccountSuccess(ctx context.Context, accountID, model strin
 	if err != nil {
 		return
 	}
-	nextErrors := health.ConsecutiveErrors
+	nextErrors, nextStatus, recovering := successRecoveryState(health.Status, health.ConsecutiveErrors)
+	query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("\"consecutiveErrors\" = ?", nextErrors).Set("\"lastSuccessAt\" = ?", now).Where("id = ?", health.ID)
+	if recovering {
+		query.Set("status = ?", nextStatus).Set("\"statusChangedAt\" = ?", now)
+	}
+	_, _ = query.Exec(ctx)
+}
+
+func successRecoveryState(status string, consecutiveErrors int) (int, string, bool) {
+	nextErrors := consecutiveErrors
 	if nextErrors > 0 {
 		nextErrors--
 	}
-	query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("\"consecutiveErrors\" = ?", nextErrors).Set("\"lastSuccessAt\" = ?", now).Where("id = ?", health.ID)
-	if health.Status == "degraded" || health.Status == "failed" || health.Status == "half_open" {
-		if nextErrors > 0 {
-			query.Set("status = ?", "degraded").Set("\"statusChangedAt\" = ?", now)
-		} else {
-			query.Set("status = ?", "active").Set("\"statusChangedAt\" = ?", now)
-		}
+	if status != "degraded" && status != "failed" && status != "half_open" {
+		return nextErrors, status, false
 	}
-	_, _ = query.Exec(ctx)
+	if nextErrors > 0 {
+		return nextErrors, "degraded", true
+	}
+	return nextErrors, "active", true
 }
 
 func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, durationMS int, stream bool, requestStartMS int64) {

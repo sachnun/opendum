@@ -189,6 +189,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
         ? db
             .select({
               providerAccountId: providerAccountModelHealth.providerAccountId,
+              model: providerAccountModelHealth.model,
               status: providerAccountModelHealth.status,
               statusChangedAt: providerAccountModelHealth.statusChangedAt,
               consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
@@ -215,6 +216,23 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       const nextWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[row.status] ?? 0;
       if (nextWeight > currentWeight || (nextWeight === currentWeight && row.consecutiveErrors > (current?.consecutiveErrors ?? 0))) {
         acc[row.providerAccountId] = row;
+      }
+      return acc;
+    }, {});
+    const modelHealthByAccountId = effectiveHealthRows.reduce<Record<string, Record<string, { status: string; consecutiveErrors: number; lastErrorAt: Date | string | null; lastSuccessAt: Date | string | null }>>>((acc, row) => {
+      const model = resolveModelAlias(row.model);
+      const accountHealth = acc[row.providerAccountId] ?? {};
+      const current = accountHealth[model];
+      const currentWeight = current ? ACCOUNT_HEALTH_STATUS_WEIGHT[current.status] ?? 0 : 0;
+      const nextWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[row.status] ?? 0;
+      if (!current || nextWeight > currentWeight || (nextWeight === currentWeight && row.consecutiveErrors > current.consecutiveErrors)) {
+        accountHealth[model] = {
+          status: row.status,
+          consecutiveErrors: row.consecutiveErrors,
+          lastErrorAt: row.lastErrorAt,
+          lastSuccessAt: row.lastSuccessAt,
+        };
+        acc[row.providerAccountId] = accountHealth;
       }
       return acc;
     }, {});
@@ -245,6 +263,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       }),
       supportedModels,
       disabledModelsByAccountId,
+      modelHealthByAccountId,
       pinnedProviders,
     };
   } catch (error) {

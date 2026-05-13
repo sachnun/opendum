@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import type { ProviderAccountModelHealthItem } from "../../lib/dashboard-api-types";
+
 const props = defineProps<{
   accountId: string;
   supportedModels: string[];
   initialDisabledModels: string[];
+  modelHealth: Record<string, ProviderAccountModelHealthItem>;
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -20,8 +23,42 @@ watch(
 
 const enabledCount = computed(() => props.supportedModels.length - disabledModels.value.size);
 const hasMore = computed(() => props.supportedModels.length > visibleCount);
-const visibleModels = computed(() => (expanded.value ? props.supportedModels : props.supportedModels.slice(0, visibleCount)));
+const sortedModels = computed(() => [...props.supportedModels].sort((a, b) => modelSortWeight(a) - modelSortWeight(b) || a.localeCompare(b)));
+const visibleModels = computed(() => (expanded.value ? sortedModels.value : sortedModels.value.slice(0, visibleCount)));
 const hiddenCount = computed(() => props.supportedModels.length - visibleCount);
+
+function modelSortWeight(model: string): number {
+  const status = props.modelHealth[model]?.status;
+  if (status === "failed") return 0;
+  if (status === "half_open") return 1;
+  if (status === "degraded") return 2;
+  if (disabledModels.value.has(model)) return 4;
+  return 3;
+}
+
+function modelHealthLabel(model: string): string | null {
+  const health = props.modelHealth[model];
+  if (!health || health.status === "active") return null;
+  if (health.status === "failed") return `Failed (${health.consecutiveErrors})`;
+  if (health.status === "half_open") return `Recovering (${health.consecutiveErrors})`;
+  if (health.status === "degraded") return `Degraded (${health.consecutiveErrors})`;
+  return null;
+}
+
+function modelButtonTitle(model: string): string {
+  const action = disabledModels.value.has(model) ? `Enable ${model}` : `Disable ${model}`;
+  const health = modelHealthLabel(model);
+  return health ? `${health}. ${action}` : action;
+}
+
+function modelButtonClass(model: string): string {
+  if (disabledModels.value.has(model)) return "bg-transparent text-muted-foreground/60 line-through";
+  const status = props.modelHealth[model]?.status;
+  if (status === "failed") return "bg-red-500/10 text-red-600 ring-1 ring-red-500/45";
+  if (status === "half_open") return "bg-yellow-500/10 text-yellow-700 ring-1 ring-yellow-500/45";
+  if (status === "degraded") return "bg-yellow-500/10 text-yellow-700 ring-1 ring-yellow-500/45";
+  return "bg-muted text-foreground";
+}
 
 async function toggleModel(model: string) {
   const currentlyEnabled = !disabledModels.value.has(model);
@@ -60,10 +97,10 @@ async function toggleModel(model: string) {
         :key="model"
         type="button"
         :disabled="togglingModels.has(model)"
-        :title="disabledModels.has(model) ? `Enable ${model}` : `Disable ${model}`"
+        :title="modelButtonTitle(model)"
         :class="[
           'inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-          disabledModels.has(model) ? 'bg-transparent text-muted-foreground/60 line-through' : 'bg-muted text-foreground',
+          modelButtonClass(model),
         ]"
         @click="toggleModel(model)"
       >

@@ -70,6 +70,7 @@ const props = defineProps<{
   showTier?: boolean;
   supportedModels?: string[];
   disabledModels?: string[];
+  modelHealth?: ProviderDetailData["modelHealthByAccountId"][string];
   quotaInfo?: AccountQuotaInfo | null;
   quotaError?: string | null;
   isQuotaLoading?: boolean;
@@ -752,7 +753,7 @@ function historyEntryPreview(errorMessage: string): string {
             </template>
           </div>
 
-          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" />
+          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" />
         </div>
         <div class="mt-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
