@@ -291,7 +291,7 @@ const successRateData = computed(() =>
           <UiButton
             variant="outline"
             size="sm"
-            :disabled="pending || apiKeys.length === 0"
+            :disabled="apiKeys.length === 0"
             class="h-8 min-w-0 justify-between overflow-hidden rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
           >
             <span class="inline-flex min-w-0 items-center gap-1.5">
@@ -307,7 +307,6 @@ const successRateData = computed(() =>
                 variant="ghost"
                 size="sm"
                 :class="['h-8 w-full justify-start rounded-md px-2.5 text-xs', selectedApiKeyId === 'all' ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : '']"
-                :disabled="pending"
                 @click="handleApiKeyChange('all')"
               >
                 All API keys
@@ -318,7 +317,6 @@ const successRateData = computed(() =>
                 variant="ghost"
                 size="sm"
                 :class="['h-8 w-full justify-start rounded-md px-2.5 text-xs', selectedApiKeyId === apiKey.id ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : '']"
-                :disabled="pending"
                 @click="handleApiKeyChange(apiKey.id)"
               >
                 <span class="truncate">{{ apiKey.name ?? 'Unnamed key' }}</span>
@@ -332,7 +330,6 @@ const successRateData = computed(() =>
           <UiButton
             variant="outline"
             size="sm"
-            :disabled="pending"
             class="h-8 min-w-0 justify-between overflow-hidden rounded-lg border-border bg-background px-2.5 text-xs sm:h-9 sm:min-w-48 sm:text-sm"
           >
             <span class="inline-flex min-w-0 items-center gap-1.5">
@@ -353,7 +350,6 @@ const successRateData = computed(() =>
                   variant="ghost"
                   size="sm"
                   :class="['h-8 justify-start rounded-md px-2.5 text-xs', !isCustomRangeActive && period === item.value ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : '']"
-                  :disabled="pending"
                   @click="handlePeriodChange(item.value)"
                 >
                   {{ item.label }}
@@ -378,7 +374,7 @@ const successRateData = computed(() =>
                   variant="ghost"
                   size="sm"
                   class="h-8 px-2.5 text-xs"
-                  :disabled="pending || (!isCustomRangeActive && !draftFromDate && !draftToDate)"
+                  :disabled="!isCustomRangeActive && !draftFromDate && !draftToDate"
                   @click="handleClearCustomRange"
                 >
                   Clear
@@ -386,7 +382,7 @@ const successRateData = computed(() =>
                 <UiButton
                   size="sm"
                   class="h-8 px-2.5 text-xs"
-                  :disabled="pending || !draftFromDate || !draftToDate"
+                  :disabled="!draftFromDate || !draftToDate"
                   @click="handleApplyCustomRange"
                 >
                   Apply range
@@ -395,11 +391,6 @@ const successRateData = computed(() =>
             </div>
           </template>
         </UiPopover>
-
-        <span class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-xs text-muted-foreground sm:h-9">
-          <span class="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.75)]" />
-          Auto 5s
-        </span>
       </div>
     </div>
 
