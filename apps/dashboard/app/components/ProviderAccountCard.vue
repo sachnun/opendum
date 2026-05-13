@@ -23,7 +23,7 @@ type ParsedErrorDetails = {
   messageObjects: string[] | null;
 };
 
-const QUOTA_PROVIDERS = new Set<string>(["copilot", "codex", "kiro", "openrouter"]);
+const QUOTA_PROVIDERS = new Set<string>(["copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
   { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },

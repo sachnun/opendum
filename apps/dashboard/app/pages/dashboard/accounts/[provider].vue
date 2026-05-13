@@ -19,7 +19,7 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
   accounts: number;
 };
 
-const QUOTA_PROVIDERS = new Set<string>(["copilot", "codex", "kiro", "openrouter"]);
+const QUOTA_PROVIDERS = new Set<string>(["copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const ENABLED_QUOTA_FETCH_DELAY_MS = 750;
 const DISABLED_QUOTA_FETCH_DELAY_MS = 2000;
 const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
