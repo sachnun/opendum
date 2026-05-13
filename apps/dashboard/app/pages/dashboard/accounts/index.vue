@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import {
-  API_KEY_DEFINITIONS,
-  OAUTH_DEFINITIONS,
   PROVIDER_ACCOUNT_DEFINITIONS,
   type ProviderAccountKey,
 } from "../../../../lib/provider-accounts";
@@ -23,14 +21,19 @@ function summaryFor(provider: ProviderAccountKey): AccountSummaryData["summaries
 }
 
 function sortProvidersByStatus<T extends { key: ProviderAccountKey }>(providers: T[]): T[] {
-  return [...providers].sort((a, b) => PROVIDER_STATUS_ORDER[summaryFor(a.key).indicator] - PROVIDER_STATUS_ORDER[summaryFor(b.key).indicator]);
+  return [...providers].sort((a, b) => {
+    const pinnedA = pinnedProviderSet.value.has(a.key) ? 0 : 1;
+    const pinnedB = pinnedProviderSet.value.has(b.key) ? 0 : 1;
+    return pinnedA - pinnedB
+      || PROVIDER_STATUS_ORDER[summaryFor(a.key).indicator] - PROVIDER_STATUS_ORDER[summaryFor(b.key).indicator]
+      || a.key.localeCompare(b.key);
+  });
 }
 
-const sortedOauthProviders = computed(() => summaryData.value ? sortProvidersByStatus(OAUTH_DEFINITIONS) : []);
-const sortedApiKeyProviders = computed(() => summaryData.value ? sortProvidersByStatus(API_KEY_DEFINITIONS) : []);
+const sortedProviders = computed(() => summaryData.value ? sortProvidersByStatus(PROVIDER_ACCOUNT_DEFINITIONS) : []);
 
 function handlePinnedToggled() {
-  refresh();
+  // Keep the current card order stable after toggling; pinned sorting applies on load/refresh.
 }
 
 function handleAccountConnected() {
@@ -56,28 +59,9 @@ function handleAccountConnected() {
     <DashboardDataNotice :error="error" />
     <template v-if="summaryData">
       <section class="space-y-4 md:space-y-2">
-        <div class="space-y-1">
-          <h3 class="text-base font-semibold">OAuth Provider Accounts</h3>
-        </div>
         <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
           <ProviderOverviewCard
-            v-for="provider in sortedOauthProviders"
-            :key="provider.key"
-            :provider="provider"
-            :summary="summaryFor(provider.key)"
-            :pinned="pinnedProviderSet.has(provider.key)"
-            @toggled="handlePinnedToggled"
-          />
-        </div>
-      </section>
-
-      <section class="space-y-4 md:space-y-2">
-        <div class="space-y-1">
-          <h3 class="text-base font-semibold">API Key Provider Accounts</h3>
-        </div>
-        <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-          <ProviderOverviewCard
-            v-for="provider in sortedApiKeyProviders"
+            v-for="provider in sortedProviders"
             :key="provider.key"
             :provider="provider"
             :summary="summaryFor(provider.key)"

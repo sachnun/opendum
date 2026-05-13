@@ -46,8 +46,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", flowType: "api_key_with_account_id", apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
 };
 
-const oauthProviders: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot"];
-const apiKeyProviders: Provider[] = ["ollama_cloud", "openrouter", "nvidia_nim", "groq", "workers_ai"];
+const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "ollama_cloud", "openrouter", "nvidia_nim", "groq", "workers_ai"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -419,40 +418,19 @@ onBeforeUnmount(() => {
 
       <div class="min-h-0 flex-1 space-y-4 overflow-y-auto">
         <div v-if="step === 1" class="space-y-4">
-          <div class="space-y-2">
-            <p class="text-sm font-medium">OAuth Providers</p>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <button
-                v-for="providerKey in oauthProviders"
-                :key="providerKey"
-                type="button"
-                :class="cn(
-                  'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent',
-                  provider === providerKey ? 'border-primary bg-accent' : 'border-border',
-                )"
-                @click="selectProvider(providerKey)"
-              >
-                <span class="text-sm font-medium">{{ providerConfigs[providerKey].name }}</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <p class="text-sm font-medium">API Key Providers</p>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <button
-                v-for="providerKey in apiKeyProviders"
-                :key="providerKey"
-                type="button"
-                :class="cn(
-                  'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent',
-                  provider === providerKey ? 'border-primary bg-accent' : 'border-border',
-                )"
-                @click="selectProvider(providerKey)"
-              >
-                <span class="text-sm font-medium">{{ providerConfigs[providerKey].name }}</span>
-              </button>
-            </div>
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <button
+              v-for="providerKey in providerOptions"
+              :key="providerKey"
+              type="button"
+              :class="cn(
+                'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent',
+                provider === providerKey ? 'border-primary bg-accent' : 'border-border',
+              )"
+              @click="selectProvider(providerKey)"
+            >
+              <span class="text-sm font-medium">{{ providerConfigs[providerKey].name }}</span>
+            </button>
           </div>
         </div>
 
