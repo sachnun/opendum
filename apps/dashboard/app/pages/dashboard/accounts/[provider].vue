@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AccountQuotaInfo, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../../lib/dashboard-api-types";
+import type { ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../../lib/dashboard-api-types";
 import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
@@ -20,8 +20,6 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
 };
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
-const ENABLED_QUOTA_FETCH_DELAY_MS = 750;
-const DISABLED_QUOTA_FETCH_DELAY_MS = 2000;
 const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
 const FREE_TIER_VALUES = new Set(["", "free", "free-tier", "guest", "unknown"]);
 
@@ -39,13 +37,18 @@ const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
-const quotaByAccountId = ref<Record<string, AccountQuotaInfo>>({});
-const quotaErrorByAccountId = ref<Record<string, string>>({});
-const quotaLoadingByAccountId = ref<Record<string, boolean>>({});
-let quotaQueueRunId = 0;
 
 const quotaCapableAccounts = computed(() => accounts.value.filter((account) => toQuotaProvider(account.provider)));
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
+const {
+  quotaByAccountId,
+  quotaErrorByAccountId,
+  quotaLoadingByAccountId,
+  hydrateQuotaCache,
+  loadAccountQuota,
+  pruneQuotaState,
+  runQuotaQueue,
+} = useAccountQuotaMonitor({ accounts, quotaCapableAccounts, toQuotaProvider });
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
   const groups = new Map<string, QuotaSummaryGroup>();
 
@@ -103,68 +106,6 @@ function compareAccounts(a: Account, b: Account): number {
     || (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active);
 }
 
-function setQuotaLoading(accountId: string, loading: boolean) {
-  quotaLoadingByAccountId.value = loading
-    ? { ...quotaLoadingByAccountId.value, [accountId]: true }
-    : Object.fromEntries(Object.entries(quotaLoadingByAccountId.value).filter(([key]) => key !== accountId));
-}
-
-function pruneQuotaState() {
-  const accountIds = new Set(accounts.value.map((account) => account.id));
-  quotaByAccountId.value = Object.fromEntries(Object.entries(quotaByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
-  quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
-  quotaLoadingByAccountId.value = Object.fromEntries(Object.entries(quotaLoadingByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
-}
-
-async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number) {
-  const provider = toQuotaProvider(account.provider);
-  if (!provider || quotaLoadingByAccountId.value[account.id]) return;
-  if (!forceRefresh && (quotaByAccountId.value[account.id] || quotaErrorByAccountId.value[account.id])) return;
-
-  setQuotaLoading(account.id, true);
-  quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
-
-  try {
-    const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh });
-    if (runId !== undefined && runId !== quotaQueueRunId) return;
-    if (!result.success) throw new Error(result.error);
-
-    quotaByAccountId.value = { ...quotaByAccountId.value, [account.id]: result.data };
-    quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountId !== account.id));
-  } catch (error) {
-    if (runId !== undefined && runId !== quotaQueueRunId) return;
-    const message = error instanceof Error ? error.message : "Failed to fetch quota data";
-    quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: message };
-  } finally {
-    setQuotaLoading(account.id, false);
-  }
-}
-
-async function runQuotaQueue() {
-  const runId = ++quotaQueueRunId;
-  const accountsToFetch = [
-    ...quotaCapableAccounts.value.filter((account) => account.isActive),
-    ...quotaCapableAccounts.value.filter((account) => !account.isActive),
-  ];
-
-  for (const [index, account] of accountsToFetch.entries()) {
-    if (runId !== quotaQueueRunId) return;
-    if (index > 0) {
-      const delay = account.isActive ? ENABLED_QUOTA_FETCH_DELAY_MS : DISABLED_QUOTA_FETCH_DELAY_MS;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      if (runId !== quotaQueueRunId) return;
-    }
-
-    if (quotaLoadingByAccountId.value[account.id]) {
-      while (quotaLoadingByAccountId.value[account.id] && runId === quotaQueueRunId) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-      if (runId !== quotaQueueRunId) return;
-    }
-    await loadAccountQuota(account, false, runId);
-  }
-}
-
 function quotaPercentRemaining(group: QuotaSummaryGroup): number {
   return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
 }
@@ -184,8 +125,9 @@ function handleQuotaRefresh(accountId: string) {
 
 watch(
   () => accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|"),
-  () => {
+  async () => {
     pruneQuotaState();
+    await hydrateQuotaCache();
     runQuotaQueue();
   },
   { immediate: true }
