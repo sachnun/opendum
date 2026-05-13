@@ -267,6 +267,23 @@ func (s *Service) disableAccountForFailedCooldown(ctx context.Context, accountID
 		Exec(ctx)
 }
 
+func (s *Service) markAccountUsageLimited(ctx context.Context, accountID, model string, disabledUntil, failedAt time.Time) {
+	reason := "usage limit reached until " + disabledUntil.UTC().Format(time.RFC3339)
+	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
+		Set("\"disabledUntil\" = ?", disabledUntil).
+		Where("id = ?", accountID).
+		Exec(ctx)
+
+	resolved := s.registry.ResolveAlias(model)
+	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).
+		Set("status = ?", "failed").
+		Set("\"statusReason\" = ?", reason).
+		Set("\"statusChangedAt\" = ?", failedAt).
+		Where("\"providerAccountId\" = ?", accountID).
+		Where("model = ?", resolved).
+		Exec(ctx)
+}
+
 func (s *Service) markAccountsRecoveredByRotation(ctx context.Context, failures []accountRotationFailure) {
 	latest := map[string]time.Time{}
 	for _, failure := range failures {

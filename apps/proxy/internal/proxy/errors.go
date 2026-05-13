@@ -124,6 +124,51 @@ func shouldRotate(status int) bool {
 	return status >= 500 || status == http.StatusTooManyRequests || status == http.StatusRequestTimeout || status == http.StatusNotFound || status == http.StatusForbidden || status == http.StatusPaymentRequired || status == http.StatusUnauthorized
 }
 
+func codexUsageLimitDisabledUntil(provider string, status int, body string, now time.Time) (time.Time, bool) {
+	if provider != "codex" || status != http.StatusTooManyRequests {
+		return time.Time{}, false
+	}
+
+	var payload map[string]any
+	if json.Unmarshal([]byte(strings.TrimSpace(body)), &payload) != nil {
+		return time.Time{}, false
+	}
+	errorBody, ok := payload["error"].(map[string]any)
+	if !ok || strings.TrimSpace(stringValue(errorBody["type"])) != "usage_limit_reached" {
+		return time.Time{}, false
+	}
+
+	if resetsAt, ok := int64Value(errorBody["resets_at"]); ok {
+		until := time.Unix(resetsAt, 0)
+		if until.After(now) {
+			return until, true
+		}
+	}
+	if resetsInSeconds, ok := int64Value(errorBody["resets_in_seconds"]); ok && resetsInSeconds > 0 {
+		return now.Add(time.Duration(resetsInSeconds) * time.Second), true
+	}
+	return time.Time{}, false
+}
+
+func int64Value(value any) (int64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return int64(v), v > 0
+	case int:
+		return int64(v), v > 0
+	case int64:
+		return v, v > 0
+	case json.Number:
+		parsed, err := v.Int64()
+		return parsed, err == nil && parsed > 0
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		return parsed, err == nil && parsed > 0
+	default:
+		return 0, false
+	}
+}
+
 func retryMetadata(d time.Duration) (*string, *int64) {
 	if d <= 0 {
 		return nil, nil

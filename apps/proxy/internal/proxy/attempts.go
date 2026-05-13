@@ -14,6 +14,7 @@ type accountRotationRunner interface {
 	bumpAccountRequestCount(context.Context, string, time.Time)
 	makeProviderRequest(context.Context, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error)
 	markAccountFailed(context.Context, string, string, int, string) time.Time
+	markAccountUsageLimited(context.Context, string, string, time.Time, time.Time)
 	logUsage(context.Context, usageParams)
 	isVisionModel(string) bool
 	isToolCallModel(string) bool
@@ -88,6 +89,9 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			if resp.StatusCode != http.StatusRequestTimeout {
 				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
 				failedAt = runner.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, detailed)
+				if disabledUntil, ok := codexUsageLimitDisabledUntil(account.Provider, resp.StatusCode, bodyText, failedAt); ok {
+					runner.markAccountUsageLimited(ctx, account.ID, validation.Model, disabledUntil, failedAt)
+				}
 			}
 			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
 			message, typ := sanitizedProxyError(resp.StatusCode, bodyText)

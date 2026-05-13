@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,9 +89,55 @@ func TestFailedCooldownUntilUsesConfiguredCooldown(t *testing.T) {
 	}
 }
 
+func TestExecuteAccountRotationMarksCodexUsageLimitDisabledUntil(t *testing.T) {
+	now := time.Now()
+	resetAt := now.Add(2 * time.Hour).Unix()
+	runner := &testRotationRunner{
+		accounts:     []appdb.ProviderAccount{{ID: "codex-account", Provider: "codex"}},
+		responseBody: `{"error":{"type":"usage_limit_reached","message":"The usage limit has been reached","plan_type":"free","resets_at":` + strconv.FormatInt(resetAt, 10) + `,"resets_in_seconds":7200}}`,
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "gpt-5.5", Provider: strPtr("codex")},
+		nil,
+		now.UnixMilli(),
+	)
+
+	if routeErr == nil || routeErr.Status != http.StatusTooManyRequests {
+		t.Fatalf("routeErr = %+v, want 429", routeErr)
+	}
+	if runner.usageLimitedAccountID != "codex-account" {
+		t.Fatalf("usageLimitedAccountID = %q, want codex-account", runner.usageLimitedAccountID)
+	}
+	if runner.usageLimitedModel != "gpt-5.5" {
+		t.Fatalf("usageLimitedModel = %q, want gpt-5.5", runner.usageLimitedModel)
+	}
+	if got := runner.usageLimitedUntil.Unix(); got != resetAt {
+		t.Fatalf("usageLimitedUntil = %d, want %d", got, resetAt)
+	}
+}
+
 type testRotationRunner struct {
-	accounts  []appdb.ProviderAccount
-	requested []string
+	accounts              []appdb.ProviderAccount
+	requested             []string
+	responseBody          string
+	usageLimitedAccountID string
+	usageLimitedModel     string
+	usageLimitedUntil     time.Time
 }
 
 func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude []string, _ auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
@@ -113,11 +161,21 @@ func (r *testRotationRunner) makeProviderRequest(_ context.Context, account appd
 	if account.Provider == "provider_2" {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(http.NoBody)}, nil
 	}
-	return &http.Response{StatusCode: http.StatusTooManyRequests, Body: io.NopCloser(http.NoBody)}, nil
+	var body io.ReadCloser = http.NoBody
+	if r.responseBody != "" {
+		body = io.NopCloser(strings.NewReader(r.responseBody))
+	}
+	return &http.Response{StatusCode: http.StatusTooManyRequests, Body: body}, nil
 }
 
 func (r *testRotationRunner) markAccountFailed(context.Context, string, string, int, string) time.Time {
 	return time.Now()
+}
+
+func (r *testRotationRunner) markAccountUsageLimited(_ context.Context, accountID, model string, disabledUntil, _ time.Time) {
+	r.usageLimitedAccountID = accountID
+	r.usageLimitedModel = model
+	r.usageLimitedUntil = disabledUntil
 }
 
 func (r *testRotationRunner) logUsage(context.Context, usageParams) {}
