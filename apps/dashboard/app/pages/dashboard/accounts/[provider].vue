@@ -23,6 +23,7 @@ const QUOTA_PROVIDERS = new Set<string>(["copilot", "codex", "gemini_cli", "kiro
 const ENABLED_QUOTA_FETCH_DELAY_MS = 750;
 const DISABLED_QUOTA_FETCH_DELAY_MS = 2000;
 const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
+const FREE_TIER_VALUES = new Set(["", "free", "free-tier", "guest", "unknown"]);
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
@@ -31,7 +32,7 @@ const { data, error, pending, refresh } = await useAsyncData(
 );
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
-const accounts = computed(() => [...(detailData.value?.accounts ?? [])].sort((a, b) => (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active)));
+const accounts = computed(() => [...(detailData.value?.accounts ?? [])].sort(compareAccounts));
 const activeAccountCount = computed(() => accounts.value.filter((account) => account.isActive).length);
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
@@ -86,6 +87,20 @@ const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
 
 function toQuotaProvider(provider: string): QuotaProviderKey | null {
   return QUOTA_PROVIDERS.has(provider) ? provider as QuotaProviderKey : null;
+}
+
+function isTierAboveFree(tier: string | null): boolean {
+  return !FREE_TIER_VALUES.has(tier?.trim().toLowerCase() ?? "");
+}
+
+function getAccountSortGroup(account: Account): number {
+  if (!account.isActive) return 2;
+  return isTierAboveFree(account.tier) ? 0 : 1;
+}
+
+function compareAccounts(a: Account, b: Account): number {
+  return getAccountSortGroup(a) - getAccountSortGroup(b)
+    || (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active);
 }
 
 function setQuotaLoading(accountId: string, loading: boolean) {
