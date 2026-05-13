@@ -70,6 +70,19 @@ func TestWorkersAIModelsDeclareCloudflareUpstream(t *testing.T) {
 	}
 }
 
+func TestGeminiCLIExcludesGemmaModels(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, model := range []string{"gemma-4-31b-it", "gemma-4-26b-a4b-it"} {
+		if registry.IsSupportedByProvider(model, "gemini_cli") {
+			t.Fatalf("%s should not be routed to gemini_cli Code Assist", model)
+		}
+	}
+}
+
 func TestSupportedModelsDeclareFamily(t *testing.T) {
 	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
 	if err != nil {

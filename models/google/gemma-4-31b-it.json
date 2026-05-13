@@ -1,6 +1,5 @@
 {
   "providers": [
-    "gemini_cli",
     "nvidia_nim",
     "openrouter"
   ],

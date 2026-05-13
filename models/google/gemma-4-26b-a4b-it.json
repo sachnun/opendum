@@ -1,6 +1,5 @@
 {
   "providers": [
-    "gemini_cli",
     "openrouter",
     "workers_ai"
   ],

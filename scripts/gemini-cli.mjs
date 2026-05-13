@@ -29,6 +29,7 @@ const MAX_FETCH_ATTEMPTS = 3;
 // Models to exclude – internal routing variants, not user-facing
 const EXCLUDED_PATTERNS = [
   /-customtools$/,  // internal custom-tools routing variant
+  /^gemma-/,  // API-key/native Gemini only; Code Assist OAuth returns 404
 ];
 
 // Auto / alias model IDs that should not become JSON registry entries
