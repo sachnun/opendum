@@ -9,11 +9,13 @@ const dashboardApi = useDashboardApi();
 const route = useRoute();
 
 const root = ref<HTMLElement | null>(null);
+const searchInput = ref<HTMLInputElement | null>(null);
 const suggestionsOpen = ref(false);
 const activeSuggestionIndex = ref(-1);
 const search = ref("");
 const detailModel = ref<ModelListItem | null>(null);
 const copiedModelId = ref<string | null>(null);
+const suppressFocusUntil = ref(0);
 const suggestionListId = "model-search-suggestions";
 
 const detailOpen = computed({
@@ -67,6 +69,8 @@ watch(() => route.fullPath, () => {
 });
 
 function openSuggestions() {
+  if (Date.now() < suppressFocusUntil.value) return;
+
   suggestionsOpen.value = true;
   if (filteredModels.value.length > 0 && activeSuggestionIndex.value === -1) {
     activeSuggestionIndex.value = 0;
@@ -119,9 +123,15 @@ async function copyModelId(modelId: string) {
 }
 
 function closeDetail() {
+  suppressFocusUntil.value = Date.now() + 300;
   detailModel.value = null;
   closeSuggestions();
   search.value = "";
+  searchInput.value?.blur();
+
+  if (document.activeElement instanceof HTMLElement && root.value?.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
 }
 </script>
 
@@ -132,6 +142,7 @@ function closeDetail() {
       <UiIcon name="i-lucide-search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <input
         id="model-search-input"
+        ref="searchInput"
         v-model="search"
         type="text"
         role="combobox"
