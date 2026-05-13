@@ -2,12 +2,16 @@
 import type { ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../../lib/dashboard-api-types";
 import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../../lib/provider-accounts";
 
-definePageMeta({ middleware: "auth", layout: "dashboard" });
+definePageMeta({
+  middleware: "auth",
+  layout: "dashboard",
+  validate: (route) => Boolean(getProviderFromSlug(String(route.params.provider))),
+});
 
 const route = useRoute();
 const dashboardApi = useDashboardApi();
-const selectedProvider = computed(() => getProviderFromSlug(String(route.params.provider)) ?? String(route.params.provider));
-const providerMeta = computed(() => selectedProvider.value in BY_KEY ? BY_KEY[selectedProvider.value as ProviderAccountKey] : null);
+const selectedProvider = computed<ProviderAccountKey>(() => getProviderFromSlug(String(route.params.provider))!);
+const providerMeta = computed(() => BY_KEY[selectedProvider.value]);
 
 type Account = ProviderDetailData["accounts"][number];
 type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {

@@ -14,7 +14,9 @@ const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degrad
 const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
 const MANUAL_REENABLE_STATUS_REASON = "manually re-enabled after failure";
 
-export const providerInputSchema = z.object({ provider: z.string() });
+export const providerInputSchema = z.object({
+  provider: z.string().refine(isKnownProvider, "Invalid provider"),
+});
 export const updateAccountInputSchema = z.object({ id: z.string(), name: z.string().optional(), isActive: z.boolean().optional(), disabledUntil: z.coerce.date().nullable().optional() });
 export const deleteAccountInputSchema = z.object({ id: z.string() });
 export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string() });
