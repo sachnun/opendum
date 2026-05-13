@@ -14,7 +14,6 @@ const activeSuggestionIndex = ref(-1);
 const search = ref("");
 const detailModel = ref<ModelListItem | null>(null);
 const copiedModelId = ref<string | null>(null);
-const pendingModelId = ref<string | null>(null);
 const suggestionListId = "model-search-suggestions";
 
 const detailOpen = computed({
@@ -24,7 +23,7 @@ const detailOpen = computed({
   },
 });
 
-const { data, refresh } = await useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
+const { data } = await useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
   default: () => [] as ModelListItem[],
 });
 const sharedFullModels = useNuxtData<DashboardModelListItem[]>("dashboard-models");
@@ -119,23 +118,10 @@ async function copyModelId(modelId: string) {
   }, 2000);
 }
 
-async function setModelEnabled(model: ModelListItem, enabled: boolean) {
-  pendingModelId.value = model.id;
-  const previousValue = model.isEnabled;
-  model.isEnabled = enabled;
-
-  try {
-    const result = await dashboardApi.models.setEnabled({ modelId: model.id, enabled });
-    if (!result.success) throw new Error(result.error);
-    await refresh();
-    const updatedModel = models.value.find((item) => item.id === model.id);
-    if (updatedModel) detailModel.value = updatedModel;
-  } catch (error) {
-    model.isEnabled = previousValue;
-    console.error(error);
-  } finally {
-    pendingModelId.value = null;
-  }
+function closeDetail() {
+  detailModel.value = null;
+  closeSuggestions();
+  search.value = "";
 }
 </script>
 
@@ -228,15 +214,6 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                 {{ detailModel.id }}
               </span>
             </button>
-            <div class="flex shrink-0 items-center gap-1.5">
-              <span class="text-[11px] text-muted-foreground">{{ detailModel.isEnabled ? 'On' : 'Off' }}</span>
-              <UiSwitch
-                :model-value="detailModel.isEnabled"
-                :disabled="pendingModelId === detailModel.id"
-                :title="detailModel.isEnabled ? 'Disable model' : 'Enable model'"
-                @update:model-value="setModelEnabled(detailModel, $event)"
-              />
-            </div>
           </div>
 
           <div class="flex flex-wrap items-center gap-1">
@@ -247,6 +224,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
               v-if="detailModel.isEnabled"
               :to="`/dashboard/playground?model=${encodeURIComponent(detailModel.id)}`"
               class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50"
+              @click="closeDetail"
             >
               <UiIcon name="i-lucide-flask-conical" class="size-3" />
             </NuxtLink>
