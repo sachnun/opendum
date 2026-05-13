@@ -105,7 +105,7 @@ export function useAccountQuotaMonitor(options: {
   async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number) {
     const provider = options.toQuotaProvider(account.provider);
     if (!provider || quotaLoadingByAccountId.value[account.id]) return;
-    if (!forceRefresh && quotaByAccountId.value[account.id]) return;
+    if (!forceRefresh && quotaByAccountId.value[account.id] && !runId) return;
 
     const hadQuota = Boolean(quotaByAccountId.value[account.id]);
     setQuotaLoading(account.id, true);
@@ -128,11 +128,11 @@ export function useAccountQuotaMonitor(options: {
     }
   }
 
-  async function runQuotaQueue() {
+  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value) {
     const runId = ++quotaQueueRunId;
     const accountsToFetch = [
-      ...options.quotaCapableAccounts.value.filter((account) => account.isActive),
-      ...options.quotaCapableAccounts.value.filter((account) => !account.isActive),
+      ...accounts.filter((account) => account.isActive),
+      ...accounts.filter((account) => !account.isActive),
     ];
 
     for (const [index, account] of accountsToFetch.entries()) {

@@ -105,6 +105,7 @@ onBeforeUnmount(() => {
 
 const quotaCapableAccounts = computed(() => accounts.value.filter((account) => toQuotaProvider(account.provider)));
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
+let previousQuotaAccountKeys = new Set<string>();
 const {
   quotaByAccountId,
   quotaErrorByAccountId,
@@ -191,9 +192,14 @@ function handleQuotaRefresh(accountId: string) {
 watch(
   () => accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|"),
   async () => {
+    const currentQuotaAccountKeys = new Set(quotaCapableAccounts.value.map((account) => `${account.id}:${account.provider}`));
+    const newQuotaAccounts = quotaCapableAccounts.value.filter((account) => !previousQuotaAccountKeys.has(`${account.id}:${account.provider}`));
+    const accountsToFetch = previousQuotaAccountKeys.size > 0 && newQuotaAccounts.length > 0 ? newQuotaAccounts : quotaCapableAccounts.value;
+
     pruneQuotaState();
     await hydrateQuotaCache();
-    runQuotaQueue();
+    runQuotaQueue(accountsToFetch);
+    previousQuotaAccountKeys = currentQuotaAccountKeys;
   },
   { immediate: true }
 );
@@ -204,8 +210,6 @@ function handlePinnedToggled() {
 
 async function handleAccountConnected() {
   await refresh();
-  await hydrateQuotaCache();
-  runQuotaQueue();
 }
 
 function handleAccountChanged() {
