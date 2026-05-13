@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
@@ -478,15 +479,23 @@ func newKiroSSEReader(source io.Reader, model string) io.Reader {
 		}
 
 		buf := make([]byte, 32*1024)
+		pendingUTF8 := []byte{}
 		for {
 			n, err := source.Read(buf)
 			if n > 0 {
-				for _, event := range parseKiroJSONEvents(string(buf[:n]), state) {
+				chunk, pending := completeKiroUTF8Chunk(append(pendingUTF8, buf[:n]...))
+				pendingUTF8 = pending
+				for _, event := range parseKiroJSONEvents(string(chunk), state) {
 					processEvent(event)
 				}
 			}
 			if err != nil {
 				break
+			}
+		}
+		if len(pendingUTF8) > 0 {
+			for _, event := range parseKiroJSONEvents(string(pendingUTF8), state) {
+				processEvent(event)
 			}
 		}
 		for _, event := range parseKiroJSONEvents("", state) {
@@ -1100,6 +1109,26 @@ func keepKiroParserTail(value string) string {
 		return value
 	}
 	return value[len(value)-64:]
+}
+
+func completeKiroUTF8Chunk(chunk []byte) ([]byte, []byte) {
+	if len(chunk) == 0 {
+		return chunk, nil
+	}
+
+	start := max(0, len(chunk)-utf8.UTFMax)
+	for i := len(chunk) - 1; i >= start; i-- {
+		if !utf8.RuneStart(chunk[i]) {
+			continue
+		}
+		if utf8.FullRune(chunk[i:]) {
+			return chunk, nil
+		}
+		pending := append([]byte(nil), chunk[i:]...)
+		return chunk[:i], pending
+	}
+
+	return chunk, nil
 }
 
 func isKiroResponseEvent(parsed map[string]any) bool {

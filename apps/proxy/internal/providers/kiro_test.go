@@ -9,6 +9,20 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
+type oneByteReader struct {
+	data []byte
+	pos  int
+}
+
+func (r *oneByteReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.data) {
+		return 0, io.EOF
+	}
+	p[0] = r.data[r.pos]
+	r.pos++
+	return 1, nil
+}
+
 func TestKiroBuildRequestConvertsMessagesAndTools(t *testing.T) {
 	provider := kiroProvider{}
 	payload := provider.buildRequest(map[string]any{
@@ -342,6 +356,21 @@ func TestKiroSSEReaderExtractsReasoningContent(t *testing.T) {
 	}
 	if !strings.Contains(text, `"content":"answer"`) {
 		t.Fatalf("missing answer content chunk: %s", text)
+	}
+}
+
+func TestKiroSSEReaderPreservesUTF8AcrossReadBoundaries(t *testing.T) {
+	reader := newKiroSSEReader(&oneByteReader{data: []byte(`{"content":"project` + "\u2014" + `like"}{"stop":true}`)}, "unit-test-model")
+	out, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	if strings.Contains(text, "\ufffd") {
+		t.Fatalf("stream contained replacement characters: %s", text)
+	}
+	if !strings.Contains(text, "proj") || !strings.Contains(text, "ect"+"\u2014"+"like") {
+		t.Fatalf("missing preserved UTF-8 content: %s", text)
 	}
 }
 
