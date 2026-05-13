@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
-import { getProviderLabel } from "../../../lib/provider-accounts";
+import { getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import type { PlaygroundOptions } from "../../../lib/dashboard-api-types";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
@@ -401,6 +401,18 @@ function getSelectedRouteLabel(panel: PanelState): string {
   if (selectedAccount) return `${getAccountLabel(selectedAccount)} (${getProviderLabel(selectedAccount.provider)})`;
   if (panel.modelId) return usedAccount ? `Auto (${getAccountLabel(usedAccount)} - ${getProviderLabel(usedAccount.provider)})` : "Auto (load balancer)";
   return "-";
+}
+
+function getPanelProviderAccount(panel: PanelState): ProviderAccountOption | null {
+  const selectedAccountId = getValidAccountIdForPanel(panel);
+  if (selectedAccountId) return providerAccountsById.value.get(selectedAccountId) ?? null;
+
+  const usedAccountId = responses.value[panel.id]?.usedAccountId;
+  return usedAccountId ? providerAccountsById.value.get(usedAccountId) ?? null : null;
+}
+
+function getProviderAccountHref(account: ProviderAccountOption): string {
+  return `${getProviderAccountPath(account.provider as ProviderAccountKey)}#${encodeURIComponent(account.id)}`;
 }
 
 function getPanelModels(panel: PanelState): ModelOption[] {
@@ -1506,7 +1518,15 @@ function formatToolArguments(value: string): string {
               </div>
               <div class="mt-1 flex items-center justify-between gap-2">
                 <span class="shrink-0 whitespace-nowrap text-muted-foreground">Provider account</span>
-                <span class="min-w-0 truncate text-right font-medium">{{ getSelectedRouteLabel(panel) }}</span>
+                <NuxtLink
+                  v-if="getPanelProviderAccount(panel)"
+                  :to="getProviderAccountHref(getPanelProviderAccount(panel)!)"
+                  class="min-w-0 truncate text-right font-medium text-foreground underline-offset-2 hover:underline"
+                  :title="`Open ${getSelectedRouteLabel(panel)} in provider accounts`"
+                >
+                  {{ getSelectedRouteLabel(panel) }}
+                </NuxtLink>
+                <span v-else class="min-w-0 truncate text-right font-medium">{{ getSelectedRouteLabel(panel) }}</span>
               </div>
             </div>
           </UiCardContent>

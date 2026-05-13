@@ -36,6 +36,7 @@ const { data, error, pending, refresh } = await useAsyncData(
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
 const accountDisplayOrder = ref<Record<string, number>>({});
 const highlightedAccountIds = ref<Set<string>>(new Set());
+const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
@@ -56,6 +57,7 @@ const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
+const selectedAccountId = computed(() => decodeAccountHash(route.hash));
 
 watch(
   detailData,
@@ -98,6 +100,29 @@ watch(selectedProvider, () => {
     highlightTimer = null;
   }
 });
+
+watch(
+  [accounts, selectedAccountId],
+  async ([currentAccounts, accountId]) => {
+    if (!accountId || !currentAccounts.some((account) => account.id === accountId)) return;
+
+    highlightedAccountIds.value = new Set([accountId]);
+    if (highlightTimer) clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      highlightedAccountIds.value = new Set();
+      highlightTimer = null;
+    }, 5000);
+
+    await nextTick();
+    const accountCard = accountCardRefs.value.find((card) => {
+      if (card instanceof Element) return card.getAttribute("data-account-id") === accountId;
+      return card.accountId === accountId || card.$el?.getAttribute("data-account-id") === accountId;
+    });
+    const accountElement = accountCard instanceof Element ? accountCard : accountCard?.$el;
+    accountElement?.scrollIntoView({ block: "center", behavior: "smooth" });
+  },
+  { immediate: true }
+);
 
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
@@ -216,6 +241,17 @@ function handleAccountChanged() {
   refresh();
   requestDashboardAccountSummaryRefresh();
 }
+
+function decodeAccountHash(hash: string): string | null {
+  const accountId = hash.startsWith("#") ? hash.slice(1) : hash;
+  if (!accountId) return null;
+
+  try {
+    return decodeURIComponent(accountId);
+  } catch {
+    return accountId;
+  }
+}
 </script>
 
 <template>
@@ -302,8 +338,11 @@ function handleAccountChanged() {
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <ProviderAccountCard
           v-for="account in accounts"
+          :id="account.id"
           :key="account.id"
+          ref="accountCardRefs"
           :account="account"
+          :data-account-id="account.id"
           :show-tier="providerMeta?.showTier"
           :supported-models="supportedModels"
           :disabled-models="disabledModelsByAccountId[account.id] ?? []"
