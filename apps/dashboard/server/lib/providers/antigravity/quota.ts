@@ -56,18 +56,6 @@ const QUOTA_GROUPS: Record<string, { displayName: string; models: string[] }> = 
     displayName: "Gemini 3.1 Pro",
     models: ["gemini-3.1-pro-preview"],
   },
-  "g3-flash": {
-    displayName: "Gemini 3 Flash",
-    models: ["gemini-3-flash-preview"],
-  },
-  "g25-flash": {
-    displayName: "Gemini 2.5 Flash",
-    models: ["gemini-2.5-flash"],
-  },
-  "g25-lite": {
-    displayName: "Gemini 2.5 Lite",
-    models: ["gemini-2.5-flash-lite"],
-  },
 };
 
 const USER_TO_API_MODEL_MAP: Record<string, string> = {
@@ -105,7 +93,7 @@ function apiToUserModel(apiModel: string): string {
  */
 function getMaxRequestsForModel(model: string, tier: string): number {
   const cleanModel = model.includes("/") ? model.split("/").pop()! : model;
-  const tierLimits = QUOTA_MAX_REQUESTS[tier] ?? QUOTA_MAX_REQUESTS["free-tier"];
+  const tierLimits = QUOTA_MAX_REQUESTS[tier] ?? QUOTA_MAX_REQUESTS["free-tier"] ?? {};
   return tierLimits[cleanModel] ?? QUOTA_MAX_REQUESTS_DEFAULT;
 }
 
@@ -311,6 +299,8 @@ export async function fetchQuotaFromApi(
         }
 
         const representativeModel = groupConfig.models[0];
+        if (!representativeModel) continue;
+
         const maxRequests = getMaxRequestsForModel(representativeModel, tier);
         const remainingRequests = Math.max(0, Math.floor(groupRemaining * maxRequests));
 
