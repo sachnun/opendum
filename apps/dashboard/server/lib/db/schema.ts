@@ -135,7 +135,6 @@ export const providerAccount = pgTable(
 
     // Health status
     status: text("status").notNull().default("active"),
-    statusReason: text("statusReason"),
     statusChangedAt: timestamp("statusChangedAt"),
 
     // Success metrics
@@ -347,7 +346,6 @@ export const providerAccountModelHealth = pgTable(
 
     consecutiveErrors: integer("consecutiveErrors").notNull().default(0),
     status: text("status").notNull().default("active"),
-    statusReason: text("statusReason"),
     statusChangedAt: timestamp("statusChangedAt"),
 
     lastErrorAt: timestamp("lastErrorAt"),

@@ -611,11 +611,11 @@ function historyEntryPreview(errorMessage: string): string {
             </UiBadge>
             <UiBadge v-if="account.status === 'failed'" variant="destructive" class="gap-1">
               <UiIcon name="i-lucide-alert-circle" class="size-3" />
-              Failed
+              {{ account.consecutiveErrors }}
             </UiBadge>
             <UiBadge v-else-if="account.status === 'degraded'" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
               <UiIcon name="i-lucide-triangle-alert" class="size-3" />
-              Degraded ({{ account.consecutiveErrors }})
+              {{ account.consecutiveErrors }}
             </UiBadge>
             <UiBadge v-else-if="account.status === 'half_open'" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
               <UiIcon name="i-lucide-activity" class="size-3" />
