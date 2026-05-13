@@ -5,6 +5,7 @@ import { db } from "../lib/db";
 import { providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "../lib/db/schema";
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
+import { getAuthlessProviderAccounts, isAuthlessProvider } from "../lib/proxy/authless-providers";
 import { getAllFamilies, getAllModels, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
 import type { ActionResult } from "../utils/api";
 
@@ -74,7 +75,10 @@ export async function getApiKeyOptions(userId: string) {
     return {
       availableModels: getAllModels().sort((a, b) => a.localeCompare(b)),
       availableFamilies: getAllFamilies(),
-      providerAccounts,
+      providerAccounts: [
+        ...getAuthlessProviderAccounts().map(({ disabledModels: _disabledModels, ...account }) => account),
+        ...providerAccounts,
+      ],
       rateLimitsByKeyId: rateLimitRows.reduce<Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>>((acc, row) => {
         acc[row.apiKeyId] = [
           ...(acc[row.apiKeyId] ?? []),
@@ -187,7 +191,7 @@ export async function updateApiKeyAccountAccess(userId: string, input: UpdateApi
     if (input.mode !== "all" && normalizedAccounts.length === 0) return { success: false, error: "Select at least one account" } as const;
     if (normalizedAccounts.length > 0) {
       const rows = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, normalizedAccounts)));
-      const validIds = new Set(rows.map((row) => row.id));
+      const validIds = new Set([...rows.map((row) => row.id), ...normalizedAccounts.filter(isAuthlessProvider)]);
       const invalidId = normalizedAccounts.find((id) => !validIds.has(id));
       if (invalidId) return { success: false, error: `Unknown account: ${invalidId}` } as const;
     }

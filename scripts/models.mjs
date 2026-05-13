@@ -18,6 +18,7 @@ const refreshScripts = [
   "groq.mjs",
   "kilo-code.mjs",
   "kiro.mjs",
+  "opencode.mjs",
   "openrouter.mjs",
   "nvidia.mjs",
   "ollama.mjs",
@@ -27,7 +28,7 @@ const refreshScripts = [
 ];
 
 // Providers whose models are refreshed by the scripts above
-const REFRESHED_PROVIDERS = ["antigravity", "codex", "copilot", "gemini_cli", "groq", "kilo_code", "kiro", "nvidia_nim", "ollama_cloud", "openrouter", "qwen_code", "workers_ai"];
+const REFRESHED_PROVIDERS = ["antigravity", "codex", "copilot", "gemini_cli", "groq", "kilo_code", "kiro", "nvidia_nim", "ollama_cloud", "opencode", "openrouter", "qwen_code", "workers_ai"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

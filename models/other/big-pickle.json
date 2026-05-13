@@ -1,9 +1,8 @@
 {
   "providers": [
-    "opencode",
-    "ollama_cloud"
+    "opencode"
   ],
-  "family": "NVIDIA",
+  "family": "OpenCode",
   "meta": {
     "reasoning": true,
     "toolCall": true,
@@ -15,11 +14,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "opencode": {
-      "upstream": "nemotron-3-super-free"
     }
   }
 }

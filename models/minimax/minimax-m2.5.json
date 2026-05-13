@@ -1,5 +1,6 @@
 {
   "providers": [
+    "opencode",
     "kiro",
     "ollama_cloud",
     "openrouter"
@@ -19,6 +20,9 @@
     }
   },
   "providerConfig": {
+    "opencode": {
+      "upstream": "minimax-m2.5-free"
+    },
     "openrouter": {
       "upstream": "minimax/minimax-m2.5:free"
     }

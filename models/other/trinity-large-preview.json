@@ -1,5 +1,7 @@
 {
-  "providers": [],
+  "providers": [
+    "opencode"
+  ],
   "family": "Trinity",
   "meta": {
     "reasoning": false,
@@ -12,6 +14,11 @@
       "output": [
         "text"
       ]
+    }
+  },
+  "providerConfig": {
+    "opencode": {
+      "upstream": "trinity-large-preview-free"
     }
   }
 }

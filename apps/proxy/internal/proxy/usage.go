@@ -30,7 +30,7 @@ func (s *Service) logUsage(ctx context.Context, params usageParams) {
 	}
 	now := time.Now()
 	var providerAccountID *string
-	if params.ProviderAccountID != "" {
+	if params.ProviderAccountID != "" && !isSyntheticProviderAccountID(params.ProviderAccountID) {
 		providerAccountID = &params.ProviderAccountID
 	}
 	var proxyAPIKeyID *string

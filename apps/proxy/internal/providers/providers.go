@@ -26,6 +26,10 @@ type Provider interface {
 	MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error)
 }
 
+type AuthlessProvider interface {
+	Authless() bool
+}
+
 type CredentialRefresher interface {
 	RefreshCredentials(ctx context.Context, client *http.Client, refreshToken string, account appdb.ProviderAccount) (RefreshedCredentials, error)
 }
@@ -50,6 +54,7 @@ type Registry struct {
 
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
 	return &Registry{providers: map[string]Provider{
+		"opencode":     opencodeProvider{registry: registry},
 		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
 		"groq":         openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.com/openai/v1", supportedParams: supportedGroq, registry: registry},
 		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
@@ -206,6 +211,31 @@ func (p openAICompatibleProvider) requiresResponsesAPI(model string) bool {
 	return providerConfigBool(p.registry, model, p.name, "responses_api")
 }
 
+type opencodeProvider struct {
+	registry *models.Registry
+}
+
+func (p opencodeProvider) Authless() bool { return true }
+
+func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, _ string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
+	payload := map[string]any{}
+	for key, value := range body {
+		if _, ok := supportedOpenCode[key]; ok && value != nil {
+			payload[key] = value
+		}
+	}
+	model := stringValue(body["model"])
+	if strings.HasPrefix(model, "opencode/") {
+		model = strings.TrimPrefix(model, "opencode/")
+	}
+	if p.registry != nil {
+		model = p.registry.UpstreamModelName(model, "opencode")
+	}
+	payload["model"] = model
+	payload["stream"] = stream
+	return postJSONWithoutAuth(ctx, client, "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions", payload, stream)
+}
+
 type workersAIProvider struct {
 	registry *models.Registry
 }
@@ -331,6 +361,14 @@ func postJSON(ctx context.Context, client *http.Client, url, bearer string, payl
 }
 
 func postJSONWithHeaders(ctx context.Context, client *http.Client, url, bearer string, payload map[string]any, stream bool, extraHeaders map[string]string) (*http.Response, error) {
+	return postJSONWithHeadersAuth(ctx, client, url, bearer, payload, stream, extraHeaders, true)
+}
+
+func postJSONWithoutAuth(ctx context.Context, client *http.Client, url string, payload map[string]any, stream bool) (*http.Response, error) {
+	return postJSONWithHeadersAuth(ctx, client, url, "", payload, stream, nil, false)
+}
+
+func postJSONWithHeadersAuth(ctx context.Context, client *http.Client, url, bearer string, payload map[string]any, stream bool, extraHeaders map[string]string, useAuth bool) (*http.Response, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -339,7 +377,9 @@ func postJSONWithHeaders(ctx context.Context, client *http.Client, url, bearer s
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(bearer))
+	if useAuth {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(bearer))
+	}
 	req.Header.Set("Content-Type", "application/json")
 	if stream {
 		req.Header.Set("Accept", "text/event-stream")
@@ -422,5 +462,6 @@ var supportedGroq = set("model", "messages", "temperature", "top_p", "max_tokens
 var supportedNvidia = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 var supportedOllama = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 var supportedKilo = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+var supportedOpenCode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedWorkersAI = set("model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "function_call", "functions", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "chat_template_kwargs", "modalities", "metadata", "prediction", "logit_bias", "logprobs", "top_logprobs", "store", "service_tier", "user", "web_search_options", "n")
 var supportedQwenCode = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")

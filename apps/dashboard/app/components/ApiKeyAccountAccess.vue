@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getProviderLabel } from "../../lib/provider-accounts";
+
 type AccessMode = "all" | "whitelist" | "blacklist";
 
 interface ProviderAccountOption {
@@ -41,6 +43,10 @@ function getModeLabel(mode: AccessMode): string {
 
 function getAccountLabel(account: ProviderAccountOption): string {
   return account.email ? `${account.name} (${account.email})` : account.name;
+}
+
+function getProviderDisplayName(provider: string): string {
+  return getProviderLabel(provider);
 }
 
 function toggleAccount(accountId: string) {
@@ -129,7 +135,7 @@ const filteredAccounts = computed(() => {
                 <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0']" />
                 <div class="flex min-w-0 flex-col">
                   <span class="truncate text-xs font-medium">{{ account.name }}</span>
-                  <span class="truncate text-[11px] text-muted-foreground">{{ account.provider }}{{ account.email ? ` - ${account.email}` : '' }}</span>
+                  <span class="truncate text-[11px] text-muted-foreground">{{ getProviderDisplayName(account.provider) }}{{ account.email ? ` - ${account.email}` : '' }}</span>
                 </div>
               </button>
               <p v-if="filteredAccounts.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No account found.</p>

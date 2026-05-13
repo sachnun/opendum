@@ -23,6 +23,26 @@ const (
 	maxErrorHistoryRows = 200
 )
 
+func isSyntheticProviderAccountID(accountID string) bool {
+	return auth.IsAuthlessProvider(accountID)
+}
+
+func syntheticAuthlessAccount(provider string) (appdb.ProviderAccount, bool) {
+	if !auth.IsAuthlessProvider(provider) {
+		return appdb.ProviderAccount{}, false
+	}
+	return appdb.ProviderAccount{ID: provider, Provider: provider, IsActive: true, Status: "active"}, true
+}
+
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string, provider *string, exclude []string, accountAccess auth.AccountAccess) ([]appdb.ProviderAccount, error) {
 	targetProviders := []string{}
 	if provider != nil {
@@ -32,6 +52,21 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	}
 	if len(targetProviders) == 0 {
 		return nil, nil
+	}
+
+	rows := []appdb.ProviderAccount{}
+	for _, targetProvider := range targetProviders {
+		account, ok := syntheticAuthlessAccount(targetProvider)
+		if !ok {
+			continue
+		}
+		if len(exclude) > 0 && stringSliceContains(exclude, account.ID) {
+			continue
+		}
+		if err := accountAllowed(account.ID, accountAccess); err != nil {
+			continue
+		}
+		rows = append(rows, account)
 	}
 
 	query := s.db.NewSelect().Model((*appdb.ProviderAccount)(nil)).
@@ -52,10 +87,11 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 		query.Where("id NOT IN (?)", bun.In(accounts))
 	}
 
-	var rows []appdb.ProviderAccount
-	if err := query.OrderExpr("status ASC").OrderExpr("\"lastUsedAt\" ASC NULLS FIRST").OrderExpr("\"createdAt\" ASC").Scan(ctx, &rows); err != nil {
+	var dbRows []appdb.ProviderAccount
+	if err := query.OrderExpr("status ASC").OrderExpr("\"lastUsedAt\" ASC NULLS FIRST").OrderExpr("\"createdAt\" ASC").Scan(ctx, &dbRows); err != nil {
 		return nil, err
 	}
+	rows = append(rows, dbRows...)
 	if len(rows) == 0 {
 		return rows, nil
 	}
@@ -76,6 +112,10 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 
 	enabled := make([]appdb.ProviderAccount, 0, len(rows))
 	for _, row := range rows {
+		if isSyntheticProviderAccountID(row.ID) {
+			enabled = append(enabled, row)
+			continue
+		}
 		if _, disabled := disabledSet[row.ID]; !disabled {
 			enabled = append(enabled, row)
 		}
@@ -135,6 +175,9 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 }
 
 func (s *Service) bumpAccountRequestCount(ctx context.Context, accountID string, usedAt time.Time) {
+	if isSyntheticProviderAccountID(accountID) {
+		return
+	}
 	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"lastUsedAt\" = ?", usedAt).Set("\"requestCount\" = \"requestCount\" + 1").Where("id = ?", accountID).Exec(ctx)
 }
 
@@ -161,6 +204,18 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 	param := "provider_account_id"
 	if id == "" {
 		return nil, &routeError{Status: http.StatusBadRequest, Message: "provider_account_id must be a non-empty string", Type: "invalid_request_error", Param: &param, Code: strPtr("invalid_provider_account")}
+	}
+	if account, ok := syntheticAuthlessAccount(id); ok {
+		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
+			return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
+		}
+		if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
+			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
+		}
+		if validation.Provider != nil && account.Provider != *validation.Provider {
+			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
+		}
+		return &account, nil
 	}
 	var account appdb.ProviderAccount
 	err := s.db.NewSelect().Model(&account).Column("id", "userId", "provider", "tier", "status", "lastUsedAt", "createdAt", "accountId", "isActive", "disabledUntil").Where("id = ?", id).Where("\"userId\" = ?", userID).Limit(1).Scan(ctx)
@@ -189,6 +244,9 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 }
 
 func (s *Service) markAccountSuccess(ctx context.Context, accountID, model string) {
+	if isSyntheticProviderAccountID(accountID) {
+		return
+	}
 	now := time.Now()
 	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"successCount\" = \"successCount\" + 1").Set("\"lastSuccessAt\" = ?", now).Where("id = ?", accountID).Exec(ctx)
 	resolved := s.registry.ResolveAlias(model)
@@ -212,6 +270,9 @@ func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provid
 
 func (s *Service) markAccountFailed(ctx context.Context, accountID, model string, statusCode int, message string) time.Time {
 	now := time.Now()
+	if isSyntheticProviderAccountID(accountID) {
+		return now
+	}
 	if len(message) > maxStoredErrorLen {
 		message = message[:maxStoredErrorLen]
 	}
@@ -261,6 +322,9 @@ func failedCooldownUntil(failedAt time.Time) time.Time {
 }
 
 func (s *Service) disableAccountForFailedCooldown(ctx context.Context, accountID string, failedAt time.Time) {
+	if isSyntheticProviderAccountID(accountID) {
+		return
+	}
 	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
 		Set("\"disabledUntil\" = ?", failedCooldownUntil(failedAt)).
 		Where("id = ?", accountID).
@@ -268,6 +332,9 @@ func (s *Service) disableAccountForFailedCooldown(ctx context.Context, accountID
 }
 
 func (s *Service) markAccountUsageLimited(ctx context.Context, accountID, model string, disabledUntil, failedAt time.Time) {
+	if isSyntheticProviderAccountID(accountID) {
+		return
+	}
 	reason := "usage limit reached until " + disabledUntil.UTC().Format(time.RFC3339)
 	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
 		Set("\"disabledUntil\" = ?", disabledUntil).
@@ -296,6 +363,9 @@ func (s *Service) markAccountsRecoveredByRotation(ctx context.Context, failures 
 	}
 	recoveredAt := time.Now()
 	for accountID, failedAt := range latest {
+		if isSyntheticProviderAccountID(accountID) {
+			continue
+		}
 		_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"lastRecoveredByRotationAt\" = ?", recoveredAt).Where("id = ?", accountID).Where("\"lastErrorAt\" <= ?", failedAt).Exec(ctx)
 	}
 }

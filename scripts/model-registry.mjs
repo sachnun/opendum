@@ -21,6 +21,7 @@ const META_PROPERTY_ORDER = [
 ];
 
 const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "minTier", "aliases"];
+const FIRST_PROVIDERS = new Set(["opencode"]);
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -55,7 +56,17 @@ function orderProviderMap(value, preferredKeys = []) {
   return result;
 }
 
+function orderProviders(value) {
+  if (!Array.isArray(value)) return value;
+  return [...value].sort((a, b) => {
+    const aFirst = FIRST_PROVIDERS.has(a) ? 0 : 1;
+    const bFirst = FIRST_PROVIDERS.has(b) ? 0 : 1;
+    return aFirst === bFirst ? a.localeCompare(b) : aFirst - bFirst;
+  });
+}
+
 function orderValue(value, key) {
+  if (key === "providers") return orderProviders(value);
   if (Array.isArray(value)) return value.map((item) => orderValue(item));
   if (!isPlainObject(value)) return value;
 
@@ -171,8 +182,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
 
       if (!providers.includes(providerName)) {
         providers.push(providerName);
-        providers.sort();
-        existing.data.providers = providers;
+        existing.data.providers = orderProviders(providers);
         changed = true;
       }
 

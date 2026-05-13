@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { db } from "../../../lib/db";
 import { providerAccount } from "../../../lib/db/schema";
+import { getAuthlessProviderAccounts } from "../../../lib/proxy/authless-providers";
 import { readDashboardBody, requireUserId } from "../../../utils/api";
 
 const playgroundEndpointSchema = z.enum(["chat_completions", "messages", "responses"]);
@@ -42,6 +43,7 @@ function getForwardedResponseHeaders(response: Response) {
 }
 
 async function hasAnyProviderAccount(userId: string) {
+  if (getAuthlessProviderAccounts().length > 0) return true;
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(providerAccount)

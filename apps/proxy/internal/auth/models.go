@@ -136,6 +136,11 @@ func (s *Service) GetAccountModelAvailability(ctx context.Context, userID string
 		ActiveAccountIDsByProvider:   map[string][]string{},
 		AccountTierByID:              map[string]string{},
 	}
+	for _, provider := range authlessProviderNames {
+		availability.ActiveProviders[provider] = struct{}{}
+		availability.AccountCountByProvider[provider] = 1
+		availability.ActiveAccountIDsByProvider[provider] = []string{provider}
+	}
 
 	var accounts []appdb.ProviderAccount
 	if err := s.db.NewSelect().Model(&accounts).Column("id", "provider", "tier").Where("\"userId\" = ? AND \"isActive\" = TRUE", userID).Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", time.Now()).Scan(ctx); err != nil {

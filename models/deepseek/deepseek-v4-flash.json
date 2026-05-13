@@ -1,5 +1,6 @@
 {
   "providers": [
+    "opencode",
     "nvidia_nim",
     "ollama_cloud"
   ],
@@ -7,6 +8,9 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "deepseek-ai/deepseek-v4-flash"
+    },
+    "opencode": {
+      "upstream": "deepseek-v4-flash-free"
     }
   }
 }

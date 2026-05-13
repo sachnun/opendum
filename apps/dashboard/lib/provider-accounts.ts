@@ -140,6 +140,8 @@ export const API_KEY_DEFINITIONS = PROVIDER_ACCOUNT_DEFINITIONS.filter(
 );
 
 export function getProviderLabel(provider: string): string {
+  if (provider === "opencode") return "OpenCode";
+
   if (provider in BY_KEY) {
     return BY_KEY[provider as ProviderAccountKey].label;
   }

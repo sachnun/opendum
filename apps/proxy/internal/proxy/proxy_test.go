@@ -847,6 +847,22 @@ func TestAccountAccessDenialCodes(t *testing.T) {
 	}
 }
 
+func TestSyntheticAuthlessAccountAccess(t *testing.T) {
+	account, ok := syntheticAuthlessAccount("opencode")
+	if !ok || account.ID != "opencode" || account.Provider != "opencode" {
+		t.Fatalf("synthetic account = %#v ok %v, want opencode", account, ok)
+	}
+	if _, ok := syntheticAuthlessAccount("openrouter"); ok {
+		t.Fatal("openrouter should not create a synthetic authless account")
+	}
+	if err := accountAllowed("opencode", auth.AccountAccess{Mode: "whitelist", Accounts: []string{"opencode"}}); err != nil {
+		t.Fatalf("opencode whitelist allow error = %v", err)
+	}
+	if err := accountAllowed("opencode", auth.AccountAccess{Mode: "blacklist", Accounts: []string{"opencode"}}); err == nil {
+		t.Fatal("opencode blacklist should reject synthetic account")
+	}
+}
+
 func TestBuildAccountErrorMessageIncludesContext(t *testing.T) {
 	message := buildAccountErrorMessage("provider failed", accountErrorContext{
 		Model:    "test-model",

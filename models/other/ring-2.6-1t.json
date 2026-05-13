@@ -1,5 +1,6 @@
 {
   "providers": [
+    "opencode",
     "kilo_code",
     "openrouter"
   ],
@@ -7,6 +8,9 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "inclusionai/ring-2.6-1t:free"
+    },
+    "opencode": {
+      "upstream": "ring-2.6-1t-free"
     },
     "openrouter": {
       "upstream": "inclusionai/ring-2.6-1t:free"

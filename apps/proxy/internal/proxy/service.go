@@ -215,9 +215,17 @@ func (s *Service) makeProviderRequest(ctx context.Context, account appdb.Provide
 	if !ok {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
 	}
+	if isAuthlessProvider(providerImpl) {
+		return providerImpl.MakeRequest(ctx, s.client, "", account, payload, stream)
+	}
 	credentials, requestAccount, err := s.credentialsForAccount(ctx, account, providerImpl)
 	if err != nil {
 		return nil, err
 	}
 	return providerImpl.MakeRequest(ctx, s.client, credentials, requestAccount, payload, stream)
+}
+
+func isAuthlessProvider(provider providers.Provider) bool {
+	authless, ok := provider.(providers.AuthlessProvider)
+	return ok && authless.Authless()
 }

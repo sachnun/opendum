@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { disabledModel, providerAccount, providerAccountDisabledModel } from "../lib/db/schema";
 import { getAccountModelAvailability, isModelUsableByAccounts } from "../lib/proxy/auth";
+import { getAuthlessProviderAccounts } from "../lib/proxy/authless-providers";
 import { getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";
 
 function normalizeProxyBaseUrl(value: unknown) {
@@ -22,6 +23,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
     ]);
     const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
 
+    const authlessProviderAccounts = getAuthlessProviderAccounts();
     const [accountCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(providerAccount)
@@ -65,12 +67,15 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
 
     return {
       proxyBaseUrl,
-      hasAnyProviderAccount: Number(accountCount?.count ?? 0) > 0,
+      hasAnyProviderAccount: Number(accountCount?.count ?? 0) > 0 || authlessProviderAccounts.length > 0,
       models,
-      providerAccounts: providerAccounts.map((account) => ({
+      providerAccounts: [
+        ...authlessProviderAccounts,
+        ...providerAccounts.map((account) => ({
         ...account,
         disabledModels: disabledModelsByAccount.get(account.id) ?? [],
-      })),
+        })),
+      ],
     };
   } catch (error) {
     console.error("Failed to load playground options:", error);

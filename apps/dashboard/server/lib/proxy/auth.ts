@@ -8,6 +8,7 @@ import {
   getProvidersForModel,
   resolveModelAlias,
 } from "./models.js";
+import { AUTHLESS_PROVIDER_KEYS } from "./authless-providers.js";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";
@@ -117,6 +118,12 @@ export async function getAccountModelAvailability(
   const accountIdToProvider = new Map<string, string>();
   const activeAccountIdsByProvider = new Map<string, string[]>();
   const accountTierById = new Map<string, string>();
+
+  for (const provider of AUTHLESS_PROVIDER_KEYS) {
+    activeProviders.add(provider);
+    accountCountByProvider.set(provider, 1);
+    activeAccountIdsByProvider.set(provider, [provider]);
+  }
 
   for (const account of activeAccounts) {
     activeProviders.add(account.provider);
