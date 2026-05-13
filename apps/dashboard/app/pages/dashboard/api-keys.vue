@@ -141,7 +141,7 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
 
                 <div class="flex items-center justify-between gap-4 py-3 text-sm">
                   <span class="text-muted-foreground">Last used</span>
-                  <span class="text-right font-medium">{{ apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : 'Never used' }}</span>
+                  <span class="text-right font-medium">{{ apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : '-' }}</span>
                 </div>
               </div>
 
