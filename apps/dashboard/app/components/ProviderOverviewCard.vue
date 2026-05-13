@@ -43,38 +43,36 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
 </script>
 
 <template>
-  <UiCard class="relative h-full gap-3 transition-colors hover:border-primary/40">
-    <div class="relative z-10 flex items-start justify-between gap-2 px-6">
+  <UiCard class="group relative h-full gap-3 transition-colors hover:border-primary/40">
+    <NuxtLink :to="getProviderAccountPath(provider.key)" class="absolute inset-0 z-10 rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
+
+    <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2 px-6">
       <div class="flex items-center gap-1">
-        <ProviderPinButton :provider-key="provider.key" :pinned="pinned" @toggled="handlePinnedToggled" />
+        <ProviderPinButton class="pointer-events-auto" :provider-key="provider.key" :pinned="pinned" @toggled="handlePinnedToggled" />
         <UiCardTitle class="text-base">{{ provider.label }}</UiCardTitle>
         <UiBadge v-if="summary.connected > 0" variant="outline" class="text-xs tabular-nums">{{ summary.active }}/{{ summary.connected }}</UiBadge>
       </div>
       <UiBadge variant="outline" :class="badge.class">{{ badge.label }}</UiBadge>
     </div>
 
-    <NuxtLink :to="getProviderAccountPath(provider.key)" class="group block h-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`">
-      <span class="absolute inset-0 z-0 rounded-xl" aria-hidden="true" />
-      <span class="sr-only">{{ provider.label }}</span>
-      <UiCardContent>
-        <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
-          <div class="flex items-center justify-end text-[11px] text-muted-foreground">
-            <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
-          </div>
-          <div class="grid grid-cols-3 gap-1.5">
-            <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5"><p class="truncate text-[10px] text-muted-foreground">Requests</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.totalRequests.toLocaleString() }}</p></div>
-            <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5"><p class="truncate text-[10px] text-muted-foreground">Success</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.successRate === null ? '-' : `${summary.stats.successRate}%` }}</p></div>
-            <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5"><p class="truncate text-[10px] text-muted-foreground">Latency</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ formatDuration(summary.stats.avgDurationLastDay) }}</p></div>
-          </div>
-          <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5">
-            <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
-            <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
-              <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
-            </div>
-          </div>
-          <UsageSparkline :values="dailyValues" color="var(--chart-1)" :aria-label="`Requests trend for ${provider.label}`" />
+    <UiCardContent class="pointer-events-none relative z-20">
+      <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
+        <div class="flex items-center justify-end text-[11px] text-muted-foreground">
+          <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
         </div>
-      </UiCardContent>
-    </NuxtLink>
+        <div class="grid grid-cols-3 gap-1.5">
+          <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5"><p class="truncate text-[10px] text-muted-foreground">Requests</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.totalRequests.toLocaleString() }}</p></div>
+          <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5"><p class="truncate text-[10px] text-muted-foreground">Success</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.successRate === null ? '-' : `${summary.stats.successRate}%` }}</p></div>
+          <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5"><p class="truncate text-[10px] text-muted-foreground">Latency</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ formatDuration(summary.stats.avgDurationLastDay) }}</p></div>
+        </div>
+        <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+          <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
+          <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
+            <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
+          </div>
+        </div>
+        <UsageSparkline :values="dailyValues" color="var(--chart-1)" :aria-label="`Requests trend for ${provider.label}`" />
+      </div>
+    </UiCardContent>
   </UiCard>
 </template>
