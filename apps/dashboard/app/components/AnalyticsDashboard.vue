@@ -5,6 +5,11 @@ import type { AnalyticsData, ApiKeyListItem } from "../../lib/dashboard-api-type
 type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 type AnalyticsFilter = Period | { from: string; to: string };
 type DateRange = { from: Date; to: Date };
+type StatDeltaTone = "positive" | "negative" | "neutral";
+type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
+type StatMetric = { key: string; label: string; value: string; numericValue: number; hint?: string; formatDelta?: (delta: number) => string };
+
+const AUTO_REFRESH_INTERVAL_MS = 5000;
 
 const props = withDefaults(
   defineProps<{
@@ -39,6 +44,11 @@ const draftToDate = ref("");
 const isCustomRangeActive = ref(false);
 const isFilterOpen = ref(false);
 const isApiKeyFilterOpen = ref(false);
+const statHitEffects = ref<Record<string, StatHitEffect>>({});
+const previousStatValues = ref<Record<string, number> | null>(null);
+
+let analyticsRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let analyticsRefreshInFlight: Promise<void> | null = null;
 
 watch(
   () => props.apiKeyId,
@@ -108,6 +118,32 @@ function formatDuration(ms: number): string {
   return `${Math.round(ms)}ms`;
 }
 
+function formatSignedInteger(delta: number): string {
+  const sign = delta > 0 ? "+" : "-";
+  return `${sign} ${compactNumber(Math.abs(Math.round(delta)))}`;
+}
+
+function formatSignedDuration(delta: number): string {
+  const sign = delta > 0 ? "+" : "-";
+  return `${sign} ${formatDuration(Math.abs(delta))}`;
+}
+
+function formatSignedPercent(delta: number): string {
+  const sign = delta > 0 ? "+" : "-";
+  const value = Math.round(Math.abs(delta) * 10) / 10;
+  return `${sign} ${value}%`;
+}
+
+function collectStatValues(items: StatMetric[]): Record<string, number> {
+  const values: Record<string, number> = {};
+
+  for (const item of items) {
+    if (Number.isFinite(item.numericValue)) values[item.key] = item.numericValue;
+  }
+
+  return values;
+}
+
 function parseDraftDate(value: string): Date | null {
   if (!value) return null;
   const date = new Date(`${value}T00:00:00`);
@@ -143,11 +179,18 @@ function handleClearCustomRange(): void {
   isCustomRangeActive.value = false;
 }
 
-async function handleRefresh(): Promise<void> {
-  await refresh();
+async function refreshAnalyticsOnce(): Promise<void> {
+  if (pending.value || analyticsRefreshInFlight) return;
+
+  analyticsRefreshInFlight = refresh().then(() => undefined).catch(() => undefined);
+  try {
+    await analyticsRefreshInFlight;
+  } finally {
+    analyticsRefreshInFlight = null;
+  }
 }
 
-const stats = computed(() => {
+const statMetrics = computed<StatMetric[]>(() => {
   const analytics = data.value;
 
   if (!analytics) return [];
@@ -162,13 +205,61 @@ const stats = computed(() => {
   const topModelPct = topModel && totals.totalRequests > 0 ? Math.round((topModel.count / totals.totalRequests) * 100) : 0;
 
   return [
-    { label: "Total Requests", value: compactNumber(totals.totalRequests), hint: `${failedRequests.toLocaleString()} failed` },
-    { label: "Total Tokens", value: compactNumber(totalTokens), hint: `${compactNumber(totals.totalInputTokens)} in / ${compactNumber(totals.totalOutputTokens)} out` },
-    { label: "Models Used", value: requestsByModel.length.toString(), hint: topModel ? `Top: ${topModel.model.split("/").pop()} (${topModelPct}%)` : undefined },
-    { label: "P50 Latency", value: formatDuration(totals.durationPercentiles.p50), hint: `p95 ${formatDuration(totals.durationPercentiles.p95)} · p99 ${formatDuration(totals.durationPercentiles.p99)}` },
-    { label: "Success Rate", value: totals.totalRequests > 0 ? `${totals.successRate}%` : "-", hint: totals.totalRequests > 0 ? `${Math.round((totals.successRate / 100) * totals.totalRequests).toLocaleString()} / ${totals.totalRequests.toLocaleString()}` : undefined },
-    { label: "Avg Tokens/Req", value: totals.totalRequests > 0 ? compactNumber(avgTokensPerReq) : "-", hint: totals.totalRequests > 0 ? `${compactNumber(avgInPerReq)} in / ${compactNumber(avgOutPerReq)} out` : undefined },
+    { key: "totalRequests", label: "Total Requests", value: compactNumber(totals.totalRequests), numericValue: totals.totalRequests, hint: `${failedRequests.toLocaleString()} failed`, formatDelta: formatSignedInteger },
+    { key: "totalTokens", label: "Total Tokens", value: compactNumber(totalTokens), numericValue: totalTokens, hint: `${compactNumber(totals.totalInputTokens)} in / ${compactNumber(totals.totalOutputTokens)} out`, formatDelta: formatSignedInteger },
+    { key: "modelsUsed", label: "Models Used", value: requestsByModel.length.toString(), numericValue: requestsByModel.length, hint: topModel ? `Top: ${topModel.model.split("/").pop()} (${topModelPct}%)` : undefined, formatDelta: formatSignedInteger },
+    { key: "p50Latency", label: "P50 Latency", value: formatDuration(totals.durationPercentiles.p50), numericValue: totals.durationPercentiles.p50, hint: `p95 ${formatDuration(totals.durationPercentiles.p95)} · p99 ${formatDuration(totals.durationPercentiles.p99)}`, formatDelta: formatSignedDuration },
+    { key: "successRate", label: "Success Rate", value: totals.totalRequests > 0 ? `${totals.successRate}%` : "-", numericValue: totals.totalRequests > 0 ? totals.successRate : Number.NaN, hint: totals.totalRequests > 0 ? `${Math.round((totals.successRate / 100) * totals.totalRequests).toLocaleString()} / ${totals.totalRequests.toLocaleString()}` : undefined, formatDelta: formatSignedPercent },
+    { key: "avgTokensPerReq", label: "Avg Tokens/Req", value: totals.totalRequests > 0 ? compactNumber(avgTokensPerReq) : "-", numericValue: totals.totalRequests > 0 ? avgTokensPerReq : Number.NaN, hint: totals.totalRequests > 0 ? `${compactNumber(avgInPerReq)} in / ${compactNumber(avgOutPerReq)} out` : undefined, formatDelta: formatSignedInteger },
   ];
+});
+
+const stats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
+
+watch(statMetrics, (items) => {
+  const nextValues = collectStatValues(items);
+  const previousValues = previousStatValues.value;
+
+  if (!previousValues) {
+    previousStatValues.value = nextValues;
+    return;
+  }
+
+  const nextHitEffects = { ...statHitEffects.value };
+
+  for (const item of items) {
+    const currentValue = nextValues[item.key];
+    const previousValue = previousValues[item.key];
+
+    if (currentValue === undefined || previousValue === undefined) continue;
+
+    const delta = currentValue - previousValue;
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.0001) continue;
+
+    nextHitEffects[item.key] = {
+      text: item.formatDelta ? item.formatDelta(delta) : formatSignedInteger(delta),
+      tone: delta > 0 ? "positive" : "negative",
+      version: (nextHitEffects[item.key]?.version ?? 0) + 1,
+    };
+  }
+
+  previousStatValues.value = nextValues;
+  statHitEffects.value = nextHitEffects;
+}, { immediate: true });
+
+watch([selectedApiKeyId, activeFilterKey], () => {
+  previousStatValues.value = null;
+  statHitEffects.value = {};
+});
+
+onMounted(() => {
+  analyticsRefreshTimer = setInterval(() => {
+    void refreshAnalyticsOnce();
+  }, AUTO_REFRESH_INTERVAL_MS);
+});
+
+onBeforeUnmount(() => {
+  if (analyticsRefreshTimer) clearInterval(analyticsRefreshTimer);
 });
 
 const requestsSeries = [{ key: "count", label: "Requests", color: "var(--chart-1)", area: true }];
@@ -305,15 +396,10 @@ const successRateData = computed(() =>
           </template>
         </UiPopover>
 
-        <UiButton
-          variant="outline"
-          size="icon-sm"
-          :disabled="pending"
-          class="h-8 w-8 rounded-lg border-border bg-background sm:h-9 sm:w-9"
-          @click="handleRefresh"
-        >
-          <UiIcon name="i-lucide-refresh-cw" :class="['size-4', pending ? 'animate-spin' : '']" />
-        </UiButton>
+        <span class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-xs text-muted-foreground sm:h-9">
+          <span class="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.75)]" />
+          Auto 5s
+        </span>
       </div>
     </div>
 
@@ -333,6 +419,9 @@ const successRateData = computed(() =>
         :label="stat.label"
         :value="stat.value"
         :hint="stat.hint"
+        :delta="stat.hit?.text"
+        :delta-key="stat.hit?.version"
+        :delta-tone="stat.hit?.tone"
       />
     </div>
 
