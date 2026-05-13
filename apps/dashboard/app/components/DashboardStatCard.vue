@@ -11,7 +11,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="relative overflow-hidden rounded-xl border border-border bg-muted/40 px-4 py-4 sm:px-5">
+  <div class="relative overflow-hidden px-0 py-1">
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
         <p class="text-xs font-medium text-muted-foreground">

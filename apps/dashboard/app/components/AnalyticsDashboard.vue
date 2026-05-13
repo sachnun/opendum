@@ -393,7 +393,7 @@ const successRateData = computed(() =>
     <DashboardDataNotice :error="error" />
 
     <div v-if="isInitialLoading" class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
-      <div v-for="item in 6" :key="item" class="rounded-xl border border-border bg-muted/40 px-4 py-4 sm:px-5">
+      <div v-for="item in 6" :key="item" class="px-0 py-1">
         <UiSkeleton class="h-3.5 w-20" />
         <UiSkeleton class="mt-2 h-8 w-20 sm:h-9" />
         <UiSkeleton class="mt-1 h-3 w-28" />
