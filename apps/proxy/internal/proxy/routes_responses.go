@@ -33,7 +33,7 @@ func parseResponses(body map[string]any) (parsedEndpointRequest, *routeError) {
 		params["max_tokens"] = maxOutput
 		delete(params, "max_output_tokens")
 	}
-	reasoning := params["reasoning"] != nil || params["reasoning_effort"] != nil
+	reasoning := reasoningRequested(params)
 	paramsForError := buildParamsForError(params, stream, providerAccountID)
 	if instructions != "" {
 		paramsForError["instructions"] = instructions

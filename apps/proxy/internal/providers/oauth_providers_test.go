@@ -83,7 +83,15 @@ func TestGoogleCodeAssistConversion(t *testing.T) {
 		t.Fatalf("generation = %#v", generation)
 	}
 
-	completion := geminiToOpenAICompletion(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]any{"text": "thinking", "thought": true}, map[string]any{"text": "answer"}}}}}}, "unit-test-model", true, nil)
+	completion := geminiToOpenAICompletion(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]any{"text": "thinking", "thought": true}, map[string]any{"text": "answer"}}}}}}, "unit-test-model", nil)
+	message := completion["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
+	if message["content"] != "answer" || message["reasoning_content"] != "thinking" {
+		t.Fatalf("message = %#v", message)
+	}
+}
+
+func TestGeminiCompletionIncludesThoughtPartsWhenReasoningNotRequested(t *testing.T) {
+	completion := geminiToOpenAICompletion(map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"parts": []any{map[string]any{"text": "thinking", "thought": true}, map[string]any{"text": "answer"}}}}}}, "unit-test-model", nil)
 	message := completion["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
 	if message["content"] != "answer" || message["reasoning_content"] != "thinking" {
 		t.Fatalf("message = %#v", message)
@@ -677,7 +685,7 @@ func TestAntigravityResponseNormalizesToolArgsFinishAndUsage(t *testing.T) {
 		}},
 		"usageMetadata": map[string]any{"promptTokenCount": 3, "candidatesTokenCount": 4, "totalTokenCount": 7},
 	}
-	completion := geminiToOpenAICompletion(response, "gemini-test", true, schemas)
+	completion := geminiToOpenAICompletion(response, "gemini-test", schemas)
 	choice := completion["choices"].([]any)[0].(map[string]any)
 	if choice["finish_reason"] != "tool_calls" {
 		t.Fatalf("finish_reason = %#v", choice["finish_reason"])

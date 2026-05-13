@@ -27,7 +27,7 @@ func parseChatCompletions(body map[string]any) (parsedEndpointRequest, *routeErr
 	stream := parseStreamParam(body)
 	providerAccountID := parseProviderAccountID(body)
 	params := cloneMapExcept(body, "model", "messages", "stream", "provider_account_id")
-	reasoning := body["reasoning"] != nil || body["reasoning_effort"] != nil || body["thinking_budget"] != nil || body["include_thoughts"] != nil
+	reasoning := reasoningRequested(body)
 	paramsForError := buildParamsForError(params, stream, providerAccountID)
 	return parsedEndpointRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "params": params}}, nil
 }
@@ -41,6 +41,29 @@ func buildChatCompletions(parsed parsedEndpointRequest, model string, stream boo
 	body["_includeReasoning"] = parsed.ReasoningRequested
 	addSessionID(body, sessionID)
 	return body
+}
+
+func reasoningRequested(body map[string]any) bool {
+	if include, ok := body["include_thoughts"].(bool); ok {
+		return include
+	}
+	if effort := stringValue(body["reasoning_effort"]); effort != "" {
+		return effort != "none"
+	}
+	if reasoning, ok := body["reasoning"].(map[string]any); ok {
+		includeValue := reasoning["include_thoughts"]
+		if includeValue == nil {
+			includeValue = reasoning["includeThoughts"]
+		}
+		if include, ok := includeValue.(bool); ok {
+			return include
+		}
+		if effort := stringValue(reasoning["effort"]); effort != "" {
+			return effort != "none"
+		}
+		return true
+	}
+	return body["thinking_budget"] != nil
 }
 
 func cloneMapExcept(input map[string]any, excluded ...string) map[string]any {

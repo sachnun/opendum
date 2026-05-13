@@ -238,14 +238,14 @@ func anthropicToolResultIDs(rawMessages any) map[string]struct{} {
 	return ids
 }
 
-func transformOpenAIToAnthropic(openAI map[string]any, model string, includeThinking bool) map[string]any {
+func transformOpenAIToAnthropic(openAI map[string]any, model string) map[string]any {
 	content := []any{}
 	choices, _ := openAI["choices"].([]any)
 	stopReason := "end_turn"
 	if len(choices) > 0 {
 		choice, _ := choices[0].(map[string]any)
 		message, _ := choice["message"].(map[string]any)
-		content = appendOpenAIMessageContent(content, message, includeThinking)
+		content = appendOpenAIMessageContent(content, message)
 		content, stopReason = appendOpenAIToolCalls(content, message, stopReason)
 		if finish := stringValue(choice["finish_reason"]); finish == "length" {
 			stopReason = "max_tokens"
@@ -258,11 +258,9 @@ func transformOpenAIToAnthropic(openAI map[string]any, model string, includeThin
 	return map[string]any{"id": "msg_" + defaultStringValue(openAI["id"], time.Now().Format("20060102150405")), "type": "message", "role": "assistant", "content": content, "model": model, "stop_reason": stopReason, "stop_sequence": nil, "usage": map[string]any{"input_tokens": inputTokens, "output_tokens": outputTokens}}
 }
 
-func appendOpenAIMessageContent(content []any, message map[string]any, includeThinking bool) []any {
-	if includeThinking {
-		if reasoning := stringValue(message["reasoning_content"]); reasoning != "" {
-			content = append(content, map[string]any{"type": "thinking", "thinking": reasoning})
-		}
+func appendOpenAIMessageContent(content []any, message map[string]any) []any {
+	if reasoning := stringValue(message["reasoning_content"]); reasoning != "" {
+		content = append(content, map[string]any{"type": "thinking", "thinking": reasoning})
 	}
 	if text := stringValue(message["content"]); text != "" {
 		content = append(content, map[string]any{"type": "text", "text": text})

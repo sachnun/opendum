@@ -172,13 +172,6 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	}
 	modelName := p.resolveModel(stringValue(body["model"]))
 	body = p.normalizeBodyForModel(body, modelName)
-	includeReasoning := false
-	if explicit, ok := body["_includeReasoning"].(bool); ok {
-		includeReasoning = explicit
-	} else {
-		includeReasoning = body["reasoning"] != nil || body["reasoning_effort"] != nil || body["thinking_budget"] != nil || body["include_thoughts"] != nil
-	}
-	includeReasoning = includeReasoning || isOpusThinkingModel(modelName)
 	if messages, ok := body["messages"].([]any); ok && (p.name != "antigravity" || strings.Contains(modelName, "claude")) {
 		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
 	}
@@ -251,10 +244,10 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		return resp, lastErr
 	}
 	if stream {
-		return sseResponse(p.geminiSSEToOpenAISSEReader(ctx, resp.Body, modelName, includeReasoning, sessionID, toolSchemas), resp.Body), nil
+		return sseResponse(p.geminiSSEToOpenAISSEReader(ctx, resp.Body, modelName, sessionID, toolSchemas), resp.Body), nil
 	}
 	if actualStream {
-		completion := p.geminiStreamToOpenAICompletion(ctx, resp.Body, modelName, includeReasoning, sessionID, toolSchemas)
+		completion := p.geminiStreamToOpenAICompletion(ctx, resp.Body, modelName, sessionID, toolSchemas)
 		_ = resp.Body.Close()
 		return jsonResponse(http.StatusOK, completion), nil
 	}
@@ -266,7 +259,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	_ = resp.Body.Close()
 	response := unwrapGeminiResponse(data)
 	p.cacheSignaturesFromResponse(ctx, response, modelName, sessionID)
-	return jsonResponse(http.StatusOK, geminiToOpenAICompletion(response, modelName, includeReasoning, toolSchemas)), nil
+	return jsonResponse(http.StatusOK, geminiToOpenAICompletion(response, modelName, toolSchemas)), nil
 }
 
 func (p googleCodeAssistProvider) wrapCodeAssistPayload(projectID, model string, geminiPayload map[string]any) map[string]any {
@@ -2039,7 +2032,7 @@ func unwrapGeminiResponse(data any) map[string]any {
 	return obj
 }
 
-func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context, source io.Reader, model string, includeReasoning bool, sessionID string, schemas toolSchemaMap) io.Reader {
+func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context, source io.Reader, model string, sessionID string, schemas toolSchemaMap) io.Reader {
 	reader, writer := io.Pipe()
 	go func() {
 		completionID := randomID("chatcmpl")
@@ -2076,7 +2069,7 @@ func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context
 			if usage := geminiUsage(response); usage != nil {
 				trackedUsage = usage
 			}
-			for _, delta := range geminiDeltas(response, includeReasoning, schemas, &toolIndex) {
+			for _, delta := range geminiDeltas(response, schemas, &toolIndex) {
 				if !sentRole {
 					writeChunk(map[string]any{"role": "assistant", "content": ""}, nil, nil)
 					sentRole = true
@@ -2103,12 +2096,12 @@ func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context
 	return reader
 }
 
-func geminiToOpenAICompletion(response map[string]any, model string, includeReasoning bool, schemas toolSchemaMap) map[string]any {
+func geminiToOpenAICompletion(response map[string]any, model string, schemas toolSchemaMap) map[string]any {
 	content := ""
 	reasoning := ""
 	toolCalls := []any{}
 	toolIndex := 0
-	for _, delta := range geminiDeltas(response, includeReasoning, schemas, &toolIndex) {
+	for _, delta := range geminiDeltas(response, schemas, &toolIndex) {
 		content += stringValue(delta["content"])
 		reasoning += stringValue(delta["reasoning_content"])
 		if calls, ok := delta["tool_calls"].([]any); ok {
@@ -2136,7 +2129,7 @@ func geminiToOpenAICompletion(response map[string]any, model string, includeReas
 	return map[string]any{"id": randomID("chatcmpl"), "object": "chat.completion", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": finish}}, "usage": usage}
 }
 
-func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Context, source io.Reader, model string, includeReasoning bool, sessionID string, schemas toolSchemaMap) map[string]any {
+func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Context, source io.Reader, model string, sessionID string, schemas toolSchemaMap) map[string]any {
 	content := ""
 	reasoning := ""
 	toolCalls := []any{}
@@ -2160,7 +2153,7 @@ func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Con
 		}
 		response := unwrapGeminiResponse(parsed)
 		p.cacheSignaturesFromResponse(ctx, response, model, sessionID)
-		for _, delta := range geminiDeltas(response, includeReasoning, schemas, &toolIndex) {
+		for _, delta := range geminiDeltas(response, schemas, &toolIndex) {
 			content += stringValue(delta["content"])
 			reasoning += stringValue(delta["reasoning_content"])
 			if calls, ok := delta["tool_calls"].([]any); ok {
@@ -2208,7 +2201,7 @@ func (p googleCodeAssistProvider) cacheSignaturesFromResponse(ctx context.Contex
 	}
 }
 
-func geminiDeltas(response map[string]any, includeReasoning bool, schemas toolSchemaMap, toolIndex *int) []map[string]any {
+func geminiDeltas(response map[string]any, schemas toolSchemaMap, toolIndex *int) []map[string]any {
 	deltas := []map[string]any{}
 	candidates, _ := response["candidates"].([]any)
 	for _, rawCandidate := range candidates {
@@ -2243,7 +2236,7 @@ func geminiDeltas(response map[string]any, includeReasoning bool, schemas toolSc
 			if text == "" {
 				continue
 			}
-			if includeReasoning && part["thought"] == true {
+			if part["thought"] == true {
 				deltas = append(deltas, map[string]any{"reasoning_content": text})
 			} else {
 				deltas = append(deltas, map[string]any{"content": text})

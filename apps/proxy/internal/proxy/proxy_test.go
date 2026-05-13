@@ -106,6 +106,25 @@ func TestParseChatCompletionsAcceptsEmptyMessages(t *testing.T) {
 	}
 }
 
+func TestParseChatCompletionsReasoningNoneDoesNotRequestReasoning(t *testing.T) {
+	parsed, routeErr := parseChatCompletions(map[string]any{
+		"model":            "test-model",
+		"messages":         []any{},
+		"reasoning_effort": "none",
+	})
+	if routeErr != nil {
+		t.Fatalf("parseChatCompletions returned error: %+v", routeErr)
+	}
+	if parsed.ReasoningRequested {
+		t.Fatal("ReasoningRequested = true, want false")
+	}
+
+	payload := buildChatCompletions(parsed, "test-model", false, "")
+	if payload["_includeReasoning"] != false {
+		t.Fatalf("payload _includeReasoning = %#v, want false", payload["_includeReasoning"])
+	}
+}
+
 func TestParseResponsesConvertsInputAndParams(t *testing.T) {
 	input := []any{
 		map[string]any{"type": "message", "role": "developer", "content": "follow policy"},
@@ -390,7 +409,7 @@ func TestTransformOpenAIToAnthropic(t *testing.T) {
 		"usage": map[string]any{"prompt_tokens": 9, "completion_tokens": 4},
 	}
 
-	response := transformOpenAIToAnthropic(openAI, "claude-test", true)
+	response := transformOpenAIToAnthropic(openAI, "claude-test")
 	if response["id"] != "msg_chatcmpl_1" || response["model"] != "claude-test" || response["stop_reason"] != "tool_use" {
 		t.Fatalf("response metadata = %#v", response)
 	}
@@ -414,6 +433,19 @@ func TestTransformOpenAIToAnthropic(t *testing.T) {
 	usage := response["usage"].(map[string]any)
 	if usage["input_tokens"] != 9 || usage["output_tokens"] != 4 {
 		t.Fatalf("usage = %#v", usage)
+	}
+}
+
+func TestTransformOpenAIToAnthropicIncludesUpstreamThinkingWhenRequestDisabled(t *testing.T) {
+	openAI := map[string]any{"choices": []any{map[string]any{"message": map[string]any{"reasoning_content": "thought process", "content": "final answer"}}}}
+
+	response := transformOpenAIToAnthropic(openAI, "claude-test")
+	content := response["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("content len = %d, want 2: %#v", len(content), content)
+	}
+	if content[0].(map[string]any)["type"] != "thinking" || content[0].(map[string]any)["thinking"] != "thought process" {
+		t.Fatalf("thinking block = %#v", content[0])
 	}
 }
 
@@ -529,7 +561,7 @@ func TestPassthroughUsageTrackerProcessesSplitSSE(t *testing.T) {
 
 func TestAnthropicStreamTrackerTransformsOpenAIContentBlocks(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	tracker := &anthropicStreamTracker{writer: recorder, includeThinking: true}
+	tracker := &anthropicStreamTracker{writer: recorder}
 
 	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"reasoning_content": "think"}}}}))
 	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"content": "answer"}}}}))

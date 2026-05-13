@@ -18,7 +18,7 @@ func (s *Service) anthropicNonStream(ctx responseContext) error {
 	}
 	var openAI map[string]any
 	_ = json.Unmarshal(body, &openAI)
-	response := transformOpenAIToAnthropic(openAI, ctx.Model, includeThinking(ctx.Request))
+	response := transformOpenAIToAnthropic(openAI, ctx.Model)
 	inputTokens, outputTokens := usageFromJSON(openAI)
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.Header().Set("X-Provider-Account-Id", ctx.AccountID)
@@ -40,7 +40,7 @@ func (s *Service) anthropicStream(ctx responseContext) error {
 	flusher, _ := w.(http.Flusher)
 	messageID := "msg_" + time.Now().Format("20060102150405")
 	writeAnthropicEvent(w, flusher, "message_start", map[string]any{"type": "message_start", "message": map[string]any{"id": messageID, "type": "message", "role": "assistant", "content": []any{}, "model": ctx.Model, "stop_reason": nil, "stop_sequence": nil, "usage": map[string]any{"input_tokens": 0, "output_tokens": 0}}})
-	tracker := &anthropicStreamTracker{writer: w, flusher: flusher, includeThinking: includeThinking(ctx.Request)}
+	tracker := &anthropicStreamTracker{writer: w, flusher: flusher}
 	reader := bufio.NewReader(ctx.Response.Body)
 	buf := make([]byte, 32*1024)
 	for {
@@ -70,7 +70,6 @@ type anthropicStreamTracker struct {
 	inputTokens       int
 	outputTokens      int
 	finishReason      string
-	includeThinking   bool
 	generatedToolUses int
 }
 
@@ -110,10 +109,8 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 	}
 	choice, _ := choices[0].(map[string]any)
 	delta, _ := choice["delta"].(map[string]any)
-	if t.includeThinking {
-		if reasoning := stringValue(delta["reasoning_content"]); reasoning != "" {
-			t.writeThinkingDelta(reasoning)
-		}
+	if reasoning := stringValue(delta["reasoning_content"]); reasoning != "" {
+		t.writeThinkingDelta(reasoning)
 	}
 	if text := stringValue(delta["content"]); text != "" {
 		t.writeTextDelta(text)
@@ -255,13 +252,4 @@ func writeAnthropicEvent(w http.ResponseWriter, flusher http.Flusher, event stri
 	if flusher != nil {
 		flusher.Flush()
 	}
-}
-
-func includeThinking(r *http.Request) bool {
-	body, ok := r.Context().Value(requestBodyContextKey{}).(map[string]any)
-	if !ok || body == nil {
-		return false
-	}
-	thinking, ok := body["thinking"].(map[string]any)
-	return ok && (thinking["type"] == "enabled" || thinking["type"] == "adaptive")
 }
