@@ -77,6 +77,8 @@ function getFamilyAnchorId(family: string) {
   if (family === "OpenAI") return "openai-models";
   if (family === "Claude") return "claude-models";
   if (family === "Gemini") return "gemini-models";
+  if (family === "Meta") return "meta-models";
+  if (family === "Mistral") return "mistral-models";
   if (family === "Qwen") return "qwen-models";
   if (family === "DeepSeek") return "deepseek-models";
   if (family === "Kimi") return "kimi-models";
