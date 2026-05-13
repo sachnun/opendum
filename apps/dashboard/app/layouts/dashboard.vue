@@ -17,7 +17,6 @@ const { data: session } = await useSession(useFetch);
 
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
-const isModelsExpanded = ref(route.path === "/dashboard/models" || route.path.startsWith("/dashboard/models/"));
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
 
@@ -386,29 +385,7 @@ async function handleSignOut() {
         <nav class="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
           <div class="space-y-1">
             <div v-for="item in primaryNavigation" :key="item.name" class="space-y-1">
-              <div
-                v-if="item.href === '/dashboard/models'"
-                :class="[
-                  'group flex items-center rounded-lg text-sm font-medium transition-all',
-                  isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                ]"
-              >
-                <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item, $event)">
-                  <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-                  {{ item.name }}
-                </NuxtLink>
-                <button
-                  type="button"
-                  class="flex cursor-pointer items-center px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
-                  :aria-label="isModelsExpanded ? 'Collapse models' : 'Expand models'"
-                  @click="isModelsExpanded = !isModelsExpanded"
-                >
-                  <UiIcon :name="isModelsExpanded || isActive(item.href) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-3.5" />
-                </button>
-              </div>
-
               <NuxtLink
-                v-else
                 :to="item.href"
                 :class="[
                   'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
@@ -420,7 +397,7 @@ async function handleSignOut() {
                 {{ item.name }}
               </NuxtLink>
 
-              <div v-if="item.children?.length && (item.href !== '/dashboard/models' || isModelsExpanded || isActive(item.href))" class="ml-6 space-y-1 border-l border-border/60 pl-3">
+              <div v-if="item.children?.length" class="ml-6 space-y-1 border-l border-border/60 pl-3">
                 <template v-if="visibleSubItems(item).length">
                   <template v-for="subItem in visibleSubItems(item)" :key="`${item.name}-${subItem.name}`">
                     <div
@@ -581,29 +558,7 @@ async function handleSignOut() {
             <nav class="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
               <div class="space-y-1">
                 <div v-for="item in primaryNavigation" :key="`mobile-${item.name}`" class="space-y-1">
-                  <div
-                    v-if="item.href === '/dashboard/models'"
-                    :class="[
-                      'group flex items-center rounded-lg text-sm font-medium transition-all',
-                      isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                    ]"
-                  >
-                    <NuxtLink :to="item.href" class="flex flex-1 items-center gap-3 py-2.5 pl-3" @click="handleNavClick(item, $event)">
-                      <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-                      {{ item.name }}
-                    </NuxtLink>
-                    <button
-                      type="button"
-                      class="flex cursor-pointer items-center px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
-                      :aria-label="isModelsExpanded || isActive(item.href) ? 'Collapse models' : 'Expand models'"
-                      @click="isModelsExpanded = !isModelsExpanded"
-                    >
-                      <UiIcon :name="isModelsExpanded || isActive(item.href) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-3.5" />
-                    </button>
-                  </div>
-
                   <NuxtLink
-                    v-else
                     :to="item.href"
                     :class="[
                       'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
@@ -615,7 +570,7 @@ async function handleSignOut() {
                     {{ item.name }}
                   </NuxtLink>
 
-                  <div v-if="item.children?.length && (item.href !== '/dashboard/models' || isModelsExpanded || isActive(item.href))" class="ml-6 space-y-1 border-l border-border/60 pl-3">
+                  <div v-if="item.children?.length" class="ml-6 space-y-1 border-l border-border/60 pl-3">
                     <template v-if="visibleSubItems(item).length">
                       <template v-for="subItem in visibleSubItems(item)" :key="`mobile-${item.name}-${subItem.name}`">
                         <div
