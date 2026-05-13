@@ -8,12 +8,14 @@ type ModelListItem = ModelSearchItem;
 const dashboardApi = useDashboardApi();
 const route = useRoute();
 
-const desktopOpen = ref(false);
-const mobileOpen = ref(false);
+const root = ref<HTMLElement | null>(null);
+const suggestionsOpen = ref(false);
+const activeSuggestionIndex = ref(-1);
 const search = ref("");
 const detailModel = ref<ModelListItem | null>(null);
 const copiedModelId = ref<string | null>(null);
 const pendingModelId = ref<string | null>(null);
+const suggestionListId = "model-search-suggestions";
 
 const detailOpen = computed({
   get: () => detailModel.value !== null,
@@ -45,18 +47,67 @@ const filteredModels = computed(() => {
     return `${model.id} ${providers}`.toLowerCase().includes(term);
   });
 });
+const activeSuggestionModel = computed(() => filteredModels.value[activeSuggestionIndex.value] ?? null);
+
+watch(filteredModels, (items) => {
+  if (items.length === 0) {
+    activeSuggestionIndex.value = -1;
+    return;
+  }
+
+  if (activeSuggestionIndex.value < 0 || activeSuggestionIndex.value >= items.length) {
+    activeSuggestionIndex.value = 0;
+  }
+});
 
 watch(() => route.fullPath, () => {
-  desktopOpen.value = false;
-  mobileOpen.value = false;
+  suggestionsOpen.value = false;
+  activeSuggestionIndex.value = -1;
   search.value = "";
   detailModel.value = null;
 });
 
+function openSuggestions() {
+  suggestionsOpen.value = true;
+  if (filteredModels.value.length > 0 && activeSuggestionIndex.value === -1) {
+    activeSuggestionIndex.value = 0;
+  }
+}
+
+function closeSuggestions() {
+  suggestionsOpen.value = false;
+  activeSuggestionIndex.value = -1;
+}
+
+function handleFocusOut(event: FocusEvent) {
+  const nextTarget = event.relatedTarget;
+  if (nextTarget instanceof Node && root.value?.contains(nextTarget)) return;
+  closeSuggestions();
+}
+
+function moveActiveSuggestion(delta: number) {
+  openSuggestions();
+  const total = filteredModels.value.length;
+  if (total === 0) return;
+
+  const currentIndex = activeSuggestionIndex.value === -1 ? 0 : activeSuggestionIndex.value;
+  activeSuggestionIndex.value = (currentIndex + delta + total) % total;
+}
+
+function selectActiveSuggestion() {
+  if (!suggestionsOpen.value) return;
+  const model = activeSuggestionModel.value ?? filteredModels.value[0];
+  if (model) selectModel(model);
+}
+
+function clearSearch() {
+  search.value = "";
+  openSuggestions();
+}
+
 function selectModel(model: ModelListItem) {
   detailModel.value = model;
-  desktopOpen.value = false;
-  mobileOpen.value = false;
+  closeSuggestions();
   if (!fullModelById.value.get(model.id)?.stats) void loadFullModels();
 }
 
@@ -89,103 +140,75 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
 </script>
 
 <template>
-  <div class="max-w-xl">
-    <UiPopover v-model:open="desktopOpen" :content="{ align: 'start', sideOffset: 4 }" class="hidden md:block">
-      <button
-        type="button"
+  <div ref="root" class="relative w-full max-w-xl" @focusout="handleFocusOut">
+    <label for="model-search-input" class="sr-only">Search models</label>
+    <div class="relative">
+      <UiIcon name="i-lucide-search" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        id="model-search-input"
+        v-model="search"
+        type="text"
         role="combobox"
-        :aria-expanded="desktopOpen"
-        class="hidden h-9 w-full cursor-pointer items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-2.5 text-xs font-normal shadow-xs outline-none transition-all hover:bg-input/50 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-3 sm:text-sm md:inline-flex"
+        :aria-expanded="suggestionsOpen"
+        :aria-controls="suggestionListId"
+        :aria-activedescendant="activeSuggestionModel ? `model-search-option-${activeSuggestionIndex}` : undefined"
+        aria-autocomplete="list"
+        class="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-9 text-xs font-normal shadow-xs outline-none transition-all placeholder:text-muted-foreground hover:bg-input/50 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:text-sm"
+        placeholder="Search models..."
+        autocomplete="off"
+        @focus="openSuggestions"
+        @input="openSuggestions"
+        @keydown.down.prevent="moveActiveSuggestion(1)"
+        @keydown.up.prevent="moveActiveSuggestion(-1)"
+        @keydown.enter.prevent="selectActiveSuggestion"
+        @keydown.esc.stop="closeSuggestions"
       >
-        <span class="flex min-w-0 items-center gap-2">
-          <UiIcon name="i-lucide-search" class="size-4 text-muted-foreground" />
-          <span class="truncate text-muted-foreground">Search models...</span>
-        </span>
-        <UiIcon name="i-lucide-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
+      <button
+        v-if="search"
+        type="button"
+        class="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label="Clear model search"
+        @mousedown.prevent
+        @click="clearSearch"
+      >
+        <UiIcon name="i-lucide-x" class="size-3.5" />
       </button>
+    </div>
 
-      <template #content>
-        <div class="w-[min(92vw,30rem)] p-0">
-          <div class="flex h-11 items-center gap-2 border-b border-border px-3">
-            <UiIcon name="i-lucide-search" class="size-4 shrink-0 text-muted-foreground" />
-            <input
-              v-model="search"
-              class="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="Search model ID or provider..."
-              autocomplete="off"
-            >
-          </div>
-          <div class="max-h-[320px] overflow-y-auto p-1">
-            <p v-if="filteredModels.length === 0" class="py-6 text-center text-sm text-muted-foreground">No model found.</p>
-            <div v-else class="space-y-1">
-              <p class="px-2 py-1.5 text-xs font-medium text-muted-foreground">Models</p>
-              <button
-                v-for="model in filteredModels"
-                :key="model.id"
-                type="button"
-                class="flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-                @click="selectModel(model)"
-              >
-                <div class="min-w-0 flex-1">
-                  <p class="truncate font-mono text-xs sm:text-sm">{{ model.id }}</p>
-                  <div class="mt-1 flex flex-wrap gap-1">
-                    <UiBadge v-for="provider in model.providers" :key="`${model.id}-${provider}`" variant="outline" class="text-[10px]">
-                      {{ getProviderLabel(provider) }}
-                    </UiBadge>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-    </UiPopover>
-
-    <button
-      type="button"
-      role="combobox"
-      :aria-expanded="mobileOpen"
-      class="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-2.5 text-xs font-normal shadow-xs outline-none transition-all hover:bg-input/50 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:px-3 sm:text-sm md:hidden"
-      @click="mobileOpen = true"
+    <div
+      v-if="suggestionsOpen"
+      :id="suggestionListId"
+      role="listbox"
+      class="absolute left-0 right-0 top-full z-40 mt-1 max-h-[min(22rem,calc(100vh-5rem))] overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
     >
-      <span class="flex min-w-0 items-center gap-2">
-        <UiIcon name="i-lucide-search" class="size-4 text-muted-foreground" />
-        <span class="truncate text-muted-foreground">Search models...</span>
-      </span>
-      <UiIcon name="i-lucide-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
-    </button>
-
-    <UiDialog v-model:open="mobileOpen" :ui="{ content: 'p-0 sm:max-w-md' }">
-      <template #content>
-        <div class="border-b border-border px-4 py-3">
-          <p class="text-sm font-semibold">Search Models</p>
-          <p class="mt-1 text-xs text-muted-foreground">Find a model and tap to view details</p>
-        </div>
-        <div class="flex h-11 items-center gap-2 border-b border-border px-3">
-          <UiIcon name="i-lucide-search" class="size-4 shrink-0 text-muted-foreground" />
-          <input v-model="search" class="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" placeholder="Search model ID or provider...">
-        </div>
-        <div class="max-h-[60vh] overflow-y-auto p-1">
-          <p v-if="filteredModels.length === 0" class="py-6 text-center text-sm text-muted-foreground">No model found.</p>
-          <button
-            v-for="model in filteredModels"
-            :key="`mobile-${model.id}`"
-            type="button"
-            class="flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-            @click="selectModel(model)"
-          >
-            <div class="min-w-0 flex-1">
-              <p class="truncate font-mono text-xs sm:text-sm">{{ model.id }}</p>
-              <div class="mt-1 flex flex-wrap gap-1">
-                <UiBadge v-for="provider in model.providers" :key="`mobile-${model.id}-${provider}`" variant="outline" class="text-[10px]">
-                  {{ getProviderLabel(provider) }}
-                </UiBadge>
-              </div>
+      <p v-if="filteredModels.length === 0" class="py-6 text-center text-sm text-muted-foreground">No model found.</p>
+      <div v-else class="space-y-1">
+        <p class="px-2 py-1.5 text-xs font-medium text-muted-foreground">Models</p>
+        <button
+          v-for="(model, index) in filteredModels"
+          :id="`model-search-option-${index}`"
+          :key="model.id"
+          type="button"
+          role="option"
+          :aria-selected="activeSuggestionIndex === index"
+          :class="[
+            'flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors',
+            activeSuggestionIndex === index ? 'bg-accent text-accent-foreground' : 'hover:bg-accent hover:text-accent-foreground',
+          ]"
+          @mouseenter="activeSuggestionIndex = index"
+          @mousedown.prevent="selectModel(model)"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-mono text-xs sm:text-sm">{{ model.id }}</p>
+            <div class="mt-1 flex flex-wrap gap-1">
+              <UiBadge v-for="provider in model.providers" :key="`${model.id}-${provider}`" variant="outline" class="text-[10px]">
+                {{ getProviderLabel(provider) }}
+              </UiBadge>
             </div>
-          </button>
-        </div>
-      </template>
-    </UiDialog>
+          </div>
+        </button>
+      </div>
+    </div>
 
     <UiDialog v-model:open="detailOpen" :ui="{ content: 'gap-0 sm:max-w-md' }">
       <template #content>
