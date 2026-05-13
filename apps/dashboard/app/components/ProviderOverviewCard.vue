@@ -18,7 +18,7 @@ const emit = defineEmits<{
 function indicatorBadge(indicator: string, connectedAccounts: number) {
   if (connectedAccounts === 0) return { label: "No Accounts", class: "" };
   if (indicator === "error") return { label: "Needs Attention", class: "border-transparent bg-destructive/60 text-white" };
-  if (indicator === "warning") return { label: "Recovering", class: "border-yellow-500 text-yellow-600" };
+  if (indicator === "warning") return { label: "Unhealty", class: "border-yellow-500 text-yellow-600" };
   return { label: "Healthy", class: "border-green-500 text-green-600" };
 }
 

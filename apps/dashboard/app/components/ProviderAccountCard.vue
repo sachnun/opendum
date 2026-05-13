@@ -615,7 +615,7 @@ function historyEntryPreview(errorMessage: string): string {
             </UiBadge>
             <UiBadge v-else-if="account.status === 'half_open'" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
               <UiIcon name="i-lucide-activity" class="size-3" />
-              Recovering
+              Unhealty
             </UiBadge>
           </div>
         </div>
