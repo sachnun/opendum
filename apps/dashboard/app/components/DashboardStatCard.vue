@@ -17,24 +17,26 @@ defineProps<{
         <p class="text-xs font-medium text-muted-foreground">
           {{ label }}
         </p>
-        <div class="mt-2 flex items-baseline gap-2">
-          <p class="text-2xl font-bold tracking-tight tabular-nums transition-transform duration-200 sm:text-3xl">
-            {{ value }}
-          </p>
-          <span
-            v-if="delta"
-            :key="deltaKey"
-            :class="[
-              'pointer-events-none text-xs font-black tabular-nums animate-[stat-hit_1800ms_ease-in-out_both]',
-              deltaTone === 'negative'
-                ? 'text-red-500'
-                : deltaTone === 'neutral'
-                  ? 'text-blue-500'
-                  : 'text-emerald-500',
-            ]"
-          >
-            {{ delta }}
-          </span>
+        <div class="mt-2">
+          <div class="relative inline-block">
+            <p class="text-2xl font-bold tracking-tight tabular-nums transition-transform duration-200 sm:text-3xl">
+              {{ value }}
+            </p>
+            <span
+              v-if="delta"
+              :key="deltaKey"
+              :class="[
+                'pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap text-xs font-black tabular-nums animate-[stat-hit_1800ms_ease-in-out_both]',
+                deltaTone === 'negative'
+                  ? 'text-red-500'
+                  : deltaTone === 'neutral'
+                    ? 'text-blue-500'
+                    : 'text-emerald-500',
+              ]"
+            >
+              {{ delta }}
+            </span>
+          </div>
         </div>
         <p v-if="hint" class="mt-1 text-xs text-muted-foreground">
           {{ hint }}
@@ -49,22 +51,18 @@ defineProps<{
 @keyframes stat-hit {
   0% {
     opacity: 0;
-    transform: translate3d(0, 2px, 0);
   }
 
   25% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 
   70% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 
   100% {
     opacity: 0;
-    transform: translate3d(0, -2px, 0);
   }
 }
 </style>
