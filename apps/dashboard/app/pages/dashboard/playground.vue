@@ -1304,7 +1304,7 @@ function formatToolArguments(value: string): string {
             @click="applyProviderPreset(preset.provider)"
           >
             <span class="whitespace-normal break-words text-xs leading-tight">{{ getProviderLabel(preset.provider) }}</span>
-            <span :class="activeProviderPreset === preset.provider ? 'text-[10px] leading-none text-primary-foreground/85' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.accounts.length }} accounts · {{ preset.panels.length }} panels</span>
+            <span :class="activeProviderPreset === preset.provider ? 'text-[10px] leading-none text-primary-foreground/85' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.accounts.length }} accounts</span>
           </button>
         </div>
         <p v-else class="text-xs text-muted-foreground">Connect at least one provider account to use provider presets.</p>
