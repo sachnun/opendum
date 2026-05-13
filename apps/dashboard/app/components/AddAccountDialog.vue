@@ -67,6 +67,9 @@ const isFetchingUrl = ref(false);
 const isPolling = ref(false);
 const errorMessage = ref("");
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
+let copiedLinkTimer: ReturnType<typeof setTimeout> | null = null;
+let copiedDeviceCodeTimer: ReturnType<typeof setTimeout> | null = null;
+let copyAutoNextTimer: ReturnType<typeof setTimeout> | null = null;
 
 const selectedConfig = computed(() => (provider.value ? providerConfigs[provider.value] : null));
 const dialogOpen = computed({
@@ -154,11 +157,29 @@ function resetForm() {
     clearTimeout(pollingTimer);
     pollingTimer = null;
   }
+  if (copiedLinkTimer) {
+    clearTimeout(copiedLinkTimer);
+    copiedLinkTimer = null;
+  }
+  if (copiedDeviceCodeTimer) {
+    clearTimeout(copiedDeviceCodeTimer);
+    copiedDeviceCodeTimer = null;
+  }
+  if (copyAutoNextTimer) {
+    clearTimeout(copyAutoNextTimer);
+    copyAutoNextTimer = null;
+  }
 }
 
 function closeAndReset() {
   open.value = false;
   resetForm();
+}
+
+function clearCopyAutoNextTimer() {
+  if (!copyAutoNextTimer) return;
+  clearTimeout(copyAutoNextTimer);
+  copyAutoNextTimer = null;
 }
 
 async function refreshConnectedAccountData(providerKey: Provider) {
@@ -204,18 +225,32 @@ async function copyText(value: string, target: "link" | "code") {
     await navigator.clipboard.writeText(value);
     if (target === "link") {
       copiedLink.value = true;
-      setTimeout(() => (copiedLink.value = false), 1800);
+      if (copiedLinkTimer) clearTimeout(copiedLinkTimer);
+      copiedLinkTimer = setTimeout(() => {
+        copiedLink.value = false;
+        copiedLinkTimer = null;
+      }, 2000);
     } else {
       copiedDeviceCode.value = true;
-      setTimeout(() => (copiedDeviceCode.value = false), 1800);
+      if (copiedDeviceCodeTimer) clearTimeout(copiedDeviceCodeTimer);
+      copiedDeviceCodeTimer = setTimeout(() => {
+        copiedDeviceCode.value = false;
+        copiedDeviceCodeTimer = null;
+      }, 2000);
     }
   } catch {
     errorMessage.value = target === "link" ? "Failed to copy link" : "Failed to copy code";
     return;
   }
 
-  if (target === "link" && selectedConfig.value && ["api_key", "api_key_with_account_id"].includes(selectedConfig.value.flowType) && step.value === 2) {
-    step.value = 3;
+  if (target === "link" && selectedConfig.value?.flowType !== "device_code" && step.value === 2) {
+    clearCopyAutoNextTimer();
+    copyAutoNextTimer = setTimeout(() => {
+      if (step.value === 2 && selectedConfig.value?.flowType !== "device_code") {
+        step.value = 3;
+      }
+      copyAutoNextTimer = null;
+    }, 2000);
   }
 
   if (target === "link" && selectedConfig.value?.flowType === "device_code") {
@@ -366,6 +401,7 @@ async function handleExchangeOAuth() {
 }
 
 function goBack() {
+  clearCopyAutoNextTimer();
   step.value = Math.max(minimumStep.value, step.value - 1);
 }
 
@@ -374,6 +410,15 @@ onBeforeUnmount(() => {
     clearTimeout(pollingTimer);
     pollingTimer = null;
   }
+  if (copiedLinkTimer) {
+    clearTimeout(copiedLinkTimer);
+    copiedLinkTimer = null;
+  }
+  if (copiedDeviceCodeTimer) {
+    clearTimeout(copiedDeviceCodeTimer);
+    copiedDeviceCodeTimer = null;
+  }
+  clearCopyAutoNextTimer();
 });
 </script>
 
