@@ -43,28 +43,20 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
 </script>
 
 <template>
-  <UiCard class="relative h-full transition-colors hover:border-primary/40">
+  <UiCard class="relative h-full gap-3 transition-colors hover:border-primary/40">
     <div class="relative z-10 flex items-start justify-between gap-2 px-6">
       <div class="flex items-center gap-1">
         <ProviderPinButton :provider-key="provider.key" :pinned="pinned" @toggled="handlePinnedToggled" />
         <UiCardTitle class="text-base">{{ provider.label }}</UiCardTitle>
+        <UiBadge v-if="summary.connected > 0" variant="outline" class="text-xs tabular-nums">{{ summary.active }}/{{ summary.connected }}</UiBadge>
       </div>
       <UiBadge variant="outline" :class="badge.class">{{ badge.label }}</UiBadge>
     </div>
 
     <NuxtLink :to="getProviderAccountPath(provider.key)" class="group block h-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`">
       <span class="absolute inset-0 z-0 rounded-xl" aria-hidden="true" />
-      <UiCardHeader class="space-y-1 pb-3">
-        <span class="sr-only">{{ provider.label }}</span>
-      </UiCardHeader>
-      <UiCardContent class="space-y-3">
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex flex-wrap gap-2">
-            <UiBadge variant="secondary">{{ summary.connected }} connected</UiBadge>
-            <UiBadge variant="outline">{{ summary.active }} active</UiBadge>
-          </div>
-          <UiIcon name="i-lucide-arrow-right" class="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-        </div>
+      <span class="sr-only">{{ provider.label }}</span>
+      <UiCardContent>
         <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
           <div class="flex items-center justify-end text-[11px] text-muted-foreground">
             <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
