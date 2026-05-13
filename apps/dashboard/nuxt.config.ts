@@ -39,7 +39,7 @@ function buildModelRegistryModule(): string {
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   sourcemap: false,
-  modules: ["@nuxt/eslint"],
+  modules: ["@nuxt/eslint", "@nuxt/fonts"],
   css: ["~/assets/css/main.css"],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
   runtimeConfig: {
@@ -96,6 +96,19 @@ export default defineNuxtConfig({
       cssMinify: "lightningcss",
       reportCompressedSize: false,
       sourcemap: false,
+    },
+    optimizeDeps: {
+      include: [
+        "@vue/devtools-core",
+        "@vue/devtools-kit",
+        "better-auth/vue",
+        "clsx",
+        "date-fns",
+        "idb-keyval",
+        "lucide-vue-next",
+        "reka-ui",
+        "tailwind-merge",
+      ],
     },
     esbuild: {
       legalComments: "none",
