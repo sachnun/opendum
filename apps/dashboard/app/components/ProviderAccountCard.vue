@@ -776,12 +776,8 @@ function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null 
               </div>
               <span class="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </button>
-            <div v-else class="w-full min-h-[7rem] rounded-sm border border-border/60 bg-muted/20 px-2 pt-2 pb-2 text-left">
-              <div class="flex items-center justify-between gap-1">
-                <span class="invisible text-xs">No status code</span>
-              </div>
-              <div class="mt-3 flex min-h-16 items-center justify-center pt-2 text-center text-xs text-muted-foreground">No data</div>
-              <span class="invisible mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
+            <div v-else class="flex min-h-[7rem] w-full items-center justify-center rounded-sm border border-border/60 bg-muted/20 px-2 text-center text-xs text-muted-foreground">
+              No data
             </div>
           </div>
 
