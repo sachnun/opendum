@@ -218,6 +218,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 			continue
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
+			MarkUpstreamResponseStarted(ctx)
 			return resp, nil
 		}
 		if resp.StatusCode >= 500 || resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
@@ -228,8 +229,10 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 			continue
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			MarkUpstreamResponseStarted(ctx)
 			return resp, nil
 		}
+		MarkUpstreamResponseStarted(ctx)
 		lastResp = resp
 		lastErr = nil
 		break

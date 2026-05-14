@@ -171,7 +171,11 @@ func (p copilotProvider) post(ctx context.Context, client *http.Client, accessTo
 	if visionRequest {
 		req.Header.Set("Copilot-Vision-Request", "true")
 	}
-	return client.Do(req)
+	resp, err := client.Do(req)
+	if resp != nil {
+		MarkUpstreamResponseStarted(ctx)
+	}
+	return resp, err
 }
 
 func (p copilotProvider) systemToolMode(ctx context.Context, accountID string) (string, bool) {

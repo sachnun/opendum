@@ -122,7 +122,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		return
 	}
 
-	account, providerResp, requestStartMS, rotationFailures, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced, startMS)
+	account, providerResp, requestStartMS, upstreamFirstResponseMS, rotationFailures, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 	if errInfo != nil {
 		s.writeRouteError(w, cfg, errInfo.Status, errInfo.Message, errInfo.Type, errInfo.Param, errInfo.Code, errInfo.RetryAfter, errInfo.RetryAfterMS)
 		return
@@ -134,7 +134,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	defer providerResp.Body.Close()
 
 	if parsed.Stream {
-		if err := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+		if err := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
 			go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
 		} else {
 			s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)
@@ -142,7 +142,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		return
 	}
 
-	if err := cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+	if err := cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
 		go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
 	} else {
 		s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)

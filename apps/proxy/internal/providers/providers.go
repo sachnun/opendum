@@ -396,7 +396,11 @@ func postJSONWithHeadersAuth(ctx context.Context, client *http.Client, url, bear
 	for key, value := range extraHeaders {
 		req.Header.Set(key, value)
 	}
-	return client.Do(req)
+	resp, err := client.Do(req)
+	if resp != nil {
+		MarkUpstreamResponseStarted(ctx)
+	}
+	return resp, err
 }
 
 func shouldRefresh(account appdb.ProviderAccount) bool {

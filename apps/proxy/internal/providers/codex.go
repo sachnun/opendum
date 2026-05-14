@@ -121,6 +121,7 @@ func (p codexProvider) MakeRequest(ctx context.Context, client *http.Client, acc
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
+	MarkUpstreamResponseStarted(ctx)
 	p.updateQuotaFromHeaders(ctx, account.ID, resp.Header)
 	if stream {
 		return sseResponse(responsesSSEToChatSSEReader(resp.Body, modelName), resp.Body), nil

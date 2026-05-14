@@ -327,9 +327,11 @@ func successRecoveryState(status string, consecutiveErrors int) (int, string, bo
 	return nextErrors, "active", true
 }
 
-func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, durationMS int, stream bool, requestStartMS int64) {
+func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, durationMS int, stream bool, requestStartMS, upstreamFirstResponseMS int64) {
 	s.markAccountSuccess(ctx, accountID, model)
-	s.recordLatency(ctx, provider, model, stream, time.Now().UnixMilli()-requestStartMS)
+	if upstreamFirstResponseMS > requestStartMS {
+		s.recordLatency(ctx, provider, model, stream, upstreamFirstResponseMS-requestStartMS)
+	}
 	s.logUsage(ctx, usageParams{UserID: userID, ProviderAccountID: accountID, ProxyAPIKeyID: apiKeyID, Model: model, InputTokens: inputTokens, OutputTokens: outputTokens, StatusCode: http.StatusOK, DurationMS: durationMS, Provider: provider})
 }
 

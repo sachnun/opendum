@@ -49,16 +49,17 @@ type accountRotationFailure struct {
 }
 
 type responseContext struct {
-	Response       *http.Response
-	AccountID      string
-	Provider       string
-	Writer         http.ResponseWriter
-	Request        *http.Request
-	RequestStartMS int64
-	StartMS        int64
-	UserID         string
-	APIKeyID       string
-	Model          string
+	Response                *http.Response
+	AccountID               string
+	Provider                string
+	Writer                  http.ResponseWriter
+	Request                 *http.Request
+	RequestStartMS          int64
+	UpstreamFirstResponseMS int64
+	StartMS                 int64
+	UserID                  string
+	APIKeyID                string
+	Model                   string
 }
 
 type openAIError struct {

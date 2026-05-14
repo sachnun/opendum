@@ -7,6 +7,7 @@ import (
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
 type accountRotationRunner interface {
@@ -20,11 +21,11 @@ type accountRotationRunner interface {
 	isToolCallModel(string) bool
 }
 
-func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, []accountRotationFailure, *routeError) {
+func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *routeError) {
 	return executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 }
 
-func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, []accountRotationFailure, *routeError) {
+func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *routeError) {
 	tried := []string{}
 	recoverableFailures := []accountRotationFailure{}
 	var lastFailure *routeError
@@ -35,7 +36,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 		if account == nil {
 			selected, configured, err := runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
 			if err != nil {
-				return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
+				return nil, nil, 0, 0, recoverableFailures, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
 			accountConfigured = accountConfigured || configured
 			account = selected
@@ -44,14 +45,14 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 		if account == nil {
 			if len(tried) == 0 {
 				if accountConfigured {
-					return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "This model is temporarily unavailable. Please try again later.", Type: "api_error"}
+					return nil, nil, 0, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "This model is temporarily unavailable. Please try again later.", Type: "api_error"}
 				}
-				return nil, nil, 0, recoverableFailures, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
+				return nil, nil, 0, 0, recoverableFailures, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
 			}
 			if lastFailure != nil {
-				return nil, nil, 0, recoverableFailures, lastFailure
+				return nil, nil, 0, 0, recoverableFailures, lastFailure
 			}
-			return nil, nil, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "No available accounts for this request.", Type: "api_error"}
+			return nil, nil, 0, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "No available accounts for this request.", Type: "api_error"}
 		}
 
 		tried = append(tried, account.ID)
@@ -67,7 +68,16 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			stripToolCallParameters(payload)
 		}
 		requestStart := time.Now().UnixMilli()
-		resp, err := runner.makeProviderRequest(ctx, *account, payload, parsed.Stream)
+		upstreamFirstResponseMS := int64(0)
+		attemptCtx := providers.WithUpstreamResponseStartRecorder(ctx, func(at time.Time) {
+			if upstreamFirstResponseMS == 0 {
+				upstreamFirstResponseMS = at.UnixMilli()
+			}
+		})
+		resp, err := runner.makeProviderRequest(attemptCtx, *account, payload, parsed.Stream)
+		if upstreamFirstResponseMS == 0 && resp != nil {
+			upstreamFirstResponseMS = time.Now().UnixMilli()
+		}
 		if err != nil {
 			status := http.StatusInternalServerError
 			message := err.Error()
@@ -79,7 +89,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 				recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: account.ID, FailedAt: failedAt})
 				continue
 			}
-			return nil, nil, 0, recoverableFailures, lastFailure
+			return nil, nil, 0, 0, recoverableFailures, lastFailure
 		}
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -102,10 +112,10 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 				}
 				continue
 			}
-			return nil, nil, 0, recoverableFailures, lastFailure
+			return nil, nil, 0, 0, recoverableFailures, lastFailure
 		}
 
-		return account, resp, requestStart, recoverableFailures, nil
+		return account, resp, requestStart, upstreamFirstResponseMS, recoverableFailures, nil
 	}
 }
 

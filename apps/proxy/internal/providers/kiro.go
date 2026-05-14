@@ -113,6 +113,7 @@ func (p kiroProvider) MakeRequest(ctx context.Context, client *http.Client, cred
 	if err != nil || upstream == nil || upstream.StatusCode < 200 || upstream.StatusCode >= 300 {
 		return upstream, err
 	}
+	MarkUpstreamResponseStarted(ctx)
 	if upstream.Body == nil {
 		return jsonResponse(http.StatusBadGateway, map[string]any{"error": map[string]any{"message": "Kiro response stream is empty", "type": "api_error"}}), nil
 	}

@@ -32,7 +32,7 @@ func TestExecuteAccountRotationContinuesPastFiveFailures(t *testing.T) {
 		},
 	}
 
-	account, resp, _, failures, routeErr := executeAccountRotation(
+	account, resp, _, _, failures, routeErr := executeAccountRotation(
 		runner,
 		context.Background(),
 		request,
@@ -105,7 +105,7 @@ func TestExecuteAccountRotationMarksCodexUsageLimitDisabledUntil(t *testing.T) {
 		},
 	}
 
-	_, _, _, _, routeErr := executeAccountRotation(
+	_, _, _, _, _, routeErr := executeAccountRotation(
 		runner,
 		context.Background(),
 		request,
