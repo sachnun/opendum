@@ -32,7 +32,6 @@ function modelSortWeight(model: string): number {
   if (status === "failed") return 0;
   if (status === "half_open") return 1;
   if (status === "degraded") return 2;
-  if (disabledModels.value.has(model)) return 4;
   return 3;
 }
 
