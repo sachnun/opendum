@@ -171,6 +171,9 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		return nil, fmt.Errorf("%s account missing projectId", p.name)
 	}
 	modelName := p.resolveModel(stringValue(body["model"]))
+	if p.name == "antigravity" {
+		modelName = p.resolveAntigravityGemini3ModelVariant(modelName, body)
+	}
 	body = p.normalizeBodyForModel(body, modelName)
 	if messages, ok := body["messages"].([]any); ok && (p.name != "antigravity" || strings.Contains(modelName, "claude")) {
 		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
@@ -366,7 +369,16 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 			return
 		}
 	}
-	thinking := normalizedThinkingMap(generation["thinkingConfig"])
+	rawThinking, _ := generation["thinkingConfig"].(map[string]any)
+	if isGemini3ModelName(model) {
+		if thinking := p.normalizeGemini3ThinkingConfig(rawThinking, model); thinking != nil {
+			generation["thinkingConfig"] = thinking
+		} else {
+			delete(generation, "thinkingConfig")
+		}
+		return
+	}
+	thinking := normalizedThinkingMap(rawThinking)
 	if providerConfigBool(p.registry, model, p.name, "thinking_model") {
 		if thinking == nil {
 			thinking = map[string]any{"thinkingBudget": 16384, "include_thoughts": true}
@@ -442,6 +454,44 @@ func (p googleCodeAssistProvider) resolveModel(model string) string {
 		model = p.registry.UpstreamModelName(model, p.name)
 	}
 	return model
+}
+
+func (p googleCodeAssistProvider) resolveAntigravityGemini3ModelVariant(model string, body map[string]any) string {
+	if !isGemini3ModelName(model) || !strings.Contains(strings.ToLower(model), "pro") {
+		return model
+	}
+	base := strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(model, "-low"), "-medium"), "-high")
+	level := geminiThinkingLevelFromModel(model)
+	if bodyLevel := p.requestedGemini3ThinkingLevel(model, body); bodyLevel != "" {
+		level = bodyLevel
+	}
+	if level == "" {
+		level = "high"
+	}
+	return base + "-" + level
+}
+
+func (p googleCodeAssistProvider) requestedGemini3ThinkingLevel(model string, body map[string]any) string {
+	if thinking, ok := body["thinking"].(map[string]any); ok {
+		if level := p.normalizeGemini3ThinkingLevel(model, stringValue(thinking["thinkingLevel"])); level != "" {
+			return level
+		}
+		if budget := numberFromAny(thinking["budget_tokens"]); budget > 0 {
+			return p.thinkingLevelFromBudget(model, budget)
+		}
+	}
+	if budget := numberFromAny(body["thinking_budget"]); budget > 0 {
+		return p.thinkingLevelFromBudget(model, budget)
+	}
+	if level := p.thinkingLevelFromEffort(model, stringValue(body["reasoning_effort"])); level != "" {
+		return level
+	}
+	if reasoning, ok := body["reasoning"].(map[string]any); ok {
+		if level := p.thinkingLevelFromEffort(model, stringValue(reasoning["effort"])); level != "" {
+			return level
+		}
+	}
+	return ""
 }
 
 func (p googleCodeAssistProvider) normalizeBodyForModel(body map[string]any, model string) map[string]any {
@@ -1296,24 +1346,37 @@ func (p googleCodeAssistProvider) applyThinkingConfig(payload map[string]any, mo
 		return
 	}
 	config := map[string]any{}
-	format := providerConfigString(p.registry, model, p.name, "thinking_format")
-	if format == "" {
-		format = "budget"
-	}
-	if budget > 0 && format != "level" {
-		config["thinkingBudget"] = budget
-		config["includeThoughts"] = true
-	} else if effort != "" && effort != "none" {
-		if format == "level" {
-			if level := p.thinkingLevel(model, effort); level != "" {
-				config["thinkingLevel"] = level
-			}
-		} else {
-			if thinkingBudget := p.thinkingBudget(model, effort); thinkingBudget > 0 {
-				config["thinkingBudget"] = thinkingBudget
-			}
+	if isGemini3ModelName(model) {
+		level := ""
+		if budget > 0 {
+			level = p.thinkingLevelFromBudget(model, budget)
+		} else if effort != "" && effort != "none" {
+			level = p.thinkingLevelFromEffort(model, effort)
 		}
-		config["includeThoughts"] = true
+		if level != "" {
+			config["thinkingLevel"] = level
+			config["includeThoughts"] = true
+		}
+	} else {
+		format := providerConfigString(p.registry, model, p.name, "thinking_format")
+		if format == "" {
+			format = "budget"
+		}
+		if budget > 0 && format != "level" {
+			config["thinkingBudget"] = budget
+			config["includeThoughts"] = true
+		} else if effort != "" && effort != "none" {
+			if format == "level" {
+				if level := p.thinkingLevel(model, effort); level != "" {
+					config["thinkingLevel"] = level
+				}
+			} else {
+				if thinkingBudget := p.thinkingBudget(model, effort); thinkingBudget > 0 {
+					config["thinkingBudget"] = thinkingBudget
+				}
+			}
+			config["includeThoughts"] = true
+		}
 	}
 	if len(config) == 0 {
 		return
@@ -1324,6 +1387,99 @@ func (p googleCodeAssistProvider) applyThinkingConfig(payload map[string]any, mo
 		payload["generationConfig"] = generation
 	}
 	generation["thinkingConfig"] = config
+}
+
+func (p googleCodeAssistProvider) normalizeGemini3ThinkingConfig(thinking map[string]any, model string) map[string]any {
+	out := map[string]any{}
+	if include, ok := defaultAny(thinking["includeThoughts"], thinking["include_thoughts"]).(bool); ok {
+		out["includeThoughts"] = include
+	}
+	level := defaultStringValue(thinking["thinkingLevel"], stringValue(thinking["thinking_level"]))
+	if level == "" {
+		if budget := numberFromAny(defaultAny(thinking["thinkingBudget"], thinking["thinking_budget"])); budget > 0 {
+			level = p.thinkingLevelFromBudget(model, budget)
+		}
+	} else {
+		level = p.normalizeGemini3ThinkingLevel(model, level)
+	}
+	if level == "" {
+		level = geminiThinkingLevelFromModel(model)
+	}
+	if level != "" {
+		out["thinkingLevel"] = level
+		if _, ok := out["includeThoughts"]; !ok {
+			out["includeThoughts"] = true
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func isGemini3ModelName(model string) bool {
+	model = strings.ToLower(lastModelSegment(model))
+	return strings.HasPrefix(model, "gemini-3")
+}
+
+func geminiThinkingLevelFromModel(model string) string {
+	model = strings.ToLower(lastModelSegment(model))
+	for _, level := range []string{"minimal", "low", "medium", "high"} {
+		if strings.HasSuffix(model, "-"+level) {
+			return level
+		}
+	}
+	return ""
+}
+
+func (p googleCodeAssistProvider) thinkingLevelFromBudget(model string, budget int) string {
+	effort := "high"
+	budgets := providerConfigIntMap(p.registry, model, p.name, "thinking_budgets")
+	if low := budgets["low"]; low > 0 && budget <= low {
+		effort = "low"
+	} else if medium := budgets["medium"]; medium > 0 && budget <= medium {
+		effort = "medium"
+	} else if len(budgets) == 0 {
+		if budget <= 8192 {
+			effort = "low"
+		} else if budget <= 16384 {
+			effort = "medium"
+		}
+	}
+	if level := p.thinkingLevel(model, effort); level != "" {
+		return p.normalizeGemini3ThinkingLevel(model, level)
+	}
+	return p.normalizeGemini3ThinkingLevel(model, effort)
+}
+
+func (p googleCodeAssistProvider) thinkingLevelFromEffort(model, effort string) string {
+	if level := p.thinkingLevel(model, effort); level != "" {
+		return p.normalizeGemini3ThinkingLevel(model, level)
+	}
+	return p.normalizeGemini3ThinkingLevel(model, effort)
+}
+
+func (p googleCodeAssistProvider) normalizeGemini3ThinkingLevel(model, level string) string {
+	level = strings.ToLower(strings.TrimSpace(level))
+	switch level {
+	case "xhigh":
+		return "high"
+	case "minimal":
+		if strings.Contains(strings.ToLower(model), "pro") {
+			return "low"
+		}
+		return "minimal"
+	case "medium":
+		lower := strings.ToLower(model)
+		if strings.Contains(lower, "pro") && !strings.Contains(lower, "gemini-3.1-pro") {
+			return "high"
+		}
+		return "medium"
+	case "low", "high":
+		return level
+	default:
+		return ""
+	}
 }
 
 func (p googleCodeAssistProvider) thinkingLevel(model, effort string) string {

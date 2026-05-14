@@ -455,6 +455,33 @@ func TestAntigravityWrapCodeAssistPayloadUsesOfficialFields(t *testing.T) {
 	}
 }
 
+func TestAntigravityGemini3ThinkingBudgetUsesThinkingLevel(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	body := map[string]any{
+		"model":           "gemini-3.1-pro-preview",
+		"messages":        []any{map[string]any{"role": "user", "content": "hi"}},
+		"thinking_budget": 4000,
+	}
+	model := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
+	if model != "gemini-3.1-pro-low" {
+		t.Fatalf("resolved model = %q, want gemini-3.1-pro-low", model)
+	}
+	payload := openAIToGemini(body)
+	provider.transformAntigravityPayload(t.Context(), payload, model, "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinkingLevel"] != "low" || thinking["includeThoughts"] != true {
+		t.Fatalf("thinking = %#v", thinking)
+	}
+	if _, ok := thinking["thinkingBudget"]; ok {
+		t.Fatalf("gemini 3 thinking should not include budget: %#v", thinking)
+	}
+	if _, ok := thinking["thinking_budget"]; ok {
+		t.Fatalf("gemini 3 thinking should not include snake_case budget: %#v", thinking)
+	}
+}
+
 func TestCodexExtractAccountIDFromJWT(t *testing.T) {
 	token := "x." + base64.RawURLEncoding.EncodeToString([]byte(`{"https://api.openai.com/auth":{"organizations":[{"id":"org_1","is_default":true}]}}`)) + ".y"
 	if got := extractAccountIDFromJWT(token); got != "org_1" {
