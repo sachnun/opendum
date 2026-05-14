@@ -160,7 +160,6 @@ const settings = reactive<PlaygroundSettings>({ ...DEFAULT_SETTINGS });
 const settingsOpen = ref(false);
 const panels = ref<PanelState[]>([{ id: generateId(), modelId: null, accountId: null }]);
 const responses = ref<Record<string, ResponseData>>({});
-const isAnyLoading = ref(false);
 const loopDialogOpen = ref(false);
 const loopCountInput = ref("2");
 const loopCount = ref(2);
@@ -177,6 +176,9 @@ const initializedFromRoute = ref(false);
 const liveNow = ref(Date.now());
 
 const controllers = new Map<string, AbortController>();
+const requestIds = new Map<string, string>();
+const stoppedBatchPanelIds = new Set<string>();
+const isBatchRunActive = ref(false);
 let liveTimer: ReturnType<typeof setInterval> | null = null;
 let startLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 let startLongPressTriggered = false;
@@ -202,6 +204,7 @@ const maxPanels = computed(() => Math.max(filteredModels.value.length, providerP
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
 const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value));
+const isAnyLoading = computed(() => Object.values(responses.value).some((response) => response.isLoading));
 const playgroundSetupMessage = computed(() => {
   if (!hasAnyProviderAccount.value) return "Connect a provider account before running Playground.";
   if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
@@ -506,6 +509,7 @@ function addPanel() {
 }
 
 function removePanel(panelId: string) {
+  stopPanelRequest(panelId);
   panels.value = panels.value.filter((panel) => panel.id !== panelId);
   const nextResponses = { ...responses.value };
   Reflect.deleteProperty(nextResponses, panelId);
@@ -952,16 +956,24 @@ function setResponse(panelId: string, response: ResponseData) {
   responses.value = { ...responses.value, [panelId]: response };
 }
 
+function setResponseIfCurrent(panelId: string, requestId: string, response: ResponseData) {
+  if (requestIds.get(panelId) !== requestId) return;
+  setResponse(panelId, response);
+}
+
 function refreshAccountSummary() {
   requestDashboardAccountSummaryRefresh();
 }
 
 async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, accountId: string | null) {
   const requestStartedAt = Date.now();
+  const requestId = generateId();
   let waitMs: number | null = null;
   let usedAccountId: string | null = null;
   let shouldRefreshAccountSummary = false;
 
+  controllers.get(panelId)?.abort();
+  requestIds.set(panelId, requestId);
   setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: buildResponseMetrics(null, null, null), startedAt: requestStartedAt });
 
   try {
@@ -1012,32 +1024,35 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
         streamedReasoning += chunk.reasoning;
         streamedToolCalls = chunk.toolCalls.length > 0 ? [...streamedToolCalls, ...chunk.toolCalls] : streamedToolCalls;
         usage = mergeUsageData(usage, chunk.usage);
-        setResponse(panelId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: true, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId, startedAt: requestStartedAt });
+        setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: true, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId, startedAt: requestStartedAt });
       });
 
-      setResponse(panelId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId });
+      setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId });
       return;
     }
 
     const payload = await response.json();
     const parsed = currentSettings.endpoint === "messages" ? extractAnthropicCompletionData(payload) : currentSettings.endpoint === "responses" ? extractResponsesCompletionData(payload) : extractChatCompletionData(payload);
-    setResponse(panelId, { content: parsed.content, reasoning: parsed.reasoning, toolCalls: parsed.toolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, Date.now() - requestStartedAt, parsed.usage), usedAccountId });
+    setResponseIfCurrent(panelId, requestId, { content: parsed.content, reasoning: parsed.reasoning, toolCalls: parsed.toolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, Date.now() - requestStartedAt, parsed.usage), usedAccountId });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       const existing = responses.value[panelId];
-      if (existing) setResponse(panelId, { ...existing, isLoading: false, error: undefined });
+      if (existing && requestIds.get(panelId) === requestId) setResponse(panelId, { ...existing, isLoading: false, error: undefined });
       return;
     }
 
-    setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: error instanceof Error ? error.message : "Unknown error", metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
+    setResponseIfCurrent(panelId, requestId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: error instanceof Error ? error.message : "Unknown error", metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
   } finally {
-    controllers.delete(panelId);
+    if (requestIds.get(panelId) === requestId) {
+      controllers.delete(panelId);
+      requestIds.delete(panelId);
+    }
     if (shouldRefreshAccountSummary) refreshAccountSummary();
   }
 }
 
 async function runSelectedScenario(requestedLoopCount = 1) {
-  if (!selectedScenario.value || isAnyLoading.value || !canRunPlayground.value) return;
+  if (!selectedScenario.value || !canRunPlayground.value) return;
   let currentSettings = { ...settings };
   if (selectedScenario.value.isReasoning && currentSettings.reasoningEffort === "none") {
     settings.reasoningEffort = "medium";
@@ -1048,39 +1063,49 @@ async function runSelectedScenario(requestedLoopCount = 1) {
   if (panelsWithModels.length === 0) return;
 
   const totalLoops = Math.max(1, Math.floor(requestedLoopCount));
-  isAnyLoading.value = true;
   activeLoopProgress.value = totalLoops > 1 ? { current: 1, total: totalLoops } : null;
+  stoppedBatchPanelIds.clear();
+  isBatchRunActive.value = true;
 
   try {
     for (let iteration = 0; iteration < totalLoops; iteration += 1) {
+      if (!isBatchRunActive.value) break;
       activeLoopProgress.value = totalLoops > 1 ? { current: iteration + 1, total: totalLoops } : null;
-      responses.value = Object.fromEntries(panelsWithModels.map((panel) => [panel.id, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: buildResponseMetrics(null, null, null), startedAt: Date.now() }]));
-      await Promise.all(panelsWithModels.map((panel) => fetchFromModel(panel.id, panel.modelId, selectedScenario.value, currentSettings, getValidAccountIdForPanel(panel))));
-      if (!isAnyLoading.value) break;
+      await Promise.all(panelsWithModels
+        .filter((panel) => !stoppedBatchPanelIds.has(panel.id))
+        .map((panel) => fetchFromModel(panel.id, panel.modelId, selectedScenario.value, currentSettings, getValidAccountIdForPanel(panel))));
+      if (panelsWithModels.every((panel) => stoppedBatchPanelIds.has(panel.id))) break;
     }
   } finally {
     activeLoopProgress.value = null;
-    isAnyLoading.value = false;
+    stoppedBatchPanelIds.clear();
+    isBatchRunActive.value = false;
   }
 }
 
+function stopPanelRequest(panelId: string) {
+  controllers.get(panelId)?.abort();
+  controllers.delete(panelId);
+  requestIds.delete(panelId);
+  stoppedBatchPanelIds.add(panelId);
+
+  const response = responses.value[panelId];
+  if (response?.isLoading) setResponse(panelId, { ...response, isLoading: false, error: undefined });
+}
+
 function stopAllRequests() {
-  controllers.forEach((controller) => controller.abort());
-  controllers.clear();
+  for (const panelId of Array.from(controllers.keys())) {
+    stopPanelRequest(panelId);
+  }
+  isBatchRunActive.value = false;
   activeLoopProgress.value = null;
-  isAnyLoading.value = false;
-  responses.value = Object.fromEntries(Object.entries(responses.value).map(([panelId, response]) => [panelId, response.isLoading ? { ...response, isLoading: false } : response]));
 }
 
 async function retryPanel(panelId: string) {
   const panel = panels.value.find((item) => item.id === panelId);
   if (!panel?.modelId || !selectedScenario.value || !canRunPlayground.value) return;
-  isAnyLoading.value = true;
-  try {
-    await fetchFromModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, getValidAccountIdForPanel(panel));
-  } finally {
-    isAnyLoading.value = false;
-  }
+  if (isBatchRunActive.value) stoppedBatchPanelIds.add(panelId);
+  await fetchFromModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, getValidAccountIdForPanel(panel));
 }
 
 function handleStartPointerDown(event: PointerEvent) {
@@ -1260,13 +1285,13 @@ function formatToolArguments(value: string): string {
               <UiIcon name="i-lucide-square" class="size-3.5" />
               <span v-if="activeLoopBadgeLabel" class="absolute -right-3 -top-2 rounded-full bg-primary px-1 py-0.5 text-[9px] font-semibold leading-none text-primary-foreground">{{ activeLoopBadgeLabel }}</span>
             </span>
-            Stop
+            Stop all
           </UiButton>
-          <UiButton v-else type="button" variant="outline" size="sm" :disabled="!canRunPlayground" @click="handleStartClick" @pointerdown="handleStartPointerDown" @pointerup="handleStartPointerEnd" @pointerleave="handleStartPointerEnd" @pointercancel="handleStartPointerEnd">
+          <UiButton type="button" variant="outline" size="sm" :disabled="!canRunPlayground" @click="handleStartClick" @pointerdown="handleStartPointerDown" @pointerup="handleStartPointerEnd" @pointerleave="handleStartPointerEnd" @pointercancel="handleStartPointerEnd">
             <UiIcon name="i-lucide-play" class="size-4" />
             Start
           </UiButton>
-          <UiButton type="button" variant="outline" size="icon" :disabled="isAnyLoading" @click="settingsOpen = true">
+          <UiButton type="button" variant="outline" size="icon" @click="settingsOpen = true">
             <UiIcon name="i-lucide-settings" class="size-4" />
             <span class="sr-only">Settings</span>
           </UiButton>
@@ -1345,13 +1370,13 @@ function formatToolArguments(value: string): string {
 
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
-          <UiButton v-if="panels.length > 1" variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" :disabled="isAnyLoading || responses[panel.id]?.isLoading" title="Remove card" @click="removePanel(panel.id)">
+          <UiButton v-if="panels.length > 1" variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" title="Remove card" @click="removePanel(panel.id)">
             <UiIcon name="i-lucide-x" class="size-3.5" />
           </UiButton>
 
           <UiCardHeader class="flex-none gap-0 border-b py-2 pl-3 pr-11">
             <UiPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
-              <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between px-2 font-normal" :disabled="isAnyLoading || responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
+              <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between px-2 font-normal" :disabled="responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
                 <span v-if="panel.modelId && modelsById.get(panel.modelId)" class="flex min-w-0 items-center gap-2">
                   <span class="truncate">{{ modelsById.get(panel.modelId)?.name }}</span>
                   <UiBadge variant="secondary" class="shrink-0 whitespace-nowrap px-1.5 py-0 text-[10px]">
@@ -1458,7 +1483,7 @@ function formatToolArguments(value: string): string {
                     <p class="text-sm text-destructive/90">{{ responses[panel.id]?.error }}</p>
                   </div>
                 </div>
-                <UiButton v-if="panel.modelId" type="button" variant="outline" size="sm" class="w-full gap-1.5" :disabled="isAnyLoading || responses[panel.id]?.isLoading" @click="retryPanel(panel.id)">
+                <UiButton v-if="panel.modelId" type="button" variant="outline" size="sm" class="w-full gap-1.5" :disabled="responses[panel.id]?.isLoading" @click="retryPanel(panel.id)">
                   <UiIcon name="i-lucide-rotate-cw" class="size-3.5" />
                   Retry
                 </UiButton>
@@ -1509,10 +1534,16 @@ function formatToolArguments(value: string): string {
                 <span class="text-muted-foreground">Wait</span>
                 <div class="flex items-center gap-2">
                   <span class="font-medium tabular-nums">{{ getPanelWaitLabel(panel.id) }}</span>
-                  <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" :disabled="isAnyLoading" title="Run panel" @click="retryPanel(panel.id)">
+                  <UiButton v-if="panel.modelId && responses[panel.id]?.isLoading" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Stop panel" @click="stopPanelRequest(panel.id)">
+                    <UiIcon name="i-lucide-square" class="size-3" />
+                  </UiButton>
+                  <UiButton v-if="panel.modelId && responses[panel.id]?.isLoading" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Restart panel" @click="retryPanel(panel.id)">
+                    <UiIcon name="i-lucide-rotate-cw" class="size-3" />
+                  </UiButton>
+                  <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Run panel" @click="retryPanel(panel.id)">
                     <UiIcon name="i-lucide-play" class="size-3 fill-current" />
                   </UiButton>
-                  <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.error)" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" :disabled="isAnyLoading" title="Retry" @click="retryPanel(panel.id)">
+                  <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.error)" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Retry" @click="retryPanel(panel.id)">
                     <UiIcon name="i-lucide-rotate-cw" class="size-3" />
                   </UiButton>
                 </div>
@@ -1534,7 +1565,7 @@ function formatToolArguments(value: string): string {
         </UiCard>
 
         <UiCard v-if="canAddPanel" class="group h-[400px] overflow-hidden border-2 border-dashed border-border/80 bg-background p-0 transition-colors hover:border-muted-foreground/45">
-          <button type="button" class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-50" :disabled="isAnyLoading" aria-label="Add comparison card" @click="addPanel">
+          <button type="button" class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Add comparison card" @click="addPanel">
             <span class="inline-flex size-10 items-center justify-center rounded-full border border-muted-foreground/30 transition-colors group-hover:border-muted-foreground/45">
               <UiIcon name="i-lucide-plus" class="size-4 transition-colors group-hover:text-foreground/80" />
             </span>
