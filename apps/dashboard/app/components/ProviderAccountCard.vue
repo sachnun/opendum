@@ -4,6 +4,13 @@ import type { AccountQuotaInfo, ErrorHistoryResult, ProviderDetailData, QuotaGro
 
 type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
+type ErrorPreviewEntry = {
+  id: string;
+  errorCode: number | null;
+  errorMessage: string;
+  createdAt: string | Date | null;
+  isCurrent: boolean;
+};
 
 type TemporaryOffUnit = "minutes" | "hours" | "days";
 
@@ -30,6 +37,7 @@ type ErrorStatusTag = {
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
+const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
   { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },
   { value: "hours", label: "Hours", multiplier: 60 * 60 * 1000 },
@@ -169,14 +177,16 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
-const copiedHistoryEntryId = ref<string | null>(null);
 const isHistoryLoading = ref(false);
 const historyError = ref<string | null>(null);
 const historyEntries = ref<ErrorHistoryEntry[] | null>(null);
+const activeErrorIndex = ref(0);
 const cardRoot = ref<HTMLElement | null>(null);
 let historyRequestId = 0;
 let temporaryOffLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 let suppressNextToggle = false;
+let errorPreviewDragStartX: number | null = null;
+let suppressNextErrorPreviewClick = false;
 
 watch(
   () => props.account.name,
@@ -184,24 +194,6 @@ watch(
     editName.value = value;
   }
 );
-
-watch(
-  () => props.account.id,
-  () => {
-    historyRequestId += 1;
-    historyEntries.value = null;
-    historyError.value = null;
-    isHistoryLoading.value = false;
-  }
-);
-
-watch(errorDialogOpen, (open) => {
-  if (!open || historyEntries.value !== null) return;
-
-  isHistoryLoading.value = true;
-  historyError.value = null;
-  loadErrorHistory();
-});
 
 watch(temporaryOffDialogOpen, (open) => {
   if (!open) return;
@@ -434,10 +426,63 @@ const errorToneClass = computed(() => {
 });
 const errorPreviewToneClass = computed(() => errorToneClass.value === "text-foreground" ? "text-foreground/80" : errorToneClass.value);
 const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
-const displayErrorMessage = computed(() => stripStatusFromErrorMessage(currentErrorMessage.value, props.account.lastErrorCode));
-const errorPreview = computed(() => (displayErrorMessage.value.length > 150 ? `${displayErrorMessage.value.slice(0, 150)}...` : displayErrorMessage.value));
-const errorDetails = computed(() => (currentErrorMessage.value ? parseStoredErrorMessage(currentErrorMessage.value, props.account.lastErrorCode) : null));
-const errorStatusTag = computed<ErrorStatusTag | null>(() => getErrorStatusTag(props.account.lastErrorCode));
+const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
+  if (!currentErrorMessage.value) return [];
+
+  const currentErrorAtMs = props.account.lastErrorAt ? new Date(props.account.lastErrorAt).getTime() : null;
+  const history = (historyEntries.value ?? []).filter((entry) => {
+    const isSameError = entry.errorCode === props.account.lastErrorCode && entry.errorMessage === currentErrorMessage.value;
+    if (!isSameError) return true;
+    if (!currentErrorAtMs) return false;
+
+    const entryCreatedAtMs = new Date(entry.createdAt).getTime();
+    return Number.isNaN(entryCreatedAtMs) || Math.abs(entryCreatedAtMs - currentErrorAtMs) > 1000;
+  });
+
+  return [
+    {
+      id: "current",
+      errorCode: props.account.lastErrorCode,
+      errorMessage: currentErrorMessage.value,
+      createdAt: props.account.lastErrorAt,
+      isCurrent: true,
+    },
+    ...history.map((entry) => ({
+      id: entry.id,
+      errorCode: entry.errorCode,
+      errorMessage: entry.errorMessage,
+      createdAt: entry.createdAt,
+      isCurrent: false,
+    })),
+  ];
+});
+const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => errorPreviewEntries.value[activeErrorIndex.value] ?? errorPreviewEntries.value[0] ?? null);
+const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatusFromErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
+const errorDetails = computed(() => activeErrorEntry.value ? parseStoredErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : null);
+const visibleStackedErrorEntries = computed(() => errorPreviewEntries.value.slice(activeErrorIndex.value, activeErrorIndex.value + 3));
+const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < errorPreviewEntries.value.length - 1);
+const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
+
+watch(
+  () => [props.account.id, props.account.lastErrorMessage, props.account.lastErrorAt, props.account.lastErrorCode] as const,
+  ([, message]) => {
+    activeErrorIndex.value = 0;
+    historyRequestId += 1;
+    historyEntries.value = null;
+    historyError.value = null;
+    isHistoryLoading.value = false;
+
+    if (!message) return;
+    isHistoryLoading.value = true;
+    loadErrorHistory();
+  },
+  { immediate: true }
+);
+
+watch(errorPreviewEntries, (entries) => {
+  if (activeErrorIndex.value >= entries.length) activeErrorIndex.value = Math.max(0, entries.length - 1);
+});
+
 function quotaPercentRemaining(group: QuotaGroupDisplay): number {
   return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
 }
@@ -590,6 +635,11 @@ async function resolveErrors() {
     const result = await dashboardApi.accounts.resolveErrors({ accountId: props.account.id });
     if (!result.success) throw new Error(result.error);
     errorDialogOpen.value = false;
+    activeErrorIndex.value = 0;
+    historyRequestId += 1;
+    historyEntries.value = null;
+    historyError.value = null;
+    isHistoryLoading.value = false;
     emit("changed");
   } finally {
     resolvingErrors.value = false;
@@ -600,7 +650,7 @@ async function loadErrorHistory() {
   const requestId = ++historyRequestId;
 
   try {
-    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id });
+    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id, limit: 20 });
     if (requestId !== historyRequestId) return;
 
     if (!result.success) {
@@ -638,13 +688,13 @@ async function copyErrorPreview(event: Event) {
   event.stopPropagation();
   event.preventDefault();
 
-  if (!(await copyToClipboard(currentErrorMessage.value))) return;
+  if (!activeErrorEntry.value || !(await copyToClipboard(activeErrorEntry.value.errorMessage))) return;
   copiedErrorPreview.value = true;
   resetFlag(copiedErrorPreview);
 }
 
 async function copyErrorDetails() {
-  if (!(await copyToClipboard(currentErrorMessage.value))) return;
+  if (!activeErrorEntry.value || !(await copyToClipboard(activeErrorEntry.value.errorMessage))) return;
   copiedErrorDetails.value = true;
   resetFlag(copiedErrorDetails);
 }
@@ -663,31 +713,68 @@ async function copyAllErrors() {
   resetFlag(copiedAllErrors);
 }
 
-async function copyHistoryError(entry: ErrorHistoryEntry, event: Event) {
-  event.stopPropagation();
-
-  if (!(await copyToClipboard(entry.errorMessage))) return;
-  copiedHistoryEntryId.value = entry.id;
-  setTimeout(() => {
-    if (copiedHistoryEntryId.value === entry.id) copiedHistoryEntryId.value = null;
-  }, 1500);
-}
-
-function historyEntryRelativeTime(entry: ErrorHistoryEntry): string {
+function getErrorEntryRelativeTime(entry: ErrorPreviewEntry): string {
+  if (!entry.createdAt) return entry.isCurrent ? "Current" : "Unknown time";
   const createdAt = new Date(entry.createdAt);
   return Number.isNaN(createdAt.getTime()) ? "Unknown time" : formatRelativeTime(createdAt);
 }
 
-function historyEntryPreview(errorMessage: string): string {
-  return errorMessage.length > 120 ? `${errorMessage.slice(0, 120)}...` : errorMessage;
+function getErrorEntryPreview(entry: ErrorPreviewEntry, maxLength = 150): string {
+  const message = stripStatusFromErrorMessage(entry.errorMessage, entry.errorCode);
+  return message.length > maxLength ? `${message.slice(0, maxLength)}...` : message;
 }
 
-function historyEntryDisplayMessage(entry: ErrorHistoryEntry): string {
-  return stripStatusFromErrorMessage(entry.errorMessage, entry.errorCode);
-}
-
-function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null {
+function getErrorEntryStatusTag(entry: ErrorPreviewEntry): ErrorStatusTag | null {
   return getErrorStatusTag(entry.errorCode);
+}
+
+function getStackedErrorEntryStyle(index: number): Record<string, string> {
+  return {
+    transform: `translateX(${index * 9}px) translateY(${index * 7}px) scale(${1 - index * 0.035})`,
+    zIndex: `${30 - index}`,
+    opacity: `${1 - index * 0.18}`,
+  };
+}
+
+function showNewerErrorPreview(event?: Event) {
+  event?.stopPropagation();
+  activeErrorIndex.value = Math.max(0, activeErrorIndex.value - 1);
+}
+
+function showPreviousErrorPreview(event?: Event) {
+  event?.stopPropagation();
+  activeErrorIndex.value = Math.min(errorPreviewEntries.value.length - 1, activeErrorIndex.value + 1);
+}
+
+function openActiveErrorDialog() {
+  if (suppressNextErrorPreviewClick) {
+    suppressNextErrorPreviewClick = false;
+    return;
+  }
+
+  errorDialogOpen.value = true;
+}
+
+function handleErrorPreviewPointerDown(event: PointerEvent) {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  errorPreviewDragStartX = event.clientX;
+}
+
+function handleErrorPreviewPointerEnd(event: PointerEvent) {
+  if (errorPreviewDragStartX === null) return;
+
+  const deltaX = event.clientX - errorPreviewDragStartX;
+  errorPreviewDragStartX = null;
+
+  if (Math.abs(deltaX) < ERROR_PREVIEW_SWIPE_THRESHOLD_PX) return;
+
+  suppressNextErrorPreviewClick = true;
+  if (deltaX > 0) showPreviousErrorPreview(event);
+  else showNewerErrorPreview(event);
+}
+
+function cancelErrorPreviewPointer() {
+  errorPreviewDragStartX = null;
 }
 </script>
 
@@ -753,29 +840,78 @@ function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null 
           <div class="flex justify-between"><span class="text-muted-foreground">Last Error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
 
           <div class="min-h-14 border-t">
-            <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[7rem] cursor-pointer rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
-              <div class="flex items-center justify-between gap-1">
-                <span v-if="errorStatusTag" class="flex min-w-0 items-center gap-1.5">
-                  <UiBadge variant="outline" class="h-5 shrink-0 px-1.5 py-0 text-[10px] font-medium">{{ errorStatusTag.code }}</UiBadge>
-                  <span class="truncate text-xs text-muted-foreground">{{ errorStatusTag.label }}</span>
-                </span>
-                <span v-else class="text-xs text-muted-foreground">No status code</span>
-                <button
-                  type="button"
-                  class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
-                  aria-label="Copy last error message"
-                  title="Copy last error message"
-                  @click="copyErrorPreview"
+            <div v-if="account.lastErrorMessage" class="space-y-1.5 pt-2">
+              <div class="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                <span>{{ activeErrorEntry?.isCurrent ? 'Current error' : 'Previous error' }}</span>
+                <span class="font-mono">{{ activeErrorIndex + 1 }} / {{ errorPreviewEntries.length || 1 }}</span>
+              </div>
+
+              <div class="relative min-h-[7.6rem] pr-4 pb-3">
+                <div
+                  v-for="(entry, stackIndex) in visibleStackedErrorEntries"
+                  :key="entry.id"
+                  :aria-hidden="stackIndex !== 0"
+                  tabindex="-1"
+                  :class="[
+                    'absolute inset-x-0 top-0 min-h-[7rem] rounded-sm border border-border/60 bg-background px-2 pt-2 pb-2 text-left shadow-sm transition-[transform,opacity,background-color,border-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    stackIndex === 0 ? 'cursor-pointer bg-muted/30 hover:bg-muted/40' : 'pointer-events-none bg-muted/20',
+                  ]"
+                  :style="getStackedErrorEntryStyle(stackIndex)"
+                  @click="stackIndex === 0 && openActiveErrorDialog()"
+                  @pointerdown="stackIndex === 0 && handleErrorPreviewPointerDown($event)"
+                  @pointerup="stackIndex === 0 && handleErrorPreviewPointerEnd($event)"
+                  @pointerleave="stackIndex === 0 && cancelErrorPreviewPointer()"
+                  @pointercancel="stackIndex === 0 && cancelErrorPreviewPointer()"
                 >
-                  <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-green-600" />
-                  <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
-                </button>
+                  <div class="flex items-center justify-between gap-1">
+                    <span v-if="getErrorEntryStatusTag(entry)" class="flex min-w-0 items-center gap-1.5">
+                      <UiBadge variant="outline" class="h-5 shrink-0 px-1.5 py-0 text-[10px] font-medium">{{ getErrorEntryStatusTag(entry)?.code }}</UiBadge>
+                      <span class="truncate text-xs text-muted-foreground">{{ getErrorEntryStatusTag(entry)?.label }}</span>
+                    </span>
+                    <span v-else class="text-xs text-muted-foreground">No status code</span>
+                    <button
+                      v-if="stackIndex === 0"
+                      type="button"
+                      class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
+                      :aria-label="entry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
+                      title="Copy error message"
+                      @click="copyErrorPreview"
+                    >
+                      <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-green-600" />
+                      <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <div class="mt-1 flex min-h-16 items-center">
+                    <span :class="['line-clamp-4 break-all text-xs', stackIndex === 0 ? errorPreviewToneClass : 'text-muted-foreground']">{{ getErrorEntryPreview(entry) }}</span>
+                  </div>
+                  <div class="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/80">
+                    <span>{{ getErrorEntryRelativeTime(entry) }}</span>
+                    <span v-if="stackIndex === 0">Click for details</span>
+                  </div>
+                </div>
               </div>
-              <div class="mt-1 flex min-h-16 items-center">
-                <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ errorPreview }}</span>
+
+              <div class="flex items-center justify-between gap-2">
+                <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasNewerErrorPreview" aria-label="Show newer error" title="Slide left to newer error" @click="showNewerErrorPreview">
+                  <UiIcon name="i-lucide-chevron-left" class="size-3.5" />
+                </UiButton>
+                <div class="flex min-w-0 flex-1 items-center justify-center gap-1">
+                  <span v-if="isHistoryLoading" class="truncate text-[10px] text-muted-foreground">Loading history...</span>
+                  <span v-else-if="historyError" class="truncate text-[10px] text-red-500">{{ historyError }}</span>
+                  <template v-else>
+                    <span
+                      v-for="(_, index) in errorPreviewEntries.slice(0, 8)"
+                      :key="index"
+                      :class="['h-1.5 rounded-full transition-all', index === activeErrorIndex ? 'w-4 bg-foreground/70' : 'w-1.5 bg-muted-foreground/35']"
+                    />
+                    <span v-if="errorPreviewEntries.length > 8" class="text-[10px] text-muted-foreground">+{{ errorPreviewEntries.length - 8 }}</span>
+                  </template>
+                </div>
+                <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasPreviousErrorPreview" aria-label="Show previous error" title="Slide right to previous error" @click="showPreviousErrorPreview">
+                  <UiIcon name="i-lucide-chevron-right" class="size-3.5" />
+                </UiButton>
               </div>
-              <span class="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
-            </button>
+            </div>
             <div v-else class="flex min-h-[7rem] w-full items-center justify-center rounded-sm border border-border/60 bg-muted/20 px-2 text-center text-xs text-muted-foreground">
               No data
             </div>
@@ -960,35 +1096,9 @@ function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null 
             {{ displayErrorMessage }}
           </p>
 
-          <div class="border-t pt-3">
-            <p class="mb-2 text-xs text-muted-foreground">Recent Error History (up to 200)</p>
-
-            <p v-if="isHistoryLoading" class="text-xs text-muted-foreground">Loading error history...</p>
-
-            <p v-else-if="historyError" class="text-xs text-red-500">{{ historyError }}</p>
-
-            <div v-else-if="historyEntries && historyEntries.length > 0" class="space-y-2">
-              <details v-for="entry in historyEntries" :key="entry.id" class="rounded-md border bg-background/70 p-2">
-                <summary class="cursor-pointer break-words text-xs text-foreground">
-                  <span class="font-medium">{{ historyEntryRelativeTime(entry) }}</span>
-                  <span class="mx-1 text-muted-foreground">-</span>
-                  <span v-if="historyEntryStatusTag(entry)" class="inline-flex items-center gap-1.5 align-middle">
-                    <UiBadge variant="outline" class="h-5 px-1.5 py-0 text-[10px] font-medium">{{ historyEntryStatusTag(entry)?.code }}</UiBadge>
-                    <span class="text-muted-foreground">{{ historyEntryStatusTag(entry)?.label }}</span>
-                  </span>
-                  <span class="mx-1 text-muted-foreground">-</span>
-                  <span class="text-muted-foreground">{{ historyEntryPreview(historyEntryDisplayMessage(entry)) }}</span>
-                </summary>
-                <div class="mt-2 flex items-start gap-2">
-                  <p class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-foreground">{{ historyEntryDisplayMessage(entry) }}</p>
-                  <UiButton type="button" variant="ghost" size="icon-sm" class="shrink-0" aria-label="Copy error message" title="Copy error message" @click="copyHistoryError(entry, $event)">
-                    <UiIcon :name="copiedHistoryEntryId === entry.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
-                  </UiButton>
-                </div>
-              </details>
-            </div>
-
-            <p v-else-if="historyEntries && historyEntries.length === 0" class="text-xs text-muted-foreground">No stored error history yet.</p>
+          <div class="flex items-center justify-between gap-2 border-t pt-3 text-xs text-muted-foreground">
+            <span>{{ activeErrorEntry?.isCurrent ? 'Showing current error' : `Showing previous error from ${activeErrorEntry ? getErrorEntryRelativeTime(activeErrorEntry) : 'history'}` }}</span>
+            <span class="font-mono">{{ activeErrorIndex + 1 }} / {{ errorPreviewEntries.length || 1 }}</span>
           </div>
         </div>
       </template>
