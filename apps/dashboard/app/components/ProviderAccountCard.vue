@@ -658,7 +658,7 @@ function historyEntryPreview(errorMessage: string): string {
           <div class="flex justify-between"><span class="text-muted-foreground">Last Error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
 
           <div class="min-h-14 border-t">
-            <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[7rem] cursor-pointer rounded-sm pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
+            <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[7rem] cursor-pointer rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
               <div class="flex items-center justify-between gap-1">
                 <span class="text-xs text-muted-foreground">Last Error Message:</span>
                 <button
@@ -677,7 +677,7 @@ function historyEntryPreview(errorMessage: string): string {
               </div>
               <span class="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </button>
-            <div v-else class="w-full min-h-[7rem] rounded-sm pt-2 text-left">
+            <div v-else class="w-full min-h-[7rem] rounded-sm border border-border/60 bg-muted/20 px-2 pt-2 pb-2 text-left">
               <div class="flex items-center justify-between gap-1">
                 <span class="text-xs text-muted-foreground">Last Error Message:</span>
               </div>
@@ -831,8 +831,8 @@ function historyEntryPreview(errorMessage: string): string {
           </div>
         </div>
 
-        <div class="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/20 p-3">
-          <div v-if="errorDetails && (errorDetails.provider || errorDetails.endpoint || errorDetails.model)" class="rounded-md border bg-background/70 p-2">
+        <div class="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/30 p-3">
+          <div v-if="errorDetails && (errorDetails.provider || errorDetails.endpoint || errorDetails.model)" class="rounded-md border bg-muted/30 p-2">
             <p v-if="errorDetails.provider" class="text-xs">
               <span class="text-muted-foreground">Provider:</span>
               <span class="font-mono">{{ errorDetails.provider }}</span>
@@ -874,7 +874,7 @@ function historyEntryPreview(errorMessage: string): string {
             <p v-else-if="historyError" class="text-xs text-red-500">{{ historyError }}</p>
 
             <div v-else-if="historyEntries && historyEntries.length > 0" class="space-y-2">
-              <details v-for="entry in historyEntries" :key="entry.id" class="rounded-md border bg-background/70 p-2">
+              <details v-for="entry in historyEntries" :key="entry.id" class="rounded-md border bg-muted/30 p-2">
                 <summary class="cursor-pointer break-words text-xs text-foreground">
                   <span class="font-medium">{{ historyEntryRelativeTime(entry) }}</span>
                   <span class="mx-1 text-muted-foreground">-</span>
