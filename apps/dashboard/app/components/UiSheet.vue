@@ -28,6 +28,10 @@ const sideClasses: Record<SheetSide, string> = {
   bottom: "inset-x-0 bottom-0 h-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
   left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
 };
+
+function handleOpenAutoFocus(event: Event) {
+  event.preventDefault();
+}
 </script>
 
 <template>
@@ -45,6 +49,7 @@ const sideClasses: Record<SheetSide, string> = {
           sideClasses[side],
           props.ui.content,
         )"
+        @open-auto-focus="handleOpenAutoFocus"
       >
         <slot name="content">
           <slot />

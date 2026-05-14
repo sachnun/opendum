@@ -578,7 +578,6 @@ onBeforeUnmount(() => {
               type="text"
               :placeholder="callbackPlaceholder(provider)"
               :disabled="isLoading"
-              autofocus
               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
             >
             <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
@@ -622,7 +621,6 @@ onBeforeUnmount(() => {
                 data-1p-ignore="true"
                 :placeholder="selectedConfig.apiKeyPlaceholder"
                 :disabled="isLoading"
-                autofocus
                 :class="cn(
                   'h-9 w-full rounded-md border border-input bg-background px-3 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50',
                   isApiKeyVisible ? '' : '[text-security:disc] [-webkit-text-security:disc]',

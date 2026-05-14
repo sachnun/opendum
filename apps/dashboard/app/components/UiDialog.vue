@@ -32,6 +32,10 @@ function handleInteractOutside(event: Event) {
 function handleEscapeKeyDown(event: Event) {
   if (props.preventEscapeClose) event.preventDefault();
 }
+
+function handleOpenAutoFocus(event: Event) {
+  event.preventDefault();
+}
 </script>
 
 <template>
@@ -48,6 +52,7 @@ function handleEscapeKeyDown(event: Event) {
           'fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-hidden rounded-lg border border-border bg-background p-6 text-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg',
           props.ui.content,
         )"
+        @open-auto-focus="handleOpenAutoFocus"
         @interact-outside="handleInteractOutside"
         @escape-key-down="handleEscapeKeyDown"
       >

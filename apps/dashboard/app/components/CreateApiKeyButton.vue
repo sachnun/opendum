@@ -115,7 +115,6 @@ function closeDialog() {
               v-model="name"
               type="text"
               :disabled="isCreating"
-              autofocus
               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
               placeholder="My API Key"
             >
