@@ -412,19 +412,17 @@ const temporaryOffPreview = computed(() => {
   if (!until) return "Select a valid future duration.";
   return `${formatRelativeTime(until)} (${formatDateTime(until)})`;
 });
-const hasSuccessAfterLastError = computed(() => {
-  if (!props.account.lastErrorAt) return false;
-  const errorMs = new Date(props.account.lastErrorAt).getTime();
+function getErrorToneClass(errorAt: string | Date | null | undefined): string {
+  if (!errorAt) return "text-muted-foreground";
+
+  const errorMs = new Date(errorAt).getTime();
   const recoveredMs = Math.max(new Date(props.account.lastSuccessAt ?? 0).getTime() || 0, new Date(props.account.lastRecoveredByRotationAt ?? 0).getTime() || 0, new Date(props.account.lastUsedAt ?? 0).getTime() || 0);
-  return recoveredMs > errorMs;
-});
-const errorToneClass = computed(() => {
-  if (!props.account.lastErrorAt) return "text-muted-foreground";
-  const errorMs = new Date(props.account.lastErrorAt).getTime();
-  if (hasSuccessAfterLastError.value && Date.now() - errorMs > 3 * 60 * 60 * 1000) return "text-foreground";
-  return hasSuccessAfterLastError.value ? "text-amber-400" : "text-red-500";
-});
-const errorPreviewToneClass = computed(() => errorToneClass.value === "text-foreground" ? "text-foreground/80" : errorToneClass.value);
+  const hasRecoveredAfterError = recoveredMs > errorMs;
+  if (hasRecoveredAfterError && Date.now() - errorMs > 3 * 60 * 60 * 1000) return "text-foreground";
+  return hasRecoveredAfterError ? "text-amber-400" : "text-red-500";
+}
+
+const errorToneClass = computed(() => getErrorToneClass(props.account.lastErrorAt));
 const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
 const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   if (!currentErrorMessage.value) return [];
@@ -457,6 +455,10 @@ const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   ].slice(0, 8);
 });
 const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => errorPreviewEntries.value[activeErrorIndex.value] ?? errorPreviewEntries.value[0] ?? null);
+const errorPreviewToneClass = computed(() => {
+  const toneClass = getErrorToneClass(activeErrorEntry.value?.createdAt);
+  return toneClass === "text-foreground" ? "text-foreground/80" : toneClass;
+});
 const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatusFromErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
 const errorDetails = computed(() => activeErrorEntry.value ? parseStoredErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : null);
 const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < errorPreviewEntries.value.length - 1);
