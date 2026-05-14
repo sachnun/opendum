@@ -23,6 +23,11 @@ type ParsedErrorDetails = {
   messageObjects: string[] | null;
 };
 
+type ErrorStatusTag = {
+  code: number;
+  label: string;
+};
+
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
@@ -30,6 +35,70 @@ const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multi
   { value: "hours", label: "Hours", multiplier: 60 * 60 * 1000 },
   { value: "days", label: "Days", multiplier: 24 * 60 * 60 * 1000 },
 ];
+const HTTP_STATUS_DESCRIPTIONS: Record<number, string> = {
+  100: "Continue",
+  101: "Switching Protocols",
+  102: "Processing",
+  103: "Early Hints",
+  200: "OK",
+  201: "Created",
+  202: "Accepted",
+  203: "Non-Authoritative Information",
+  204: "No Content",
+  205: "Reset Content",
+  206: "Partial Content",
+  207: "Multi-Status",
+  208: "Already Reported",
+  226: "IM Used",
+  300: "Multiple Choices",
+  301: "Moved Permanently",
+  302: "Found",
+  303: "See Other",
+  304: "Not Modified",
+  305: "Use Proxy",
+  307: "Temporary Redirect",
+  308: "Permanent Redirect",
+  400: "Bad Request",
+  401: "Unauthorized",
+  402: "Payment Required",
+  403: "Forbidden",
+  404: "Not Found",
+  405: "Method Not Allowed",
+  406: "Not Acceptable",
+  407: "Proxy Authentication Required",
+  408: "Request Timeout",
+  409: "Conflict",
+  410: "Gone",
+  411: "Length Required",
+  412: "Precondition Failed",
+  413: "Content Too Large",
+  414: "URI Too Long",
+  415: "Unsupported Media Type",
+  416: "Range Not Satisfiable",
+  417: "Expectation Failed",
+  418: "I'm a Teapot",
+  421: "Misdirected Request",
+  422: "Unprocessable Content",
+  423: "Locked",
+  424: "Failed Dependency",
+  425: "Too Early",
+  426: "Upgrade Required",
+  428: "Precondition Required",
+  429: "Rate Limit",
+  431: "Request Header Fields Too Large",
+  451: "Unavailable For Legal Reasons",
+  500: "Internal Server Error",
+  501: "Not Implemented",
+  502: "Bad Gateway",
+  503: "Service Unavailable",
+  504: "Gateway Timeout",
+  505: "HTTP Version Not Supported",
+  506: "Variant Also Negotiates",
+  507: "Insufficient Storage",
+  508: "Loop Detected",
+  510: "Not Extended",
+  511: "Network Authentication Required",
+};
 const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
   antigravity: [
     { labelClass: "w-24", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
@@ -142,7 +211,7 @@ watch(temporaryOffDialogOpen, (open) => {
   temporaryOffError.value = "";
 });
 
-function parseStoredErrorMessage(rawMessage: string): ParsedErrorDetails {
+function parseStoredErrorMessage(rawMessage: string, code: number | null | undefined): ParsedErrorDetails {
   const sections: Record<"error" | "provider" | "endpoint" | "model" | "parameters" | "messages", string[]> = {
     error: [],
     provider: [],
@@ -208,7 +277,7 @@ function parseStoredErrorMessage(rawMessage: string): ParsedErrorDetails {
   })();
 
   return {
-    error: sections.error.join("\n").trim() || null,
+    error: stripStatusFromErrorMessage(sections.error.join("\n"), code) || null,
     provider: sections.provider.join("\n").trim() || null,
     endpoint: sections.endpoint.join("\n").trim() || null,
     model: sections.model.join("\n").trim() || null,
@@ -229,6 +298,24 @@ function formatRelativeTime(value: string | Date | number): string {
 
   const relative = formatDistanceToNowStrict(date, { addSuffix: true });
   return relative === "0 seconds ago" ? "just now" : relative;
+}
+
+function getHttpStatusDescription(code: number): string {
+  return HTTP_STATUS_DESCRIPTIONS[code] ?? "HTTP Error";
+}
+
+function getErrorStatusTag(code: number | null | undefined): ErrorStatusTag | null {
+  return code ? { code, label: getHttpStatusDescription(code) } : null;
+}
+
+function stripStatusFromErrorMessage(message: string, code: number | null | undefined): string {
+  const trimmed = message.trimStart();
+  if (!code) return trimmed;
+
+  return trimmed
+    .replace(new RegExp(`^\\[${code}\\]\\s*(?:error:\\s*)?`, "i"), "")
+    .replace(new RegExp(`^HTTP\\s+${code}\\s*[:\\-]?\\s*(?:error:\\s*)?`, "i"), "")
+    .trimStart();
 }
 
 function formatHourLabel(time: string): string {
@@ -346,12 +433,10 @@ const errorToneClass = computed(() => {
 });
 const errorPreviewToneClass = computed(() => errorToneClass.value === "text-foreground" ? "text-foreground/80" : errorToneClass.value);
 const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
-const errorPreview = computed(() => (currentErrorMessage.value.length > 150 ? `${currentErrorMessage.value.slice(0, 150)}...` : currentErrorMessage.value));
-const errorDetails = computed(() => (currentErrorMessage.value ? parseStoredErrorMessage(currentErrorMessage.value) : null));
-const errorDialogDescription = computed(() => {
-  return `${props.account.lastErrorCode ? `HTTP ${props.account.lastErrorCode}` : "No status code"}${props.account.lastErrorAt ? ` - ${formatRelativeTime(props.account.lastErrorAt)}` : ""}`;
-});
-
+const displayErrorMessage = computed(() => stripStatusFromErrorMessage(currentErrorMessage.value, props.account.lastErrorCode));
+const errorPreview = computed(() => (displayErrorMessage.value.length > 150 ? `${displayErrorMessage.value.slice(0, 150)}...` : displayErrorMessage.value));
+const errorDetails = computed(() => (currentErrorMessage.value ? parseStoredErrorMessage(currentErrorMessage.value, props.account.lastErrorCode) : null));
+const errorStatusTag = computed<ErrorStatusTag | null>(() => getErrorStatusTag(props.account.lastErrorCode));
 function quotaPercentRemaining(group: QuotaGroupDisplay): number {
   return Math.max(0, Math.min(100, Math.round(group.remainingFraction * 100)));
 }
@@ -595,6 +680,14 @@ function historyEntryRelativeTime(entry: ErrorHistoryEntry): string {
 function historyEntryPreview(errorMessage: string): string {
   return errorMessage.length > 120 ? `${errorMessage.slice(0, 120)}...` : errorMessage;
 }
+
+function historyEntryDisplayMessage(entry: ErrorHistoryEntry): string {
+  return stripStatusFromErrorMessage(entry.errorMessage, entry.errorCode);
+}
+
+function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null {
+  return getErrorStatusTag(entry.errorCode);
+}
 </script>
 
 <template>
@@ -661,7 +754,10 @@ function historyEntryPreview(errorMessage: string): string {
           <div class="min-h-14 border-t">
             <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[7rem] cursor-pointer rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
               <div class="flex items-center justify-between gap-1">
-                <span class="text-xs text-muted-foreground">Last Error Message:</span>
+                <UiBadge v-if="errorStatusTag" variant="outline" class="h-5 px-1.5 py-0 text-[10px] font-medium">
+                  ({{ errorStatusTag.code }}) {{ errorStatusTag.label }}
+                </UiBadge>
+                <span v-else class="text-xs text-muted-foreground">No status code</span>
                 <button
                   type="button"
                   class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
@@ -674,13 +770,13 @@ function historyEntryPreview(errorMessage: string): string {
                 </button>
               </div>
               <div class="mt-1 flex min-h-16 items-center">
-                <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ account.lastErrorCode ? `[${account.lastErrorCode}] ` : '' }}{{ errorPreview }}</span>
+                <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ errorPreview }}</span>
               </div>
               <span class="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </button>
             <div v-else class="w-full min-h-[7rem] rounded-sm border border-border/60 bg-muted/20 px-2 pt-2 pb-2 text-left">
               <div class="flex items-center justify-between gap-1">
-                <span class="text-xs text-muted-foreground">Last Error Message:</span>
+                <span class="invisible text-xs">No status code</span>
               </div>
               <div class="mt-3 flex min-h-16 items-center justify-center pt-2 text-center text-xs text-muted-foreground">No data</div>
               <span class="invisible mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
@@ -812,13 +908,9 @@ function historyEntryPreview(errorMessage: string): string {
       </template>
     </UiDialog>
 
-    <UiDialog v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-xl' }">
+    <UiDialog v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-xl pt-12', close: 'left-4 right-auto' }">
       <template #content>
-        <div class="flex items-start justify-between gap-3 pr-6">
-          <div>
-            <h2 class="text-lg font-semibold">Provider Error Details</h2>
-            <p class="text-sm text-muted-foreground">{{ errorDialogDescription }}</p>
-          </div>
+        <div class="flex justify-end">
           <div class="flex items-center gap-1">
             <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy all errors" title="Copy all errors (current + history)" @click="copyAllErrors">
               <UiIcon :name="copiedAllErrors ? 'i-lucide-check' : 'i-lucide-clipboard-list'" class="size-4" />
@@ -864,7 +956,7 @@ function historyEntryPreview(errorMessage: string): string {
           </div>
 
           <p v-if="errorDetails && !errorDetails.error && !errorDetails.parameters && (!errorDetails.messageObjects || errorDetails.messageObjects.length === 0)" class="whitespace-pre-wrap break-words font-mono text-xs text-foreground">
-            {{ currentErrorMessage }}
+            {{ displayErrorMessage }}
           </p>
 
           <div class="border-t pt-3">
@@ -879,12 +971,14 @@ function historyEntryPreview(errorMessage: string): string {
                 <summary class="cursor-pointer break-words text-xs text-foreground">
                   <span class="font-medium">{{ historyEntryRelativeTime(entry) }}</span>
                   <span class="mx-1 text-muted-foreground">-</span>
-                  <span class="font-mono text-[11px] text-muted-foreground">HTTP {{ entry.errorCode }}</span>
+                  <UiBadge v-if="historyEntryStatusTag(entry)" variant="outline" class="inline-flex h-5 px-1.5 py-0 text-[10px] font-medium">
+                    ({{ historyEntryStatusTag(entry)?.code }}) {{ historyEntryStatusTag(entry)?.label }}
+                  </UiBadge>
                   <span class="mx-1 text-muted-foreground">-</span>
-                  <span class="text-muted-foreground">{{ historyEntryPreview(entry.errorMessage) }}</span>
+                  <span class="text-muted-foreground">{{ historyEntryPreview(historyEntryDisplayMessage(entry)) }}</span>
                 </summary>
                 <div class="mt-2 flex items-start gap-2">
-                  <p class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-foreground">{{ entry.errorMessage }}</p>
+                  <p class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-foreground">{{ historyEntryDisplayMessage(entry) }}</p>
                   <UiButton type="button" variant="ghost" size="icon-sm" class="shrink-0" aria-label="Copy error message" title="Copy error message" @click="copyHistoryError(entry, $event)">
                     <UiIcon :name="copiedHistoryEntryId === entry.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
                   </UiButton>

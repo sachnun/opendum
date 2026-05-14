@@ -8,6 +8,7 @@ const props = withDefaults(
     ui?: {
       overlay?: string;
       content?: string;
+      close?: string;
     };
     preventOutsideClose?: boolean;
     preventEscapeClose?: boolean;
@@ -55,7 +56,10 @@ function handleEscapeKeyDown(event: Event) {
         </slot>
         <DialogClose
           v-if="showClose"
-          class="absolute right-4 top-4 cursor-pointer rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0"
+          :class="cn(
+            'absolute right-4 top-4 cursor-pointer rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
+            props.ui.close,
+          )"
         >
           <UiIcon name="i-lucide-x" class="size-4" />
           <span class="sr-only">Close</span>
