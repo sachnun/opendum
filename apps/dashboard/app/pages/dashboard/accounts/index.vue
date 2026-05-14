@@ -15,14 +15,14 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 const { data, error, refresh } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
 const summaryData = computed<AccountSummaryData | null>(() => data.value ?? null);
 const pinnedProviderSet = computed(() => new Set(summaryData.value!.pinnedProviders));
-const providerAccountCounts = computed(() => {
+const providerCounts = computed(() => {
   if (!summaryData.value) return null;
 
   return PROVIDER_ACCOUNT_DEFINITIONS.reduce(
     (counts, provider) => {
       const summary = summaryData.value!.summaries[provider.key];
-      counts.active += summary.active;
-      counts.connected += summary.connected;
+      if (summary.active > 0) counts.active += 1;
+      if (summary.connected > 0) counts.connected += 1;
       return counts;
     },
     { active: 0, connected: 0 }
@@ -60,8 +60,8 @@ function handleAccountConnected() {
       <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
           Provider Accounts
-          <UiBadge v-if="providerAccountCounts && providerAccountCounts.connected > 0" variant="outline" class="text-xs tabular-nums">
-            {{ providerAccountCounts.active }}/{{ providerAccountCounts.connected }}
+          <UiBadge v-if="providerCounts && providerCounts.connected > 0" variant="outline" class="text-xs tabular-nums">
+            {{ providerCounts.active }}/{{ providerCounts.connected }}
           </UiBadge>
         </h2>
         <div class="flex w-full items-center sm:w-auto">
