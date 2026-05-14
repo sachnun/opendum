@@ -16,7 +16,6 @@ const durationLabelPoints = computed(() => {
   const points = props.stats.durationLast24Hours;
   return [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
 });
-const maxDailyRequests = computed(() => Math.max(...dailyValues.value, 0));
 
 function formatDuration(duration: number | null): string {
   if (duration === null) return "-";
@@ -31,10 +30,6 @@ function formatHourLabel(time: string): string {
 
 <template>
   <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5">
-    <div class="flex items-center justify-end text-[11px] text-muted-foreground">
-      <span class="tabular-nums">{{ maxDailyRequests.toLocaleString() }} peak</span>
-    </div>
-
     <div class="grid grid-cols-3 gap-1.5">
       <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
         <p class="truncate text-[10px] text-muted-foreground">Requests</p>

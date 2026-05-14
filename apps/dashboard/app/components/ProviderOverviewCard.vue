@@ -35,7 +35,6 @@ function formatHourLabel(time: string): string {
 const dailyValues = computed(() => props.summary.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.summary.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
 const durationLabelPoints = computed(() => [props.summary.stats.durationLast24Hours[0], props.summary.stats.durationLast24Hours[Math.floor(props.summary.stats.durationLast24Hours.length / 2)], props.summary.stats.durationLast24Hours[props.summary.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
-const peakRequests = computed(() => Math.max(...dailyValues.value, 0));
 const badge = computed(() => indicatorBadge(props.summary.indicator, props.summary.connected));
 function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
   emit("toggled", providerKey, pinned);
@@ -57,9 +56,6 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
 
     <UiCardContent class="pointer-events-none relative z-20 p-0">
       <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
-        <div class="flex items-center justify-end text-[11px] text-muted-foreground">
-          <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
-        </div>
         <div class="grid grid-cols-3 gap-1.5">
           <div><p class="truncate text-[10px] text-muted-foreground">Requests</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.totalRequests.toLocaleString() }}</p></div>
           <div><p class="truncate text-[10px] text-muted-foreground">Success</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.successRate === null ? '-' : `${summary.stats.successRate}%` }}</p></div>

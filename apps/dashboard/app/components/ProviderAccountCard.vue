@@ -304,7 +304,6 @@ const subtitleDisplay = computed(() => (subtitle.value ? (isSubtitleVisible.valu
 const dailyValues = computed(() => props.account.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.account.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
 const durationLabelPoints = computed(() => [props.account.stats.durationLast24Hours[0], props.account.stats.durationLast24Hours[Math.floor(props.account.stats.durationLast24Hours.length / 2)], props.account.stats.durationLast24Hours[props.account.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
-const peakRequests = computed(() => Math.max(...dailyValues.value, 0));
 const effectiveTier = computed(() => {
   const quotaTier = props.quotaInfo?.tier?.trim();
   if (props.account.provider === "codex" && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
@@ -641,9 +640,6 @@ function historyEntryPreview(errorMessage: string): string {
       <UiCardContent class="flex flex-1 flex-col pt-2">
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
-            <div class="mb-2 flex items-center justify-end text-[11px] text-muted-foreground">
-              <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
-            </div>
             <div class="mb-2 grid grid-cols-3 gap-1.5">
               <div>
                 <p class="truncate text-[10px] text-muted-foreground">Requests</p>
