@@ -476,7 +476,7 @@ async function handleSignOut() {
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
-      <header class="sticky top-0 z-30 h-16 border-b border-border bg-background px-5 sm:px-6 lg:px-8">
+      <header class="sticky top-0 z-30 h-16 border-b border-border bg-background px-3 sm:px-6 lg:px-8">
         <div class="flex h-full w-full items-center gap-3 md:gap-0">
           <div class="flex min-w-0 items-center">
             <button
