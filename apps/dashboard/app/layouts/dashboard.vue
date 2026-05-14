@@ -437,8 +437,8 @@ async function handleSignOut() {
                       <span
                         v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
                         :class="[
-                          'rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                          isSubItemActive(subItem) ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
+                          'px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                          isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground',
                         ]"
                       >
                         {{ modelCountFor(subItem) }}
@@ -609,8 +609,8 @@ async function handleSignOut() {
                           <span
                             v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
                             :class="[
-                              'rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                              isSubItemActive(subItem) ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
+                              'px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                              isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground',
                             ]"
                           >
                             {{ modelCountFor(subItem) }}
