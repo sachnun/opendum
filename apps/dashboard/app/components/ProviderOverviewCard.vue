@@ -55,7 +55,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
     </div>
 
     <UiCardContent class="pointer-events-none relative z-20 p-0">
-      <div class="space-y-2 pt-1">
+      <div class="space-y-2 rounded-md border border-border/70 p-2.5">
         <div class="grid grid-cols-3 gap-1.5">
           <UsageStatMetric label="Requests" :value="summary.stats.totalRequests.toLocaleString()" />
           <UsageStatMetric label="Success" :value="summary.stats.successRate === null ? '-' : `${summary.stats.successRate}%`" />
