@@ -657,15 +657,13 @@ function handlePanelScroll(panelId: string, event: Event) {
   if (!(element instanceof HTMLElement)) return;
 
   const response = responses.value[panelId];
-  if (!response?.isLoading || !autoScrollByPanel[panelId]) return;
+  if (!response?.isLoading) return;
 
   const scrollableDistance = Math.max(element.scrollHeight - element.clientHeight, 0);
   if (scrollableDistance === 0) return;
 
   const distanceFromBottom = scrollableDistance - element.scrollTop;
-  if (distanceFromBottom / scrollableDistance > AUTO_SCROLL_DISABLE_THRESHOLD) {
-    autoScrollByPanel[panelId] = false;
-  }
+  autoScrollByPanel[panelId] = distanceFromBottom / scrollableDistance <= AUTO_SCROLL_DISABLE_THRESHOLD;
 }
 
 function normalizeTokenValue(value: unknown): number | null {

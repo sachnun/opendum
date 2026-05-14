@@ -481,10 +481,10 @@ async function handleSignOut() {
           <div class="flex min-w-0 items-center">
             <button
               type="button"
-              class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-sm font-medium outline-none transition-all hover:bg-accent/50 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:hidden"
+              class="inline-flex size-11 cursor-pointer items-center justify-center text-foreground outline-none transition-colors hover:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 md:hidden"
               @click="mobileOpen = true"
             >
-              <UiIcon name="i-lucide-menu" class="size-5" />
+              <UiIcon name="i-lucide-menu" class="size-8" />
               <span class="sr-only">Toggle menu</span>
             </button>
           </div>
