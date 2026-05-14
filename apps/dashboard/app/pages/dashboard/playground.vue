@@ -34,6 +34,7 @@ interface Scenario {
   prompt: string;
   isReasoning: boolean;
   messages?: ScenarioMessage[];
+  autoFollowUps?: string[];
   requestOverrides?: Record<string, unknown>;
 }
 
@@ -65,6 +66,21 @@ const SCENARIOS: Scenario[] = [
     messages: [
       { role: "system", content: "You are a creative writing assistant. Write vivid, expressive text with a poetic tone. Keep responses concise." },
       { role: "user", content: "Write a short poem about the ocean." },
+    ],
+  },
+  {
+    id: "chat",
+    name: "Chat",
+    icon: "i-lucide-messages-square",
+    prompt: "Help me plan a small weekend project to learn Vue.",
+    isReasoning: false,
+    messages: [
+      { role: "system", content: "You are a concise chat assistant. Keep each answer conversational, practical, and no longer than 3 short paragraphs." },
+      { role: "user", content: "Help me plan a small weekend project to learn Vue." },
+    ],
+    autoFollowUps: [
+      "Turn that into a 3-step weekend checklist.",
+      "Wrap up with the biggest risk and one practical tip to stay on track.",
     ],
   },
   {
@@ -172,6 +188,7 @@ const selectionStepByPanel = reactive<Record<string, "model" | "routing">>({});
 const pendingModelByPanel = reactive<Record<string, string | null>>({});
 const modelSearchByPanel = reactive<Record<string, string>>({});
 const routeSearchByPanel = reactive<Record<string, string>>({});
+const chatMessagesByPanel = reactive<Record<string, ScenarioMessage[]>>({});
 const systemCollapsedByPanel = reactive<Record<string, boolean>>({});
 const autoScrollByPanel = reactive<Record<string, boolean>>({});
 const initializedFromRoute = ref(false);
@@ -220,8 +237,7 @@ const parsedLoopCount = computed(() => Number(loopCountInput.value));
 const isLoopCountValid = computed(() => Number.isInteger(parsedLoopCount.value) && parsedLoopCount.value >= 1);
 const activeLoopBadgeLabel = computed(() => activeLoopProgress.value && activeLoopProgress.value.total > 1 ? `${activeLoopProgress.value.current}/${activeLoopProgress.value.total}` : null);
 const scenarioMessages = computed(() => getScenarioMessages(selectedScenario.value));
-const systemPromptText = computed(() => scenarioMessages.value.filter((message) => message.role === "system").map((message) => extractMessageText(message.content)).filter(Boolean).join("\n\n"));
-const userScenarioMessages = computed(() => scenarioMessages.value.filter((message) => message.role !== "system"));
+const isChatScenario = computed(() => selectedScenario.value.id === "chat");
 
 watch(options, (value) => {
   if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard/accounts", { replace: true });
@@ -522,6 +538,7 @@ function removePanel(panelId: string) {
   stopPanelRequest(panelId);
   panelScrollElements.delete(panelId);
   Reflect.deleteProperty(autoScrollByPanel, panelId);
+  Reflect.deleteProperty(chatMessagesByPanel, panelId);
   panels.value = panels.value.filter((panel) => panel.id !== panelId);
   const nextResponses = { ...responses.value };
   Reflect.deleteProperty(nextResponses, panelId);
@@ -572,6 +589,7 @@ function applyProviderPreset(provider: string) {
 function selectScenario(scenario: Scenario) {
   selectedScenario.value = scenario;
   responses.value = {};
+  resetChatMessages();
   if (scenario.isReasoning && settings.reasoningEffort === "none") {
     settings.reasoningEffort = "medium";
   }
@@ -581,8 +599,31 @@ function resetSettings() {
   Object.assign(settings, DEFAULT_SETTINGS);
 }
 
+function resetChatMessages() {
+  for (const panelId of Object.keys(chatMessagesByPanel)) {
+    Reflect.deleteProperty(chatMessagesByPanel, panelId);
+  }
+}
+
 function getScenarioMessages(scenario: Scenario): ScenarioMessage[] {
   return scenario.messages?.length ? scenario.messages : [{ role: "user", content: scenario.prompt }];
+}
+
+function getPanelScenarioMessages(panelId: string, scenario: Scenario): ScenarioMessage[] {
+  return scenario.id === "chat" && chatMessagesByPanel[panelId]?.length ? chatMessagesByPanel[panelId] : getScenarioMessages(scenario);
+}
+
+function getScenarioConversationMessages(panelId: string): ScenarioMessage[] {
+  const scenario = selectedScenario.value;
+  return scenario?.id === "chat" && chatMessagesByPanel[panelId]?.length ? chatMessagesByPanel[panelId] : scenarioMessages.value;
+}
+
+function getPanelSystemPromptText(panelId: string): string {
+  return getScenarioConversationMessages(panelId).filter((message) => message.role === "system").map((message) => extractMessageText(message.content)).filter(Boolean).join("\n\n");
+}
+
+function getPanelUserScenarioMessages(panelId: string): ScenarioMessage[] {
+  return getScenarioConversationMessages(panelId).filter((message) => message.role !== "system");
 }
 
 function extractTextContent(content: unknown): string {
@@ -1011,7 +1052,35 @@ function refreshAccountSummary() {
   requestDashboardAccountSummaryRefresh();
 }
 
-async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, accountId: string | null): Promise<FetchModelResult> {
+async function runChatScenarioForPanel(panel: PanelState & { modelId: string }, scenario: Scenario, currentSettings: PlaygroundSettings): Promise<FetchModelResult> {
+  const messages = [...getScenarioMessages(scenario)];
+  chatMessagesByPanel[panel.id] = messages;
+
+  const followUps = scenario.autoFollowUps ?? [];
+  for (let step = 0; step <= followUps.length; step += 1) {
+    if (!isBatchRunActive.value || stoppedBatchPanelIds.has(panel.id)) return "aborted";
+
+    const result = await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidAccountIdForPanel(panel), messages);
+    if (result !== "success") return result;
+
+    const response = responses.value[panel.id];
+    const assistantContent = response?.content?.trim();
+    if (!assistantContent) return "success";
+
+    messages.push({ role: "assistant", content: assistantContent });
+    chatMessagesByPanel[panel.id] = [...messages];
+
+    const followUp = followUps[step];
+    if (!followUp) return "success";
+
+    messages.push({ role: "user", content: followUp });
+    chatMessagesByPanel[panel.id] = [...messages];
+  }
+
+  return "success";
+}
+
+async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, accountId: string | null, messages = getPanelScenarioMessages(panelId, scenario)): Promise<FetchModelResult> {
   const requestStartedAt = Date.now();
   const requestId = generateId();
   let waitMs: number | null = null;
@@ -1024,7 +1093,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
   setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: buildResponseMetrics(null, null, null), startedAt: requestStartedAt });
 
   try {
-    const requestBody = buildRequestBody(modelId, getScenarioMessages(scenario), currentSettings, accountId);
+    const requestBody = buildRequestBody(modelId, messages, currentSettings, accountId);
     const endpointOverrides = adaptRequestOverridesForEndpoint(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
     if (!canUsePlayground.value) throw new Error(playgroundSetupMessage.value || "Playground is not ready.");
@@ -1103,6 +1172,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 async function runSelectedScenario(requestedLoopCount = 1) {
   if (!selectedScenario.value || !canRunPlayground.value) return;
   const scenario = selectedScenario.value;
+  resetChatMessages();
   let currentSettings = { ...settings };
   if (scenario.isReasoning && currentSettings.reasoningEffort === "none") {
     settings.reasoningEffort = "medium";
@@ -1123,7 +1193,9 @@ async function runSelectedScenario(requestedLoopCount = 1) {
         if (!isBatchRunActive.value || stoppedBatchPanelIds.has(panel.id)) break;
         activeLoopProgress.value = totalLoops > 1 ? { current: iteration + 1, total: totalLoops } : null;
 
-        const result = await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidAccountIdForPanel(panel));
+        const result = scenario.id === "chat"
+          ? await runChatScenarioForPanel(panel, scenario, currentSettings)
+          : await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidAccountIdForPanel(panel));
         if (result !== "success") {
           stoppedBatchPanelIds.add(panel.id);
           break;
@@ -1158,7 +1230,18 @@ function stopAllRequests() {
 async function retryPanel(panelId: string) {
   const panel = panels.value.find((item) => item.id === panelId);
   if (!panel?.modelId || !selectedScenario.value || !canRunPlayground.value) return;
-  if (isBatchRunActive.value) stoppedBatchPanelIds.add(panelId);
+  const wasBatchRunActive = isBatchRunActive.value;
+  if (wasBatchRunActive) stoppedBatchPanelIds.add(panelId);
+  if (selectedScenario.value.id === "chat") {
+    isBatchRunActive.value = true;
+    stoppedBatchPanelIds.delete(panel.id);
+    try {
+      await runChatScenarioForPanel(panel as PanelState & { modelId: string }, selectedScenario.value, { ...settings });
+    } finally {
+      isBatchRunActive.value = wasBatchRunActive;
+    }
+    return;
+  }
   await fetchFromModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, getValidAccountIdForPanel(panel));
 }
 
@@ -1369,7 +1452,7 @@ function formatToolArguments(value: string): string {
             v-for="scenario in SCENARIOS"
             :key="scenario.id"
             type="button"
-            :disabled="isAnyLoading || !hasSelectedModel"
+            :disabled="isAnyLoading"
             :class="[
               'flex h-auto min-w-[72px] cursor-pointer flex-col items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50',
               selectedScenario.id === scenario.id ? (scenario.isReasoning ? 'border-amber-600 bg-amber-600 text-white hover:bg-amber-700' : 'bg-primary text-primary-foreground') : (scenario.isReasoning ? 'border-dashed border-amber-700 hover:border-amber-600' : 'border-input bg-input/30 hover:bg-input/50'),
@@ -1430,7 +1513,7 @@ function formatToolArguments(value: string): string {
             <UiIcon name="i-lucide-x" class="size-3.5" />
           </UiButton>
 
-          <UiCardHeader class="flex-none gap-0 border-b py-2 pl-3 pr-11">
+          <UiCardHeader class="flex-none gap-0 border-b py-2 pl-3" :class="panels.length > 1 ? 'pr-11' : 'pr-3'">
             <UiPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
               <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between px-2 font-normal" :disabled="responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
                 <span v-if="panel.modelId && modelsById.get(panel.modelId)" class="flex min-w-0 items-center gap-2">
@@ -1501,25 +1584,25 @@ function formatToolArguments(value: string): string {
             <div :ref="(element) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto p-3" @scroll="handlePanelScroll(panel.id, $event)">
               <p v-if="!panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" class="py-8 text-center text-sm text-muted-foreground">Select a model to start</p>
 
-              <template v-if="panel.modelId && scenarioMessages.length > 0">
-                <div v-if="systemPromptText" class="mb-2">
+              <template v-if="panel.modelId && getScenarioConversationMessages(panel.id).length > 0">
+                <div v-if="getPanelSystemPromptText(panel.id)" class="mb-2">
                   <button type="button" class="flex w-full cursor-pointer items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/80" @click="systemCollapsedByPanel[panel.id] = !(systemCollapsedByPanel[panel.id] ?? true)">
                     <UiIcon name="i-lucide-settings" class="size-3 shrink-0 text-muted-foreground" />
                     <span class="flex-1 text-[11px] font-medium text-muted-foreground">System</span>
                     <UiIcon :name="(systemCollapsedByPanel[panel.id] ?? true) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" class="size-3 shrink-0 text-muted-foreground" />
                   </button>
                   <div v-if="!(systemCollapsedByPanel[panel.id] ?? true)" class="mt-1 rounded-md bg-muted/30 px-2.5 py-2">
-                    <pre class="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ systemPromptText }}</pre>
+                    <pre class="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ getPanelSystemPromptText(panel.id) }}</pre>
                   </div>
                 </div>
 
-                <div v-for="(message, index) in userScenarioMessages" :key="`${panel.id}-user-${index}`" class="mb-2 flex gap-2">
-                  <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <UiIcon name="i-lucide-user" class="size-3 text-primary" />
+                <div v-for="(message, index) in getPanelUserScenarioMessages(panel.id)" :key="`${panel.id}-message-${index}`" class="mb-2 flex gap-2">
+                  <div :class="message.role === 'assistant' ? 'bg-secondary' : 'bg-primary/10'" class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
+                    <UiIcon :name="message.role === 'assistant' ? 'i-lucide-bot' : 'i-lucide-user'" :class="message.role === 'assistant' ? 'text-secondary-foreground' : 'text-primary'" class="size-3" />
                   </div>
                   <div class="min-w-0 flex-1">
-                    <p class="mb-1 text-[11px] font-medium text-primary">User</p>
-                    <div class="rounded-lg bg-muted px-3 py-2">
+                    <p :class="message.role === 'assistant' ? 'text-muted-foreground' : 'text-primary'" class="mb-1 text-[11px] font-medium">{{ message.role === 'assistant' ? 'Assistant' : 'User' }}</p>
+                    <div :class="message.role === 'assistant' ? 'border border-border bg-card' : 'bg-muted'" class="rounded-lg px-3 py-2">
                       <pre v-if="extractMessageText(message.content)" class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ extractMessageText(message.content) }}</pre>
                       <div v-if="extractImageUrls(message.content).length > 0" class="mt-1.5 flex flex-wrap gap-1.5">
                         <a v-for="(url, imageIndex) in extractImageUrls(message.content)" :key="`${panel.id}-${imageIndex}`" :href="url" target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded border border-border">
@@ -1545,7 +1628,7 @@ function formatToolArguments(value: string): string {
                 </UiButton>
               </div>
 
-              <div v-if="panel.modelId && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.toolCalls?.length || responses[panel.id]?.isLoading)" class="mb-2 flex gap-2">
+              <div v-if="panel.modelId && !isChatScenario && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.toolCalls?.length || responses[panel.id]?.isLoading)" class="mb-2 flex gap-2">
                 <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary">
                   <UiIcon name="i-lucide-bot" class="size-3 text-secondary-foreground" />
                 </div>
@@ -1582,7 +1665,32 @@ function formatToolArguments(value: string): string {
                 </div>
               </div>
 
-              <p v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error && !responses[panel.id]?.toolCalls?.length && scenarioMessages.length === 0" class="py-8 text-center text-sm text-muted-foreground">Response will appear here</p>
+              <div v-if="panel.modelId && isChatScenario && responses[panel.id]?.isLoading" class="mb-2 flex gap-2">
+                <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary">
+                  <UiIcon name="i-lucide-bot" class="size-3 text-secondary-foreground" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="mb-1 text-[11px] font-medium text-muted-foreground">Assistant</p>
+                  <div class="space-y-2">
+                    <div v-if="responses[panel.id]?.reasoning" class="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2">
+                      <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Reasoning</p>
+                      <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.reasoning }}<span v-if="!responses[panel.id]?.content" class="animate-pulse text-primary">▌</span></pre>
+                    </div>
+                    <div v-if="responses[panel.id]?.content" class="rounded-lg border border-border bg-card px-3 py-2">
+                      <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.content }}<span class="animate-pulse text-primary">▌</span></pre>
+                    </div>
+                    <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning" class="rounded-lg border border-border bg-card px-3 py-2">
+                      <div class="space-y-1.5">
+                        <UiSkeleton class="h-3 w-full" />
+                        <UiSkeleton class="h-3 w-4/5" />
+                        <UiSkeleton class="h-3 w-3/5" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <p v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error && !responses[panel.id]?.toolCalls?.length && getScenarioConversationMessages(panel.id).length === 0" class="py-8 text-center text-sm text-muted-foreground">Response will appear here</p>
             </div>
 
             <div class="shrink-0 border-t bg-card px-3 py-2 text-[11px]">
