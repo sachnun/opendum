@@ -423,7 +423,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <UiButton :class="cn('gap-2', triggerClass)" @click="open = true">
+  <UiButton variant="outline" :class="cn('gap-2', triggerClass)" @click="open = true">
     <UiIcon name="i-lucide-plus" class="size-4" />
     Add Account
   </UiButton>
