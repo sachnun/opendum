@@ -134,7 +134,11 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 			payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
 		}
 	}
-	return p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model)
+	resp, err := p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model)
+	if p.name == "groq" && err == nil && !stream && resp != nil && resp.StatusCode == http.StatusBadRequest {
+		return p.recoverGroqToolUseFailed(resp, modelName)
+	}
+	return resp, err
 }
 
 func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, model string) (*http.Response, error) {
@@ -153,6 +157,9 @@ func (p openAICompatibleProvider) buildPayload(body map[string]any, modelName st
 	}
 	payload["model"] = modelName
 	payload["stream"] = stream
+	if p.name == "groq" {
+		filterGroqPayload(payload, modelName)
+	}
 	return payload
 }
 

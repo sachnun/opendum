@@ -205,6 +205,111 @@ func TestOpenAICompatibleProviderKeepsAuthForKiloAccount(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleGroqFiltersUnsupportedReasoningEffort(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq, registry: registry}
+	var payload map[string]any
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"ok"}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":            "llama-4-scout-17b-16e-instruct",
+		"messages":         []any{map[string]any{"role": "user", "content": "hi"}},
+		"reasoning_effort": "medium",
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+
+	if payload["model"] != "meta-llama/llama-4-scout-17b-16e-instruct" {
+		t.Fatalf("model = %q", payload["model"])
+	}
+	if _, ok := payload["reasoning_effort"]; ok {
+		t.Fatalf("unsupported reasoning_effort leaked to Groq: %#v", payload)
+	}
+}
+
+func TestOpenAICompatibleGroqKeepsSupportedReasoningEffort(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq, registry: registry}
+	var payload map[string]any
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"ok"}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":            "gpt-oss-20b",
+		"messages":         []any{map[string]any{"role": "user", "content": "hi"}},
+		"reasoning_effort": "MEDIUM",
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+
+	if payload["model"] != "openai/gpt-oss-20b" || payload["reasoning_effort"] != "medium" {
+		t.Fatalf("bad Groq reasoning payload: %#v", payload)
+	}
+}
+
+func TestOpenAICompatibleGroqToolUseFailedBecomesToolCall(t *testing.T) {
+	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq}
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		data, _ := json.Marshal(map[string]any{"error": map[string]any{
+			"message":           "Failed to call a function. Please adjust your prompt. See 'failed_generation' for more details.",
+			"type":              "invalid_request_error",
+			"code":              "tool_use_failed",
+			"failed_generation": "<function=get_weather>`{" + `"name":"get_weather","parameters":{"city":"Jakarta","unit":"celsius"}` + "}`</function>\n",
+		}})
+		body := string(data)
+		return &http.Response{StatusCode: http.StatusBadRequest, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":       "llama-3.1-8b-instant",
+		"messages":    []any{map[string]any{"role": "user", "content": "weather in Jakarta"}},
+		"tools":       []any{map[string]any{"type": "function", "function": map[string]any{"name": "get_weather", "parameters": map[string]any{"type": "object"}}}},
+		"tool_choice": "auto",
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var completion map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
+		t.Fatal(err)
+	}
+	choice := completion["choices"].([]any)[0].(map[string]any)
+	if choice["finish_reason"] != "tool_calls" {
+		t.Fatalf("finish_reason = %#v", choice["finish_reason"])
+	}
+	message := choice["message"].(map[string]any)
+	call := message["tool_calls"].([]any)[0].(map[string]any)
+	fn := call["function"].(map[string]any)
+	if fn["name"] != "get_weather" {
+		t.Fatalf("function = %#v", fn)
+	}
+	var args map[string]any
+	if err := json.Unmarshal([]byte(fn["arguments"].(string)), &args); err != nil {
+		t.Fatal(err)
+	}
+	if args["city"] != "Jakarta" || args["unit"] != "celsius" {
+		t.Fatalf("arguments = %#v", args)
+	}
+}
+
 func TestWorkersAIProviderConvertsImageURL(t *testing.T) {
 	accountID := "acct_123"
 	var payload map[string]any
