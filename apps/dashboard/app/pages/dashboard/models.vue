@@ -160,12 +160,12 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     <DashboardDataNotice :error="error" />
     <UiSkeleton v-if="pending" class="h-96 rounded-xl" />
     <DashboardEmptyState v-else-if="models.length === 0" title="No models found" description="Connect accounts or adjust your search." icon="i-lucide-cpu" />
-    <div v-else class="space-y-5">
-      <div class="flex flex-wrap gap-2">
+    <div v-else class="space-y-4 md:space-y-2">
+      <div class="flex flex-wrap gap-1.5 pb-2">
         <button
           type="button"
           :class="[
-            'inline-flex h-8 cursor-pointer items-center justify-center rounded-md border px-3 text-sm font-medium transition-all',
+            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium transition-colors',
             allSelected ? 'bg-primary text-primary-foreground' : 'border-input bg-input/30 hover:bg-input/50',
           ]"
           @click="toggleProvider('all')"
@@ -177,7 +177,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           :key="provider.id"
           type="button"
           :class="[
-            'inline-flex h-8 cursor-pointer items-center justify-center rounded-md border px-3 text-sm font-medium transition-all',
+            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium transition-colors',
             activeProviders.includes(provider.id) ? 'bg-primary text-primary-foreground' : 'border-input bg-input/30 hover:bg-input/50',
           ]"
           @click="toggleProvider(provider.id)"
@@ -186,32 +186,39 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
         </button>
       </div>
 
-      <div v-if="modelSections.length > 0" class="space-y-8">
-        <section v-for="section in modelSections" :id="section.anchorId" :key="section.name" class="scroll-mt-24 space-y-3">
+      <div v-if="modelSections.length > 0" class="space-y-6">
+        <section v-for="section in modelSections" :id="section.anchorId" :key="section.name" class="scroll-mt-24 space-y-4 md:space-y-2">
           <div class="flex items-center gap-2">
             <h3 class="text-sm font-semibold">{{ section.name }}</h3>
-            <span class="text-xs text-muted-foreground">{{ section.models.length }} models</span>
+            <UiBadge variant="outline" class="text-[10px] font-normal tabular-nums">{{ section.models.length }} models</UiBadge>
           </div>
           <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
-              <UiCard v-for="model in section.models" :key="model.id" class="flex flex-col bg-card py-4" :class="model.isEnabled === false ? 'opacity-70' : ''">
-                <UiCardHeader class="px-4 pb-2 sm:px-5">
-                  <div class="flex items-start justify-between gap-2">
-                    <button
+            <UiCard
+              v-for="model in section.models"
+              :key="model.id"
+              class="flex h-full flex-col bg-transparent transition-colors"
+              :class="model.isEnabled === false ? 'opacity-65' : ''"
+            >
+              <UiCardHeader class="pb-1">
+                <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                  <button
                     type="button"
                     class="-m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      :title="`Copy model ID ${model.id}`"
-                      :aria-label="`Copy model ID ${model.id}`"
-                      @click="copyModelId(model.id)"
-                    >
-                      <span class="flex size-3 shrink-0 items-center justify-center">
-                        <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
-                      </span>
-                      <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="model.id">
-                        {{ model.id }}
+                    :title="`Copy model ID ${model.id}`"
+                    :aria-label="`Copy model ID ${model.id}`"
+                    @click="copyModelId(model.id)"
+                  >
+                    <span class="flex size-3 shrink-0 items-center justify-center">
+                      <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                    </span>
+                    <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="model.id">
+                      {{ model.id }}
                     </span>
                   </button>
-                  <div class="flex shrink-0 items-center gap-1.5">
-                    <span class="text-[11px] text-muted-foreground">{{ model.isEnabled ? 'On' : 'Off' }}</span>
+                  <div class="flex h-7 shrink-0 items-center gap-1.5">
+                    <UiBadge variant="outline" class="min-w-10 justify-center text-[10px] font-normal">
+                      {{ model.isEnabled ? 'On' : 'Off' }}
+                    </UiBadge>
                     <UiSwitch
                       :model-value="model.isEnabled"
                       :disabled="pendingModelId === model.id"
@@ -221,18 +228,18 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                   </div>
                 </div>
 
-                <div class="mt-1.5 flex flex-wrap items-center gap-1">
-                  <UiBadge v-for="provider in model.providers" :key="provider" variant="secondary" class="text-xs">
+                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                  <UiBadge v-for="provider in model.providers" :key="provider" variant="outline" class="text-[10px] font-normal">
                     {{ getProviderLabel(provider) }}
                   </UiBadge>
-                  <NuxtLink v-if="model.isEnabled" :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50" title="Try in Playground">
+                  <NuxtLink v-if="model.isEnabled" :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex h-5 items-center justify-center gap-1 rounded-md border border-border px-1.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" title="Try in Playground">
                     <UiIcon name="i-lucide-flask-conical" class="size-3" />
                   </NuxtLink>
                 </div>
               </UiCardHeader>
 
-              <UiCardContent class="flex flex-1 flex-col px-4 sm:px-5">
-                <div class="mt-auto space-y-2.5">
+              <UiCardContent class="flex flex-1 flex-col pt-0">
+                <div class="mt-auto space-y-3">
                   <ModelFeatureBadges :meta="model.meta" />
                   <ModelStatsPanel :stats="model.stats as ModelStats" :label="model.id" :disabled="!model.isEnabled" compact />
                 </div>
