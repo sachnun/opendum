@@ -237,6 +237,7 @@ watch(options, (value) => {
 watch(options, (value) => {
   if (!value || initializedFromRoute.value) return;
 
+  applyQuerySettings(route.query);
   const modelId = normalizeQueryParam(route.query.model);
   const accountId = normalizeQueryParam(route.query.accountId);
 
@@ -265,6 +266,7 @@ watch(() => route.query, (query) => {
   if (!initializedFromRoute.value) return;
   if (!options.value) return;
 
+  applyQuerySettings(query);
   const modelId = normalizeQueryParam(query.model);
   const accountId = normalizeQueryParam(query.accountId);
 
@@ -333,6 +335,54 @@ function generateId(): string {
 function normalizeQueryParam(value: unknown): string | null {
   if (Array.isArray(value)) return typeof value[0] === "string" ? value[0] : null;
   return typeof value === "string" ? value : null;
+}
+
+function normalizeQueryEndpoint(value: unknown): PlaygroundEndpoint | null {
+  const endpoint = normalizeQueryParam(value);
+  return endpoint === "chat_completions" || endpoint === "messages" || endpoint === "responses" ? endpoint : null;
+}
+
+function normalizeQueryNumber(value: unknown): number | null {
+  const rawValue = normalizeQueryParam(value);
+  if (rawValue === null || rawValue.trim() === "") return null;
+  const numericValue = Number(rawValue);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function normalizeQueryBoolean(value: unknown): boolean | null {
+  const rawValue = normalizeQueryParam(value)?.trim().toLowerCase();
+  if (rawValue === "true") return true;
+  if (rawValue === "false") return false;
+  return null;
+}
+
+function normalizeQueryReasoningEffort(value: unknown): ReasoningEffort | null {
+  const effort = normalizeQueryParam(value);
+  return effort === "none" || effort === "low" || effort === "medium" || effort === "high" || effort === "xhigh" ? effort : null;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function applyQuerySettings(query: typeof route.query) {
+  const endpoint = normalizeQueryEndpoint(query.endpoint);
+  const streamResponses = normalizeQueryBoolean(query.stream);
+  const temperature = normalizeQueryNumber(query.temperature);
+  const topP = normalizeQueryNumber(query.top_p);
+  const maxTokens = normalizeQueryNumber(query.max_tokens);
+  const presencePenalty = normalizeQueryNumber(query.presence_penalty);
+  const frequencyPenalty = normalizeQueryNumber(query.frequency_penalty);
+  const reasoningEffort = normalizeQueryReasoningEffort(query.reasoning_effort);
+
+  if (endpoint) settings.endpoint = endpoint;
+  if (streamResponses !== null) settings.streamResponses = streamResponses;
+  if (temperature !== null) settings.temperature = clampNumber(temperature, 0, 2);
+  if (topP !== null) settings.topP = clampNumber(topP, 0, 1);
+  if (maxTokens !== null) settings.maxTokens = Math.round(clampNumber(maxTokens, 1, 128000));
+  if (presencePenalty !== null) settings.presencePenalty = clampNumber(presencePenalty, -2, 2);
+  if (frequencyPenalty !== null) settings.frequencyPenalty = clampNumber(frequencyPenalty, -2, 2);
+  if (reasoningEffort) settings.reasoningEffort = reasoningEffort;
 }
 
 function accountSupportsModel(account: ProviderAccountOption, model: ModelOption | string): boolean {

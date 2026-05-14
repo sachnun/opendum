@@ -35,6 +35,8 @@ type ErrorStatusTag = {
   label: string;
 };
 
+type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
+
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
@@ -318,6 +320,43 @@ function stripStatusFromErrorMessage(message: string, code: number | null | unde
     .trimStart();
 }
 
+function normalizePlaygroundEndpoint(value: string | null | undefined): ErrorPlaygroundEndpoint | null {
+  const normalized = value?.trim().replace(/^\/v1\//, "") ?? "";
+  if (normalized === "chat/completions" || normalized === "chat_completions") return "chat_completions";
+  if (normalized === "messages") return "messages";
+  if (normalized === "responses") return "responses";
+  return null;
+}
+
+function parseErrorParameters(value: string | null | undefined): Record<string, unknown> | null {
+  if (!value?.trim()) return null;
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function addPlaygroundParam(query: Record<string, string>, params: Record<string, unknown>, targetKey: string, sourceKeys: string[] = []) {
+  for (const key of [targetKey, ...sourceKeys]) {
+    const value = params[key];
+    if (typeof value === "string" && value.trim()) {
+      query[targetKey] = value.trim();
+      return;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      query[targetKey] = String(value);
+      return;
+    }
+    if (typeof value === "boolean") {
+      query[targetKey] = String(value);
+      return;
+    }
+  }
+}
+
 function formatHourLabel(time: string): string {
   const date = new Date(time);
   return Number.isNaN(date.getTime()) ? time.slice(11, 16) : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -475,6 +514,39 @@ const errorPreviewToneClass = computed(() => {
 });
 const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatusFromErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
 const errorDetails = computed(() => activeErrorEntry.value ? parseStoredErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : null);
+const errorPlaygroundRoute = computed(() => {
+  const details = errorDetails.value;
+  const query: Record<string, string> = { accountId: props.account.id };
+  const model = details?.model?.trim();
+  const endpoint = normalizePlaygroundEndpoint(details?.endpoint);
+  const params = parseErrorParameters(details?.parameters);
+
+  if (model) query.model = model;
+  if (endpoint) query.endpoint = endpoint;
+  if (params) {
+    addPlaygroundParam(query, params, "stream");
+    addPlaygroundParam(query, params, "temperature");
+    addPlaygroundParam(query, params, "top_p");
+    addPlaygroundParam(query, params, "max_tokens", ["max_output_tokens", "max_completion_tokens"]);
+    addPlaygroundParam(query, params, "presence_penalty");
+    addPlaygroundParam(query, params, "frequency_penalty");
+    addPlaygroundParam(query, params, "reasoning_effort");
+
+    const outputConfig = params.output_config;
+    if (!query.reasoning_effort && outputConfig && typeof outputConfig === "object" && !Array.isArray(outputConfig)) {
+      const effort = (outputConfig as Record<string, unknown>).effort;
+      if (typeof effort === "string" && effort.trim()) query.reasoning_effort = effort.trim();
+    }
+
+    const reasoning = params.reasoning;
+    if (!query.reasoning_effort && reasoning && typeof reasoning === "object" && !Array.isArray(reasoning)) {
+      const effort = (reasoning as Record<string, unknown>).effort;
+      if (typeof effort === "string" && effort.trim()) query.reasoning_effort = effort.trim();
+    }
+  }
+
+  return { path: "/dashboard/playground", query };
+});
 const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < errorPreviewEntries.value.length - 1);
 const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
 
@@ -1046,6 +1118,11 @@ function cancelErrorPreviewPointer() {
             <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy error details" title="Copy error details" @click="copyErrorDetails">
               <UiIcon :name="copiedErrorDetails ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
             </UiButton>
+            <NuxtLink :to="errorPlaygroundRoute">
+              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Open in Playground" title="Open in Playground with this account, model, endpoint, and parameters">
+                <UiIcon name="i-lucide-flask-conical" class="size-4" />
+              </UiButton>
+            </NuxtLink>
             <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" title="Resolve — clear all errors and error history for this account" :disabled="resolvingErrors" @click="resolveErrors">
               <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
             </UiButton>
