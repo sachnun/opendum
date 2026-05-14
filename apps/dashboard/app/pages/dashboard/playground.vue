@@ -14,6 +14,7 @@ type ToolCallData = { name: string; arguments: string };
 type ParsedCompletionData = { content: string; reasoning: string; toolCalls: ToolCallData[]; usage: ParsedUsageData | null };
 type ResponseMetrics = { waitMs: number | null; firstResponseMs: number | null; inputTokens: number | null; outputTokens: number | null; totalTokens: number | null };
 type ResponseData = { content: string; reasoning: string; toolCalls: ToolCallData[]; isLoading: boolean; error?: string; metrics: ResponseMetrics; usedAccountId?: string | null; startedAt?: number | null };
+type FetchModelResult = "success" | "error" | "aborted";
 
 interface PlaygroundSettings {
   endpoint: PlaygroundEndpoint;
@@ -1010,7 +1011,7 @@ function refreshAccountSummary() {
   requestDashboardAccountSummaryRefresh();
 }
 
-async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, accountId: string | null) {
+async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, accountId: string | null): Promise<FetchModelResult> {
   const requestStartedAt = Date.now();
   const requestId = generateId();
   let waitMs: number | null = null;
@@ -1074,20 +1075,22 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
       });
 
       setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId });
-      return;
+      return "success";
     }
 
     const payload = await response.json();
     const parsed = currentSettings.endpoint === "messages" ? extractAnthropicCompletionData(payload) : currentSettings.endpoint === "responses" ? extractResponsesCompletionData(payload) : extractChatCompletionData(payload);
     setResponseIfCurrent(panelId, requestId, { content: parsed.content, reasoning: parsed.reasoning, toolCalls: parsed.toolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, Date.now() - requestStartedAt, parsed.usage), usedAccountId });
+    return "success";
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       const existing = responses.value[panelId];
       if (existing && requestIds.get(panelId) === requestId) setResponse(panelId, { ...existing, isLoading: false, error: undefined });
-      return;
+      return "aborted";
     }
 
     setResponseIfCurrent(panelId, requestId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: error instanceof Error ? error.message : "Unknown error", metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
+    return "error";
   } finally {
     if (requestIds.get(panelId) === requestId) {
       controllers.delete(panelId);
@@ -1099,8 +1102,9 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
 async function runSelectedScenario(requestedLoopCount = 1) {
   if (!selectedScenario.value || !canRunPlayground.value) return;
+  const scenario = selectedScenario.value;
   let currentSettings = { ...settings };
-  if (selectedScenario.value.isReasoning && currentSettings.reasoningEffort === "none") {
+  if (scenario.isReasoning && currentSettings.reasoningEffort === "none") {
     settings.reasoningEffort = "medium";
     currentSettings = { ...settings };
   }
@@ -1114,14 +1118,18 @@ async function runSelectedScenario(requestedLoopCount = 1) {
   isBatchRunActive.value = true;
 
   try {
-    for (let iteration = 0; iteration < totalLoops; iteration += 1) {
-      if (!isBatchRunActive.value) break;
-      activeLoopProgress.value = totalLoops > 1 ? { current: iteration + 1, total: totalLoops } : null;
-      await Promise.all(panelsWithModels
-        .filter((panel) => !stoppedBatchPanelIds.has(panel.id))
-        .map((panel) => fetchFromModel(panel.id, panel.modelId, selectedScenario.value, currentSettings, getValidAccountIdForPanel(panel))));
-      if (panelsWithModels.every((panel) => stoppedBatchPanelIds.has(panel.id))) break;
-    }
+    await Promise.all(panelsWithModels.map(async (panel) => {
+      for (let iteration = 0; iteration < totalLoops; iteration += 1) {
+        if (!isBatchRunActive.value || stoppedBatchPanelIds.has(panel.id)) break;
+        activeLoopProgress.value = totalLoops > 1 ? { current: iteration + 1, total: totalLoops } : null;
+
+        const result = await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidAccountIdForPanel(panel));
+        if (result !== "success") {
+          stoppedBatchPanelIds.add(panel.id);
+          break;
+        }
+      }
+    }));
   } finally {
     activeLoopProgress.value = null;
     stoppedBatchPanelIds.clear();
@@ -1156,10 +1164,12 @@ async function retryPanel(panelId: string) {
 
 function handleStartPointerDown(event: PointerEvent) {
   if (event.pointerType === "mouse" && event.button !== 0) return;
+  document.getSelection()?.removeAllRanges();
   if (startLongPressTimer) clearTimeout(startLongPressTimer);
   startLongPressTriggered = false;
   startLongPressTimer = setTimeout(() => {
     startLongPressTriggered = true;
+    document.getSelection()?.removeAllRanges();
     loopCountInput.value = String(loopCount.value);
     loopDialogOpen.value = true;
   }, START_LONG_PRESS_DELAY_MS);
@@ -1333,7 +1343,7 @@ function formatToolArguments(value: string): string {
             </span>
             Stop all
           </UiButton>
-          <UiButton type="button" variant="outline" size="sm" :disabled="!canRunPlayground" @click="handleStartClick" @pointerdown="handleStartPointerDown" @pointerup="handleStartPointerEnd" @pointerleave="handleStartPointerEnd" @pointercancel="handleStartPointerEnd">
+          <UiButton type="button" variant="outline" size="sm" class="select-none" :disabled="!canRunPlayground" @click="handleStartClick" @pointerdown="handleStartPointerDown" @pointerup="handleStartPointerEnd" @pointerleave="handleStartPointerEnd" @pointercancel="handleStartPointerEnd" @selectstart.prevent @dragstart.prevent @contextmenu.prevent>
             <UiIcon name="i-lucide-play" class="size-4" />
             Start
           </UiButton>
