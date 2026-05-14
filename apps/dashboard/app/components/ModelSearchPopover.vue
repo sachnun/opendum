@@ -109,6 +109,7 @@ function clearSearch() {
 }
 
 function selectModel(model: ModelListItem) {
+  searchInput.value?.blur();
   detailModel.value = model;
   closeSuggestions();
   if (!fullModelById.value.get(model.id)?.stats) void loadFullModels();
@@ -207,7 +208,7 @@ function closeDetail() {
       </div>
     </div>
 
-    <UiDialog v-model:open="detailOpen" :ui="{ content: 'gap-0 sm:max-w-md' }">
+    <UiDialog v-model:open="detailOpen" prevent-close-auto-focus :ui="{ content: 'gap-0 sm:max-w-md' }">
       <template #content>
         <div v-if="detailModel" class="space-y-3" :class="detailModel.isEnabled === false ? 'opacity-70' : ''">
           <div class="flex items-start justify-between gap-2">

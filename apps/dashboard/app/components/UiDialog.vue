@@ -12,6 +12,7 @@ const props = withDefaults(
     };
     preventOutsideClose?: boolean;
     preventEscapeClose?: boolean;
+    preventCloseAutoFocus?: boolean;
     showClose?: boolean;
   }>(),
   {
@@ -19,6 +20,7 @@ const props = withDefaults(
     ui: () => ({}),
     preventOutsideClose: false,
     preventEscapeClose: false,
+    preventCloseAutoFocus: false,
     showClose: true,
   }
 );
@@ -35,6 +37,10 @@ function handleEscapeKeyDown(event: Event) {
 
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
+}
+
+function handleCloseAutoFocus(event: Event) {
+  if (props.preventCloseAutoFocus) event.preventDefault();
 }
 </script>
 
@@ -53,6 +59,7 @@ function handleOpenAutoFocus(event: Event) {
           props.ui.content,
         )"
         @open-auto-focus="handleOpenAutoFocus"
+        @close-auto-focus="handleCloseAutoFocus"
         @interact-outside="handleInteractOutside"
         @escape-key-down="handleEscapeKeyDown"
       >
