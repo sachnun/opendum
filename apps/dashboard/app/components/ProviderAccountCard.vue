@@ -602,7 +602,7 @@ function historyEntryPreview(errorMessage: string): string {
       class="flex h-full flex-col bg-transparent transition-[border-color,box-shadow] duration-[1800ms] ease-out"
       :class="`${!account.isActive ? 'opacity-65 ' : ''}${highlight ? 'border-primary shadow-[0_0_0_3px_var(--primary)]' : 'border-border shadow-none'}`"
     >
-      <UiCardHeader class="pb-2">
+      <UiCardHeader class="pb-1">
         <div class="flex min-w-0 items-center justify-between gap-2">
           <UiCardTitle class="min-w-0 truncate text-lg">{{ accountTitle }}</UiCardTitle>
           <div class="flex flex-wrap justify-end gap-1">
@@ -637,7 +637,7 @@ function historyEntryPreview(errorMessage: string): string {
           </UiButton>
         </div>
       </UiCardHeader>
-      <UiCardContent class="flex flex-1 flex-col pt-2">
+      <UiCardContent class="flex flex-1 flex-col pt-0">
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
             <div class="mb-2 grid grid-cols-3 gap-1.5">
