@@ -432,10 +432,45 @@ func (s *Service) markAccountsRecoveredByRotation(ctx context.Context, failures 
 }
 
 func (s *Service) insertErrorHistory(ctx context.Context, accountID, userID string, model *string, statusCode int, message string, now time.Time) error {
+	match := func(query *bun.SelectQuery) *bun.SelectQuery {
+		query = query.Where("\"providerAccountId\" = ?", accountID).Where("\"errorCode\" = ?", statusCode).Where("\"errorMessage\" = ?", message)
+		if model == nil {
+			return query.Where("model IS NULL")
+		}
+		return query.Where("model = ?", *model)
+	}
+
+	var existing struct {
+		ID string `bun:"id"`
+	}
+	err := match(s.db.NewSelect().Model((*appdb.ProviderAccountErrorHistory)(nil)).Column("id")).OrderExpr("\"createdAt\" DESC, \"id\" DESC").Limit(1).Scan(ctx, &existing)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if err == nil {
+		if _, err := s.db.NewUpdate().Model((*appdb.ProviderAccountErrorHistory)(nil)).Set("\"createdAt\" = ?", now).Where("id = ?", existing.ID).Exec(ctx); err != nil {
+			return err
+		}
+		deleteQuery := s.db.NewDelete().Model((*appdb.ProviderAccountErrorHistory)(nil)).Where("id != ?", existing.ID).Where("\"providerAccountId\" = ?", accountID).Where("\"errorCode\" = ?", statusCode).Where("\"errorMessage\" = ?", message)
+		if model == nil {
+			deleteQuery = deleteQuery.Where("model IS NULL")
+		} else {
+			deleteQuery = deleteQuery.Where("model = ?", *model)
+		}
+		if _, err := deleteQuery.Exec(ctx); err != nil {
+			return err
+		}
+		return s.pruneErrorHistory(ctx, accountID)
+	}
+
 	row := appdb.ProviderAccountErrorHistory{ID: appdb.NewID(), ProviderAccountID: accountID, UserID: userID, Model: model, ErrorCode: statusCode, ErrorMessage: message, CreatedAt: now}
 	if _, err := s.db.NewInsert().Model(&row).Exec(ctx); err != nil {
 		return err
 	}
+	return s.pruneErrorHistory(ctx, accountID)
+}
+
+func (s *Service) pruneErrorHistory(ctx context.Context, accountID string) error {
 	_, err := s.db.NewDelete().Model((*appdb.ProviderAccountErrorHistory)(nil)).Where("\"providerAccountId\" = ?", accountID).Where("id NOT IN (?)", s.db.NewSelect().Model((*appdb.ProviderAccountErrorHistory)(nil)).Column("id").Where("\"providerAccountId\" = ?", accountID).OrderExpr("\"createdAt\" DESC, \"id\" DESC").Limit(maxErrorHistoryRows)).Exec(ctx)
 	return err
 }
