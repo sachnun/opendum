@@ -67,6 +67,13 @@ function keyRateLimits(apiKeyId: string) {
   return options.value?.rateLimitsByKeyId[apiKeyId] ?? [];
 }
 
+function accessModeLabel(mode: string) {
+  const normalizedMode = mode === "whitelist" || mode === "blacklist" ? mode : "all";
+  if (normalizedMode === "whitelist") return "Whitelist";
+  if (normalizedMode === "blacklist") return "Blacklist";
+  return "All";
+}
+
 function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
   if (!data.value) return;
   data.value = {
@@ -89,105 +96,105 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <UiCard v-if="apiKeys.length === 0" class="bg-card">
-      <UiCardContent class="flex flex-col items-center justify-center py-12">
-        <div class="mb-4 rounded-full bg-muted p-4">
-          <UiIcon name="i-lucide-key" class="size-8 text-muted-foreground" />
-        </div>
-        <h3 class="text-lg font-semibold">No API keys</h3>
-        <div class="mt-4">
-          <CreateApiKeyButton @created="refresh" />
-        </div>
-      </UiCardContent>
-    </UiCard>
+    <section v-if="apiKeys.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
+      <div class="space-y-3 pt-1">
+        <p class="text-sm text-muted-foreground">No API keys created yet.</p>
+        <CreateApiKeyButton @created="refresh" />
+      </div>
+    </section>
 
-    <div v-else class="grid gap-4 md:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
-      <UiCard v-for="apiKey in apiKeys" :key="apiKey.id" class="bg-card" :class="getApiKeyStatus(apiKey).label !== 'Active' ? 'opacity-70' : ''">
-        <UiCardContent>
-          <div class="space-y-4">
-            <div class="flex flex-col gap-4">
+    <section v-else class="scroll-mt-24 space-y-4 md:space-y-2">
+      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
+        <UiCard
+          v-for="apiKey in apiKeys"
+          :key="apiKey.id"
+          class="flex h-full flex-col bg-transparent transition-colors"
+          :class="getApiKeyStatus(apiKey).label !== 'Active' ? 'opacity-65' : ''"
+        >
+          <UiCardHeader class="pb-1">
+            <div class="flex min-w-0 items-start justify-between gap-2">
               <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="refresh" />
-                  <UiBadge v-if="getApiKeyStatus(apiKey).label !== 'Active'" :variant="getApiKeyStatus(apiKey).variant">
-                    {{ getApiKeyStatus(apiKey).label }}
-                  </UiBadge>
-                </div>
+                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="refresh" />
               </div>
-
-              <div class="w-full max-w-[540px]">
-                <ApiKeyActions :api-key="apiKey" @changed="refresh" @toggled="updateApiKeyActive(apiKey.id, $event)" />
+              <div class="flex shrink-0 flex-wrap justify-end gap-1">
+                <UiBadge :variant="getApiKeyStatus(apiKey).variant" class="text-xs">
+                  {{ getApiKeyStatus(apiKey).label }}
+                </UiBadge>
               </div>
             </div>
+            <div class="mt-1 flex flex-wrap items-center gap-1.5">
+              <UiBadge variant="outline" class="text-[10px] font-normal">Models: {{ accessModeLabel(apiKey.modelAccessMode) }}</UiBadge>
+              <UiBadge variant="outline" class="text-[10px] font-normal">Accounts: {{ accessModeLabel(apiKey.accountAccessMode) }}</UiBadge>
+              <UiBadge v-if="keyRateLimits(apiKey.id).length > 0" variant="outline" class="text-[10px] font-normal">
+                {{ keyRateLimits(apiKey.id).length }} limit{{ keyRateLimits(apiKey.id).length === 1 ? '' : 's' }}
+              </UiBadge>
+            </div>
+          </UiCardHeader>
 
-            <div class="space-y-2.5">
-              <div class="rounded-xl border border-border/70 bg-muted/20 px-4 py-1">
-                <div class="flex items-center justify-between gap-4 py-3 text-sm">
+          <UiCardContent class="flex flex-1 flex-col pt-0">
+            <div class="flex-1 space-y-3 text-sm">
+              <ApiKeyActions :api-key="apiKey" @changed="refresh" @toggled="updateApiKeyActive(apiKey.id, $event)" />
+
+              <div class="space-y-2">
+                <div class="flex justify-between gap-4">
                   <span class="text-muted-foreground">Created</span>
                   <span class="text-right font-medium">{{ apiKey.createdAt ? new Date(apiKey.createdAt).toLocaleDateString() : '-' }}</span>
                 </div>
-
-                <div class="border-t border-border/60" />
-
-                <div class="flex items-center justify-between gap-4 py-3 text-sm">
+                <div class="flex items-center justify-between gap-4">
                   <span class="text-muted-foreground">Expiration</span>
                   <div class="text-right">
                     <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" @updated="refresh" />
                   </div>
                 </div>
-
-                <div class="border-t border-border/60" />
-
-                <div class="flex items-center justify-between gap-4 py-3 text-sm">
+                <div class="flex justify-between gap-4">
                   <span class="text-muted-foreground">Last used</span>
                   <span class="text-right font-medium">{{ apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : '-' }}</span>
                 </div>
+                <NuxtLink
+                  :to="`/dashboard/analistik/${apiKey.id}`"
+                  class="flex justify-between gap-4 rounded-sm py-0.5 transition-colors hover:bg-muted/30"
+                  title="View analytics"
+                >
+                  <span class="inline-flex items-center gap-1.5 text-muted-foreground">
+                    <UiIcon name="i-lucide-bar-chart-3" class="size-3.5" />
+                    Analytics
+                  </span>
+                  <span class="text-right font-medium">Open details</span>
+                </NuxtLink>
               </div>
 
-              <NuxtLink
-                :to="`/dashboard/analistik/${apiKey.id}`"
-                class="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-sm transition-colors hover:border-border hover:bg-muted/35"
-                title="View analytics"
-              >
-                <span class="inline-flex items-center gap-1.5 text-muted-foreground">
-                  <UiIcon name="i-lucide-bar-chart-3" class="size-3.5" />
-                  Analytics
-                </span>
-                <span class="text-right font-medium">Open usage details</span>
-              </NuxtLink>
+              <div class="grid gap-2.5 border-t border-border/60 pt-3">
+                <ApiKeyAccessSection title="Model Access" :default-open="modelAccessExpanded(apiKey)">
+                  <ApiKeyModelAccess
+                    :api-key-id="apiKey.id"
+                    :available-models="options?.availableModels ?? []"
+                    :initial-mode="normalizeModelAccessMode(apiKey.modelAccessMode)"
+                    :initial-models="apiKey.modelAccessList"
+                  />
+                </ApiKeyAccessSection>
+
+                <ApiKeyAccessSection title="Account Access" :default-open="accountAccessExpanded(apiKey)">
+                  <ApiKeyAccountAccess
+                    :api-key-id="apiKey.id"
+                    :available-accounts="options?.providerAccounts ?? []"
+                    :initial-mode="normalizeAccountAccessMode(apiKey.accountAccessMode)"
+                    :initial-accounts="apiKey.accountAccessList"
+                  />
+                </ApiKeyAccessSection>
+
+                <ApiKeyAccessSection title="Rate Limits" :default-open="keyRateLimits(apiKey.id).length > 0">
+                  <ApiKeyRateLimit
+                    :api-key-id="apiKey.id"
+                    :available-models="options?.availableModels ?? []"
+                    :available-families="options?.availableFamilies ?? []"
+                    :initial-rules="keyRateLimits(apiKey.id)"
+                  />
+                </ApiKeyAccessSection>
+              </div>
             </div>
-
-            <div class="grid gap-3.5">
-              <ApiKeyAccessSection title="Model Access" :default-open="modelAccessExpanded(apiKey)">
-                <ApiKeyModelAccess
-                  :api-key-id="apiKey.id"
-                  :available-models="options?.availableModels ?? []"
-                  :initial-mode="normalizeModelAccessMode(apiKey.modelAccessMode)"
-                  :initial-models="apiKey.modelAccessList"
-                />
-              </ApiKeyAccessSection>
-
-              <ApiKeyAccessSection title="Account Access" :default-open="accountAccessExpanded(apiKey)">
-                <ApiKeyAccountAccess
-                  :api-key-id="apiKey.id"
-                  :available-accounts="options?.providerAccounts ?? []"
-                  :initial-mode="normalizeAccountAccessMode(apiKey.accountAccessMode)"
-                  :initial-accounts="apiKey.accountAccessList"
-                />
-              </ApiKeyAccessSection>
-
-              <ApiKeyAccessSection title="Rate Limits" :default-open="keyRateLimits(apiKey.id).length > 0">
-                <ApiKeyRateLimit
-                  :api-key-id="apiKey.id"
-                  :available-models="options?.availableModels ?? []"
-                  :available-families="options?.availableFamilies ?? []"
-                  :initial-rules="keyRateLimits(apiKey.id)"
-                />
-              </ApiKeyAccessSection>
-            </div>
-          </div>
-        </UiCardContent>
-      </UiCard>
-    </div>
+          </UiCardContent>
+        </UiCard>
+      </div>
+    </section>
   </div>
 </template>

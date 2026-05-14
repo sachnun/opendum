@@ -97,14 +97,14 @@ async function deleteKey() {
 </script>
 
 <template>
-  <div class="rounded-xl border border-border/70 bg-muted/20 p-3.5">
-    <div class="flex flex-col gap-3">
+  <div class="space-y-2.5 rounded-sm border border-border/60 bg-muted/20 p-2">
+    <div class="flex flex-col gap-2.5">
       <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
       <button
         type="button"
         :disabled="isLoading"
         :class="cn(
-          'flex w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-input/30 px-3 py-2 text-left font-mono text-xs text-muted-foreground outline-none transition-colors disabled:pointer-events-none disabled:opacity-50',
+          'flex w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-background/60 px-2 py-2 text-left font-mono text-xs text-muted-foreground outline-none transition-colors hover:bg-muted/30 disabled:pointer-events-none disabled:opacity-50',
           isRevealed ? 'min-h-9' : 'h-9',
         )"
         :title="isRevealed ? 'Hide key' : 'Reveal key'"
@@ -114,12 +114,12 @@ async function deleteKey() {
         <UiIcon :name="isRevealed ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4 shrink-0 text-muted-foreground" />
       </button>
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
-          <UiButton variant="outline" size="icon" class="h-9 w-9" title="Delete key" @click="deleteDialogOpen = true">
+          <UiButton variant="outline" size="icon-sm" class="h-8 w-8" title="Delete key" @click="deleteDialogOpen = true">
             <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
           </UiButton>
-          <UiButton variant="outline" size="icon" class="h-9 w-9" :disabled="isLoading" title="Copy key" @click="copyKey">
+          <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading" title="Copy key" @click="copyKey">
             <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />
           </UiButton>
           <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" @updated="emit('changed')" />
