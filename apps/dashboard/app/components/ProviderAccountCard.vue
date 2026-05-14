@@ -6,6 +6,7 @@ type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
 type ErrorPreviewEntry = {
   id: string;
+  model: string | null;
   errorCode: number | null;
   errorMessage: string;
   createdAt: string | Date | null;
@@ -40,6 +41,7 @@ type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
+const RECOVERED_ERROR_STALE_MS = 3 * 60 * 60 * 1000;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
   { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },
   { value: "hours", label: "Hours", multiplier: 60 * 60 * 1000 },
@@ -320,6 +322,10 @@ function stripStatusFromErrorMessage(message: string, code: number | null | unde
     .trimStart();
 }
 
+function getErrorMessageModel(message: string, code: number | null | undefined): string | null {
+  return parseStoredErrorMessage(message, code).model?.trim() || null;
+}
+
 function normalizePlaygroundEndpoint(value: string | null | undefined): ErrorPlaygroundEndpoint | null {
   const normalized = value?.trim().replace(/^\/v1\//, "") ?? "";
   if (normalized === "chat/completions" || normalized === "chat_completions") return "chat_completions";
@@ -462,19 +468,51 @@ function getRecoveredTimeMs(): number {
   return Math.max(toTimeMs(props.account.lastSuccessAt) ?? 0, toTimeMs(props.account.lastRecoveredByRotationAt) ?? 0, toTimeMs(props.account.lastUsedAt) ?? 0);
 }
 
-function getErrorToneClass(errorAt: string | Date | null | undefined, isCurrent = true): string {
-  const errorMs = toTimeMs(errorAt);
+function getErrorToneClass(entry: ErrorPreviewEntry | null | undefined): string {
+  const errorMs = toTimeMs(entry?.createdAt);
   if (!errorMs) return "text-muted-foreground";
 
   const recoveredMs = getRecoveredTimeMs();
   const hasRecoveredAfterError = recoveredMs > errorMs;
-  if (!isCurrent && hasRecoveredAfterError) return "text-foreground";
-  if (hasRecoveredAfterError && Date.now() - errorMs > 3 * 60 * 60 * 1000) return "text-foreground";
+
+  const model = entry?.model?.trim() || (entry?.errorMessage ? getErrorMessageModel(entry.errorMessage, entry.errorCode) : null);
+  if (model) {
+    const health = props.modelHealth?.[model];
+    const modelRecoveredMs = toTimeMs(health?.lastSuccessAt);
+    const hasModelRecoveredAfterError = Boolean(modelRecoveredMs && modelRecoveredMs > errorMs);
+
+    if (!hasModelRecoveredAfterError) return hasRecoveredAfterError ? "text-amber-400" : "text-red-500";
+    if (health?.status === "active" && Date.now() - errorMs > RECOVERED_ERROR_STALE_MS) return "text-foreground";
+    return "text-amber-400";
+  }
+
+  if (hasRecoveredAfterError && Date.now() - errorMs > RECOVERED_ERROR_STALE_MS) return "text-foreground";
   return hasRecoveredAfterError ? "text-amber-400" : "text-red-500";
 }
 
-const errorToneClass = computed(() => getErrorToneClass(props.account.lastErrorAt));
 const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
+const currentHistoryEntry = computed(() => {
+  const currentErrorAtMs = toTimeMs(props.account.lastErrorAt);
+
+  return (historyEntries.value ?? []).find((entry) => {
+    const entryCreatedAtMs = toTimeMs(entry.createdAt);
+    const isSameError = entry.errorCode === props.account.lastErrorCode && entry.errorMessage === currentErrorMessage.value;
+    if (!isSameError) return false;
+    if (!currentErrorAtMs) return true;
+
+    return !entryCreatedAtMs || Math.abs(entryCreatedAtMs - currentErrorAtMs) <= 1000;
+  }) ?? null;
+});
+const currentErrorModel = computed(() => currentHistoryEntry.value?.model ?? getErrorMessageModel(currentErrorMessage.value, props.account.lastErrorCode));
+const currentErrorPreviewEntry = computed<ErrorPreviewEntry>(() => ({
+  id: "current",
+  model: currentErrorModel.value,
+  errorCode: props.account.lastErrorCode,
+  errorMessage: currentErrorMessage.value,
+  createdAt: props.account.lastErrorAt,
+  isCurrent: true,
+}));
+const errorToneClass = computed(() => getErrorToneClass(currentErrorPreviewEntry.value));
 const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   if (!currentErrorMessage.value) return [];
 
@@ -493,6 +531,7 @@ const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   return [
     {
       id: "current",
+      model: currentErrorModel.value,
       errorCode: props.account.lastErrorCode,
       errorMessage: currentErrorMessage.value,
       createdAt: props.account.lastErrorAt,
@@ -500,6 +539,7 @@ const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
     },
     ...history.map((entry) => ({
       id: entry.id,
+      model: entry.model ?? getErrorMessageModel(entry.errorMessage, entry.errorCode),
       errorCode: entry.errorCode,
       errorMessage: entry.errorMessage,
       createdAt: entry.createdAt,
@@ -509,9 +549,25 @@ const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
 });
 const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => errorPreviewEntries.value[activeErrorIndex.value] ?? errorPreviewEntries.value[0] ?? null);
 const errorPreviewToneClass = computed(() => {
-  const toneClass = getErrorToneClass(activeErrorEntry.value?.createdAt, activeErrorEntry.value?.isCurrent ?? false);
+  const toneClass = getErrorToneClass(activeErrorEntry.value);
   return toneClass === "text-foreground" ? "text-foreground/80" : toneClass;
 });
+
+function getErrorPreviewSliderDotClass(entry: ErrorPreviewEntry, isActive: boolean): string {
+  const toneClass = getErrorToneClass(entry);
+
+  if (isActive) {
+    if (toneClass === "text-red-500") return "w-4 bg-red-500";
+    if (toneClass === "text-amber-400") return "w-4 bg-amber-400";
+    if (toneClass === "text-muted-foreground") return "w-4 bg-muted-foreground/55";
+    return "w-4 bg-foreground/70";
+  }
+
+  if (toneClass === "text-red-500") return "w-1.5 bg-red-500/35";
+  if (toneClass === "text-amber-400") return "w-1.5 bg-amber-400/35";
+  return "w-1.5 bg-muted-foreground/35";
+}
+
 const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatusFromErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
 const errorDetails = computed(() => activeErrorEntry.value ? parseStoredErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : null);
 const errorPlaygroundRoute = computed(() => {
@@ -967,9 +1023,9 @@ function cancelErrorPreviewPointer() {
                   <span v-else-if="historyError" class="truncate text-[10px] text-red-500">{{ historyError }}</span>
                   <template v-else>
                     <span
-                      v-for="(_, index) in errorPreviewEntries"
+                      v-for="(entry, index) in errorPreviewEntries"
                       :key="index"
-                      :class="['h-1.5 rounded-full', index === activeErrorIndex ? 'w-4 bg-foreground/70' : 'w-1.5 bg-muted-foreground/35']"
+                      :class="['h-1.5 rounded-full', getErrorPreviewSliderDotClass(entry, index === activeErrorIndex)]"
                     />
                   </template>
                 </div>

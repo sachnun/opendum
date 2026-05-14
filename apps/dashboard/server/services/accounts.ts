@@ -395,7 +395,7 @@ export async function getAccountErrorHistory(userId: string, input: z.infer<type
     if (!account) return { success: false, error: "Account not found" } as const;
 
     const entries = await db
-      .select({ id: providerAccountErrorHistory.id, errorCode: providerAccountErrorHistory.errorCode, errorMessage: providerAccountErrorHistory.errorMessage, createdAt: providerAccountErrorHistory.createdAt })
+      .select({ id: providerAccountErrorHistory.id, model: providerAccountErrorHistory.model, errorCode: providerAccountErrorHistory.errorCode, errorMessage: providerAccountErrorHistory.errorMessage, createdAt: providerAccountErrorHistory.createdAt })
       .from(providerAccountErrorHistory)
       .where(eq(providerAccountErrorHistory.providerAccountId, input.accountId))
       .orderBy(desc(providerAccountErrorHistory.createdAt), desc(providerAccountErrorHistory.id))

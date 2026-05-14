@@ -96,6 +96,7 @@ export interface AccountQuotaInfo {
 
 export interface ErrorHistoryEntry {
   id: string;
+  model: string | null;
   errorCode: number | null;
   errorMessage: string;
   createdAt: string | Date;
