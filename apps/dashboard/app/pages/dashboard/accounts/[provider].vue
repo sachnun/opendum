@@ -41,6 +41,9 @@ let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
   return [...currentAccounts].sort((a, b) => {
+    const priority = compareAccounts(a, b);
+    if (priority !== 0) return priority;
+
     const aOrder = accountDisplayOrder.value[a.id];
     const bOrder = accountDisplayOrder.value[b.id];
 
@@ -193,8 +196,16 @@ function getAccountSortGroup(account: Account): number {
   return isTierAboveFree(account.tier) ? 0 : 1;
 }
 
+function toTimeMs(value: string | Date | null | undefined): number {
+  if (!value) return 0;
+
+  const timeMs = new Date(value).getTime();
+  return Number.isNaN(timeMs) ? 0 : timeMs;
+}
+
 function compareAccounts(a: Account, b: Account): number {
   return getAccountSortGroup(a) - getAccountSortGroup(b)
+    || toTimeMs(b.lastErrorAt) - toTimeMs(a.lastErrorAt)
     || (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active);
 }
 
