@@ -2,6 +2,7 @@
   "providers": [
     "opencode"
   ],
+  "ignored": true,
   "family": "Trinity",
   "meta": {
     "reasoning": false,
