@@ -1322,7 +1322,7 @@ function formatToolArguments(value: string): string {
   </UiSheet>
 
   <div class="space-y-6">
-    <div class="border-b border-border pb-4">
+    <div class="dashboard-header-divider">
       <div class="flex items-center justify-between gap-4">
         <h1 class="text-xl font-semibold">Playground</h1>
         <div class="flex items-center gap-2">

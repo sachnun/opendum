@@ -107,6 +107,23 @@
 }
 
 @layer utilities {
+  .dashboard-header-divider {
+    @apply relative pb-4;
+  }
+
+  .dashboard-header-divider::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, var(--border) 18%, var(--border) 82%, transparent) bottom / 100% 1px no-repeat,
+      linear-gradient(90deg, transparent, color-mix(in oklch, var(--foreground) 28%, transparent) 42%, color-mix(in oklch, var(--foreground) 28%, transparent) 58%, transparent) bottom / 72% 3px no-repeat;
+  }
+
   .shiki,
   .shiki pre,
   .shiki pre code {

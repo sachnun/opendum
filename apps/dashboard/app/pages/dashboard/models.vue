@@ -150,7 +150,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
 
 <template>
   <div class="space-y-6">
-    <div class="border-b border-border pb-4">
+    <div class="dashboard-header-divider">
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-xl font-semibold">Models</h2>
         <UiBadge variant="outline" class="tabular-nums">{{ enabledModelCount }}/{{ models.length }}</UiBadge>

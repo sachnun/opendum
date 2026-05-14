@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="border-b border-border pb-4">
+  <div class="dashboard-header-divider">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">

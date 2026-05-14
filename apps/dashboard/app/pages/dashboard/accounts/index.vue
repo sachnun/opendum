@@ -44,7 +44,7 @@ function handleAccountConnected() {
 <template>
   <div class="space-y-6">
     <div class="sticky top-0 z-20 -mx-5 bg-background px-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div class="border-b border-border pb-4 pt-3">
+      <div class="dashboard-header-divider pt-3">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-xl font-semibold">Provider Accounts</h2>
