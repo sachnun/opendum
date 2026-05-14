@@ -344,6 +344,7 @@ const errorToneClass = computed(() => {
   if (hasSuccessAfterLastError.value && Date.now() - errorMs > 3 * 60 * 60 * 1000) return "text-foreground";
   return hasSuccessAfterLastError.value ? "text-amber-400" : "text-red-500";
 });
+const errorPreviewToneClass = computed(() => errorToneClass.value === "text-foreground" ? "text-foreground/80" : errorToneClass.value);
 const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
 const errorPreview = computed(() => (currentErrorMessage.value.length > 150 ? `${currentErrorMessage.value.slice(0, 150)}...` : currentErrorMessage.value));
 const errorDetails = computed(() => (currentErrorMessage.value ? parseStoredErrorMessage(currentErrorMessage.value) : null));
@@ -673,7 +674,7 @@ function historyEntryPreview(errorMessage: string): string {
                 </button>
               </div>
               <div class="mt-1 flex min-h-16 items-center">
-                <span :class="['line-clamp-4 break-all text-xs', errorToneClass]">{{ account.lastErrorCode ? `[${account.lastErrorCode}] ` : '' }}{{ errorPreview }}</span>
+                <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ account.lastErrorCode ? `[${account.lastErrorCode}] ` : '' }}{{ errorPreview }}</span>
               </div>
               <span class="mt-1 block text-[10px] text-muted-foreground/80">Click for details</span>
             </button>
@@ -831,8 +832,8 @@ function historyEntryPreview(errorMessage: string): string {
           </div>
         </div>
 
-        <div class="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/30 p-3">
-          <div v-if="errorDetails && (errorDetails.provider || errorDetails.endpoint || errorDetails.model)" class="rounded-md border bg-muted/30 p-2">
+        <div class="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/20 p-3">
+          <div v-if="errorDetails && (errorDetails.provider || errorDetails.endpoint || errorDetails.model)" class="rounded-md border bg-background/70 p-2">
             <p v-if="errorDetails.provider" class="text-xs">
               <span class="text-muted-foreground">Provider:</span>
               <span class="font-mono">{{ errorDetails.provider }}</span>
@@ -874,7 +875,7 @@ function historyEntryPreview(errorMessage: string): string {
             <p v-else-if="historyError" class="text-xs text-red-500">{{ historyError }}</p>
 
             <div v-else-if="historyEntries && historyEntries.length > 0" class="space-y-2">
-              <details v-for="entry in historyEntries" :key="entry.id" class="rounded-md border bg-muted/30 p-2">
+              <details v-for="entry in historyEntries" :key="entry.id" class="rounded-md border bg-background/70 p-2">
                 <summary class="cursor-pointer break-words text-xs text-foreground">
                   <span class="font-medium">{{ historyEntryRelativeTime(entry) }}</span>
                   <span class="mx-1 text-muted-foreground">-</span>
