@@ -95,17 +95,18 @@
   * {
     @apply border-border outline-ring/50;
   }
-  input:focus-visible,
-  textarea:focus-visible,
-  select:focus-visible {
-    box-shadow: none;
-  }
   body {
     @apply bg-background text-foreground;
   }
 }
 
 @layer utilities {
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    box-shadow: none !important;
+  }
+
   .dashboard-header-divider {
     @apply pb-1;
   }
