@@ -15,8 +15,8 @@ const emit = defineEmits<{
   toggled: [providerKey: ProviderAccountKey, pinned: boolean];
 }>();
 
-function indicatorBadge(indicator: string, connectedAccounts: number) {
-  if (connectedAccounts === 0) return { label: "No Accounts", class: "" };
+function indicatorBadge(indicator: string, activeAccounts: number) {
+  if (activeAccounts === 0) return { label: "No Accounts", class: "" };
   if (indicator === "error") return { label: "Issue", class: "border-transparent bg-destructive/60 text-white" };
   if (indicator === "warning") return { label: "Unhealty", class: "border-yellow-500 text-yellow-600" };
   return { label: "Healthy", class: "border-green-500 text-green-600" };
@@ -35,7 +35,7 @@ function formatHourLabel(time: string): string {
 const dailyValues = computed(() => props.summary.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.summary.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
 const durationLabelPoints = computed(() => [props.summary.stats.durationLast24Hours[0], props.summary.stats.durationLast24Hours[Math.floor(props.summary.stats.durationLast24Hours.length / 2)], props.summary.stats.durationLast24Hours[props.summary.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
-const badge = computed(() => indicatorBadge(props.summary.indicator, props.summary.connected));
+const badge = computed(() => indicatorBadge(props.summary.indicator, props.summary.active));
 function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
   emit("toggled", providerKey, pinned);
 }
