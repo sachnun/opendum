@@ -29,14 +29,14 @@ function formatHourLabel(time: string): string {
 </script>
 
 <template>
-  <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5">
+  <div class="space-y-2">
     <div class="grid grid-cols-3 gap-1.5">
-      <UsageStatMetric variant="card" label="Requests" :value="stats.totalRequests.toLocaleString()" :compact="compact" />
-      <UsageStatMetric variant="card" label="Success" :value="stats.successRate === null ? '-' : `${stats.successRate}%`" :compact="compact" />
-      <UsageStatMetric variant="card" label="Latency" :value="formatDuration(stats.avgDurationLastDay)" :compact="compact" />
+      <UsageStatMetric label="Requests" :value="stats.totalRequests.toLocaleString()" :compact="compact" />
+      <UsageStatMetric label="Success" :value="stats.successRate === null ? '-' : `${stats.successRate}%`" :compact="compact" />
+      <UsageStatMetric label="Latency" :value="formatDuration(stats.avgDurationLastDay)" :compact="compact" />
     </div>
 
-    <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
+    <div>
       <UsageSparkline
         :values="durationValues"
         :color="durationChartColor"

@@ -215,10 +215,10 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                       {{ model.id }}
                     </span>
                   </button>
-                  <div class="flex h-7 shrink-0 items-center gap-1.5">
-                    <UiBadge variant="outline" class="min-w-10 justify-center text-[10px] font-normal">
+                  <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
+                    <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
                       {{ model.isEnabled ? 'On' : 'Off' }}
-                    </UiBadge>
+                    </span>
                     <UiSwitch
                       :model-value="model.isEnabled"
                       :disabled="pendingModelId === model.id"
