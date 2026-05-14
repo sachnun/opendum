@@ -172,17 +172,20 @@ const pendingModelByPanel = reactive<Record<string, string | null>>({});
 const modelSearchByPanel = reactive<Record<string, string>>({});
 const routeSearchByPanel = reactive<Record<string, string>>({});
 const systemCollapsedByPanel = reactive<Record<string, boolean>>({});
+const autoScrollByPanel = reactive<Record<string, boolean>>({});
 const initializedFromRoute = ref(false);
 const liveNow = ref(Date.now());
 
 const controllers = new Map<string, AbortController>();
 const requestIds = new Map<string, string>();
 const stoppedBatchPanelIds = new Set<string>();
+const panelScrollElements = new Map<string, HTMLElement>();
 const isBatchRunActive = ref(false);
 let liveTimer: ReturnType<typeof setInterval> | null = null;
 let startLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 let startLongPressTriggered = false;
 const START_LONG_PRESS_DELAY_MS = 600;
+const AUTO_SCROLL_DISABLE_THRESHOLD = 0.05;
 
 const filteredModels = computed(() => models.value);
 const filteredModelIds = computed(() => new Set(filteredModels.value.map((model) => model.id)));
@@ -516,6 +519,8 @@ function addPanel() {
 
 function removePanel(panelId: string) {
   stopPanelRequest(panelId);
+  panelScrollElements.delete(panelId);
+  Reflect.deleteProperty(autoScrollByPanel, panelId);
   panels.value = panels.value.filter((panel) => panel.id !== panelId);
   const nextResponses = { ...responses.value };
   Reflect.deleteProperty(nextResponses, panelId);
@@ -626,6 +631,41 @@ function getPanelWaitLabel(panelId: string): string {
   const response = responses.value[panelId];
   if (response?.isLoading && response.startedAt) return formatDurationMs(liveNow.value - response.startedAt);
   return formatDurationMs(response?.metrics.waitMs);
+}
+
+function setPanelScrollElement(panelId: string, element: unknown) {
+  if (element instanceof HTMLElement) {
+    panelScrollElements.set(panelId, element);
+    return;
+  }
+
+  panelScrollElements.delete(panelId);
+}
+
+function scrollPanelToBottom(panelId: string) {
+  if (!autoScrollByPanel[panelId]) return;
+  nextTick(() => {
+    const element = panelScrollElements.get(panelId);
+    const response = responses.value[panelId];
+    if (!element || !response?.isLoading || !autoScrollByPanel[panelId]) return;
+    element.scrollTop = element.scrollHeight;
+  });
+}
+
+function handlePanelScroll(panelId: string, event: Event) {
+  const element = event.currentTarget;
+  if (!(element instanceof HTMLElement)) return;
+
+  const response = responses.value[panelId];
+  if (!response?.isLoading || !autoScrollByPanel[panelId]) return;
+
+  const scrollableDistance = Math.max(element.scrollHeight - element.clientHeight, 0);
+  if (scrollableDistance === 0) return;
+
+  const distanceFromBottom = scrollableDistance - element.scrollTop;
+  if (distanceFromBottom / scrollableDistance > AUTO_SCROLL_DISABLE_THRESHOLD) {
+    autoScrollByPanel[panelId] = false;
+  }
 }
 
 function normalizeTokenValue(value: unknown): number | null {
@@ -960,6 +1000,7 @@ function adaptRequestOverridesForEndpoint(overrides: Record<string, unknown> | u
 
 function setResponse(panelId: string, response: ResponseData) {
   responses.value = { ...responses.value, [panelId]: response };
+  if (response.isLoading) scrollPanelToBottom(panelId);
 }
 
 function setResponseIfCurrent(panelId: string, requestId: string, response: ResponseData) {
@@ -980,6 +1021,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
   controllers.get(panelId)?.abort();
   requestIds.set(panelId, requestId);
+  autoScrollByPanel[panelId] = true;
   setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: buildResponseMetrics(null, null, null), startedAt: requestStartedAt });
 
   try {
@@ -1448,7 +1490,7 @@ function formatToolArguments(value: string): string {
           </UiCardHeader>
 
           <UiCardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-            <div class="min-h-0 flex-1 overflow-y-auto p-3">
+            <div :ref="(element) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto p-3" @scroll="handlePanelScroll(panel.id, $event)">
               <p v-if="!panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" class="py-8 text-center text-sm text-muted-foreground">Select a model to start</p>
 
               <template v-if="panel.modelId && scenarioMessages.length > 0">
