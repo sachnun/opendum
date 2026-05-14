@@ -454,12 +454,11 @@ const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
       createdAt: entry.createdAt,
       isCurrent: false,
     })),
-  ];
+  ].slice(0, 8);
 });
 const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => errorPreviewEntries.value[activeErrorIndex.value] ?? errorPreviewEntries.value[0] ?? null);
 const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatusFromErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
 const errorDetails = computed(() => activeErrorEntry.value ? parseStoredErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : null);
-const visibleStackedErrorEntries = computed(() => errorPreviewEntries.value.slice(activeErrorIndex.value, activeErrorIndex.value + 3));
 const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < errorPreviewEntries.value.length - 1);
 const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
 
@@ -650,7 +649,7 @@ async function loadErrorHistory() {
   const requestId = ++historyRequestId;
 
   try {
-    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id, limit: 20 });
+    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id, limit: 8 });
     if (requestId !== historyRequestId) return;
 
     if (!result.success) {
@@ -726,14 +725,6 @@ function getErrorEntryPreview(entry: ErrorPreviewEntry, maxLength = 150): string
 
 function getErrorEntryStatusTag(entry: ErrorPreviewEntry): ErrorStatusTag | null {
   return getErrorStatusTag(entry.errorCode);
-}
-
-function getStackedErrorEntryStyle(index: number): Record<string, string> {
-  return {
-    transform: `translateX(${index * 9}px) translateY(${index * 7}px) scale(${1 - index * 0.035})`,
-    zIndex: `${30 - index}`,
-    opacity: `${1 - index * 0.18}`,
-  };
 }
 
 function showNewerErrorPreview(event?: Event) {
@@ -841,39 +832,27 @@ function cancelErrorPreviewPointer() {
 
           <div class="min-h-14 border-t">
             <div v-if="account.lastErrorMessage" class="space-y-1.5 pt-2">
-              <div class="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
-                <span>{{ activeErrorEntry?.isCurrent ? 'Current error' : 'Previous error' }}</span>
-                <span class="font-mono">{{ activeErrorIndex + 1 }} / {{ errorPreviewEntries.length || 1 }}</span>
-              </div>
-
-              <div class="relative min-h-[7.6rem] pr-4 pb-3">
+              <div class="min-h-[7rem] pb-1">
                 <div
-                  v-for="(entry, stackIndex) in visibleStackedErrorEntries"
-                  :key="entry.id"
-                  :aria-hidden="stackIndex !== 0"
+                  v-if="activeErrorEntry"
                   tabindex="-1"
-                  :class="[
-                    'absolute inset-x-0 top-0 min-h-[7rem] rounded-sm border border-border/60 bg-background px-2 pt-2 pb-2 text-left shadow-sm transition-[transform,opacity,background-color,border-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    stackIndex === 0 ? 'cursor-pointer bg-muted/30 hover:bg-muted/40' : 'pointer-events-none bg-muted/20',
-                  ]"
-                  :style="getStackedErrorEntryStyle(stackIndex)"
-                  @click="stackIndex === 0 && openActiveErrorDialog()"
-                  @pointerdown="stackIndex === 0 && handleErrorPreviewPointerDown($event)"
-                  @pointerup="stackIndex === 0 && handleErrorPreviewPointerEnd($event)"
-                  @pointerleave="stackIndex === 0 && cancelErrorPreviewPointer()"
-                  @pointercancel="stackIndex === 0 && cancelErrorPreviewPointer()"
+                  class="min-h-[7rem] cursor-pointer rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left hover:bg-muted/40"
+                  @click="openActiveErrorDialog"
+                  @pointerdown="handleErrorPreviewPointerDown"
+                  @pointerup="handleErrorPreviewPointerEnd"
+                  @pointerleave="cancelErrorPreviewPointer"
+                  @pointercancel="cancelErrorPreviewPointer"
                 >
                   <div class="flex items-center justify-between gap-1">
-                    <span v-if="getErrorEntryStatusTag(entry)" class="flex min-w-0 items-center gap-1.5">
-                      <UiBadge variant="outline" class="h-5 shrink-0 px-1.5 py-0 text-[10px] font-medium">{{ getErrorEntryStatusTag(entry)?.code }}</UiBadge>
-                      <span class="truncate text-xs text-muted-foreground">{{ getErrorEntryStatusTag(entry)?.label }}</span>
+                    <span v-if="getErrorEntryStatusTag(activeErrorEntry)" class="flex min-w-0 items-center gap-1.5">
+                      <UiBadge variant="outline" class="h-5 shrink-0 px-1.5 py-0 text-[10px] font-medium">{{ getErrorEntryStatusTag(activeErrorEntry)?.code }}</UiBadge>
+                      <span class="truncate text-xs text-muted-foreground">{{ getErrorEntryStatusTag(activeErrorEntry)?.label }}</span>
                     </span>
                     <span v-else class="text-xs text-muted-foreground">No status code</span>
                     <button
-                      v-if="stackIndex === 0"
                       type="button"
                       class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
-                      :aria-label="entry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
+                      :aria-label="activeErrorEntry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
                       title="Copy error message"
                       @click="copyErrorPreview"
                     >
@@ -882,11 +861,11 @@ function cancelErrorPreviewPointer() {
                     </button>
                   </div>
                   <div class="mt-1 flex min-h-16 items-center">
-                    <span :class="['line-clamp-4 break-all text-xs', stackIndex === 0 ? errorPreviewToneClass : 'text-muted-foreground']">{{ getErrorEntryPreview(entry) }}</span>
+                    <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ getErrorEntryPreview(activeErrorEntry) }}</span>
                   </div>
                   <div class="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/80">
-                    <span>{{ getErrorEntryRelativeTime(entry) }}</span>
-                    <span v-if="stackIndex === 0">Click for details</span>
+                    <span>{{ getErrorEntryRelativeTime(activeErrorEntry) }}</span>
+                    <span>Click for details</span>
                   </div>
                 </div>
               </div>
@@ -900,11 +879,10 @@ function cancelErrorPreviewPointer() {
                   <span v-else-if="historyError" class="truncate text-[10px] text-red-500">{{ historyError }}</span>
                   <template v-else>
                     <span
-                      v-for="(_, index) in errorPreviewEntries.slice(0, 8)"
+                      v-for="(_, index) in errorPreviewEntries"
                       :key="index"
-                      :class="['h-1.5 rounded-full transition-all', index === activeErrorIndex ? 'w-4 bg-foreground/70' : 'w-1.5 bg-muted-foreground/35']"
+                      :class="['h-1.5 rounded-full', index === activeErrorIndex ? 'w-4 bg-foreground/70' : 'w-1.5 bg-muted-foreground/35']"
                     />
-                    <span v-if="errorPreviewEntries.length > 8" class="text-[10px] text-muted-foreground">+{{ errorPreviewEntries.length - 8 }}</span>
                   </template>
                 </div>
                 <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasPreviousErrorPreview" aria-label="Show previous error" title="Slide right to previous error" @click="showPreviousErrorPreview">
@@ -1096,9 +1074,8 @@ function cancelErrorPreviewPointer() {
             {{ displayErrorMessage }}
           </p>
 
-          <div class="flex items-center justify-between gap-2 border-t pt-3 text-xs text-muted-foreground">
-            <span>{{ activeErrorEntry?.isCurrent ? 'Showing current error' : `Showing previous error from ${activeErrorEntry ? getErrorEntryRelativeTime(activeErrorEntry) : 'history'}` }}</span>
-            <span class="font-mono">{{ activeErrorIndex + 1 }} / {{ errorPreviewEntries.length || 1 }}</span>
+          <div class="border-t pt-3 text-xs text-muted-foreground">
+            {{ activeErrorEntry?.isCurrent ? 'Showing current error' : `Showing previous error from ${activeErrorEntry ? getErrorEntryRelativeTime(activeErrorEntry) : 'history'}` }}
           </div>
         </div>
       </template>
