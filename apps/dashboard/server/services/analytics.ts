@@ -12,7 +12,7 @@ const analyticsFilterSchema = z.union([
 ]);
 export const analyticsDataInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional() }).optional();
 export const analyticsByApiKeyInputSchema = z.object({ apiKeyId: z.string(), filter: analyticsFilterSchema.optional() });
-export const analyticsUsageInputSchema = z.object({ range: periodSchema.default("24h") }).optional();
+export const analyticsUsageInputSchema = z.object({ range: periodSchema.default("30d") }).optional();
 
 type Period = z.infer<typeof periodSchema>;
 type AnalyticsFilter = z.infer<typeof analyticsFilterSchema>;
@@ -185,7 +185,7 @@ async function getAnalyticsDataForUser(
 }
 
 export async function getAnalyticsData(userId: string, input?: z.infer<typeof analyticsDataInputSchema>) {
-  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "24h", input?.apiKeyId);
+  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId);
   if (!result.success) throw new Error(result.error);
   return result.data;
 }
@@ -207,7 +207,7 @@ export async function getAnalyticsOverview(userId: string) {
 }
 
 export async function getAnalyticsByApiKey(userId: string, input: z.infer<typeof analyticsByApiKeyInputSchema>) {
-  const result = await getAnalyticsDataForUser(userId, input.filter ?? "24h", input.apiKeyId);
+  const result = await getAnalyticsDataForUser(userId, input.filter ?? "30d", input.apiKeyId);
   if (!result.success) throw new Error(result.error);
 
   const totals = result.data.totals;
@@ -222,7 +222,7 @@ export async function getAnalyticsByApiKey(userId: string, input: z.infer<typeof
 }
 
 export async function getUsageRows(userId: string, input?: z.infer<typeof analyticsUsageInputSchema>) {
-  const resolvedFilter = resolveFilterConfig(input?.range ?? "24h");
+  const resolvedFilter = resolveFilterConfig(input?.range ?? "30d");
   if (!resolvedFilter.success) throw new Error(resolvedFilter.error);
 
   try {

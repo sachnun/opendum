@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { endOfDay, format, startOfDay } from "date-fns";
+import type { DateRange as CalendarDateRange, DateValue } from "reka-ui";
 import type { AnalyticsData, ApiKeyListItem } from "../../lib/dashboard-api-types";
 
 type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 type AnalyticsFilter = Period | { from: string; to: string };
-type DateRange = { from: Date; to: Date };
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
 type StatMetric = { key: string; label: string; value: string; numericValue: number; hint?: string; formatDelta?: (delta: number) => string };
@@ -34,11 +34,10 @@ const periods: { value: Period; label: string }[] = [
 ];
 const quickPeriods = periods.filter((item) => ["15m", "1h", "24h", "7d", "30d"].includes(item.value));
 
-const period = ref<Period>("24h");
+const period = ref<Period>("30d");
 const selectedApiKeyId = ref(props.apiKeyId || "all");
-const customRange = ref<DateRange | null>(null);
-const draftFromDate = ref("");
-const draftToDate = ref("");
+const customRange = ref<CalendarDateRange | null>(null);
+const draftCustomRange = ref<CalendarDateRange | null>(null);
 const isCustomRangeActive = ref(false);
 const isFilterOpen = ref(false);
 const isApiKeyFilterOpen = ref(false);
@@ -55,8 +54,7 @@ watch(
 
 watch(isFilterOpen, (open) => {
   if (!open) return;
-  draftFromDate.value = customRange.value?.from ? format(customRange.value.from, "yyyy-MM-dd") : "";
-  draftToDate.value = customRange.value?.to ? format(customRange.value.to, "yyyy-MM-dd") : "";
+  draftCustomRange.value = customRange.value ? { ...customRange.value } : null;
 });
 
 const { data: apiKeysData } = await useAsyncData("dashboard-analytics-api-keys", () => dashboardApi.apiKeys.list(), {
@@ -64,10 +62,10 @@ const { data: apiKeysData } = await useAsyncData("dashboard-analytics-api-keys",
 });
 const apiKeys = computed<ApiKeyListItem[]>(() => apiKeysData.value ?? []);
 
-const selectedPeriod = computed(() => periods.find((item) => item.value === period.value) ?? periods[5]!);
+const selectedPeriod = computed(() => periods.find((item) => item.value === period.value) ?? periods[7]!);
 const customRangeLabel = computed(() => {
-  if (!customRange.value) return "Custom range";
-  return `${format(customRange.value.from, "dd MMM yyyy")} - ${format(customRange.value.to, "dd MMM yyyy")}`;
+  if (!customRange.value?.start || !customRange.value?.end) return "Custom range";
+  return `${format(toLocalDate(customRange.value.start), "dd MMM yyyy")} - ${format(toLocalDate(customRange.value.end), "dd MMM yyyy")}`;
 });
 const activeFilterLabel = computed(() => (isCustomRangeActive.value ? customRangeLabel.value : selectedPeriod.value.label));
 const selectedApiKeyLabel = computed(() => {
@@ -77,10 +75,10 @@ const selectedApiKeyLabel = computed(() => {
   return apiKey ? `${apiKey.name ?? "Unnamed key"} (${apiKey.keyPreview})` : selectedApiKeyId.value;
 });
 const activeFilter = computed<AnalyticsFilter>(() => {
-  if (isCustomRangeActive.value && customRange.value) {
+  if (isCustomRangeActive.value && customRange.value?.start && customRange.value?.end) {
     return {
-      from: startOfDay(customRange.value.from).toISOString(),
-      to: endOfDay(customRange.value.to).toISOString(),
+      from: startOfDay(toLocalDate(customRange.value.start)).toISOString(),
+      to: endOfDay(toLocalDate(customRange.value.end)).toISOString(),
     };
   }
 
@@ -140,10 +138,18 @@ function collectStatValues(items: StatMetric[]): Record<string, number> {
   return values;
 }
 
-function parseDraftDate(value: string): Date | null {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+function toDateOnlyString(value: DateValue): string {
+  return value.toString().slice(0, 10);
+}
+
+function toLocalDate(value: DateValue | undefined): Date {
+  if (!value) return new Date();
+  const [year, month, day] = toDateOnlyString(value).split("-").map(Number);
+  return new Date(year, (month ?? 1) - 1, day ?? 1);
+}
+
+function isFutureCalendarDate(value: DateValue): boolean {
+  return toDateOnlyString(value) > format(new Date(), "yyyy-MM-dd");
 }
 
 function handlePeriodChange(value: Period): void {
@@ -159,18 +165,14 @@ async function handleApiKeyChange(apiKeyId: string): Promise<void> {
 }
 
 function handleApplyCustomRange(): void {
-  const fromDate = parseDraftDate(draftFromDate.value);
-  const toDate = parseDraftDate(draftToDate.value);
-
-  if (!fromDate || !toDate) return;
-  customRange.value = fromDate <= toDate ? { from: fromDate, to: toDate } : { from: toDate, to: fromDate };
+  if (!draftCustomRange.value?.start || !draftCustomRange.value?.end) return;
+  customRange.value = { ...draftCustomRange.value };
   isCustomRangeActive.value = true;
   isFilterOpen.value = false;
 }
 
 function handleClearCustomRange(): void {
-  draftFromDate.value = "";
-  draftToDate.value = "";
+  draftCustomRange.value = null;
   customRange.value = null;
   isCustomRangeActive.value = false;
 }
@@ -345,22 +347,13 @@ const successRateData = computed(() =>
             <div class="h-px bg-border" />
             <div class="space-y-3 p-3">
               <p class="text-xs font-medium text-muted-foreground">Custom range</p>
-              <div class="grid gap-2 sm:grid-cols-2">
-                <label class="grid gap-1 text-xs text-muted-foreground">
-                  From
-                  <input v-model="draftFromDate" type="date" class="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
-                </label>
-                <label class="grid gap-1 text-xs text-muted-foreground">
-                  To
-                  <input v-model="draftToDate" type="date" class="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
-                </label>
-              </div>
+              <UiRangeCalendar v-model="draftCustomRange" :is-date-disabled="isFutureCalendarDate" class="max-w-[calc(100vw-3rem)]" />
               <div class="flex items-center justify-between gap-2">
                 <UiButton
                   variant="ghost"
                   size="sm"
                   class="h-8 px-2.5 text-xs"
-                  :disabled="!isCustomRangeActive && !draftFromDate && !draftToDate"
+                  :disabled="!isCustomRangeActive && !draftCustomRange?.start && !draftCustomRange?.end"
                   @click="handleClearCustomRange"
                 >
                   Clear
@@ -368,7 +361,7 @@ const successRateData = computed(() =>
                 <UiButton
                   size="sm"
                   class="h-8 px-2.5 text-xs"
-                  :disabled="!draftFromDate || !draftToDate"
+                  :disabled="!draftCustomRange?.start || !draftCustomRange?.end"
                   @click="handleApplyCustomRange"
                 >
                   Apply range
