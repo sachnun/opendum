@@ -812,7 +812,7 @@ function cancelErrorPreviewPointer() {
       </UiCardHeader>
       <UiCardContent class="flex flex-1 flex-col pt-0">
         <div class="flex-1 space-y-2 text-sm">
-          <div class="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
+          <div class="mb-3">
             <div class="mb-2 grid grid-cols-3 gap-1.5">
               <UsageStatMetric label="Requests" :value="account.stats.totalRequests.toLocaleString()" />
               <UsageStatMetric label="Success" :value="account.stats.successRate === null ? '-' : `${account.stats.successRate}%`" />
@@ -830,7 +830,7 @@ function cancelErrorPreviewPointer() {
           <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : '-' }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">Last Error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
 
-          <div class="min-h-14 border-t">
+          <div class="min-h-14">
             <div v-if="account.lastErrorMessage" class="space-y-1.5 pt-2">
               <div class="min-h-[7rem] pb-1">
                 <div
