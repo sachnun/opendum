@@ -53,14 +53,14 @@ const DEFAULT_SETTINGS: PlaygroundSettings = {
   maxTokens: 4096,
   presencePenalty: 0,
   frequencyPenalty: 0,
-  reasoningEffort: "none",
+  reasoningEffort: "low",
 };
 
 const SCENARIOS: Scenario[] = [
   {
     id: "text",
     name: "Text",
-    icon: "i-lucide-message-square-text",
+    icon: "i-lucide-file-text",
     prompt: "Write a short poem about the ocean.",
     isReasoning: false,
     messages: [
@@ -71,7 +71,7 @@ const SCENARIOS: Scenario[] = [
   {
     id: "chat",
     name: "Chat",
-    icon: "i-lucide-messages-square",
+    icon: "i-lucide-message-square-text",
     prompt: "Help me plan a small weekend project to learn Vue.",
     isReasoning: false,
     messages: [
@@ -133,17 +133,6 @@ const SCENARIOS: Scenario[] = [
       },
     ],
   },
-  {
-    id: "reasoning",
-    name: "Reasoning",
-    icon: "i-lucide-brain",
-    prompt: "Think step by step: A farmer has 17 sheep. All but 9 run away. How many sheep does the farmer have left? Explain your reasoning.",
-    isReasoning: true,
-    messages: [
-      { role: "system", content: "You are a logical reasoning assistant. Think through problems step by step, showing your chain of thought clearly before giving a final answer. Focus on accuracy and clarity." },
-      { role: "user", content: "Think step by step: A farmer has 17 sheep. All but 9 run away. How many sheep does the farmer have left? Explain your reasoning." },
-    ],
-  },
 ];
 
 const ENDPOINT_OPTIONS: Array<{ value: PlaygroundEndpoint; label: string; description: string }> = [
@@ -183,6 +172,8 @@ const loopCount = ref(2);
 const activeLoopProgress = ref<{ current: number; total: number } | null>(null);
 const activeFamilyPreset = ref<string | null>(null);
 const activeProviderPreset = ref<string | null>(null);
+const familyPresetExpanded = ref(false);
+const providerPresetExpanded = ref(false);
 const selectionOpenByPanel = reactive<Record<string, boolean>>({});
 const selectionStepByPanel = reactive<Record<string, "model" | "routing">>({});
 const pendingModelByPanel = reactive<Record<string, string | null>>({});
@@ -319,6 +310,13 @@ watch(isAnyLoading, (loading) => {
   if (!loading && liveTimer) {
     clearInterval(liveTimer);
     liveTimer = null;
+  }
+});
+
+onMounted(() => {
+  if (window.matchMedia("(min-width: 640px)").matches) {
+    familyPresetExpanded.value = true;
+    providerPresetExpanded.value = true;
   }
 });
 
@@ -1466,8 +1464,14 @@ function formatToolArguments(value: string): string {
       </div>
 
       <div class="space-y-3">
-        <h2 class="text-sm font-medium text-muted-foreground">Family Preset</h2>
-        <div v-if="familyPresets.length > 0" class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+        <button type="button" class="flex w-full cursor-pointer items-center justify-between gap-3 text-left" :aria-expanded="familyPresetExpanded" @click="familyPresetExpanded = !familyPresetExpanded">
+          <span class="text-sm font-medium text-muted-foreground">Family Preset</span>
+          <span class="flex items-center gap-2 text-xs text-muted-foreground">
+            {{ familyPresets.length }} groups
+            <UiIcon :name="familyPresetExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" />
+          </span>
+        </button>
+        <div v-if="familyPresetExpanded && familyPresets.length > 0" class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
           <button
             v-for="preset in familyPresets"
             :key="preset.family"
@@ -1483,12 +1487,18 @@ function formatToolArguments(value: string): string {
             <span :class="activeFamilyPreset === preset.family ? 'text-[10px] leading-none text-primary-foreground/85' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.models.length }} models</span>
           </button>
         </div>
-        <p v-else class="text-xs text-muted-foreground">Connect at least one provider account to use family presets.</p>
+        <p v-else-if="familyPresetExpanded" class="text-xs text-muted-foreground">Connect at least one provider account to use family presets.</p>
       </div>
 
       <div class="space-y-3">
-        <h2 class="text-sm font-medium text-muted-foreground">Provider Preset</h2>
-        <div v-if="providerPresets.length > 0" class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <button type="button" class="flex w-full cursor-pointer items-center justify-between gap-3 text-left" :aria-expanded="providerPresetExpanded" @click="providerPresetExpanded = !providerPresetExpanded">
+          <span class="text-sm font-medium text-muted-foreground">Provider Preset</span>
+          <span class="flex items-center gap-2 text-xs text-muted-foreground">
+            {{ providerPresets.length }} providers
+            <UiIcon :name="providerPresetExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" />
+          </span>
+        </button>
+        <div v-if="providerPresetExpanded && providerPresets.length > 0" class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <button
             v-for="preset in providerPresets"
             :key="preset.provider"
@@ -1504,7 +1514,7 @@ function formatToolArguments(value: string): string {
             <span :class="activeProviderPreset === preset.provider ? 'text-[10px] leading-none text-primary-foreground/85' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.accounts.length }} accounts</span>
           </button>
         </div>
-        <p v-else class="text-xs text-muted-foreground">Connect at least one provider account to use provider presets.</p>
+        <p v-else-if="providerPresetExpanded" class="text-xs text-muted-foreground">Connect at least one provider account to use provider presets.</p>
       </div>
 
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
