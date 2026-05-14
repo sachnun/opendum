@@ -1,11 +1,4 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
-  "family": "Z.AI",
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "z-ai/glm4.7"
-    }
-  }
+  "providers": [],
+  "family": "Z.AI"
 }

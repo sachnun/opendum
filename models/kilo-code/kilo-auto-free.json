@@ -1,5 +1,13 @@
 {
-  "providers": [],
+  "providers": [
+    "kilo_code"
+  ],
   "family": "Kilo Code",
-  "ignored": true
+  "ignored": true,
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "kilo-auto/free",
+      "authless": true
+    }
+  }
 }
