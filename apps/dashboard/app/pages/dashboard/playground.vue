@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
 import { compareModelEntries } from "../../../lib/model-sort";
-import { getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../../lib/provider-accounts";
+import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import type { PlaygroundOptions } from "../../../lib/dashboard-api-types";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
@@ -415,8 +415,14 @@ function getPanelProviderAccount(panel: PanelState): ProviderAccountOption | nul
   return usedAccountId ? providerAccountsById.value.get(usedAccountId) ?? null : null;
 }
 
-function getProviderAccountHref(account: ProviderAccountOption): string {
+function getProviderAccountHref(account: ProviderAccountOption): string | null {
+  if (!(account.provider in BY_KEY)) return null;
   return `${getProviderAccountPath(account.provider as ProviderAccountKey)}#${encodeURIComponent(account.id)}`;
+}
+
+function getPanelProviderAccountHref(panel: PanelState): string | null {
+  const account = getPanelProviderAccount(panel);
+  return account ? getProviderAccountHref(account) : null;
 }
 
 function getPanelModels(panel: PanelState): ModelOption[] {
@@ -1551,8 +1557,8 @@ function formatToolArguments(value: string): string {
               <div class="mt-1 flex items-center justify-between gap-2">
                 <span class="shrink-0 whitespace-nowrap text-muted-foreground">Provider account</span>
                 <NuxtLink
-                  v-if="getPanelProviderAccount(panel)"
-                  :to="getProviderAccountHref(getPanelProviderAccount(panel)!)"
+                  v-if="getPanelProviderAccountHref(panel)"
+                  :to="getPanelProviderAccountHref(panel)!"
                   class="min-w-0 truncate text-right font-medium text-foreground underline-offset-2 hover:underline"
                   :title="`Open ${getSelectedRouteLabel(panel)} in provider accounts`"
                 >
