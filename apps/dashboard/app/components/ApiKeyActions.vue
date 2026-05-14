@@ -10,12 +10,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   changed: [];
-  toggled: [isActive: boolean];
 }>();
 
 const dashboardApi = useDashboardApi();
 const isDeleting = ref(false);
-const isToggling = ref(false);
 const deleteDialogOpen = ref(false);
 const isRevealed = ref(false);
 const revealedKey = ref<string | null>(null);
@@ -66,20 +64,6 @@ async function copyKey() {
   }
 }
 
-async function toggleKey() {
-  isToggling.value = true;
-  errorMessage.value = "";
-  try {
-    const result = await dashboardApi.apiKeys.toggle({ id: props.apiKey.id });
-    if (!result.success) throw new Error(result.error);
-    emit("toggled", result.data.isActive);
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to toggle API key";
-  } finally {
-    isToggling.value = false;
-  }
-}
-
 async function deleteKey() {
   isDeleting.value = true;
   errorMessage.value = "";
@@ -119,15 +103,11 @@ async function deleteKey() {
           <UiButton variant="outline" size="icon-sm" class="h-8 w-8" title="Delete key" @click="deleteDialogOpen = true">
             <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
           </UiButton>
-          <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading" title="Copy key" @click="copyKey">
-            <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />
-          </UiButton>
           <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" @updated="emit('changed')" />
         </div>
-        <div class="flex shrink-0 items-center gap-1.5 self-center">
-          <span class="text-[11px] leading-none text-muted-foreground">{{ apiKey.isActive ? 'On' : 'Off' }}</span>
-          <UiSwitch :model-value="apiKey.isActive" :disabled="isToggling" :title="apiKey.isActive ? 'Disable key' : 'Enable key'" @update:model-value="toggleKey" />
-        </div>
+        <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading" title="Copy key" @click="copyKey">
+          <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />
+        </UiButton>
       </div>
     </div>
 

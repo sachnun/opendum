@@ -16,6 +16,8 @@ const { data, error, refresh } = await useAsyncData("dashboard-api-keys", async 
 const apiKeys = computed<ApiKeyListItem[]>(() => data.value?.apiKeys ?? []);
 const options = computed<ApiKeyOptions | null>(() => data.value?.options ?? null);
 const activeApiKeyCount = computed(() => apiKeys.value.filter((apiKey) => getApiKeyStatus(apiKey).label === "Active").length);
+const togglingApiKeyIds = ref(new Set<string>());
+const toggleErrors = ref<Record<string, string>>({});
 
 function getApiKeyStatus(apiKey: ApiKeyListItem) {
   const now = new Date();
@@ -73,6 +75,30 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
     ...data.value,
     apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, isActive } : apiKey)),
   };
+}
+
+async function toggleApiKey(apiKey: ApiKeyListItem) {
+  if (togglingApiKeyIds.value.has(apiKey.id)) return;
+
+  const nextTogglingIds = new Set(togglingApiKeyIds.value);
+  nextTogglingIds.add(apiKey.id);
+  togglingApiKeyIds.value = nextTogglingIds;
+  toggleErrors.value = { ...toggleErrors.value, [apiKey.id]: "" };
+
+  try {
+    const result = await dashboardApi.apiKeys.toggle({ id: apiKey.id });
+    if (!result.success) throw new Error(result.error);
+    updateApiKeyActive(apiKey.id, result.data.isActive);
+  } catch (error) {
+    toggleErrors.value = {
+      ...toggleErrors.value,
+      [apiKey.id]: error instanceof Error ? error.message : "Failed to toggle API key",
+    };
+  } finally {
+    const nextTogglingIds = new Set(togglingApiKeyIds.value);
+    nextTogglingIds.delete(apiKey.id);
+    togglingApiKeyIds.value = nextTogglingIds;
+  }
 }
 
 function updateApiKeyModelAccess(apiKeyId: string, value: { mode: AccessMode; models: string[] }) {
@@ -139,12 +165,17 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
               <div class="min-w-0 overflow-hidden">
                 <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="refresh" />
               </div>
-              <div class="flex h-7 shrink-0 items-center justify-end">
-                <UiBadge :variant="getApiKeyStatus(apiKey).variant" class="min-w-16 justify-center text-xs">
-                  {{ getApiKeyStatus(apiKey).label }}
-                </UiBadge>
+              <div class="flex h-7 shrink-0 items-center justify-end gap-1.5">
+                <span class="text-[11px] leading-none text-muted-foreground">{{ apiKey.isActive ? 'On' : 'Off' }}</span>
+                <UiSwitch
+                  :model-value="apiKey.isActive"
+                  :disabled="togglingApiKeyIds.has(apiKey.id)"
+                  :title="apiKey.isActive ? 'Disable key' : 'Enable key'"
+                  @update:model-value="toggleApiKey(apiKey)"
+                />
               </div>
             </div>
+            <p v-if="toggleErrors[apiKey.id]" class="mt-1 text-xs text-destructive">{{ toggleErrors[apiKey.id] }}</p>
             <div class="mt-1 flex flex-wrap items-center gap-1.5">
               <UiBadge variant="outline" class="text-[10px] font-normal">Models: {{ accessModeLabel(apiKey.modelAccessMode) }}</UiBadge>
               <UiBadge variant="outline" class="text-[10px] font-normal">Accounts: {{ accessModeLabel(apiKey.accountAccessMode) }}</UiBadge>
@@ -156,7 +187,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
 
           <UiCardContent class="flex flex-1 flex-col pt-0">
             <div class="flex-1 space-y-3 text-sm">
-              <ApiKeyActions :api-key="apiKey" @changed="refresh" @toggled="updateApiKeyActive(apiKey.id, $event)" />
+              <ApiKeyActions :api-key="apiKey" @changed="refresh" />
 
               <div class="space-y-2">
                 <div class="flex justify-between gap-4">
