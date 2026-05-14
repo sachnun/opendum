@@ -7,7 +7,7 @@ type ApiKeyListItem = Awaited<ReturnType<typeof dashboardApi.apiKeys.list>>[numb
 type ApiKeyOptions = Awaited<ReturnType<typeof dashboardApi.apiKeys.options>>;
 type AccessMode = "all" | "whitelist" | "blacklist";
 
-const { data, error, pending, refresh } = await useAsyncData("dashboard-api-keys", async () => {
+const { data, error, refresh } = await useAsyncData("dashboard-api-keys", async () => {
   const [apiKeys, options] = await Promise.all([dashboardApi.apiKeys.list(), dashboardApi.apiKeys.options()]);
   return { apiKeys, options };
 });
@@ -89,8 +89,7 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="pending" class="h-80 rounded-xl" />
-    <UiCard v-else-if="apiKeys.length === 0" class="bg-card">
+    <UiCard v-if="apiKeys.length === 0" class="bg-card">
       <UiCardContent class="flex flex-col items-center justify-center py-12">
         <div class="mb-4 rounded-full bg-muted p-4">
           <UiIcon name="i-lucide-key" class="size-8 text-muted-foreground" />

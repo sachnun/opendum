@@ -8,20 +8,22 @@ const open = ref(false);
 const name = ref("");
 const isCreating = ref(false);
 const createdKey = ref<string | null>(null);
+const hasCreatedKey = ref(false);
 const copied = ref(false);
 const errorMessage = ref("");
 
 function reset() {
   name.value = "";
   createdKey.value = null;
+  hasCreatedKey.value = false;
   copied.value = false;
   errorMessage.value = "";
 }
 
 watch(open, (value) => {
   if (!value) {
+    if (hasCreatedKey.value) emit("created");
     reset();
-    emit("created");
   }
 });
 
@@ -32,6 +34,7 @@ async function createKey() {
     const result = await dashboardApi.apiKeys.create({ name: name.value.trim() || undefined });
     if (!result.success) throw new Error(result.error);
     createdKey.value = result.data.key;
+    hasCreatedKey.value = true;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to create API key";
   } finally {
@@ -52,29 +55,43 @@ function closeDialog() {
 </script>
 
 <template>
-  <UiButton size="sm" @click="open = true">
-    <UiIcon name="i-lucide-plus" class="mr-1.5 size-3.5" />
+  <UiButton size="sm" class="gap-2" @click="open = true">
+    <UiIcon name="i-lucide-plus" class="size-3.5" />
     Create API Key
   </UiButton>
 
-  <UiDialog v-model:open="open" :ui="{ content: 'sm:max-w-[440px]' }">
+  <UiDialog v-model:open="open" :prevent-outside-close="isCreating" :prevent-escape-close="isCreating" :ui="{ content: 'max-h-[calc(100dvh-1rem)] p-4 sm:max-w-md sm:p-6' }">
     <template #content>
       <template v-if="createdKey">
         <div class="space-y-1.5 pr-6">
           <h2 class="text-lg font-semibold leading-none tracking-tight">API Key Created</h2>
           <p class="sr-only">Your new API key is ready to use.</p>
         </div>
-        <div class="py-3">
-          <label class="text-sm font-medium">Your API Key</label>
-          <div class="mt-1.5 flex items-center gap-2">
-            <code class="flex-1 break-all rounded bg-muted px-2.5 py-1.5 font-mono text-xs">{{ createdKey }}</code>
-            <UiButton variant="outline" size="sm" class="h-8 w-8 shrink-0 p-0" title="Copy key" @click="copyCreatedKey">
-              <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-3.5', copied ? 'text-green-500' : '']" />
-            </UiButton>
+        <div class="space-y-4 py-1">
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Save your API key</p>
+            <p class="text-sm text-muted-foreground">Copy this key now. For security, it will not be shown again after you close this dialog.</p>
           </div>
-        </div>
-        <div class="flex justify-end">
-          <UiButton size="sm" @click="closeDialog">Done</UiButton>
+
+          <div class="rounded-md border border-border bg-muted/30 p-3">
+            <p class="text-xs text-muted-foreground">Your API Key</p>
+            <div class="mt-2 flex items-center gap-2">
+              <code class="flex-1 break-all rounded bg-background px-2 py-1 font-mono text-xs font-medium">{{ createdKey }}</code>
+              <UiButton type="button" variant="outline" size="sm" class="h-8 shrink-0 px-2" :title="copied ? 'Copied!' : 'Copy key'" @click="copyCreatedKey">
+                <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                {{ copied ? 'Copied' : 'Copy' }}
+              </UiButton>
+            </div>
+          </div>
+
+          <div class="relative w-full rounded-lg border px-4 py-3 text-sm">
+            <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
+            <div class="pl-7 text-xs">Treat this key like a password. Anyone with access to it can use your Opendum account.</div>
+          </div>
+
+          <div class="flex justify-end">
+            <UiButton type="button" size="sm" @click="closeDialog">Done</UiButton>
+          </div>
         </div>
       </template>
 
@@ -83,24 +100,40 @@ function closeDialog() {
           <h2 class="text-lg font-semibold leading-none tracking-tight">Create API Key</h2>
           <p class="sr-only">Create a new API key for accessing Opendum.</p>
         </div>
-        <div v-if="errorMessage" class="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {{ errorMessage }}
-        </div>
-        <div class="space-y-3 py-3">
-          <label class="grid gap-1.5 text-sm font-medium">
-            Name
+
+        <form class="space-y-4 py-1" autocomplete="off" @submit.prevent="createKey">
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Add API key</p>
+            <p class="text-sm text-muted-foreground">Create an API key for accessing Opendum from clients, scripts, or external tools.</p>
+          </div>
+
+          <div v-if="errorMessage" class="relative w-full rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive">
+            <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
+            <div class="pl-7 text-xs">{{ errorMessage }}</div>
+          </div>
+
+          <div class="space-y-2">
+            <label for="api-key-name" class="text-sm font-medium">Name</label>
             <input
+              id="api-key-name"
               v-model="name"
-              class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              type="text"
+              :disabled="isCreating"
+              autofocus
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
               placeholder="My API Key"
-              @keydown.enter.prevent="createKey"
             >
-          </label>
-        </div>
-        <div class="flex justify-end gap-2">
-          <UiButton variant="outline" size="sm" @click="open = false">Cancel</UiButton>
-          <UiButton size="sm" :disabled="isCreating" @click="createKey">{{ isCreating ? 'Creating...' : 'Create' }}</UiButton>
-        </div>
+            <p class="text-xs text-muted-foreground">Optional. Use a name that helps you identify where this key is used.</p>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <UiButton type="button" variant="outline" size="sm" :disabled="isCreating" @click="open = false">Cancel</UiButton>
+            <UiButton type="submit" size="sm" :disabled="isCreating">
+              <UiIcon v-if="isCreating" name="i-lucide-loader-2" class="size-3.5 animate-spin" />
+              {{ isCreating ? 'Creating...' : 'Create' }}
+            </UiButton>
+          </div>
+        </form>
       </template>
     </template>
   </UiDialog>
