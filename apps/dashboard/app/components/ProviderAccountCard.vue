@@ -309,12 +309,13 @@ function getErrorStatusTag(code: number | null | undefined): ErrorStatusTag | nu
 }
 
 function stripStatusFromErrorMessage(message: string, code: number | null | undefined): string {
-  const trimmed = message.trimStart();
+  const trimmed = message.trimStart().replace(/^Error:\s*/i, "");
   if (!code) return trimmed;
 
   return trimmed
     .replace(new RegExp(`^\\[${code}\\]\\s*(?:error:\\s*)?`, "i"), "")
     .replace(new RegExp(`^HTTP\\s+${code}\\s*[:\\-]?\\s*(?:error:\\s*)?`, "i"), "")
+    .replace(/^Error:\s*/i, "")
     .trimStart();
 }
 
@@ -754,9 +755,10 @@ function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null 
           <div class="min-h-14 border-t">
             <button v-if="account.lastErrorMessage" type="button" class="w-full min-h-[7rem] cursor-pointer rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="errorDialogOpen = true">
               <div class="flex items-center justify-between gap-1">
-                <UiBadge v-if="errorStatusTag" variant="outline" class="h-5 px-1.5 py-0 text-[10px] font-medium">
-                  ({{ errorStatusTag.code }}) {{ errorStatusTag.label }}
-                </UiBadge>
+                <span v-if="errorStatusTag" class="flex min-w-0 items-center gap-1.5">
+                  <UiBadge variant="outline" class="h-5 shrink-0 px-1.5 py-0 text-[10px] font-medium">{{ errorStatusTag.code }}</UiBadge>
+                  <span class="truncate text-xs text-muted-foreground">{{ errorStatusTag.label }}</span>
+                </span>
                 <span v-else class="text-xs text-muted-foreground">No status code</span>
                 <button
                   type="button"
@@ -908,9 +910,9 @@ function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null 
       </template>
     </UiDialog>
 
-    <UiDialog v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-xl pt-12', close: 'left-4 right-auto' }">
+    <UiDialog v-model:open="errorDialogOpen" :ui="{ content: 'sm:max-w-xl' }" :show-close="false">
       <template #content>
-        <div class="flex justify-end">
+        <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-1">
             <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy all errors" title="Copy all errors (current + history)" @click="copyAllErrors">
               <UiIcon :name="copiedAllErrors ? 'i-lucide-check' : 'i-lucide-clipboard-list'" class="size-4" />
@@ -922,6 +924,9 @@ function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null 
               <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
             </UiButton>
           </div>
+          <UiButton type="button" variant="ghost" size="icon-sm" aria-label="Close error details" title="Close" class="shrink-0" @click="errorDialogOpen = false">
+            <UiIcon name="i-lucide-x" class="size-4" />
+          </UiButton>
         </div>
 
         <div class="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/20 p-3">
@@ -971,9 +976,10 @@ function historyEntryStatusTag(entry: ErrorHistoryEntry): ErrorStatusTag | null 
                 <summary class="cursor-pointer break-words text-xs text-foreground">
                   <span class="font-medium">{{ historyEntryRelativeTime(entry) }}</span>
                   <span class="mx-1 text-muted-foreground">-</span>
-                  <UiBadge v-if="historyEntryStatusTag(entry)" variant="outline" class="inline-flex h-5 px-1.5 py-0 text-[10px] font-medium">
-                    ({{ historyEntryStatusTag(entry)?.code }}) {{ historyEntryStatusTag(entry)?.label }}
-                  </UiBadge>
+                  <span v-if="historyEntryStatusTag(entry)" class="inline-flex items-center gap-1.5 align-middle">
+                    <UiBadge variant="outline" class="h-5 px-1.5 py-0 text-[10px] font-medium">{{ historyEntryStatusTag(entry)?.code }}</UiBadge>
+                    <span class="text-muted-foreground">{{ historyEntryStatusTag(entry)?.label }}</span>
+                  </span>
                   <span class="mx-1 text-muted-foreground">-</span>
                   <span class="text-muted-foreground">{{ historyEntryPreview(historyEntryDisplayMessage(entry)) }}</span>
                 </summary>
