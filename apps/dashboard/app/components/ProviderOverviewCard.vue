@@ -57,9 +57,9 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
     <UiCardContent class="pointer-events-none relative z-20 p-0">
       <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
         <div class="grid grid-cols-3 gap-1.5">
-          <div><p class="truncate text-[10px] text-muted-foreground">Requests</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.totalRequests.toLocaleString() }}</p></div>
-          <div><p class="truncate text-[10px] text-muted-foreground">Success</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ summary.stats.successRate === null ? '-' : `${summary.stats.successRate}%` }}</p></div>
-          <div><p class="truncate text-[10px] text-muted-foreground">Latency</p><p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ formatDuration(summary.stats.avgDurationLastDay) }}</p></div>
+          <UsageStatMetric label="Requests" :value="summary.stats.totalRequests.toLocaleString()" />
+          <UsageStatMetric label="Success" :value="summary.stats.successRate === null ? '-' : `${summary.stats.successRate}%`" />
+          <UsageStatMetric label="Latency" :value="formatDuration(summary.stats.avgDurationLastDay)" />
         </div>
         <div>
           <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />

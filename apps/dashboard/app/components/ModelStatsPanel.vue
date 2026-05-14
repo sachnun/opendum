@@ -31,24 +31,9 @@ function formatHourLabel(time: string): string {
 <template>
   <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2 sm:p-2.5">
     <div class="grid grid-cols-3 gap-1.5">
-      <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-        <p class="truncate text-[10px] text-muted-foreground">Requests</p>
-        <p class="truncate font-semibold tabular-nums text-foreground" :class="compact ? 'text-xs sm:text-sm' : 'text-sm'">
-          {{ stats.totalRequests.toLocaleString() }}
-        </p>
-      </div>
-      <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-        <p class="truncate text-[10px] text-muted-foreground">Success</p>
-        <p class="truncate font-semibold tabular-nums text-foreground" :class="compact ? 'text-xs sm:text-sm' : 'text-sm'">
-          {{ stats.successRate === null ? '-' : `${stats.successRate}%` }}
-        </p>
-      </div>
-      <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">
-        <p class="truncate text-[10px] text-muted-foreground">Latency</p>
-        <p class="truncate font-semibold tabular-nums text-foreground" :class="compact ? 'text-xs sm:text-sm' : 'text-sm'">
-          {{ formatDuration(stats.avgDurationLastDay) }}
-        </p>
-      </div>
+      <UsageStatMetric variant="card" label="Requests" :value="stats.totalRequests.toLocaleString()" :compact="compact" />
+      <UsageStatMetric variant="card" label="Success" :value="stats.successRate === null ? '-' : `${stats.successRate}%`" :compact="compact" />
+      <UsageStatMetric variant="card" label="Latency" :value="formatDuration(stats.avgDurationLastDay)" :compact="compact" />
     </div>
 
     <div class="rounded border border-border/60 bg-background/70 px-1.5 py-1 sm:px-2 sm:py-1.5">

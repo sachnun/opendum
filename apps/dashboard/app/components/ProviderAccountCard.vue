@@ -641,18 +641,9 @@ function historyEntryPreview(errorMessage: string): string {
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3 rounded-md border border-border/70 bg-muted/20 p-2.5">
             <div class="mb-2 grid grid-cols-3 gap-1.5">
-              <div>
-                <p class="truncate text-[10px] text-muted-foreground">Requests</p>
-                <p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ account.stats.totalRequests.toLocaleString() }}</p>
-              </div>
-              <div>
-                <p class="truncate text-[10px] text-muted-foreground">Success</p>
-                <p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ account.stats.successRate === null ? '-' : `${account.stats.successRate}%` }}</p>
-              </div>
-              <div>
-                <p class="truncate text-[10px] text-muted-foreground">Latency</p>
-                <p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ formatDuration(account.stats.avgDurationLastDay) }}</p>
-              </div>
+              <UsageStatMetric label="Requests" :value="account.stats.totalRequests.toLocaleString()" />
+              <UsageStatMetric label="Success" :value="account.stats.successRate === null ? '-' : `${account.stats.successRate}%`" />
+              <UsageStatMetric label="Latency" :value="formatDuration(account.stats.avgDurationLastDay)" />
             </div>
             <div class="mb-2">
               <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
