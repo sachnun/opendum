@@ -17,7 +17,7 @@ const emit = defineEmits<{
 
 function indicatorBadge(indicator: string, connectedAccounts: number) {
   if (connectedAccounts === 0) return { label: "No Accounts", class: "" };
-  if (indicator === "error") return { label: "Needs Attention", class: "border-transparent bg-destructive/60 text-white" };
+  if (indicator === "error") return { label: "Issue", class: "border-transparent bg-destructive/60 text-white" };
   if (indicator === "warning") return { label: "Unhealty", class: "border-yellow-500 text-yellow-600" };
   return { label: "Healthy", class: "border-green-500 text-green-600" };
 }
@@ -43,8 +43,8 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
 </script>
 
 <template>
-  <UiCard class="group relative h-full gap-3 transition-colors hover:border-primary/40">
-    <NuxtLink :to="getProviderAccountPath(provider.key)" class="absolute inset-0 z-10 rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
+  <UiCard class="group relative h-full gap-3 border-transparent bg-transparent shadow-none transition-colors hover:bg-muted/20">
+    <NuxtLink :to="getProviderAccountPath(provider.key)" class="absolute inset-0 z-10 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
 
     <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2 px-6">
       <div class="flex items-center gap-1">
