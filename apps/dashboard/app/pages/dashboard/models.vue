@@ -166,7 +166,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           type="button"
           :class="[
             'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium transition-colors',
-            allSelected ? 'bg-primary text-primary-foreground' : 'border-input bg-input/30 hover:bg-input/50',
+            allSelected ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
           ]"
           @click="toggleProvider('all')"
         >
@@ -178,7 +178,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           type="button"
           :class="[
             'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium transition-colors',
-            activeProviders.includes(provider.id) ? 'bg-primary text-primary-foreground' : 'border-input bg-input/30 hover:bg-input/50',
+            activeProviders.includes(provider.id) ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
           ]"
           @click="toggleProvider(provider.id)"
         >
@@ -216,6 +216,9 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                     </span>
                   </button>
                   <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
+                    <NuxtLink v-if="model.isEnabled" :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" title="Try in Playground" aria-label="Try in Playground">
+                      <UiIcon name="i-lucide-flask-conical" class="size-3" />
+                    </NuxtLink>
                     <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
                       {{ model.isEnabled ? 'On' : 'Off' }}
                     </span>
@@ -232,9 +235,6 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                   <UiBadge v-for="provider in model.providers" :key="provider" variant="outline" class="text-[10px] font-normal">
                     {{ getProviderLabel(provider) }}
                   </UiBadge>
-                  <NuxtLink v-if="model.isEnabled" :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex h-5 items-center justify-center gap-1 rounded-md border border-border px-1.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" title="Try in Playground">
-                    <UiIcon name="i-lucide-flask-conical" class="size-3" />
-                  </NuxtLink>
                 </div>
               </UiCardHeader>
 
