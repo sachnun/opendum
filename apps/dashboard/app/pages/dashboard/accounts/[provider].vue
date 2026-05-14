@@ -257,29 +257,25 @@ function decodeAccountHash(hash: string): string | null {
 
 <template>
   <div class="space-y-6">
-    <div class="sticky top-0 z-20 -mx-5 bg-background px-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div class="dashboard-header-divider pt-3">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="inline-flex items-center gap-2 text-xl font-semibold">
-              <ProviderPinButton
-                v-if="providerMeta"
-                :provider-key="providerMeta.key"
-                :pinned="pinnedProviders.has(providerMeta.key)"
-                @toggled="handlePinnedToggled"
-              />
-              {{ providerMeta?.label ?? selectedProvider.replaceAll('_', ' ') }}
-              <UiBadge v-if="accounts.length > 0" variant="outline" class="text-xs tabular-nums">{{ activeAccountCount }}/{{ accounts.length }}</UiBadge>
-            </h2>
-          </div>
-          <div class="flex w-full items-center gap-2 sm:w-auto">
-            <AddAccountDialog
-              v-if="providerMeta"
-              :initial-provider="providerMeta.key"
-              trigger-class="flex-1 sm:w-auto sm:flex-none"
-              @connected="handleAccountConnected"
-            />
-          </div>
+    <div class="dashboard-header-divider">
+      <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
+          <ProviderPinButton
+            v-if="providerMeta"
+            :provider-key="providerMeta.key"
+            :pinned="pinnedProviders.has(providerMeta.key)"
+            @toggled="handlePinnedToggled"
+          />
+          {{ providerMeta?.label ?? selectedProvider.replaceAll('_', ' ') }}
+          <UiBadge v-if="accounts.length > 0" variant="outline" class="text-xs tabular-nums">{{ activeAccountCount }}/{{ accounts.length }}</UiBadge>
+        </h2>
+        <div class="flex w-full items-center sm:w-auto">
+          <AddAccountDialog
+            v-if="providerMeta"
+            :initial-provider="providerMeta.key"
+            trigger-class="flex-1 sm:w-auto sm:flex-none"
+            @connected="handleAccountConnected"
+          />
         </div>
       </div>
     </div>
