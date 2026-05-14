@@ -131,7 +131,7 @@ const filteredModels = computed(() => {
         <div class="max-h-40 overflow-y-auto py-1">
           <p v-if="normalizedDraftModels.length === 0" class="px-1 text-[11px] text-muted-foreground">No models selected</p>
           <div v-else class="flex flex-wrap gap-1.5">
-            <UiBadge v-for="modelId in normalizedDraftModels" :key="modelId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
+            <UiBadge v-for="modelId in normalizedDraftModels" :key="modelId" variant="outline" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate font-mono">{{ modelId }}</span>
               <button type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleModel(modelId)">
                 <UiIcon name="i-lucide-x" class="size-2.5" />

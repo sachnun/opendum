@@ -52,12 +52,12 @@ function modelButtonTitle(model: string): string {
 }
 
 function modelButtonClass(model: string): string {
-  if (disabledModels.value.has(model)) return "bg-transparent text-muted-foreground/60 line-through";
+  if (disabledModels.value.has(model)) return "border border-border/60 bg-transparent text-muted-foreground/60 line-through";
   const status = props.modelHealth[model]?.status;
-  if (status === "failed") return "bg-red-500/10 text-red-600 ring-1 ring-red-500/45";
-  if (status === "half_open") return "bg-yellow-500/10 text-yellow-700 ring-1 ring-yellow-500/45";
-  if (status === "degraded") return "bg-yellow-500/10 text-yellow-700 ring-1 ring-yellow-500/45";
-  return "bg-muted text-foreground";
+  if (status === "failed") return "border border-red-500/45 bg-transparent text-red-600";
+  if (status === "half_open") return "border border-yellow-500/45 bg-transparent text-yellow-700";
+  if (status === "degraded") return "border border-yellow-500/45 bg-transparent text-yellow-700";
+  return "border border-border bg-transparent text-foreground hover:bg-muted/30";
 }
 
 async function toggleModel(model: string) {
@@ -106,7 +106,7 @@ async function toggleModel(model: string) {
       >
         {{ model }}
       </button>
-      <button v-if="hasMore" type="button" class="inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="expanded = !expanded">
+      <button v-if="hasMore" type="button" class="inline-flex cursor-pointer items-center rounded-md border border-border bg-transparent px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="expanded = !expanded">
         {{ expanded ? 'Show less' : `+${hiddenCount} more` }}
       </button>
     </div>
