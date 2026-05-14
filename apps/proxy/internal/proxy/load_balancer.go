@@ -20,7 +20,7 @@ const (
 	degradedThreshold                  = 3
 	failedThreshold                    = 7
 	maxStoredErrorLen                  = 10000
-	maxErrorHistoryRows                = 200
+	maxErrorHistoryRows                = 8
 	providerModelAuthlessAccountPrefix = "authless:"
 )
 
@@ -436,7 +436,7 @@ func (s *Service) insertErrorHistory(ctx context.Context, accountID, userID stri
 	if _, err := s.db.NewInsert().Model(&row).Exec(ctx); err != nil {
 		return err
 	}
-	_, err := s.db.NewDelete().Model((*appdb.ProviderAccountErrorHistory)(nil)).Where("\"providerAccountId\" = ?", accountID).Where("id NOT IN (?)", s.db.NewSelect().Model((*appdb.ProviderAccountErrorHistory)(nil)).Column("id").Where("\"providerAccountId\" = ?", accountID).OrderExpr("\"createdAt\" DESC").Limit(maxErrorHistoryRows)).Exec(ctx)
+	_, err := s.db.NewDelete().Model((*appdb.ProviderAccountErrorHistory)(nil)).Where("\"providerAccountId\" = ?", accountID).Where("id NOT IN (?)", s.db.NewSelect().Model((*appdb.ProviderAccountErrorHistory)(nil)).Column("id").Where("\"providerAccountId\" = ?", accountID).OrderExpr("\"createdAt\" DESC, \"id\" DESC").Limit(maxErrorHistoryRows)).Exec(ctx)
 	return err
 }
 

@@ -14,6 +14,7 @@ const AUTO_PIN_SENTINEL = "_auto_pinned";
 const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degraded: 1, half_open: 2, failed: 3 };
 const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
+const MAX_ERROR_HISTORY_ROWS = 8;
 
 export const providerInputSchema = z.object({
   provider: z.string().refine(isKnownProvider, "Invalid provider"),
@@ -398,7 +399,7 @@ export async function getAccountErrorHistory(userId: string, input: z.infer<type
       .from(providerAccountErrorHistory)
       .where(eq(providerAccountErrorHistory.providerAccountId, input.accountId))
       .orderBy(desc(providerAccountErrorHistory.createdAt), desc(providerAccountErrorHistory.id))
-      .limit(input.limit ?? 200);
+      .limit(Math.min(input.limit ?? MAX_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS));
 
     return { success: true, data: { entries } } as const;
 }

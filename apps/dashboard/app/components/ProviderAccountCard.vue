@@ -292,6 +292,13 @@ function formatRelativeTime(value: string | Date | number): string {
   return relative === "0 seconds ago" ? "just now" : relative;
 }
 
+function toTimeMs(value: string | Date | null | undefined): number | null {
+  if (!value) return null;
+
+  const timeMs = new Date(value).getTime();
+  return Number.isNaN(timeMs) ? null : timeMs;
+}
+
 function getHttpStatusDescription(code: number): string {
   return HTTP_STATUS_DESCRIPTIONS[code] ?? "HTTP Error";
 }
@@ -412,12 +419,17 @@ const temporaryOffPreview = computed(() => {
   if (!until) return "Select a valid future duration.";
   return `${formatRelativeTime(until)} (${formatDateTime(until)})`;
 });
-function getErrorToneClass(errorAt: string | Date | null | undefined): string {
-  if (!errorAt) return "text-muted-foreground";
+function getRecoveredTimeMs(): number {
+  return Math.max(toTimeMs(props.account.lastSuccessAt) ?? 0, toTimeMs(props.account.lastRecoveredByRotationAt) ?? 0, toTimeMs(props.account.lastUsedAt) ?? 0);
+}
 
-  const errorMs = new Date(errorAt).getTime();
-  const recoveredMs = Math.max(new Date(props.account.lastSuccessAt ?? 0).getTime() || 0, new Date(props.account.lastRecoveredByRotationAt ?? 0).getTime() || 0, new Date(props.account.lastUsedAt ?? 0).getTime() || 0);
+function getErrorToneClass(errorAt: string | Date | null | undefined, isCurrent = true): string {
+  const errorMs = toTimeMs(errorAt);
+  if (!errorMs) return "text-muted-foreground";
+
+  const recoveredMs = getRecoveredTimeMs();
   const hasRecoveredAfterError = recoveredMs > errorMs;
+  if (!isCurrent && hasRecoveredAfterError) return "text-foreground";
   if (hasRecoveredAfterError && Date.now() - errorMs > 3 * 60 * 60 * 1000) return "text-foreground";
   return hasRecoveredAfterError ? "text-amber-400" : "text-red-500";
 }
@@ -427,15 +439,17 @@ const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "")
 const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   if (!currentErrorMessage.value) return [];
 
-  const currentErrorAtMs = props.account.lastErrorAt ? new Date(props.account.lastErrorAt).getTime() : null;
+  const currentErrorAtMs = toTimeMs(props.account.lastErrorAt);
   const history = (historyEntries.value ?? []).filter((entry) => {
+    const entryCreatedAtMs = toTimeMs(entry.createdAt);
+    if (currentErrorAtMs && entryCreatedAtMs && entryCreatedAtMs > currentErrorAtMs + 1000) return false;
+
     const isSameError = entry.errorCode === props.account.lastErrorCode && entry.errorMessage === currentErrorMessage.value;
     if (!isSameError) return true;
     if (!currentErrorAtMs) return false;
 
-    const entryCreatedAtMs = new Date(entry.createdAt).getTime();
-    return Number.isNaN(entryCreatedAtMs) || Math.abs(entryCreatedAtMs - currentErrorAtMs) > 1000;
-  });
+    return !entryCreatedAtMs || Math.abs(entryCreatedAtMs - currentErrorAtMs) > 1000;
+  }).sort((a, b) => (toTimeMs(b.createdAt) ?? 0) - (toTimeMs(a.createdAt) ?? 0));
 
   return [
     {
@@ -456,7 +470,7 @@ const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
 });
 const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => errorPreviewEntries.value[activeErrorIndex.value] ?? errorPreviewEntries.value[0] ?? null);
 const errorPreviewToneClass = computed(() => {
-  const toneClass = getErrorToneClass(activeErrorEntry.value?.createdAt);
+  const toneClass = getErrorToneClass(activeErrorEntry.value?.createdAt, activeErrorEntry.value?.isCurrent ?? false);
   return toneClass === "text-foreground" ? "text-foreground/80" : toneClass;
 });
 const displayErrorMessage = computed(() => activeErrorEntry.value ? stripStatusFromErrorMessage(activeErrorEntry.value.errorMessage, activeErrorEntry.value.errorCode) : "");
