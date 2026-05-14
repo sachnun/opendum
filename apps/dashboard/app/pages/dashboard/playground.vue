@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
+import { compareModelEntries } from "../../../lib/model-sort";
 import { getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import type { PlaygroundOptions } from "../../../lib/dashboard-api-types";
 
@@ -332,7 +333,7 @@ function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccou
   }
 
   for (const familyModels of grouped.values()) {
-    familyModels.sort((a, b) => a.name.localeCompare(b.name));
+    familyModels.sort(compareModelEntries);
   }
 
   const familyOrder = new Map(MODEL_FAMILY_SORT_ORDER.map((family, index) => [family, index]));
@@ -448,7 +449,7 @@ function getGroupedPanelModels(panel: PanelState) {
       const orderB = familyOrder.get(familyB) ?? Number.MAX_SAFE_INTEGER;
       return orderA === orderB ? familyA.localeCompare(familyB) : orderA - orderB;
     })
-    .map(([family, familyModels]) => ({ family, models: familyModels.sort((a, b) => a.name.localeCompare(b.name)) }));
+    .map(([family, familyModels]) => ({ family, models: familyModels.sort(compareModelEntries) }));
 }
 
 function getPendingModelAccounts(panel: PanelState): ProviderAccountOption[] {

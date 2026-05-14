@@ -6,6 +6,7 @@ import { disabledModel } from "../lib/db/schema";
 import { getModelStatsByModel } from "../lib/model-stats";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
+import { compareModelEntries } from "../../lib/model-sort";
 
 export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
 
@@ -20,7 +21,7 @@ async function getAvailableModelsForUser(userId: string) {
     disabledModelSet: new Set(disabledModels.map((entry) => resolveModelAlias(entry.model))),
     models: getAllModels()
       .filter((model) => isModelUsableByAccounts(model, availability))
-      .sort((a, b) => a.localeCompare(b)),
+      .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) })),
   };
 }
 

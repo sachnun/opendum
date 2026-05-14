@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { compareModelIds } from "../../lib/model-sort";
 import type { ProviderAccountModelHealthItem } from "../../lib/dashboard-api-types";
 
 const props = defineProps<{
@@ -23,7 +24,7 @@ watch(
 
 const enabledCount = computed(() => props.supportedModels.length - disabledModels.value.size);
 const hasMore = computed(() => props.supportedModels.length > visibleCount);
-const sortedModels = computed(() => [...props.supportedModels].sort((a, b) => modelSortWeight(a) - modelSortWeight(b) || a.localeCompare(b)));
+const sortedModels = computed(() => [...props.supportedModels].sort((a, b) => modelSortWeight(a) - modelSortWeight(b) || compareModelIds(a, b)));
 const visibleModels = computed(() => (expanded.value ? sortedModels.value : sortedModels.value.slice(0, visibleCount)));
 const hiddenCount = computed(() => props.supportedModels.length - visibleCount);
 

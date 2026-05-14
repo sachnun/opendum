@@ -3,6 +3,7 @@ import {
   IGNORED_MODELS,
   type ModelInfo,
 } from "./loader.js";
+import { compareModelEntries } from "../../../lib/model-sort";
 
 // Re-export types and registry so existing consumers keep working
 export { MODEL_REGISTRY };
@@ -142,7 +143,7 @@ export function getAuthlessProviderModels(): Record<string, string[]> {
   return Object.fromEntries(
     Object.entries(result).map(([provider, models]) => [
       provider,
-      models.sort((a, b) => a.localeCompare(b)),
+      models.sort((a, b) => compareModelEntries({ id: a, family: EFFECTIVE_MODEL_REGISTRY[a]?.family }, { id: b, family: EFFECTIVE_MODEL_REGISTRY[b]?.family })),
     ])
   );
 }

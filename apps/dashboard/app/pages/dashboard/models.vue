@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
+import { compareModelEntries } from "../../../lib/model-sort";
 import type { ModelFamilyCounts } from "../../../lib/navigation";
 import type { ModelStats } from "../../../lib/model-stats";
 import { getProviderLabel } from "../../../lib/provider-accounts";
@@ -51,7 +52,7 @@ const modelSections = computed(() => {
   }
 
   for (const familyModels of groupedModels.values()) {
-    familyModels.sort((a, b) => a.id.localeCompare(b.id));
+    familyModels.sort(compareModelEntries);
   }
 
   return MODEL_FAMILY_SORT_ORDER

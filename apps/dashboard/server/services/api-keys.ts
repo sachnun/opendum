@@ -6,7 +6,8 @@ import { providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "../lib/db/sc
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "../lib/proxy/authless-providers";
-import { getAllFamilies, getAllModels, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
+import { getAllFamilies, getAllModels, getModelFamily, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
+import { compareModelEntries } from "../../lib/model-sort";
 import type { ActionResult } from "../utils/api";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 
@@ -36,7 +37,11 @@ type UpdateApiKeyAccountAccessInput = z.infer<typeof updateApiKeyAccountAccessIn
 type UpdateApiKeyRateLimitsInput = z.infer<typeof updateApiKeyRateLimitsInputSchema>;
 
 function normalizeModelList(models: string[]): string[] {
-  return Array.from(new Set(models.map((model) => resolveModelAlias(model.trim())).filter((model) => model.length > 0))).sort((a, b) => a.localeCompare(b));
+  return Array.from(new Set(models.map((model) => resolveModelAlias(model.trim())).filter((model) => model.length > 0))).sort(compareKnownModelIds);
+}
+
+function compareKnownModelIds(left: string, right: string): number {
+  return compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) });
 }
 
 async function getOwnedApiKey(userId: string, id: string) {
@@ -74,7 +79,7 @@ export async function getApiKeyOptions(userId: string) {
       .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
 
     return {
-      availableModels: getAllModels().sort((a, b) => a.localeCompare(b)),
+      availableModels: getAllModels().sort(compareKnownModelIds),
       availableFamilies: getAllFamilies(),
       providerAccounts: [
         ...getAuthlessProviderAccounts().map(({ disabledModels: _disabledModels, ...account }) => account),

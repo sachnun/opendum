@@ -1,7 +1,8 @@
 import { db } from "../lib/db";
 import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountErrorHistory, providerAccountModelHealth } from "../lib/db/schema";
-import { getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
+import { getModelFamily, getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
+import { compareModelEntries } from "../../lib/model-sort";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
@@ -175,7 +176,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       .orderBy(desc(providerAccount.createdAt));
 
     const accountIds = accounts.map((account) => account.id);
-    const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => a.localeCompare(b));
+    const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
     const [accountStatsById, disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
       buildAccountStats(userId, accountIds),

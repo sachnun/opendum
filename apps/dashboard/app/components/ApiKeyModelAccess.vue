@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { compareModelIds } from "../../lib/model-sort";
+
 type AccessMode = "all" | "whitelist" | "blacklist";
 
 const props = defineProps<{
@@ -19,7 +21,7 @@ const draftModels = ref<string[]>(normalizeModels(props.initialModels));
 const errorMessage = ref("");
 
 function normalizeModels(models: string[]): string[] {
-  return Array.from(new Set(models)).sort((a, b) => a.localeCompare(b));
+  return Array.from(new Set(models)).sort(compareModelIds);
 }
 
 function sameList(left: string[], right: string[]): boolean {
