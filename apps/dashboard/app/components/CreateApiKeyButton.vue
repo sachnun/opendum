@@ -79,11 +79,6 @@ function closeDialog() {
           <p class="sr-only">Your new API key is ready to use.</p>
         </div>
         <div class="space-y-4 py-1">
-          <div class="space-y-2">
-            <p class="text-sm font-medium">Save your API key</p>
-            <p class="text-sm text-muted-foreground">Copy this key now. For security, it will not be shown again after you close this dialog.</p>
-          </div>
-
           <div class="rounded-md border border-border bg-muted/30 p-3">
             <p class="text-xs text-muted-foreground">Your API Key</p>
             <div class="mt-2 flex items-center gap-2">
@@ -93,11 +88,6 @@ function closeDialog() {
                 {{ copied ? 'Copied' : 'Copy' }}
               </UiButton>
             </div>
-          </div>
-
-          <div class="relative w-full rounded-lg border px-4 py-3 text-sm">
-            <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
-            <div class="pl-7 text-xs">Treat this key like a password. Anyone with access to it can use your Opendum account.</div>
           </div>
 
           <div class="flex justify-end">
@@ -113,11 +103,6 @@ function closeDialog() {
         </div>
 
         <form class="space-y-4 py-1" autocomplete="off" @submit.prevent="createKey">
-          <div class="space-y-2">
-            <p class="text-sm font-medium">Add API key</p>
-            <p class="text-sm text-muted-foreground">Create an API key for accessing Opendum from clients, scripts, or external tools.</p>
-          </div>
-
           <div v-if="errorMessage" class="relative w-full rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive">
             <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
             <div class="pl-7 text-xs">{{ errorMessage }}</div>
@@ -134,7 +119,6 @@ function closeDialog() {
               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
               placeholder="My API Key"
             >
-            <p class="text-xs text-muted-foreground">Optional. Use a name that helps you identify where this key is used.</p>
           </div>
 
           <div class="flex justify-end gap-2">
