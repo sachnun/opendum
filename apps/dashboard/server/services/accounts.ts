@@ -22,7 +22,7 @@ export const updateAccountInputSchema = z.object({ id: z.string(), name: z.strin
 export const deleteAccountInputSchema = z.object({ id: z.string() });
 export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string() });
 export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(), modelId: z.string(), enabled: z.boolean() });
-export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.number().int().min(1).max(200).optional() });
+export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.coerce.number().int().min(1).max(200).optional() });
 export const resolveErrorsInputSchema = z.object({ accountId: z.string() });
 
 const providerAccountListColumns = {
