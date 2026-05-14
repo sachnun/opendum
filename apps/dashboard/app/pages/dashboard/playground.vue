@@ -1585,9 +1585,6 @@ function formatToolArguments(value: string): string {
                   <UiButton v-if="panel.modelId && responses[panel.id]?.isLoading" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Stop panel" @click="stopPanelRequest(panel.id)">
                     <UiIcon name="i-lucide-square" class="size-3" />
                   </UiButton>
-                  <UiButton v-if="panel.modelId && responses[panel.id]?.isLoading" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Restart panel" @click="retryPanel(panel.id)">
-                    <UiIcon name="i-lucide-rotate-cw" class="size-3" />
-                  </UiButton>
                   <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Run panel" @click="retryPanel(panel.id)">
                     <UiIcon name="i-lucide-play" class="size-3 fill-current" />
                   </UiButton>
