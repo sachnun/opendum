@@ -22,6 +22,10 @@ const props = defineProps<{
   initialRules: RateLimitRuleInput[];
 }>();
 
+const emit = defineEmits<{
+  updated: [rules: RateLimitRuleInput[]];
+}>();
+
 const dashboardApi = useDashboardApi();
 const isSaving = ref(false);
 const savedRules = ref<RateLimitRuleInput[]>(props.initialRules);
@@ -87,6 +91,7 @@ async function save() {
     savedRules.value = result.data.rules;
     draftRules.value = result.data.rules.map(ruleToState);
     pickerOpen.value = false;
+    emit("updated", savedRules.value);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update rate limits";
   } finally {

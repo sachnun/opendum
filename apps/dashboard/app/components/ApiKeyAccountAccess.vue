@@ -17,6 +17,10 @@ const props = defineProps<{
   initialAccounts: string[];
 }>();
 
+const emit = defineEmits<{
+  updated: [value: { mode: AccessMode; accounts: string[] }];
+}>();
+
 const dashboardApi = useDashboardApi();
 const accountPickerOpen = ref(false);
 const accountSearch = ref("");
@@ -80,6 +84,7 @@ async function save() {
     draftMode.value = result.data.mode;
     draftAccounts.value = [...savedAccounts.value];
     accountPickerOpen.value = false;
+    emit("updated", { mode: result.data.mode, accounts: savedAccounts.value });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update account access";
   } finally {

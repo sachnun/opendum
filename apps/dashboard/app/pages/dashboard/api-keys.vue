@@ -6,6 +6,7 @@ const dashboardApi = useDashboardApi();
 type ApiKeyListItem = Awaited<ReturnType<typeof dashboardApi.apiKeys.list>>[number];
 type ApiKeyOptions = Awaited<ReturnType<typeof dashboardApi.apiKeys.options>>;
 type AccessMode = "all" | "whitelist" | "blacklist";
+type RateLimitRule = ApiKeyOptions["rateLimitsByKeyId"][string][number];
 
 const { data, error, refresh } = await useAsyncData("dashboard-api-keys", async () => {
   const [apiKeys, options] = await Promise.all([dashboardApi.apiKeys.list(), dashboardApi.apiKeys.options()]);
@@ -55,14 +56,6 @@ function formatRelativeTime(value: string | Date) {
   return date.toLocaleDateString();
 }
 
-function modelAccessExpanded(apiKey: ApiKeyListItem) {
-  return normalizeModelAccessMode(apiKey.modelAccessMode) !== "all" || apiKey.modelAccessList.length > 0;
-}
-
-function accountAccessExpanded(apiKey: ApiKeyListItem) {
-  return normalizeAccountAccessMode(apiKey.accountAccessMode) !== "all" || apiKey.accountAccessList.length > 0;
-}
-
 function keyRateLimits(apiKeyId: string) {
   return options.value?.rateLimitsByKeyId[apiKeyId] ?? [];
 }
@@ -81,6 +74,36 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
     apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, isActive } : apiKey)),
   };
 }
+
+function updateApiKeyModelAccess(apiKeyId: string, value: { mode: AccessMode; models: string[] }) {
+  if (!data.value) return;
+  data.value = {
+    ...data.value,
+    apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, modelAccessMode: value.mode, modelAccessList: value.models } : apiKey)),
+  };
+}
+
+function updateApiKeyAccountAccess(apiKeyId: string, value: { mode: AccessMode; accounts: string[] }) {
+  if (!data.value) return;
+  data.value = {
+    ...data.value,
+    apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, accountAccessMode: value.mode, accountAccessList: value.accounts } : apiKey)),
+  };
+}
+
+function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
+  if (!data.value) return;
+  data.value = {
+    ...data.value,
+    options: {
+      ...data.value.options,
+      rateLimitsByKeyId: {
+        ...data.value.options.rateLimitsByKeyId,
+        [apiKeyId]: rules,
+      },
+    },
+  };
+}
 </script>
 
 <template>
@@ -91,7 +114,7 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
           <h2 class="text-xl font-semibold">API Keys</h2>
           <UiBadge variant="outline" class="tabular-nums">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
         </div>
-        <CreateApiKeyButton @created="refresh" />
+        <CreateApiKeyButton trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
       </div>
     </div>
 
@@ -112,12 +135,12 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
           :class="getApiKeyStatus(apiKey).label !== 'Active' ? 'opacity-65' : ''"
         >
           <UiCardHeader class="pb-1">
-            <div class="flex min-w-0 items-start justify-between gap-2">
-              <div class="min-w-0">
+            <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <div class="min-w-0 overflow-hidden">
                 <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="refresh" />
               </div>
-              <div class="flex shrink-0 flex-wrap justify-end gap-1">
-                <UiBadge :variant="getApiKeyStatus(apiKey).variant" class="text-xs">
+              <div class="flex h-7 shrink-0 items-center justify-end">
+                <UiBadge :variant="getApiKeyStatus(apiKey).variant" class="min-w-16 justify-center text-xs">
                   {{ getApiKeyStatus(apiKey).label }}
                 </UiBadge>
               </div>
@@ -155,39 +178,39 @@ function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
                   class="flex justify-between gap-4 rounded-sm py-0.5 transition-colors hover:bg-muted/30"
                   title="View analytics"
                 >
-                  <span class="inline-flex items-center gap-1.5 text-muted-foreground">
-                    <UiIcon name="i-lucide-bar-chart-3" class="size-3.5" />
-                    Analytics
-                  </span>
+                  <span class="text-muted-foreground">Analytics</span>
                   <span class="text-right font-medium">Open details</span>
                 </NuxtLink>
               </div>
 
               <div class="grid gap-2.5 border-t border-border/60 pt-3">
-                <ApiKeyAccessSection title="Model Access" :default-open="modelAccessExpanded(apiKey)">
+                <ApiKeyAccessSection title="Model Access">
                   <ApiKeyModelAccess
                     :api-key-id="apiKey.id"
                     :available-models="options?.availableModels ?? []"
                     :initial-mode="normalizeModelAccessMode(apiKey.modelAccessMode)"
                     :initial-models="apiKey.modelAccessList"
+                    @updated="updateApiKeyModelAccess(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Account Access" :default-open="accountAccessExpanded(apiKey)">
+                <ApiKeyAccessSection title="Account Access">
                   <ApiKeyAccountAccess
                     :api-key-id="apiKey.id"
                     :available-accounts="options?.providerAccounts ?? []"
                     :initial-mode="normalizeAccountAccessMode(apiKey.accountAccessMode)"
                     :initial-accounts="apiKey.accountAccessList"
+                    @updated="updateApiKeyAccountAccess(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Rate Limits" :default-open="keyRateLimits(apiKey.id).length > 0">
+                <ApiKeyAccessSection title="Rate Limits">
                   <ApiKeyRateLimit
                     :api-key-id="apiKey.id"
                     :available-models="options?.availableModels ?? []"
                     :available-families="options?.availableFamilies ?? []"
                     :initial-rules="keyRateLimits(apiKey.id)"
+                    @updated="updateApiKeyRateLimits(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
               </div>

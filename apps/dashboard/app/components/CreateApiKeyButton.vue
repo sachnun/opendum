@@ -1,4 +1,15 @@
 <script setup lang="ts">
+import { cn } from "../../lib/utils";
+
+const props = withDefaults(
+  defineProps<{
+    triggerClass?: string;
+  }>(),
+  {
+    triggerClass: "",
+  }
+);
+
 const emit = defineEmits<{
   created: [];
 }>();
@@ -55,8 +66,8 @@ function closeDialog() {
 </script>
 
 <template>
-  <UiButton size="sm" class="gap-2" @click="open = true">
-    <UiIcon name="i-lucide-plus" class="size-3.5" />
+  <UiButton variant="outline" :class="cn('gap-2', props.triggerClass)" @click="open = true">
+    <UiIcon name="i-lucide-plus" class="size-4" />
     Create API Key
   </UiButton>
 

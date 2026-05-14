@@ -97,14 +97,14 @@ async function deleteKey() {
 </script>
 
 <template>
-  <div class="space-y-2.5 rounded-sm border border-border/60 bg-muted/20 p-2">
+  <div>
     <div class="flex flex-col gap-2.5">
       <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
       <button
         type="button"
         :disabled="isLoading"
         :class="cn(
-          'flex w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-background/60 px-2 py-2 text-left font-mono text-xs text-muted-foreground outline-none transition-colors hover:bg-muted/30 disabled:pointer-events-none disabled:opacity-50',
+          'flex w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-transparent px-2 py-2 text-left font-mono text-xs text-muted-foreground outline-none transition-colors hover:bg-muted/30 disabled:pointer-events-none disabled:opacity-50',
           isRevealed ? 'min-h-9' : 'h-9',
         )"
         :title="isRevealed ? 'Hide key' : 'Reveal key'"

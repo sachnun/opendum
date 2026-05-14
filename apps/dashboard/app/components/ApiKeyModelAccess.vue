@@ -10,6 +10,10 @@ const props = defineProps<{
   initialModels: string[];
 }>();
 
+const emit = defineEmits<{
+  updated: [value: { mode: AccessMode; models: string[] }];
+}>();
+
 const dashboardApi = useDashboardApi();
 const modelPickerOpen = ref(false);
 const modelSearch = ref("");
@@ -69,6 +73,7 @@ async function save() {
     draftMode.value = result.data.mode;
     draftModels.value = [...savedModels.value];
     modelPickerOpen.value = false;
+    emit("updated", { mode: result.data.mode, models: savedModels.value });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update model access";
   } finally {
