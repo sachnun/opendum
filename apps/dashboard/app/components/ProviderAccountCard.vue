@@ -645,20 +645,20 @@ function historyEntryPreview(errorMessage: string): string {
               <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
             </div>
             <div class="mb-2 grid grid-cols-3 gap-1.5">
-              <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+              <div>
                 <p class="truncate text-[10px] text-muted-foreground">Requests</p>
                 <p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ account.stats.totalRequests.toLocaleString() }}</p>
               </div>
-              <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+              <div>
                 <p class="truncate text-[10px] text-muted-foreground">Success</p>
                 <p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ account.stats.successRate === null ? '-' : `${account.stats.successRate}%` }}</p>
               </div>
-              <div class="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+              <div>
                 <p class="truncate text-[10px] text-muted-foreground">Latency</p>
                 <p class="truncate text-sm font-semibold tabular-nums text-foreground">{{ formatDuration(account.stats.avgDurationLastDay) }}</p>
               </div>
             </div>
-            <div class="mb-2 rounded border border-border/60 bg-background/70 px-2 py-1.5">
+            <div class="mb-2">
               <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
               <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
                 <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
