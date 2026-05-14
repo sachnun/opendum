@@ -43,10 +43,10 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
 </script>
 
 <template>
-  <UiCard class="group relative h-full gap-3 border-transparent bg-transparent shadow-none transition-colors hover:bg-muted/20">
+  <UiCard class="group relative h-full gap-3 border-transparent bg-transparent p-0 shadow-none transition-colors hover:bg-muted/20">
     <NuxtLink :to="getProviderAccountPath(provider.key)" class="absolute inset-0 z-10 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
 
-    <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2 px-6">
+    <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2">
       <div class="flex items-center gap-1">
         <ProviderPinButton class="pointer-events-auto" :provider-key="provider.key" :pinned="pinned" @toggled="handlePinnedToggled" />
         <UiCardTitle class="text-base">{{ provider.label }}</UiCardTitle>
@@ -55,7 +55,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
       <UiBadge variant="outline" :class="badge.class">{{ badge.label }}</UiBadge>
     </div>
 
-    <UiCardContent class="pointer-events-none relative z-20">
+    <UiCardContent class="pointer-events-none relative z-20 p-0">
       <div class="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
         <div class="flex items-center justify-end text-[11px] text-muted-foreground">
           <span class="tabular-nums">{{ peakRequests.toLocaleString() }} peak</span>
