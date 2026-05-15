@@ -975,10 +975,10 @@ function cancelErrorPreviewPointer() {
           <div class="flex justify-between"><span class="text-muted-foreground">Last Error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
 
           <div class="min-h-14">
-            <div v-if="account.lastErrorMessage" class="space-y-1.5 pt-2">
+            <div class="space-y-1.5 pt-2">
               <div class="min-h-[7rem] pb-1">
                 <div
-                  v-if="activeErrorEntry"
+                  v-if="account.lastErrorMessage && activeErrorEntry"
                   tabindex="-1"
                   class="min-h-[7rem] cursor-pointer rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left hover:bg-muted/40"
                   @click="openActiveErrorDialog"
@@ -1012,6 +1012,9 @@ function cancelErrorPreviewPointer() {
                     <span>Click for details</span>
                   </div>
                 </div>
+                <div v-else class="flex min-h-[7rem] w-full items-center justify-center rounded-sm border border-border/60 bg-muted/20 px-2 text-center text-xs text-muted-foreground">
+                  No data
+                </div>
               </div>
 
               <div class="flex items-center justify-between gap-2">
@@ -1033,9 +1036,6 @@ function cancelErrorPreviewPointer() {
                   <UiIcon name="i-lucide-chevron-right" class="size-3.5" />
                 </UiButton>
               </div>
-            </div>
-            <div v-else class="flex min-h-[7rem] w-full items-center justify-center rounded-sm border border-border/60 bg-muted/20 px-2 text-center text-xs text-muted-foreground">
-              No data
             </div>
           </div>
 
