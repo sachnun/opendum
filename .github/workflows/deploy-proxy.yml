@@ -8,6 +8,11 @@ on:
       - .github/workflows/deploy-proxy.yml
       - apps/proxy/**
       - models/**
+  workflow_run:
+    workflows:
+      - Refresh Provider Models
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -19,6 +24,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     name: Proxy Railway
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -34,6 +40,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: main
 
       - name: Setup Go
         uses: actions/setup-go@v6

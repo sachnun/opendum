@@ -10,6 +10,11 @@ on:
       - models/**
       - package.json
       - package-lock.json
+  workflow_run:
+    workflows:
+      - Refresh Provider Models
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -22,6 +27,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     name: Dashboard Worker
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -31,6 +37,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
