@@ -144,6 +144,10 @@ export interface PlaygroundOptions {
   providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; isActive: boolean; disabledUntil: string | Date | null; disabledModels: string[]; supportedModels?: string[] | null }>;
 }
 
+export interface PlaygroundProxyAuth {
+  headers: Record<string, string>;
+}
+
 export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 export type AnalyticsFilter = Period | { from: string; to: string };
 

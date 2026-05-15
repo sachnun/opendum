@@ -977,6 +977,18 @@ function mapReasoningEffortToThinkingBudget(effort: ReasoningEffort): number {
   return 0;
 }
 
+function getProxyBaseUrl(): string {
+  const proxyBaseUrl = options.value?.proxyBaseUrl?.trim().replace(/\/+$/, "");
+  if (!proxyBaseUrl) throw new Error("Proxy URL is not configured");
+  return proxyBaseUrl;
+}
+
+function getEndpointPath(endpoint: PlaygroundEndpoint): string {
+  if (endpoint === "messages") return "/v1/messages";
+  if (endpoint === "responses") return "/v1/responses";
+  return "/v1/chat/completions";
+}
+
 function usesAdaptiveThinking(modelId: string): boolean {
   const normalized = modelId.toLowerCase();
   return normalized === "claude-opus-4-7" || normalized === "claude-opus-4.7";
@@ -1153,13 +1165,18 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
     const controller = new AbortController();
     controllers.set(panelId, controller);
-    const response = await fetch("/api/dashboard/playground/run", {
+    const auth = await dashboardApi.playground.auth({ endpoint: currentSettings.endpoint });
+    if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+
+    const response = await fetch(`${getProxyBaseUrl()}${getEndpointPath(currentSettings.endpoint)}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        ...auth.headers,
       },
       signal: controller.signal,
-      body: JSON.stringify({ endpoint: currentSettings.endpoint, body: requestBody }),
+      body: JSON.stringify(requestBody),
     });
 
     waitMs = Date.now() - requestStartedAt;

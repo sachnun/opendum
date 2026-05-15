@@ -10,14 +10,16 @@ import type {
   ModelListItem,
   ModelSearchItem,
   PlaygroundOptions,
+  PlaygroundProxyAuth,
   ProviderDetailData,
   QuotaProviderKey,
 } from "../../lib/dashboard-api-types";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
+type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null };
 
-type DashboardFetch = typeof $fetch;
+type DashboardFetch = ReturnType<typeof useRequestFetch>;
 
 function post<T>(fetcher: DashboardFetch, url: string, body?: Record<string, unknown>) {
   return fetcher<T>(url, { method: "POST", body });
@@ -72,6 +74,7 @@ export function useDashboardApi() {
     },
     playground: {
       options: () => dashboardFetch<PlaygroundOptions>("/api/dashboard/playground/options"),
+      auth: (body: { endpoint: PlaygroundEndpoint }) => post<PlaygroundProxyAuth>(dashboardFetch, "/api/dashboard/playground/auth", body),
     },
   };
 }
