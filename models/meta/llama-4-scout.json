@@ -4,6 +4,7 @@
     "workers_ai"
   ],
   "aliases": [
+    "llama-4-scout-17b-16e-instruct",
     "meta-llama-4-scout-17b-16e-instruct",
     "meta/llama-4-scout-17b-16e-instruct"
   ],

@@ -4,6 +4,12 @@
     "nvidia_nim",
     "openrouter"
   ],
+  "aliases": [
+    "nemotron-3-nano-omni-30b-a3b-reasoning",
+    "nemotron-omni",
+    "nano-omni",
+    "nvidia-nemotron-3-nano-omni-30b-a3b-reasoning"
+  ],
   "family": "NVIDIA",
   "providerConfig": {
     "kilo_code": {

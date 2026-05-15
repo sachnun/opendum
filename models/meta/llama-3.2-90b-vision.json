@@ -2,6 +2,11 @@
   "providers": [
     "nvidia_nim"
   ],
+  "aliases": [
+    "llama-3.2-90b-vision-instruct",
+    "meta-llama-3.2-90b-vision-instruct",
+    "meta/llama-3.2-90b-vision-instruct"
+  ],
   "family": "Meta",
   "meta": {
     "reasoning": false,

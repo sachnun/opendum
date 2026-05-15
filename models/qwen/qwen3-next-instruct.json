@@ -4,6 +4,7 @@
     "nvidia_nim"
   ],
   "aliases": [
+    "qwen3-next-80b-a3b-instruct",
     "qwen-qwen3-next-80b-a3b-instruct",
     "qwen/qwen3-next-80b-a3b-instruct"
   ],

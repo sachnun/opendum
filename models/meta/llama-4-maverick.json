@@ -2,10 +2,15 @@
   "providers": [
     "nvidia_nim"
   ],
+  "aliases": [
+    "llama-4-maverick-17b-128e-instruct",
+    "meta-llama-4-maverick-17b-128e-instruct",
+    "meta/llama-4-maverick-17b-128e-instruct"
+  ],
   "family": "Meta",
   "meta": {
-    "reasoning": true,
-    "toolCall": false,
+    "reasoning": false,
+    "toolCall": true,
     "vision": true,
     "modalities": {
       "input": [
@@ -19,7 +24,7 @@
   },
   "providerConfig": {
     "nvidia_nim": {
-      "upstream": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+      "upstream": "meta/llama-4-maverick-17b-128e-instruct"
     }
   }
 }

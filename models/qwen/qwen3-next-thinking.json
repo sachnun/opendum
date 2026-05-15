@@ -2,6 +2,10 @@
   "providers": [
     "nvidia_nim"
   ],
+  "aliases": [
+    "qwen3-next-80b-a3b-thinking",
+    "qwen/qwen3-next-80b-a3b-thinking"
+  ],
   "family": "Qwen",
   "providerConfig": {
     "nvidia_nim": {

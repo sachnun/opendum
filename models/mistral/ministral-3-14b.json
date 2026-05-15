@@ -1,9 +1,11 @@
 {
   "providers": [
-    "ollama_cloud"
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "ministral-14b-instruct-2512"
   ],
   "family": "Mistral",
-  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,
@@ -18,8 +20,8 @@
     }
   },
   "providerConfig": {
-    "ollama_cloud": {
-      "upstream": "ministral-3:14b"
+    "nvidia_nim": {
+      "upstream": "mistralai/ministral-14b-instruct-2512"
     }
   }
 }

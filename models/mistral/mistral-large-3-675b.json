@@ -1,6 +1,12 @@
 {
   "providers": [
+    "nvidia_nim",
     "ollama_cloud"
+  ],
+  "aliases": [
+    "mistral-large",
+    "mistral-large-3-675b-instruct-2512",
+    "mistralai/mistral-large"
   ],
   "family": "Mistral",
   "meta": {
@@ -18,6 +24,9 @@
     }
   },
   "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-large-3-675b-instruct-2512"
+    },
     "ollama_cloud": {
       "upstream": "mistral-large-3:675b"
     }

@@ -2,6 +2,9 @@
   "providers": [
     "ollama_cloud"
   ],
+  "aliases": [
+    "qwen3-vl-235b-instruct"
+  ],
   "family": "Qwen",
   "meta": {
     "reasoning": false,

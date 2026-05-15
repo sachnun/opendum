@@ -1,6 +1,11 @@
 {
   "providers": [
+    "nvidia_nim",
     "ollama_cloud"
+  ],
+  "aliases": [
+    "qwen3-coder-480b-a35b-instruct",
+    "qwen/qwen3-coder-480b-a35b-instruct"
   ],
   "family": "Qwen",
   "meta": {
@@ -17,6 +22,9 @@
     }
   },
   "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "qwen/qwen3-coder-480b-a35b-instruct"
+    },
     "ollama_cloud": {
       "upstream": "qwen3-coder:480b"
     }

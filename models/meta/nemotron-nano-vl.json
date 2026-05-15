@@ -3,13 +3,14 @@
     "nvidia_nim"
   ],
   "aliases": [
-    "mistral-large",
-    "mistralai/mistral-large"
+    "llama-3.1-nemotron-nano-vl-8b-v1",
+    "nvidia-llama-3.1-nemotron-nano-vl-8b-v1",
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
   ],
-  "family": "Mistral",
+  "family": "Meta",
   "meta": {
-    "reasoning": false,
-    "toolCall": true,
+    "reasoning": true,
+    "toolCall": false,
     "vision": true,
     "modalities": {
       "input": [
@@ -23,7 +24,7 @@
   },
   "providerConfig": {
     "nvidia_nim": {
-      "upstream": "mistralai/mistral-large-3-675b-instruct-2512"
+      "upstream": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
     }
   }
 }
