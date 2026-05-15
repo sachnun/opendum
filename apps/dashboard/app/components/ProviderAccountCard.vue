@@ -922,7 +922,7 @@ function cancelErrorPreviewPointer() {
       <UiCardHeader class="pb-1">
         <div class="flex min-w-0 items-center justify-between gap-2">
           <UiCardTitle class="min-w-0 truncate text-lg">{{ accountTitle }}</UiCardTitle>
-          <div class="flex flex-wrap justify-end gap-1">
+          <div class="flex shrink-0 items-center justify-end gap-1 whitespace-nowrap">
             <UiBadge v-if="showTierBadge" variant="outline" :class="isPaidTierValue(normalizedTier) ? 'border-green-500 text-green-600' : ''">
               {{ formatTierLabel(normalizedTier) }}
             </UiBadge>
