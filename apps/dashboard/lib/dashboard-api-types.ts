@@ -6,6 +6,13 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
+export type DashboardUserRole = "user" | "maintener";
+
+export interface DashboardMeData {
+  role: DashboardUserRole;
+  isMaintener: boolean;
+}
+
 export interface ProviderStats {
   totalRequests: number;
   successRate: number | null;

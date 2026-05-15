@@ -58,6 +58,11 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
 
+const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
+  default: () => ({ role: "user" as const, isMaintener: false }),
+});
+const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
+
 const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
   const summary = await dashboardApi.accounts.summary();
   const nextAccountCounts = { ...emptyAccountCounts };
@@ -498,10 +503,12 @@ async function handleSignOut() {
                 type="button"
                 class="flex cursor-pointer items-center justify-center rounded-full transition-opacity hover:opacity-80"
               >
-                <span class="relative flex size-8 shrink-0 overflow-hidden rounded-full select-none">
-                  <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
-                  <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
-                    {{ userInitial }}
+                <span :class="['relative flex shrink-0 rounded-full select-none', isMaintener ? 'border-2 border-white p-0.5' : '']">
+                  <span class="relative flex size-8 overflow-hidden rounded-full">
+                    <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
+                    <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
+                      {{ userInitial }}
+                    </span>
                   </span>
                 </span>
               </button>

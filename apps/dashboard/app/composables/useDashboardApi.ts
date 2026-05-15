@@ -3,6 +3,7 @@ import type {
   ActionResult,
   AnalyticsData,
   AnalyticsFilter,
+  DashboardMeData,
   ApiKeyListItem,
   ApiKeyOptions,
   ErrorHistoryResult,
@@ -29,6 +30,9 @@ export function useDashboardApi() {
   const dashboardFetch = useRequestFetch();
 
   return {
+    me: {
+      get: () => dashboardFetch<DashboardMeData>("/api/dashboard/me"),
+    },
     accounts: {
       list: () => dashboardFetch("/api/dashboard/accounts"),
       byProvider: (query: { provider: string }) => dashboardFetch("/api/dashboard/accounts/by-provider", { query }),
