@@ -7,26 +7,33 @@ import { formatQuotaHttpError } from "../provider-http-errors.js";
 
 const DEFAULT_MAX_REQUESTS = 1000;
 
+const MODEL_ALIASES: Record<string, string> = {
+  "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite",
+};
+
 const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
   "standard-tier": {
     "gemini-2.5-pro": 250,
-    "gemini-3-pro-preview": 250,
+    "gemini-3.1-pro-preview": 250,
     "gemini-2.5-flash": 1500,
     "gemini-2.5-flash-lite": 1500,
+    "gemini-3.1-flash-lite": 1500,
     "gemini-3-flash-preview": 1500,
   },
   "free-tier": {
     "gemini-2.5-pro": 100,
-    "gemini-3-pro-preview": 100,
+    "gemini-3.1-pro-preview": 100,
     "gemini-2.5-flash": 1000,
     "gemini-2.5-flash-lite": 1000,
+    "gemini-3.1-flash-lite": 1000,
     "gemini-3-flash-preview": 1000,
   },
   "legacy-tier": {
     "gemini-2.5-pro": 100,
-    "gemini-3-pro-preview": 100,
+    "gemini-3.1-pro-preview": 100,
     "gemini-2.5-flash": 1000,
     "gemini-2.5-flash-lite": 1000,
+    "gemini-3.1-flash-lite": 1000,
     "gemini-3-flash-preview": 1000,
   },
 };
@@ -37,7 +44,7 @@ const QUOTA_GROUPS: Record<
 > = {
   pro: {
     displayName: "Gemini Pro",
-    models: ["gemini-2.5-pro", "gemini-3-pro-preview"],
+    models: ["gemini-2.5-pro", "gemini-3.1-pro-preview"],
   },
   "25-flash": {
     displayName: "Gemini 2.5 Flash",
@@ -45,12 +52,13 @@ const QUOTA_GROUPS: Record<
   },
   "3-flash": {
     displayName: "Gemini 3 Flash",
-    models: ["gemini-3-flash-preview"],
+    models: ["gemini-3-flash-preview", "gemini-3.1-flash-lite"],
   },
 };
 
 interface RetrieveUserQuotaBucket {
   modelId?: string;
+  remainingAmount?: string | null;
   remainingFraction?: number | null;
   resetTime?: string | null;
 }
@@ -62,6 +70,8 @@ interface RetrieveUserQuotaResponse {
 export interface GeminiCliModelQuotaInfo {
   modelId: string;
   remainingFraction: number;
+  remainingRequests: number;
+  maxRequests: number;
   isExhausted: boolean;
   resetTimeIso: string | null;
   resetTimestamp: number | null;
@@ -108,11 +118,17 @@ function normalizeTier(tier: string | null | undefined): string {
 }
 
 function getMaxRequestsForModel(model: string, tier: string): number {
-  const cleanModel = model.includes("/") ? model.split("/").pop() ?? model : model;
+  const rawModel = model.includes("/") ? model.split("/").pop() ?? model : model;
+  const cleanModel = MODEL_ALIASES[rawModel] ?? rawModel;
   const normalizedTier = normalizeTier(tier);
   const tierLimits =
     MAX_REQUESTS_BY_TIER[normalizedTier] ?? MAX_REQUESTS_BY_TIER["free-tier"];
-  return tierLimits[cleanModel] ?? DEFAULT_MAX_REQUESTS;
+  return tierLimits?.[cleanModel] ?? DEFAULT_MAX_REQUESTS;
+}
+
+function normalizeModelId(model: string): string {
+  const cleanModel = model.includes("/") ? model.split("/").pop() ?? model : model;
+  return MODEL_ALIASES[cleanModel] ?? cleanModel;
 }
 
 function parseResetTime(resetTime: string | null | undefined): {
@@ -147,19 +163,18 @@ function buildQuotaGroups(
     }
 
     const modelQuota = models[representative];
+    if (!modelQuota) {
+      continue;
+    }
     const maxRequests = getMaxRequestsForModel(representative, tier);
-    const remainingRequests = Math.max(
-      0,
-      Math.floor(modelQuota.remainingFraction * maxRequests)
-    );
 
     groups.push({
       name: groupName,
       displayName: groupConfig.displayName,
       models: groupConfig.models,
       remainingFraction: modelQuota.remainingFraction,
-      remainingRequests,
-      maxRequests,
+      remainingRequests: modelQuota.remainingRequests,
+      maxRequests: modelQuota.maxRequests || maxRequests,
       isExhausted: modelQuota.isExhausted,
       resetTimeIso: modelQuota.resetTimeIso,
       resetTimestamp: modelQuota.resetTimestamp,
@@ -167,6 +182,39 @@ function buildQuotaGroups(
   }
 
   return groups;
+}
+
+function quotaFromBucket(
+  bucket: RetrieveUserQuotaBucket,
+  tier: string
+): { remainingRequests: number; maxRequests: number; remainingFraction: number } | null {
+  if (!bucket.modelId || bucket.remainingFraction === null || bucket.remainingFraction === undefined) {
+    return null;
+  }
+
+  const remainingFraction = Math.max(0, Math.min(1, bucket.remainingFraction));
+  if (bucket.remainingAmount) {
+    const remainingRequests = Number.parseInt(bucket.remainingAmount, 10);
+    const maxRequests =
+      remainingFraction > 0
+        ? Math.round(remainingRequests / remainingFraction)
+        : getMaxRequestsForModel(bucket.modelId, tier);
+    if (Number.isFinite(remainingRequests) && Number.isFinite(maxRequests) && maxRequests > 0) {
+      return {
+        remainingRequests: Math.max(0, remainingRequests),
+        maxRequests,
+        remainingFraction,
+      };
+    }
+  }
+
+  // Mirrors Gemini CLI: if the backend only sends a fraction, display a normalized percentage scale.
+  const maxRequests = 100;
+  return {
+    remainingRequests: Math.round(remainingFraction * maxRequests),
+    maxRequests,
+    remainingFraction,
+  };
 }
 
 export async function fetchGeminiCliQuotaFromApi(
@@ -216,20 +264,19 @@ export async function fetchGeminiCliQuotaFromApi(
           continue;
         }
 
-        const remainingFractionRaw = bucket.remainingFraction;
-        const isExhausted =
-          remainingFractionRaw === null ||
-          remainingFractionRaw === undefined ||
-          remainingFractionRaw <= 0;
-        const remainingFraction = isExhausted
-          ? 0
-          : Math.max(0, Math.min(1, remainingFractionRaw));
+        const quota = quotaFromBucket(bucket, normalizedTier);
+        if (!quota) {
+          continue;
+        }
         const reset = parseResetTime(bucket.resetTime);
 
-        models[bucket.modelId] = {
-          modelId: bucket.modelId,
-          remainingFraction,
-          isExhausted,
+        const modelId = normalizeModelId(bucket.modelId);
+        models[modelId] = {
+          modelId,
+          remainingFraction: quota.remainingFraction,
+          remainingRequests: quota.remainingRequests,
+          maxRequests: quota.maxRequests,
+          isExhausted: quota.remainingFraction <= 0,
           resetTimeIso: reset.iso,
           resetTimestamp: reset.timestamp,
         };

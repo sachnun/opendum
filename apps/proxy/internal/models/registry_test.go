@@ -175,6 +175,7 @@ func TestShortenedModelAliasesUseHostedUpstreams(t *testing.T) {
 		{alias: "llama-4-maverick-17b-128e-instruct", canonical: "llama-4-maverick", provider: "nvidia_nim", upstream: "meta/llama-4-maverick-17b-128e-instruct"},
 		{alias: "llama-4-scout-17b-16e-instruct", canonical: "llama-4-scout", provider: "groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct"},
 		{alias: "mistral-small-3.1-24b-instruct", canonical: "mistral-small-3.1", provider: "workers_ai", upstream: "@cf/mistralai/mistral-small-3.1-24b-instruct"},
+		{alias: "gemini-3.1-flash-lite-preview", canonical: "gemini-3.1-flash-lite", provider: "gemini_cli", upstream: "gemini-3.1-flash-lite-preview"},
 		{alias: "qwen3-vl-235b-instruct", canonical: "qwen3-vl-instruct", provider: "ollama_cloud", upstream: "qwen3-vl:235b-instruct"},
 		{alias: "nemotron-3-super-120b-a12b", canonical: "nemotron-3-super", provider: "nvidia_nim", upstream: "nvidia/nemotron-3-super-120b-a12b"},
 		{alias: "mistral-small-4-119b-2603", canonical: "mistral-small-4", provider: "nvidia_nim", upstream: "mistralai/mistral-small-4-119b-2603"},
