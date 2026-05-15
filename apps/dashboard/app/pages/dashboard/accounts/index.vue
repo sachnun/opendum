@@ -7,12 +7,11 @@ import {
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const dashboardApi = useDashboardApi();
-
 type AccountSummaryData = Awaited<ReturnType<typeof dashboardApi.accounts.summary>>;
 
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
-const { data, error, refresh } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
+const { data, error } = await useAsyncData("dashboard-accounts-summary", () => dashboardApi.accounts.summary());
 const summaryData = computed<AccountSummaryData | null>(() => data.value ?? null);
 const pinnedProviderSet = computed(() => new Set(summaryData.value!.pinnedProviders));
 const providerCounts = computed(() => {
@@ -45,13 +44,6 @@ function sortProvidersByStatus<T extends { key: ProviderAccountKey }>(providers:
 
 const sortedProviders = computed(() => summaryData.value ? sortProvidersByStatus(PROVIDER_ACCOUNT_DEFINITIONS) : []);
 
-function handlePinnedToggled() {
-  // Keep the current card order stable after toggling; pinned sorting applies on load/refresh.
-}
-
-function handleAccountConnected() {
-  refresh();
-}
 </script>
 
 <template>
@@ -65,7 +57,7 @@ function handleAccountConnected() {
           </UiBadge>
         </h2>
         <div class="flex w-full items-center sm:w-auto">
-          <AddAccountDialog trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="handleAccountConnected" />
+          <AddAccountDialog trigger-class="flex-1 sm:w-auto sm:flex-none" />
         </div>
       </div>
     </div>
@@ -80,7 +72,6 @@ function handleAccountConnected() {
             :provider="provider"
             :summary="summaryFor(provider.key)"
             :pinned="pinnedProviderSet.has(provider.key)"
-            @toggled="handlePinnedToggled"
           />
         </div>
       </section>

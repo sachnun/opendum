@@ -2,6 +2,7 @@
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 const config = useRuntimeConfig();
 
 type ApiKeyListItem = Awaited<ReturnType<typeof dashboardApi.apiKeys.list>>[number];
@@ -111,6 +112,29 @@ function updateApiKeyState(apiKeyId: string, value: { isActive: boolean; expires
   };
 }
 
+function updateApiKeyPatch(apiKeyId: string, value: Partial<ApiKeyListItem>) {
+  if (!data.value) return;
+  data.value = {
+    ...data.value,
+    apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, ...value } : apiKey)),
+  };
+  dashboardInvalidation.patchApiKey(apiKeyId, value);
+}
+
+function deleteApiKey(apiKeyId: string) {
+  if (!data.value) return;
+  const { [apiKeyId]: _removedRateLimits, ...rateLimitsByKeyId } = data.value.options.rateLimitsByKeyId;
+  data.value = {
+    ...data.value,
+    apiKeys: data.value.apiKeys.filter((apiKey) => apiKey.id !== apiKeyId),
+    options: {
+      ...data.value.options,
+      rateLimitsByKeyId,
+    },
+  };
+  dashboardInvalidation.removeApiKey(apiKeyId);
+}
+
 async function toggleApiKey(apiKey: ApiKeyListItem) {
   if (togglingApiKeyIds.value.has(apiKey.id)) return;
 
@@ -211,7 +235,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
           <UiCardHeader class="pb-1">
             <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <div class="min-w-0 overflow-hidden">
-                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="refresh" />
+                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="updateApiKeyPatch(apiKey.id, $event)" />
               </div>
               <div class="flex h-7 shrink-0 items-center justify-end gap-1.5">
                 <span class="text-[11px] leading-none text-muted-foreground">{{ isApiKeyEffectivelyActive(apiKey) ? 'On' : 'Off' }}</span>
@@ -235,7 +259,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
 
           <UiCardContent class="flex flex-1 flex-col pt-0">
             <div class="flex-1 space-y-3 text-sm">
-              <ApiKeyActions :api-key="apiKey" @changed="refresh" />
+              <ApiKeyActions :api-key="apiKey" @renamed="updateApiKeyPatch(apiKey.id, $event)" @deleted="deleteApiKey" />
 
               <div class="space-y-2">
                 <div class="flex justify-between gap-4">
@@ -245,7 +269,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                 <div class="flex items-center justify-between gap-4">
                   <span class="text-muted-foreground">Expiration</span>
                   <div class="text-right">
-                    <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" @updated="refresh" />
+                    <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" @updated="updateApiKeyPatch(apiKey.id, $event)" />
                   </div>
                 </div>
                 <div class="flex justify-between gap-4">

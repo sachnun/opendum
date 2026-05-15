@@ -4,12 +4,14 @@ import type { ProviderAccountModelHealthItem } from "../../lib/dashboard-api-typ
 
 const props = defineProps<{
   accountId: string;
+  provider: string;
   supportedModels: string[];
   initialDisabledModels: string[];
   modelHealth: Record<string, ProviderAccountModelHealthItem>;
 }>();
 
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 const disabledModels = ref(new Set(props.initialDisabledModels));
 const togglingModels = ref(new Set<string>());
 const expanded = ref(false);
@@ -75,6 +77,8 @@ async function toggleModel(model: string) {
   try {
     const result = await dashboardApi.accounts.setAccountModelEnabled({ accountId: props.accountId, modelId: model, enabled });
     if (!result.success) throw new Error(result.error);
+    dashboardInvalidation.patchDisabledModels(props.provider, props.accountId, Array.from(disabledModels.value));
+    dashboardInvalidation.clearAccountDependentOptions();
   } catch {
     disabledModels.value = previous;
   } finally {

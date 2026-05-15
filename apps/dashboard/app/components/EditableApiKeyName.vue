@@ -13,7 +13,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  updated: [];
+  updated: [value: { name: string | null }];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -36,7 +36,7 @@ async function updateName() {
     const result = await dashboardApi.apiKeys.updateName({ id: props.id, name: newName.value });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
-    emit("updated");
+    emit("updated", { name: result.data.name });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update API key name";
   } finally {

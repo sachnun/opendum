@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../../lib/dashboard-api-types";
+import type { ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../../lib/dashboard-api-types";
 import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../../lib/provider-accounts";
 
 definePageMeta({
@@ -10,6 +10,7 @@ definePageMeta({
 
 const route = useRoute();
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 const selectedProvider = computed<ProviderAccountKey>(() => getProviderFromSlug(String(route.params.provider))!);
 const providerMeta = computed(() => BY_KEY[selectedProvider.value]);
 
@@ -257,17 +258,28 @@ watch(
   { immediate: true }
 );
 
-function handlePinnedToggled() {
-  refresh();
+function handleAccountRenamed(account: ProviderAccountUpdateData) {
+  dashboardInvalidation.patchProviderAccount(selectedProvider.value, account.id, { name: account.name });
+  dashboardInvalidation.patchAccountNameInOptions(account.id, account.name);
 }
 
-async function handleAccountConnected() {
-  await refresh();
+function handleAccountActiveUpdated(account: ProviderAccountUpdateData) {
+  dashboardInvalidation.patchProviderAccount(selectedProvider.value, account.id, account);
+  void dashboardInvalidation.invalidateAccountSummary();
+  dashboardInvalidation.clearAccountDependentOptions();
+  dashboardInvalidation.clearModelAvailability();
 }
 
-function handleAccountChanged() {
-  refresh();
-  requestDashboardAccountSummaryRefresh();
+function handleAccountDeleted(accountId: string) {
+  dashboardInvalidation.removeProviderAccount(selectedProvider.value, accountId);
+  void dashboardInvalidation.invalidateAccountSummary();
+  dashboardInvalidation.clearAccountDependentOptions();
+  dashboardInvalidation.clearModelAvailability();
+}
+
+function handleAccountErrorsResolved() {
+  void refresh();
+  void dashboardInvalidation.invalidateAccountSummary();
 }
 
 function decodeAccountHash(hash: string): string | null {
@@ -291,7 +303,6 @@ function decodeAccountHash(hash: string): string | null {
             v-if="providerMeta"
             :provider-key="providerMeta.key"
             :pinned="pinnedProviders.has(providerMeta.key)"
-            @toggled="handlePinnedToggled"
           />
           {{ providerMeta?.label ?? selectedProvider.replaceAll('_', ' ') }}
           <UiBadge v-if="accounts.length > 0" variant="outline" class="text-xs">{{ activeAccountCount }}/{{ accounts.length }}</UiBadge>
@@ -301,7 +312,6 @@ function decodeAccountHash(hash: string): string | null {
             v-if="providerMeta"
             :initial-provider="providerMeta.key"
             trigger-class="flex-1 sm:w-auto sm:flex-none"
-            @connected="handleAccountConnected"
           />
         </div>
       </div>
@@ -375,7 +385,11 @@ function decodeAccountHash(hash: string): string | null {
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
           :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"
           :highlight="highlightedAccountIds.has(account.id)"
-          @changed="handleAccountChanged"
+          @renamed="handleAccountRenamed"
+          @active-updated="handleAccountActiveUpdated"
+          @temporarily-disabled="handleAccountActiveUpdated"
+          @deleted="handleAccountDeleted"
+          @errors-resolved="handleAccountErrorsResolved"
           @refresh-quota="handleQuotaRefresh"
         />
       </div>

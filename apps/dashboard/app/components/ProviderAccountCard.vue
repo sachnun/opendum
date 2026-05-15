@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNowStrict } from "date-fns";
-import type { AccountQuotaInfo, ErrorHistoryResult, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/dashboard-api-types";
+import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/dashboard-api-types";
 
 type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
@@ -159,7 +159,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  changed: [];
+  renamed: [account: ProviderAccountUpdateData];
+  "active-updated": [account: ProviderAccountUpdateData];
+  "temporarily-disabled": [account: ProviderAccountUpdateData];
+  deleted: [accountId: string];
+  "errors-resolved": [accountId: string];
   refreshQuota: [accountId: string];
 }>();
 
@@ -721,7 +725,7 @@ async function toggleActive() {
   try {
     const result = await dashboardApi.accounts.update({ id: props.account.id, isActive: !props.account.isActive });
     if (!result.success) throw new Error(result.error);
-    emit("changed");
+    emit("active-updated", result.data);
   } finally {
     isToggling.value = false;
   }
@@ -740,7 +744,7 @@ async function disableTemporarily() {
     const result = await dashboardApi.accounts.update({ id: props.account.id, disabledUntil: disabledUntil.toISOString() });
     if (!result.success) throw new Error(result.error);
     temporaryOffDialogOpen.value = false;
-    emit("changed");
+    emit("temporarily-disabled", result.data);
   } catch (error) {
     temporaryOffError.value = error instanceof Error ? error.message : "Failed to disable account temporarily";
   } finally {
@@ -754,7 +758,7 @@ async function renameAccount() {
     const result = await dashboardApi.accounts.update({ id: props.account.id, name: editName.value });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
-    emit("changed");
+    emit("renamed", result.data);
   } finally {
     savingName.value = false;
   }
@@ -766,7 +770,7 @@ async function deleteAccount() {
     const result = await dashboardApi.accounts.delete({ id: props.account.id });
     if (!result.success) throw new Error(result.error);
     deleteDialogOpen.value = false;
-    emit("changed");
+    emit("deleted", props.account.id);
   } finally {
     deleting.value = false;
   }
@@ -783,7 +787,7 @@ async function resolveErrors() {
     historyEntries.value = null;
     historyError.value = null;
     isHistoryLoading.value = false;
-    emit("changed");
+    emit("errors-resolved", props.account.id);
   } finally {
     resolvingErrors.value = false;
   }
@@ -1093,7 +1097,7 @@ function cancelErrorPreviewPointer() {
             </template>
           </div>
 
-          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" />
+          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" />
         </div>
         <div class="mt-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">

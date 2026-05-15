@@ -149,7 +149,6 @@ const PENDING_SCROLL_RETRIES = 20;
 const PENDING_SCROLL_DELAY_MS = 60;
 const ACCOUNT_SUMMARY_REFRESH_MS = 30_000;
 let accountSummaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
-let stopAccountSummaryRefreshListener: (() => void) | null = null;
 let accountSummaryRefreshInFlight: Promise<void> | null = null;
 let accountSummaryRefreshQueued = false;
 
@@ -308,9 +307,6 @@ onMounted(() => {
   accountSummaryRefreshTimer = setInterval(() => {
     void refreshAccountSummaryOnce();
   }, ACCOUNT_SUMMARY_REFRESH_MS);
-  stopAccountSummaryRefreshListener = onDashboardAccountSummaryRefresh(() => {
-    void refreshAccountSummaryOnce();
-  });
   watch(shouldUseAccountSummary, () => {
     void refreshAccountSummaryOnce();
   });
@@ -385,7 +381,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (accountSummaryRefreshTimer) clearInterval(accountSummaryRefreshTimer);
-  stopAccountSummaryRefreshListener?.();
 });
 
 async function handleSignOut() {

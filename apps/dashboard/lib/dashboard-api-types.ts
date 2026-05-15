@@ -49,6 +49,8 @@ export interface ProviderAccountDetailItem extends ProviderAccountItem {
   stats: ProviderStats;
 }
 
+export type ProviderAccountUpdateData = Pick<ProviderAccountItem, "id" | "name" | "isActive" | "disabledUntil" | "status" | "statusChangedAt" | "consecutiveErrors">;
+
 export interface ProviderAccountModelHealthItem {
   status: string;
   consecutiveErrors: number;

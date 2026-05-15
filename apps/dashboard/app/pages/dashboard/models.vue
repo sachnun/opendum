@@ -8,6 +8,7 @@ import { getProviderLabel } from "../../../lib/provider-accounts";
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 
 type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
 
@@ -139,6 +140,8 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
   try {
     const result = await dashboardApi.models.setEnabled({ modelId: model.id, enabled });
     if (!result.success) throw new Error(result.error);
+    dashboardInvalidation.patchModelEnabled(result.data.model, result.data.enabled);
+    void dashboardInvalidation.invalidateModelAvailability();
   } catch (error) {
     updateModelEnabled(model.id, previousValue);
     console.error(error);

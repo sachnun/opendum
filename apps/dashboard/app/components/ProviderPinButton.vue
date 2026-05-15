@@ -12,6 +12,7 @@ const emit = defineEmits<{
 }>();
 
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 const localPinned = ref(props.pinned);
 const pending = ref(false);
 
@@ -33,8 +34,8 @@ async function togglePin(event: Event) {
     const result = await dashboardApi.accounts.togglePinned({ providerKey: props.providerKey });
     if (!result.success) throw new Error(result.error);
     localPinned.value = result.data.pinned;
+    dashboardInvalidation.patchPinnedProvider(props.providerKey, result.data.pinned);
     emit("toggled", props.providerKey, result.data.pinned);
-    requestDashboardAccountSummaryRefresh();
   } catch {
     localPinned.value = previous;
   } finally {

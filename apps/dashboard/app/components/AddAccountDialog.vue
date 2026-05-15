@@ -31,6 +31,7 @@ const emit = defineEmits<{
 }>();
 
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 
 const providerConfigs: Record<Provider, ProviderConfig> = {
   antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", flowType: "oauth_redirect" },
@@ -182,31 +183,13 @@ function clearCopyAutoNextTimer() {
   copyAutoNextTimer = null;
 }
 
-async function refreshConnectedAccountData(providerKey: Provider) {
-  const keys = [
-    "dashboard-shell-accounts",
-    "dashboard-accounts-summary",
-    "dashboard-models",
-    "dashboard-shell-model-family-counts",
-    "layout-model-search",
-    "dashboard-playground-options",
-    "dashboard-api-keys",
-  ];
-
-  if (providerKey) {
-    keys.push(`dashboard-accounts-detail-${providerKey}`);
-  }
-
-  await refreshNuxtData(keys);
-}
-
 function finishConnection(result: { email: string; isUpdate: boolean }) {
   const connectedProvider = provider.value;
   if (!connectedProvider) return;
 
   open.value = false;
   emit("connected", { provider: connectedProvider, ...result });
-  void refreshConnectedAccountData(connectedProvider);
+  void dashboardInvalidation.invalidateAccountCollection(connectedProvider);
 }
 
 function selectProvider(providerKey: Provider) {

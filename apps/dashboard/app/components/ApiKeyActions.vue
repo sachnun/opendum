@@ -9,7 +9,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  changed: [];
+  deleted: [apiKeyId: string];
+  renamed: [value: { name: string | null }];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -71,7 +72,7 @@ async function deleteKey() {
     const result = await dashboardApi.apiKeys.delete({ id: props.apiKey.id });
     if (!result.success) throw new Error(result.error);
     deleteDialogOpen.value = false;
-    emit("changed");
+    emit("deleted", props.apiKey.id);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to delete API key";
   } finally {
@@ -103,7 +104,7 @@ async function deleteKey() {
           <UiButton variant="outline" size="icon-sm" class="h-8 w-8" title="Delete key" @click="deleteDialogOpen = true">
             <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
           </UiButton>
-          <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" @updated="emit('changed')" />
+          <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" @updated="emit('renamed', $event)" />
         </div>
         <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading" title="Copy key" @click="copyKey">
           <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />

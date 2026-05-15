@@ -42,6 +42,7 @@ interface Scenario {
 }
 
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 const route = useRoute();
 
 type ModelOption = PlaygroundOptions["models"][number];
@@ -195,8 +196,10 @@ const panelScrollElements = new Map<string, HTMLElement>();
 const isBatchRunActive = ref(false);
 let liveTimer: ReturnType<typeof setInterval> | null = null;
 let startLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+let accountSummaryInvalidationTimer: ReturnType<typeof setTimeout> | null = null;
 let startLongPressTriggered = false;
 const START_LONG_PRESS_DELAY_MS = 600;
+const ACCOUNT_SUMMARY_INVALIDATION_DELAY_MS = 500;
 const AUTO_SCROLL_DISABLE_THRESHOLD = 0.05;
 
 const filteredModels = computed(() => models.value);
@@ -329,6 +332,7 @@ onBeforeUnmount(() => {
   stopAllRequests();
   if (liveTimer) clearInterval(liveTimer);
   if (startLongPressTimer) clearTimeout(startLongPressTimer);
+  if (accountSummaryInvalidationTimer) clearTimeout(accountSummaryInvalidationTimer);
 });
 
 function generateId(): string {
@@ -1212,7 +1216,11 @@ function setResponseIfCurrent(panelId: string, requestId: string, response: Resp
 }
 
 function refreshAccountSummary() {
-  requestDashboardAccountSummaryRefresh();
+  if (accountSummaryInvalidationTimer) clearTimeout(accountSummaryInvalidationTimer);
+  accountSummaryInvalidationTimer = setTimeout(() => {
+    accountSummaryInvalidationTimer = null;
+    void dashboardInvalidation.invalidateAccountSummary();
+  }, ACCOUNT_SUMMARY_INVALIDATION_DELAY_MS);
 }
 
 async function runChatScenarioForPanel(panel: PanelState & { modelId: string }, scenario: Scenario, currentSettings: PlaygroundSettings): Promise<FetchModelResult> {

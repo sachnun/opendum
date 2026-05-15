@@ -361,7 +361,14 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
         if (updates.isActive !== undefined || updates.disabledUntil !== undefined) await invalidateDisabledModelsCache(userId);
       }
 
-      return { success: true, data: undefined } as const;
+      const [updated] = await db
+        .select({ id: providerAccount.id, name: providerAccount.name, isActive: providerAccount.isActive, disabledUntil: providerAccount.disabledUntil, status: providerAccount.status, statusChangedAt: providerAccount.statusChangedAt, consecutiveErrors: providerAccount.consecutiveErrors })
+        .from(providerAccount)
+        .where(eq(providerAccount.id, input.id))
+        .limit(1);
+      if (!updated) return { success: false, error: "Account not found" } as const;
+
+      return { success: true, data: withEffectiveActive(updated, now) } as const;
     } catch (error) {
       console.error("Failed to update account:", error);
       return { success: false, error: "Failed to update account" } as const;

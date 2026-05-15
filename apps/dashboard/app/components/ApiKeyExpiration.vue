@@ -9,7 +9,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  updated: [];
+  updated: [value: { expiresAt: string | Date | null }];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -64,7 +64,7 @@ async function saveExpiration(value: Date | null) {
     if (!result.success) throw new Error(result.error);
     expiresAt.value = result.data.expiresAt ? new Date(result.data.expiresAt) : null;
     open.value = false;
-    emit("updated");
+    emit("updated", { expiresAt: result.data.expiresAt });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update expiration";
   } finally {
