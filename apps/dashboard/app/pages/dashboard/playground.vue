@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createParser, type EventSourceMessage } from "eventsource-parser";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
 import { compareModelEntries } from "../../../lib/model-sort";
 import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../../lib/provider-accounts";
@@ -15,6 +16,8 @@ type ParsedCompletionData = { content: string; reasoning: string; toolCalls: Too
 type ResponseMetrics = { waitMs: number | null; firstResponseMs: number | null; inputTokens: number | null; outputTokens: number | null; totalTokens: number | null };
 type ResponseData = { content: string; reasoning: string; toolCalls: ToolCallData[]; isLoading: boolean; error?: string; metrics: ResponseMetrics; usedAccountId?: string | null; startedAt?: number | null };
 type FetchModelResult = "success" | "error" | "aborted";
+type StreamHeaderInfo = { status: number; statusText: string; getHeader: (name: string) => string | null };
+type StreamProxyRequestInput = { url: string; headers: Record<string, string>; body: string; signal: AbortSignal; endpoint: PlaygroundEndpoint; onHeaders: (info: StreamHeaderInfo) => void; onChunk: (chunk: ParsedCompletionData) => void };
 
 interface PlaygroundSettings {
   endpoint: PlaygroundEndpoint;
@@ -906,32 +909,48 @@ function extractResponsesCompletionData(payload: unknown): ParsedCompletionData 
   return { content: textParts.join(""), reasoning: reasoningParts.join(""), toolCalls, usage };
 }
 
-function processSseEvents(events: string[], onChunk: (chunk: ParsedCompletionData) => void, endpoint: PlaygroundEndpoint): number {
-  let emittedChunks = 0;
-  for (const event of events) {
-    const lines = event.split(/\r?\n/);
-    let eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() ?? "";
-    const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n").trim();
-    if (!data || data === "[DONE]") continue;
+function handleSseMessage(message: EventSourceMessage, onChunk: (chunk: ParsedCompletionData) => void, endpoint: PlaygroundEndpoint): boolean {
+  const data = message.data.trim();
+  if (!data || data === "[DONE]") return false;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(data);
-    } catch {
-      continue;
-    }
-
-    const errorMessage = extractErrorMessage(parsed);
-    if (errorMessage) throw new Error(errorMessage);
-
-    if (!eventName && parsed && typeof parsed === "object") eventName = typeof (parsed as { type?: unknown }).type === "string" ? (parsed as { type: string }).type : "";
-    const chunk = endpoint === "messages" ? extractAnthropicStreamChunkData(eventName, parsed) : endpoint === "responses" ? extractResponsesStreamChunkData(parsed) : extractStreamChunkData(parsed);
-    if (chunk.content || chunk.reasoning || chunk.toolCalls.length > 0 || chunk.usage) {
-      emittedChunks += 1;
-      onChunk(chunk);
-    }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return false;
   }
-  return emittedChunks;
+
+  const errorMessage = extractErrorMessage(parsed);
+  if (errorMessage) throw new Error(errorMessage);
+
+  const eventName = message.event ?? (parsed && typeof parsed === "object" && typeof (parsed as { type?: unknown }).type === "string" ? (parsed as { type: string }).type : "");
+  const chunk = endpoint === "messages" ? extractAnthropicStreamChunkData(eventName, parsed) : endpoint === "responses" ? extractResponsesStreamChunkData(parsed) : extractStreamChunkData(parsed);
+  if (!chunk.content && !chunk.reasoning && chunk.toolCalls.length === 0 && !chunk.usage) return false;
+
+  onChunk(chunk);
+  return true;
+}
+
+function createSseChunkProcessor(endpoint: PlaygroundEndpoint, onChunk: (chunk: ParsedCompletionData) => void) {
+  let emittedSinceLastFlush = 0;
+  const parser = createParser({
+    onEvent: (message) => {
+      if (handleSseMessage(message, onChunk, endpoint)) emittedSinceLastFlush += 1;
+    },
+  });
+
+  return {
+    feed(chunk: string) {
+      emittedSinceLastFlush = 0;
+      parser.feed(chunk);
+      return emittedSinceLastFlush;
+    },
+    flush() {
+      emittedSinceLastFlush = 0;
+      parser.reset({ consume: true });
+      return emittedSinceLastFlush;
+    },
+  };
 }
 
 function extractAnthropicStreamChunkData(eventName: string, payload: unknown): ParsedCompletionData {
@@ -957,32 +976,94 @@ function extractResponsesStreamChunkData(payload: unknown): ParsedCompletionData
   return { content: "", reasoning: "", toolCalls: [], usage: null };
 }
 
-async function consumeStream(response: Response, endpoint: PlaygroundEndpoint, onChunk: (chunk: ParsedCompletionData) => void) {
-  if (!response.body) throw new Error("No response body");
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split(/\r?\n\r?\n/);
-    buffer = events.pop() || "";
-    if (processSseEvents(events, onChunk, endpoint) > 0) await yieldToBrowserFrame();
-  }
-
-  buffer += decoder.decode();
-  if (buffer.trim()) processSseEvents([buffer], onChunk, endpoint);
+function isSuccessfulStatus(status: number): boolean {
+  return status >= 200 && status < 300;
 }
 
-function yieldToBrowserFrame(): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => setTimeout(resolve, 0));
+function getErrorMessageFromText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "Request failed";
+  try {
+    const parsed = JSON.parse(trimmed);
+    const errorMessage = extractErrorMessage(parsed);
+    if (errorMessage) return errorMessage;
+    if (parsed && typeof parsed === "object" && typeof (parsed as { message?: unknown }).message === "string") return (parsed as { message: string }).message;
+  } catch {
+    return trimmed;
+  }
+  return trimmed;
+}
+
+function streamProxyRequest(input: StreamProxyRequestInput): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (input.signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
       return;
     }
-    setTimeout(resolve, 0);
+
+    const xhr = new XMLHttpRequest();
+    let processedLength = 0;
+    let headersHandled = false;
+    let settled = false;
+    const processor = createSseChunkProcessor(input.endpoint, input.onChunk);
+
+    const cleanup = () => {
+      input.signal.removeEventListener("abort", abortRequest);
+    };
+    const settle = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const handleHeaders = () => {
+      if (headersHandled || xhr.readyState < XMLHttpRequest.HEADERS_RECEIVED) return;
+      headersHandled = true;
+      input.onHeaders({ status: xhr.status, statusText: xhr.statusText, getHeader: (name) => xhr.getResponseHeader(name) });
+    };
+    const processResponseText = () => {
+      const text = xhr.responseText || "";
+      if (text.length <= processedLength) return;
+      const chunk = text.slice(processedLength);
+      processedLength = text.length;
+      processor.feed(chunk);
+    };
+    function abortRequest() {
+      xhr.abort();
+    }
+
+    xhr.onreadystatechange = () => {
+      handleHeaders();
+      if (xhr.readyState === XMLHttpRequest.LOADING && isSuccessfulStatus(xhr.status)) processResponseText();
+    };
+    xhr.onprogress = () => {
+      handleHeaders();
+      if (isSuccessfulStatus(xhr.status)) processResponseText();
+    };
+    xhr.onload = () => {
+      handleHeaders();
+      if (!isSuccessfulStatus(xhr.status)) {
+        settle(() => reject(new Error(getErrorMessageFromText(xhr.responseText || ""))));
+        return;
+      }
+      processResponseText();
+      processor.flush();
+      settle(resolve);
+    };
+    xhr.onerror = () => settle(() => reject(new Error("Network error")));
+    xhr.ontimeout = () => settle(() => reject(new Error("Request timed out")));
+    xhr.onabort = () => settle(() => reject(new DOMException("Aborted", "AbortError")));
+
+    input.signal.addEventListener("abort", abortRequest, { once: true });
+    try {
+      xhr.open("POST", input.url, true);
+      for (const [name, value] of Object.entries(input.headers)) {
+        xhr.setRequestHeader(name, value);
+      }
+      xhr.send(input.body);
+    } catch (error) {
+      settle(() => reject(error));
+    }
   });
 }
 
@@ -1185,15 +1266,51 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     const auth = await dashboardApi.playground.auth({ endpoint: currentSettings.endpoint });
     if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const response = await fetch(`${getProxyBaseUrl()}${getEndpointPath(currentSettings.endpoint)}`, {
+    const url = `${getProxyBaseUrl()}${getEndpointPath(currentSettings.endpoint)}`;
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      ...auth.headers,
+    };
+    const body = JSON.stringify(requestBody);
+
+    if (requestBody.stream !== false) {
+      let streamedContent = "";
+      let streamedReasoning = "";
+      let streamedToolCalls: ToolCallData[] = [];
+      let firstResponseMs: number | null = null;
+      let usage: ParsedUsageData | null = null;
+
+      await streamProxyRequest({
+        url,
+        headers,
+        body,
+        signal: controller.signal,
+        endpoint: currentSettings.endpoint,
+        onHeaders: (info) => {
+          waitMs = Date.now() - requestStartedAt;
+          usedAccountId = info.getHeader("x-provider-account-id");
+          shouldRefreshAccountSummary = true;
+        },
+        onChunk: (chunk) => {
+          firstResponseMs ??= Date.now() - requestStartedAt;
+          streamedContent += chunk.content;
+          streamedReasoning += chunk.reasoning;
+          streamedToolCalls = chunk.toolCalls.length > 0 ? [...streamedToolCalls, ...chunk.toolCalls] : streamedToolCalls;
+          usage = mergeUsageData(usage, chunk.usage);
+          setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: true, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId, startedAt: requestStartedAt });
+        },
+      });
+
+      setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId });
+      return "success";
+    }
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-        ...auth.headers,
-      },
+      headers,
       signal: controller.signal,
-      body: JSON.stringify(requestBody),
+      body,
     });
 
     waitMs = Date.now() - requestStartedAt;
@@ -1211,28 +1328,6 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
         if (errorText.trim()) errorMessage = errorText;
       }
       throw new Error(errorMessage);
-    }
-
-    const contentType = response.headers.get("content-type") ?? "";
-    const shouldStream = requestBody.stream !== false && (Boolean(response.body) || contentType.includes("text/event-stream"));
-    if (shouldStream) {
-      let streamedContent = "";
-      let streamedReasoning = "";
-      let streamedToolCalls: ToolCallData[] = [];
-      let firstResponseMs: number | null = null;
-      let usage: ParsedUsageData | null = null;
-
-      await consumeStream(response, currentSettings.endpoint, (chunk) => {
-        firstResponseMs ??= Date.now() - requestStartedAt;
-        streamedContent += chunk.content;
-        streamedReasoning += chunk.reasoning;
-        streamedToolCalls = chunk.toolCalls.length > 0 ? [...streamedToolCalls, ...chunk.toolCalls] : streamedToolCalls;
-        usage = mergeUsageData(usage, chunk.usage);
-        setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: true, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId, startedAt: requestStartedAt });
-      });
-
-      setResponseIfCurrent(panelId, requestId, { content: streamedContent, reasoning: streamedReasoning, toolCalls: streamedToolCalls, isLoading: false, metrics: buildResponseMetrics(waitMs, firstResponseMs, usage), usedAccountId });
-      return "success";
     }
 
     const payload = await response.json();

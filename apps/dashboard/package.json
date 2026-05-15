@@ -21,6 +21,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
+    "eventsource-parser": "^3.0.8",
     "idb-keyval": "^6.2.2",
     "lucide-vue-next": "^1.0.0",
     "nuxt": "^4.4.4",
