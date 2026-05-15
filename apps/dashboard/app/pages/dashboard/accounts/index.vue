@@ -60,7 +60,7 @@ function handleAccountConnected() {
       <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
           Provider Accounts
-          <UiBadge v-if="providerCounts && providerCounts.connected > 0" variant="outline" class="text-xs tabular-nums">
+          <UiBadge v-if="providerCounts && providerCounts.connected > 0" variant="outline" class="text-xs">
             {{ providerCounts.active }}/{{ providerCounts.connected }}
           </UiBadge>
         </h2>

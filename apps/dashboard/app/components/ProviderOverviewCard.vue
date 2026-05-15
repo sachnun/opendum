@@ -49,7 +49,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
       <div class="flex items-center gap-1">
         <ProviderPinButton class="pointer-events-auto" :provider-key="provider.key" :pinned="pinned" @toggled="handlePinnedToggled" />
         <UiCardTitle class="text-base">{{ provider.label }}</UiCardTitle>
-        <UiBadge v-if="summary.connected > 0" variant="outline" class="text-xs tabular-nums">{{ summary.active }}/{{ summary.connected }}</UiBadge>
+        <UiBadge v-if="summary.connected > 0" variant="outline" class="text-xs">{{ summary.active }}/{{ summary.connected }}</UiBadge>
       </div>
       <UiBadge variant="outline" :class="badge.class">{{ badge.label }}</UiBadge>
     </div>

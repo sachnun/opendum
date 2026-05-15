@@ -153,7 +153,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     <div class="dashboard-header-divider">
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-xl font-semibold">Models</h2>
-        <UiBadge variant="outline" class="tabular-nums">{{ enabledModelCount }}/{{ models.length }}</UiBadge>
+        <UiBadge variant="outline">{{ enabledModelCount }}/{{ models.length }}</UiBadge>
       </div>
     </div>
 
@@ -190,7 +190,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
         <section v-for="section in modelSections" :id="section.anchorId" :key="section.name" class="scroll-mt-24 space-y-4 md:space-y-2">
           <div class="flex items-center gap-2">
             <h3 class="text-sm font-semibold">{{ section.name }}</h3>
-            <UiBadge variant="outline" class="text-[10px] font-normal tabular-nums">{{ section.models.length }} models</UiBadge>
+            <UiBadge variant="outline" class="text-[10px] font-normal">{{ section.models.length }} models</UiBadge>
           </div>
           <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
             <UiCard

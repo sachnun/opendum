@@ -168,7 +168,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="text-xl font-semibold">API Keys</h2>
-          <UiBadge variant="outline" class="tabular-nums">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
+          <UiBadge variant="outline">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
         </div>
         <CreateApiKeyButton trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
       </div>

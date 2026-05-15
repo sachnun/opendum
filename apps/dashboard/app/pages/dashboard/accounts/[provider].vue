@@ -278,7 +278,7 @@ function decodeAccountHash(hash: string): string | null {
             @toggled="handlePinnedToggled"
           />
           {{ providerMeta?.label ?? selectedProvider.replaceAll('_', ' ') }}
-          <UiBadge v-if="accounts.length > 0" variant="outline" class="text-xs tabular-nums">{{ activeAccountCount }}/{{ accounts.length }}</UiBadge>
+          <UiBadge v-if="accounts.length > 0" variant="outline" class="text-xs">{{ activeAccountCount }}/{{ accounts.length }}</UiBadge>
         </h2>
         <div class="flex w-full items-center sm:w-auto">
           <AddAccountDialog
