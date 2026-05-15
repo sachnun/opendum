@@ -124,6 +124,21 @@ func shouldRotate(status int) bool {
 	return status >= 500 || status == http.StatusTooManyRequests || status == http.StatusRequestTimeout || status == http.StatusNotFound || status == http.StatusForbidden || status == http.StatusPaymentRequired || status == http.StatusUnauthorized
 }
 
+func isAntigravityResourceExhausted(provider string, status int, body string) bool {
+	if provider != "antigravity" || status != http.StatusTooManyRequests {
+		return false
+	}
+	var payload map[string]any
+	if json.Unmarshal([]byte(strings.TrimSpace(body)), &payload) != nil {
+		return false
+	}
+	errorBody, ok := payload["error"].(map[string]any)
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(stringValue(errorBody["status"])), "RESOURCE_EXHAUSTED")
+}
+
 func codexUsageLimitDisabledUntil(provider string, status int, body string, now time.Time) (time.Time, bool) {
 	if provider != "codex" || status != http.StatusTooManyRequests {
 		return time.Time{}, false

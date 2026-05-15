@@ -21,6 +21,12 @@ type accountRotationRunner interface {
 	isToolCallModel(string) bool
 }
 
+type delayedAccountFailure struct {
+	account    appdb.ProviderAccount
+	statusCode int
+	message    string
+}
+
 func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *routeError) {
 	return executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 }
@@ -29,6 +35,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 	tried := []string{}
 	recoverableFailures := []accountRotationFailure{}
 	var lastFailure *routeError
+	var delayedFinalFailure *delayedAccountFailure
 	accountConfigured := false
 
 	for {
@@ -43,6 +50,9 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 		}
 
 		if account == nil {
+			if lastFailure != nil && delayedFinalFailure != nil {
+				runner.markAccountFailed(ctx, delayedFinalFailure.account.ID, validation.Model, delayedFinalFailure.statusCode, delayedFinalFailure.message)
+			}
 			if len(tried) == 0 {
 				if accountConfigured {
 					return nil, nil, 0, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "This model is temporarily unavailable. Please try again later.", Type: "api_error"}
@@ -79,6 +89,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			upstreamFirstResponseMS = time.Now().UnixMilli()
 		}
 		if err != nil {
+			delayedFinalFailure = nil
 			status := http.StatusInternalServerError
 			message := err.Error()
 			detailed := buildAccountErrorMessage(message, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
@@ -96,11 +107,16 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			bodyText := readBodyLimit(resp.Body, 1<<20)
 			_ = resp.Body.Close()
 			var failedAt time.Time
+			delayedFinalFailure = nil
 			if resp.StatusCode != http.StatusRequestTimeout {
 				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
-				failedAt = runner.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, detailed)
-				if disabledUntil, ok := codexUsageLimitDisabledUntil(account.Provider, resp.StatusCode, bodyText, failedAt); ok {
-					runner.markAccountUsageLimited(ctx, account.ID, validation.Model, disabledUntil, failedAt)
+				if forced == nil && isAntigravityResourceExhausted(account.Provider, resp.StatusCode, bodyText) {
+					delayedFinalFailure = &delayedAccountFailure{account: *account, statusCode: resp.StatusCode, message: detailed}
+				} else {
+					failedAt = runner.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, detailed)
+					if disabledUntil, ok := codexUsageLimitDisabledUntil(account.Provider, resp.StatusCode, bodyText, failedAt); ok {
+						runner.markAccountUsageLimited(ctx, account.ID, validation.Model, disabledUntil, failedAt)
+					}
 				}
 			}
 			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})

@@ -131,6 +131,88 @@ func TestExecuteAccountRotationMarksCodexUsageLimitDisabledUntil(t *testing.T) {
 	}
 }
 
+func TestExecuteAccountRotationDelaysAntigravityResourceExhaustedFailureOnRecovery(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "ag-a1", Provider: "antigravity"},
+			{ID: "p2-a1", Provider: "provider_2"},
+		},
+		responseBody: antigravityResourceExhaustedBody,
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	account, resp, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "gemini-3-flash-preview", Provider: strPtr("antigravity")},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr != nil {
+		t.Fatalf("executeAccountRotation routeErr = %+v", routeErr)
+	}
+	if account == nil || account.ID != "p2-a1" {
+		t.Fatalf("selected account = %#v, want p2-a1", account)
+	}
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("response = %#v, want 200", resp)
+	}
+	if len(runner.failedAccountIDs) != 0 {
+		t.Fatalf("failed accounts = %#v, want none", runner.failedAccountIDs)
+	}
+}
+
+func TestExecuteAccountRotationRecordsLastAntigravityResourceExhaustedFailure(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "ag-a1", Provider: "antigravity"},
+			{ID: "ag-a2", Provider: "antigravity"},
+		},
+		responseBody: antigravityResourceExhaustedBody,
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "gemini-3-flash-preview", Provider: strPtr("antigravity")},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil || routeErr.Status != http.StatusTooManyRequests {
+		t.Fatalf("routeErr = %+v, want 429", routeErr)
+	}
+	if len(runner.failedAccountIDs) != 1 || runner.failedAccountIDs[0] != "ag-a2" {
+		t.Fatalf("failed accounts = %#v, want only ag-a2", runner.failedAccountIDs)
+	}
+}
+
+const antigravityResourceExhaustedBody = `{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}`
+
 type testRotationRunner struct {
 	accounts              []appdb.ProviderAccount
 	requested             []string
@@ -138,6 +220,7 @@ type testRotationRunner struct {
 	usageLimitedAccountID string
 	usageLimitedModel     string
 	usageLimitedUntil     time.Time
+	failedAccountIDs      []string
 }
 
 func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude []string, _ auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
@@ -168,7 +251,8 @@ func (r *testRotationRunner) makeProviderRequest(_ context.Context, account appd
 	return &http.Response{StatusCode: http.StatusTooManyRequests, Body: body}, nil
 }
 
-func (r *testRotationRunner) markAccountFailed(context.Context, string, string, int, string) time.Time {
+func (r *testRotationRunner) markAccountFailed(_ context.Context, accountID string, _ string, _ int, _ string) time.Time {
+	r.failedAccountIDs = append(r.failedAccountIDs, accountID)
 	return time.Now()
 }
 
