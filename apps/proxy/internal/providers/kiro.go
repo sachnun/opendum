@@ -1293,7 +1293,7 @@ func (s *kiroThinkingSplitter) Process(delta string, final bool) (string, string
 				s.buffer = ""
 				break
 			}
-			safeLen := max(0, len(s.buffer)-maxKiroThinkingStartLen())
+			safeLen := safeKiroUTF8PrefixLen(s.buffer, max(0, len(s.buffer)-maxKiroThinkingStartLen()))
 			if safeLen > 0 {
 				content += s.buffer[:safeLen]
 				s.buffer = s.buffer[safeLen:]
@@ -1316,7 +1316,7 @@ func (s *kiroThinkingSplitter) Process(delta string, final bool) (string, string
 				s.buffer = ""
 				break
 			}
-			safeLen := max(0, len(s.buffer)-len(endTag))
+			safeLen := safeKiroUTF8PrefixLen(s.buffer, max(0, len(s.buffer)-len(endTag)))
 			if safeLen > 0 {
 				reasoning += s.buffer[:safeLen]
 				s.buffer = s.buffer[safeLen:]
@@ -1331,6 +1331,19 @@ func (s *kiroThinkingSplitter) Process(delta string, final bool) (string, string
 
 func (s *kiroThinkingSplitter) Flush() (string, string) {
 	return s.Process("", true)
+}
+
+func safeKiroUTF8PrefixLen(value string, maxLen int) int {
+	if maxLen <= 0 {
+		return 0
+	}
+	if maxLen >= len(value) {
+		return len(value)
+	}
+	for maxLen > 0 && !utf8.RuneStart(value[maxLen]) {
+		maxLen--
+	}
+	return maxLen
 }
 
 func findKiroThinkingStartTag(buffer string) (int, struct {

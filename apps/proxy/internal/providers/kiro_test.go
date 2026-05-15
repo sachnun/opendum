@@ -480,6 +480,43 @@ func TestKiroSSEReaderPreservesUTF8AcrossReadBoundaries(t *testing.T) {
 	}
 }
 
+func TestKiroSSEReaderPreservesUTF8AcrossThinkingSplitterBoundaries(t *testing.T) {
+	reader := newKiroSSEReader(&oneByteReader{data: []byte(`{"content":"emoji ` + "🙂" + ` text"}{"stop":true}`)}, "unit-test-model", true)
+	out, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	if strings.Contains(text, "\ufffd") {
+		t.Fatalf("stream contained replacement characters: %s", text)
+	}
+	if aggregateKiroSSEContent(t, text) != "emoji 🙂 text" {
+		t.Fatalf("missing preserved UTF-8 content: %s", text)
+	}
+}
+
+func aggregateKiroSSEContent(t *testing.T, text string) string {
+	t.Helper()
+	content := ""
+	for _, chunk := range strings.Split(text, "\n\n") {
+		if !strings.HasPrefix(chunk, "data: {") {
+			continue
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(chunk, "data: ")), &parsed); err != nil {
+			t.Fatal(err)
+		}
+		choices, _ := parsed["choices"].([]any)
+		if len(choices) == 0 {
+			continue
+		}
+		choice, _ := choices[0].(map[string]any)
+		delta, _ := choice["delta"].(map[string]any)
+		content += stringValue(delta["content"])
+	}
+	return content
+}
+
 func TestKiroAPIURLUsesProfileARNRegion(t *testing.T) {
 	profileArn := "arn:aws:codecatalyst:eu-west-1:123456789012:space/test"
 	got := kiroAPIURLForAccount(appdb.ProviderAccount{AccountID: &profileArn})
