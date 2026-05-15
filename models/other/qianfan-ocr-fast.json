@@ -1,17 +1,5 @@
 {
-  "providers": [
-    "kilo_code",
-    "openrouter"
-  ],
+  "providers": [],
   "family": "Baidu",
-  "ignored": true,
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "baidu/qianfan-ocr-fast:free",
-      "authless": true
-    },
-    "openrouter": {
-      "upstream": "baidu/qianfan-ocr-fast:free"
-    }
-  }
+  "ignored": true
 }
