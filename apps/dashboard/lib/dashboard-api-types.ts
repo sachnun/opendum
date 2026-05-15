@@ -61,6 +61,12 @@ export interface AccountSummaryData {
   pinnedProviders: ProviderAccountKey[];
 }
 
+export interface AccountPingData {
+  summaries: Partial<Record<ProviderAccountKey, { active: number; indicator: "normal" | "warning" | "error" }>>;
+  pinnedProviders: ProviderAccountKey[];
+  hasConnectedAccounts: boolean;
+}
+
 export interface ProviderDetailData {
   accounts: ProviderAccountDetailItem[];
   supportedModels: string[];

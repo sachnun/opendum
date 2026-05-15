@@ -16,6 +16,16 @@ const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
 const MAX_ERROR_HISTORY_ROWS = 8;
 
+type AccountSummarySourceRow = {
+  provider: string;
+  isActive: boolean;
+  disabledUntil: Date | string | null;
+  lastUsedAt: Date | string | null;
+  lastErrorAt: Date | string | null;
+  lastSuccessAt: Date | string | null;
+  lastRecoveredByRotationAt: Date | string | null;
+};
+
 export const providerInputSchema = z.object({
   provider: z.string().refine(isKnownProvider, "Invalid provider"),
 });
@@ -71,6 +81,36 @@ function withEffectiveHealthStatus<T extends { status: string; statusChangedAt?:
   return { ...row, status: "degraded" };
 }
 
+function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], now = new Date()) {
+  const summaries = Object.fromEntries(
+    PROVIDER_ACCOUNT_KEYS.map((provider) => [
+      provider,
+      {
+        connected: 0,
+        active: 0,
+        indicator: "normal" as ProviderAccountIndicator,
+      },
+    ])
+  ) as Record<ProviderAccountKey, { connected: number; active: number; indicator: ProviderAccountIndicator }>;
+
+  for (const account of accounts) {
+    if (!isKnownProvider(account.provider)) continue;
+
+    const summary = summaries[account.provider];
+    summary.connected += 1;
+
+    if (!accountIsEffectivelyActive(account, now)) continue;
+
+    summary.active += 1;
+    const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt, account.lastUsedAt);
+    if (INDICATOR_WEIGHT[indicator] > INDICATOR_WEIGHT[summary.indicator]) {
+      summary.indicator = indicator;
+    }
+  }
+
+  return summaries;
+}
+
 async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>): Promise<ProviderAccountKey[]> {
   const rows = await db.select({ providerKey: pinnedProvider.providerKey }).from(pinnedProvider).where(eq(pinnedProvider.userId, userId)).orderBy(asc(pinnedProvider.createdAt));
 
@@ -116,6 +156,7 @@ export async function listAccountsByProvider(userId: string, input: z.infer<type
 
 export async function getAccountSummary(userId: string) {
   try {
+    const now = new Date();
     const [accounts, providerStats] = await Promise.all([
       db
         .select({
@@ -132,38 +173,51 @@ export async function getAccountSummary(userId: string) {
       getProviderSummaryStats(userId),
     ]);
     const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider));
+    const pingSummaries = buildAccountPingSummaries(accounts, now);
 
     const summaries = Object.fromEntries(
       PROVIDER_ACCOUNT_KEYS.map((provider) => [
         provider,
         {
-          connected: 0,
-          active: 0,
-          indicator: "normal" as ProviderAccountIndicator,
+          ...pingSummaries[provider],
           stats: providerStats[provider],
         },
       ])
     ) as Record<ProviderAccountKey, { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats }>;
 
-    for (const account of accounts) {
-      if (!isKnownProvider(account.provider)) continue;
-
-      const summary = summaries[account.provider];
-      summary.connected += 1;
-
-      if (!accountIsEffectivelyActive(account)) continue;
-
-      summary.active += 1;
-      const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt, account.lastUsedAt);
-      if (INDICATOR_WEIGHT[indicator] > INDICATOR_WEIGHT[summary.indicator]) {
-        summary.indicator = indicator;
-      }
-    }
-
     return { summaries, pinnedProviders };
   } catch (error) {
     console.error("Failed to load account summaries:", error);
     throw new Error("Failed to load account summaries");
+  }
+}
+
+export async function getAccountPing(userId: string) {
+  try {
+    const now = new Date();
+    const accounts = await db
+      .select({
+        provider: providerAccount.provider,
+        isActive: providerAccount.isActive,
+        disabledUntil: providerAccount.disabledUntil,
+        lastUsedAt: providerAccount.lastUsedAt,
+        lastErrorAt: providerAccount.lastErrorAt,
+        lastSuccessAt: providerAccount.lastSuccessAt,
+        lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
+      })
+      .from(providerAccount)
+      .where(eq(providerAccount.userId, userId));
+    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider));
+    const pingSummaries = buildAccountPingSummaries(accounts, now);
+
+    return {
+      summaries: Object.fromEntries(pinnedProviders.map((provider) => [provider, pingSummaries[provider]])),
+      pinnedProviders,
+      hasConnectedAccounts: accounts.some((account) => isKnownProvider(account.provider)),
+    };
+  } catch (error) {
+    console.error("Failed to ping account summaries:", error);
+    throw new Error("Failed to ping account summaries");
   }
 }
 

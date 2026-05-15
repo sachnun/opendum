@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {
+  AccountPingData,
+  AccountSummaryData,
   ModelFamilyCounts,
   NavItem,
   NavSubItem,
@@ -38,6 +40,7 @@ interface ShellAccountSummary {
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
   pinnedProviders: ProviderAccountKey[];
+  hasConnectedAccounts: boolean;
 }
 
 const emptyShellAccountSummary: ShellAccountSummary = {
@@ -45,6 +48,7 @@ const emptyShellAccountSummary: ShellAccountSummary = {
   activeAccountCounts: { ...emptyAccountCounts },
   accountIndicators: { ...emptyAccountIndicators },
   pinnedProviders: [],
+  hasConnectedAccounts: false,
 };
 
 const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
@@ -57,21 +61,27 @@ const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
+const shouldUseAccountSummary = computed(() => route.path === "/dashboard/accounts");
 
 const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
 });
 const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
 
-const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
-  const summary = await dashboardApi.accounts.summary();
+function toShellAccountSummary(summary: AccountSummaryData | AccountPingData): ShellAccountSummary {
   const nextAccountCounts = { ...emptyAccountCounts };
   const nextActiveAccountCounts = { ...emptyAccountCounts };
   const nextAccountIndicators = { ...emptyAccountIndicators };
+  let hasConnectedAccounts = "hasConnectedAccounts" in summary ? summary.hasConnectedAccounts : false;
 
   for (const definition of PROVIDER_ACCOUNT_DEFINITIONS) {
     const providerSummary = summary.summaries[definition.key];
-    nextAccountCounts[definition.key] = providerSummary.connected;
+    if (!providerSummary) continue;
+
+    const connected = "connected" in providerSummary ? providerSummary.connected : providerSummary.active;
+    if (connected > 0) hasConnectedAccounts = true;
+
+    nextAccountCounts[definition.key] = connected;
     nextActiveAccountCounts[definition.key] = providerSummary.active;
     nextAccountIndicators[definition.key] = providerSummary.indicator;
   }
@@ -81,7 +91,16 @@ const { data: accountSummaryData, pending: accountSummaryPending, refresh: refre
     activeAccountCounts: nextActiveAccountCounts,
     accountIndicators: nextAccountIndicators,
     pinnedProviders: summary.pinnedProviders,
+    hasConnectedAccounts,
   };
+}
+
+const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
+  const summary = shouldUseAccountSummary.value
+    ? await dashboardApi.accounts.summary()
+    : await dashboardApi.accounts.ping();
+
+  return toShellAccountSummary(summary);
 }, {
   default: () => emptyShellAccountSummary,
 });
@@ -92,13 +111,13 @@ const accountIndicators = computed(
   () => accountSummaryData.value?.accountIndicators ?? emptyShellAccountSummary.accountIndicators
 );
 const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? emptyShellAccountSummary.pinnedProviders);
+const hasConnectedAccounts = computed(() => accountSummaryData.value?.hasConnectedAccounts ?? emptyShellAccountSummary.hasConnectedAccounts);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
 
 const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
-const totalConnectedAccountCount = computed(() => Object.values(accountCounts.value).reduce((sum, count) => sum + count, 0));
-const playgroundNavigationDisabled = computed(() => hasLoadedAccountSummary.value && !accountSummaryPending.value && totalConnectedAccountCount.value === 0);
+const playgroundNavigationDisabled = computed(() => hasLoadedAccountSummary.value && !accountSummaryPending.value && !hasConnectedAccounts.value);
 
 function normalizeModelFamilyCounts(counts: Record<string, number>) {
   const nextCounts = { ...emptyModelFamilyCounts };
@@ -290,6 +309,9 @@ onMounted(() => {
     void refreshAccountSummaryOnce();
   }, ACCOUNT_SUMMARY_REFRESH_MS);
   stopAccountSummaryRefreshListener = onDashboardAccountSummaryRefresh(() => {
+    void refreshAccountSummaryOnce();
+  });
+  watch(shouldUseAccountSummary, () => {
     void refreshAccountSummaryOnce();
   });
 
