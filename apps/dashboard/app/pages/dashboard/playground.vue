@@ -242,7 +242,7 @@ watch(options, (value) => {
   const accountId = normalizeQueryParam(route.query.accountId);
 
   if (modelId && modelsById.value.has(modelId)) {
-    panels.value = [{ id: generateId(), modelId, accountId: null }];
+    panels.value = [{ id: generateId(), modelId, accountId: getValidRouteAccountId(accountId, modelId) }];
     initializedFromRoute.value = true;
     return;
   }
@@ -271,7 +271,7 @@ watch(() => route.query, (query) => {
   const accountId = normalizeQueryParam(query.accountId);
 
   if (modelId && modelsById.value.has(modelId)) {
-    panels.value = [{ id: generateId(), modelId, accountId: null }];
+    panels.value = [{ id: generateId(), modelId, accountId: getValidRouteAccountId(accountId, modelId) }];
     responses.value = {};
     return;
   }
@@ -391,6 +391,11 @@ function accountSupportsModel(account: ProviderAccountOption, model: ModelOption
   if (!modelOption?.providers.includes(account.provider)) return false;
   if (account.disabledModels?.includes(modelId)) return false;
   return !account.supportedModels || account.supportedModels.includes(modelId);
+}
+
+function getValidRouteAccountId(accountId: string | null, modelId: string): string | null {
+  const account = accountId ? providerAccountsById.value.get(accountId) : null;
+  return account && accountSupportsModel(account, modelId) ? account.id : null;
 }
 
 function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
