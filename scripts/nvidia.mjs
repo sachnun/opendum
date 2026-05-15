@@ -34,7 +34,7 @@ const EXCLUDED_MODEL_KEY_TOKENS = [
   "vila",
 ];
 
-const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b"]);
+const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b", "mistral-large"]);
 
 function sleep(ms) {
   return new Promise((resolvePromise) => {

@@ -120,3 +120,20 @@ func TestKiloCodeOnlyExposesFreeAuthlessModels(t *testing.T) {
 		}
 	}
 }
+
+func TestNvidiaMistralLargeAliasUsesCurrentHostedModel(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := registry.ResolveAlias("mistralai/mistral-large"); got != "mistral-large-3-675b-instruct-2512" {
+		t.Fatalf("ResolveAlias(mistralai/mistral-large) = %q, want mistral-large-3-675b-instruct-2512", got)
+	}
+	if got := registry.UpstreamModelName("mistralai/mistral-large", "nvidia_nim"); got != "mistralai/mistral-large-3-675b-instruct-2512" {
+		t.Fatalf("NVIDIA upstream = %q, want mistralai/mistral-large-3-675b-instruct-2512", got)
+	}
+	if _, ok := registry.ProviderModelMap("nvidia_nim")["mistral-large"]; ok {
+		t.Fatal("deprecated mistral-large model key should not be exposed as a separate NVIDIA NIM registry entry")
+	}
+}

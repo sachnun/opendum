@@ -1,7 +1,6 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
+  "ignored": true,
   "family": "Mistral",
   "meta": {
     "reasoning": false,
@@ -15,11 +14,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/mistral-large"
     }
   }
 }
