@@ -61,7 +61,7 @@ function orderProviders(value) {
   return [...value].sort((a, b) => {
     const aFirst = FIRST_PROVIDERS.has(a) ? 0 : 1;
     const bFirst = FIRST_PROVIDERS.has(b) ? 0 : 1;
-    return aFirst === bFirst ? a.localeCompare(b) : aFirst - bFirst;
+    return aFirst - bFirst;
   });
 }
 
