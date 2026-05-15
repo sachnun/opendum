@@ -51,7 +51,6 @@ const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((fa
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
-  { name: "Usage", href: "/dashboard/usage", icon: "i-lucide-book-open" },
   { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical", disabled: playgroundNavigationDisabled.value },
 ]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;

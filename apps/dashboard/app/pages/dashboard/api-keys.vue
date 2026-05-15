@@ -2,6 +2,7 @@
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const dashboardApi = useDashboardApi();
+const config = useRuntimeConfig();
 
 type ApiKeyListItem = Awaited<ReturnType<typeof dashboardApi.apiKeys.list>>[number];
 type ApiKeyOptions = Awaited<ReturnType<typeof dashboardApi.apiKeys.options>>;
@@ -18,6 +19,35 @@ const options = computed<ApiKeyOptions | null>(() => data.value?.options ?? null
 const activeApiKeyCount = computed(() => apiKeys.value.filter((apiKey) => getApiKeyStatus(apiKey).label === "Active").length);
 const togglingApiKeyIds = ref(new Set<string>());
 const toggleErrors = ref<Record<string, string>>({});
+const proxyBaseUrl = computed(() => {
+  const proxyUrl = String(config.public.proxyUrl || "").replace(/\/$/, "");
+  return `${proxyUrl}/v1`;
+});
+const copiedProxyBaseUrl = ref(false);
+let copyProxyBaseUrlTimeout: ReturnType<typeof setTimeout> | null = null;
+
+async function copyProxyBaseUrl() {
+  try {
+    await navigator.clipboard.writeText(proxyBaseUrl.value);
+    copiedProxyBaseUrl.value = true;
+
+    if (copyProxyBaseUrlTimeout) {
+      clearTimeout(copyProxyBaseUrlTimeout);
+    }
+
+    copyProxyBaseUrlTimeout = setTimeout(() => {
+      copiedProxyBaseUrl.value = false;
+    }, 1800);
+  } catch {
+    console.error("Failed to copy proxy base URL");
+  }
+}
+
+onBeforeUnmount(() => {
+  if (copyProxyBaseUrlTimeout) {
+    clearTimeout(copyProxyBaseUrlTimeout);
+  }
+});
 
 function getApiKeyStatus(apiKey: ApiKeyListItem) {
   const now = new Date();
@@ -145,6 +175,20 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
     </div>
 
     <DashboardDataNotice :error="error" />
+
+    <UiCard class="bg-card">
+      <UiCardContent class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0 space-y-1">
+          <p class="text-sm font-medium">Proxy Base URL</p>
+          <code class="block break-all text-sm text-muted-foreground">{{ proxyBaseUrl }}</code>
+        </div>
+        <UiButton type="button" variant="outline" class="shrink-0" @click="copyProxyBaseUrl">
+          <UiIcon :name="copiedProxyBaseUrl ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+          {{ copiedProxyBaseUrl ? 'Copied' : 'Copy' }}
+        </UiButton>
+      </UiCardContent>
+    </UiCard>
+
     <section v-if="apiKeys.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="space-y-3 pt-1">
         <p class="text-sm text-muted-foreground">No API keys created yet.</p>
