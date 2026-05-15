@@ -525,7 +525,7 @@ async function handleSignOut() {
                 type="button"
                 class="flex cursor-pointer items-center justify-center rounded-full transition-opacity hover:opacity-80"
               >
-                <span :class="['relative flex shrink-0 rounded-full select-none', isMaintener ? 'border-2 border-white p-0.5' : '']">
+                <span :class="['relative flex shrink-0 rounded-full select-none', isMaintener ? 'border-[3px] border-white/70 p-[3px]' : '']">
                   <span class="relative flex size-8 overflow-hidden rounded-full">
                     <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
                     <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
