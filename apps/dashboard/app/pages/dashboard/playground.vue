@@ -1483,7 +1483,7 @@ function formatToolArguments(value: string): string {
             <UiIcon name="i-lucide-play" class="size-4" />
             Start
           </UiButton>
-          <UiButton type="button" variant="outline" size="icon" @click="settingsOpen = true">
+          <UiButton type="button" variant="outline" size="icon-sm" @click="settingsOpen = true">
             <UiIcon name="i-lucide-settings" class="size-4" />
             <span class="sr-only">Settings</span>
           </UiButton>
