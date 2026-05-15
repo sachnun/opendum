@@ -3,6 +3,20 @@
     "nvidia_nim"
   ],
   "family": "Meta",
+  "meta": {
+    "reasoning": true,
+    "toolCall": false,
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"

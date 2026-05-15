@@ -137,3 +137,18 @@ func TestNvidiaMistralLargeAliasUsesCurrentHostedModel(t *testing.T) {
 		t.Fatal("deprecated mistral-large model key should not be exposed as a separate NVIDIA NIM registry entry")
 	}
 }
+
+func TestNvidiaNemotronNanoVLDisablesToolCalling(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	model := "llama-3.1-nemotron-nano-vl-8b-v1"
+	if !registry.IsVisionModel(model) {
+		t.Fatal("Nemotron Nano VL should remain vision-capable")
+	}
+	if registry.IsToolCallModel(model) {
+		t.Fatal("Nemotron Nano VL should not send OpenAI tool parameters to NVIDIA NIM")
+	}
+}
