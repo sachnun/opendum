@@ -42,7 +42,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
 </script>
 
 <template>
-  <UiCard class="group relative h-full gap-3 border-transparent bg-transparent p-0 shadow-none transition-colors hover:bg-muted/20">
+  <UiCard class="group relative h-full gap-3 border-transparent bg-transparent p-0 shadow-none transition-colors">
     <NuxtLink :to="getProviderAccountPath(provider.key)" class="absolute inset-0 z-10 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
 
     <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2">

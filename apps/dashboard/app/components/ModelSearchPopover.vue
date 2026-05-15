@@ -216,7 +216,7 @@ function closeDetail() {
               type="button"
               :title="`Copy model ID ${detailModel.id}`"
               :aria-label="`Copy model ID ${detailModel.id}`"
-              class="-m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               @click="copyModelId(detailModel.id)"
             >
               <span class="flex size-3 shrink-0 items-center justify-center">

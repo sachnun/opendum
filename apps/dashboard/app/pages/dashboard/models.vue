@@ -203,7 +203,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                 <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                   <button
                     type="button"
-                    class="-m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     :title="`Copy model ID ${model.id}`"
                     :aria-label="`Copy model ID ${model.id}`"
                     @click="copyModelId(model.id)"
