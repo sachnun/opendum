@@ -116,22 +116,6 @@
   .shiki pre code {
     background-color: var(--muted) !important;
   }
-
-  .sidebar-scrollbar {
-    scrollbar-color: transparent transparent;
-  }
-
-  .sidebar-scrollbar:hover {
-    scrollbar-color: oklch(0.3 0 0) transparent;
-  }
-
-  .sidebar-scrollbar::-webkit-scrollbar-thumb {
-    background-color: transparent;
-  }
-
-  .sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
-    background-color: oklch(0.3 0 0);
-  }
 }
 
 * {

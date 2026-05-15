@@ -381,7 +381,7 @@ async function handleSignOut() {
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col px-3 py-4">
-        <nav class="sidebar-scrollbar min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
+        <nav class="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
           <div class="space-y-1">
             <div v-for="item in primaryNavigation" :key="item.name" class="space-y-1">
               <NuxtLink
@@ -554,7 +554,7 @@ async function handleSignOut() {
           </div>
 
           <div class="flex min-h-0 flex-1 flex-col px-3 py-4">
-            <nav class="sidebar-scrollbar min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
+            <nav class="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
               <div class="space-y-1">
                 <div v-for="item in primaryNavigation" :key="`mobile-${item.name}`" class="space-y-1">
                   <NuxtLink
