@@ -837,7 +837,7 @@ function extractStreamChunkData(payload: unknown): ParsedCompletionData {
   if (!delta || typeof delta !== "object") return { content: "", reasoning: "", toolCalls: [], usage };
   return {
     content: extractTextContent((delta as { content?: unknown }).content),
-    reasoning: extractTextContent((delta as { reasoning_content?: unknown }).reasoning_content),
+    reasoning: extractTextContent((delta as { reasoning_content?: unknown; reasoning?: unknown }).reasoning_content ?? (delta as { reasoning?: unknown }).reasoning),
     toolCalls: [],
     usage,
   };
@@ -906,10 +906,11 @@ function extractResponsesCompletionData(payload: unknown): ParsedCompletionData 
   return { content: textParts.join(""), reasoning: reasoningParts.join(""), toolCalls, usage };
 }
 
-function processSseEvents(events: string[], onChunk: (chunk: ParsedCompletionData) => void, endpoint: PlaygroundEndpoint) {
+function processSseEvents(events: string[], onChunk: (chunk: ParsedCompletionData) => void, endpoint: PlaygroundEndpoint): number {
+  let emittedChunks = 0;
   for (const event of events) {
     const lines = event.split(/\r?\n/);
-    const eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() ?? "";
+    let eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() ?? "";
     const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n").trim();
     if (!data || data === "[DONE]") continue;
 
@@ -923,20 +924,26 @@ function processSseEvents(events: string[], onChunk: (chunk: ParsedCompletionDat
     const errorMessage = extractErrorMessage(parsed);
     if (errorMessage) throw new Error(errorMessage);
 
+    if (!eventName && parsed && typeof parsed === "object") eventName = typeof (parsed as { type?: unknown }).type === "string" ? (parsed as { type: string }).type : "";
     const chunk = endpoint === "messages" ? extractAnthropicStreamChunkData(eventName, parsed) : endpoint === "responses" ? extractResponsesStreamChunkData(parsed) : extractStreamChunkData(parsed);
-    if (chunk.content || chunk.reasoning || chunk.toolCalls.length > 0 || chunk.usage) onChunk(chunk);
+    if (chunk.content || chunk.reasoning || chunk.toolCalls.length > 0 || chunk.usage) {
+      emittedChunks += 1;
+      onChunk(chunk);
+    }
   }
+  return emittedChunks;
 }
 
 function extractAnthropicStreamChunkData(eventName: string, payload: unknown): ParsedCompletionData {
   if (!payload || typeof payload !== "object") return { content: "", reasoning: "", toolCalls: [], usage: null };
-  if (eventName === "content_block_delta") {
+  const normalizedEventName = eventName || (typeof (payload as { type?: unknown }).type === "string" ? (payload as { type: string }).type : "");
+  if (normalizedEventName === "content_block_delta") {
     const delta = (payload as { delta?: unknown }).delta;
     if (!delta || typeof delta !== "object") return { content: "", reasoning: "", toolCalls: [], usage: null };
     if ((delta as { type?: unknown }).type === "text_delta") return { content: typeof (delta as { text?: unknown }).text === "string" ? (delta as { text: string }).text : "", reasoning: "", toolCalls: [], usage: null };
     if ((delta as { type?: unknown }).type === "thinking_delta") return { content: "", reasoning: typeof (delta as { thinking?: unknown }).thinking === "string" ? (delta as { thinking: string }).thinking : "", toolCalls: [], usage: null };
   }
-  if (eventName === "message_delta") return { content: "", reasoning: "", toolCalls: [], usage: extractUsageData({ usage: (payload as { usage?: unknown }).usage }) };
+  if (normalizedEventName === "message_delta") return { content: "", reasoning: "", toolCalls: [], usage: extractUsageData({ usage: (payload as { usage?: unknown }).usage }) };
   return { content: "", reasoning: "", toolCalls: [], usage: null };
 }
 
@@ -962,11 +969,21 @@ async function consumeStream(response: Response, endpoint: PlaygroundEndpoint, o
     buffer += decoder.decode(value, { stream: true });
     const events = buffer.split(/\r?\n\r?\n/);
     buffer = events.pop() || "";
-    processSseEvents(events, onChunk, endpoint);
+    if (processSseEvents(events, onChunk, endpoint) > 0) await yieldToBrowserFrame();
   }
 
   buffer += decoder.decode();
   if (buffer.trim()) processSseEvents([buffer], onChunk, endpoint);
+}
+
+function yieldToBrowserFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
 }
 
 function mapReasoningEffortToThinkingBudget(effort: ReasoningEffort): number {
@@ -1196,7 +1213,8 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
       throw new Error(errorMessage);
     }
 
-    const shouldStream = requestBody.stream !== false && (response.headers.get("content-type") ?? "").includes("text/event-stream");
+    const contentType = response.headers.get("content-type") ?? "";
+    const shouldStream = requestBody.stream !== false && (Boolean(response.body) || contentType.includes("text/event-stream"));
     if (shouldStream) {
       let streamedContent = "";
       let streamedReasoning = "";
