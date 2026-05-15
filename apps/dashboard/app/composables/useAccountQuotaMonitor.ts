@@ -55,6 +55,10 @@ export function useAccountQuotaMonitor(options: {
   const hydratedAccountIds = useState<Record<string, boolean>>("account-quota-hydrated-account-ids", () => ({}));
   let quotaQueueRunId = 0;
 
+  function cancelQuotaQueue() {
+    quotaQueueRunId += 1;
+  }
+
   function setQuotaLoading(accountId: string, loading: boolean) {
     quotaLoadingByAccountId.value = loading
       ? { ...quotaLoadingByAccountId.value, [accountId]: true }
@@ -157,6 +161,7 @@ export function useAccountQuotaMonitor(options: {
     quotaByAccountId,
     quotaErrorByAccountId,
     quotaLoadingByAccountId,
+    cancelQuotaQueue,
     hydrateQuotaCache,
     loadAccountQuota,
     pruneQuotaState,

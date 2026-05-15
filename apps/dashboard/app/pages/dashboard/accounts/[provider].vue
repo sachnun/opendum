@@ -24,6 +24,7 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
 };
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
+const QUOTA_AUTO_LOAD_DELAY_MS = 400;
 const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
 const FREE_TIER_VALUES = new Set(["", "free", "free-tier", "guest", "unknown"]);
 
@@ -128,22 +129,24 @@ watch(
   { immediate: true }
 );
 
-onBeforeUnmount(() => {
-  if (highlightTimer) clearTimeout(highlightTimer);
-});
-
-const quotaCapableAccounts = computed(() => accounts.value.filter((account) => toQuotaProvider(account.provider)));
+const quotaCapableAccounts = computed(() => accounts.value.filter((account) => account.provider === selectedProvider.value && toQuotaProvider(account.provider)));
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
 let previousQuotaAccountKeys = new Set<string>();
 const {
   quotaByAccountId,
   quotaErrorByAccountId,
   quotaLoadingByAccountId,
+  cancelQuotaQueue,
   hydrateQuotaCache,
   loadAccountQuota,
   pruneQuotaState,
   runQuotaQueue,
 } = useAccountQuotaMonitor({ accounts, quotaCapableAccounts, toQuotaProvider });
+
+onBeforeUnmount(() => {
+  if (highlightTimer) clearTimeout(highlightTimer);
+  cancelQuotaQueue();
+});
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
   const groups = new Map<string, QuotaSummaryGroup>();
 
@@ -227,16 +230,29 @@ function handleQuotaRefresh(accountId: string) {
 }
 
 watch(
-  () => accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|"),
-  async () => {
+  () => [selectedProvider.value, accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|")] as const,
+  (_, __, onCleanup) => {
     const currentQuotaAccountKeys = new Set(quotaCapableAccounts.value.map((account) => `${account.id}:${account.provider}`));
     const newQuotaAccounts = quotaCapableAccounts.value.filter((account) => !previousQuotaAccountKeys.has(`${account.id}:${account.provider}`));
     const accountsToFetch = previousQuotaAccountKeys.size > 0 && newQuotaAccounts.length > 0 ? newQuotaAccounts : quotaCapableAccounts.value;
 
     pruneQuotaState();
-    await hydrateQuotaCache();
-    runQuotaQueue(accountsToFetch);
+    cancelQuotaQueue();
+    void hydrateQuotaCache();
     previousQuotaAccountKeys = currentQuotaAccountKeys;
+
+    if (accountsToFetch.length === 0) return;
+
+    let cancelled = false;
+    const quotaLoadTimer = setTimeout(() => {
+      if (!cancelled) void runQuotaQueue(accountsToFetch);
+    }, QUOTA_AUTO_LOAD_DELAY_MS);
+
+    onCleanup(() => {
+      cancelled = true;
+      clearTimeout(quotaLoadTimer);
+      cancelQuotaQueue();
+    });
   },
   { immediate: true }
 );
