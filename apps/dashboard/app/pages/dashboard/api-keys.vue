@@ -52,15 +52,19 @@ onBeforeUnmount(() => {
 function getApiKeyStatus(apiKey: ApiKeyListItem) {
   const now = new Date();
 
-  if (!apiKey.isActive) {
-    return { label: "Disabled", variant: "secondary" as const };
-  }
-
   if (apiKey.expiresAt && new Date(apiKey.expiresAt) < now) {
     return { label: "Expired", variant: "destructive" as const };
   }
 
+  if (!apiKey.isActive) {
+    return { label: "Disabled", variant: "secondary" as const };
+  }
+
   return { label: "Active", variant: "default" as const };
+}
+
+function isApiKeyEffectivelyActive(apiKey: ApiKeyListItem) {
+  return getApiKeyStatus(apiKey).label === "Active";
 }
 
 function normalizeModelAccessMode(mode: string): AccessMode {
@@ -99,11 +103,11 @@ function accessModeLabel(mode: string) {
   return "All";
 }
 
-function updateApiKeyActive(apiKeyId: string, isActive: boolean) {
+function updateApiKeyState(apiKeyId: string, value: { isActive: boolean; expiresAt: string | Date | null }) {
   if (!data.value) return;
   data.value = {
     ...data.value,
-    apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, isActive } : apiKey)),
+    apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, ...value } : apiKey)),
   };
 }
 
@@ -118,7 +122,7 @@ async function toggleApiKey(apiKey: ApiKeyListItem) {
   try {
     const result = await dashboardApi.apiKeys.toggle({ id: apiKey.id });
     if (!result.success) throw new Error(result.error);
-    updateApiKeyActive(apiKey.id, result.data.isActive);
+    updateApiKeyState(apiKey.id, { isActive: result.data.isActive, expiresAt: result.data.expiresAt });
   } catch (error) {
     toggleErrors.value = {
       ...toggleErrors.value,
@@ -210,11 +214,11 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                 <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="refresh" />
               </div>
               <div class="flex h-7 shrink-0 items-center justify-end gap-1.5">
-                <span class="text-[11px] leading-none text-muted-foreground">{{ apiKey.isActive ? 'On' : 'Off' }}</span>
+                <span class="text-[11px] leading-none text-muted-foreground">{{ isApiKeyEffectivelyActive(apiKey) ? 'On' : 'Off' }}</span>
                 <UiSwitch
-                  :model-value="apiKey.isActive"
+                  :model-value="isApiKeyEffectivelyActive(apiKey)"
                   :disabled="togglingApiKeyIds.has(apiKey.id)"
-                  :title="apiKey.isActive ? 'Disable key' : 'Enable key'"
+                  :title="isApiKeyEffectivelyActive(apiKey) ? 'Disable key' : 'Enable key'"
                   @update:model-value="toggleApiKey(apiKey)"
                 />
               </div>

@@ -27,6 +27,14 @@ watch(open, (value) => {
 const isExpired = computed(() => expiresAt.value != null && expiresAt.value < new Date());
 const displayText = computed(() => (expiresAt.value ? format(expiresAt.value, "MMM d, yyyy") : "No expiry"));
 
+watch(
+  () => props.initialExpiresAt,
+  (value) => {
+    expiresAt.value = value ? new Date(value) : null;
+    if (!open.value) draftDate.value = expiresAt.value ? format(expiresAt.value, "yyyy-MM-dd") : "";
+  }
+);
+
 function parseDraftDate(): Date | null {
   if (!draftDate.value) return null;
   const date = new Date(`${draftDate.value}T00:00:00`);

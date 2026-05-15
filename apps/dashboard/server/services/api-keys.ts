@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../lib/db";
@@ -101,6 +101,11 @@ export async function getApiKeyOptions(userId: string) {
 
 export async function listApiKeys(userId: string) {
   try {
+    await db
+      .update(proxyApiKey)
+      .set({ isActive: false })
+      .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.isActive, true), lte(proxyApiKey.expiresAt, new Date())));
+
     return await db
       .select({
         id: proxyApiKey.id,
@@ -138,10 +143,12 @@ export async function createApiKey(userId: string, input: CreateApiKeyInput) {
 
 export async function toggleApiKey(userId: string, id: string) {
   return withOwnedApiKey(userId, id, "Failed to toggle API key", async (apiKey) => {
-    const isActive = !apiKey.isActive;
-    await db.update(proxyApiKey).set({ isActive }).where(eq(proxyApiKey.id, id));
+    const isExpired = apiKey.expiresAt != null && apiKey.expiresAt <= new Date();
+    const isActive = !(apiKey.isActive && !isExpired);
+    const expiresAt = isActive && isExpired ? null : apiKey.expiresAt;
+    await db.update(proxyApiKey).set({ isActive, expiresAt }).where(eq(proxyApiKey.id, id));
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
-    return { success: true, data: { id, isActive } } as const;
+    return { success: true, data: { id, isActive, expiresAt } } as const;
   });
 }
 
