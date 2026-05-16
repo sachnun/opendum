@@ -13,13 +13,25 @@ const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidati
 const summaries = computed(() => data.value?.summaries ?? null);
 const isInitialLoading = computed(() => pending.value && !data.value);
 const pinnedProviders = computed(() => new Set(data.value?.pinnedProviders ?? []));
+const providerAvailabilityOrder = { active: 0, inactive: 1 } as const;
+const providerStatusOrder = { error: 0, warning: 1, normal: 2 } as const;
 const sortedProviders = computed(() => [...PROVIDER_ACCOUNT_DEFINITIONS].sort((a, b) => {
   const aPinned = pinnedProviders.value.has(a.key) ? 0 : 1;
   const bPinned = pinnedProviders.value.has(b.key) ? 0 : 1;
+  const aSummary = summaries.value?.[a.key];
+  const bSummary = summaries.value?.[b.key];
+  const aAvailability = (aSummary?.active ?? 0) > 0 ? "active" : "inactive";
+  const bAvailability = (bSummary?.active ?? 0) > 0 ? "active" : "inactive";
+  const aIndicator = aSummary?.indicator ?? "normal";
+  const bIndicator = bSummary?.indicator ?? "normal";
   const aConnected = summaries.value?.[a.key]?.connected ?? 0;
   const bConnected = summaries.value?.[b.key]?.connected ?? 0;
 
-  return aPinned - bPinned || bConnected - aConnected || a.label.localeCompare(b.label);
+  return aPinned - bPinned
+    || providerAvailabilityOrder[aAvailability] - providerAvailabilityOrder[bAvailability]
+    || providerStatusOrder[aIndicator] - providerStatusOrder[bIndicator]
+    || bConnected - aConnected
+    || a.label.localeCompare(b.label);
 }));
 
 function providerSummary(provider: ProviderAccountKey) {
