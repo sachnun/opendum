@@ -471,6 +471,15 @@ function getAccountPlaygroundStatus(account: ProviderAccountOption): string | nu
   return "Disabled";
 }
 
+function isAuthlessAccount(account: ProviderAccountOption): boolean {
+  return account.id === account.provider || account.id.startsWith("authless:");
+}
+
+function getProviderPresetAccountLabel(accounts: ProviderAccountOption[]): string | null {
+  if (accounts.every(isAuthlessAccount)) return null;
+  return `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}`;
+}
+
 function getValidAccountIdForPanel(panel: PanelState): string | null {
   if (!panel.accountId || !panel.modelId) return null;
   const model = modelsById.value.get(panel.modelId);
@@ -1707,7 +1716,7 @@ function formatToolArguments(value: string): string {
             @click="applyProviderPreset(preset.provider)"
           >
             <span class="whitespace-normal break-words text-xs leading-tight">{{ getProviderLabel(preset.provider) }}</span>
-            <span :class="activeProviderPreset === preset.provider ? 'text-[10px] leading-none text-primary-foreground/85' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.accounts.length }} accounts</span>
+            <span v-if="getProviderPresetAccountLabel(preset.accounts)" :class="activeProviderPreset === preset.provider ? 'text-[10px] leading-none text-primary-foreground/85' : 'text-[10px] leading-none text-muted-foreground'">{{ getProviderPresetAccountLabel(preset.accounts) }}</span>
           </button>
         </div>
         <p v-else-if="providerPresetExpanded" class="text-xs text-muted-foreground">Connect at least one provider account to use provider presets.</p>
