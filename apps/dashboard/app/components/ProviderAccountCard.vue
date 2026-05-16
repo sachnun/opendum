@@ -987,11 +987,11 @@ function cancelErrorPreviewPointer() {
 
           <div class="min-h-14">
             <div class="space-y-1.5 pt-2">
-              <div class="min-h-[7rem] pb-1">
+              <div class="h-32 pb-1">
                 <div
                   v-if="account.lastErrorMessage && activeErrorEntry"
                   tabindex="-1"
-                  class="min-h-[7rem] cursor-pointer rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left hover:bg-muted/40"
+                  class="flex h-full cursor-pointer flex-col rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left hover:bg-muted/40"
                   @click="openActiveErrorDialog"
                   @pointerdown="handleErrorPreviewPointerDown"
                   @pointerup="handleErrorPreviewPointerEnd"
@@ -1015,7 +1015,7 @@ function cancelErrorPreviewPointer() {
                       <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
                     </button>
                   </div>
-                  <div class="mt-1 flex min-h-16 items-center">
+                  <div class="mt-1 flex min-h-0 flex-1 items-center">
                     <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ getErrorEntryPreview(activeErrorEntry) }}</span>
                   </div>
                   <div class="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/80">
@@ -1023,7 +1023,7 @@ function cancelErrorPreviewPointer() {
                     <span>Click for details</span>
                   </div>
                 </div>
-                <div v-else class="flex min-h-[7rem] w-full items-center justify-center rounded-sm border border-border/60 bg-muted/20 px-2 text-center text-xs text-muted-foreground">
+                <div v-else class="flex h-full w-full items-center justify-center rounded-sm border border-border/60 bg-muted/20 px-2 text-center text-xs text-muted-foreground">
                   No data
                 </div>
               </div>

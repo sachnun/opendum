@@ -333,8 +333,8 @@ function decodeAccountHash(hash: string): string | null {
           <AddAccountDialog
             v-if="providerMeta"
             :initial-provider="providerMeta.key"
-            trigger-class="flex-1 sm:w-auto sm:flex-none"
             :readonly="isAuditMode"
+            trigger-class="flex-1 sm:w-auto sm:flex-none"
           />
         </div>
       </div>
