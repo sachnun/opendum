@@ -219,14 +219,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
       </UiCardContent>
     </UiCard>
 
-    <section v-if="apiKeys.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
-      <div class="space-y-3 pt-1">
-        <p class="text-sm text-muted-foreground">No API keys created yet.</p>
-        <CreateApiKeyButton :readonly="isAuditMode" @created="refresh" />
-      </div>
-    </section>
-
-    <section v-else class="scroll-mt-24 space-y-4 md:space-y-2">
+    <section v-if="apiKeys.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <UiCard
           v-for="apiKey in apiKeys"
