@@ -1028,7 +1028,7 @@ function cancelErrorPreviewPointer() {
             <UiBadge v-if="showTierBadge" variant="outline" :class="isPaidTierValue(normalizedTier) ? 'border-green-500 text-green-600' : ''">
               {{ formatTierLabel(normalizedTier) }}
             </UiBadge>
-            <UiBadge v-if="account.status === 'failed'" variant="destructive" class="gap-1">
+            <UiBadge v-if="account.status === 'failed'" variant="outline" class="border-destructive/60 text-destructive gap-1">
               <UiIcon name="i-lucide-alert-circle" class="size-3" />
               {{ account.consecutiveErrors }}
             </UiBadge>
