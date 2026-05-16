@@ -6,6 +6,7 @@ import type {
   AnalyticsFilter,
   DashboardMeData,
   MaintenerAuditUser,
+  MaintenerAuditUserListResult,
   ApiKeyListItem,
   ApiKeyOptions,
   ErrorHistoryResult,
@@ -87,7 +88,7 @@ export function useDashboardApi() {
     },
     maintener: {
       users: {
-        search: (query: { q: string }) => dashboardFetch<MaintenerAuditUser[]>("/api/dashboard/maintener/users/search", { query }),
+        search: (query?: { q?: string; offset?: number; limit?: number }) => dashboardFetch<MaintenerAuditUserListResult>("/api/dashboard/maintener/users/search", { query }),
       },
       audit: {
         start: (body: { userId: string }) => post<ActionResult<{ user: MaintenerAuditUser }>>(dashboardFetch, "/api/dashboard/maintener/audit/start", body),

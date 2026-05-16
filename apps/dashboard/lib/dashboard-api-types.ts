@@ -30,6 +30,12 @@ export interface DashboardMeData {
 
 export type MaintenerAuditUser = DashboardUserIdentity;
 
+export interface MaintenerAuditUserListResult {
+  users: MaintenerAuditUser[];
+  hasMore: boolean;
+  nextOffset: number;
+}
+
 export interface ProviderStats {
   totalRequests: number;
   successRate: number | null;
