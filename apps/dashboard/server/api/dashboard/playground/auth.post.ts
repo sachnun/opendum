@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { createError } from "h3";
 import { z } from "zod";
 
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { readDashboardBody, requireReadableUserId } from "../../../utils/api";
 
 const playgroundEndpointSchema = z.enum(["chat_completions", "messages", "responses"]);
 const playgroundAuthInputSchema = z.object({
@@ -22,7 +22,7 @@ function signPlaygroundRequest(userId: string, timestamp: string, method: string
 }
 
 export default defineEventHandler(async (event) => {
-  const userId = await requireWritableUserId(event);
+  const userId = await requireReadableUserId(event);
   const input = await readDashboardBody(event, playgroundAuthInputSchema);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const method = "POST";

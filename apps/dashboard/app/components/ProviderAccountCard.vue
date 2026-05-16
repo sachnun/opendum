@@ -863,7 +863,6 @@ async function deleteAccount() {
 }
 
 async function resolveErrors() {
-  if (props.readonly) return;
   resolvingErrors.value = true;
   try {
     const result = await dashboardApi.accounts.resolveErrors({ accountId: props.account.id });
@@ -1206,8 +1205,8 @@ function cancelErrorPreviewPointer() {
             <UiButton variant="outline" size="sm" :disabled="readonly" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
             <UiButton variant="outline" size="sm" :disabled="readonly" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
             <UiTooltip text="Playground">
-              <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`" :class="readonly ? 'pointer-events-none' : ''" :aria-disabled="readonly">
-                <UiButton variant="outline" size="sm" :disabled="readonly"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
+              <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
+                <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
             </UiTooltip>
           </div>
@@ -1296,7 +1295,7 @@ function cancelErrorPreviewPointer() {
               </NuxtLink>
             </UiTooltip>
             <UiTooltip text="Resolve">
-              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" :disabled="resolvingErrors || readonly" @click="resolveErrors">
+              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" :disabled="resolvingErrors" @click="resolveErrors">
                 <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
               </UiButton>
             </UiTooltip>
