@@ -43,9 +43,6 @@ let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
   return [...currentAccounts].sort((a, b) => {
-    const priority = compareAccounts(a, b);
-    if (priority !== 0) return priority;
-
     const aOrder = accountDisplayOrder.value[a.id];
     const bOrder = accountDisplayOrder.value[b.id];
 
