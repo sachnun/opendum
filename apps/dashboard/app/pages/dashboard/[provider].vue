@@ -63,6 +63,7 @@ let accountVisibilityObserver: IntersectionObserver | null = null;
 let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let providerDetailRefreshInFlight: Promise<void> | null = null;
 let providerDetailRefreshQueued = false;
+let providerQuotaRefreshInFlight: Promise<void> | null = null;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
   return [...currentAccounts].sort(compareAccounts);
@@ -86,6 +87,7 @@ async function refreshProviderDetailOnce() {
   providerDetailRefreshInFlight = refresh().then(() => undefined).catch(() => undefined);
   try {
     await providerDetailRefreshInFlight;
+    void refreshProviderQuotaAfterAccountPoll();
   } finally {
     providerDetailRefreshInFlight = null;
     const shouldRefreshAgain = providerDetailRefreshQueued;
@@ -111,6 +113,22 @@ function startProviderDetailRefresh() {
   providerDetailRefreshTimer = setInterval(() => {
     void refreshProviderDetailOnce();
   }, PROVIDER_DETAIL_REFRESH_MS);
+}
+
+async function refreshProviderQuotaAfterAccountPoll() {
+  if (!supportsProviderQuota.value || providerQuotaRefreshInFlight) return;
+
+  providerQuotaRefreshInFlight = (async () => {
+    await waitForQuotaQueue();
+    const accountsToRefresh = quotaCapableAccounts.value.filter((account) => account.isActive || quotaByAccountId.value[account.id]);
+    if (accountsToRefresh.length > 0) await runQuotaQueue(accountsToRefresh, true, { append: true });
+  })().catch(() => undefined);
+
+  try {
+    await providerQuotaRefreshInFlight;
+  } finally {
+    providerQuotaRefreshInFlight = null;
+  }
 }
 
 watch(
@@ -180,6 +198,7 @@ const {
   loadAccountQuota,
   pruneQuotaState,
   runQuotaQueue,
+  waitForQuotaQueue,
 } = useAccountQuotaMonitor({
   accounts,
   quotaCapableAccounts,

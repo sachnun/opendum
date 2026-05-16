@@ -184,6 +184,10 @@ export function useAccountQuotaMonitor(options: {
     await queueRun;
   }
 
+  async function waitForQuotaQueue() {
+    await quotaQueueTail;
+  }
+
   return {
     quotaByAccountId,
     quotaErrorByAccountId,
@@ -193,5 +197,6 @@ export function useAccountQuotaMonitor(options: {
     loadAccountQuota,
     pruneQuotaState,
     runQuotaQueue,
+    waitForQuotaQueue,
   };
 }
