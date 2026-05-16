@@ -499,7 +499,6 @@ function decodeAccountHash(hash: string): string | null {
       <div class="space-y-3 pt-1">
         <p class="text-sm text-muted-foreground">{{ providerMeta?.emptyMessage ?? 'No accounts connected yet.' }}</p>
         <div v-if="supportedModels.length" class="space-y-2">
-          <p class="text-xs font-medium text-muted-foreground">Supported models ({{ supportedModels.length }}):</p>
           <div class="flex flex-wrap gap-1.5">
             <UiBadge
               v-for="model in supportedModels"

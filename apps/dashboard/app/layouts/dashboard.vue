@@ -533,7 +533,7 @@ async function handleAuditSelected() {
                     </NuxtLink>
                   </template>
                 </template>
-                <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1.5 text-[11px] text-muted-foreground">
                   No pinned providers.
                 </p>
               </div>
@@ -732,7 +732,7 @@ async function handleAuditSelected() {
                         </NuxtLink>
                       </template>
                     </template>
-                    <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1.5 text-[11px] text-muted-foreground">
                       No pinned providers.
                     </p>
                   </div>
