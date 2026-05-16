@@ -71,6 +71,7 @@ const codexLoginMethod = ref<CodexLoginMethod | null>(null);
 const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
+const copiedCallbackUrl = ref(false);
 const isApiKeyVisible = ref(false);
 const isLoading = ref(false);
 const isFetchingUrl = ref(false);
@@ -79,6 +80,7 @@ const errorMessage = ref("");
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedLinkTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedDeviceCodeTimer: ReturnType<typeof setTimeout> | null = null;
+let copiedCallbackUrlTimer: ReturnType<typeof setTimeout> | null = null;
 let copyAutoNextTimer: ReturnType<typeof setTimeout> | null = null;
 
 const selectedConfig = computed(() => (provider.value ? providerConfigs[provider.value] : null));
@@ -180,6 +182,7 @@ function resetForm() {
   deviceCodeInfo.value = null;
   copiedLink.value = false;
   copiedDeviceCode.value = false;
+  copiedCallbackUrl.value = false;
   isApiKeyVisible.value = false;
   isLoading.value = false;
   isFetchingUrl.value = false;
@@ -196,6 +199,10 @@ function resetForm() {
   if (copiedDeviceCodeTimer) {
     clearTimeout(copiedDeviceCodeTimer);
     copiedDeviceCodeTimer = null;
+  }
+  if (copiedCallbackUrlTimer) {
+    clearTimeout(copiedCallbackUrlTimer);
+    copiedCallbackUrlTimer = null;
   }
   if (copyAutoNextTimer) {
     clearTimeout(copyAutoNextTimer);
@@ -233,6 +240,7 @@ function resetAuthProgress() {
   deviceCodeInfo.value = null;
   copiedLink.value = false;
   copiedDeviceCode.value = false;
+  copiedCallbackUrl.value = false;
   isFetchingUrl.value = false;
   isPolling.value = false;
   errorMessage.value = "";
@@ -448,6 +456,36 @@ async function handleExchangeOAuth() {
   }
 }
 
+async function pasteCallbackUrl() {
+  if (props.readonly || isLoading.value) return;
+
+  try {
+    const value = await navigator.clipboard.readText();
+    callbackUrl.value = value.trim();
+    copiedCallbackUrl.value = true;
+    if (copiedCallbackUrlTimer) clearTimeout(copiedCallbackUrlTimer);
+    copiedCallbackUrlTimer = setTimeout(() => {
+      copiedCallbackUrl.value = false;
+      copiedCallbackUrlTimer = null;
+    }, 2000);
+    await handleExchangeOAuth();
+  } catch {
+    errorMessage.value = "Failed to paste callback URL";
+  }
+}
+
+async function handleCallbackPaste(event: ClipboardEvent) {
+  if (props.readonly || isLoading.value) return;
+
+  const pastedText = event.clipboardData?.getData("text").trim();
+  if (!pastedText) return;
+
+  event.preventDefault();
+  callbackUrl.value = pastedText;
+  await nextTick();
+  await handleExchangeOAuth();
+}
+
 function goBack() {
   clearCopyAutoNextTimer();
   const nextStep = Math.max(minimumStep.value, step.value - 1);
@@ -482,6 +520,10 @@ onBeforeUnmount(() => {
   if (copiedDeviceCodeTimer) {
     clearTimeout(copiedDeviceCodeTimer);
     copiedDeviceCodeTimer = null;
+  }
+  if (copiedCallbackUrlTimer) {
+    clearTimeout(copiedCallbackUrlTimer);
+    copiedCallbackUrlTimer = null;
   }
   clearCopyAutoNextTimer();
 });
@@ -664,26 +706,36 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <form v-if="step === finishStep && selectedConfig && activeFlowType === 'oauth_redirect'" class="space-y-4" @submit.prevent="handleExchangeOAuth">
+        <form v-if="step === finishStep && selectedConfig && activeFlowType === 'oauth_redirect'" class="space-y-4" @submit.prevent>
           <div class="space-y-2">
             <label for="callback-url" class="text-sm font-medium">
               Paste Callback URL <span aria-hidden="true" class="text-destructive">*</span>
             </label>
             <p class="text-sm text-muted-foreground">Paste the URL from your browser after the OAuth redirect.</p>
-            <input
-              id="callback-url"
-              v-model="callbackUrl"
-              type="text"
-              :placeholder="callbackPlaceholder(provider)"
-              :disabled="isLoading"
-              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
-            >
+            <div class="relative">
+              <input
+                id="callback-url"
+                v-model="callbackUrl"
+                type="text"
+                :placeholder="callbackPlaceholder(provider)"
+                :disabled="isLoading"
+                class="h-9 w-full rounded-md border border-input bg-background px-3 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+                @paste="handleCallbackPaste"
+              >
+              <UiTooltip :text="copiedCallbackUrl ? 'Pasted' : 'Paste'">
+                <button
+                  type="button"
+                  :disabled="isLoading"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                  aria-label="Paste callback URL"
+                  @click="pasteCallbackUrl"
+                >
+                  <UiIcon :name="isLoading ? 'i-lucide-loader-2' : copiedCallbackUrl ? 'i-lucide-check' : 'i-lucide-clipboard-paste'" :class="['size-4', isLoading ? 'animate-spin' : '']" />
+                </button>
+              </UiTooltip>
+            </div>
             <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
           </div>
-          <UiButton type="submit" class="w-full" :disabled="isLoading">
-            <UiIcon v-if="isLoading" name="i-lucide-loader-2" class="size-4 animate-spin" />
-            {{ isLoading ? 'Connecting...' : `Connect ${selectedConfig.name} Account` }}
-          </UiButton>
         </form>
 
         <form
