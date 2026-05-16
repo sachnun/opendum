@@ -135,7 +135,7 @@ export function useAccountQuotaMonitor(options: {
       if (runId !== undefined && runId !== quotaQueueRunId) return;
 
       const message = error instanceof Error ? error.message : "Failed to fetch quota data";
-      if (!hadQuota) quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: message };
+      if (refreshExisting || !hadQuota) quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: message };
     } finally {
       setQuotaLoading(account.id, false);
     }
@@ -196,7 +196,7 @@ export function useAccountQuotaMonitor(options: {
                 nextQuotaByAccountId = { ...nextQuotaByAccountId, [account.id]: accountResult.data };
                 nextErrorByAccountId = Object.fromEntries(Object.entries(nextErrorByAccountId).filter(([accountId]) => accountId !== account.id));
                 await writeCachedQuota(account, provider, accountResult.data);
-              } else if (!hadQuotaByAccountId[account.id]) {
+              } else if (refreshExisting || !hadQuotaByAccountId[account.id]) {
                 nextErrorByAccountId = { ...nextErrorByAccountId, [account.id]: accountResult.error };
               }
             }
@@ -207,7 +207,7 @@ export function useAccountQuotaMonitor(options: {
             if (runId !== quotaQueueRunId) return;
 
             const message = error instanceof Error ? error.message : "Failed to fetch quota data";
-            quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(batchAccounts.filter((account) => !hadQuotaByAccountId[account.id]).map((account) => [account.id, message])) };
+            quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(batchAccounts.filter((account) => refreshExisting || !hadQuotaByAccountId[account.id]).map((account) => [account.id, message])) };
           } finally {
             batchAccounts.forEach((account) => setQuotaLoading(account.id, false));
           }

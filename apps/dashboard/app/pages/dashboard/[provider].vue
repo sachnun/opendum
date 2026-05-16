@@ -311,7 +311,11 @@ function quotaBarColor(group: QuotaSummaryGroup): string {
 
 function handleQuotaRefresh(accountId: string) {
   const account = accounts.value.find((account) => account.id === accountId);
-  if (account) loadAccountQuota(account, true);
+  if (!account) return;
+
+  void loadAccountQuota(account, true).finally(() => {
+    void refreshProviderDetailOnce();
+  });
 }
 
 function getAccountCardElement(card: { accountId?: string; $el?: Element } | Element): Element | null {
