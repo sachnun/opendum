@@ -336,20 +336,27 @@ function startDevicePolling(popup: Window | null) {
   const startedAt = Date.now();
   let intervalMs = 8000;
 
-  const stopPolling = () => {
+  const stopPolling = (returnToAuthStep = false) => {
     isPolling.value = false;
     if (pollingTimer) {
       clearTimeout(pollingTimer);
       pollingTimer = null;
     }
+    if (returnToAuthStep && step.value === finishStep.value && finishStep.value > authStep.value) {
+      step.value = authStep.value;
+    }
   };
+
+  if (step.value === authStep.value && finishStep.value > authStep.value) {
+    step.value = finishStep.value;
+  }
 
   const poll = async () => {
     if (!deviceCodeInfo.value) return;
 
     if (Date.now() - startedAt >= 900_000) {
       errorMessage.value = "Device code expired. Please try again.";
-      stopPolling();
+      stopPolling(true);
       return;
     }
 
@@ -371,7 +378,7 @@ function startDevicePolling(popup: Window | null) {
 
       if (result.data.status === "error") {
         errorMessage.value = result.data.message;
-        stopPolling();
+        stopPolling(true);
         return;
       }
 
@@ -664,6 +671,25 @@ onBeforeUnmount(() => {
             {{ isLoading ? 'Connecting...' : `Connect ${selectedConfig.name} Account` }}
           </UiButton>
         </form>
+
+        <div v-if="step === finishStep && selectedConfig && activeFlowType === 'device_code' && isPolling" class="space-y-4">
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Waiting for login...</p>
+            <p class="text-sm text-muted-foreground">
+              Complete the login in your browser. This dialog will close automatically when authorization is complete.
+            </p>
+          </div>
+          <div class="relative w-full rounded-lg border px-4 py-3 text-sm">
+            <UiIcon name="i-lucide-loader-2" class="absolute left-4 top-4 size-4 animate-spin" />
+            <div class="pl-7 text-xs">
+              Checking authorization status for {{ selectedConfig.name }}.
+            </div>
+          </div>
+          <div v-if="errorMessage" class="relative w-full rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive">
+            <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
+            <div class="pl-7 text-xs">{{ errorMessage }}</div>
+          </div>
+        </div>
 
         <form
           v-if="step === finishStep && selectedConfig && (activeFlowType === 'api_key' || activeFlowType === 'api_key_with_account_id')"
