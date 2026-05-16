@@ -137,9 +137,17 @@ watch(
     if (!value) return;
     if (!previousValue) return;
 
-    const previousAccountIds = new Set(previousValue?.accounts.map((account) => account.id) ?? []);
+    const previousAccountIds = new Set(previousValue.accounts.map((account) => account.id));
     const newAccounts = value.accounts.filter((account) => !previousAccountIds.has(account.id));
     if (newAccounts.length === 0) return;
+    if (newAccounts.length === value.accounts.length) {
+      highlightedAccountIds.value = new Set();
+      if (highlightTimer) {
+        clearTimeout(highlightTimer);
+        highlightTimer = null;
+      }
+      return;
+    }
 
     highlightedAccountIds.value = new Set(newAccounts.map((account) => account.id));
     if (highlightTimer) clearTimeout(highlightTimer);
