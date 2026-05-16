@@ -40,7 +40,7 @@ func (s *Service) anthropicStream(ctx responseContext) error {
 	flusher, _ := w.(http.Flusher)
 	messageID := "msg_" + time.Now().Format("20060102150405")
 	writeAnthropicEvent(w, flusher, "message_start", map[string]any{"type": "message_start", "message": map[string]any{"id": messageID, "type": "message", "role": "assistant", "content": []any{}, "model": ctx.Model, "stop_reason": nil, "stop_sequence": nil, "usage": map[string]any{"input_tokens": 0, "output_tokens": 0}}})
-	tracker := &anthropicStreamTracker{writer: w, flusher: flusher}
+	tracker := &anthropicStreamTracker{writer: w, flusher: flusher, keepThinkingOpen: ctx.Provider == "kiro"}
 	reader := bufio.NewReader(ctx.Response.Body)
 	buf := make([]byte, 32*1024)
 	for {
@@ -64,6 +64,10 @@ type anthropicStreamTracker struct {
 	scanner           sseScanner
 	openBlockType     string
 	blockIndex        int
+	keepThinkingOpen  bool
+	thinkingBlock     int
+	hasThinkingBlock  bool
+	thinkingBlockOpen bool
 	toolBlockByID     map[string]int
 	toolBlockByIndex  map[int]anthropicToolBlock
 	openToolBlocks    map[int]bool
@@ -136,13 +140,28 @@ func (t *anthropicStreamTracker) writeTextDelta(text string) {
 }
 
 func (t *anthropicStreamTracker) writeThinkingDelta(thinking string) {
-	if t.openBlockType != "thinking" {
+	if !t.keepThinkingOpen {
+		if t.openBlockType != "thinking" {
+			t.closeOpenToolBlocks()
+			t.closeOpenBlock()
+			writeAnthropicEvent(t.writer, t.flusher, "content_block_start", map[string]any{"type": "content_block_start", "index": t.blockIndex, "content_block": map[string]any{"type": "thinking", "thinking": ""}})
+			t.openBlockType = "thinking"
+		}
+		writeAnthropicEvent(t.writer, t.flusher, "content_block_delta", map[string]any{"type": "content_block_delta", "index": t.blockIndex, "delta": map[string]any{"type": "thinking_delta", "thinking": thinking}})
+		return
+	}
+
+	if !t.hasThinkingBlock {
 		t.closeOpenToolBlocks()
 		t.closeOpenBlock()
+		t.thinkingBlock = t.blockIndex
+		t.hasThinkingBlock = true
+		t.thinkingBlockOpen = true
 		writeAnthropicEvent(t.writer, t.flusher, "content_block_start", map[string]any{"type": "content_block_start", "index": t.blockIndex, "content_block": map[string]any{"type": "thinking", "thinking": ""}})
+		t.blockIndex++
 		t.openBlockType = "thinking"
 	}
-	writeAnthropicEvent(t.writer, t.flusher, "content_block_delta", map[string]any{"type": "content_block_delta", "index": t.blockIndex, "delta": map[string]any{"type": "thinking_delta", "thinking": thinking}})
+	writeAnthropicEvent(t.writer, t.flusher, "content_block_delta", map[string]any{"type": "content_block_delta", "index": t.thinkingBlock, "delta": map[string]any{"type": "thinking_delta", "thinking": thinking}})
 }
 
 func (t *anthropicStreamTracker) writeToolCallDelta(raw any) {
@@ -203,9 +222,21 @@ func (t *anthropicStreamTracker) closeOpenBlock() {
 	if t.openBlockType == "" {
 		return
 	}
+	if t.keepThinkingOpen && t.openBlockType == "thinking" {
+		t.openBlockType = ""
+		return
+	}
 	writeAnthropicEvent(t.writer, t.flusher, "content_block_stop", map[string]any{"type": "content_block_stop", "index": t.blockIndex})
 	t.blockIndex++
 	t.openBlockType = ""
+}
+
+func (t *anthropicStreamTracker) closeThinkingBlock() {
+	if !t.keepThinkingOpen || !t.hasThinkingBlock || !t.thinkingBlockOpen {
+		return
+	}
+	writeAnthropicEvent(t.writer, t.flusher, "content_block_stop", map[string]any{"type": "content_block_stop", "index": t.thinkingBlock})
+	t.thinkingBlockOpen = false
 }
 
 func (t *anthropicStreamTracker) closeOpenToolBlocks() {
@@ -225,6 +256,7 @@ func (t *anthropicStreamTracker) closeOpenToolBlocks() {
 
 func (t *anthropicStreamTracker) Finish() {
 	t.Flush()
+	t.closeThinkingBlock()
 	t.closeOpenBlock()
 	t.closeOpenToolBlocks()
 	stopReason := t.finishReason

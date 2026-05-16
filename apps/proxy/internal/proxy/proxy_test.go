@@ -612,6 +612,42 @@ func TestAnthropicStreamTrackerTransformsOpenAIContentBlocks(t *testing.T) {
 	}
 }
 
+func TestAnthropicStreamTrackerKeepsKiroReasoningInOneBlock(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	tracker := &anthropicStreamTracker{writer: recorder, keepThinkingOpen: true}
+
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"reasoning_content": "\nThe"}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"content": "\n\nA cat sat."}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"reasoning_content": " user wants a cat poem."}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{}, "finish_reason": "stop"}}}))
+	tracker.Finish()
+
+	events := parseRecordedSSE(t, recorder.Body.String())
+	if len(events) != 9 {
+		t.Fatalf("events len = %d, want 9: %#v", len(events), events)
+	}
+	assertSSEEvent(t, events[0], "content_block_start", "thinking", 0)
+	if delta := events[1].data["delta"].(map[string]any); delta["type"] != "thinking_delta" || delta["thinking"] != "\nThe" || int(events[1].data["index"].(float64)) != 0 {
+		t.Fatalf("first thinking delta = %#v", events[1])
+	}
+	assertSSEEvent(t, events[2], "content_block_start", "text", 1)
+	if delta := events[3].data["delta"].(map[string]any); delta["type"] != "text_delta" || delta["text"] != "\n\nA cat sat." || int(events[3].data["index"].(float64)) != 1 {
+		t.Fatalf("text delta = %#v", events[3])
+	}
+	if delta := events[4].data["delta"].(map[string]any); delta["type"] != "thinking_delta" || delta["thinking"] != " user wants a cat poem." || int(events[4].data["index"].(float64)) != 0 {
+		t.Fatalf("late thinking delta = %#v", events[4])
+	}
+	if events[5].event != "content_block_stop" || int(events[5].data["index"].(float64)) != 0 {
+		t.Fatalf("thinking stop = %#v", events[5])
+	}
+	if events[6].event != "content_block_stop" || int(events[6].data["index"].(float64)) != 1 {
+		t.Fatalf("text stop = %#v", events[6])
+	}
+	if events[7].event != "message_delta" || events[8].event != "message_stop" {
+		t.Fatalf("finish events = %#v", events[7:])
+	}
+}
+
 func TestAnthropicStreamTrackerFinishReasonMappingAndFlush(t *testing.T) {
 	tests := []struct {
 		finish string
