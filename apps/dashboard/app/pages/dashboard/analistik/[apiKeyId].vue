@@ -1,10 +1,9 @@
 <script setup lang="ts">
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
-const route = useRoute();
-const apiKeyId = computed(() => String(route.params.apiKeyId));
+await navigateTo("/dashboard/codex", { replace: true });
 </script>
 
 <template>
-  <AnalyticsDashboard :api-key-id="apiKeyId" />
+  <div />
 </template>

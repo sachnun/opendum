@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../../lib/dashboard-api-types";
-import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../../lib/provider-accounts";
+import type { ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
+import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
 
 definePageMeta({
   middleware: "auth",

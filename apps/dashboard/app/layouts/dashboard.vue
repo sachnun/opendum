@@ -12,7 +12,7 @@ import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-f
 import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
 import type { ProviderAccountKey } from "../../lib/provider-accounts";
-import { buildProviderHrefMap, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
+import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
 
 const route = useRoute();
 const { data: session } = await useSession(useFetch);
@@ -61,7 +61,7 @@ const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
-const shouldUseAccountSummary = computed(() => route.path === "/dashboard/accounts");
+const accountsNavigationHref = getProviderAccountPath("codex");
 
 const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
@@ -96,10 +96,7 @@ function toShellAccountSummary(summary: AccountSummaryData | AccountPingData): S
 }
 
 const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
-  const summary = shouldUseAccountSummary.value
-    ? await dashboardApi.accounts.summary()
-    : await dashboardApi.accounts.ping();
-
+  const summary = await dashboardApi.accounts.ping();
   return toShellAccountSummary(summary);
 }, {
   default: () => emptyShellAccountSummary,
@@ -117,6 +114,7 @@ const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value)
 const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
+const accountNavigationHrefs = computed(() => new Set(PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => getProviderAccountPath(definition.key))));
 const playgroundNavigationDisabled = computed(() => hasLoadedAccountSummary.value && !accountSummaryPending.value && !hasConnectedAccounts.value);
 
 function normalizeModelFamilyCounts(counts: Record<string, number>) {
@@ -159,7 +157,7 @@ const pinnedProviderHrefs = computed(() => {
     const provider = PROVIDER_ACCOUNT_DEFINITIONS.find((definition) => definition.key === key);
 
     if (provider) {
-      hrefs.add(`/dashboard/accounts/${provider.slug}`);
+      hrefs.add(getProviderAccountPath(provider.key));
     }
   });
 
@@ -167,7 +165,12 @@ const pinnedProviderHrefs = computed(() => {
 });
 
 function isActive(href: string) {
+  if (href === accountsNavigationHref && accountNavigationHrefs.value.has(route.path)) return true;
   return route.path === href || (href !== "/dashboard" && route.path.startsWith(href));
+}
+
+function isAccountsNavItem(item: NavItem) {
+  return item.href === accountsNavigationHref;
 }
 
 function subItemHref(subItem: NavSubItem) {
@@ -191,7 +194,7 @@ function visibleSubItems(item: NavItem) {
     return [];
   }
 
-  if (item.href === "/dashboard/accounts") {
+  if (isAccountsNavItem(item)) {
     return item.children
       .filter((subItem) => pinnedProviderHrefs.value.has(subItem.href))
       .sort((a, b) => {
@@ -307,9 +310,6 @@ onMounted(() => {
   accountSummaryRefreshTimer = setInterval(() => {
     void refreshAccountSummaryOnce();
   }, ACCOUNT_SUMMARY_REFRESH_MS);
-  watch(shouldUseAccountSummary, () => {
-    void refreshAccountSummaryOnce();
-  });
 
   watch(subNavigationAnchorIds, (anchorIds, _previousAnchorIds, onCleanup) => {
     if (anchorIds.length === 0) {
@@ -453,7 +453,7 @@ async function handleSignOut() {
                           {{ subItem.tag }}
                         </UiBadge>
                       </span>
-                      <span v-if="item.href === '/dashboard/accounts'" class="flex items-center gap-2">
+                      <span v-if="isAccountsNavItem(item)" class="flex items-center gap-2">
                         <AccountStatusIndicator
                           :account-count="accountCountByHref[subItem.href]"
                           :active-account-count="activeAccountCountByHref[subItem.href]"
@@ -472,7 +472,7 @@ async function handleSignOut() {
                     </NuxtLink>
                   </template>
                 </template>
-                <p v-else-if="item.href === '/dashboard/accounts' && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
                   No pinned providers.
                 </p>
               </div>
@@ -632,7 +632,7 @@ async function handleSignOut() {
                             </UiBadge>
                           </span>
                           <AccountStatusIndicator
-                            v-if="item.href === '/dashboard/accounts'"
+                            v-if="isAccountsNavItem(item)"
                             :account-count="accountCountByHref[subItem.href]"
                             :active-account-count="activeAccountCountByHref[subItem.href]"
                             :indicator="accountIndicatorByHref[subItem.href]"
@@ -649,7 +649,7 @@ async function handleSignOut() {
                         </NuxtLink>
                       </template>
                     </template>
-                    <p v-else-if="item.href === '/dashboard/accounts' && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
                       No pinned providers.
                     </p>
                   </div>

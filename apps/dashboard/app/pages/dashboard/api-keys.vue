@@ -276,14 +276,6 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   <span class="text-muted-foreground">Last used</span>
                   <span class="text-right font-medium">{{ apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : '-' }}</span>
                 </div>
-                <NuxtLink
-                  :to="`/dashboard/analistik/${apiKey.id}`"
-                  class="flex justify-between gap-4 rounded-sm py-0.5 transition-colors hover:bg-muted/30"
-                  title="View analytics"
-                >
-                  <span class="text-muted-foreground">Analytics</span>
-                  <span class="text-right font-medium">Open details</span>
-                </NuxtLink>
               </div>
 
               <div class="grid gap-2.5 border-t border-border/60 pt-3">

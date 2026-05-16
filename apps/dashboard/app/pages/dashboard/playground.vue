@@ -155,7 +155,7 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
 
 const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => dashboardApi.playground.options());
 if (data.value && !data.value.hasAnyProviderAccount) {
-  await navigateTo("/dashboard/accounts", { replace: true });
+  await navigateTo("/dashboard/codex", { replace: true });
 }
 
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
@@ -237,7 +237,7 @@ const scenarioMessages = computed(() => getScenarioMessages(selectedScenario.val
 const isChatScenario = computed(() => selectedScenario.value.id === "chat");
 
 watch(options, (value) => {
-  if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard/accounts", { replace: true });
+  if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard/codex", { replace: true });
 });
 
 watch(options, (value) => {

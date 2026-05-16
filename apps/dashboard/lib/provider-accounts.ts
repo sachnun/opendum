@@ -142,7 +142,7 @@ export function getProviderLabel(provider: string): string {
 }
 
 export function getProviderAccountPath(provider: ProviderAccountKey): string {
-  return `/dashboard/accounts/${BY_KEY[provider].slug}`;
+  return `/dashboard/${BY_KEY[provider].slug}`;
 }
 
 export function buildProviderHrefMap<V>(
