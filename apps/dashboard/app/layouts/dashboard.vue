@@ -147,7 +147,6 @@ const ACCOUNT_SUMMARY_REFRESH_MS = 30_000;
 let accountSummaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountSummaryRefreshInFlight: Promise<void> | null = null;
 let accountSummaryRefreshQueued = false;
-const pinnedProviderNavOrder = ref<Record<string, number>>({});
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
@@ -172,44 +171,6 @@ function isAccountsNavItem(item: NavItem) {
   return item.href === accountsNavigationHref;
 }
 
-function compareAccountSubItems(a: NavSubItem, b: NavSubItem) {
-  const availabilityA = (activeAccountCountByHref.value[a.href] ?? 0) > 0 ? "active" : "inactive";
-  const availabilityB = (activeAccountCountByHref.value[b.href] ?? 0) > 0 ? "active" : "inactive";
-  const indicatorA = accountIndicatorByHref.value[a.href] ?? "normal";
-  const indicatorB = accountIndicatorByHref.value[b.href] ?? "normal";
-
-  return PROVIDER_AVAILABILITY_ORDER[availabilityA] - PROVIDER_AVAILABILITY_ORDER[availabilityB]
-    || PROVIDER_STATUS_ORDER[indicatorA] - PROVIDER_STATUS_ORDER[indicatorB]
-    || a.name.localeCompare(b.name);
-}
-
-function syncPinnedProviderNavOrder() {
-  const accountsItem = primaryNavigation.find(isAccountsNavItem);
-  if (!accountsItem?.children) return;
-
-  pinnedProviderNavOrder.value = Object.fromEntries(
-    accountsItem.children
-      .filter((subItem) => pinnedProviderHrefs.value.has(subItem.href))
-      .sort(compareAccountSubItems)
-      .map((subItem, index) => [subItem.href, index])
-  );
-}
-
-function accountSubItemDisplayOrder(subItems: NavSubItem[]) {
-  const currentOrder = pinnedProviderNavOrder.value;
-
-  return [...subItems].sort((a, b) => {
-    const aOrder = currentOrder[a.href];
-    const bOrder = currentOrder[b.href];
-
-    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
-    if (aOrder !== undefined) return -1;
-    if (bOrder !== undefined) return 1;
-
-    return compareAccountSubItems(a, b);
-  });
-}
-
 function subItemHref(subItem: NavSubItem) {
   if (subItem.anchorId) {
     return `${subItem.href}#${subItem.anchorId}`;
@@ -232,7 +193,17 @@ function visibleSubItems(item: NavItem) {
   }
 
   if (isAccountsNavItem(item)) {
-    return accountSubItemDisplayOrder(item.children.filter((subItem) => pinnedProviderHrefs.value.has(subItem.href)));
+    return item.children
+      .filter((subItem) => pinnedProviderHrefs.value.has(subItem.href))
+      .sort((a, b) => {
+        const availabilityA = (activeAccountCountByHref.value[a.href] ?? 0) > 0 ? "active" : "inactive";
+        const availabilityB = (activeAccountCountByHref.value[b.href] ?? 0) > 0 ? "active" : "inactive";
+        const indicatorA = accountIndicatorByHref.value[a.href] ?? "normal";
+        const indicatorB = accountIndicatorByHref.value[b.href] ?? "normal";
+        return PROVIDER_AVAILABILITY_ORDER[availabilityA] - PROVIDER_AVAILABILITY_ORDER[availabilityB]
+          || PROVIDER_STATUS_ORDER[indicatorA] - PROVIDER_STATUS_ORDER[indicatorB]
+          || a.name.localeCompare(b.name);
+      });
   }
 
   if (item.href === "/dashboard/models") {
@@ -249,15 +220,6 @@ function modelCountFor(subItem: NavSubItem) {
 const subNavigationAnchorIds = computed(() => primaryNavigation.flatMap((item) => visibleSubItems(item)
   .filter((subItem) => subItem.href === route.path && subItem.anchorId)
   .map((subItem) => subItem.anchorId as string)));
-
-watch(accountSummaryData, (value) => {
-  if (!value || Object.keys(pinnedProviderNavOrder.value).length > 0) return;
-  syncPinnedProviderNavOrder();
-}, { immediate: true });
-
-watch(accountSummaryPending, (isPending, wasPending) => {
-  if (!isPending && wasPending) syncPinnedProviderNavOrder();
-});
 
 function setPendingAnchor(path: string, anchorId: string) {
   window.sessionStorage.setItem(PENDING_NAV_ANCHOR_KEY, JSON.stringify({ path, anchorId }));
