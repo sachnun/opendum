@@ -35,6 +35,7 @@ type ProviderModelConfig struct {
 }
 
 type Info struct {
+	ID             string                         `json:"id"`
 	Providers      []string                       `json:"providers"`
 	Aliases        []string                       `json:"aliases"`
 	Description    string                         `json:"description"`
@@ -83,14 +84,17 @@ func Load(dir string) (*Registry, error) {
 			return err
 		}
 
+		info.ID = strings.TrimSpace(info.ID)
 		info.Providers = compactStrings(info.Providers)
 		info.Aliases = compactStrings(info.Aliases)
-		modelID := strings.TrimSuffix(filepath.Base(path), ".json")
-		registry.models[modelID] = info
+		fileID := strings.TrimSuffix(filepath.Base(path), ".json")
+		modelID := fileID
+		if info.ID != "" {
+			modelID = info.ID
+		}
+		registry.mergeModelInfo(modelID, fileID, info)
 		if info.Ignored {
 			registry.ignored[modelID] = struct{}{}
-		} else {
-			registry.effective[modelID] = info
 		}
 		return nil
 	})
@@ -100,6 +104,55 @@ func Load(dir string) (*Registry, error) {
 
 	registry.buildAliases()
 	return registry, nil
+}
+
+func (r *Registry) mergeModelInfo(modelID, fileID string, info Info) {
+	if info.ID == "" {
+		info.ID = modelID
+	}
+	if fileID != modelID {
+		info.Aliases = append(info.Aliases, fileID)
+	}
+
+	existing, exists := r.models[modelID]
+	if !exists {
+		info.Aliases = uniqueSorted(info.Aliases)
+		r.models[modelID] = info
+		if !info.Ignored {
+			r.effective[modelID] = info
+		}
+		return
+	}
+
+	merged := existing
+	merged.ID = modelID
+	merged.Providers = uniqueSorted(append(merged.Providers, info.Providers...))
+	merged.Aliases = uniqueSorted(append(merged.Aliases, info.Aliases...))
+	if merged.Description == "" {
+		merged.Description = info.Description
+	}
+	if merged.Family == "" {
+		merged.Family = info.Family
+	}
+	merged.Ignored = merged.Ignored && info.Ignored
+	if merged.Meta == nil {
+		merged.Meta = info.Meta
+	}
+	if len(info.ProviderConfig) > 0 {
+		if merged.ProviderConfig == nil {
+			merged.ProviderConfig = map[string]ProviderModelConfig{}
+		}
+		for provider, cfg := range info.ProviderConfig {
+			merged.ProviderConfig[provider] = cfg
+		}
+	}
+
+	r.models[modelID] = merged
+	if !merged.Ignored {
+		r.effective[modelID] = merged
+	} else {
+		delete(r.effective, modelID)
+	}
 }
 
 func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
@@ -149,6 +202,9 @@ func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
 
 func (r *Registry) buildAliases() {
 	for canonical, info := range r.effective {
+		if info.ID != "" && info.ID != canonical {
+			r.aliasToCanonical[info.ID] = canonical
+		}
 		for _, alias := range info.Aliases {
 			r.aliasToCanonical[alias] = canonical
 		}

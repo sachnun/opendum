@@ -15,6 +15,7 @@ export interface ModelMeta {
 }
 
 export interface ModelInfo {
+  id?: string;
   providers: string[];
   aliases?: string[];
   description?: string;

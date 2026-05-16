@@ -1,16 +1,16 @@
 {
+  "id": "nemotron-nano-vl",
   "providers": [
     "nvidia_nim"
   ],
   "aliases": [
-    "llama-3.2-90b-vision-instruct",
-    "meta-llama-3.2-90b-vision-instruct",
-    "meta/llama-3.2-90b-vision-instruct"
+    "nvidia-llama-3.1-nemotron-nano-vl-8b-v1",
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
   ],
   "family": "Meta",
   "meta": {
-    "reasoning": false,
-    "toolCall": true,
+    "reasoning": true,
+    "toolCall": false,
     "vision": true,
     "modalities": {
       "input": [
@@ -24,7 +24,7 @@
   },
   "providerConfig": {
     "nvidia_nim": {
-      "upstream": "meta/llama-3.2-90b-vision-instruct"
+      "upstream": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
     }
   }
 }

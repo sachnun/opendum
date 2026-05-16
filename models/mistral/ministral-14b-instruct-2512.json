@@ -1,10 +1,8 @@
 {
+  "id": "ministral-3-14b",
   "providers": [
     "nvidia_nim",
     "ollama_cloud"
-  ],
-  "aliases": [
-    "ministral-14b-instruct-2512"
   ],
   "family": "Mistral",
   "meta": {

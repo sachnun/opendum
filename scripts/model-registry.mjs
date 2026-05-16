@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 const MODEL_FILE_EXTENSION = ".json";
 
 const MODEL_PROPERTY_ORDER = [
+  "id",
   "providers",
   "aliases",
   "description",
@@ -84,6 +85,11 @@ function readModelJson(content) {
   return JSON.parse(content);
 }
 
+function getModelPublicId(data, fileId) {
+  const id = typeof data.id === "string" ? data.id.trim() : "";
+  return id || fileId;
+}
+
 export function writeModelJson(filePath, data) {
   const content = JSON.stringify(normalizeModelData(data), null, 2);
   writeFileSync(filePath, `${content}\n`);
@@ -109,9 +115,10 @@ function collectModelFiles(modelsDir) {
 export function buildModelIndex(modelsDir) {
   const index = {};
   for (const filePath of collectModelFiles(modelsDir)) {
-    const modelId = basename(filePath, MODEL_FILE_EXTENSION);
+    const fileId = basename(filePath, MODEL_FILE_EXTENSION);
     const content = readFileSync(filePath, "utf-8");
-    index[modelId] = { path: filePath, data: readModelJson(content) };
+    const data = readModelJson(content);
+    index[fileId] = { id: getModelPublicId(data, fileId), fileId, path: filePath, data };
   }
   return index;
 }
@@ -156,10 +163,24 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
   const removed = [];
   const updated = [];
 
+  function entryMatchesProviderMap(entry) {
+    return modelMap.has(entry.fileId) || modelMap.has(entry.id);
+  }
+
+  function findExistingEntry(modelKey, upstreamName) {
+    if (index[modelKey]) return index[modelKey];
+
+    const entries = Object.values(index);
+    return entries.find((entry) => entry.id === modelKey) ||
+      entries.find((entry) => (entry.data.aliases || []).includes(modelKey)) ||
+      entries.find((entry) => getProviderUpstream(entry.data, providerName, entry.fileId) === upstreamName) ||
+      null;
+  }
+
   for (const [modelId, entry] of Object.entries(index)) {
     const providers = entry.data.providers || [];
     if (!providers.includes(providerName)) continue;
-    if (modelMap.has(modelId)) continue;
+    if (entryMatchesProviderMap(entry)) continue;
 
     entry.data.providers = providers.filter((provider) => provider !== providerName);
 
@@ -175,7 +196,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
   }
 
   for (const [modelKey, upstreamName] of modelMap.entries()) {
-    const existing = index[modelKey];
+    const existing = findExistingEntry(modelKey, upstreamName);
 
     if (existing) {
       const providers = existing.data.providers || [];
@@ -189,7 +210,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
 
       const providerConfig = existing.data.providerConfig?.[providerName] || {};
 
-      if (upstreamName !== modelKey) {
+      if (upstreamName !== existing.id) {
         if (!existing.data.providerConfig) existing.data.providerConfig = {};
         if (!existing.data.providerConfig[providerName]) existing.data.providerConfig[providerName] = {};
         if (existing.data.providerConfig[providerName].upstream !== upstreamName) {

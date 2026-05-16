@@ -1,9 +1,7 @@
 {
+  "id": "mistral-small-3.1",
   "providers": [
     "workers_ai"
-  ],
-  "aliases": [
-    "mistral-small-3.1-24b-instruct"
   ],
   "family": "Mistral",
   "meta": {

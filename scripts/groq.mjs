@@ -98,7 +98,7 @@ function buildReverseMap(modelsDir) {
     if (!providers.includes("groq")) continue;
 
     const upstream = getProviderUpstream(entry.data, "groq", modelId);
-    reverseMap.set(upstream, modelId);
+    reverseMap.set(upstream, entry.id || modelId);
   }
 
   return reverseMap;

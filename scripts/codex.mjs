@@ -131,7 +131,7 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
   const index = buildModelIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
-    const entry = index[modelKey];
+    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
     if (!entry) continue;
 
     const meta = metadataLookup.get(modelKey);

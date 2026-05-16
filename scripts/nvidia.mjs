@@ -313,7 +313,7 @@ async function main() {
     const providers = entry.data.providers || [];
     if (providers.includes(PROVIDER_NAME)) {
       const upstream = getProviderUpstream(entry.data, PROVIDER_NAME, modelId);
-      existingKeys.set(modelId, upstream);
+      existingKeys.set(entry.id || modelId, upstream);
     }
   }
 

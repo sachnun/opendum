@@ -169,14 +169,14 @@ function buildReverseMap(modelsDir) {
     if (!providers.includes(PROVIDER_NAME)) continue;
 
     const upstream = getProviderUpstream(entry.data, PROVIDER_NAME, modelId);
-    reverseMap.set(upstream, modelId);
+    reverseMap.set(upstream, entry.id || modelId);
   }
 
   return reverseMap;
 }
 
 function isExistingIgnoredWithoutWorkersAI(index, modelKey) {
-  const entry = index[modelKey];
+  const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
   if (!entry?.data?.ignored) return false;
   return !(entry.data.providers || []).includes(PROVIDER_NAME);
 }
@@ -259,7 +259,7 @@ function applyMetadata(modelsDir, metadata) {
   let updated = 0;
 
   for (const [modelKey, info] of metadata.entries()) {
-    const entry = index[modelKey];
+    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
     if (!entry) continue;
 
     let changed = false;

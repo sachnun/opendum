@@ -129,7 +129,7 @@ function applyAuthlessMetadata(modelsDir, modelMap) {
   let updated = 0;
 
   for (const modelKey of modelMap.keys()) {
-    const entry = index[modelKey];
+    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
     if (!entry?.data?.providerConfig?.kilo_code) continue;
 
     if (entry.data.providerConfig.kilo_code.authless !== true) {

@@ -265,7 +265,7 @@ function enrichNewModels(modelsDir, addedKeys, apiModels) {
   const index = buildModelIndex(modelsDir);
 
   for (const modelKey of addedKeys) {
-    const entry = index[modelKey];
+    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
     if (!entry) continue;
 
     // Try to find API metadata via exact match or prefix match

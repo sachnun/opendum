@@ -1,13 +1,14 @@
 {
+  "id": "mistral-large-3-675b",
   "providers": [
-    "nvidia_nim"
+    "nvidia_nim",
+    "ollama_cloud"
   ],
   "aliases": [
-    "llama-4-maverick-17b-128e-instruct",
-    "meta-llama-4-maverick-17b-128e-instruct",
-    "meta/llama-4-maverick-17b-128e-instruct"
+    "mistral-large",
+    "mistralai/mistral-large"
   ],
-  "family": "Meta",
+  "family": "Mistral",
   "meta": {
     "reasoning": false,
     "toolCall": true,
@@ -24,7 +25,10 @@
   },
   "providerConfig": {
     "nvidia_nim": {
-      "upstream": "meta/llama-4-maverick-17b-128e-instruct"
+      "upstream": "mistralai/mistral-large-3-675b-instruct-2512"
+    },
+    "ollama_cloud": {
+      "upstream": "mistral-large-3:675b"
     }
   }
 }

@@ -34,6 +34,10 @@ function getProviderUpstream(info: ModelInfo, provider: string): string | undefi
 }
 
 for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
+  if (info.id && info.id !== canonical) {
+    aliasToCanonical[info.id] = canonical;
+  }
+
   // Register JSON-declared aliases
   if (info.aliases) {
     for (const alias of info.aliases) {

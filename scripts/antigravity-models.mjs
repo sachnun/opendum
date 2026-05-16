@@ -205,19 +205,20 @@ function syncJson(modelMap, dryRun) {
     const wouldKeep = [];
 
     for (const [modelId, entry] of Object.entries(index)) {
+      const publicId = entry.id || modelId;
       const providers = entry.data.providers || [];
       if (!providers.includes(PROVIDER_NAME)) continue;
 
-      if (modelMap.has(modelId)) {
-        wouldKeep.push(modelId);
+      if (modelMap.has(modelId) || modelMap.has(publicId)) {
+        wouldKeep.push(publicId);
       } else {
-        wouldRemove.push(modelId);
+        wouldRemove.push(publicId);
       }
     }
 
     const wouldAdd = [];
     for (const key of modelMap.keys()) {
-      const existing = index[key];
+      const existing = Object.values(index).find((entry) => entry.fileId === key || entry.id === key);
       if (!existing || !(existing.data.providers || []).includes(PROVIDER_NAME)) {
         wouldAdd.push(key);
       }

@@ -210,7 +210,7 @@ function enrichNewModels(modelsDir, addedKeys, oauthModels) {
   }
 
   for (const modelKey of addedKeys) {
-    const entry = index[modelKey];
+    const entry = Object.values(index).find((item) => item.fileId === modelKey || item.id === modelKey);
     if (!entry) continue;
 
     const meta = lookup.get(modelKey);
@@ -254,7 +254,7 @@ async function main() {
     const providers = entry.data.providers || [];
     if (providers.includes(PROVIDER_NAME)) {
       const upstream = getProviderUpstream(entry.data, PROVIDER_NAME, modelId);
-      existingKeys.set(modelId, upstream);
+      existingKeys.set(entry.id || modelId, upstream);
     }
   }
 

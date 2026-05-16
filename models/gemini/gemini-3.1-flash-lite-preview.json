@@ -1,4 +1,5 @@
 {
+  "id": "gemini-3.1-flash-lite",
   "providers": [
     "gemini_cli"
   ],
@@ -6,6 +7,30 @@
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true
+    "vision": true,
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
+  "providerConfig": {
+    "gemini_cli": {
+      "upstream": "gemini-3.1-flash-lite-preview",
+      "thinking_budgets": {
+        "high": 24576,
+        "low": 6144,
+        "medium": 12288,
+        "xhigh": 24576
+      },
+      "thinking_format": "budget"
+    }
   }
 }
