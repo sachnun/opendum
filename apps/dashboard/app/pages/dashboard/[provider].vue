@@ -218,6 +218,7 @@ function toTimeMs(value: string | Date | null | undefined): number {
 function compareAccounts(a: Account, b: Account): number {
   return getAccountSortGroup(a) - getAccountSortGroup(b)
     || toTimeMs(b.lastErrorAt) - toTimeMs(a.lastErrorAt)
+    || toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
     || (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active);
 }
 
