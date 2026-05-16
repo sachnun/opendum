@@ -1,4 +1,7 @@
 import { listApiKeys } from "../../../services/api-keys";
-import { requireUserId } from "../../../utils/api";
+import { requireReadableDashboardContext } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => listApiKeys(await requireUserId(event)));
+export default defineEventHandler(async (event) => {
+  const context = await requireReadableDashboardContext(event);
+  return listApiKeys(context.userId, { expireActiveKeys: !context.isAuditMode });
+});

@@ -1,4 +1,4 @@
 import { getAccountsByProviderDetailed, providerInputSchema } from "../../../services/accounts";
-import { getDashboardQuery, requireUserId } from "../../../utils/api";
+import { getDashboardQuery, requireReadableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => getAccountsByProviderDetailed(await requireUserId(event), getDashboardQuery(event, providerInputSchema)));
+export default defineEventHandler(async (event) => getAccountsByProviderDetailed(await requireReadableUserId(event), getDashboardQuery(event, providerInputSchema)));

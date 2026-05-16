@@ -15,6 +15,7 @@ const props = defineProps<{
   availableAccounts: ProviderAccountOption[];
   initialMode: AccessMode;
   initialAccounts: string[];
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -54,6 +55,7 @@ function getProviderDisplayName(provider: string): string {
 }
 
 function toggleAccount(accountId: string) {
+  if (props.readonly) return;
   draftAccounts.value = draftAccounts.value.includes(accountId)
     ? draftAccounts.value.filter((id) => id !== accountId)
     : normalizeAccounts([...draftAccounts.value, accountId]);
@@ -68,6 +70,7 @@ function resetDraftState() {
 }
 
 async function save() {
+  if (props.readonly) return;
   const accountsForSave = draftMode.value === "all" ? [] : normalizedDraftAccounts.value;
   if (draftMode.value !== "all" && accountsForSave.length === 0) {
     errorMessage.value = "Select at least one account";
@@ -115,7 +118,7 @@ const filteredAccounts = computed(() => {
 
     <div class="flex-1 space-y-3 lg:mt-5">
       <div class="grid grid-cols-3 gap-1 rounded-md border border-input bg-input/30 p-1">
-        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="draftMode = mode as AccessMode">
+        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="draftMode = mode as AccessMode">
           {{ mode === 'all' ? 'All' : mode === 'whitelist' ? 'Whitelist' : 'Blacklist' }}
         </button>
       </div>
@@ -123,11 +126,11 @@ const filteredAccounts = computed(() => {
       <div v-if="draftMode !== 'all'" class="space-y-2">
         <div class="flex items-center justify-between gap-2">
           <p class="text-xs font-medium">Accounts</p>
-          <UiButton type="button" variant="ghost" size="sm" class="h-7 px-2 text-[11px]" :disabled="normalizedDraftAccounts.length === 0 || isSaving" @click="draftAccounts = []">Clear</UiButton>
+          <UiButton type="button" variant="ghost" size="sm" class="h-7 px-2 text-[11px]" :disabled="normalizedDraftAccounts.length === 0 || isSaving || readonly" @click="draftAccounts = []">Clear</UiButton>
         </div>
 
         <UiPopover v-model:open="accountPickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
-          <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving">
+          <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving || readonly">
             <span class="truncate">{{ normalizedDraftAccounts.length > 0 ? `${normalizedDraftAccounts.length} account selected` : 'Select accounts' }}</span>
             <UiIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
           </UiButton>
@@ -136,7 +139,7 @@ const filteredAccounts = computed(() => {
               <input v-model="accountSearch" placeholder="Search account..." class="h-8 w-full rounded-md bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
-              <button v-for="account in filteredAccounts" :key="account.id" type="button" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent" @click="toggleAccount(account.id)">
+              <button v-for="account in filteredAccounts" :key="account.id" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(account.id)">
                 <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0']" />
                 <div class="flex min-w-0 flex-col">
                   <span class="truncate text-xs font-medium">{{ account.name }}</span>
@@ -153,7 +156,7 @@ const filteredAccounts = computed(() => {
           <div v-else class="flex flex-wrap gap-1.5">
             <UiBadge v-for="accountId in normalizedDraftAccounts" :key="accountId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate">{{ accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId }}</span>
-              <button type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleAccount(accountId)">
+              <button v-if="!readonly" type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleAccount(accountId)">
                 <UiIcon name="i-lucide-x" class="size-2.5" />
               </button>
             </UiBadge>
@@ -164,8 +167,8 @@ const filteredAccounts = computed(() => {
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraftState"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
-      <UiButton size="sm" :disabled="isSaving || !hasChanges" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraftState"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
+      <UiButton size="sm" :disabled="isSaving || !hasChanges || readonly" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>
 </template>

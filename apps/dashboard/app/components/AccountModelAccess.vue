@@ -8,6 +8,7 @@ const props = defineProps<{
   supportedModels: string[];
   initialDisabledModels: string[];
   modelHealth: Record<string, ProviderAccountModelHealthItem>;
+  readonly?: boolean;
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -63,6 +64,7 @@ function modelButtonClass(model: string): string {
 }
 
 async function toggleModel(model: string) {
+  if (props.readonly) return;
   const currentlyEnabled = !disabledModels.value.has(model);
   const enabled = !currentlyEnabled;
   const previous = new Set(disabledModels.value);
@@ -100,7 +102,7 @@ async function toggleModel(model: string) {
         v-for="model in visibleModels"
         :key="model"
         type="button"
-        :disabled="togglingModels.has(model)"
+        :disabled="togglingModels.has(model) || readonly"
         :title="modelButtonTitle(model)"
         :class="[
           'inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',

@@ -8,10 +8,27 @@ export type ActionResult<T = void> =
 
 export type DashboardUserRole = "user" | "maintener";
 
+export interface DashboardUserIdentity {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+}
+
+export interface DashboardAuditInfo {
+  active: boolean;
+  readonly: boolean;
+  user: DashboardUserIdentity | null;
+}
+
 export interface DashboardMeData {
   role: DashboardUserRole;
   isMaintener: boolean;
+  actor?: DashboardUserIdentity;
+  audit?: DashboardAuditInfo;
 }
+
+export type MaintenerAuditUser = DashboardUserIdentity;
 
 export interface ProviderStats {
   totalRequests: number;

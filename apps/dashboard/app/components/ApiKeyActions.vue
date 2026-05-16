@@ -6,6 +6,7 @@ type ApiKey = ApiKeyListItem;
 
 const props = defineProps<{
   apiKey: ApiKey;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -25,6 +26,7 @@ const errorMessage = ref("");
 const displayKey = computed(() => (isRevealed.value && revealedKey.value ? revealedKey.value : `${props.apiKey.keyPreview.substring(0, 8)}********`));
 
 async function revealKey() {
+  if (props.readonly) return;
   if (isRevealed.value) {
     isRevealed.value = false;
     revealedKey.value = null;
@@ -46,6 +48,7 @@ async function revealKey() {
 }
 
 async function copyKey() {
+  if (props.readonly) return;
   let key = revealedKey.value;
   isLoading.value = true;
   errorMessage.value = "";
@@ -66,6 +69,7 @@ async function copyKey() {
 }
 
 async function deleteKey() {
+  if (props.readonly) return;
   isDeleting.value = true;
   errorMessage.value = "";
   try {
@@ -87,7 +91,7 @@ async function deleteKey() {
       <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
       <button
         type="button"
-        :disabled="isLoading"
+        :disabled="isLoading || readonly"
         :class="cn(
           'flex w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-transparent px-2 py-2 text-left font-mono text-xs text-muted-foreground outline-none transition-colors hover:bg-muted/30 disabled:pointer-events-none disabled:opacity-50',
           isRevealed ? 'min-h-9' : 'h-9',
@@ -101,12 +105,12 @@ async function deleteKey() {
 
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
-          <UiButton variant="outline" size="icon-sm" class="h-8 w-8" title="Delete key" @click="deleteDialogOpen = true">
+          <UiButton v-if="!readonly" variant="outline" size="icon-sm" class="h-8 w-8" title="Delete key" @click="deleteDialogOpen = true">
             <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
           </UiButton>
-          <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" @updated="emit('renamed', $event)" />
+          <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" :readonly="readonly" @updated="emit('renamed', $event)" />
         </div>
-        <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading" title="Copy key" @click="copyKey">
+        <UiButton v-if="!readonly" variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading" title="Copy key" @click="copyKey">
           <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />
         </UiButton>
       </div>

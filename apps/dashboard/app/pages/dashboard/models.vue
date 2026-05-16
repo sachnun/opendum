@@ -8,6 +8,7 @@ import { getProviderLabel } from "../../../lib/provider-accounts";
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const dashboardApi = useDashboardApi();
+const { isAuditMode } = useDashboardAudit();
 const dashboardInvalidation = useDashboardDataInvalidation();
 
 type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
@@ -133,6 +134,7 @@ function updateModelEnabled(modelId: string, enabled: boolean) {
 }
 
 async function setModelEnabled(model: ModelListItem, enabled: boolean) {
+  if (isAuditMode.value) return;
   pendingModelId.value = model.id;
   const previousValue = model.isEnabled;
   updateModelEnabled(model.id, enabled);
@@ -227,7 +229,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                     </span>
                     <UiSwitch
                       :model-value="model.isEnabled"
-                      :disabled="pendingModelId === model.id"
+                      :disabled="pendingModelId === model.id || isAuditMode"
                       :title="model.isEnabled ? 'Disable model' : 'Enable model'"
                       @update:model-value="setModelEnabled(model, $event)"
                     />

@@ -57,6 +57,7 @@ export function useAccountQuotaMonitor(options: {
   toQuotaProvider: (provider: string) => QuotaProviderKey | null;
 }) {
   const dashboardApi = useDashboardApi();
+  const { isAuditMode } = useDashboardAudit();
   const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>("account-quota-by-account-id", () => ({}));
   const quotaErrorByAccountId = useState<Record<string, string>>("account-quota-error-by-account-id", () => ({}));
   const quotaLoadingByAccountId = useState<Record<string, boolean>>("account-quota-loading-by-account-id", () => ({}));
@@ -81,6 +82,10 @@ export function useAccountQuotaMonitor(options: {
 
   async function hydrateQuotaCache() {
     if (!import.meta.client) return;
+    if (isAuditMode.value) {
+      hydratedAccountIds.value = {};
+      return;
+    }
 
     const accountsToHydrate = options.quotaCapableAccounts.value.filter((account) => !hydratedAccountIds.value[account.id]);
     if (accountsToHydrate.length === 0) return;
@@ -115,6 +120,7 @@ export function useAccountQuotaMonitor(options: {
   }
 
   async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number, refreshExisting = false) {
+    if (isAuditMode.value) return;
     const provider = options.toQuotaProvider(account.provider);
     if (!provider || quotaLoadingByAccountId.value[account.id]) return;
     if (!forceRefresh && quotaByAccountId.value[account.id] && !refreshExisting) return;
@@ -146,6 +152,7 @@ export function useAccountQuotaMonitor(options: {
   }
 
   async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshExisting = false) {
+    if (isAuditMode.value) return;
     const runId = ++quotaQueueRunId;
     const accountsToFetch = [
       ...accounts.filter((account) => account.isActive),

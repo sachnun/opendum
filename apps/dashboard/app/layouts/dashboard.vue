@@ -19,6 +19,7 @@ const { data: session } = await useSession(useFetch);
 
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
+const auditDialogOpen = ref(false);
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
 
@@ -67,7 +68,16 @@ const accountsNavigationHref = "/dashboard";
 const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
 });
+const { auditUser, dashboardMe: dashboardMeState, isAuditMode, refreshAfterAuditChange } = useDashboardAudit();
+dashboardMeState.value = dashboardMe.value ?? null;
+watch(dashboardMe, (value) => {
+  dashboardMeState.value = value ?? null;
+}, { immediate: true });
 const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
+const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
+const auditUserEmail = computed(() => auditUser.value?.email || "");
+const auditUserImage = computed(() => auditUser.value?.image || "");
+const auditUserInitial = computed(() => (auditUserLabel.value[0] || "U").toUpperCase());
 
 function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
   const nextAccountCounts = { ...emptyAccountCounts };
@@ -387,8 +397,24 @@ onBeforeUnmount(() => {
 });
 
 async function handleSignOut() {
+  if (isAuditMode.value) {
+    await dashboardApi.maintener.audit.stop();
+    userMenuOpen.value = false;
+    await refreshAfterAuditChange();
+    return;
+  }
+
   await signOut();
   await navigateTo("/");
+}
+
+function openAuditDialog() {
+  userMenuOpen.value = false;
+  auditDialogOpen.value = true;
+}
+
+async function handleAuditSelected() {
+  await refreshAfterAuditChange();
 }
 </script>
 
@@ -528,10 +554,18 @@ async function handleSignOut() {
                 type="button"
                 class="flex cursor-pointer items-center justify-center rounded-full transition-opacity hover:opacity-80"
               >
-                <span class="relative flex size-8 shrink-0 overflow-hidden rounded-full select-none">
-                  <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
-                  <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
-                    {{ userInitial }}
+                <span class="relative flex size-8 shrink-0 select-none">
+                  <span class="flex size-8 overflow-hidden rounded-full">
+                    <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
+                    <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
+                      {{ userInitial }}
+                    </span>
+                  </span>
+                  <span v-if="isAuditMode" class="absolute -bottom-1 -left-1 flex size-5 overflow-hidden rounded-full border-2 border-background bg-muted ring-1 ring-border">
+                    <img v-if="auditUserImage" :src="auditUserImage" alt="" class="aspect-square size-full">
+                    <span v-else class="flex size-full items-center justify-center text-[9px] font-semibold text-muted-foreground">
+                      {{ auditUserInitial }}
+                    </span>
                   </span>
                 </span>
               </button>
@@ -544,7 +578,20 @@ async function handleSignOut() {
                       <span class="truncate text-xs text-muted-foreground">{{ userEmail }}</span>
                     </div>
                   </div>
+                  <div v-if="isAuditMode" class="mx-1 rounded-md border border-border/70 bg-muted/30 px-2 py-2 text-sm">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Auditing</p>
+                    <p class="truncate font-medium">{{ auditUserLabel }}</p>
+                    <p class="truncate text-xs text-muted-foreground">{{ auditUserEmail }}</p>
+                  </div>
                   <div class="-mx-1 my-1 h-px bg-border" />
+                  <button
+                    v-if="isMaintener && !isAuditMode"
+                    type="button"
+                    class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                    @click="openAuditDialog"
+                  >
+                    Audit user
+                  </button>
                   <button
                     type="button"
                     class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -682,5 +729,7 @@ async function handleSignOut() {
         </div>
       </template>
     </UiSheet>
+
+    <MaintenerAuditDialog v-model:open="auditDialogOpen" @selected="handleAuditSelected" />
   </div>
 </template>

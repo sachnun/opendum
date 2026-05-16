@@ -36,6 +36,10 @@ type UpdateApiKeyModelAccessInput = z.infer<typeof updateApiKeyModelAccessInputS
 type UpdateApiKeyAccountAccessInput = z.infer<typeof updateApiKeyAccountAccessInputSchema>;
 type UpdateApiKeyRateLimitsInput = z.infer<typeof updateApiKeyRateLimitsInputSchema>;
 
+interface ApiKeyReadOptions {
+  expireActiveKeys?: boolean;
+}
+
 function normalizeModelList(models: string[]): string[] {
   return Array.from(new Set(models.map((model) => resolveModelAlias(model.trim())).filter((model) => model.length > 0))).sort(compareKnownModelIds);
 }
@@ -99,12 +103,14 @@ export async function getApiKeyOptions(userId: string) {
   }
 }
 
-export async function listApiKeys(userId: string) {
+export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {}) {
   try {
-    await db
-      .update(proxyApiKey)
-      .set({ isActive: false })
-      .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.isActive, true), lte(proxyApiKey.expiresAt, new Date())));
+    if (options.expireActiveKeys !== false) {
+      await db
+        .update(proxyApiKey)
+        .set({ isActive: false })
+        .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.isActive, true), lte(proxyApiKey.expiresAt, new Date())));
+    }
 
     return await db
       .select({

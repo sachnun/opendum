@@ -1,4 +1,4 @@
 import { analyticsByApiKeyInputSchema, getAnalyticsByApiKey } from "../../../services/analytics";
-import { readDashboardBody, requireUserId } from "../../../utils/api";
+import { readDashboardBody, requireReadableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => getAnalyticsByApiKey(await requireUserId(event), await readDashboardBody(event, analyticsByApiKeyInputSchema)));
+export default defineEventHandler(async (event) => getAnalyticsByApiKey(await requireReadableUserId(event), await readDashboardBody(event, analyticsByApiKeyInputSchema)));

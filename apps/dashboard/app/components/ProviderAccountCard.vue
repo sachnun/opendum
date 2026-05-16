@@ -156,6 +156,7 @@ const props = defineProps<{
   quotaError?: string | null;
   isQuotaLoading?: boolean;
   highlight?: boolean;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -682,6 +683,7 @@ function clearTemporaryOffLongPress() {
 }
 
 function startTemporaryOffLongPress(event: PointerEvent) {
+  if (props.readonly) return;
   if (!props.account.isActive || isToggling.value || isTemporaryDisabling.value) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
 
@@ -708,6 +710,7 @@ function handleTemporaryOffToggleClick(event: Event) {
 }
 
 function refreshQuota() {
+  if (props.readonly) return;
   emit("refreshQuota", props.account.id);
 }
 
@@ -716,6 +719,7 @@ onBeforeUnmount(() => {
 });
 
 async function toggleActive() {
+  if (props.readonly) return;
   if (suppressNextToggle) {
     suppressNextToggle = false;
     return;
@@ -732,6 +736,7 @@ async function toggleActive() {
 }
 
 async function disableTemporarily() {
+  if (props.readonly) return;
   const disabledUntil = getTemporaryOffUntil();
   if (!disabledUntil) {
     temporaryOffError.value = "Please choose at least 1 minute, hour, or day.";
@@ -753,6 +758,7 @@ async function disableTemporarily() {
 }
 
 async function renameAccount() {
+  if (props.readonly) return;
   savingName.value = true;
   try {
     const result = await dashboardApi.accounts.update({ id: props.account.id, name: editName.value });
@@ -765,6 +771,7 @@ async function renameAccount() {
 }
 
 async function deleteAccount() {
+  if (props.readonly) return;
   deleting.value = true;
   try {
     const result = await dashboardApi.accounts.delete({ id: props.account.id });
@@ -777,6 +784,7 @@ async function deleteAccount() {
 }
 
 async function resolveErrors() {
+  if (props.readonly) return;
   resolvingErrors.value = true;
   try {
     const result = await dashboardApi.accounts.resolveErrors({ accountId: props.account.id });
@@ -1051,7 +1059,7 @@ function cancelErrorPreviewPointer() {
                 variant="ghost"
                 size="icon-sm"
                 class="h-6 w-6"
-                :disabled="isQuotaLoading"
+                :disabled="isQuotaLoading || readonly"
                 :aria-label="`Refresh quota for ${accountTitle}`"
                 title="Refresh quota"
                 @click="refreshQuota"
@@ -1097,9 +1105,9 @@ function cancelErrorPreviewPointer() {
             </template>
           </div>
 
-          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" />
+          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" :readonly="readonly" />
         </div>
-        <div class="mt-4 flex items-center justify-between gap-2">
+        <div v-if="!readonly" class="mt-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
             <UiButton variant="outline" size="sm" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
             <UiButton variant="outline" size="sm" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
@@ -1183,7 +1191,7 @@ function cancelErrorPreviewPointer() {
                 <UiIcon name="i-lucide-flask-conical" class="size-4" />
               </UiButton>
             </NuxtLink>
-            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" title="Resolve — clear all errors and error history for this account" :disabled="resolvingErrors" @click="resolveErrors">
+            <UiButton v-if="!readonly" type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" title="Resolve — clear all errors and error history for this account" :disabled="resolvingErrors" @click="resolveErrors">
               <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
             </UiButton>
           </div>

@@ -1,4 +1,4 @@
 import { searchModels } from "../../../services/models";
-import { requireUserId } from "../../../utils/api";
+import { requireReadableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => searchModels(await requireUserId(event)));
+export default defineEventHandler(async (event) => searchModels(await requireReadableUserId(event)));

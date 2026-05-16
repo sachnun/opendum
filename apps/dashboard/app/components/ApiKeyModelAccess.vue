@@ -8,6 +8,7 @@ const props = defineProps<{
   availableModels: string[];
   initialMode: AccessMode;
   initialModels: string[];
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -39,10 +40,12 @@ function getModeLabel(mode: AccessMode): string {
 }
 
 function setDraftMode(value: AccessMode) {
+  if (props.readonly) return;
   draftMode.value = value;
 }
 
 function toggleModel(modelId: string) {
+  if (props.readonly) return;
   draftModels.value = draftModels.value.includes(modelId)
     ? draftModels.value.filter((model) => model !== modelId)
     : normalizeModels([...draftModels.value, modelId]);
@@ -57,6 +60,7 @@ function resetDraftState() {
 }
 
 async function save() {
+  if (props.readonly) return;
   const modelsForSave = draftMode.value === "all" ? [] : normalizedDraftModels.value;
   if (draftMode.value !== "all" && modelsForSave.length === 0) {
     errorMessage.value = "Select at least one model";
@@ -103,7 +107,7 @@ const filteredModels = computed(() => {
 
     <div class="flex-1 space-y-3 lg:mt-5">
       <div class="grid grid-cols-3 gap-1 rounded-md border border-input bg-input/30 p-1">
-        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="setDraftMode(mode as AccessMode)">
+        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="setDraftMode(mode as AccessMode)">
           {{ mode === 'all' ? 'All' : mode === 'whitelist' ? 'Whitelist' : 'Blacklist' }}
         </button>
       </div>
@@ -111,11 +115,11 @@ const filteredModels = computed(() => {
       <div v-if="draftMode !== 'all'" class="space-y-2">
         <div class="flex items-center justify-between gap-2">
           <p class="text-xs font-medium">Models</p>
-          <UiButton type="button" variant="ghost" size="sm" class="h-7 px-2 text-[11px]" :disabled="normalizedDraftModels.length === 0 || isSaving" @click="draftModels = []">Clear</UiButton>
+          <UiButton type="button" variant="ghost" size="sm" class="h-7 px-2 text-[11px]" :disabled="normalizedDraftModels.length === 0 || isSaving || readonly" @click="draftModels = []">Clear</UiButton>
         </div>
 
         <UiPopover v-model:open="modelPickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
-          <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving">
+          <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving || readonly">
             <span class="truncate">{{ normalizedDraftModels.length > 0 ? `${normalizedDraftModels.length} model selected` : 'Select models' }}</span>
             <UiIcon name="i-lucide-chevron-down" class="size-3.5 text-muted-foreground" />
           </UiButton>
@@ -124,7 +128,7 @@ const filteredModels = computed(() => {
               <input v-model="modelSearch" placeholder="Search model..." class="h-8 w-full rounded-md bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
-              <button v-for="modelId in filteredModels" :key="modelId" type="button" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent" @click="toggleModel(modelId)">
+              <button v-for="modelId in filteredModels" :key="modelId" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-60" @click="toggleModel(modelId)">
                 <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftModels.includes(modelId) ? 'opacity-100' : 'opacity-0']" />
                 <span class="truncate font-mono text-[11px]">{{ modelId }}</span>
               </button>
@@ -138,7 +142,7 @@ const filteredModels = computed(() => {
           <div v-else class="flex flex-wrap gap-1.5">
             <UiBadge v-for="modelId in normalizedDraftModels" :key="modelId" variant="outline" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate font-mono">{{ modelId }}</span>
-              <button type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleModel(modelId)">
+              <button v-if="!readonly" type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleModel(modelId)">
                 <UiIcon name="i-lucide-x" class="size-2.5" />
               </button>
             </UiBadge>
@@ -149,8 +153,8 @@ const filteredModels = computed(() => {
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraftState"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
-      <UiButton size="sm" :disabled="isSaving || !hasChanges" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraftState"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
+      <UiButton size="sm" :disabled="isSaving || !hasChanges || readonly" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>
 </template>

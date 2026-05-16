@@ -42,6 +42,7 @@ interface Scenario {
 }
 
 const dashboardApi = useDashboardApi();
+const { isAuditMode } = useDashboardAudit();
 const dashboardInvalidation = useDashboardDataInvalidation();
 const route = useRoute();
 
@@ -221,9 +222,10 @@ const activePresetModelIds = computed(() => {
 const maxPanels = computed(() => Math.max(filteredModels.value.length, providerPresets.value.reduce((total, preset) => total + preset.panels.length, 0), 1));
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
-const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value));
+const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value && !isAuditMode.value));
 const isAnyLoading = computed(() => Object.values(responses.value).some((response) => response.isLoading));
 const playgroundSetupMessage = computed(() => {
+  if (isAuditMode.value) return "Playground is disabled in audit mode.";
   if (!hasAnyProviderAccount.value) return "Connect a provider account before running Playground.";
   if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
   if (providerAccounts.value.length === 0) return "Enable at least one provider account before running Playground.";

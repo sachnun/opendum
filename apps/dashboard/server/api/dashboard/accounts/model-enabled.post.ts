@@ -1,4 +1,4 @@
 import { setAccountModelEnabled, setAccountModelEnabledInputSchema } from "../../../services/accounts";
-import { readDashboardBody, requireUserId } from "../../../utils/api";
+import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => setAccountModelEnabled(await requireUserId(event), await readDashboardBody(event, setAccountModelEnabledInputSchema)));
+export default defineEventHandler(async (event) => setAccountModelEnabled(await requireWritableUserId(event), await readDashboardBody(event, setAccountModelEnabledInputSchema)));

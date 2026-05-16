@@ -6,6 +6,7 @@ import type { DateValue } from "reka-ui";
 const props = defineProps<{
   apiKeyId: string;
   initialExpiresAt: string | Date | null;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -57,6 +58,7 @@ function isPastOrToday(value: DateValue): boolean {
 }
 
 async function saveExpiration(value: Date | null) {
+  if (props.readonly) return;
   isSaving.value = true;
   errorMessage.value = "";
   try {
@@ -81,7 +83,7 @@ async function saveExpiration(value: Date | null) {
         'inline-flex cursor-pointer items-center gap-1 text-sm transition-colors hover:text-primary disabled:pointer-events-none disabled:opacity-50',
         isExpired ? 'text-destructive' : 'text-muted-foreground',
       ]"
-      :disabled="isSaving"
+      :disabled="isSaving || readonly"
     >
       <UiIcon name="i-lucide-calendar" class="size-3" />
       <span>{{ displayText }}</span>

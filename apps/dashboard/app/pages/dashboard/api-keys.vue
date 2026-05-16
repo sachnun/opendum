@@ -2,6 +2,7 @@
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const dashboardApi = useDashboardApi();
+const { isAuditMode } = useDashboardAudit();
 const dashboardInvalidation = useDashboardDataInvalidation();
 const config = useRuntimeConfig();
 
@@ -136,6 +137,7 @@ function deleteApiKey(apiKeyId: string) {
 }
 
 async function toggleApiKey(apiKey: ApiKeyListItem) {
+  if (isAuditMode.value) return;
   if (togglingApiKeyIds.value.has(apiKey.id)) return;
 
   const nextTogglingIds = new Set(togglingApiKeyIds.value);
@@ -198,7 +200,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
           <h2 class="text-xl font-semibold">API Keys</h2>
           <UiBadge variant="outline">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
         </div>
-        <CreateApiKeyButton trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
+        <CreateApiKeyButton v-if="!isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
       </div>
     </div>
 
@@ -220,7 +222,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
     <section v-if="apiKeys.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="space-y-3 pt-1">
         <p class="text-sm text-muted-foreground">No API keys created yet.</p>
-        <CreateApiKeyButton @created="refresh" />
+        <CreateApiKeyButton v-if="!isAuditMode" @created="refresh" />
       </div>
     </section>
 
@@ -235,13 +237,13 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
           <UiCardHeader class="pb-1">
             <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <div class="min-w-0 overflow-hidden">
-                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" @updated="updateApiKeyPatch(apiKey.id, $event)" />
+                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" :readonly="isAuditMode" @updated="updateApiKeyPatch(apiKey.id, $event)" />
               </div>
               <div class="flex h-7 shrink-0 items-center justify-end gap-1.5">
                 <span class="text-[11px] leading-none text-muted-foreground">{{ isApiKeyEffectivelyActive(apiKey) ? 'On' : 'Off' }}</span>
                 <UiSwitch
                   :model-value="isApiKeyEffectivelyActive(apiKey)"
-                  :disabled="togglingApiKeyIds.has(apiKey.id)"
+                  :disabled="togglingApiKeyIds.has(apiKey.id) || isAuditMode"
                   :title="isApiKeyEffectivelyActive(apiKey) ? 'Disable key' : 'Enable key'"
                   @update:model-value="toggleApiKey(apiKey)"
                 />
@@ -259,7 +261,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
 
           <UiCardContent class="flex flex-1 flex-col pt-0">
             <div class="flex-1 space-y-3 text-sm">
-              <ApiKeyActions :api-key="apiKey" @renamed="updateApiKeyPatch(apiKey.id, $event)" @deleted="deleteApiKey" />
+              <ApiKeyActions :api-key="apiKey" :readonly="isAuditMode" @renamed="updateApiKeyPatch(apiKey.id, $event)" @deleted="deleteApiKey" />
 
               <div class="space-y-2">
                 <div class="flex justify-between gap-4">
@@ -269,7 +271,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                 <div class="flex items-center justify-between gap-4">
                   <span class="text-muted-foreground">Expiration</span>
                   <div class="text-right">
-                    <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" @updated="updateApiKeyPatch(apiKey.id, $event)" />
+                    <ApiKeyExpiration :api-key-id="apiKey.id" :initial-expires-at="apiKey.expiresAt" :readonly="isAuditMode" @updated="updateApiKeyPatch(apiKey.id, $event)" />
                   </div>
                 </div>
                 <div class="flex justify-between gap-4">
@@ -285,6 +287,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                     :available-models="options?.availableModels ?? []"
                     :initial-mode="normalizeModelAccessMode(apiKey.modelAccessMode)"
                     :initial-models="apiKey.modelAccessList"
+                    :readonly="isAuditMode"
                     @updated="updateApiKeyModelAccess(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
@@ -295,6 +298,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                     :available-accounts="options?.providerAccounts ?? []"
                     :initial-mode="normalizeAccountAccessMode(apiKey.accountAccessMode)"
                     :initial-accounts="apiKey.accountAccessList"
+                    :readonly="isAuditMode"
                     @updated="updateApiKeyAccountAccess(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>
@@ -305,6 +309,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                     :available-models="options?.availableModels ?? []"
                     :available-families="options?.availableFamilies ?? []"
                     :initial-rules="keyRateLimits(apiKey.id)"
+                    :readonly="isAuditMode"
                     @updated="updateApiKeyRateLimits(apiKey.id, $event)"
                   />
                 </ApiKeyAccessSection>

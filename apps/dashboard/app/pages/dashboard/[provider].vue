@@ -10,6 +10,7 @@ definePageMeta({
 
 const route = useRoute();
 const dashboardApi = useDashboardApi();
+const { isAuditMode } = useDashboardAudit();
 const dashboardInvalidation = useDashboardDataInvalidation();
 const selectedProvider = computed<ProviderAccountKey>(() => getProviderFromSlug(String(route.params.provider))!);
 const providerMeta = computed(() => BY_KEY[selectedProvider.value]);
@@ -226,6 +227,7 @@ function quotaBarColor(group: QuotaSummaryGroup): string {
 }
 
 function handleQuotaRefresh(accountId: string) {
+  if (isAuditMode.value) return;
   const account = accounts.value.find((account) => account.id === accountId);
   if (account) loadAccountQuota(account, true);
 }
@@ -256,6 +258,7 @@ watch(
     previousQuotaProvider = selectedProvider.value;
 
     if (accountsToFetch.length === 0) return;
+    if (isAuditMode.value) return;
 
     let cancelled = false;
     const quotaLoadTimer = setTimeout(() => {
@@ -313,7 +316,7 @@ function decodeAccountHash(hash: string): string | null {
       <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
           <ProviderPinButton
-            v-if="providerMeta"
+            v-if="providerMeta && !isAuditMode"
             :provider-key="providerMeta.key"
             :pinned="pinnedProviders.has(providerMeta.key)"
           />
@@ -322,7 +325,7 @@ function decodeAccountHash(hash: string): string | null {
         </h2>
         <div class="flex w-full items-center sm:w-auto">
           <AddAccountDialog
-            v-if="providerMeta"
+            v-if="providerMeta && !isAuditMode"
             :initial-provider="providerMeta.key"
             trigger-class="flex-1 sm:w-auto sm:flex-none"
           />
@@ -398,6 +401,7 @@ function decodeAccountHash(hash: string): string | null {
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
           :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"
           :highlight="highlightedAccountIds.has(account.id)"
+          :readonly="isAuditMode"
           @renamed="handleAccountRenamed"
           @active-updated="handleAccountActiveUpdated"
           @temporarily-disabled="handleAccountActiveUpdated"

@@ -4,6 +4,7 @@ import { PROVIDER_ACCOUNT_DEFINITIONS, type ProviderAccountKey } from "../../../
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const dashboardApi = useDashboardApi();
+const { isAuditMode } = useDashboardAudit();
 
 const dashboardInvalidation = useDashboardDataInvalidation();
 
@@ -38,7 +39,7 @@ function refreshAccountsOverview() {
           Provider Accounts
         </h2>
         <div class="flex w-full items-center sm:w-auto">
-          <AddAccountDialog trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
+          <AddAccountDialog v-if="!isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
         </div>
       </div>
     </div>
@@ -51,7 +52,7 @@ function refreshAccountsOverview() {
       description="Connect your first provider account to start routing requests through Opendum."
       icon="i-lucide-user-plus"
     >
-      <AddAccountDialog @connected="refreshAccountsOverview" />
+      <AddAccountDialog v-if="!isAuditMode" @connected="refreshAccountsOverview" />
     </DashboardEmptyState>
     <div v-else-if="summaries" class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
       <ProviderOverviewCard
@@ -60,6 +61,7 @@ function refreshAccountsOverview() {
         :provider="provider"
         :summary="providerSummary(provider.key)!"
         :pinned="pinnedProviders.has(provider.key)"
+        :readonly="isAuditMode"
       />
     </div>
   </div>

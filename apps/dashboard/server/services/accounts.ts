@@ -26,6 +26,10 @@ type AccountSummarySourceRow = {
   lastRecoveredByRotationAt: Date | string | null;
 };
 
+interface AccountReadOptions {
+  autoPin?: boolean;
+}
+
 export const providerInputSchema = z.object({
   provider: z.string().refine(isKnownProvider, "Invalid provider"),
 });
@@ -111,10 +115,10 @@ function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], now = ne
   return summaries;
 }
 
-async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>): Promise<ProviderAccountKey[]> {
+async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>, options: AccountReadOptions = {}): Promise<ProviderAccountKey[]> {
   const rows = await db.select({ providerKey: pinnedProvider.providerKey }).from(pinnedProvider).where(eq(pinnedProvider.userId, userId)).orderBy(asc(pinnedProvider.createdAt));
 
-  if (rows.length === 0 && providersWithAccounts) {
+  if (rows.length === 0 && providersWithAccounts && options.autoPin !== false) {
     const providerSet = new Set(providersWithAccounts);
     const autoPinKeys = PROVIDER_ACCOUNT_KEYS.filter((provider) => providerSet.has(provider)).slice(0, 5);
     const rowsToInsert = [
@@ -154,7 +158,7 @@ export async function listAccountsByProvider(userId: string, input: z.infer<type
   }
 }
 
-export async function getAccountOverview(userId: string) {
+export async function getAccountOverview(userId: string, options: AccountReadOptions = {}) {
   try {
     const now = new Date();
     const [accounts, providerStats] = await Promise.all([
@@ -172,7 +176,7 @@ export async function getAccountOverview(userId: string) {
         .where(eq(providerAccount.userId, userId)),
       getProviderSummaryStats(userId),
     ]);
-    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider));
+    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options);
     const pingSummaries = buildAccountPingSummaries(accounts, now);
 
     const summaries = Object.fromEntries(
@@ -192,7 +196,7 @@ export async function getAccountOverview(userId: string) {
   }
 }
 
-export async function getAccountPing(userId: string) {
+export async function getAccountPing(userId: string, options: AccountReadOptions = {}) {
   try {
     const now = new Date();
     const accounts = await db
@@ -207,7 +211,7 @@ export async function getAccountPing(userId: string) {
       })
       .from(providerAccount)
       .where(eq(providerAccount.userId, userId));
-    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider));
+    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options);
     const pingSummaries = buildAccountPingSummaries(accounts, now);
 
     return {

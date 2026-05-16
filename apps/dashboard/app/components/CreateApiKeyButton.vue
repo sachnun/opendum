@@ -4,9 +4,11 @@ import { cn } from "../../lib/utils";
 const props = withDefaults(
   defineProps<{
     triggerClass?: string;
+    readonly?: boolean;
   }>(),
   {
     triggerClass: "",
+    readonly: false,
   }
 );
 
@@ -40,6 +42,7 @@ watch(open, (value) => {
 });
 
 async function createKey() {
+  if (props.readonly) return;
   isCreating.value = true;
   errorMessage.value = "";
   try {
@@ -67,7 +70,7 @@ function closeDialog() {
 </script>
 
 <template>
-  <UiButton variant="outline" :class="cn('gap-2', props.triggerClass)" @click="open = true">
+  <UiButton variant="outline" :class="cn('gap-2', props.triggerClass)" :disabled="readonly" @click="open = true">
     <UiIcon name="i-lucide-plus" class="size-4" />
     Create API Key
   </UiButton>

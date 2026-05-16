@@ -1,4 +1,7 @@
 import { getAccountOverview } from "../../../services/accounts";
-import { requireUserId } from "../../../utils/api";
+import { requireReadableDashboardContext } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => getAccountOverview(await requireUserId(event)));
+export default defineEventHandler(async (event) => {
+  const context = await requireReadableDashboardContext(event);
+  return getAccountOverview(context.userId, { autoPin: !context.isAuditMode });
+});

@@ -1,4 +1,4 @@
 import { listAccounts } from "../../../services/accounts";
-import { requireUserId } from "../../../utils/api";
+import { requireReadableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => listAccounts(await requireUserId(event)));
+export default defineEventHandler(async (event) => listAccounts(await requireReadableUserId(event)));

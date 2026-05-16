@@ -5,6 +5,7 @@ import type {
   AnalyticsData,
   AnalyticsFilter,
   DashboardMeData,
+  MaintenerAuditUser,
   ApiKeyListItem,
   ApiKeyOptions,
   ErrorHistoryResult,
@@ -83,6 +84,15 @@ export function useDashboardApi() {
     playground: {
       options: () => dashboardFetch<PlaygroundOptions>("/api/dashboard/playground/options"),
       auth: (body: { endpoint: PlaygroundEndpoint }) => post<PlaygroundProxyAuth>(dashboardFetch, "/api/dashboard/playground/auth", body),
+    },
+    maintener: {
+      users: {
+        search: (query: { q: string }) => dashboardFetch<MaintenerAuditUser[]>("/api/dashboard/maintener/users/search", { query }),
+      },
+      audit: {
+        start: (body: { userId: string }) => post<ActionResult<{ user: MaintenerAuditUser }>>(dashboardFetch, "/api/dashboard/maintener/audit/start", body),
+        stop: () => post<ActionResult>(dashboardFetch, "/api/dashboard/maintener/audit/stop"),
+      },
     },
   };
 }

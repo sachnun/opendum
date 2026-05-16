@@ -1,4 +1,4 @@
 import { getAnalyticsOverview } from "../../../services/analytics";
-import { requireUserId } from "../../../utils/api";
+import { requireReadableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => getAnalyticsOverview(await requireUserId(event)));
+export default defineEventHandler(async (event) => getAnalyticsOverview(await requireReadableUserId(event)));

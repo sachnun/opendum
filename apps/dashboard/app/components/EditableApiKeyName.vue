@@ -5,6 +5,7 @@ const props = withDefaults(
     name: string | null;
     showTitle?: boolean;
     showEditButton?: boolean;
+    readonly?: boolean;
   }>(),
   {
     showTitle: true,
@@ -30,6 +31,7 @@ watch(editDialogOpen, (open) => {
 });
 
 async function updateName() {
+  if (props.readonly) return;
   isUpdating.value = true;
   errorMessage.value = "";
   try {
@@ -48,7 +50,7 @@ async function updateName() {
 <template>
   <div class="flex min-w-0 items-center gap-1.5">
     <span v-if="showTitle" class="min-w-0 truncate text-lg font-semibold">{{ name ?? 'Unnamed key' }}</span>
-    <UiButton v-if="showEditButton" variant="outline" size="icon-sm" class="h-8 w-8" title="Edit name" @click="editDialogOpen = true">
+    <UiButton v-if="showEditButton && !readonly" variant="outline" size="icon-sm" class="h-8 w-8" title="Edit name" @click="editDialogOpen = true">
       <UiIcon name="i-lucide-pencil" class="size-4" />
     </UiButton>
   </div>

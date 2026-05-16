@@ -5,6 +5,7 @@ import { cn } from "../../lib/utils";
 const props = defineProps<{
   providerKey: ProviderAccountKey;
   pinned: boolean;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -26,6 +27,7 @@ watch(
 async function togglePin(event: Event) {
   event.preventDefault();
   event.stopPropagation();
+  if (props.readonly) return;
 
   const previous = localPinned.value;
   localPinned.value = !previous;
@@ -51,7 +53,7 @@ async function togglePin(event: Event) {
       'cursor-pointer rounded-md p-1 transition-colors disabled:pointer-events-none disabled:opacity-50',
       localPinned ? 'text-foreground hover:text-muted-foreground' : 'text-muted-foreground/40 hover:text-muted-foreground',
     )"
-    :disabled="pending"
+    :disabled="pending || readonly"
     :title="localPinned ? 'Unpin from sidebar' : 'Pin to sidebar'"
     @click="togglePin"
   >

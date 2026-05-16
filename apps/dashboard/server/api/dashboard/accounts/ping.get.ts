@@ -1,4 +1,7 @@
 import { getAccountPing } from "../../../services/accounts";
-import { requireUserId } from "../../../utils/api";
+import { requireReadableDashboardContext } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => getAccountPing(await requireUserId(event)));
+export default defineEventHandler(async (event) => {
+  const context = await requireReadableDashboardContext(event);
+  return getAccountPing(context.userId, { autoPin: !context.isAuditMode });
+});

@@ -1,4 +1,4 @@
 import { updateApiKeyName, updateApiKeyNameInputSchema } from "../../../services/api-keys";
-import { readDashboardBody, requireUserId } from "../../../utils/api";
+import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => updateApiKeyName(await requireUserId(event), await readDashboardBody(event, updateApiKeyNameInputSchema)));
+export default defineEventHandler(async (event) => updateApiKeyName(await requireWritableUserId(event), await readDashboardBody(event, updateApiKeyNameInputSchema)));

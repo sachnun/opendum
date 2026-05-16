@@ -19,10 +19,12 @@ const props = withDefaults(
   defineProps<{
     initialProvider?: Provider | null;
     triggerClass?: string;
+    readonly?: boolean;
   }>(),
   {
     initialProvider: null,
     triggerClass: "",
+    readonly: false,
   }
 );
 
@@ -97,6 +99,7 @@ watch(open, (value) => {
 });
 
 watch([open, step, provider], async () => {
+  if (props.readonly) return;
   if (!open.value || step.value !== 2 || !provider.value || !selectedConfig.value) return;
 
   errorMessage.value = "";
@@ -193,6 +196,7 @@ function finishConnection(result: { email: string; isUpdate: boolean }) {
 }
 
 function selectProvider(providerKey: Provider) {
+  if (props.readonly) return;
   provider.value = providerKey;
   step.value = 2;
 }
@@ -332,6 +336,7 @@ function startDevicePolling(popup: Window | null) {
 }
 
 async function handleConnectApiKey() {
+  if (props.readonly) return;
   if (!provider.value || !selectedConfig.value) return;
 
   errorMessage.value = "";
@@ -358,6 +363,7 @@ async function handleConnectApiKey() {
 }
 
 async function handleExchangeOAuth() {
+  if (props.readonly) return;
   if (!provider.value) return;
 
   errorMessage.value = "";
@@ -406,7 +412,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <UiButton variant="outline" :class="cn('gap-2', triggerClass)" @click="open = true">
+  <UiButton variant="outline" :class="cn('gap-2', triggerClass)" :disabled="readonly" @click="open = true">
     <UiIcon name="i-lucide-plus" class="size-4" />
     Add Account
   </UiButton>

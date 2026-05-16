@@ -1,12 +1,16 @@
-import { getDashboardRoleForEmail } from "../../utils/maintainers";
-import { requireSession } from "../../utils/session";
+import { requireDashboardContext } from "../../utils/api";
 
 export default defineEventHandler(async (event) => {
-  const session = await requireSession(event);
-  const role = getDashboardRoleForEmail(session.user.email);
+  const context = await requireDashboardContext(event);
 
   return {
-    role,
-    isMaintener: role === "maintener",
+    role: context.role,
+    isMaintener: context.isMaintener,
+    actor: context.actor,
+    audit: {
+      active: context.isAuditMode,
+      readonly: context.isAuditMode,
+      user: context.auditUser,
+    },
   };
 });

@@ -20,6 +20,7 @@ const props = defineProps<{
   availableModels: string[];
   availableFamilies: string[];
   initialRules: RateLimitRuleInput[];
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -59,6 +60,7 @@ function resetDraft() {
 }
 
 function addRule(target: string) {
+  if (props.readonly) return;
   if (usedTargets.value.has(`${addMode.value}:${target}`)) return;
   draftRules.value = [...draftRules.value, { target, targetType: addMode.value, perMinute: "", perHour: "", perDay: "" }];
   pickerOpen.value = false;
@@ -66,15 +68,18 @@ function addRule(target: string) {
 }
 
 function removeRule(index: number) {
+  if (props.readonly) return;
   draftRules.value = draftRules.value.filter((_, ruleIndex) => ruleIndex !== index);
 }
 
 function updateRule(index: number, field: "perMinute" | "perHour" | "perDay", value: string) {
+  if (props.readonly) return;
   if (value !== "" && !/^\d+$/.test(value)) return;
   draftRules.value = draftRules.value.map((rule, ruleIndex) => (ruleIndex === index ? { ...rule, [field]: value } : rule));
 }
 
 async function save() {
+  if (props.readonly) return;
   const rules = draftRules.value.map(stateToRule);
   for (const rule of rules) {
     if (rule.perMinute == null && rule.perHour == null && rule.perDay == null) {
@@ -131,14 +136,14 @@ const pickerItems = computed(() => {
               <UiBadge variant="outline" class="shrink-0 text-[10px]">{{ rule.targetType === 'family' ? 'Family' : 'Model' }}</UiBadge>
               <span class="truncate font-mono text-xs">{{ rule.target }}</span>
             </div>
-            <UiButton variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving" @click="removeRule(index)">
+            <UiButton v-if="!readonly" variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving" @click="removeRule(index)">
               <UiIcon name="i-lucide-trash-2" class="size-3.5" />
             </UiButton>
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2">
-            <label class="text-[10px] text-muted-foreground">/ minute<input :value="rule.perMinute" placeholder="--" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="updateRule(index, 'perMinute', ($event.target as HTMLInputElement).value)"></label>
-            <label class="text-[10px] text-muted-foreground">/ hour<input :value="rule.perHour" placeholder="--" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="updateRule(index, 'perHour', ($event.target as HTMLInputElement).value)"></label>
-            <label class="text-[10px] text-muted-foreground">/ day<input :value="rule.perDay" placeholder="--" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="updateRule(index, 'perDay', ($event.target as HTMLInputElement).value)"></label>
+            <label class="text-[10px] text-muted-foreground">/ minute<input :value="rule.perMinute" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" @input="updateRule(index, 'perMinute', ($event.target as HTMLInputElement).value)"></label>
+            <label class="text-[10px] text-muted-foreground">/ hour<input :value="rule.perHour" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" @input="updateRule(index, 'perHour', ($event.target as HTMLInputElement).value)"></label>
+            <label class="text-[10px] text-muted-foreground">/ day<input :value="rule.perDay" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" @input="updateRule(index, 'perDay', ($event.target as HTMLInputElement).value)"></label>
           </div>
         </div>
       </div>
@@ -147,13 +152,13 @@ const pickerItems = computed(() => {
         <div class="flex items-center justify-between gap-2">
           <p class="text-xs font-medium">Add rule</p>
           <div class="grid grid-cols-2 gap-1 rounded-md border border-input bg-input/30 p-1">
-            <button type="button" :class="['h-7 rounded-sm px-2 text-[11px] font-medium', addMode === 'model' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'model'; pickerOpen = false">Model</button>
-            <button type="button" :class="['h-7 rounded-sm px-2 text-[11px] font-medium', addMode === 'family' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'family'; pickerOpen = false">Family</button>
+            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:pointer-events-none disabled:opacity-60', addMode === 'model' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'model'; pickerOpen = false">Model</button>
+            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:pointer-events-none disabled:opacity-60', addMode === 'family' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'family'; pickerOpen = false">Family</button>
           </div>
         </div>
 
         <UiPopover v-model:open="pickerOpen" :content="{ align: 'start', class: 'w-[min(90vw,28rem)] p-0' }">
-          <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving || pickerItems.length === 0">
+          <UiButton variant="outline" class="h-9 w-full justify-between px-3 text-xs" :disabled="isSaving || pickerItems.length === 0 || readonly">
             <span class="flex items-center gap-1.5 text-muted-foreground">
               <UiIcon name="i-lucide-plus" class="size-3.5" />
               {{ pickerItems.length === 0 ? `No ${addMode} left to add` : `Select ${addMode === 'model' ? 'model' : 'family'}` }}
@@ -165,7 +170,7 @@ const pickerItems = computed(() => {
               <input v-model="search" :placeholder="`Search ${addMode}...`" class="h-8 w-full rounded-md bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
-              <button v-for="item in pickerItems" :key="item" type="button" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent" @click="addRule(item)">
+              <button v-for="item in pickerItems" :key="item" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-60" @click="addRule(item)">
                 <span class="truncate font-mono text-[11px]">{{ item }}</span>
               </button>
               <p v-if="pickerItems.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No {{ addMode }} found.</p>
@@ -177,8 +182,8 @@ const pickerItems = computed(() => {
     </div>
 
     <div class="flex items-center justify-end gap-2 border-t border-border/60 pt-3 lg:mt-4">
-      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges" @click="resetDraft"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
-      <UiButton size="sm" :disabled="isSaving || !hasChanges" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
+      <UiButton variant="outline" size="sm" :disabled="isSaving || !hasChanges || readonly" @click="resetDraft"><UiIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reset</UiButton>
+      <UiButton size="sm" :disabled="isSaving || !hasChanges || readonly" @click="save">{{ isSaving ? 'Saving...' : 'Save' }}</UiButton>
     </div>
   </section>
 </template>

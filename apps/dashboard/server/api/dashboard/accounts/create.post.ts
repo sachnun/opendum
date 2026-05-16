@@ -1,4 +1,4 @@
 import { createAccount, createAccountInputSchema } from "../../../services/accounts";
-import { readDashboardBody, requireUserId } from "../../../utils/api";
+import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => createAccount(await requireUserId(event), await readDashboardBody(event, createAccountInputSchema)));
+export default defineEventHandler(async (event) => createAccount(await requireWritableUserId(event), await readDashboardBody(event, createAccountInputSchema)));
