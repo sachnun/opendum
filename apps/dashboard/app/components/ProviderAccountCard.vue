@@ -1107,8 +1107,8 @@ function cancelErrorPreviewPointer() {
 
           <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" :readonly="readonly" />
         </div>
-        <div v-if="!readonly" class="mt-4 flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
+        <div class="mt-4 flex items-center justify-between gap-2">
+          <div v-if="!readonly" class="flex items-center gap-2">
             <UiButton variant="outline" size="sm" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
             <UiButton variant="outline" size="sm" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
             <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
@@ -1119,8 +1119,8 @@ function cancelErrorPreviewPointer() {
             <span class="max-w-32 truncate text-[11px] text-muted-foreground" :title="accountStatusTitle">{{ accountStatusLabel }}</span>
             <UiSwitch
               :model-value="account.isActive"
-              :disabled="isToggling || isTemporaryDisabling"
-              :title="account.isActive ? 'Disable account. Hold to choose duration.' : 'Enable account'"
+              :disabled="readonly || isToggling || isTemporaryDisabling"
+              :title="readonly ? 'Audit mode is read-only' : account.isActive ? 'Disable account. Hold to choose duration.' : 'Enable account'"
               @pointerdown="startTemporaryOffLongPress"
               @pointerup="finishTemporaryOffLongPress"
               @pointerleave="finishTemporaryOffLongPress"

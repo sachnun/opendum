@@ -81,6 +81,13 @@ watch(
     const knownAccountIds = new Set(Object.keys(currentOrder));
     const newAccounts = orderedAccounts.filter((account) => !knownAccountIds.has(account.id));
     if (newAccounts.length === 0) return;
+    if (newAccounts.length === orderedAccounts.length) {
+      accountDisplayOrder.value = Object.fromEntries(
+        orderedAccounts.map((account, index) => [account.id, index])
+      );
+      highlightedAccountIds.value = new Set();
+      return;
+    }
 
     accountDisplayOrder.value = Object.fromEntries([
       ...newAccounts.map((account, index) => [account.id, index] as const),
