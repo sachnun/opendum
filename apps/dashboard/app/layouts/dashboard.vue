@@ -578,6 +578,7 @@ async function handleAuditSelected() {
             <UiPopover v-model:open="userMenuOpen" :content="{ align: 'end', sideOffset: 8 }">
               <button
                 type="button"
+                aria-label="Open account menu"
                 class="flex cursor-pointer items-center justify-center rounded-full transition-opacity hover:opacity-80"
               >
                 <span class="relative flex size-8 shrink-0 select-none">
