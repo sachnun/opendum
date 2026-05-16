@@ -38,7 +38,7 @@ function refreshAccountsOverview() {
           Provider Accounts
         </h2>
         <div class="flex w-full items-center sm:w-auto">
-          <AddAccountDialog v-if="!isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
+          <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
         </div>
       </div>
     </div>

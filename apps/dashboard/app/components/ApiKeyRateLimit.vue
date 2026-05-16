@@ -136,7 +136,7 @@ const pickerItems = computed(() => {
               <UiBadge variant="outline" class="shrink-0 text-[10px]">{{ rule.targetType === 'family' ? 'Family' : 'Model' }}</UiBadge>
               <span class="truncate font-mono text-xs">{{ rule.target }}</span>
             </div>
-            <UiButton v-if="!readonly" variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving" @click="removeRule(index)">
+            <UiButton variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving || readonly" @click="removeRule(index)">
               <UiIcon name="i-lucide-trash-2" class="size-3.5" />
             </UiButton>
           </div>

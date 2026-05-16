@@ -156,7 +156,7 @@ const filteredAccounts = computed(() => {
           <div v-else class="flex flex-wrap gap-1.5">
             <UiBadge v-for="accountId in normalizedDraftAccounts" :key="accountId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate">{{ accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId }}</span>
-              <button v-if="!readonly" type="button" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" @click="toggleAccount(accountId)">
+              <button type="button" :disabled="readonly" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(accountId)">
                 <UiIcon name="i-lucide-x" class="size-2.5" />
               </button>
             </UiBadge>

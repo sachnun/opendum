@@ -585,9 +585,10 @@ async function handleAuditSelected() {
                   </div>
                   <div class="-mx-1 my-1 h-px bg-border" />
                   <button
-                    v-if="isMaintener && !isAuditMode"
+                    v-if="isMaintener"
                     type="button"
-                    class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                    :disabled="isAuditMode"
+                    class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
                     @click="openAuditDialog"
                   >
                     Audit user

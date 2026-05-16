@@ -105,12 +105,12 @@ async function deleteKey() {
 
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
-          <UiButton v-if="!readonly" variant="outline" size="icon-sm" class="h-8 w-8" title="Delete key" @click="deleteDialogOpen = true">
+          <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="readonly" title="Delete key" @click="deleteDialogOpen = true">
             <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
           </UiButton>
           <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" :readonly="readonly" @updated="emit('renamed', $event)" />
         </div>
-        <UiButton v-if="!readonly" variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading" title="Copy key" @click="copyKey">
+        <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="isLoading || readonly" title="Copy key" @click="copyKey">
           <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" :class="['size-4', copied ? 'text-green-500' : '']" />
         </UiButton>
       </div>

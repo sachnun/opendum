@@ -1107,11 +1107,11 @@ function cancelErrorPreviewPointer() {
           <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" :readonly="readonly" />
         </div>
         <div class="mt-4 flex items-center justify-between gap-2">
-          <div v-if="!readonly" class="flex items-center gap-2">
-            <UiButton variant="outline" size="sm" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
-            <UiButton variant="outline" size="sm" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
-            <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
-              <UiButton variant="outline" size="sm" title="Open in Playground"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
+          <div class="flex items-center gap-2">
+            <UiButton variant="outline" size="sm" :disabled="readonly" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
+            <UiButton variant="outline" size="sm" :disabled="readonly" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
+            <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`" :class="readonly ? 'pointer-events-none' : ''" :aria-disabled="readonly">
+              <UiButton variant="outline" size="sm" :disabled="readonly" title="Open in Playground"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
             </NuxtLink>
           </div>
           <div class="flex shrink-0 items-center gap-1.5">
@@ -1119,7 +1119,7 @@ function cancelErrorPreviewPointer() {
             <UiSwitch
               :model-value="account.isActive"
               :disabled="readonly || isToggling || isTemporaryDisabling"
-              :title="readonly ? 'Audit mode is read-only' : account.isActive ? 'Disable account. Hold to choose duration.' : 'Enable account'"
+              :title="account.isActive ? 'Disable account. Hold to choose duration.' : 'Enable account'"
               @pointerdown="startTemporaryOffLongPress"
               @pointerup="finishTemporaryOffLongPress"
               @pointerleave="finishTemporaryOffLongPress"
@@ -1190,7 +1190,7 @@ function cancelErrorPreviewPointer() {
                 <UiIcon name="i-lucide-flask-conical" class="size-4" />
               </UiButton>
             </NuxtLink>
-            <UiButton v-if="!readonly" type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" title="Resolve — clear all errors and error history for this account" :disabled="resolvingErrors" @click="resolveErrors">
+            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" title="Resolve — clear all errors and error history for this account" :disabled="resolvingErrors || readonly" @click="resolveErrors">
               <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
             </UiButton>
           </div>

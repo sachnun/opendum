@@ -200,7 +200,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
           <h2 class="text-xl font-semibold">API Keys</h2>
           <UiBadge variant="outline">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
         </div>
-        <CreateApiKeyButton v-if="!isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
+        <CreateApiKeyButton :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
       </div>
     </div>
 
@@ -222,7 +222,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
     <section v-if="apiKeys.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="space-y-3 pt-1">
         <p class="text-sm text-muted-foreground">No API keys created yet.</p>
-        <CreateApiKeyButton v-if="!isAuditMode" @created="refresh" />
+        <CreateApiKeyButton :readonly="isAuditMode" @created="refresh" />
       </div>
     </section>
 
