@@ -238,8 +238,8 @@ function closeDetail() {
         >
           <div class="min-w-0 flex-1">
             <p class="truncate font-mono text-xs sm:text-sm">{{ model.id }}</p>
-            <div class="mt-1 flex flex-wrap gap-1">
-              <UiBadge v-for="provider in model.providers" :key="`${model.id}-${provider}`" variant="outline" class="text-[10px]">
+            <div class="mt-1 flex flex-wrap gap-1.5">
+              <UiBadge v-for="provider in model.providers" :key="`${model.id}-${provider}`" variant="outline" class="text-[10px] font-normal">
                 {{ getProviderLabel(provider) }}
               </UiBadge>
             </div>
@@ -269,8 +269,8 @@ function closeDetail() {
             </UiTooltip>
           </div>
 
-          <div class="flex flex-wrap items-center gap-1">
-            <UiBadge v-for="provider in detailModel.providers" :key="provider" variant="secondary" class="text-xs">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <UiBadge v-for="provider in detailModel.providers" :key="provider" variant="outline" class="text-[10px] font-normal">
               {{ getProviderLabel(provider) }}
             </UiBadge>
             <UiTooltip v-if="detailModel.isEnabled" text="Playground">
@@ -285,9 +285,11 @@ function closeDetail() {
             </UiTooltip>
           </div>
 
-          <ModelFeatureBadges :meta="detailModel.meta" />
-          <UiSkeleton v-if="isLoadingDetailStats" class="h-24 rounded-lg" />
-          <ModelStatsPanel v-else-if="detailModelStats" :stats="detailModelStats" :label="detailModel.id" compact />
+          <div class="space-y-3 pt-1">
+            <ModelFeatureBadges :meta="detailModel.meta" />
+            <UiSkeleton v-if="isLoadingDetailStats" class="h-24 rounded-lg" />
+            <ModelStatsPanel v-else-if="detailModelStats" :stats="detailModelStats" :label="detailModel.id" compact />
+          </div>
         </div>
       </template>
     </UiDialog>
