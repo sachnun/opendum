@@ -5,9 +5,10 @@ export type ModelSortEntry = string | { id?: string; name?: string; family?: str
 const FAMILY_ORDER = new Map<ModelFamily, number>(MODEL_FAMILY_SORT_ORDER.map((family, index) => [family, index]));
 
 const INFERRED_FAMILY_RULES: Array<{ test: RegExp; family: string }> = [
-  { test: /^gpt-|^gpt\d|^o\d|^grok-/, family: "OpenAI" },
+  { test: /^gpt-|^gpt\d|^o\d/, family: "OpenAI" },
   { test: /^claude-/, family: "Claude" },
   { test: /^gemini-/, family: "Gemini" },
+  { test: /^grok-/, family: "xAI" },
   { test: /^llama|^codellama/, family: "Meta" },
   { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, family: "Mistral" },
   { test: /^qwen|^qwq-/, family: "Qwen" },
@@ -128,8 +129,7 @@ function openAIModelLineRank(modelId: string): number {
   if (/^gpt-oss-/.test(normalized)) return 2;
   if (/^gpt-/.test(normalized)) return 0;
   if (/^o\d/.test(normalized)) return 1;
-  if (/^grok-/.test(normalized)) return 3;
-  return 4;
+  return 3;
 }
 
 function isGptOssModel(modelId: string): boolean {

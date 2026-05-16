@@ -3,9 +3,9 @@
     "copilot",
     "kilo_code"
   ],
-  "family": "OpenAI",
+  "family": "xAI",
   "meta": {
-    "reasoning": false,
+    "reasoning": true,
     "toolCall": true,
     "vision": false,
     "modalities": {

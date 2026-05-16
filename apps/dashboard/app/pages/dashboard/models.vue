@@ -87,6 +87,7 @@ function getFamilyAnchorId(family: string) {
   if (family === "Kimi") return "kimi-models";
   if (family === "MiniMax") return "minimax-models";
   if (family === "Xiaomi") return "xiaomi-models";
+  if (family === "xAI") return "xai-models";
   if (family === "Z.AI") return "zai-models";
   return "other-models";
 }

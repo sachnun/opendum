@@ -118,8 +118,9 @@ export function buildModelIndex(modelsDir) {
 
 const FAMILY_RULES = [
   { test: /^claude-/, folder: "claude" },
-  { test: /^gpt-|^grok-|^o\d/, folder: "openai" },
+  { test: /^gpt-|^o\d/, folder: "openai" },
   { test: /^gemini-/, folder: "gemini" },
+  { test: /^grok-/, folder: "xai" },
   { test: /^gemma/, folder: "google" },
   { test: /^llama|^codellama/, folder: "meta" },
   { test: /^phi-/, folder: "microsoft" },

@@ -9,6 +9,7 @@ const FEATURED_MODEL_FAMILIES = [
   "Kimi",
   "MiniMax",
   "Xiaomi",
+  "xAI",
   "Z.AI",
 ] as const;
 
@@ -26,6 +27,7 @@ const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   Kimi: "kimi-models",
   MiniMax: "minimax-models",
   Xiaomi: "xiaomi-models",
+  xAI: "xai-models",
   "Z.AI": "zai-models",
 };
 
