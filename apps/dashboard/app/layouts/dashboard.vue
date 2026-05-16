@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import type {
-  AccountPingData,
-  AccountOverviewData,
   ModelFamilyCounts,
   NavItem,
   NavSubItem,
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "../../lib/navigation";
+import type { AccountOverviewData, AccountPingData } from "../../lib/dashboard-api-types";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
 import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
@@ -63,7 +62,9 @@ const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
+const dashboardInvalidation = useDashboardDataInvalidation();
 const accountsNavigationHref = "/dashboard";
+const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dashboardInvalidation.keys.accountsOverview);
 
 const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
@@ -106,8 +107,12 @@ function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): 
   };
 }
 
-const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
-  const summary = await dashboardApi.accounts.ping();
+const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
+
+const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+  const useOverview = isProviderOverviewRoute.value;
+  const summary = useOverview ? await dashboardApi.accounts.overview() : await dashboardApi.accounts.ping();
+  if (useOverview) accountsOverviewData.value = summary as AccountOverviewData;
   return toShellAccountSummary(summary);
 });
 
@@ -120,6 +125,7 @@ const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders
 const hasConnectedAccounts = computed(() => accountSummaryData.value?.hasConnectedAccounts ?? emptyShellAccountSummary.hasConnectedAccounts);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
 const hasPinnedProviders = computed(() => pinnedProviders.value.length > 0);
+const shouldRefreshAccountSummary = computed(() => hasPinnedProviders.value || isProviderOverviewRoute.value);
 
 watch(accountSummaryData, (value) => {
   if (value) cachedPinnedProviders.value = value.pinnedProviders;
@@ -303,7 +309,7 @@ function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
 }
 
 async function refreshAccountSummaryOnce() {
-  if (!hasPinnedProviders.value) return;
+  if (!shouldRefreshAccountSummary.value) return;
 
   if (accountSummaryRefreshInFlight) {
     accountSummaryRefreshQueued = true;
@@ -315,7 +321,7 @@ async function refreshAccountSummaryOnce() {
     await accountSummaryRefreshInFlight;
   } finally {
     accountSummaryRefreshInFlight = null;
-    const shouldRefreshAgain = accountSummaryRefreshQueued && hasPinnedProviders.value;
+    const shouldRefreshAgain = accountSummaryRefreshQueued && shouldRefreshAccountSummary.value;
     accountSummaryRefreshQueued = false;
 
     if (shouldRefreshAgain) {
@@ -333,7 +339,7 @@ function stopAccountSummaryRefresh() {
 }
 
 function startAccountSummaryRefresh() {
-  if (accountSummaryRefreshTimer || !hasPinnedProviders.value) return;
+  if (accountSummaryRefreshTimer || !shouldRefreshAccountSummary.value) return;
 
   accountSummaryRefreshTimer = setInterval(() => {
     void refreshAccountSummaryOnce();
@@ -341,8 +347,8 @@ function startAccountSummaryRefresh() {
 }
 
 onMounted(() => {
-  watch(hasPinnedProviders, (hasPinned) => {
-    if (hasPinned) {
+  watch(shouldRefreshAccountSummary, (shouldRefresh) => {
+    if (shouldRefresh) {
       startAccountSummaryRefresh();
       return;
     }
