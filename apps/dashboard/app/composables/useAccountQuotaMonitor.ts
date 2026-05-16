@@ -14,9 +14,17 @@ type CachedAccountQuota = {
 
 const ENABLED_QUOTA_FETCH_DELAY_MS = 500;
 const DISABLED_QUOTA_FETCH_DELAY_MS = 1500;
+const QUOTA_FETCH_TIMEOUT_MS = 7000;
 const QUOTA_DB_NAME = "opendum-dashboard";
 const QUOTA_STORE_NAME = "account-quota";
 const quotaStore = import.meta.client ? createStore(QUOTA_DB_NAME, QUOTA_STORE_NAME) : null;
+
+class QuotaFetchTimeoutError extends Error {
+  constructor() {
+    super("Quota fetch timed out");
+    this.name = "QuotaFetchTimeoutError";
+  }
+}
 
 function getQuotaCacheKey(accountId: string) {
   return `account-quota:${accountId}`;
@@ -106,17 +114,19 @@ export function useAccountQuotaMonitor(options: {
     if (hasErrorChanges) quotaErrorByAccountId.value = nextErrorByAccountId;
   }
 
-  async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number) {
+  async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number, refreshExisting = false) {
     const provider = options.toQuotaProvider(account.provider);
     if (!provider || quotaLoadingByAccountId.value[account.id]) return;
-    if (!forceRefresh && quotaByAccountId.value[account.id] && !runId) return;
+    if (!forceRefresh && quotaByAccountId.value[account.id] && !refreshExisting) return;
 
     const hadQuota = Boolean(quotaByAccountId.value[account.id]);
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(new QuotaFetchTimeoutError()), QUOTA_FETCH_TIMEOUT_MS);
     setQuotaLoading(account.id, true);
     quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
 
     try {
-      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh });
+      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh }, { signal: abortController.signal });
       if (runId !== undefined && runId !== quotaQueueRunId) return;
       if (!result.success) throw new Error(result.error);
 
@@ -125,14 +135,17 @@ export function useAccountQuotaMonitor(options: {
       await writeCachedQuota(account, provider, result.data);
     } catch (error) {
       if (runId !== undefined && runId !== quotaQueueRunId) return;
+      if (abortController.signal.aborted) return;
+
       const message = error instanceof Error ? error.message : "Failed to fetch quota data";
       if (!hadQuota) quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: message };
     } finally {
+      clearTimeout(timeout);
       setQuotaLoading(account.id, false);
     }
   }
 
-  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value) {
+  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshExisting = false) {
     const runId = ++quotaQueueRunId;
     const accountsToFetch = [
       ...accounts.filter((account) => account.isActive),
@@ -153,7 +166,7 @@ export function useAccountQuotaMonitor(options: {
         }
         if (runId !== quotaQueueRunId) return;
       }
-      await loadAccountQuota(account, false, runId);
+      await loadAccountQuota(account, false, runId, refreshExisting);
     }
   }
 

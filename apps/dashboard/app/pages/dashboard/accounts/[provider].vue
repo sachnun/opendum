@@ -61,6 +61,7 @@ const disabledModelsByAccountId = computed(() => detailData.value?.disabledModel
 const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
 const selectedAccountId = computed(() => decodeAccountHash(route.hash));
+type QuotaAccountState = { provider: string; isActive: boolean };
 
 watch(
   detailData,
@@ -130,6 +131,8 @@ watch(
 const quotaCapableAccounts = computed(() => accounts.value.filter((account) => account.provider === selectedProvider.value && toQuotaProvider(account.provider)));
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
 let previousQuotaAccountKeys = new Set<string>();
+let previousQuotaAccountStates = new Map<string, QuotaAccountState>();
+let previousQuotaProvider: ProviderAccountKey | null = null;
 const {
   quotaByAccountId,
   quotaErrorByAccountId,
@@ -228,22 +231,35 @@ function handleQuotaRefresh(accountId: string) {
 }
 
 watch(
-  () => [selectedProvider.value, accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|")] as const,
+  () => `${selectedProvider.value}|${accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|")}`,
   (_, __, onCleanup) => {
+    const providerChanged = previousQuotaProvider !== selectedProvider.value;
     const currentQuotaAccountKeys = new Set(quotaCapableAccounts.value.map((account) => `${account.id}:${account.provider}`));
+    const currentQuotaAccountStates = new Map(quotaCapableAccounts.value.map((account) => [account.id, { provider: account.provider, isActive: account.isActive }]));
     const newQuotaAccounts = quotaCapableAccounts.value.filter((account) => !previousQuotaAccountKeys.has(`${account.id}:${account.provider}`));
-    const accountsToFetch = previousQuotaAccountKeys.size > 0 && newQuotaAccounts.length > 0 ? newQuotaAccounts : quotaCapableAccounts.value;
+    const reenabledAccountsWithoutQuota = quotaCapableAccounts.value.filter((account) => {
+      const previousState = previousQuotaAccountStates.get(account.id);
+      return previousState?.provider === account.provider && previousState.isActive === false && account.isActive && !quotaByAccountId.value[account.id];
+    });
+    const shouldRefreshExisting = previousQuotaAccountKeys.size === 0 || providerChanged;
+    const accountsToFetch = shouldRefreshExisting
+      ? quotaCapableAccounts.value
+      : newQuotaAccounts.length > 0
+        ? newQuotaAccounts
+        : reenabledAccountsWithoutQuota;
 
     pruneQuotaState();
     cancelQuotaQueue();
     void hydrateQuotaCache();
     previousQuotaAccountKeys = currentQuotaAccountKeys;
+    previousQuotaAccountStates = currentQuotaAccountStates;
+    previousQuotaProvider = selectedProvider.value;
 
     if (accountsToFetch.length === 0) return;
 
     let cancelled = false;
     const quotaLoadTimer = setTimeout(() => {
-      if (!cancelled) void runQuotaQueue(accountsToFetch);
+      if (!cancelled) void runQuotaQueue(accountsToFetch, shouldRefreshExisting);
     }, QUOTA_AUTO_LOAD_DELAY_MS);
 
     onCleanup(() => {

@@ -23,9 +23,10 @@ type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null };
 
 type DashboardFetch = ReturnType<typeof useRequestFetch>;
+type DashboardFetchOptions = Parameters<DashboardFetch>[1];
 
-function post<T>(fetcher: DashboardFetch, url: string, body?: Record<string, unknown>) {
-  return fetcher<T>(url, { method: "POST", body });
+function post<T>(fetcher: DashboardFetch, url: string, body?: Record<string, unknown>, options?: DashboardFetchOptions) {
+  return fetcher<T>(url, { ...options, method: "POST", body });
 }
 
 export function useDashboardApi() {
@@ -52,7 +53,7 @@ export function useDashboardApi() {
       exchangeOAuth: (body: { provider: "antigravity" | "gemini_cli" | "codex" | "kiro"; callbackUrl: string; state?: string | null; codeVerifier?: string | null }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/exchange-oauth", body),
       initiateDeviceAuth: (body: { provider: "qwen_code" | "copilot" | "codex" }) => post<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string }>>(dashboardFetch, "/api/dashboard/accounts/initiate-device-auth", body),
       pollDeviceAuth: (body: { provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode?: string; codeVerifier?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/poll-device-auth", body),
-      quota: (body: { provider: QuotaProviderKey; accountId: string; forceRefresh?: boolean }) => post<ActionResult<AccountQuotaInfo>>(dashboardFetch, "/api/dashboard/accounts/quota", body),
+      quota: (body: { provider: QuotaProviderKey; accountId: string; forceRefresh?: boolean }, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaInfo>>(dashboardFetch, "/api/dashboard/accounts/quota", body, options),
     },
     analytics: {
       data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string }) => post<AnalyticsData>(dashboardFetch, "/api/dashboard/analytics/data", body),
