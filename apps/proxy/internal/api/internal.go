@@ -48,12 +48,26 @@ var internalRelayAllowedHosts = map[string]struct{}{
 	"www.googleapis.com":                        {},
 }
 
-func (s *Server) internalRoute(w http.ResponseWriter, r *http.Request) {
+
+func (s *Server) internalRefreshRoute(w http.ResponseWriter, r *http.Request) {
+	rawBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, internalRelayMaxBodyBytes))
+	if err != nil {
+		writeInternalRelayError(w, http.StatusBadRequest, "Invalid internal refresh payload")
+		return
+	}
+	if !s.validateInternalSignature(r, "/internal/refresh", rawBody) {
+		writeInternalRelayError(w, http.StatusUnauthorized, "Invalid internal refresh signature")
+		return
+	}
+	s.internalRefreshRouteWithBody(w, r, rawBody)
+}
+
+func (s *Server) internalRefreshRouteWithBody(w http.ResponseWriter, r *http.Request, rawBody []byte) {
 	var input internalRelayRequest
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, internalRelayMaxBodyBytes))
+	decoder := json.NewDecoder(bytes.NewReader(rawBody))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
-		writeInternalRelayError(w, http.StatusBadRequest, "Invalid internal relay payload")
+		writeInternalRelayError(w, http.StatusBadRequest, "Invalid internal refresh payload")
 		return
 	}
 

@@ -21,6 +21,8 @@ function isTokenExpired(expiresAt: Date): boolean {
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
+type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "email">;
+
 export const antigravityProvider = {
   async exchangeCode(
     code: string,
@@ -111,7 +113,7 @@ export const antigravityProvider = {
     };
   },
 
-  async getValidCredentials(account: ProviderAccount): Promise<string> {
+  async getValidCredentials(account: CredentialAccount): Promise<string> {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
 

@@ -2,16 +2,33 @@ package api
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type internalRoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f internalRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func signedInternalRefreshRequest(body []byte) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "/internal/refresh", bytes.NewReader(body))
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	mac := hmac.New(sha256.New, []byte("test-secret"))
+	_, _ = mac.Write([]byte(timestamp))
+	_, _ = mac.Write([]byte("\n/internal/refresh\n"))
+	_, _ = mac.Write(body)
+	req.Header.Set("X-Opendum-Internal-Timestamp", timestamp)
+	req.Header.Set("X-Opendum-Internal-Signature", hex.EncodeToString(mac.Sum(nil)))
+	return req
+}
 
 func TestInternalRouteForwardsAllowedURL(t *testing.T) {
 	previousClient := internalRelayClient
@@ -31,9 +48,9 @@ func TestInternalRouteForwardsAllowedURL(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	body := `{"url":"https://openrouter.ai/api/v1/models","method":"GET","headers":{"Authorization":"Bearer token","Connection":"keep-alive"}}`
-	req := httptest.NewRequest(http.MethodPost, "/internal", strings.NewReader(body))
+	req := signedInternalRefreshRequest([]byte(body))
 
-	(&Server{}).internalRoute(recorder, req)
+	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
@@ -60,9 +77,10 @@ func TestInternalRouteForwardsAllowedURL(t *testing.T) {
 
 func TestInternalRouteRejectsBlockedHost(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/internal", strings.NewReader(`{"url":"https://example.com/models","method":"GET"}`))
+	body := []byte(`{"url":"https://example.com/models","method":"GET"}`)
+	req := signedInternalRefreshRequest(body)
 
-	(&Server{}).internalRoute(recorder, req)
+	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
@@ -71,9 +89,10 @@ func TestInternalRouteRejectsBlockedHost(t *testing.T) {
 
 func TestInternalRouteRejectsHTTPURL(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/internal", strings.NewReader(`{"url":"http://openrouter.ai/api/v1/models","method":"GET"}`))
+	body := []byte(`{"url":"http://openrouter.ai/api/v1/models","method":"GET"}`)
+	req := signedInternalRefreshRequest(body)
 
-	(&Server{}).internalRoute(recorder, req)
+	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
@@ -82,9 +101,10 @@ func TestInternalRouteRejectsHTTPURL(t *testing.T) {
 
 func TestInternalRouteRejectsUserinfoURL(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/internal", strings.NewReader(`{"url":"https://token@openrouter.ai/api/v1/models","method":"GET"}`))
+	body := []byte(`{"url":"https://token@openrouter.ai/api/v1/models","method":"GET"}`)
+	req := signedInternalRefreshRequest(body)
 
-	(&Server{}).internalRoute(recorder, req)
+	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
@@ -104,9 +124,9 @@ func TestInternalRouteForwardsPostBody(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	body := []byte(`{"url":"https://integrate.api.nvidia.com/v1/chat/completions","method":"POST","headers":{"Authorization":"Bearer token","Content-Type":"application/json"},"body":{"model":"unit","messages":[{"role":"user","content":"ping"}],"max_tokens":1,"stream":false}}`)
-	req := httptest.NewRequest(http.MethodPost, "/internal", bytes.NewReader(body))
+	req := signedInternalRefreshRequest(body)
 
-	(&Server{}).internalRoute(recorder, req)
+	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
 
 	if recorder.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusAccepted, recorder.Body.String())
@@ -131,9 +151,9 @@ func TestInternalRouteForwardsKiroTokenExchange(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	body := []byte(`{"url":"https://prod.us-east-1.auth.desktop.kiro.dev/oauth/token","method":"POST","headers":{"Content-Type":"application/json","Accept":"application/json","User-Agent":"KiroIDE"},"body":"{\"code\":\"abc\",\"code_verifier\":\"verifier\",\"redirect_uri\":\"http://localhost:49153/oauth/callback\"}"}`)
-	req := httptest.NewRequest(http.MethodPost, "/internal", bytes.NewReader(body))
+	req := signedInternalRefreshRequest(body)
 
-	(&Server{}).internalRoute(recorder, req)
+	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())

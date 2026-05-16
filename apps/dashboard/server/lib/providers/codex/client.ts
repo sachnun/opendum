@@ -111,7 +111,9 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
     const parts = token.split(".");
     if (parts.length < 2) return null;
 
-    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payloadPart = parts[1];
+    if (!payloadPart) return null;
+    const payload = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
     return asRecord(JSON.parse(atob(padded)));
   } catch {
@@ -172,6 +174,8 @@ function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
+
+type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "accountId">;
 
 function buildOAuthResult(tokens: CodexTokenResponse, refreshToken?: string): OAuthResult {
   const accountId =
@@ -256,7 +260,7 @@ export const codexProvider = {
     return buildOAuthResult((await response.json()) as CodexTokenResponse, refreshToken);
   },
 
-  async getValidCredentials(account: ProviderAccount): Promise<string> {
+  async getValidCredentials(account: CredentialAccount): Promise<string> {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
 

@@ -54,7 +54,7 @@ func main() {
 	if cfg.TokenRefreshInterval > 0 {
 		go proxySvc.StartTokenRefresher(refreshCtx, cfg.TokenRefreshInterval)
 	}
-	handler := api.NewServer(registry, authSvc, proxySvc)
+	handler := api.NewServer(registry, authSvc, proxySvc, cfg.BetterAuthSecret)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),

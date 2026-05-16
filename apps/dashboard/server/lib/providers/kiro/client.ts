@@ -34,6 +34,8 @@ function isTokenExpired(expiresAt: Date): boolean {
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
+type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt">;
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? value as Record<string, unknown> : null;
 }
@@ -49,7 +51,9 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
     const parts = token.split(".");
     if (parts.length < 2) return null;
 
-    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payloadPart = parts[1];
+    if (!payloadPart) return null;
+    const payload = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
     return asRecord(JSON.parse(atob(padded)));
   } catch {
@@ -189,7 +193,7 @@ export const kiroProvider = {
     };
   },
 
-  async getValidCredentials(account: ProviderAccount): Promise<string> {
+  async getValidCredentials(account: CredentialAccount): Promise<string> {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
 

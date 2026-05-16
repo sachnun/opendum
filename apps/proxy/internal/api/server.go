@@ -1,8 +1,14 @@
 package api
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -16,10 +22,11 @@ type Server struct {
 	registry *models.Registry
 	auth     *auth.Service
 	proxy    *proxy.Service
+	secret   string
 }
 
-func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy.Service) http.Handler {
-	s := &Server{registry: registry, auth: authSvc, proxy: proxySvc}
+func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy.Service, secret string) http.Handler {
+	s := &Server{registry: registry, auth: authSvc, proxy: proxySvc, secret: secret}
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
@@ -39,7 +46,8 @@ func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy
 	r.Post("/v1/chat/completions", s.proxy.ChatCompletions)
 	r.Post("/v1/messages", s.proxy.Messages)
 	r.Post("/v1/responses", s.proxy.Responses)
-	r.Post("/internal", s.internalRoute)
+	r.Post("/internal/refresh", s.internalRefreshRoute)
+	r.Post("/internal/quota", s.proxy.InternalQuota)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/v1" {
 			WriteOpenAIError(w, http.StatusNotFound, ErrorInfo{Message: "Unknown API endpoint.", Type: "invalid_request_error"})
@@ -48,6 +56,37 @@ func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy
 		WriteOpenAIError(w, http.StatusNotFound, ErrorInfo{Message: "Not Found", Type: "invalid_request_error"})
 	})
 	return r
+}
+
+func (s *Server) validateInternalSignature(r *http.Request, path string, body []byte) bool {
+	if strings.TrimSpace(s.secret) == "" {
+		return false
+	}
+	timestampValue := strings.TrimSpace(r.Header.Get("X-Opendum-Internal-Timestamp"))
+	signatureValue := strings.TrimSpace(r.Header.Get("X-Opendum-Internal-Signature"))
+	if timestampValue == "" || signatureValue == "" {
+		return false
+	}
+	timestamp, err := strconv.ParseInt(timestampValue, 10, 64)
+	if err != nil {
+		return false
+	}
+	requestTime := time.Unix(timestamp, 0)
+	if time.Since(requestTime) > 2*time.Minute || time.Until(requestTime) > 2*time.Minute {
+		return false
+	}
+	provided, err := hex.DecodeString(signatureValue)
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(s.secret))
+	_, _ = mac.Write([]byte(timestampValue))
+	_, _ = mac.Write([]byte("\n"))
+	_, _ = mac.Write([]byte(path))
+	_, _ = mac.Write([]byte("\n"))
+	_, _ = mac.Write(body)
+	expected := mac.Sum(nil)
+	return hmac.Equal(provided, expected)
 }
 
 func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {

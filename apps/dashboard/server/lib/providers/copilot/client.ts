@@ -43,6 +43,8 @@ function isTokenExpired(expiresAt: Date): boolean {
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
+type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt">;
+
 async function fetchCopilotIdentity(accessToken: string): Promise<string> {
   try {
     const response = await fetchInternalProvider(USER_ENDPOINT, {
@@ -113,7 +115,7 @@ export const copilotProvider = {
     };
   },
 
-  async getValidCredentials(account: ProviderAccount): Promise<string> {
+  async getValidCredentials(account: CredentialAccount): Promise<string> {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
 

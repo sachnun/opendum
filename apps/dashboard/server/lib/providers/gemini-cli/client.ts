@@ -25,6 +25,8 @@ function isTokenExpired(expiresAt: Date): boolean {
   return new Date().getTime() > expiresAt.getTime() - bufferMs;
 }
 
+type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "projectId" | "tier" | "email">;
+
 export const geminiCliProvider = {
 
   async exchangeCode(
@@ -115,7 +117,7 @@ export const geminiCliProvider = {
     };
   },
 
-  async getValidCredentials(account: ProviderAccount): Promise<string> {
+  async getValidCredentials(account: CredentialAccount): Promise<string> {
     let accessToken = decrypt(account.accessToken);
     const refreshTokenValue = decrypt(account.refreshToken);
 
