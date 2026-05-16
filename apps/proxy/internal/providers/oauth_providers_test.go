@@ -587,6 +587,30 @@ func TestAntigravityGemini3ThinkingBudgetUsesThinkingLevel(t *testing.T) {
 	}
 }
 
+func TestAntigravityGemini3RaisesMaxTokensAboveThinkingBudget(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	body := map[string]any{
+		"model":      "gemini-3.1-pro-preview",
+		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens": 8192,
+	}
+	model := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
+	if model != "gemini-3.1-pro-high" {
+		t.Fatalf("resolved model = %q, want gemini-3.1-pro-high", model)
+	}
+	payload := openAIToGemini(provider.normalizeBodyForModel(body, model))
+	provider.transformAntigravityPayload(t.Context(), payload, model, "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	if generation["maxOutputTokens"] != 64000 {
+		t.Fatalf("maxOutputTokens = %#v, want 64000: %#v", generation["maxOutputTokens"], generation)
+	}
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinkingLevel"] != "high" {
+		t.Fatalf("thinking = %#v, want high", thinking)
+	}
+}
+
 func TestCodexExtractAccountIDFromJWT(t *testing.T) {
 	token := "x." + base64.RawURLEncoding.EncodeToString([]byte(`{"https://api.openai.com/auth":{"organizations":[{"id":"org_1","is_default":true}]}}`)) + ".y"
 	if got := extractAccountIDFromJWT(token); got != "org_1" {

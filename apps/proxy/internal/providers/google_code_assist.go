@@ -373,6 +373,7 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 	if isGemini3ModelName(model) {
 		if thinking := p.normalizeGemini3ThinkingConfig(rawThinking, model); thinking != nil {
 			generation["thinkingConfig"] = thinking
+			p.ensureGemini3MaxOutputTokens(generation, model, stringValue(thinking["thinkingLevel"]))
 		} else {
 			delete(generation, "thinkingConfig")
 		}
@@ -1416,6 +1417,18 @@ func (p googleCodeAssistProvider) normalizeGemini3ThinkingConfig(thinking map[st
 		return nil
 	}
 	return out
+}
+
+func (p googleCodeAssistProvider) ensureGemini3MaxOutputTokens(generation map[string]any, model, level string) {
+	budgets := providerConfigIntMap(p.registry, model, p.name, "thinking_budgets")
+	budget := budgets[level]
+	if budget <= 0 {
+		return
+	}
+	if maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"])); maxTokens == 0 || maxTokens <= budget {
+		generation["maxOutputTokens"] = 64000
+		delete(generation, "max_output_tokens")
+	}
 }
 
 func isGemini3ModelName(model string) bool {
