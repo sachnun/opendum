@@ -105,31 +105,19 @@ export type QuotaProviderKey = "antigravity" | "copilot" | "codex" | "gemini_cli
 export interface QuotaGroupDisplay {
   name: string;
   displayName: string;
-  models: string[];
   remainingFraction: number;
   remainingRequests: number;
   maxRequests: number;
   usedRequests: number;
-  percentUsed: number;
-  isExhausted: boolean;
-  isEstimated: boolean;
-  confidence: "high" | "medium" | "low";
   resetTimeIso: string | null;
   resetInHuman: string | null;
-  remainingLabel?: string;
 }
 
 export interface AccountQuotaInfo {
-  accountId: string;
-  accountName: string;
-  email: string | null;
   tier: string;
-  isActive: boolean;
   status: "success" | "error" | "expired";
   error?: string;
   groups: QuotaGroupDisplay[];
-  fetchedAt: number;
-  lastUsedAt: number | null;
 }
 
 export type AccountQuotaBatchResult = Record<string, ActionResult<AccountQuotaInfo>>;

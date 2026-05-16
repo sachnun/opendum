@@ -31,31 +31,25 @@ type quotaRequest struct {
 type quotaGroupDisplay struct {
 	Name              string   `json:"name"`
 	DisplayName       string   `json:"displayName"`
-	Models            []string `json:"models"`
+	Models            []string `json:"-"`
 	RemainingFraction float64  `json:"remainingFraction"`
 	RemainingRequests float64  `json:"remainingRequests"`
 	MaxRequests       float64  `json:"maxRequests"`
 	UsedRequests      float64  `json:"usedRequests"`
-	PercentUsed       int      `json:"percentUsed"`
-	IsExhausted       bool     `json:"isExhausted"`
-	IsEstimated       bool     `json:"isEstimated"`
-	Confidence        string   `json:"confidence"`
+	PercentUsed       int      `json:"-"`
+	IsExhausted       bool     `json:"-"`
+	IsEstimated       bool     `json:"-"`
+	Confidence        string   `json:"-"`
 	ResetTimeIso      *string  `json:"resetTimeIso"`
 	ResetInHuman      *string  `json:"resetInHuman"`
-	RemainingLabel    *string  `json:"remainingLabel,omitempty"`
+	RemainingLabel    *string  `json:"-"`
 }
 
 type accountQuotaInfo struct {
-	AccountID   string              `json:"accountId"`
-	AccountName string              `json:"accountName"`
-	Email       *string             `json:"email"`
-	Tier        string              `json:"tier"`
-	IsActive    bool                `json:"isActive"`
-	Status      string              `json:"status"`
-	Error       string              `json:"error,omitempty"`
-	Groups      []quotaGroupDisplay `json:"groups"`
-	FetchedAt   int64               `json:"fetchedAt"`
-	LastUsedAt  *int64              `json:"lastUsedAt"`
+	Tier   string              `json:"tier"`
+	Status string              `json:"status"`
+	Error  string              `json:"error,omitempty"`
+	Groups []quotaGroupDisplay `json:"groups"`
 }
 
 func (s *Service) InternalQuota(w http.ResponseWriter, r *http.Request) {
@@ -175,13 +169,8 @@ func quotaFallbackTier(account appdb.ProviderAccount) string {
 	return "free"
 }
 
-func baseQuotaInfo(account appdb.ProviderAccount, tier, status string, groups []quotaGroupDisplay, fetchedAt int64, message string) accountQuotaInfo {
-	var lastUsedAt *int64
-	if account.LastUsedAt != nil {
-		value := account.LastUsedAt.UnixMilli()
-		lastUsedAt = &value
-	}
-	return accountQuotaInfo{AccountID: account.ID, AccountName: account.Name, Email: account.Email, Tier: tier, IsActive: account.IsActive, Status: status, Error: message, Groups: groups, FetchedAt: fetchedAt, LastUsedAt: lastUsedAt}
+func baseQuotaInfo(_ appdb.ProviderAccount, tier, status string, groups []quotaGroupDisplay, _ int64, message string) accountQuotaInfo {
+	return accountQuotaInfo{Tier: tier, Status: status, Error: message, Groups: groups}
 }
 
 func expiredQuotaInfo(account appdb.ProviderAccount, tier, message string) accountQuotaInfo {

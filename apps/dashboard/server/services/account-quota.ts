@@ -14,37 +14,24 @@ export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema,
 export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS), forceRefresh: z.boolean().optional() });
 
 type QuotaProviderKey = z.infer<typeof quotaProviderSchema>;
-type QuotaConfidence = "high" | "medium" | "low";
 type JsonRecord = Record<string, unknown>;
 
 interface QuotaGroupDisplay {
   name: string;
   displayName: string;
-  models: string[];
   remainingFraction: number;
   remainingRequests: number;
   maxRequests: number;
   usedRequests: number;
-  percentUsed: number;
-  isExhausted: boolean;
-  isEstimated: boolean;
-  confidence: QuotaConfidence;
   resetTimeIso: string | null;
   resetInHuman: string | null;
-  remainingLabel?: string;
 }
 
 interface AccountQuotaInfo {
-  accountId: string;
-  accountName: string;
-  email: string | null;
   tier: string;
-  isActive: boolean;
   status: "success" | "error" | "expired";
   error?: string;
   groups: QuotaGroupDisplay[];
-  fetchedAt: number;
-  lastUsedAt: number | null;
 }
 
 type AccountQuotaResult = { success: true; data: AccountQuotaInfo } | { success: false; error: string };
@@ -63,15 +50,10 @@ function isQuotaGroup(value: unknown): value is QuotaGroupDisplay {
     record &&
     typeof record.name === "string" &&
     typeof record.displayName === "string" &&
-    Array.isArray(record.models) &&
     typeof record.remainingFraction === "number" &&
     typeof record.remainingRequests === "number" &&
     typeof record.maxRequests === "number" &&
     typeof record.usedRequests === "number" &&
-    typeof record.percentUsed === "number" &&
-    typeof record.isExhausted === "boolean" &&
-    typeof record.isEstimated === "boolean" &&
-    (record.confidence === "high" || record.confidence === "medium" || record.confidence === "low") &&
     (record.resetTimeIso === null || typeof record.resetTimeIso === "string") &&
     (record.resetInHuman === null || typeof record.resetInHuman === "string")
   );
@@ -81,17 +63,29 @@ function isAccountQuotaInfo(value: unknown): value is AccountQuotaInfo {
   const record = asRecord(value);
   return Boolean(
     record &&
-    typeof record.accountId === "string" &&
-    typeof record.accountName === "string" &&
-    (record.email === null || typeof record.email === "string") &&
     typeof record.tier === "string" &&
-    typeof record.isActive === "boolean" &&
     (record.status === "success" || record.status === "error" || record.status === "expired") &&
     Array.isArray(record.groups) &&
-    record.groups.every(isQuotaGroup) &&
-    typeof record.fetchedAt === "number" &&
-    (record.lastUsedAt === null || typeof record.lastUsedAt === "number")
+    record.groups.every(isQuotaGroup)
   );
+}
+
+function toPublicQuotaInfo(quota: AccountQuotaInfo): AccountQuotaInfo {
+  return {
+    tier: quota.tier,
+    status: quota.status,
+    ...(quota.error ? { error: quota.error } : {}),
+    groups: quota.groups.map((group) => ({
+      name: group.name,
+      displayName: group.displayName,
+      remainingFraction: group.remainingFraction,
+      remainingRequests: group.remainingRequests,
+      maxRequests: group.maxRequests,
+      usedRequests: group.usedRequests,
+      resetTimeIso: group.resetTimeIso,
+      resetInHuman: group.resetInHuman,
+    })),
+  };
 }
 
 async function fetchQuotaFromProxy(userId: string, provider: QuotaProviderKey, accountId: string): Promise<AccountQuotaResult> {
@@ -103,7 +97,7 @@ async function fetchQuotaFromProxy(userId: string, provider: QuotaProviderKey, a
       return { success: false, error: typeof payload?.error === "string" ? payload.error : `Quota proxy failed: HTTP ${response.status}` };
     }
     if (payload?.success === true && isAccountQuotaInfo(payload.data)) {
-      return { success: true, data: payload.data };
+      return { success: true, data: toPublicQuotaInfo(payload.data) };
     }
     if (payload?.success === false && typeof payload.error === "string") {
       return { success: false, error: payload.error };
