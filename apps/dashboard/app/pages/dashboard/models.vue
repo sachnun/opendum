@@ -10,10 +10,13 @@ definePageMeta({ middleware: "auth", layout: "dashboard" });
 const dashboardApi = useDashboardApi();
 const { isAuditMode } = useDashboardAudit();
 const dashboardInvalidation = useDashboardDataInvalidation();
+const nuxtApp = useNuxtApp();
 
 type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
 
-const { data, error, pending } = await useAsyncData("dashboard-models", () => dashboardApi.models.list());
+const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardInvalidation.keys.models).data.value !== undefined;
+const shouldRefreshCachedModelsOnMount = import.meta.client && !nuxtApp.isHydrating && cachedModelsBeforePageLoad;
+const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidation.keys.models, () => dashboardApi.models.list());
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 const isInitialLoading = computed(() => pending.value && !data.value);
 const availableProviders = computed(() => {
@@ -75,6 +78,10 @@ watchEffect(() => {
 
 onUnmounted(() => {
   modelFamilyCountsOverride.value = null;
+});
+
+onMounted(() => {
+  if (shouldRefreshCachedModelsOnMount) void refresh();
 });
 
 function getFamilyAnchorId(family: string) {
