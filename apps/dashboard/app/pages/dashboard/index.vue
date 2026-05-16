@@ -12,7 +12,6 @@ const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidati
 
 const summaries = computed(() => data.value?.summaries ?? null);
 const pinnedProviders = computed(() => new Set(data.value?.pinnedProviders ?? []));
-const totalConnectedAccounts = computed(() => Object.values(summaries.value ?? {}).reduce((total, summary) => total + summary.connected, 0));
 const sortedProviders = computed(() => [...PROVIDER_ACCOUNT_DEFINITIONS].sort((a, b) => {
   const aPinned = pinnedProviders.value.has(a.key) ? 0 : 1;
   const bPinned = pinnedProviders.value.has(b.key) ? 0 : 1;
@@ -46,14 +45,6 @@ function refreshAccountsOverview() {
 
     <DashboardDataNotice :error="error" />
     <UiSkeleton v-if="pending" class="h-96 rounded-xl" />
-    <DashboardEmptyState
-      v-else-if="summaries && totalConnectedAccounts === 0"
-      title="No accounts connected"
-      description="Connect your first provider account to start routing requests through Opendum."
-      icon="i-lucide-user-plus"
-    >
-      <AddAccountDialog v-if="!isAuditMode" @connected="refreshAccountsOverview" />
-    </DashboardEmptyState>
     <div v-else-if="summaries" class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
       <ProviderOverviewCard
         v-for="provider in sortedProviders"
