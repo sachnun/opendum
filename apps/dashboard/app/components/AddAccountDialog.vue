@@ -203,11 +203,6 @@ function resetForm() {
   }
 }
 
-function closeAndReset() {
-  open.value = false;
-  resetForm();
-}
-
 function clearCopyAutoNextTimer() {
   if (!copyAutoNextTimer) return;
   clearTimeout(copyAutoNextTimer);
@@ -241,6 +236,14 @@ function resetAuthProgress() {
   isFetchingUrl.value = false;
   isPolling.value = false;
   errorMessage.value = "";
+  if (pollingTimer) {
+    clearTimeout(pollingTimer);
+    pollingTimer = null;
+  }
+}
+
+function stopDevicePolling() {
+  isPolling.value = false;
   if (pollingTimer) {
     clearTimeout(pollingTimer);
     pollingTimer = null;
@@ -337,11 +340,7 @@ function startDevicePolling(popup: Window | null) {
   let intervalMs = 8000;
 
   const stopPolling = (returnToAuthStep = false) => {
-    isPolling.value = false;
-    if (pollingTimer) {
-      clearTimeout(pollingTimer);
-      pollingTimer = null;
-    }
+    stopDevicePolling();
     if (returnToAuthStep && step.value === finishStep.value && finishStep.value > authStep.value) {
       step.value = authStep.value;
     }
@@ -454,6 +453,12 @@ function goBack() {
   const nextStep = Math.max(minimumStep.value, step.value - 1);
   if (nextStep === 1) codexLoginMethod.value = null;
   step.value = nextStep;
+}
+
+function goBackFromDevicePolling() {
+  clearCopyAutoNextTimer();
+  resetAuthProgress();
+  step.value = authStep.value;
 }
 
 onBeforeUnmount(() => {
@@ -603,9 +608,9 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <div class="flex gap-2">
-              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !deviceCodeInfo || isPolling" @click="openDeviceAuthUrl">
-                <UiIcon :name="isFetchingUrl || isPolling ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl || isPolling ? 'animate-spin' : '']" />
-                {{ isPolling ? 'Waiting for login...' : `Open ${selectedConfig.name} Login` }}
+              <UiButton variant="outline" class="flex-1" :disabled="isFetchingUrl || !deviceCodeInfo" @click="openDeviceAuthUrl">
+                <UiIcon :name="isFetchingUrl ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl ? 'animate-spin' : '']" />
+                Open {{ selectedConfig.name }} Login
               </UiButton>
               <UiTooltip :text="copiedLink ? 'Copied' : 'Copy link'">
                 <UiButton variant="outline" :disabled="isFetchingUrl || !deviceCodeInfo" @click="deviceCodeInfo && copyText(deviceCodeInfo.verificationUrl, 'link')">
@@ -753,7 +758,10 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="flex flex-row items-center justify-between gap-2">
-        <UiButton v-if="isPolling" type="button" variant="ghost" @click="closeAndReset">Cancel</UiButton>
+        <UiButton v-if="isPolling" type="button" variant="ghost" @click="goBackFromDevicePolling">
+          <UiIcon name="i-lucide-arrow-left" class="size-4" />
+          Back
+        </UiButton>
 
         <UiButton v-if="step > minimumStep && !isPolling" type="button" variant="ghost" :disabled="isLoading" @click="goBack">
           <UiIcon name="i-lucide-arrow-left" class="size-4" />
