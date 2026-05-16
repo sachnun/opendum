@@ -208,31 +208,34 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
             >
               <UiCardHeader class="pb-1">
                 <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <button
-                    type="button"
-                    class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    :title="`Copy model ID ${model.id}`"
-                    :aria-label="`Copy model ID ${model.id}`"
-                    @click="copyModelId(model.id)"
-                  >
-                    <span class="flex size-3 shrink-0 items-center justify-center">
-                      <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
-                    </span>
-                    <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="model.id">
-                      {{ model.id }}
-                    </span>
-                  </button>
+                  <UiTooltip text="Copy ID" class="max-w-96 break-all font-mono">
+                    <button
+                      type="button"
+                      class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      :aria-label="`Copy model ID ${model.id}`"
+                      @click="copyModelId(model.id)"
+                    >
+                      <span class="flex size-3 shrink-0 items-center justify-center">
+                        <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                      </span>
+                      <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                        {{ model.id }}
+                      </span>
+                    </button>
+                  </UiTooltip>
                   <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
-                    <NuxtLink v-if="model.isEnabled" :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" title="Try in Playground" aria-label="Try in Playground">
-                      <UiIcon name="i-lucide-flask-conical" class="size-3" />
-                    </NuxtLink>
+                    <UiTooltip v-if="model.isEnabled" text="Playground">
+                      <NuxtLink :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
+                        <UiIcon name="i-lucide-flask-conical" class="size-3" />
+                      </NuxtLink>
+                    </UiTooltip>
                     <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
                       {{ model.isEnabled ? 'On' : 'Off' }}
                     </span>
                     <UiSwitch
                       :model-value="model.isEnabled"
                       :disabled="pendingModelId === model.id || isAuditMode"
-                      :title="model.isEnabled ? 'Disable model' : 'Enable model'"
+                      :title="model.isEnabled ? 'Disable' : 'Enable'"
                       @update:model-value="setModelEnabled(model, $event)"
                     />
                   </div>

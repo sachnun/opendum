@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { TooltipProvider } from "reka-ui";
+
 useHead({
   htmlAttrs: { lang: "en" },
   title: "Opendum",
@@ -14,7 +16,9 @@ useHead({
 </script>
 
 <template>
-  <NuxtLayout>
-    <NuxtPage />
-  </NuxtLayout>
+  <TooltipProvider :delay-duration="300" :skip-delay-duration="300">
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+  </TooltipProvider>
 </template>

@@ -212,20 +212,21 @@ function closeDetail() {
       <template #content>
         <div v-if="detailModel" class="space-y-3" :class="detailModel.isEnabled === false ? 'opacity-70' : ''">
           <div class="flex items-start justify-between gap-2">
-            <button
-              type="button"
-              :title="`Copy model ID ${detailModel.id}`"
-              :aria-label="`Copy model ID ${detailModel.id}`"
-              class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              @click="copyModelId(detailModel.id)"
-            >
-              <span class="flex size-3 shrink-0 items-center justify-center">
-                <UiIcon :name="copiedModelId === detailModel.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
-              </span>
-              <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]" :title="detailModel.id">
-                {{ detailModel.id }}
-              </span>
-            </button>
+            <UiTooltip text="Copy ID" class="max-w-96 break-all font-mono">
+              <button
+                type="button"
+                :aria-label="`Copy model ID ${detailModel.id}`"
+                class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                @click="copyModelId(detailModel.id)"
+              >
+                <span class="flex size-3 shrink-0 items-center justify-center">
+                  <UiIcon :name="copiedModelId === detailModel.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                </span>
+                <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                  {{ detailModel.id }}
+                </span>
+              </button>
+            </UiTooltip>
           </div>
 
           <div class="flex flex-wrap items-center gap-1">

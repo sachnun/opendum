@@ -1715,9 +1715,11 @@ function formatToolArguments(value: string): string {
 
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
-          <UiButton v-if="panels.length > 1" variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" title="Remove card" @click="removePanel(panel.id)">
-            <UiIcon name="i-lucide-x" class="size-3.5" />
-          </UiButton>
+          <UiTooltip v-if="panels.length > 1" text="Remove">
+            <UiButton variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" @click="removePanel(panel.id)">
+              <UiIcon name="i-lucide-x" class="size-3.5" />
+            </UiButton>
+          </UiTooltip>
 
           <UiCardHeader class="flex-none gap-0 border-b py-2 pl-3" :class="panels.length > 1 ? 'pr-11' : 'pr-3'">
             <UiPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
@@ -1904,27 +1906,33 @@ function formatToolArguments(value: string): string {
                 <span class="text-muted-foreground">Wait</span>
                 <div class="flex items-center gap-2">
                   <span class="font-medium tabular-nums">{{ getPanelWaitLabel(panel.id) }}</span>
-                  <UiButton v-if="panel.modelId && responses[panel.id]?.isLoading" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Stop panel" @click="stopPanelRequest(panel.id)">
-                    <UiIcon name="i-lucide-square" class="size-3" />
-                  </UiButton>
-                  <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Run panel" @click="retryPanel(panel.id)">
-                    <UiIcon name="i-lucide-play" class="size-3 fill-current" />
-                  </UiButton>
-                  <UiButton v-if="panel.modelId && !responses[panel.id]?.isLoading && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.error)" type="button" variant="ghost" size="icon-xs" class="h-5 w-5" title="Retry" @click="retryPanel(panel.id)">
-                    <UiIcon name="i-lucide-rotate-cw" class="size-3" />
-                  </UiButton>
+                  <UiTooltip v-if="panel.modelId && responses[panel.id]?.isLoading" text="Stop">
+                    <UiButton type="button" variant="ghost" size="icon-xs" class="h-5 w-5" @click="stopPanelRequest(panel.id)">
+                      <UiIcon name="i-lucide-square" class="size-3" />
+                    </UiButton>
+                  </UiTooltip>
+                  <UiTooltip v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" text="Run">
+                    <UiButton type="button" variant="ghost" size="icon-xs" class="h-5 w-5" @click="retryPanel(panel.id)">
+                      <UiIcon name="i-lucide-play" class="size-3 fill-current" />
+                    </UiButton>
+                  </UiTooltip>
+                  <UiTooltip v-if="panel.modelId && !responses[panel.id]?.isLoading && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.error)" text="Retry">
+                    <UiButton type="button" variant="ghost" size="icon-xs" class="h-5 w-5" @click="retryPanel(panel.id)">
+                      <UiIcon name="i-lucide-rotate-cw" class="size-3" />
+                    </UiButton>
+                  </UiTooltip>
                 </div>
               </div>
               <div class="mt-1 flex items-center justify-between gap-2">
                 <span class="shrink-0 whitespace-nowrap text-muted-foreground">Provider account</span>
-                <NuxtLink
-                  v-if="getPanelProviderAccountHref(panel)"
-                  :to="getPanelProviderAccountHref(panel)!"
-                  class="min-w-0 truncate text-right font-medium text-foreground underline-offset-2 hover:underline"
-                  :title="`Open ${getSelectedRouteLabel(panel)} in provider accounts`"
-                >
-                  {{ getSelectedRouteLabel(panel) }}
-                </NuxtLink>
+                <UiTooltip v-if="getPanelProviderAccountHref(panel)" text="Open account">
+                  <NuxtLink
+                    :to="getPanelProviderAccountHref(panel)!"
+                    class="min-w-0 truncate text-right font-medium text-foreground underline-offset-2 hover:underline"
+                  >
+                    {{ getSelectedRouteLabel(panel) }}
+                  </NuxtLink>
+                </UiTooltip>
                 <span v-else class="min-w-0 truncate text-right font-medium">{{ getSelectedRouteLabel(panel) }}</span>
               </div>
             </div>

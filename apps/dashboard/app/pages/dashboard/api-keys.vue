@@ -244,7 +244,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                 <UiSwitch
                   :model-value="isApiKeyEffectivelyActive(apiKey)"
                   :disabled="togglingApiKeyIds.has(apiKey.id) || isAuditMode"
-                  :title="isApiKeyEffectivelyActive(apiKey) ? 'Disable key' : 'Enable key'"
+                  :title="isApiKeyEffectivelyActive(apiKey) ? 'Disable' : 'Enable'"
                   @update:model-value="toggleApiKey(apiKey)"
                 />
               </div>

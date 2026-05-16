@@ -47,16 +47,17 @@ async function togglePin(event: Event) {
 </script>
 
 <template>
-  <button
-    type="button"
-    :class="cn(
-      'cursor-pointer rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-      localPinned ? 'text-foreground hover:text-muted-foreground' : 'text-muted-foreground/40 hover:text-muted-foreground',
-    )"
-    :disabled="pending || readonly"
-    :title="localPinned ? 'Unpin from sidebar' : 'Pin to sidebar'"
-    @click="togglePin"
-  >
-    <UiIcon :name="localPinned ? 'i-lucide-pin' : 'i-lucide-pin-off'" class="size-4" />
-  </button>
+  <UiTooltip :text="localPinned ? 'Unpin' : 'Pin'">
+    <button
+      type="button"
+      :class="cn(
+        'cursor-pointer rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        localPinned ? 'text-foreground hover:text-muted-foreground' : 'text-muted-foreground/40 hover:text-muted-foreground',
+      )"
+      :disabled="pending || readonly"
+      @click="togglePin"
+    >
+      <UiIcon :name="localPinned ? 'i-lucide-pin' : 'i-lucide-pin-off'" class="size-4" />
+    </button>
+  </UiTooltip>
 </template>

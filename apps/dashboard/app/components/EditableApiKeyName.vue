@@ -50,9 +50,11 @@ async function updateName() {
 <template>
   <div class="flex min-w-0 items-center gap-1.5">
     <span v-if="showTitle" class="min-w-0 truncate text-lg font-semibold">{{ name ?? 'Unnamed key' }}</span>
-    <UiButton v-if="showEditButton" variant="outline" size="icon-sm" class="h-8 w-8" :disabled="readonly" title="Edit name" @click="editDialogOpen = true">
-      <UiIcon name="i-lucide-pencil" class="size-4" />
-    </UiButton>
+    <UiTooltip v-if="showEditButton" text="Edit">
+      <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="readonly" @click="editDialogOpen = true">
+        <UiIcon name="i-lucide-pencil" class="size-4" />
+      </UiButton>
+    </UiTooltip>
   </div>
 
   <UiDialog v-model:open="editDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">

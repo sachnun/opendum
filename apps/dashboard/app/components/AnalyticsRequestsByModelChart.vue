@@ -41,7 +41,9 @@ function percentage(count: number): number {
     <div v-else class="max-h-[250px] space-y-3 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
       <div v-for="(item, index) in data" :key="item.model" class="space-y-1.5 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
         <div class="flex items-center justify-between gap-3 text-xs">
-          <span class="min-w-0 truncate font-mono text-foreground" :title="item.model">{{ shortModelName(item.model) }}</span>
+          <UiTooltip text="Model">
+            <span class="min-w-0 truncate font-mono text-foreground">{{ shortModelName(item.model) }}</span>
+          </UiTooltip>
           <span class="shrink-0 tabular-nums text-muted-foreground">
             {{ item.count.toLocaleString() }} · {{ percentage(item.count) }}%
           </span>

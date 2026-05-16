@@ -49,7 +49,7 @@ function modelHealthLabel(model: string): string | null {
 }
 
 function modelButtonTitle(model: string): string {
-  const action = disabledModels.value.has(model) ? `Enable ${model}` : `Disable ${model}`;
+  const action = disabledModels.value.has(model) ? "Enable" : "Disable";
   const health = modelHealthLabel(model);
   return health ? `${health}. ${action}` : action;
 }
@@ -98,20 +98,23 @@ async function toggleModel(model: string) {
       <span class="text-xs text-muted-foreground">{{ enabledCount }}/{{ supportedModels.length }}</span>
     </div>
     <div class="flex flex-wrap gap-1.5">
-      <button
+      <UiTooltip
         v-for="model in visibleModels"
         :key="model"
-        type="button"
-        :disabled="togglingModels.has(model) || readonly"
-        :title="modelButtonTitle(model)"
-        :class="[
-          'inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-          modelButtonClass(model),
-        ]"
-        @click="toggleModel(model)"
+        :text="modelButtonTitle(model)"
       >
-        {{ model }}
-      </button>
+        <button
+          type="button"
+          :disabled="togglingModels.has(model) || readonly"
+          :class="[
+            'inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+            modelButtonClass(model),
+          ]"
+          @click="toggleModel(model)"
+        >
+          {{ model }}
+        </button>
+      </UiTooltip>
       <button v-if="hasMore" type="button" class="inline-flex cursor-pointer items-center rounded-md border border-border bg-transparent px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="expanded = !expanded">
         {{ expanded ? 'Show less' : `+${hiddenCount} more` }}
       </button>

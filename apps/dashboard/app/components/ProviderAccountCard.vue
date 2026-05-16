@@ -950,16 +950,17 @@ function cancelErrorPreviewPointer() {
         </div>
         <div v-if="subtitleDisplay" :class="['grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1', isSubtitleVisible ? 'items-start' : 'w-full items-center overflow-hidden']">
           <p :class="['min-w-0 font-mono text-sm text-muted-foreground', isSubtitleVisible ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ subtitleDisplay }}</p>
-          <UiButton
-            variant="ghost"
-            size="icon-sm"
-            class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:text-foreground"
-            :aria-label="isSubtitleVisible ? `Hide account email for ${accountTitle}` : `Show account email for ${accountTitle}`"
-            :title="isSubtitleVisible ? 'Hide email' : 'Show email'"
-            @click="isSubtitleVisible = !isSubtitleVisible"
-          >
-            <UiIcon :name="isSubtitleVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
-          </UiButton>
+          <UiTooltip :text="isSubtitleVisible ? 'Hide' : 'Show'">
+            <UiButton
+              variant="ghost"
+              size="icon-sm"
+              class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:text-foreground"
+              :aria-label="isSubtitleVisible ? `Hide account email for ${accountTitle}` : `Show account email for ${accountTitle}`"
+              @click="isSubtitleVisible = !isSubtitleVisible"
+            >
+              <UiIcon :name="isSubtitleVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
+            </UiButton>
+          </UiTooltip>
         </div>
       </UiCardHeader>
       <UiCardContent class="flex flex-1 flex-col pt-0">
@@ -1001,16 +1002,17 @@ function cancelErrorPreviewPointer() {
                       <span class="truncate text-xs text-muted-foreground">{{ getErrorEntryStatusTag(activeErrorEntry)?.label }}</span>
                     </span>
                     <span v-else class="text-xs text-muted-foreground">No status code</span>
-                    <button
-                      type="button"
-                      class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
-                      :aria-label="activeErrorEntry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
-                      title="Copy error message"
-                      @click="copyErrorPreview"
-                    >
-                      <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-green-600" />
-                      <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
-                    </button>
+                    <UiTooltip text="Copy">
+                      <button
+                        type="button"
+                        class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
+                        :aria-label="activeErrorEntry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
+                        @click="copyErrorPreview"
+                      >
+                        <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-green-600" />
+                        <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
+                      </button>
+                    </UiTooltip>
                   </div>
                   <div class="mt-1 flex min-h-0 flex-1 items-center">
                     <span :class="['line-clamp-4 break-all text-xs', errorPreviewToneClass]">{{ getErrorEntryPreview(activeErrorEntry) }}</span>
@@ -1026,9 +1028,11 @@ function cancelErrorPreviewPointer() {
               </div>
 
               <div class="flex items-center justify-between gap-2">
-                <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasNewerErrorPreview" aria-label="Show newer error" title="Slide left to newer error" @click="showNewerErrorPreview">
-                  <UiIcon name="i-lucide-chevron-left" class="size-3.5" />
-                </UiButton>
+                <UiTooltip text="Newer">
+                  <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasNewerErrorPreview" aria-label="Show newer error" @click="showNewerErrorPreview">
+                    <UiIcon name="i-lucide-chevron-left" class="size-3.5" />
+                  </UiButton>
+                </UiTooltip>
                 <div class="flex min-w-0 flex-1 items-center justify-center gap-1">
                   <span v-if="isHistoryLoading" class="truncate text-[10px] text-muted-foreground">Loading history...</span>
                   <span v-else-if="historyError" class="truncate text-[10px] text-red-500">{{ historyError }}</span>
@@ -1040,9 +1044,11 @@ function cancelErrorPreviewPointer() {
                     />
                   </template>
                 </div>
-                <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasPreviousErrorPreview" aria-label="Show previous error" title="Slide right to previous error" @click="showPreviousErrorPreview">
-                  <UiIcon name="i-lucide-chevron-right" class="size-3.5" />
-                </UiButton>
+                <UiTooltip text="Older">
+                  <UiButton type="button" variant="outline" size="icon-sm" class="h-6 w-6" :disabled="!hasPreviousErrorPreview" aria-label="Show previous error" @click="showPreviousErrorPreview">
+                    <UiIcon name="i-lucide-chevron-right" class="size-3.5" />
+                  </UiButton>
+                </UiTooltip>
               </div>
             </div>
           </div>
@@ -1050,18 +1056,19 @@ function cancelErrorPreviewPointer() {
           <div v-if="supportsQuotaMonitor" class="mt-3 space-y-2 border-t pt-3">
             <div class="flex items-center justify-between gap-2">
               <span class="text-xs font-medium text-muted-foreground">Quota</span>
-              <UiButton
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                class="h-6 w-6"
-                :disabled="isQuotaLoading"
-                :aria-label="`Refresh quota for ${accountTitle}`"
-                title="Refresh quota"
-                @click="refreshQuota"
-              >
-                <UiIcon name="i-lucide-refresh-cw" :class="['size-3.5', isQuotaLoading ? 'animate-spin' : '']" />
-              </UiButton>
+              <UiTooltip text="Refresh">
+                <UiButton
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  class="h-6 w-6"
+                  :disabled="isQuotaLoading"
+                  :aria-label="`Refresh quota for ${accountTitle}`"
+                  @click="refreshQuota"
+                >
+                  <UiIcon name="i-lucide-refresh-cw" :class="['size-3.5', isQuotaLoading ? 'animate-spin' : '']" />
+                </UiButton>
+              </UiTooltip>
             </div>
 
             <div v-if="!quotaInfo && !quotaError" class="space-y-2" aria-hidden="true">
@@ -1086,9 +1093,11 @@ function cancelErrorPreviewPointer() {
                   <div class="flex items-center justify-between gap-2 text-xs">
                     <span class="min-w-0 truncate text-muted-foreground">{{ group.displayName }}</span>
                     <span class="flex items-center gap-2">
-                      <span v-if="group.resetInHuman" class="text-[10px] text-muted-foreground" :title="quotaResetTitle(group)">
-                        {{ group.resetInHuman }}
-                      </span>
+                      <UiTooltip v-if="group.resetInHuman" :text="quotaResetTitle(group)">
+                        <span class="text-[10px] text-muted-foreground">
+                          {{ group.resetInHuman }}
+                        </span>
+                      </UiTooltip>
                       <span :class="['font-mono', quotaTextColor(group)]">{{ quotaPercentRemaining(group) }}%</span>
                     </span>
                   </div>
@@ -1107,16 +1116,20 @@ function cancelErrorPreviewPointer() {
           <div class="flex items-center gap-2">
             <UiButton variant="outline" size="sm" :disabled="readonly" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
             <UiButton variant="outline" size="sm" :disabled="readonly" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
-            <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`" :class="readonly ? 'pointer-events-none' : ''" :aria-disabled="readonly">
-              <UiButton variant="outline" size="sm" :disabled="readonly" title="Open in Playground"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
-            </NuxtLink>
+            <UiTooltip text="Playground">
+              <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`" :class="readonly ? 'pointer-events-none' : ''" :aria-disabled="readonly">
+                <UiButton variant="outline" size="sm" :disabled="readonly"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
+              </NuxtLink>
+            </UiTooltip>
           </div>
           <div class="flex shrink-0 items-center gap-1.5">
-            <span class="max-w-32 truncate text-[11px] text-muted-foreground" :title="accountStatusTitle">{{ accountStatusLabel }}</span>
+            <UiTooltip :text="accountStatusTitle">
+              <span class="max-w-32 truncate text-[11px] text-muted-foreground">{{ accountStatusLabel }}</span>
+            </UiTooltip>
             <UiSwitch
               :model-value="account.isActive"
               :disabled="readonly || isToggling || isTemporaryDisabling"
-              :title="account.isActive ? 'Disable account. Hold to choose duration.' : 'Enable account'"
+              :title="account.isActive ? 'Disable' : 'Enable'"
               @pointerdown="startTemporaryOffLongPress"
               @pointerup="finishTemporaryOffLongPress"
               @pointerleave="finishTemporaryOffLongPress"
@@ -1176,24 +1189,34 @@ function cancelErrorPreviewPointer() {
       <template #content>
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-1">
-            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy all errors" title="Copy all errors (current + history)" @click="copyAllErrors">
-              <UiIcon :name="copiedAllErrors ? 'i-lucide-check' : 'i-lucide-clipboard-list'" class="size-4" />
-            </UiButton>
-            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy error details" title="Copy error details" @click="copyErrorDetails">
-              <UiIcon :name="copiedErrorDetails ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-            </UiButton>
-            <NuxtLink :to="errorPlaygroundRoute">
-              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Open in Playground" title="Open in Playground with this account, model, endpoint, and parameters">
-                <UiIcon name="i-lucide-flask-conical" class="size-4" />
+            <UiTooltip text="Copy all">
+              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy all errors" @click="copyAllErrors">
+                <UiIcon :name="copiedAllErrors ? 'i-lucide-check' : 'i-lucide-clipboard-list'" class="size-4" />
               </UiButton>
-            </NuxtLink>
-            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" title="Resolve — clear all errors and error history for this account" :disabled="resolvingErrors || readonly" @click="resolveErrors">
-              <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
-            </UiButton>
+            </UiTooltip>
+            <UiTooltip text="Copy">
+              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Copy error details" @click="copyErrorDetails">
+                <UiIcon :name="copiedErrorDetails ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+              </UiButton>
+            </UiTooltip>
+            <UiTooltip text="Playground">
+              <NuxtLink :to="errorPlaygroundRoute">
+                <UiButton type="button" variant="outline" size="icon-sm" aria-label="Open in Playground">
+                  <UiIcon name="i-lucide-flask-conical" class="size-4" />
+                </UiButton>
+              </NuxtLink>
+            </UiTooltip>
+            <UiTooltip text="Resolve">
+              <UiButton type="button" variant="outline" size="icon-sm" aria-label="Resolve errors" :disabled="resolvingErrors || readonly" @click="resolveErrors">
+                <UiIcon name="i-lucide-check-circle" class="size-4 text-green-600" />
+              </UiButton>
+            </UiTooltip>
           </div>
-          <UiButton type="button" variant="ghost" size="icon-sm" aria-label="Close error details" title="Close" class="shrink-0" @click="errorDialogOpen = false">
-            <UiIcon name="i-lucide-x" class="size-4" />
-          </UiButton>
+          <UiTooltip text="Close">
+            <UiButton type="button" variant="ghost" size="icon-sm" aria-label="Close error details" class="shrink-0" @click="errorDialogOpen = false">
+              <UiIcon name="i-lucide-x" class="size-4" />
+            </UiButton>
+          </UiTooltip>
         </div>
 
         <div class="max-h-[60vh] space-y-3 overflow-y-auto rounded-md border bg-muted/20 p-3">

@@ -481,9 +481,11 @@ onBeforeUnmount(() => {
                 <UiIcon :name="isFetchingUrl ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl ? 'animate-spin' : '']" />
                 Open {{ selectedConfig.name }} Login
               </UiButton>
-              <UiButton variant="outline" :disabled="isFetchingUrl || !authUrl" :title="copiedLink ? 'Copied!' : 'Copy login link'" @click="copyText(authUrl, 'link')">
-                <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-              </UiButton>
+              <UiTooltip :text="copiedLink ? 'Copied' : 'Copy link'">
+                <UiButton variant="outline" :disabled="isFetchingUrl || !authUrl" @click="copyText(authUrl, 'link')">
+                  <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+                </UiButton>
+              </UiTooltip>
             </div>
             <div class="relative w-full rounded-lg border px-4 py-3 text-sm">
               <UiIcon name="i-lucide-alert-circle" class="absolute left-4 top-4 size-4" />
@@ -505,10 +507,12 @@ onBeforeUnmount(() => {
               <p class="text-xs text-muted-foreground">Enter this code on the provider page:</p>
               <div class="mt-2 flex flex-wrap items-center gap-2">
                 <code class="rounded bg-background px-2 py-1 font-mono text-sm font-semibold tracking-[0.15em]">{{ deviceCodeInfo.userCode }}</code>
-                <UiButton type="button" size="sm" variant="outline" :title="copiedDeviceCode ? 'Copied!' : 'Copy code'" @click="copyText(deviceCodeInfo.userCode, 'code')">
-                  <UiIcon :name="copiedDeviceCode ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
-                  {{ copiedDeviceCode ? 'Copied' : 'Copy code' }}
-                </UiButton>
+                <UiTooltip :text="copiedDeviceCode ? 'Copied' : 'Copy'">
+                  <UiButton type="button" size="sm" variant="outline" @click="copyText(deviceCodeInfo.userCode, 'code')">
+                    <UiIcon :name="copiedDeviceCode ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                    {{ copiedDeviceCode ? 'Copied' : 'Copy code' }}
+                  </UiButton>
+                </UiTooltip>
               </div>
             </div>
             <div class="flex gap-2">
@@ -516,9 +520,11 @@ onBeforeUnmount(() => {
                 <UiIcon :name="isFetchingUrl || isPolling ? 'i-lucide-loader-2' : 'i-lucide-external-link'" :class="['size-4', isFetchingUrl || isPolling ? 'animate-spin' : '']" />
                 {{ isPolling ? 'Waiting for login...' : `Open ${selectedConfig.name} Login` }}
               </UiButton>
-              <UiButton variant="outline" :disabled="isFetchingUrl || !deviceCodeInfo" :title="copiedLink ? 'Copied!' : 'Copy login link'" @click="deviceCodeInfo && copyText(deviceCodeInfo.verificationUrl, 'link')">
-                <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-              </UiButton>
+              <UiTooltip :text="copiedLink ? 'Copied' : 'Copy link'">
+                <UiButton variant="outline" :disabled="isFetchingUrl || !deviceCodeInfo" @click="deviceCodeInfo && copyText(deviceCodeInfo.verificationUrl, 'link')">
+                  <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+                </UiButton>
+              </UiTooltip>
             </div>
             <div v-if="isPolling" class="relative w-full rounded-lg border px-4 py-3 text-sm">
               <UiIcon name="i-lucide-loader-2" class="absolute left-4 top-4 size-4 animate-spin" />
@@ -543,9 +549,11 @@ onBeforeUnmount(() => {
                 <UiIcon name="i-lucide-external-link" class="size-4" />
                 Open {{ selectedConfig.name }} Portal
               </UiButton>
-              <UiButton type="button" variant="outline" :title="copiedLink ? 'Copied!' : 'Copy API key portal link'" @click="authUrl && copyText(authUrl, 'link')">
-                <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-              </UiButton>
+              <UiTooltip :text="copiedLink ? 'Copied' : 'Copy link'">
+                <UiButton type="button" variant="outline" @click="authUrl && copyText(authUrl, 'link')">
+                  <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+                </UiButton>
+              </UiTooltip>
             </div>
           </template>
 
