@@ -1,6 +1,5 @@
 {
   "providers": [
-    "openrouter",
     "nvidia_nim"
   ],
   "aliases": [
@@ -25,9 +24,6 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "qwen/qwen3-next-80b-a3b-instruct"
-    },
-    "openrouter": {
-      "upstream": "qwen/qwen3-next-80b-a3b-instruct:free"
     }
   }
 }

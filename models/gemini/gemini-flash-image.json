@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "antigravity"
-  ],
+  "providers": [],
   "aliases": [
     "gemini-3.1-flash-image-preview",
     "gemini-3.1-flash-image",
@@ -23,12 +21,6 @@
         "text",
         "image"
       ]
-    }
-  },
-  "providerConfig": {
-    "antigravity": {
-      "upstream": "gemini-3.1-flash-image",
-      "signature_family": "gemini-flash"
     }
   }
 }

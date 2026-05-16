@@ -1,6 +1,5 @@
 {
   "providers": [
-    "copilot",
     "kilo_code"
   ],
   "family": "xAI",

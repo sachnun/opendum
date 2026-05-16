@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "qwen/qwen3-next-80b-a3b-instruct:free"
+    }
+  }
+}

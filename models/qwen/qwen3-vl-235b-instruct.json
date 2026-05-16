@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "providerConfig": {
+    "ollama_cloud": {
+      "upstream": "qwen3-vl:235b-instruct"
+    }
+  }
+}

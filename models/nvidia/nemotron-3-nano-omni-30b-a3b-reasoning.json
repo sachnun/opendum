@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    }
+  }
+}

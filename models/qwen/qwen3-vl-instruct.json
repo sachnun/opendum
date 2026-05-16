@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "ollama_cloud"
-  ],
+  "providers": [],
   "aliases": [
     "qwen3-vl-235b-instruct"
   ],
@@ -10,10 +8,5 @@
     "reasoning": false,
     "toolCall": true,
     "vision": true
-  },
-  "providerConfig": {
-    "ollama_cloud": {
-      "upstream": "qwen3-vl:235b-instruct"
-    }
   }
 }
