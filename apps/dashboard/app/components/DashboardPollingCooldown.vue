@@ -67,7 +67,7 @@ onBeforeUnmount(() => {
       )"
     >
       <svg class="absolute inset-0 size-8 -rotate-90" viewBox="0 0 32 32" aria-hidden="true">
-        <circle cx="16" cy="16" r="11" fill="none" stroke-width="2.5" class="stroke-muted/70" />
+        <circle cx="16" cy="16" r="11" fill="none" stroke-width="2.5" class="stroke-muted" />
         <circle
           cx="16"
           cy="16"
@@ -76,8 +76,8 @@ onBeforeUnmount(() => {
           stroke-linecap="round"
           stroke-width="2.5"
           :class="[
-            'stroke-muted-foreground/50 transition-[stroke-dashoffset] duration-300 ease-linear motion-reduce:transition-none',
-            refreshing ? 'opacity-80' : 'opacity-60',
+            'stroke-primary transition-[stroke-dashoffset] duration-300 ease-linear motion-reduce:transition-none',
+            refreshing ? 'opacity-100' : 'opacity-80',
           ]"
           :style="{
             strokeDasharray: `${circumference}`,
@@ -86,7 +86,7 @@ onBeforeUnmount(() => {
         />
       </svg>
       <ProgressIndicator class="sr-only" />
-      <span :class="['relative size-1.5 rounded-full bg-muted-foreground/45', refreshing ? 'animate-pulse' : '']" aria-hidden="true" />
+      <UiIcon name="i-lucide-refresh-cw" :class="['relative size-3.5', refreshing ? 'animate-spin text-primary' : '']" />
     </ProgressRoot>
   </UiTooltip>
 </template>
