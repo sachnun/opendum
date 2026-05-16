@@ -611,17 +611,16 @@ async function handleAuditSelected() {
                       <span class="truncate text-xs text-muted-foreground">{{ userEmail }}</span>
                     </div>
                   </div>
-                  <div v-if="isAuditMode" class="mx-1 rounded-md border border-border/70 bg-muted/30 px-2 py-2 text-sm">
+                  <div v-if="isAuditMode" class="mx-1 mt-1 mb-2 rounded-md border border-border/70 bg-muted/30 px-2 py-2 text-sm">
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Auditing</p>
                     <p class="truncate font-medium">{{ auditUserLabel }}</p>
                     <p class="truncate text-xs text-muted-foreground">{{ auditUserEmail }}</p>
                   </div>
-                  <div class="-mx-1 my-1 h-px bg-border" />
+                  <div class="-mx-1 my-2 h-px bg-border" />
                   <button
-                    v-if="isMaintener"
+                    v-if="isMaintener && !isAuditMode"
                     type="button"
-                    :disabled="isAuditMode"
-                    class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+                    class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                     @click="openAuditDialog"
                   >
                     Audit user
