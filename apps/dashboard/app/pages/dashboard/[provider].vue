@@ -234,7 +234,6 @@ function quotaBarColor(group: QuotaSummaryGroup): string {
 }
 
 function handleQuotaRefresh(accountId: string) {
-  if (isAuditMode.value) return;
   const account = accounts.value.find((account) => account.id === accountId);
   if (account) loadAccountQuota(account, true);
 }
@@ -265,7 +264,6 @@ watch(
     previousQuotaProvider = selectedProvider.value;
 
     if (accountsToFetch.length === 0) return;
-    if (isAuditMode.value) return;
 
     let cancelled = false;
     const quotaLoadTimer = setTimeout(() => {

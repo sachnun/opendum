@@ -1,4 +1,4 @@
 import { accountQuotaInputSchema, getAccountQuota } from "../../../services/account-quota";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { readDashboardBody, requireReadableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => getAccountQuota(await requireWritableUserId(event), await readDashboardBody(event, accountQuotaInputSchema)));
+export default defineEventHandler(async (event) => getAccountQuota(await requireReadableUserId(event), await readDashboardBody(event, accountQuotaInputSchema)));

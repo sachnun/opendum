@@ -710,7 +710,6 @@ function handleTemporaryOffToggleClick(event: Event) {
 }
 
 function refreshQuota() {
-  if (props.readonly) return;
   emit("refreshQuota", props.account.id);
 }
 
@@ -1059,7 +1058,7 @@ function cancelErrorPreviewPointer() {
                 variant="ghost"
                 size="icon-sm"
                 class="h-6 w-6"
-                :disabled="isQuotaLoading || readonly"
+                :disabled="isQuotaLoading"
                 :aria-label="`Refresh quota for ${accountTitle}`"
                 title="Refresh quota"
                 @click="refreshQuota"
