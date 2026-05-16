@@ -136,9 +136,11 @@ const pickerItems = computed(() => {
               <UiBadge variant="outline" class="shrink-0 text-[10px]">{{ rule.targetType === 'family' ? 'Family' : 'Model' }}</UiBadge>
               <span class="truncate font-mono text-xs">{{ rule.target }}</span>
             </div>
-            <UiButton variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving || readonly" @click="removeRule(index)">
-              <UiIcon name="i-lucide-trash-2" class="size-3.5" />
-            </UiButton>
+            <UiTooltip text="Remove">
+              <UiButton variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving || readonly" aria-label="Remove rate limit rule" @click="removeRule(index)">
+                <UiIcon name="i-lucide-trash-2" class="size-3.5" />
+              </UiButton>
+            </UiTooltip>
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2">
             <label class="text-[10px] text-muted-foreground">/ minute<input :value="rule.perMinute" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" @input="updateRule(index, 'perMinute', ($event.target as HTMLInputElement).value)"></label>

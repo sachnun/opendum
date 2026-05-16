@@ -161,16 +161,17 @@ function closeDetail() {
         @keydown.enter.prevent="selectActiveSuggestion"
         @keydown.esc.stop="closeSuggestions"
       >
-      <button
-        v-if="search"
-        type="button"
-        class="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label="Clear model search"
-        @mousedown.prevent
-        @click="clearSearch"
-      >
-        <UiIcon name="i-lucide-x" class="size-3.5" />
-      </button>
+      <UiTooltip v-if="search" text="Clear">
+        <button
+          type="button"
+          class="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Clear model search"
+          @mousedown.prevent
+          @click="clearSearch"
+        >
+          <UiIcon name="i-lucide-x" class="size-3.5" />
+        </button>
+      </UiTooltip>
     </div>
 
     <div
@@ -233,14 +234,16 @@ function closeDetail() {
             <UiBadge v-for="provider in detailModel.providers" :key="provider" variant="secondary" class="text-xs">
               {{ getProviderLabel(provider) }}
             </UiBadge>
-            <NuxtLink
-              v-if="detailModel.isEnabled"
-              :to="`/dashboard/playground?model=${encodeURIComponent(detailModel.id)}`"
-              class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50"
-              @click="closeDetail"
-            >
-              <UiIcon name="i-lucide-flask-conical" class="size-3" />
-            </NuxtLink>
+            <UiTooltip v-if="detailModel.isEnabled" text="Playground">
+              <NuxtLink
+                :to="`/dashboard/playground?model=${encodeURIComponent(detailModel.id)}`"
+                class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50"
+                aria-label="Try in Playground"
+                @click="closeDetail"
+              >
+                <UiIcon name="i-lucide-flask-conical" class="size-3" />
+              </NuxtLink>
+            </UiTooltip>
           </div>
 
           <ModelFeatureBadges :meta="detailModel.meta" />

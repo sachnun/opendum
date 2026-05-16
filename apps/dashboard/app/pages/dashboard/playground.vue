@@ -1696,10 +1696,11 @@ function formatToolArguments(value: string): string {
             <UiIcon name="i-lucide-play" class="size-4" />
             Start
           </UiButton>
-          <UiButton type="button" variant="outline" size="icon-sm" @click="settingsOpen = true">
-            <UiIcon name="i-lucide-settings" class="size-4" />
-            <span class="sr-only">Settings</span>
-          </UiButton>
+          <UiTooltip text="Settings">
+            <UiButton type="button" variant="outline" size="icon-sm" aria-label="Settings" @click="settingsOpen = true">
+              <UiIcon name="i-lucide-settings" class="size-4" />
+            </UiButton>
+          </UiTooltip>
         </div>
       </div>
     </div>
@@ -1788,7 +1789,7 @@ function formatToolArguments(value: string): string {
       <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
         <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
           <UiTooltip v-if="panels.length > 1" text="Remove">
-            <UiButton variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" @click="removePanel(panel.id)">
+            <UiButton variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" aria-label="Remove comparison card" @click="removePanel(panel.id)">
               <UiIcon name="i-lucide-x" class="size-3.5" />
             </UiButton>
           </UiTooltip>

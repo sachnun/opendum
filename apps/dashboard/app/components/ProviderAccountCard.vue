@@ -1213,8 +1213,12 @@ function cancelErrorPreviewPointer() {
         </div>
         <div class="mt-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
-            <UiButton variant="outline" size="sm" :disabled="readonly" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
-            <UiButton variant="outline" size="sm" :disabled="readonly" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
+            <UiTooltip text="Edit">
+              <UiButton variant="outline" size="sm" :disabled="readonly" :aria-label="`Edit ${accountTitle}`" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
+            </UiTooltip>
+            <UiTooltip text="Delete">
+              <UiButton variant="outline" size="sm" :disabled="readonly" :aria-label="`Delete ${accountTitle}`" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
+            </UiTooltip>
             <UiTooltip text="Playground">
               <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
                 <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>

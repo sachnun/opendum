@@ -776,15 +776,17 @@ onBeforeUnmount(() => {
                   isApiKeyVisible ? '' : '[text-security:disc] [-webkit-text-security:disc]',
                 )"
               >
-              <button
-                type="button"
-                :disabled="isLoading"
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                :aria-label="isApiKeyVisible ? 'Hide API key' : 'Show API key'"
-                @click="isApiKeyVisible = !isApiKeyVisible"
-              >
-                <UiIcon :name="isApiKeyVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4" />
-              </button>
+              <UiTooltip :text="isApiKeyVisible ? 'Hide' : 'Show'">
+                <button
+                  type="button"
+                  :disabled="isLoading"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                  :aria-label="isApiKeyVisible ? 'Hide API key' : 'Show API key'"
+                  @click="isApiKeyVisible = !isApiKeyVisible"
+                >
+                  <UiIcon :name="isApiKeyVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4" />
+                </button>
+              </UiTooltip>
             </div>
           </div>
 
