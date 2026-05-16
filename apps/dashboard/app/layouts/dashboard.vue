@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {
   AccountPingData,
-  AccountSummaryData,
+  AccountOverviewData,
   ModelFamilyCounts,
   NavItem,
   NavSubItem,
@@ -61,14 +61,14 @@ const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
-const accountsNavigationHref = getProviderAccountPath("codex");
+const accountsNavigationHref = "/dashboard";
 
 const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
 });
 const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
 
-function toShellAccountSummary(summary: AccountSummaryData | AccountPingData): ShellAccountSummary {
+function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
   const nextAccountCounts = { ...emptyAccountCounts };
   const nextActiveAccountCounts = { ...emptyAccountCounts };
   const nextAccountIndicators = { ...emptyAccountIndicators };

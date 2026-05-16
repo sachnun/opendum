@@ -155,7 +155,7 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
 
 const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => dashboardApi.playground.options());
 if (data.value && !data.value.hasAnyProviderAccount) {
-  await navigateTo("/dashboard/codex", { replace: true });
+  await navigateTo("/dashboard", { replace: true });
 }
 
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
@@ -196,10 +196,10 @@ const panelScrollElements = new Map<string, HTMLElement>();
 const isBatchRunActive = ref(false);
 let liveTimer: ReturnType<typeof setInterval> | null = null;
 let startLongPressTimer: ReturnType<typeof setTimeout> | null = null;
-let accountSummaryInvalidationTimer: ReturnType<typeof setTimeout> | null = null;
+let accountOverviewInvalidationTimer: ReturnType<typeof setTimeout> | null = null;
 let startLongPressTriggered = false;
 const START_LONG_PRESS_DELAY_MS = 600;
-const ACCOUNT_SUMMARY_INVALIDATION_DELAY_MS = 500;
+const ACCOUNT_OVERVIEW_INVALIDATION_DELAY_MS = 500;
 const AUTO_SCROLL_DISABLE_THRESHOLD = 0.05;
 
 const filteredModels = computed(() => models.value);
@@ -237,7 +237,7 @@ const scenarioMessages = computed(() => getScenarioMessages(selectedScenario.val
 const isChatScenario = computed(() => selectedScenario.value.id === "chat");
 
 watch(options, (value) => {
-  if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard/codex", { replace: true });
+  if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard", { replace: true });
 });
 
 watch(options, (value) => {
@@ -332,7 +332,7 @@ onBeforeUnmount(() => {
   stopAllRequests();
   if (liveTimer) clearInterval(liveTimer);
   if (startLongPressTimer) clearTimeout(startLongPressTimer);
-  if (accountSummaryInvalidationTimer) clearTimeout(accountSummaryInvalidationTimer);
+  if (accountOverviewInvalidationTimer) clearTimeout(accountOverviewInvalidationTimer);
 });
 
 function generateId(): string {
@@ -1215,12 +1215,12 @@ function setResponseIfCurrent(panelId: string, requestId: string, response: Resp
   setResponse(panelId, response);
 }
 
-function refreshAccountSummary() {
-  if (accountSummaryInvalidationTimer) clearTimeout(accountSummaryInvalidationTimer);
-  accountSummaryInvalidationTimer = setTimeout(() => {
-    accountSummaryInvalidationTimer = null;
-    void dashboardInvalidation.invalidateAccountSummary();
-  }, ACCOUNT_SUMMARY_INVALIDATION_DELAY_MS);
+function refreshAccountOverview() {
+  if (accountOverviewInvalidationTimer) clearTimeout(accountOverviewInvalidationTimer);
+  accountOverviewInvalidationTimer = setTimeout(() => {
+    accountOverviewInvalidationTimer = null;
+    void dashboardInvalidation.invalidateAccountOverview();
+  }, ACCOUNT_OVERVIEW_INVALIDATION_DELAY_MS);
 }
 
 async function runChatScenarioForPanel(panel: PanelState & { modelId: string }, scenario: Scenario, currentSettings: PlaygroundSettings): Promise<FetchModelResult> {
@@ -1256,7 +1256,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
   const requestId = generateId();
   let waitMs: number | null = null;
   let usedAccountId: string | null = null;
-  let shouldRefreshAccountSummary = false;
+  let shouldRefreshAccountOverview = false;
 
   controllers.get(panelId)?.abort();
   requestIds.set(panelId, requestId);
@@ -1298,7 +1298,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
         onHeaders: (info) => {
           waitMs = Date.now() - requestStartedAt;
           usedAccountId = info.getHeader("x-provider-account-id");
-          shouldRefreshAccountSummary = true;
+          shouldRefreshAccountOverview = true;
         },
         onChunk: (chunk) => {
           firstResponseMs ??= Date.now() - requestStartedAt;
@@ -1323,7 +1323,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
     waitMs = Date.now() - requestStartedAt;
     usedAccountId = response.headers.get("x-provider-account-id");
-    shouldRefreshAccountSummary = true;
+    shouldRefreshAccountOverview = true;
 
     if (!response.ok) {
       const clonedResponse = response.clone();
@@ -1356,7 +1356,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
       controllers.delete(panelId);
       requestIds.delete(panelId);
     }
-    if (shouldRefreshAccountSummary) refreshAccountSummary();
+    if (shouldRefreshAccountOverview) refreshAccountOverview();
   }
 }
 

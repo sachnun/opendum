@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import type { ProviderAccountDefinition, ProviderAccountKey } from "../../lib/provider-accounts";
 import { getProviderAccountPath } from "../../lib/provider-accounts";
-import type { AccountSummaryData } from "../../lib/dashboard-api-types";
+import type { AccountOverviewData } from "../../lib/dashboard-api-types";
 
-type ProviderSummary = AccountSummaryData["summaries"][ProviderAccountKey];
+type ProviderOverview = AccountOverviewData["summaries"][ProviderAccountKey];
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
 type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string };
 
 const props = defineProps<{
   provider: ProviderAccountDefinition;
-  summary: ProviderSummary;
+  summary: ProviderOverview;
   pinned: boolean;
 }>();
 

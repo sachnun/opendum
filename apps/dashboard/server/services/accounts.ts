@@ -154,7 +154,7 @@ export async function listAccountsByProvider(userId: string, input: z.infer<type
   }
 }
 
-export async function getAccountSummary(userId: string) {
+export async function getAccountOverview(userId: string) {
   try {
     const now = new Date();
     const [accounts, providerStats] = await Promise.all([

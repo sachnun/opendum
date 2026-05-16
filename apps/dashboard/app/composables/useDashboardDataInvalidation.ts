@@ -1,5 +1,5 @@
 import type {
-  AccountSummaryData,
+  AccountOverviewData,
   ApiKeyListItem,
   ApiKeyOptions,
   ModelListItem,
@@ -25,7 +25,7 @@ type ApiKeyPageData = {
 
 export const dashboardDataKeys = {
   shellAccounts: "dashboard-shell-accounts",
-  accountsSummary: "dashboard-accounts-summary",
+  accountsOverview: "dashboard-accounts-overview",
   accountsDetail: (provider: string) => `dashboard-accounts-detail-${provider}`,
   models: "dashboard-models",
   shellModelFamilyCounts: "dashboard-shell-model-family-counts",
@@ -129,7 +129,7 @@ function patchModelEnabled(modelId: string, enabled: boolean) {
 function invalidateAccountCollection(provider: string) {
   return refreshDashboardData([
     dashboardDataKeys.shellAccounts,
-    dashboardDataKeys.accountsSummary,
+    dashboardDataKeys.accountsOverview,
     dashboardDataKeys.accountsDetail(provider),
     dashboardDataKeys.models,
     dashboardDataKeys.shellModelFamilyCounts,
@@ -139,8 +139,8 @@ function invalidateAccountCollection(provider: string) {
   ]);
 }
 
-function invalidateAccountSummary() {
-  return refreshDashboardData([dashboardDataKeys.shellAccounts, dashboardDataKeys.accountsSummary]);
+function invalidateAccountOverview() {
+  return refreshDashboardData([dashboardDataKeys.shellAccounts, dashboardDataKeys.accountsOverview]);
 }
 
 function clearAccountDependentOptions() {
@@ -166,7 +166,7 @@ function patchPinnedProvider(provider: ProviderAccountKey, pinned: boolean) {
     pinnedProviders: replacePinnedProvider(value.pinnedProviders, provider, pinned),
   }));
 
-  patchNuxtData<AccountSummaryData>(dashboardDataKeys.accountsSummary, (value) => ({
+  patchNuxtData<AccountOverviewData>(dashboardDataKeys.accountsOverview, (value) => ({
     ...value,
     pinnedProviders: replacePinnedProvider(value.pinnedProviders, provider, pinned),
   }));
@@ -182,7 +182,7 @@ export function useDashboardDataInvalidation() {
     keys: dashboardDataKeys,
     clearAccountDependentOptions,
     invalidateAccountCollection,
-    invalidateAccountSummary,
+    invalidateAccountOverview,
     invalidateModelAvailability,
     clearModelAvailability,
     patchAccountNameInOptions,

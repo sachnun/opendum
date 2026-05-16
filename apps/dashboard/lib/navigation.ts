@@ -42,7 +42,7 @@ export interface ModelFamilyCounts {
 export const primaryNavigation: NavItem[] = [
   {
     name: "Accounts",
-    href: getProviderAccountPath("codex"),
+    href: "/dashboard",
     icon: "i-lucide-user",
     children: [
       { name: "Antigravity", href: getProviderAccountPath("antigravity") },

@@ -58,7 +58,7 @@ export interface ProviderAccountModelHealthItem {
   lastSuccessAt: string | Date | null;
 }
 
-export interface AccountSummaryData {
+export interface AccountOverviewData {
   summaries: Record<ProviderAccountKey, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
   pinnedProviders: ProviderAccountKey[];
 }

@@ -278,21 +278,21 @@ function handleAccountRenamed(account: ProviderAccountUpdateData) {
 
 function handleAccountActiveUpdated(account: ProviderAccountUpdateData) {
   dashboardInvalidation.patchProviderAccount(selectedProvider.value, account.id, account);
-  void dashboardInvalidation.invalidateAccountSummary();
+  void dashboardInvalidation.invalidateAccountOverview();
   dashboardInvalidation.clearAccountDependentOptions();
   dashboardInvalidation.clearModelAvailability();
 }
 
 function handleAccountDeleted(accountId: string) {
   dashboardInvalidation.removeProviderAccount(selectedProvider.value, accountId);
-  void dashboardInvalidation.invalidateAccountSummary();
+  void dashboardInvalidation.invalidateAccountOverview();
   dashboardInvalidation.clearAccountDependentOptions();
   dashboardInvalidation.clearModelAvailability();
 }
 
 function handleAccountErrorsResolved() {
   void refresh();
-  void dashboardInvalidation.invalidateAccountSummary();
+  void dashboardInvalidation.invalidateAccountOverview();
 }
 
 function decodeAccountHash(hash: string): string | null {
