@@ -82,6 +82,7 @@ let copiedLinkTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedDeviceCodeTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedCallbackUrlTimer: ReturnType<typeof setTimeout> | null = null;
 let copyAutoNextTimer: ReturnType<typeof setTimeout> | null = null;
+let callbackAutoExchangeTimer: ReturnType<typeof setTimeout> | null = null;
 
 const selectedConfig = computed(() => (provider.value ? providerConfigs[provider.value] : null));
 const isCodexProvider = computed(() => provider.value === "codex");
@@ -208,12 +209,19 @@ function resetForm() {
     clearTimeout(copyAutoNextTimer);
     copyAutoNextTimer = null;
   }
+  clearCallbackAutoExchangeTimer();
 }
 
 function clearCopyAutoNextTimer() {
   if (!copyAutoNextTimer) return;
   clearTimeout(copyAutoNextTimer);
   copyAutoNextTimer = null;
+}
+
+function clearCallbackAutoExchangeTimer() {
+  if (!callbackAutoExchangeTimer) return;
+  clearTimeout(callbackAutoExchangeTimer);
+  callbackAutoExchangeTimer = null;
 }
 
 function finishConnection(result: { email: string; isUpdate: boolean }) {
@@ -456,6 +464,23 @@ async function handleExchangeOAuth() {
   }
 }
 
+function handleCallbackInput(event: Event) {
+  clearCallbackAutoExchangeTimer();
+  if (props.readonly || isLoading.value) return;
+  const value = event.target instanceof HTMLInputElement ? event.target.value : callbackUrl.value;
+  try {
+    const url = new URL(value);
+    if (!url.searchParams.get("code")) return;
+  } catch {
+    return;
+  }
+
+  callbackAutoExchangeTimer = setTimeout(() => {
+    callbackAutoExchangeTimer = null;
+    void handleExchangeOAuth();
+  }, 300);
+}
+
 async function pasteCallbackUrl() {
   if (props.readonly || isLoading.value) return;
 
@@ -468,6 +493,7 @@ async function pasteCallbackUrl() {
       copiedCallbackUrl.value = false;
       copiedCallbackUrlTimer = null;
     }, 2000);
+    clearCallbackAutoExchangeTimer();
     await handleExchangeOAuth();
   } catch {
     errorMessage.value = "Failed to paste callback URL";
@@ -482,6 +508,7 @@ async function handleCallbackPaste(event: ClipboardEvent) {
 
   event.preventDefault();
   callbackUrl.value = pastedText;
+  clearCallbackAutoExchangeTimer();
   await nextTick();
   await handleExchangeOAuth();
 }
@@ -525,6 +552,7 @@ onBeforeUnmount(() => {
     clearTimeout(copiedCallbackUrlTimer);
     copiedCallbackUrlTimer = null;
   }
+  clearCallbackAutoExchangeTimer();
   clearCopyAutoNextTimer();
 });
 </script>
@@ -720,6 +748,7 @@ onBeforeUnmount(() => {
                 :placeholder="callbackPlaceholder(provider)"
                 :disabled="isLoading"
                 class="h-9 w-full rounded-md border border-input bg-background px-3 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+                @input="handleCallbackInput"
                 @paste="handleCallbackPaste"
               >
               <UiTooltip :text="copiedCallbackUrl ? 'Pasted' : 'Paste'">
