@@ -98,8 +98,6 @@ function toShellAccountSummary(summary: AccountSummaryData | AccountPingData): S
 const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData("dashboard-shell-accounts", async (): Promise<ShellAccountSummary> => {
   const summary = await dashboardApi.accounts.ping();
   return toShellAccountSummary(summary);
-}, {
-  default: () => emptyShellAccountSummary,
 });
 
 const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptyShellAccountSummary.accountCounts);
