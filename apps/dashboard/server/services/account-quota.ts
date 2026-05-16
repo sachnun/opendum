@@ -10,8 +10,8 @@ const MAX_QUOTA_BATCH_ACCOUNTS = 3;
 const quotaProviderSchema = z.enum(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const quotaInFlight = new Map<string, Promise<AccountQuotaResult>>();
 
-export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: z.string(), forceRefresh: z.boolean().optional() });
-export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS), forceRefresh: z.boolean().optional() });
+export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: z.string() });
+export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS) });
 
 type QuotaProviderKey = z.infer<typeof quotaProviderSchema>;
 type JsonRecord = Record<string, unknown>;

@@ -56,8 +56,8 @@ export function useDashboardApi() {
       exchangeOAuth: (body: { provider: "antigravity" | "gemini_cli" | "codex" | "kiro"; callbackUrl: string; state?: string | null; codeVerifier?: string | null }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/oauth/exchange", body),
       initiateDeviceAuth: (body: { provider: "qwen_code" | "copilot" | "codex" }) => post<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/initiate", body),
       pollDeviceAuth: (body: { provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode?: string; codeVerifier?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/poll", body),
-      quota: (body: { provider: QuotaProviderKey; accountId: string; forceRefresh?: boolean }, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaInfo>>(dashboardFetch, "/api/dashboard/accounts/quota", body, options),
-      quotas: (body: { provider: QuotaProviderKey; accountIds: string[]; forceRefresh?: boolean }, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaBatchResult>>(dashboardFetch, "/api/dashboard/accounts/quotas", body, options),
+      quota: (body: { provider: QuotaProviderKey; accountId: string }, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaInfo>>(dashboardFetch, "/api/dashboard/accounts/quota", body, options),
+      quotas: (body: { provider: QuotaProviderKey; accountIds: string[] }, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaBatchResult>>(dashboardFetch, "/api/dashboard/accounts/quotas", body, options),
     },
     analytics: {
       data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string }) => post<AnalyticsData>(dashboardFetch, "/api/dashboard/analytics/data", body),

@@ -114,17 +114,17 @@ export function useAccountQuotaMonitor(options: {
     if (hasErrorChanges) quotaErrorByAccountId.value = nextErrorByAccountId;
   }
 
-  async function loadAccountQuota(account: Account, forceRefresh = false, runId?: number, refreshExisting = false) {
+  async function loadAccountQuota(account: Account, refreshExisting = false, runId?: number) {
     const provider = options.toQuotaProvider(account.provider);
     if (!provider || quotaLoadingByAccountId.value[account.id]) return;
-    if (!forceRefresh && quotaByAccountId.value[account.id] && !refreshExisting) return;
+    if (quotaByAccountId.value[account.id] && !refreshExisting) return;
 
     const hadQuota = Boolean(quotaByAccountId.value[account.id]);
     setQuotaLoading(account.id, true);
     quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
 
     try {
-      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh });
+      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id });
       if (runId !== undefined && runId !== quotaQueueRunId) return;
       if (!result.success) throw new Error(result.error);
 
