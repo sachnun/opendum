@@ -80,14 +80,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="containerRef" :class="cn('relative h-8 w-full', $props.class)">
-    <svg :viewBox="`0 0 ${chartWidth} ${height}`" class="h-full w-full" role="img" :aria-label="ariaLabel">
-      <path :d="`M0,${height} L${chartWidth},${height}`" stroke="var(--border)" stroke-width="1" fill="none" />
+    <svg :viewBox="`0 0 ${chartWidth} ${height}`" class="h-full w-full" preserveAspectRatio="none" role="img" :aria-label="ariaLabel">
+      <path :d="`M0,${height} L${chartWidth},${height}`" stroke="var(--border)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke" />
       <path v-if="areaPath" :d="areaPath" :fill="color" fill-opacity="0.18" stroke="none" />
       <path
         v-if="sparklinePath"
         :d="sparklinePath"
         :stroke="color"
         stroke-width="2"
+        vector-effect="non-scaling-stroke"
         fill="none"
         stroke-linecap="round"
         stroke-linejoin="round"
