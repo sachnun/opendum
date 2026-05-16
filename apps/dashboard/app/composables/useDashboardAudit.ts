@@ -18,7 +18,6 @@ export function useDashboardAudit() {
     useState<Record<string, string>>("account-quota-error-by-account-id", () => ({})).value = {};
     useState<Record<string, boolean>>("account-quota-loading-by-account-id", () => ({})).value = {};
     useState<Record<string, boolean>>("account-quota-hydrated-account-ids", () => ({})).value = {};
-    clearNuxtData();
     await refreshNuxtData();
   }
 

@@ -11,6 +11,7 @@ const dashboardInvalidation = useDashboardDataInvalidation();
 const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidation.keys.accountsOverview, () => dashboardApi.accounts.overview());
 
 const summaries = computed(() => data.value?.summaries ?? null);
+const isInitialLoading = computed(() => pending.value && !data.value);
 const pinnedProviders = computed(() => new Set(data.value?.pinnedProviders ?? []));
 const sortedProviders = computed(() => [...PROVIDER_ACCOUNT_DEFINITIONS].sort((a, b) => {
   const aPinned = pinnedProviders.value.has(a.key) ? 0 : 1;
@@ -44,7 +45,7 @@ function refreshAccountsOverview() {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="pending" class="h-96 rounded-xl" />
+    <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
     <div v-else-if="summaries" class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
       <ProviderOverviewCard
         v-for="provider in sortedProviders"

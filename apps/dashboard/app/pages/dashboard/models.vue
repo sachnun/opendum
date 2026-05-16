@@ -15,6 +15,7 @@ type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number
 
 const { data, error, pending } = await useAsyncData("dashboard-models", () => dashboardApi.models.list());
 const models = computed<ModelListItem[]>(() => data.value ?? []);
+const isInitialLoading = computed(() => pending.value && !data.value);
 const availableProviders = computed(() => {
   const entries = new Map<string, string>();
 
@@ -164,7 +165,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="pending" class="h-96 rounded-xl" />
+    <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
     <DashboardEmptyState v-else-if="models.length === 0" title="No models found" description="Connect accounts or adjust your search." icon="i-lucide-cpu" />
     <div v-else class="space-y-4 md:space-y-2">
       <div class="flex flex-wrap gap-1.5 pb-2">

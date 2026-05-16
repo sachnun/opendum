@@ -160,6 +160,7 @@ if (data.value && !data.value.hasAnyProviderAccount) {
 }
 
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
+const isInitialLoading = computed(() => pending.value && !data.value);
 const models = computed<ModelOption[]>(() => options.value?.models ?? []);
 const providerAccounts = computed<ProviderAccountOption[]>(() => options.value?.providerAccounts ?? []);
 const hasAnyProviderAccount = computed(() => Boolean(options.value?.hasAnyProviderAccount));
@@ -1632,7 +1633,7 @@ function formatToolArguments(value: string): string {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="pending" class="h-96 rounded-xl" />
+    <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
 
     <template v-else>
       <div class="space-y-3">
