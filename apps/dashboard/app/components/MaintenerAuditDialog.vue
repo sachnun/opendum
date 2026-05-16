@@ -76,7 +76,8 @@ async function selectUser(user: MaintenerAuditUser) {
     <template #content>
       <div class="space-y-1.5 pr-6">
         <h2 class="text-lg font-semibold leading-none tracking-tight">Audit User</h2>
-        <p class="text-sm text-muted-foreground">Search an account to view it in read-only audit mode.</p>
+        <p class="text-sm text-muted-foreground sm:hidden">Search account for audit mode.</p>
+        <p class="hidden text-sm text-muted-foreground sm:block">Search an account to view it in read-only audit mode.</p>
       </div>
 
       <label class="grid gap-1.5 text-sm font-medium">
