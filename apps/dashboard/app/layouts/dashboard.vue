@@ -394,9 +394,9 @@ async function handleSignOut() {
     <aside class="hidden border-r border-border bg-card md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col">
       <div class="flex h-16 items-center border-b border-border px-5">
         <NuxtLink to="/dashboard" class="inline-flex items-center gap-2.5">
-          <span class="relative inline-flex size-4 shrink-0 items-center justify-center overflow-hidden">
-            <span class="absolute size-2.5 animate-ping rounded-full bg-primary opacity-75" />
-            <span class="relative size-2.5 rounded-full bg-primary" />
+          <span class="relative flex h-2.5 w-2.5">
+            <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
           </span>
           <span class="inline-flex items-center gap-2 text-base font-semibold tracking-tight">
             Opendum
@@ -568,9 +568,9 @@ async function handleSignOut() {
         <div class="flex h-full flex-col bg-background">
           <div class="flex h-16 items-center justify-between border-b border-border px-5">
             <NuxtLink to="/dashboard" class="inline-flex items-center gap-2 text-base font-semibold tracking-tight" @click="mobileOpen = false">
-              <span class="relative inline-flex size-4 shrink-0 items-center justify-center overflow-hidden">
-                <span class="absolute size-2.5 animate-ping rounded-full bg-primary opacity-75" />
-                <span class="relative size-2.5 rounded-full bg-primary" />
+              <span class="relative flex h-2.5 w-2.5">
+                <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
               </span>
               <span class="inline-flex items-center gap-2">
                 Opendum
