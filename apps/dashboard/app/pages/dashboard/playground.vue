@@ -174,6 +174,7 @@ const responses = ref<Record<string, ResponseData>>({});
 const loopDialogOpen = ref(false);
 const loopCountInput = ref("2");
 const loopCount = ref(2);
+const additionalParametersInput = ref("");
 const activeLoopProgress = ref<{ current: number; total: number } | null>(null);
 const activeFamilyPreset = ref<string | null>(null);
 const activeProviderPreset = ref<string | null>(null);
@@ -222,8 +223,9 @@ const activePresetModelIds = computed(() => {
 const maxPanels = computed(() => Math.max(filteredModels.value.length, providerPresets.value.reduce((total, preset) => total + preset.panels.length, 0), 1));
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
-const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value));
 const isAnyLoading = computed(() => Object.values(responses.value).some((response) => response.isLoading));
+const additionalParametersError = computed(() => parseAdditionalParameters(additionalParametersInput.value).error);
+const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value && !additionalParametersError.value));
 const playgroundSetupMessage = computed(() => {
   if (!hasAnyProviderAccount.value) return "Connect a provider account before running Playground.";
   if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
@@ -370,6 +372,32 @@ function normalizeQueryReasoningEffort(value: unknown): ReasoningEffort | null {
   return effort === "none" || effort === "low" || effort === "medium" || effort === "high" || effort === "xhigh" ? effort : null;
 }
 
+function normalizeQueryAdditionalParameters(value: unknown): string | null {
+  const rawValue = normalizeQueryParam(value);
+  if (!rawValue?.trim()) return null;
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? JSON.stringify(parsed, null, 2) : null;
+  } catch {
+    return rawValue;
+  }
+}
+
+function parseAdditionalParameters(value: string): { params: Record<string, unknown> | null; error: string } {
+  if (!value.trim()) return { params: null, error: "" };
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { params: null, error: "Additional parameters must be a JSON object." };
+    }
+    return { params: parsed as Record<string, unknown>, error: "" };
+  } catch (error) {
+    return { params: null, error: error instanceof Error ? error.message : "Invalid JSON." };
+  }
+}
+
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -383,6 +411,7 @@ function applyQuerySettings(query: typeof route.query) {
   const presencePenalty = normalizeQueryNumber(query.presence_penalty);
   const frequencyPenalty = normalizeQueryNumber(query.frequency_penalty);
   const reasoningEffort = normalizeQueryReasoningEffort(query.reasoning_effort);
+  const additionalParameters = normalizeQueryAdditionalParameters(query.additional_parameters);
 
   if (endpoint) settings.endpoint = endpoint;
   if (streamResponses !== null) settings.streamResponses = streamResponses;
@@ -392,6 +421,7 @@ function applyQuerySettings(query: typeof route.query) {
   if (presencePenalty !== null) settings.presencePenalty = clampNumber(presencePenalty, -2, 2);
   if (frequencyPenalty !== null) settings.frequencyPenalty = clampNumber(frequencyPenalty, -2, 2);
   if (reasoningEffort) settings.reasoningEffort = reasoningEffort;
+  if (additionalParameters !== null) additionalParametersInput.value = additionalParameters;
 }
 
 function accountSupportsModel(account: ProviderAccountOption, model: ModelOption | string): boolean {
@@ -678,6 +708,7 @@ function selectScenario(scenario: Scenario) {
 
 function resetSettings() {
   Object.assign(settings, DEFAULT_SETTINGS);
+  additionalParametersInput.value = "";
 }
 
 function resetChatMessages() {
@@ -1288,6 +1319,9 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     const requestBody = buildRequestBody(modelId, messages, currentSettings, accountId);
     const endpointOverrides = adaptRequestOverridesForEndpoint(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
+    const additionalParameters = parseAdditionalParameters(additionalParametersInput.value);
+    if (additionalParameters.error) throw new Error(`Invalid additional parameters: ${additionalParameters.error}`);
+    if (additionalParameters.params) Object.assign(requestBody, additionalParameters.params);
     if (!canUsePlayground.value) throw new Error(playgroundSetupMessage.value || "Playground is not ready.");
 
     const controller = new AbortController();
@@ -1574,6 +1608,26 @@ function formatToolArguments(value: string): string {
               Max Tokens
               <input v-model.number="settings.maxTokens" type="number" min="1" max="128000" :disabled="isAnyLoading" class="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
               <span class="text-xs font-normal text-muted-foreground">Maximum number of tokens to generate</span>
+            </label>
+          </section>
+
+          <div class="h-px bg-border" />
+
+          <section class="space-y-4">
+            <h3 class="text-sm font-medium uppercase tracking-wide text-muted-foreground">Additional Parameters</h3>
+            <label class="grid gap-2 text-sm font-medium">
+              Request body JSON
+              <textarea
+                v-model="additionalParametersInput"
+                rows="8"
+                spellcheck="false"
+                placeholder='{\n  "seed": 1234,\n  "metadata": { "case": "repro" }\n}'
+                :disabled="isAnyLoading"
+                class="min-h-40 resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                :class="additionalParametersError ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/30' : ''"
+              />
+              <span class="text-xs font-normal text-muted-foreground">Merged into the final request body after the selected scenario and settings. Values here can override generated fields.</span>
+              <span v-if="additionalParametersError" class="text-xs font-normal text-destructive">{{ additionalParametersError }}</span>
             </label>
           </section>
 

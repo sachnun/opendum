@@ -403,6 +403,22 @@ function addPlaygroundParam(query: Record<string, string>, params: Record<string
   }
 }
 
+function addAdditionalPlaygroundParams(query: Record<string, string>, params: Record<string, unknown>) {
+  const handledKeys = new Set([
+    "stream",
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "max_output_tokens",
+    "max_completion_tokens",
+    "presence_penalty",
+    "frequency_penalty",
+    "reasoning_effort",
+  ]);
+  const additionalParams = Object.fromEntries(Object.entries(params).filter(([key]) => !handledKeys.has(key)));
+  if (Object.keys(additionalParams).length > 0) query.additional_parameters = JSON.stringify(additionalParams);
+}
+
 function formatHourLabel(time: string): string {
   const date = new Date(time);
   return Number.isNaN(date.getTime()) ? time.slice(11, 16) : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -645,6 +661,8 @@ const errorPlaygroundRoute = computed(() => {
       const effort = (reasoning as Record<string, unknown>).effort;
       if (typeof effort === "string" && effort.trim()) query.reasoning_effort = effort.trim();
     }
+
+    addAdditionalPlaygroundParams(query, params);
   }
 
   return { path: "/dashboard/playground", query };
