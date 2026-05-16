@@ -63,6 +63,7 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
 const dashboardInvalidation = useDashboardDataInvalidation();
+const accountSummaryCooldown = useDashboardPollingCooldown();
 const accountsNavigationHref = "/dashboard";
 const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dashboardInvalidation.keys.accountsOverview);
 
@@ -316,11 +317,13 @@ async function refreshAccountSummaryOnce() {
     return;
   }
 
+  accountSummaryCooldown.setRefreshing(true);
   accountSummaryRefreshInFlight = refreshAccountSummary().then(() => undefined);
   try {
     await accountSummaryRefreshInFlight;
   } finally {
     accountSummaryRefreshInFlight = null;
+    accountSummaryCooldown.setRefreshing(false);
     const shouldRefreshAgain = accountSummaryRefreshQueued && shouldRefreshAccountSummary.value;
     accountSummaryRefreshQueued = false;
 
@@ -332,6 +335,7 @@ async function refreshAccountSummaryOnce() {
 
 function stopAccountSummaryRefresh() {
   accountSummaryRefreshQueued = false;
+  accountSummaryCooldown.stop();
   if (!accountSummaryRefreshTimer) return;
 
   clearInterval(accountSummaryRefreshTimer);
@@ -341,7 +345,9 @@ function stopAccountSummaryRefresh() {
 function startAccountSummaryRefresh() {
   if (accountSummaryRefreshTimer || !shouldRefreshAccountSummary.value) return;
 
+  accountSummaryCooldown.start(ACCOUNT_SUMMARY_REFRESH_MS);
   accountSummaryRefreshTimer = setInterval(() => {
+    accountSummaryCooldown.start(ACCOUNT_SUMMARY_REFRESH_MS);
     void refreshAccountSummaryOnce();
   }, ACCOUNT_SUMMARY_REFRESH_MS);
 }
