@@ -19,17 +19,9 @@ type RunQuotaQueueOptions = {
 const ENABLED_QUOTA_FETCH_DELAY_MS = 500;
 const DISABLED_QUOTA_FETCH_DELAY_MS = 1500;
 const QUOTA_BATCH_SIZE = 3;
-const QUOTA_FETCH_TIMEOUT_MS = 7000;
 const QUOTA_DB_NAME = "opendum-dashboard";
 const QUOTA_STORE_NAME = "account-quota";
 const quotaStore = import.meta.client ? createStore(QUOTA_DB_NAME, QUOTA_STORE_NAME) : null;
-
-class QuotaFetchTimeoutError extends Error {
-  constructor() {
-    super("Quota fetch timed out");
-    this.name = "QuotaFetchTimeoutError";
-  }
-}
 
 function getQuotaCacheKey(accountId: string) {
   return `account-quota:${accountId}`;
@@ -128,13 +120,11 @@ export function useAccountQuotaMonitor(options: {
     if (!forceRefresh && quotaByAccountId.value[account.id] && !refreshExisting) return;
 
     const hadQuota = Boolean(quotaByAccountId.value[account.id]);
-    const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(new QuotaFetchTimeoutError()), QUOTA_FETCH_TIMEOUT_MS);
     setQuotaLoading(account.id, true);
     quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
 
     try {
-      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh }, { signal: abortController.signal });
+      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh });
       if (runId !== undefined && runId !== quotaQueueRunId) return;
       if (!result.success) throw new Error(result.error);
 
@@ -143,12 +133,10 @@ export function useAccountQuotaMonitor(options: {
       await writeCachedQuota(account, provider, result.data);
     } catch (error) {
       if (runId !== undefined && runId !== quotaQueueRunId) return;
-      if (abortController.signal.aborted) return;
 
       const message = error instanceof Error ? error.message : "Failed to fetch quota data";
       if (!hadQuota) quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: message };
     } finally {
-      clearTimeout(timeout);
       setQuotaLoading(account.id, false);
     }
   }
@@ -189,13 +177,11 @@ export function useAccountQuotaMonitor(options: {
 
           const batchAccounts = providerAccounts.slice(batchStart, batchStart + QUOTA_BATCH_SIZE);
           const hadQuotaByAccountId = Object.fromEntries(batchAccounts.map((account) => [account.id, Boolean(quotaByAccountId.value[account.id])]));
-          const abortController = new AbortController();
-          const timeout = setTimeout(() => abortController.abort(new QuotaFetchTimeoutError()), QUOTA_FETCH_TIMEOUT_MS);
           batchAccounts.forEach((account) => setQuotaLoading(account.id, true));
           quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(batchAccounts.map((account) => [account.id, ""])) };
 
           try {
-            const result = await dashboardApi.accounts.quotas({ provider, accountIds: batchAccounts.map((account) => account.id) }, { signal: abortController.signal });
+            const result = await dashboardApi.accounts.quotas({ provider, accountIds: batchAccounts.map((account) => account.id) });
             if (runId !== quotaQueueRunId) return;
             if (!result.success) throw new Error(result.error);
 
@@ -219,12 +205,10 @@ export function useAccountQuotaMonitor(options: {
             quotaErrorByAccountId.value = nextErrorByAccountId;
           } catch (error) {
             if (runId !== quotaQueueRunId) return;
-            if (abortController.signal.aborted) return;
 
             const message = error instanceof Error ? error.message : "Failed to fetch quota data";
             quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(batchAccounts.filter((account) => !hadQuotaByAccountId[account.id]).map((account) => [account.id, message])) };
           } finally {
-            clearTimeout(timeout);
             batchAccounts.forEach((account) => setQuotaLoading(account.id, false));
           }
         }
