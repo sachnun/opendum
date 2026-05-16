@@ -113,11 +113,8 @@ const HTTP_STATUS_DESCRIPTIONS: Record<number, string> = {
 };
 const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
   antigravity: [
-    { labelClass: "w-24", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
-    { labelClass: "w-20", metaClass: "w-12", valueClass: "w-7", barClass: "w-3/5" },
-    { labelClass: "w-24", metaClass: "w-9", valueClass: "w-8", barClass: "w-4/5" },
-    { labelClass: "w-28", metaClass: "w-11", valueClass: "w-7", barClass: "w-2/3" },
-    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-8", barClass: "w-5/6" },
+    { labelClass: "w-14", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
+    { labelClass: "w-24", metaClass: "w-12", valueClass: "w-8", barClass: "w-4/5" },
   ],
   copilot: [
     { labelClass: "w-36", metaClass: "w-12", valueClass: "w-16", barClass: "w-3/4" },

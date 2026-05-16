@@ -24,11 +24,28 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
   percentUsed: number;
   accounts: number;
 };
+type QuotaSummarySkeletonRow = {
+  labelClass: string;
+  metaClass: string;
+  valueClass: string;
+  barClass: string;
+};
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
 const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
 const FREE_TIER_VALUES = new Set(["", "free", "free-tier", "guest", "unknown"]);
+const DEFAULT_QUOTA_SUMMARY_SKELETON_ROWS: QuotaSummarySkeletonRow[] = [
+  { labelClass: "w-24", metaClass: "w-14", valueClass: "w-8", barClass: "w-4/5" },
+  { labelClass: "w-20", metaClass: "w-12", valueClass: "w-8", barClass: "w-3/5" },
+  { labelClass: "w-28", metaClass: "w-14", valueClass: "w-8", barClass: "w-5/6" },
+];
+const QUOTA_SUMMARY_SKELETON_ROWS: Partial<Record<QuotaProviderKey, QuotaSummarySkeletonRow[]>> = {
+  antigravity: [
+    { labelClass: "w-14", metaClass: "w-16", valueClass: "w-8", barClass: "w-11/12" },
+    { labelClass: "w-24", metaClass: "w-16", valueClass: "w-8", barClass: "w-4/5" },
+  ],
+};
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
@@ -193,6 +210,13 @@ const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
       percentUsed: group.maxRequests > 0 ? Math.round(Math.max(0, Math.min(100, (group.usedRequests / group.maxRequests) * 100))) : 0,
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
+});
+const quotaSummarySkeletonRows = computed(() => {
+  const quotaProvider = toQuotaProvider(selectedProvider.value);
+  const providerRows = quotaProvider ? QUOTA_SUMMARY_SKELETON_ROWS[quotaProvider] : undefined;
+  if (providerRows) return providerRows;
+
+  return DEFAULT_QUOTA_SUMMARY_SKELETON_ROWS.slice(0, Math.min(activeQuotaAccounts.value.length, DEFAULT_QUOTA_SUMMARY_SKELETON_ROWS.length));
 });
 
 function toQuotaProvider(provider: string): QuotaProviderKey | null {
@@ -377,17 +401,17 @@ function decodeAccountHash(hash: string): string | null {
             </div>
           </div>
         </div>
-        <div v-else-if="activeQuotaAccounts.length > 0" class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
-          <div v-for="index in Math.min(activeQuotaAccounts.length, 3)" :key="index" class="space-y-1.5">
+        <div v-else-if="quotaSummarySkeletonRows.length > 0" class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+          <div v-for="(row, index) in quotaSummarySkeletonRows" :key="index" class="space-y-1.5">
             <div class="flex items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-1.5">
-                <UiSkeleton class="h-3 w-24" />
-                <UiSkeleton class="h-2.5 w-14" />
+                <UiSkeleton :class="['h-3', row.labelClass]" />
+                <UiSkeleton :class="['h-2.5', row.metaClass]" />
               </div>
-              <UiSkeleton class="h-3 w-8" />
+              <UiSkeleton :class="['h-3', row.valueClass]" />
             </div>
             <div class="h-1.5 overflow-hidden rounded-full bg-muted">
-              <UiSkeleton class="h-full w-4/5 rounded-full" />
+              <UiSkeleton :class="['h-full rounded-full', row.barClass]" />
             </div>
           </div>
         </div>
