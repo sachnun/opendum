@@ -4,7 +4,7 @@ import { db } from "../lib/db";
 import { disabledModel, providerAccount, providerAccountDisabledModel } from "../lib/db/schema";
 import { getAccountModelAvailability, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts } from "../lib/proxy/authless-providers";
-import { getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";
+import { MODEL_REGISTRY, getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";
 import { compareModelEntries } from "../../lib/model-sort";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 
@@ -66,6 +66,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         name: model,
         family: getModelFamily(model),
         providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
+        meta: MODEL_REGISTRY[model]?.meta,
       }))
       .sort(compareModelEntries);
 

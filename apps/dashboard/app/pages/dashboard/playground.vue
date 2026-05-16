@@ -238,6 +238,7 @@ const isLoopCountValid = computed(() => Number.isInteger(parsedLoopCount.value) 
 const activeLoopBadgeLabel = computed(() => activeLoopProgress.value && activeLoopProgress.value.total > 1 ? `${activeLoopProgress.value.current}/${activeLoopProgress.value.total}` : null);
 const scenarioMessages = computed(() => getScenarioMessages(selectedScenario.value));
 const isChatScenario = computed(() => selectedScenario.value.id === "chat");
+const isVisionScenario = computed(() => selectedScenario.value.id === "vision");
 
 watch(options, (value) => {
   if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard", { replace: true });
@@ -534,6 +535,16 @@ function getPanelModels(panel: PanelState): ModelOption[] {
   const search = modelSearchByPanel[panel.id]?.trim().toLowerCase();
   if (!search) return nextModels;
   return nextModels.filter((model) => `${model.name} ${model.providers.join(" ")}`.toLowerCase().includes(search));
+}
+
+function hasVisionMetadata(model: ModelOption | undefined): boolean {
+  if (!model?.meta) return false;
+  if (typeof model.meta.vision === "boolean") return model.meta.vision;
+  return Boolean(model.meta.modalities?.input?.includes("image"));
+}
+
+function shouldShowVisionWarning(model: ModelOption | undefined): boolean {
+  return Boolean(isVisionScenario.value && model && !hasVisionMetadata(model));
 }
 
 function getGroupedPanelModels(panel: PanelState) {
@@ -1734,6 +1745,9 @@ function formatToolArguments(value: string): string {
             <UiPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
               <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between px-2 font-normal" :disabled="responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
                 <span v-if="panel.modelId && modelsById.get(panel.modelId)" class="flex min-w-0 items-center gap-2">
+                  <UiTooltip v-if="shouldShowVisionWarning(modelsById.get(panel.modelId))" text="This model may not support vision input">
+                    <UiIcon name="i-lucide-triangle-alert" class="size-3.5 shrink-0 text-yellow-500" />
+                  </UiTooltip>
                   <span class="truncate">{{ modelsById.get(panel.modelId)?.name }}</span>
                   <UiBadge variant="secondary" class="shrink-0 whitespace-nowrap px-1.5 py-0 text-[10px]">
                     {{ getValidAccountIdForPanel(panel) ? getProviderLabel(providerAccountsById.get(getValidAccountIdForPanel(panel)!)?.provider ?? '') : responses[panel.id]?.usedAccountId ? `Auto - ${getProviderLabel(providerAccountsById.get(responses[panel.id]?.usedAccountId ?? '')?.provider ?? '')}` : 'Auto' }}
