@@ -808,6 +808,37 @@ func TestAntigravityMakeRequestUsesDefaultProjectWithoutDiscovery(t *testing.T) 
 	}
 }
 
+func TestAntigravityDropsUnsupportedLogitBias(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	var payload map[string]any
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":      "antigravity/gemini-3.1-pro-preview",
+		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
+		"logit_bias": map[string]any{"12429": -50},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	request := payload["request"].(map[string]any)
+	if _, ok := request["logit_bias"]; ok {
+		t.Fatalf("logit_bias leaked to request: %#v", request)
+	}
+	if generation, ok := request["generationConfig"].(map[string]any); ok {
+		if _, ok := generation["logitBias"]; ok {
+			t.Fatalf("logitBias leaked to generationConfig: %#v", generation)
+		}
+	}
+}
+
 func TestAntigravityResponseNormalizesToolArgsFinishAndUsage(t *testing.T) {
 	schemas := toolSchemaMap{"lookup": map[string]schemaInfo{"items": {typ: "array"}, "query": {typ: "string"}}}
 	response := map[string]any{

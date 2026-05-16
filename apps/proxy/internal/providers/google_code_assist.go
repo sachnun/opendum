@@ -496,6 +496,7 @@ func (p googleCodeAssistProvider) requestedGemini3ThinkingLevel(model string, bo
 
 func (p googleCodeAssistProvider) normalizeBodyForModel(body map[string]any, model string) map[string]any {
 	out := cloneAnyMap(body)
+	delete(out, "logit_bias")
 	if providerConfigBool(p.registry, model, p.name, "top_p_min_095") {
 		if topP, ok := numberAsFloat(out["top_p"]); ok && topP < 0.95 {
 			delete(out, "top_p")
