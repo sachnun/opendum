@@ -398,7 +398,12 @@ async function handleSignOut() {
             <span class="absolute size-2.5 animate-ping rounded-full bg-primary opacity-75" />
             <span class="relative size-2.5 rounded-full bg-primary" />
           </span>
-          <span class="text-base font-semibold tracking-tight">Opendum</span>
+          <span class="inline-flex items-center gap-2 text-base font-semibold tracking-tight">
+            Opendum
+            <span v-if="isMaintener" class="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
+              dev
+            </span>
+          </span>
         </NuxtLink>
       </div>
 
@@ -520,12 +525,10 @@ async function handleSignOut() {
                 type="button"
                 class="flex cursor-pointer items-center justify-center rounded-full transition-opacity hover:opacity-80"
               >
-                <span :class="['relative flex shrink-0 rounded-full select-none', isMaintener ? 'border-[3px] border-white/70 p-[3px]' : '']">
-                  <span class="relative flex size-8 overflow-hidden rounded-full">
-                    <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
-                    <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
-                      {{ userInitial }}
-                    </span>
+                <span class="relative flex size-8 shrink-0 overflow-hidden rounded-full select-none">
+                  <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
+                  <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
+                    {{ userInitial }}
                   </span>
                 </span>
               </button>
@@ -569,7 +572,12 @@ async function handleSignOut() {
                 <span class="absolute size-2.5 animate-ping rounded-full bg-primary opacity-75" />
                 <span class="relative size-2.5 rounded-full bg-primary" />
               </span>
-              Opendum
+              <span class="inline-flex items-center gap-2">
+                Opendum
+                <span v-if="isMaintener" class="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
+                  dev
+                </span>
+              </span>
             </NuxtLink>
             <button type="button" class="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus:outline-none" @click="mobileOpen = false">
               <UiIcon name="i-lucide-x" class="size-4" />
