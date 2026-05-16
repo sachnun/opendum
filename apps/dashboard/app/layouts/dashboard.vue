@@ -390,8 +390,8 @@ async function handleSignOut() {
 </script>
 
 <template>
-  <div class="relative flex min-h-svh bg-background text-foreground">
-    <aside class="hidden border-r border-border bg-card md:sticky md:top-0 md:flex md:h-svh md:w-60 md:flex-col">
+  <div class="relative flex h-svh overflow-hidden bg-background text-foreground">
+    <aside class="hidden border-r border-border bg-card md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col">
       <div class="flex h-16 items-center border-b border-border px-5">
         <NuxtLink to="/dashboard" class="inline-flex items-center gap-2.5">
           <span class="relative inline-flex size-4 shrink-0 items-center justify-center overflow-hidden">
@@ -501,7 +501,7 @@ async function handleSignOut() {
       </div>
     </aside>
 
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
       <header class="sticky top-0 z-30 h-16 border-b border-border bg-background px-3 sm:px-6 lg:px-8">
         <div class="flex h-full w-full items-center gap-3 md:gap-0">
           <div class="flex min-w-0 items-center">
@@ -556,7 +556,7 @@ async function handleSignOut() {
         </div>
       </header>
 
-      <main ref="mainContent" class="flex-1 overflow-y-auto">
+      <main ref="mainContent" class="min-h-0 flex-1 overflow-y-auto">
         <div class="w-full px-5 pb-8 pt-5 sm:px-6 lg:px-8">
           <slot />
         </div>
