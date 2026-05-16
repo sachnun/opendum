@@ -132,6 +132,8 @@ export interface AccountQuotaInfo {
   lastUsedAt: number | null;
 }
 
+export type AccountQuotaBatchResult = Record<string, ActionResult<AccountQuotaInfo>>;
+
 export interface ErrorHistoryEntry {
   id: string;
   model: string | null;

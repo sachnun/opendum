@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../lib/db";
@@ -17,14 +17,19 @@ import { kiroProvider } from "../lib/providers/kiro";
 import { fetchKiroQuotaFromApi, type KiroQuotaMetric } from "../lib/providers/kiro/quota";
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
 
-export const accountQuotaInputSchema = z.object({ provider: z.enum(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]), accountId: z.string(), forceRefresh: z.boolean().optional() });
+const quotaProviderSchema = z.enum(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
+
+export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: z.string(), forceRefresh: z.boolean().optional() });
+export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(100), forceRefresh: z.boolean().optional() });
 const OPENROUTER_REQUEST_TIMEOUT_MS = 10000;
+const MAX_SIMULTANEOUS_QUOTA_FETCHES = 3;
 const COPILOT_DEFAULT_MONTHLY_LIMIT = 300;
 
-type QuotaProviderKey = z.infer<typeof accountQuotaInputSchema>["provider"];
+type QuotaProviderKey = z.infer<typeof quotaProviderSchema>;
 type QuotaConfidence = "high" | "medium" | "low";
 type JsonRecord = Record<string, unknown>;
 type QuotaFetcher = (account: ProviderAccount) => Promise<AccountQuotaInfo>;
+type AccountQuotaResult = { success: true; data: AccountQuotaInfo } | { success: false; error: string };
 
 interface QuotaGroupDisplay {
   name: string;
@@ -460,7 +465,7 @@ async function getAntigravityQuota(account: ProviderAccount): Promise<AccountQuo
   const credentials = await getValidQuotaCredentials(account, (account) => antigravityProvider.getValidCredentials(account), tier);
   if ("status" in credentials) return credentials;
   const quota = await fetchAntigravityQuotaFromApi(credentials.accessToken, account.projectId ?? "", tier);
-  if (quota.status === "error") return errorQuotaInfo(account, tier, quota.error, quota.fetchedAt);
+  if (quota.status === "error") return errorQuotaInfo(account, tier, quota.error ?? "Failed to fetch Antigravity quota data", quota.fetchedAt);
   return toBaseQuotaInfo(account, tier, "success", quota.groups.map(toAntigravityGroupDisplay), quota.fetchedAt);
 }
 
@@ -552,6 +557,15 @@ const QUOTA_FETCHERS = {
   openrouter: getOpenRouterQuota,
 } satisfies Record<QuotaProviderKey, QuotaFetcher>;
 
+async function fetchAccountQuota(provider: QuotaProviderKey, account: ProviderAccount): Promise<AccountQuotaResult> {
+  try {
+    return { success: true, data: await QUOTA_FETCHERS[provider](account) };
+  } catch (error) {
+    console.error("Failed to fetch provider quota:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota data" };
+  }
+}
+
 export async function getAccountQuota(userId: string, input: z.infer<typeof accountQuotaInputSchema>) {
   try {
     const [account] = await db
@@ -562,9 +576,52 @@ export async function getAccountQuota(userId: string, input: z.infer<typeof acco
       .limit(1);
 
     if (!account) return { success: false, error: "Account not found" } as const;
-    return { success: true, data: await QUOTA_FETCHERS[input.provider](account) } as const;
+    return await fetchAccountQuota(input.provider, account);
   } catch (error) {
     console.error("Failed to fetch provider quota:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota data" } as const;
+  }
+}
+
+export async function getAccountQuotas(userId: string, input: z.infer<typeof accountQuotaBatchInputSchema>) {
+  try {
+    const accountIds = [...new Set(input.accountIds)];
+    const accounts = await db
+      .select()
+      .from(providerAccount)
+      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider), inArray(providerAccount.id, accountIds)))
+      .orderBy(desc(providerAccount.lastUsedAt));
+
+    const accountById = new Map(accounts.map((account) => [account.id, account]));
+    const results: Record<string, AccountQuotaResult> = {};
+    const accountsToFetch: ProviderAccount[] = [];
+
+    for (const accountId of accountIds) {
+      const account = accountById.get(accountId);
+      if (account) {
+        accountsToFetch.push(account);
+      } else {
+        results[accountId] = { success: false, error: "Account not found" };
+      }
+    }
+
+    let nextAccountIndex = 0;
+    const workerCount = Math.min(MAX_SIMULTANEOUS_QUOTA_FETCHES, accountsToFetch.length);
+    const runWorker = async () => {
+      while (true) {
+        const account = accountsToFetch[nextAccountIndex];
+        nextAccountIndex += 1;
+        if (!account) return;
+
+        results[account.id] = await fetchAccountQuota(input.provider, account);
+      }
+    };
+
+    await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+
+    return { success: true, data: results } as const;
+  } catch (error) {
+    console.error("Failed to fetch provider quotas:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to fetch quota data" } as const;
   }
 }
