@@ -109,7 +109,7 @@ function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): 
 
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
-const { data: accountSummaryData, pending: accountSummaryPending, refresh: refreshAccountSummary } = await useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+const { data: accountSummaryData, refresh: refreshAccountSummary } = await useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   const useOverview = isProviderOverviewRoute.value;
   const summary = useOverview ? await dashboardApi.accounts.overview() : await dashboardApi.accounts.ping();
   if (useOverview) accountsOverviewData.value = summary as AccountOverviewData;
@@ -124,8 +124,8 @@ const accountIndicators = computed(
 const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptyShellAccountSummary.pinnedProviders);
 const hasConnectedAccounts = computed(() => accountSummaryData.value?.hasConnectedAccounts ?? emptyShellAccountSummary.hasConnectedAccounts);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
-const hasPinnedProviders = computed(() => pinnedProviders.value.length > 0);
-const shouldRefreshAccountSummary = computed(() => hasPinnedProviders.value || isProviderOverviewRoute.value);
+const hasResolvedPinnedProviders = computed(() => hasLoadedAccountSummary.value || cachedPinnedProviders.value !== null);
+const shouldRefreshAccountSummary = computed(() => true);
 
 watch(accountSummaryData, (value) => {
   if (value) cachedPinnedProviders.value = value.pinnedProviders;
@@ -135,7 +135,7 @@ const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccou
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
 const accountNavigationHrefs = computed(() => new Set(PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => getProviderAccountPath(definition.key))));
-const playgroundNavigationDisabled = computed(() => !isAuditMode.value && hasLoadedAccountSummary.value && !accountSummaryPending.value && !hasConnectedAccounts.value);
+const playgroundNavigationDisabled = computed(() => !isAuditMode.value && hasLoadedAccountSummary.value && !hasConnectedAccounts.value);
 
 function normalizeModelFamilyCounts(counts: Record<string, number>) {
   const nextCounts = { ...emptyModelFamilyCounts };
@@ -533,7 +533,14 @@ async function handleAuditSelected() {
                     </NuxtLink>
                   </template>
                 </template>
-                <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                <p
+                  v-else-if="isAccountsNavItem(item)"
+                  :class="[
+                    'min-h-6 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-opacity',
+                    hasResolvedPinnedProviders ? 'opacity-100' : 'opacity-0',
+                  ]"
+                  :aria-hidden="!hasResolvedPinnedProviders"
+                >
                   No pinned providers.
                 </p>
               </div>
@@ -732,7 +739,14 @@ async function handleAuditSelected() {
                         </NuxtLink>
                       </template>
                     </template>
-                    <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                    <p
+                      v-else-if="isAccountsNavItem(item)"
+                      :class="[
+                        'min-h-6 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-opacity',
+                        hasResolvedPinnedProviders ? 'opacity-100' : 'opacity-0',
+                      ]"
+                      :aria-hidden="!hasResolvedPinnedProviders"
+                    >
                       No pinned providers.
                     </p>
                   </div>
