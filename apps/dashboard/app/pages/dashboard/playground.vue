@@ -1721,7 +1721,7 @@ function formatToolArguments(value: string): string {
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
+              'flex h-auto min-h-10 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
               activeProviderPreset === preset.provider ? 'bg-primary text-primary-foreground' : 'border-input bg-input/30 hover:bg-input/50',
             ]"
             @click="applyProviderPreset(preset.provider)"
