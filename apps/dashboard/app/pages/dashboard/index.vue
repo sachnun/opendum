@@ -7,12 +7,6 @@ const dashboardApi = useDashboardApi();
 const { isAuditMode } = useDashboardAudit();
 
 const dashboardInvalidation = useDashboardDataInvalidation();
-const {
-  active: pollingCooldownActive,
-  durationMs: pollingCooldownDurationMs,
-  refreshing: pollingCooldownRefreshing,
-  startedAtMs: pollingCooldownStartedAtMs,
-} = useDashboardPollingCooldown();
 
 const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidation.keys.accountsOverview, () => dashboardApi.accounts.overview());
 
@@ -53,26 +47,10 @@ function refreshAccountsOverview() {
   <div class="space-y-6">
     <div class="dashboard-header-divider">
       <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex min-h-9 items-center justify-between gap-3 sm:justify-start">
-          <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
-            Provider Accounts
-          </h2>
-          <DashboardPollingCooldown
-            :started-at-ms="pollingCooldownStartedAtMs"
-            :duration-ms="pollingCooldownDurationMs"
-            :active="pollingCooldownActive"
-            :refreshing="pollingCooldownRefreshing"
-            class="sm:hidden"
-          />
-        </div>
-        <div class="flex w-full items-center gap-2 sm:w-auto">
-          <DashboardPollingCooldown
-            :started-at-ms="pollingCooldownStartedAtMs"
-            :duration-ms="pollingCooldownDurationMs"
-            :active="pollingCooldownActive"
-            :refreshing="pollingCooldownRefreshing"
-            class="hidden sm:inline-flex"
-          />
+        <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
+          Provider Accounts
+        </h2>
+        <div class="flex w-full items-center sm:w-auto">
           <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
         </div>
       </div>
