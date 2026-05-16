@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils";
 
 type Provider = ProviderAccountKey;
 type FlowType = "oauth_redirect" | "device_code" | "api_key" | "api_key_with_account_id";
+type CodexLoginMethod = Extract<FlowType, "oauth_redirect" | "device_code">;
 
 interface ProviderConfig {
   name: string;
@@ -49,6 +50,11 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", flowType: "api_key_with_account_id", apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
 };
 
+const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string; icon: string }> = [
+  { key: "oauth_redirect", name: "Browser OAuth", description: "Open the Codex login page, then paste the callback URL after redirect.", icon: "i-lucide-globe-2" },
+  { key: "device_code", name: "Device Code", description: "Enter a short code on the Codex device page and let the wizard detect completion.", icon: "i-lucide-key-round" },
+];
+
 const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "ollama_cloud", "openrouter", "nvidia_nim", "groq", "workers_ai"];
 
 const open = ref(false);
@@ -61,7 +67,8 @@ const cfAccountId = ref("");
 const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
-const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string } | null>(null);
+const codexLoginMethod = ref<CodexLoginMethod | null>(null);
+const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const isApiKeyVisible = ref(false);
@@ -75,6 +82,14 @@ let copiedDeviceCodeTimer: ReturnType<typeof setTimeout> | null = null;
 let copyAutoNextTimer: ReturnType<typeof setTimeout> | null = null;
 
 const selectedConfig = computed(() => (provider.value ? providerConfigs[provider.value] : null));
+const isCodexProvider = computed(() => provider.value === "codex");
+const activeFlowType = computed<FlowType | null>(() => {
+  if (!selectedConfig.value) return null;
+  if (isCodexProvider.value) return codexLoginMethod.value;
+  return selectedConfig.value.flowType;
+});
+const authStep = computed(() => (isCodexProvider.value ? 3 : 2));
+const finishStep = computed(() => (isCodexProvider.value ? 4 : 3));
 const dialogOpen = computed({
   get: () => open.value,
   set: (value: boolean) => {
@@ -82,25 +97,33 @@ const dialogOpen = computed({
     open.value = value;
   },
 });
-const displayedSteps = computed(() => (props.initialProvider ? [2, 3] : [1, 2, 3]));
+const displayedSteps = computed(() => {
+  if (isCodexProvider.value) return props.initialProvider ? [2, 3, 4] : [1, 2, 3, 4];
+  return props.initialProvider ? [2, 3] : [1, 2, 3];
+});
 const shouldPreventOutsideClose = computed(() => {
-  const flowType = selectedConfig.value?.flowType;
-  return isPolling.value || (step.value === 2 && (flowType === "api_key" || flowType === "api_key_with_account_id")) || (step.value === 3 && flowType === "oauth_redirect");
+  const flowType = activeFlowType.value;
+  return isPolling.value || (step.value === authStep.value && (flowType === "api_key" || flowType === "api_key_with_account_id")) || (step.value === finishStep.value && flowType === "oauth_redirect");
 });
 
 watch(open, (value) => {
   if (value) {
     step.value = minimumStep.value;
     provider.value = props.initialProvider;
+    codexLoginMethod.value = null;
     return;
   }
 
   resetForm();
 });
 
-watch([open, step, provider], async () => {
+watch([open, step, provider, codexLoginMethod], async () => {
   if (props.readonly) return;
-  if (!open.value || step.value !== 2 || !provider.value || !selectedConfig.value) return;
+  if (!open.value || step.value !== authStep.value || !provider.value || !selectedConfig.value || !activeFlowType.value) return;
+
+  const selectedProvider = provider.value;
+  const selectedFlowType = activeFlowType.value;
+  const selectedStep = step.value;
 
   errorMessage.value = "";
   authUrl.value = "";
@@ -110,20 +133,22 @@ watch([open, step, provider], async () => {
   isFetchingUrl.value = true;
 
   try {
-    if (selectedConfig.value.flowType === "oauth_redirect") {
-      const result = await dashboardApi.accounts.getAuthUrl({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro" });
+    if (selectedFlowType === "oauth_redirect") {
+      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider as "antigravity" | "gemini_cli" | "codex" | "kiro" });
       if (!result.success) throw new Error(result.error);
+      if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       authUrl.value = result.data.authUrl;
       oauthState.value = result.data.state;
       oauthCodeVerifier.value = result.data.codeVerifier;
       return;
     }
 
-    if (selectedConfig.value.flowType === "device_code") {
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: provider.value as "qwen_code" | "copilot" });
+    if (selectedFlowType === "device_code") {
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "qwen_code" | "copilot" | "codex" });
       if (!result.success) throw new Error(result.error);
+      if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
-        provider: provider.value as "qwen_code" | "copilot",
+        provider: selectedProvider as "qwen_code" | "copilot" | "codex",
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
@@ -132,11 +157,13 @@ watch([open, step, provider], async () => {
       return;
     }
 
-    authUrl.value = selectedConfig.value.apiKeyPortalUrl ?? "";
+    authUrl.value = providerConfigs[selectedProvider].apiKeyPortalUrl ?? "";
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to start account connection";
   } finally {
-    isFetchingUrl.value = false;
+    if (provider.value === selectedProvider && activeFlowType.value === selectedFlowType && step.value === selectedStep) {
+      isFetchingUrl.value = false;
+    }
   }
 });
 
@@ -149,6 +176,7 @@ function resetForm() {
   authUrl.value = "";
   oauthState.value = null;
   oauthCodeVerifier.value = null;
+  codexLoginMethod.value = null;
   deviceCodeInfo.value = null;
   copiedLink.value = false;
   copiedDeviceCode.value = false;
@@ -198,7 +226,32 @@ function finishConnection(result: { email: string; isUpdate: boolean }) {
 function selectProvider(providerKey: Provider) {
   if (props.readonly) return;
   provider.value = providerKey;
+  codexLoginMethod.value = null;
   step.value = 2;
+}
+
+function resetAuthProgress() {
+  callbackUrl.value = "";
+  authUrl.value = "";
+  oauthState.value = null;
+  oauthCodeVerifier.value = null;
+  deviceCodeInfo.value = null;
+  copiedLink.value = false;
+  copiedDeviceCode.value = false;
+  isFetchingUrl.value = false;
+  isPolling.value = false;
+  errorMessage.value = "";
+  if (pollingTimer) {
+    clearTimeout(pollingTimer);
+    pollingTimer = null;
+  }
+}
+
+function selectCodexLoginMethod(method: CodexLoginMethod) {
+  if (props.readonly) return;
+  resetAuthProgress();
+  codexLoginMethod.value = method;
+  step.value = authStep.value;
 }
 
 function callbackPlaceholder(providerKey: Provider | null) {
@@ -230,17 +283,17 @@ async function copyText(value: string, target: "link" | "code") {
     return;
   }
 
-  if (target === "link" && selectedConfig.value?.flowType !== "device_code" && step.value === 2) {
+  if (target === "link" && activeFlowType.value !== "device_code" && step.value === authStep.value) {
     clearCopyAutoNextTimer();
     copyAutoNextTimer = setTimeout(() => {
-      if (step.value === 2 && selectedConfig.value?.flowType !== "device_code") {
-        step.value = 3;
+      if (step.value === authStep.value && activeFlowType.value !== "device_code") {
+        step.value = finishStep.value;
       }
       copyAutoNextTimer = null;
     }, 2000);
   }
 
-  if (target === "link" && selectedConfig.value?.flowType === "device_code") {
+  if (target === "link" && activeFlowType.value === "device_code") {
     startDevicePolling(null);
   }
 }
@@ -260,7 +313,7 @@ function openPopup(url: string, name: string, width: number, height: number) {
 function openOAuthUrl() {
   if (!authUrl.value) return;
   openPopup(authUrl.value, "oauth_popup", 600, 700);
-  setTimeout(() => (step.value = 3), 600);
+  setTimeout(() => (step.value = finishStep.value), 600);
 }
 
 function openDeviceAuthUrl() {
@@ -272,7 +325,7 @@ function openDeviceAuthUrl() {
 function openApiKeyPortal() {
   if (!selectedConfig.value?.apiKeyPortalUrl) return;
   openPopup(selectedConfig.value.apiKeyPortalUrl, "api_key_portal_popup", 1100, 760);
-  if (step.value === 2) setTimeout(() => (step.value = 3), 600);
+  if (step.value === authStep.value) setTimeout(() => (step.value = finishStep.value), 600);
 }
 
 function startDevicePolling(popup: Window | null) {
@@ -341,11 +394,11 @@ async function handleConnectApiKey() {
 
   errorMessage.value = "";
   if (!apiKey.value.trim()) {
-    errorMessage.value = selectedConfig.value.flowType === "api_key_with_account_id" ? "Please enter an API token" : "Please enter an API key";
+    errorMessage.value = activeFlowType.value === "api_key_with_account_id" ? "Please enter an API token" : "Please enter an API key";
     return;
   }
 
-  if (selectedConfig.value.flowType === "api_key_with_account_id" && !cfAccountId.value.trim()) {
+  if (activeFlowType.value === "api_key_with_account_id" && !cfAccountId.value.trim()) {
     errorMessage.value = `Please enter the ${selectedConfig.value.accountIdLabel}`;
     return;
   }
@@ -391,7 +444,9 @@ async function handleExchangeOAuth() {
 
 function goBack() {
   clearCopyAutoNextTimer();
-  step.value = Math.max(minimumStep.value, step.value - 1);
+  const nextStep = Math.max(minimumStep.value, step.value - 1);
+  if (nextStep === 1) codexLoginMethod.value = null;
+  step.value = nextStep;
 }
 
 onBeforeUnmount(() => {
@@ -468,8 +523,33 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div v-if="step === 2 && selectedConfig" class="space-y-4">
-          <template v-if="selectedConfig.flowType === 'oauth_redirect'">
+        <div v-if="step === 2 && isCodexProvider" class="space-y-4">
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Choose Codex login method</p>
+            <p class="text-sm text-muted-foreground">Codex supports both browser OAuth and device code login. Pick the method you want to use for this account.</p>
+          </div>
+          <div class="grid gap-3">
+            <button
+              v-for="method in codexLoginMethods"
+              :key="method.key"
+              type="button"
+              :class="cn(
+                'flex cursor-pointer items-start gap-3 rounded-lg border-2 p-3 text-left transition-all hover:border-primary hover:bg-accent',
+                codexLoginMethod === method.key ? 'border-primary bg-accent' : 'border-border',
+              )"
+              @click="selectCodexLoginMethod(method.key)"
+            >
+              <UiIcon :name="method.icon" class="mt-0.5 size-4 text-muted-foreground" />
+              <span class="space-y-1">
+                <span class="block text-sm font-medium">{{ method.name }}</span>
+                <span class="block text-xs text-muted-foreground">{{ method.description }}</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="step === authStep && selectedConfig && activeFlowType" class="space-y-4">
+          <template v-if="activeFlowType === 'oauth_redirect'">
             <div class="space-y-2">
               <p class="text-sm font-medium">Login to {{ selectedConfig.name }}</p>
               <p class="text-sm text-muted-foreground">
@@ -496,7 +576,7 @@ onBeforeUnmount(() => {
             </div>
           </template>
 
-          <template v-else-if="selectedConfig.flowType === 'device_code'">
+          <template v-else-if="activeFlowType === 'device_code'">
             <div class="space-y-2">
               <p class="text-sm font-medium">Login to {{ selectedConfig.name }}</p>
               <p class="text-sm text-muted-foreground">
@@ -563,7 +643,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <form v-if="step === 3 && selectedConfig?.flowType === 'oauth_redirect'" class="space-y-4" @submit.prevent="handleExchangeOAuth">
+        <form v-if="step === finishStep && selectedConfig && activeFlowType === 'oauth_redirect'" class="space-y-4" @submit.prevent="handleExchangeOAuth">
           <div class="space-y-2">
             <label for="callback-url" class="text-sm font-medium">
               Paste Callback URL <span aria-hidden="true" class="text-destructive">*</span>
@@ -586,7 +666,7 @@ onBeforeUnmount(() => {
         </form>
 
         <form
-          v-if="step === 3 && selectedConfig && (selectedConfig.flowType === 'api_key' || selectedConfig.flowType === 'api_key_with_account_id')"
+          v-if="step === finishStep && selectedConfig && (activeFlowType === 'api_key' || activeFlowType === 'api_key_with_account_id')"
           class="space-y-4"
           autocomplete="off"
           data-lpignore="true"
@@ -596,13 +676,13 @@ onBeforeUnmount(() => {
           <div class="space-y-2">
             <p class="text-sm font-medium">Connect {{ selectedConfig.name }}</p>
             <p class="text-sm text-muted-foreground">
-              {{ selectedConfig.flowType === 'api_key_with_account_id' ? 'Paste your API token and Account ID. Credentials will be stored encrypted.' : 'Paste your provider API key directly. The key will be stored encrypted.' }}
+              {{ activeFlowType === 'api_key_with_account_id' ? 'Paste your API token and Account ID. Credentials will be stored encrypted.' : 'Paste your provider API key directly. The key will be stored encrypted.' }}
             </p>
           </div>
 
           <div class="space-y-2">
             <label for="provider-api-key" class="text-sm font-medium">
-              {{ selectedConfig.flowType === 'api_key_with_account_id' ? 'API Token' : 'API Key' }} <span aria-hidden="true" class="text-destructive">*</span>
+              {{ activeFlowType === 'api_key_with_account_id' ? 'API Token' : 'API Key' }} <span aria-hidden="true" class="text-destructive">*</span>
             </label>
             <div class="relative">
               <input
@@ -635,7 +715,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div v-if="selectedConfig.flowType === 'api_key_with_account_id'" class="space-y-2">
+          <div v-if="activeFlowType === 'api_key_with_account_id'" class="space-y-2">
             <label for="provider-account-id" class="text-sm font-medium">
               {{ selectedConfig.accountIdLabel }} <span aria-hidden="true" class="text-destructive">*</span>
             </label>
@@ -673,7 +753,7 @@ onBeforeUnmount(() => {
           Back
         </UiButton>
 
-        <UiButton v-if="step === 2 && selectedConfig && selectedConfig.flowType !== 'device_code'" type="button" variant="ghost" class="ml-auto" @click="step = 3">
+        <UiButton v-if="step === authStep && selectedConfig && activeFlowType !== 'device_code'" type="button" variant="ghost" class="ml-auto" @click="step = finishStep">
           Next
           <UiIcon name="i-lucide-arrow-right" class="size-4" />
         </UiButton>
