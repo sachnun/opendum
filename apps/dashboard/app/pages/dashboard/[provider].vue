@@ -545,7 +545,7 @@ function decodeAccountHash(hash: string): string | null {
         </div>
       </div>
 
-      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
+      <div class="dashboard-card-grid">
         <ProviderAccountCard
           v-for="account in accounts"
           :id="account.id"

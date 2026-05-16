@@ -220,7 +220,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
     </UiCard>
 
     <section v-if="apiKeys.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
-      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
+      <div class="dashboard-card-grid">
         <UiCard
           v-for="apiKey in apiKeys"
           :key="apiKey.id"

@@ -1786,7 +1786,7 @@ function formatToolArguments(value: string): string {
         <p v-else-if="providerPresetExpanded" class="text-xs text-muted-foreground">Connect at least one provider account to use provider presets.</p>
       </div>
 
-      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
+      <div class="dashboard-card-grid">
         <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
           <UiTooltip v-if="panels.length > 1" text="Remove">
             <UiButton variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" aria-label="Remove comparison card" @click="removePanel(panel.id)">
