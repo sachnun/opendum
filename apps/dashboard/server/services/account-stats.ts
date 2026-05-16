@@ -20,6 +20,8 @@ export type ProviderStats = {
 type RawProviderStats = {
   totalRequests: number;
   successfulRequests: number;
+  durationTotal: number;
+  durationCount: number;
   dailyCounts: Map<string, number>;
   durationByHour: Map<string, { total: number; count: number }>;
 };
@@ -56,7 +58,7 @@ function toNumber(value: number | string | null | undefined): number {
 }
 
 function createRawStats(): RawProviderStats {
-  return { totalRequests: 0, successfulRequests: 0, dailyCounts: new Map(), durationByHour: new Map() };
+  return { totalRequests: 0, successfulRequests: 0, durationTotal: 0, durationCount: 0, dailyCounts: new Map(), durationByHour: new Map() };
 }
 
 function buildEmptyProviderStats(dayKeys: string[], hourKeys: string[]): ProviderStats {
@@ -71,13 +73,11 @@ function buildEmptyProviderStats(dayKeys: string[], hourKeys: string[]): Provide
 
 function buildStatsFromRaw(raw: RawProviderStats | undefined, dayKeys: string[], hourKeys: string[]): ProviderStats {
   if (!raw) return buildEmptyProviderStats(dayKeys, hourKeys);
-  const durationTotalLastDay = Array.from(raw.durationByHour.values()).reduce((sum, bucket) => sum + bucket.total, 0);
-  const durationCountLastDay = Array.from(raw.durationByHour.values()).reduce((sum, bucket) => sum + bucket.count, 0);
   return {
     totalRequests: raw.totalRequests,
     successRate: raw.totalRequests > 0 ? Math.round((raw.successfulRequests / raw.totalRequests) * 100) : null,
     dailyRequests: dayKeys.map((date) => ({ date, count: raw.dailyCounts.get(date) ?? 0 })),
-    avgDurationLastDay: durationCountLastDay > 0 ? Math.round(durationTotalLastDay / durationCountLastDay) : null,
+    avgDurationLastDay: raw.durationCount > 0 ? Math.round(raw.durationTotal / raw.durationCount) : null,
     durationLast24Hours: hourKeys.map((time) => {
       const bucket = raw.durationByHour.get(time);
       return { time, avgDuration: bucket && bucket.count > 0 ? Math.round(bucket.total / bucket.count) : null };
@@ -104,19 +104,31 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
   const baseConditions = [eq(usageLog.userId, userId), eq(providerAccount.userId, userId)];
+  const allTimeConditions = [...baseConditions];
   const dailyConditions = [...baseConditions, gte(usageLog.createdAt, statsStartDate)];
   const durationConditions = [...baseConditions, gte(usageLog.createdAt, durationStartDate)];
   if (provider) {
+    allTimeConditions.push(eq(providerAccount.provider, provider));
     dailyConditions.push(eq(providerAccount.provider, provider));
     durationConditions.push(eq(providerAccount.provider, provider));
   }
 
-  const [dailyUsageRows, durationRows] = await Promise.all([
+  const [allTimeRows, dailyUsageRows, durationRows] = await Promise.all([
+    db.select({ provider: providerAccount.provider, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...allTimeConditions)).groupBy(providerAccount.provider),
     db.select({ provider: providerAccount.provider, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...dailyConditions)).groupBy(providerAccount.provider, dayBucketExpression),
     db.select({ provider: providerAccount.provider, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...durationConditions)).groupBy(providerAccount.provider, hourBucketExpression),
   ]);
 
   const statsByProvider = new Map<ProviderAccountKey, RawProviderStats>();
+  for (const row of allTimeRows) {
+    if (!isKnownProvider(row.provider)) continue;
+    const current = statsByProvider.get(row.provider) ?? createRawStats();
+    current.totalRequests += toNumber(row.requestCount);
+    current.successfulRequests += toNumber(row.successCount);
+    current.durationTotal += toNumber(row.durationTotal);
+    current.durationCount += toNumber(row.durationCount);
+    statsByProvider.set(row.provider, current);
+  }
   for (const row of dailyUsageRows) {
     if (!isKnownProvider(row.provider)) continue;
     const date = toDate(row.dayBucket);
@@ -125,8 +137,6 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
     if (!dayKeySet.has(dayKey)) continue;
     const current = statsByProvider.get(row.provider) ?? createRawStats();
     const requestCount = toNumber(row.requestCount);
-    current.totalRequests += requestCount;
-    current.successfulRequests += toNumber(row.successCount);
     current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + requestCount);
     statsByProvider.set(row.provider, current);
   }
@@ -170,10 +180,21 @@ export async function buildAccountStats(userId: string, accountIds: string[]): P
   const durationStartDate = new Date(hourKeys[0] ?? Date.now());
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
-  const [dailyUsageRows, durationRows] = await Promise.all([
+  const [allTimeRows, dailyUsageRows, durationRows] = await Promise.all([
+    db.select({ providerAccountId: usageLog.providerAccountId, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds))).groupBy(usageLog.providerAccountId),
     db.select({ providerAccountId: usageLog.providerAccountId, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, statsStartDate))).groupBy(usageLog.providerAccountId, dayBucketExpression),
     db.select({ providerAccountId: usageLog.providerAccountId, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, durationStartDate))).groupBy(usageLog.providerAccountId, hourBucketExpression),
   ]);
+
+  for (const row of allTimeRows) {
+    if (!row.providerAccountId) continue;
+    const current = rawStatsByAccountId.get(row.providerAccountId) ?? createRawStats();
+    current.totalRequests += toNumber(row.requestCount);
+    current.successfulRequests += toNumber(row.successCount);
+    current.durationTotal += toNumber(row.durationTotal);
+    current.durationCount += toNumber(row.durationCount);
+    rawStatsByAccountId.set(row.providerAccountId, current);
+  }
 
   for (const row of dailyUsageRows) {
     if (!row.providerAccountId) continue;
@@ -183,8 +204,6 @@ export async function buildAccountStats(userId: string, accountIds: string[]): P
     if (!dayKeySet.has(dayKey)) continue;
     const current = rawStatsByAccountId.get(row.providerAccountId) ?? createRawStats();
     const requestCount = toNumber(row.requestCount);
-    current.totalRequests += requestCount;
-    current.successfulRequests += toNumber(row.successCount);
     current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + requestCount);
     rawStatsByAccountId.set(row.providerAccountId, current);
   }

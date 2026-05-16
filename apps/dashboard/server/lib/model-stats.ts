@@ -8,8 +8,21 @@ import { resolveModelAlias } from "./proxy/models";
 interface RawModelStats {
   totalRequests: number;
   successfulRequests: number;
+  durationTotal: number;
+  durationCount: number;
   dailyCounts: Map<string, number>;
   durationByHour: Map<string, { total: number; count: number }>;
+}
+
+function createRawModelStats(): RawModelStats {
+  return {
+    totalRequests: 0,
+    successfulRequests: 0,
+    durationTotal: 0,
+    durationCount: 0,
+    dailyCounts: new Map<string, number>(),
+    durationByHour: new Map<string, { total: number; count: number }>(),
+  };
 }
 
 function normalizeLoggedModel(model: string): string {
@@ -34,7 +47,18 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
 
-  const [dailyRows, durationRows] = await Promise.all([
+  const [allTimeRows, dailyRows, durationRows] = await Promise.all([
+    db
+      .select({
+        model: normalizedModelExpression,
+        requestCount: sql<number>`count(*)`,
+        successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
+        durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`,
+        durationCount: sql<number>`count(${usageLog.duration})`,
+      })
+      .from(usageLog)
+      .where(eq(usageLog.userId, userId))
+      .groupBy(normalizedModelExpression),
     db
       .select({
         model: normalizedModelExpression,
@@ -59,6 +83,18 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
 
   const rawStatsByModel = new Map<string, RawModelStats>();
 
+  for (const row of allTimeRows) {
+    const modelId = normalizeLoggedModel(row.model);
+    if (!supportedModelSet.has(modelId)) continue;
+
+    const current = rawStatsByModel.get(modelId) ?? createRawModelStats();
+    current.totalRequests += Number(row.requestCount) || 0;
+    current.successfulRequests += Number(row.successCount) || 0;
+    current.durationTotal += Number(row.durationTotal) || 0;
+    current.durationCount += Number(row.durationCount) || 0;
+    rawStatsByModel.set(modelId, current);
+  }
+
   for (const row of dailyRows) {
     const modelId = normalizeLoggedModel(row.model);
     if (!supportedModelSet.has(modelId)) continue;
@@ -69,18 +105,10 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
     const dayKey = dayDate.toISOString().split("T")[0] ?? "";
     if (!dayKeySet.has(dayKey)) continue;
 
-    const current = rawStatsByModel.get(modelId) ?? {
-      totalRequests: 0,
-      successfulRequests: 0,
-      dailyCounts: new Map<string, number>(),
-      durationByHour: new Map<string, { total: number; count: number }>(),
-    };
+    const current = rawStatsByModel.get(modelId) ?? createRawModelStats();
 
     const requestCount = Number(row.requestCount) || 0;
-    const successCount = Number(row.successCount) || 0;
 
-    current.totalRequests += requestCount;
-    current.successfulRequests += successCount;
     current.dailyCounts.set(dayKey, (current.dailyCounts.get(dayKey) ?? 0) + requestCount);
     rawStatsByModel.set(modelId, current);
   }
@@ -99,12 +127,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
     const durationTotal = Number(row.durationTotal) || 0;
     if (durationCount <= 0) continue;
 
-    const current = rawStatsByModel.get(modelId) ?? {
-      totalRequests: 0,
-      successfulRequests: 0,
-      dailyCounts: new Map<string, number>(),
-      durationByHour: new Map<string, { total: number; count: number }>(),
-    };
+    const current = rawStatsByModel.get(modelId) ?? createRawModelStats();
 
     const durationBucket = current.durationByHour.get(hourKey) ?? { total: 0, count: 0 };
     durationBucket.total += durationTotal;
@@ -128,14 +151,11 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
         };
       });
 
-      const durationTotalLastDay = Array.from(modelStats.durationByHour.values()).reduce((sum, durationBucket) => sum + durationBucket.total, 0);
-      const durationCountLastDay = Array.from(modelStats.durationByHour.values()).reduce((sum, durationBucket) => sum + durationBucket.count, 0);
-
       return [model, {
         totalRequests: modelStats.totalRequests,
         successRate: modelStats.totalRequests > 0 ? Math.round((modelStats.successfulRequests / modelStats.totalRequests) * 100) : null,
         dailyRequests: dayKeys.map((day) => ({ date: day, count: modelStats.dailyCounts.get(day) ?? 0 })),
-        avgDurationLastDay: durationCountLastDay > 0 ? Math.round(durationTotalLastDay / durationCountLastDay) : null,
+        avgDurationLastDay: modelStats.durationCount > 0 ? Math.round(modelStats.durationTotal / modelStats.durationCount) : null,
         durationLast24Hours,
       } satisfies ModelStats];
     })
