@@ -119,6 +119,7 @@ const accountIndicators = computed(
 const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptyShellAccountSummary.pinnedProviders);
 const hasConnectedAccounts = computed(() => accountSummaryData.value?.hasConnectedAccounts ?? emptyShellAccountSummary.hasConnectedAccounts);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
+const hasPinnedProviders = computed(() => pinnedProviders.value.length > 0);
 
 watch(accountSummaryData, (value) => {
   if (value) cachedPinnedProviders.value = value.pinnedProviders;
@@ -128,7 +129,7 @@ const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccou
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
 const accountNavigationHrefs = computed(() => new Set(PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => getProviderAccountPath(definition.key))));
-const playgroundNavigationDisabled = computed(() => hasLoadedAccountSummary.value && !accountSummaryPending.value && !hasConnectedAccounts.value);
+const playgroundNavigationDisabled = computed(() => !isAuditMode.value && hasLoadedAccountSummary.value && !accountSummaryPending.value && !hasConnectedAccounts.value);
 
 function normalizeModelFamilyCounts(counts: Record<string, number>) {
   const nextCounts = { ...emptyModelFamilyCounts };
@@ -302,6 +303,8 @@ function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
 }
 
 async function refreshAccountSummaryOnce() {
+  if (!hasPinnedProviders.value) return;
+
   if (accountSummaryRefreshInFlight) {
     accountSummaryRefreshQueued = true;
     return;
@@ -312,17 +315,40 @@ async function refreshAccountSummaryOnce() {
     await accountSummaryRefreshInFlight;
   } finally {
     accountSummaryRefreshInFlight = null;
-    if (accountSummaryRefreshQueued) {
-      accountSummaryRefreshQueued = false;
+    const shouldRefreshAgain = accountSummaryRefreshQueued && hasPinnedProviders.value;
+    accountSummaryRefreshQueued = false;
+
+    if (shouldRefreshAgain) {
       void refreshAccountSummaryOnce();
     }
   }
 }
 
-onMounted(() => {
+function stopAccountSummaryRefresh() {
+  accountSummaryRefreshQueued = false;
+  if (!accountSummaryRefreshTimer) return;
+
+  clearInterval(accountSummaryRefreshTimer);
+  accountSummaryRefreshTimer = null;
+}
+
+function startAccountSummaryRefresh() {
+  if (accountSummaryRefreshTimer || !hasPinnedProviders.value) return;
+
   accountSummaryRefreshTimer = setInterval(() => {
     void refreshAccountSummaryOnce();
   }, ACCOUNT_SUMMARY_REFRESH_MS);
+}
+
+onMounted(() => {
+  watch(hasPinnedProviders, (hasPinned) => {
+    if (hasPinned) {
+      startAccountSummaryRefresh();
+      return;
+    }
+
+    stopAccountSummaryRefresh();
+  }, { immediate: true });
 
   watch(subNavigationAnchorIds, (anchorIds, _previousAnchorIds, onCleanup) => {
     if (anchorIds.length === 0) {
@@ -393,7 +419,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (accountSummaryRefreshTimer) clearInterval(accountSummaryRefreshTimer);
+  stopAccountSummaryRefresh();
 });
 
 async function handleSignOut() {
@@ -501,7 +527,7 @@ async function handleAuditSelected() {
                     </NuxtLink>
                   </template>
                 </template>
-                <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1 text-[11px] text-muted-foreground">
                   No pinned providers.
                 </p>
               </div>
@@ -700,7 +726,7 @@ async function handleAuditSelected() {
                         </NuxtLink>
                       </template>
                     </template>
-                    <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary && !accountSummaryPending" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <p v-else-if="isAccountsNavItem(item) && hasLoadedAccountSummary" class="px-2.5 py-1 text-[11px] text-muted-foreground">
                       No pinned providers.
                     </p>
                   </div>
