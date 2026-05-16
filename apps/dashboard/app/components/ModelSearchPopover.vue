@@ -17,6 +17,8 @@ const detailModel = ref<ModelListItem | null>(null);
 const copiedModelId = ref<string | null>(null);
 const suppressFocusUntil = ref(0);
 const suggestionListId = "model-search-suggestions";
+const placeholderModelIndex = ref(0);
+let placeholderTimer: ReturnType<typeof window.setInterval> | null = null;
 
 const detailOpen = computed({
   get: () => detailModel.value !== null,
@@ -34,6 +36,9 @@ const { data: fullModelData, execute: loadFullModels, status: fullModelStatus } 
 });
 
 const models = computed<ModelListItem[]>(() => data.value ?? []);
+const placeholderModels = computed(() => models.value.filter((model) => model.isEnabled !== false).map((model) => model.id).slice(0, 24));
+const activePlaceholderModel = computed(() => placeholderModels.value[placeholderModelIndex.value] ?? null);
+const showAnimatedPlaceholder = computed(() => search.value.length === 0 && activePlaceholderModel.value !== null);
 const fullModels = computed(() => fullModelData.value ?? sharedFullModels.data.value ?? []);
 const fullModelById = computed(() => new Map(fullModels.value.map((model) => [model.id, model])));
 const detailModelStats = computed<ModelStats | undefined>(() => detailModel.value ? fullModelById.value.get(detailModel.value.id)?.stats : undefined);
@@ -61,11 +66,27 @@ watch(filteredModels, (items) => {
   }
 });
 
+watch(placeholderModels, (items) => {
+  if (placeholderModelIndex.value >= items.length) placeholderModelIndex.value = 0;
+});
+
 watch(() => route.fullPath, () => {
   suggestionsOpen.value = false;
   activeSuggestionIndex.value = -1;
   search.value = "";
   detailModel.value = null;
+});
+
+onMounted(() => {
+  placeholderTimer = window.setInterval(() => {
+    const total = placeholderModels.value.length;
+    if (total <= 1) return;
+    placeholderModelIndex.value = (placeholderModelIndex.value + 1) % total;
+  }, 2600);
+});
+
+onBeforeUnmount(() => {
+  if (placeholderTimer) window.clearInterval(placeholderTimer);
 });
 
 function openSuggestions() {
@@ -152,7 +173,7 @@ function closeDetail() {
         :aria-activedescendant="activeSuggestionModel ? `model-search-option-${activeSuggestionIndex}` : undefined"
         aria-autocomplete="list"
         class="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-9 text-xs font-normal shadow-xs outline-none transition-all placeholder:text-muted-foreground hover:bg-input/50 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:text-sm"
-        placeholder="Search models..."
+        :placeholder="showAnimatedPlaceholder ? '' : 'Search models...'"
         autocomplete="off"
         @focus="openSuggestions"
         @input="openSuggestions"
@@ -161,6 +182,24 @@ function closeDetail() {
         @keydown.enter.prevent="selectActiveSuggestion"
         @keydown.esc.stop="closeSuggestions"
       >
+      <Transition
+        mode="out-in"
+        enter-active-class="transition-opacity duration-300 ease-out motion-reduce:transition-none"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-200 ease-in motion-reduce:transition-none"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <span
+          v-if="showAnimatedPlaceholder"
+          :key="activePlaceholderModel ?? ''"
+          aria-hidden="true"
+          class="pointer-events-none absolute left-9 right-9 top-1/2 -translate-y-1/2 truncate text-xs text-muted-foreground sm:text-sm"
+        >
+          {{ activePlaceholderModel }}
+        </span>
+      </Transition>
       <UiTooltip v-if="search" text="Clear">
         <button
           type="button"
