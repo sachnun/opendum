@@ -1,5 +1,5 @@
-import { initiateDeviceAuth, initiateDeviceAuthInputSchema } from "../../../services/account-auth";
-import { readDashboardBody, requireUserId } from "../../../utils/api";
+import { initiateDeviceAuth, initiateDeviceAuthInputSchema } from "../../../../services/account-auth";
+import { readDashboardBody, requireUserId } from "../../../../utils/api";
 
 export default defineEventHandler(async (event) => {
   await requireUserId(event);
