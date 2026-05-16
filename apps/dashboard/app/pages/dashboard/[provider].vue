@@ -55,7 +55,6 @@ const { data, error, pending, refresh } = await useAsyncData(
 );
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
-const accountDisplayOrder = ref<Record<string, number>>({});
 const highlightedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
 const visibleAccountIds = ref<Set<string>>(new Set());
@@ -66,16 +65,7 @@ let providerDetailRefreshInFlight: Promise<void> | null = null;
 let providerDetailRefreshQueued = false;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
-  return [...currentAccounts].sort((a, b) => {
-    const aOrder = accountDisplayOrder.value[a.id];
-    const bOrder = accountDisplayOrder.value[b.id];
-
-    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
-    if (aOrder !== undefined) return -1;
-    if (bOrder !== undefined) return 1;
-
-    return compareAccounts(a, b);
-  });
+  return [...currentAccounts].sort(compareAccounts);
 });
 const activeAccountCount = computed(() => accounts.value.filter((account) => account.isActive).length);
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
@@ -125,33 +115,12 @@ function startProviderDetailRefresh() {
 
 watch(
   detailData,
-  (value) => {
+  (value, previousValue) => {
     if (!value) return;
 
-    const orderedAccounts = [...value.accounts].sort(compareAccounts);
-    const currentOrder = accountDisplayOrder.value;
-    if (Object.keys(currentOrder).length === 0) {
-      accountDisplayOrder.value = Object.fromEntries(
-        orderedAccounts.map((account, index) => [account.id, index])
-      );
-      return;
-    }
-
-    const knownAccountIds = new Set(Object.keys(currentOrder));
-    const newAccounts = orderedAccounts.filter((account) => !knownAccountIds.has(account.id));
+    const previousAccountIds = new Set(previousValue?.accounts.map((account) => account.id) ?? []);
+    const newAccounts = value.accounts.filter((account) => !previousAccountIds.has(account.id));
     if (newAccounts.length === 0) return;
-    if (newAccounts.length === orderedAccounts.length) {
-      accountDisplayOrder.value = Object.fromEntries(
-        orderedAccounts.map((account, index) => [account.id, index])
-      );
-      highlightedAccountIds.value = new Set();
-      return;
-    }
-
-    accountDisplayOrder.value = Object.fromEntries([
-      ...newAccounts.map((account, index) => [account.id, index] as const),
-      ...Object.entries(currentOrder).map(([accountId, order]) => [accountId, order + newAccounts.length] as const),
-    ]);
 
     highlightedAccountIds.value = new Set(newAccounts.map((account) => account.id));
     if (highlightTimer) clearTimeout(highlightTimer);
@@ -164,7 +133,6 @@ watch(
 );
 
 watch(selectedProvider, () => {
-  accountDisplayOrder.value = {};
   highlightedAccountIds.value = new Set();
   visibleAccountIds.value = new Set();
   if (highlightTimer) {
@@ -296,8 +264,8 @@ function toTimeMs(value: string | Date | null | undefined): number {
 
 function compareAccounts(a: Account, b: Account): number {
   return getAccountSortGroup(a) - getAccountSortGroup(b)
-    || toTimeMs(b.lastErrorAt) - toTimeMs(a.lastErrorAt)
     || toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
+    || toTimeMs(b.lastErrorAt) - toTimeMs(a.lastErrorAt)
     || (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active);
 }
 

@@ -3,7 +3,7 @@ import { pinnedProvider, providerAccount, providerAccountDisabledModel, provider
 import { getModelFamily, getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { compareModelEntries } from "../../lib/model-sort";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
 import { buildAccountStats, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
@@ -63,6 +63,8 @@ const providerAccountListColumns = {
   successCount: providerAccount.successCount,
   createdAt: providerAccount.createdAt,
 };
+
+const providerAccountLastUsedOrder = [sql`${providerAccount.lastUsedAt} desc nulls last`, desc(providerAccount.createdAt), desc(providerAccount.id)] as const;
 
 function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil: Date | string | null }, now = new Date()): boolean {
   if (!account.isActive) return false;
@@ -150,7 +152,7 @@ export async function listAccounts(userId: string) {
 export async function listAccountsByProvider(userId: string, input: z.infer<typeof providerInputSchema>) {
   try {
     const now = new Date();
-    const accounts = await db.select(providerAccountListColumns).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider))).orderBy(desc(providerAccount.createdAt));
+    const accounts = await db.select(providerAccountListColumns).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider))).orderBy(...providerAccountLastUsedOrder);
     return accounts.map((account) => withEffectiveActive(account, now));
   } catch (error) {
     console.error("Failed to list provider accounts:", error);
@@ -232,7 +234,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       .select(providerAccountListColumns)
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider)))
-      .orderBy(desc(providerAccount.createdAt));
+      .orderBy(...providerAccountLastUsedOrder);
 
     const accountIds = accounts.map((account) => account.id);
     const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
