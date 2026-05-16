@@ -117,6 +117,7 @@ watch(
   detailData,
   (value, previousValue) => {
     if (!value) return;
+    if (!previousValue) return;
 
     const previousAccountIds = new Set(previousValue?.accounts.map((account) => account.id) ?? []);
     const newAccounts = value.accounts.filter((account) => !previousAccountIds.has(account.id));
