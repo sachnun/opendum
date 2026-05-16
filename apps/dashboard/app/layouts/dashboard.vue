@@ -53,6 +53,7 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 
 const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
+const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-shell-pinned-providers", () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
   { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical", disabled: playgroundNavigationDisabled.value },
@@ -105,9 +106,13 @@ const activeAccountCounts = computed(() => accountSummaryData.value?.activeAccou
 const accountIndicators = computed(
   () => accountSummaryData.value?.accountIndicators ?? emptyShellAccountSummary.accountIndicators
 );
-const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? emptyShellAccountSummary.pinnedProviders);
+const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptyShellAccountSummary.pinnedProviders);
 const hasConnectedAccounts = computed(() => accountSummaryData.value?.hasConnectedAccounts ?? emptyShellAccountSummary.hasConnectedAccounts);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
+
+watch(accountSummaryData, (value) => {
+  if (value) cachedPinnedProviders.value = value.pinnedProviders;
+}, { immediate: true });
 
 const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
