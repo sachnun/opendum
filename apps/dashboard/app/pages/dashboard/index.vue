@@ -12,7 +12,6 @@ const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidati
 const summaries = computed(() => data.value?.summaries ?? null);
 const pinnedProviders = computed(() => new Set(data.value?.pinnedProviders ?? []));
 const totalConnectedAccounts = computed(() => Object.values(summaries.value ?? {}).reduce((total, summary) => total + summary.connected, 0));
-const totalActiveAccounts = computed(() => Object.values(summaries.value ?? {}).reduce((total, summary) => total + summary.active, 0));
 const sortedProviders = computed(() => [...PROVIDER_ACCOUNT_DEFINITIONS].sort((a, b) => {
   const aPinned = pinnedProviders.value.has(a.key) ? 0 : 1;
   const bPinned = pinnedProviders.value.has(b.key) ? 0 : 1;
@@ -33,15 +32,16 @@ function refreshAccountsOverview() {
 
 <template>
   <div class="space-y-6">
-    <DashboardPageHeader
-      title="Accounts"
-      description="Monitor provider account health, usage, and latency across every connected account."
-      :badge="`${totalActiveAccounts}/${totalConnectedAccounts}`"
-    >
-      <template #actions>
-        <AddAccountDialog @connected="refreshAccountsOverview" />
-      </template>
-    </DashboardPageHeader>
+    <div class="dashboard-header-divider">
+      <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
+          Provider Accounts
+        </h2>
+        <div class="flex w-full items-center sm:w-auto">
+          <AddAccountDialog trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
+        </div>
+      </div>
+    </div>
 
     <DashboardDataNotice :error="error" />
     <UiSkeleton v-if="pending" class="h-96 rounded-xl" />
