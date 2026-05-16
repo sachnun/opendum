@@ -17,12 +17,13 @@ import { kiroProvider } from "../lib/providers/kiro";
 import { fetchKiroQuotaFromApi, type KiroQuotaMetric } from "../lib/providers/kiro/quota";
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
 
+const MAX_SIMULTANEOUS_QUOTA_FETCHES = 3;
+const MAX_QUOTA_BATCH_ACCOUNTS = MAX_SIMULTANEOUS_QUOTA_FETCHES;
 const quotaProviderSchema = z.enum(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 
 export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: z.string(), forceRefresh: z.boolean().optional() });
-export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(100), forceRefresh: z.boolean().optional() });
+export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS), forceRefresh: z.boolean().optional() });
 const OPENROUTER_REQUEST_TIMEOUT_MS = 10000;
-const MAX_SIMULTANEOUS_QUOTA_FETCHES = 3;
 const COPILOT_DEFAULT_MONTHLY_LIMIT = 300;
 
 type QuotaProviderKey = z.infer<typeof quotaProviderSchema>;

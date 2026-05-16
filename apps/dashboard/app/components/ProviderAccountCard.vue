@@ -1189,15 +1189,15 @@ function cancelErrorPreviewPointer() {
               <p v-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
               <div v-else-if="quotaInfo.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
                 <div v-for="group in quotaInfo.groups" :key="group.name" class="space-y-1">
-                  <div class="flex items-center justify-between gap-2 text-xs">
-                    <span class="min-w-0 truncate text-muted-foreground">{{ group.displayName }}</span>
-                    <span class="flex items-center gap-2">
+                  <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
+                    <span class="min-w-0 overflow-hidden truncate text-muted-foreground">{{ group.displayName }}</span>
+                    <span class="flex min-w-0 max-w-28 shrink-0 items-center justify-end gap-1.5 overflow-hidden">
                       <UiTooltip v-if="group.resetInHuman" :text="quotaResetTitle(group)">
-                        <span class="text-[10px] text-muted-foreground">
+                        <span class="block max-w-20 truncate text-[10px] text-muted-foreground">
                           {{ group.resetInHuman }}
                         </span>
                       </UiTooltip>
-                      <span :class="['font-mono', quotaTextColor(group)]">{{ quotaPercentRemaining(group) }}%</span>
+                      <span :class="['shrink-0 font-mono', quotaTextColor(group)]">{{ quotaPercentRemaining(group) }}%</span>
                     </span>
                   </div>
                   <div class="h-1.5 overflow-hidden rounded-full bg-muted">
