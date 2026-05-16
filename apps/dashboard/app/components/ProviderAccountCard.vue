@@ -186,7 +186,6 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
-const isHistoryLoading = ref(false);
 const historyError = ref<string | null>(null);
 const historyEntries = ref<ErrorHistoryEntry[] | null>(null);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
@@ -672,15 +671,13 @@ const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
 
 watch(
   () => [props.account.id, props.account.lastErrorMessage, props.account.lastErrorAt, props.account.lastErrorCode] as const,
-  ([, message]) => {
+  ([id, message], previous) => {
     activeErrorIndex.value = 0;
     historyRequestId += 1;
-    historyEntries.value = null;
+    if (previous && id !== previous[0]) historyEntries.value = null;
     historyError.value = null;
-    isHistoryLoading.value = false;
 
     if (!message) return;
-    isHistoryLoading.value = true;
     loadErrorHistory();
   },
   { immediate: true }
@@ -890,7 +887,6 @@ async function resolveErrors() {
     historyRequestId += 1;
     historyEntries.value = null;
     historyError.value = null;
-    isHistoryLoading.value = false;
     emit("errors-resolved", props.account.id);
   } finally {
     resolvingErrors.value = false;
@@ -915,8 +911,6 @@ async function loadErrorHistory() {
     if (requestId !== historyRequestId) return;
     historyError.value = "Failed to load error history";
     historyEntries.value = [];
-  } finally {
-    if (requestId === historyRequestId) isHistoryLoading.value = false;
   }
 }
 
@@ -1140,13 +1134,12 @@ function cancelErrorPreviewPointer() {
                   </UiButton>
                 </UiTooltip>
                 <div class="flex min-w-0 flex-1 items-center justify-center gap-1">
-                  <span v-if="isHistoryLoading" class="truncate text-[10px] text-muted-foreground">Loading history...</span>
-                  <span v-else-if="historyError" class="truncate text-[10px] text-red-500">{{ historyError }}</span>
+                  <span v-if="historyError" class="truncate text-[10px] text-red-500">{{ historyError }}</span>
                   <template v-else>
                     <span
                       v-for="(entry, index) in errorPreviewEntries"
                       :key="index"
-                      :class="['h-1.5 rounded-full', getErrorPreviewSliderDotClass(entry, index === activeErrorIndex)]"
+                      :class="['h-1.5 rounded-full transition-all duration-200', getErrorPreviewSliderDotClass(entry, index === activeErrorIndex)]"
                     />
                   </template>
                 </div>
