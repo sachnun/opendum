@@ -451,8 +451,17 @@ async function handleExchangeOAuth() {
 function goBack() {
   clearCopyAutoNextTimer();
   const nextStep = Math.max(minimumStep.value, step.value - 1);
-  if (nextStep === 1) codexLoginMethod.value = null;
   step.value = nextStep;
+
+  if (step.value === 1) {
+    provider.value = null;
+    codexLoginMethod.value = null;
+    return;
+  }
+
+  if (step.value === 2 && isCodexProvider.value) {
+    codexLoginMethod.value = null;
+  }
 }
 
 function goBackFromDevicePolling() {
