@@ -35,6 +35,9 @@ type ErrorStatusTag = {
   code: number;
   label: string;
 };
+type StatDeltaTone = "positive" | "negative" | "neutral";
+type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
+type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string };
 
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
@@ -186,6 +189,8 @@ const copiedErrorPreview = ref(false);
 const isHistoryLoading = ref(false);
 const historyError = ref<string | null>(null);
 const historyEntries = ref<ErrorHistoryEntry[] | null>(null);
+const statHitEffects = ref<Record<string, StatHitEffect>>({});
+const previousStatValues = ref<Record<string, number> | null>(null);
 const activeErrorIndex = ref(0);
 const cardRoot = ref<HTMLElement | null>(null);
 let historyRequestId = 0;
@@ -288,6 +293,39 @@ function formatDuration(duration: number | null): string {
   if (duration === null) return "-";
   if (duration >= 1000) return `${(duration / 1000).toFixed(2)}s`;
   return `${duration}ms`;
+}
+
+function compactNumber(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
+function formatSignedInteger(delta: number): string {
+  const sign = delta > 0 ? "+" : "-";
+  return `${sign} ${compactNumber(Math.abs(Math.round(delta)))}`;
+}
+
+function formatSignedDuration(delta: number): string {
+  const sign = delta > 0 ? "+" : "-";
+  return `${sign} ${formatDuration(Math.abs(Math.round(delta)))}`;
+}
+
+function formatSignedPercent(delta: number): string {
+  const sign = delta > 0 ? "+" : "-";
+  const value = Math.round(Math.abs(delta) * 10) / 10;
+  return `${sign} ${value}%`;
+}
+
+function collectStatValues(items: StatMetric[]): Record<string, number> {
+  const values: Record<string, number> = {};
+
+  for (const item of items) {
+    if (Number.isFinite(item.numericValue)) values[item.key] = item.numericValue;
+  }
+
+  return values;
 }
 
 function formatRelativeTime(value: string | Date | number): string {
@@ -438,6 +476,12 @@ const subtitleDisplay = computed(() => (subtitle.value ? (isSubtitleVisible.valu
 const dailyValues = computed(() => props.account.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.account.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
 const durationLabelPoints = computed(() => [props.account.stats.durationLast24Hours[0], props.account.stats.durationLast24Hours[Math.floor(props.account.stats.durationLast24Hours.length / 2)], props.account.stats.durationLast24Hours[props.account.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
+const statMetrics = computed<StatMetric[]>(() => [
+  { key: "totalRequests", label: "Requests", value: props.account.stats.totalRequests.toLocaleString(), numericValue: props.account.stats.totalRequests, formatDelta: formatSignedInteger },
+  { key: "successRate", label: "Success", value: props.account.stats.successRate === null ? "-" : `${props.account.stats.successRate}%`, numericValue: props.account.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
+  { key: "avgDuration", label: "Latency", value: formatDuration(props.account.stats.avgDurationLastDay), numericValue: props.account.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration },
+]);
+const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
 const effectiveTier = computed(() => {
   const quotaTier = props.quotaInfo?.tier?.trim();
   if (props.account.provider === "codex" && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
@@ -622,6 +666,45 @@ watch(
     loadErrorHistory();
   },
   { immediate: true }
+);
+
+watch(statMetrics, (items) => {
+  const nextValues = collectStatValues(items);
+  const previousValues = previousStatValues.value;
+
+  if (!previousValues) {
+    previousStatValues.value = nextValues;
+    return;
+  }
+
+  const nextHitEffects = { ...statHitEffects.value };
+
+  for (const item of items) {
+    const currentValue = nextValues[item.key];
+    const previousValue = previousValues[item.key];
+
+    if (currentValue === undefined || previousValue === undefined) continue;
+
+    const delta = currentValue - previousValue;
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.0001) continue;
+
+    nextHitEffects[item.key] = {
+      text: item.formatDelta(delta),
+      tone: delta > 0 ? "positive" : "negative",
+      version: (nextHitEffects[item.key]?.version ?? 0) + 1,
+    };
+  }
+
+  previousStatValues.value = nextValues;
+  statHitEffects.value = nextHitEffects;
+}, { immediate: true });
+
+watch(
+  () => props.account.id,
+  () => {
+    previousStatValues.value = null;
+    statHitEffects.value = {};
+  }
 );
 
 watch(errorPreviewEntries, (entries) => {
@@ -967,9 +1050,15 @@ function cancelErrorPreviewPointer() {
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3">
             <div class="mb-2 grid grid-cols-3 gap-1.5">
-              <UsageStatMetric label="Requests" :value="account.stats.totalRequests.toLocaleString()" />
-              <UsageStatMetric label="Success" :value="account.stats.successRate === null ? '-' : `${account.stats.successRate}%`" />
-              <UsageStatMetric label="Latency" :value="formatDuration(account.stats.avgDurationLastDay)" />
+              <UsageStatMetric
+                v-for="stat in usageStats"
+                :key="stat.key"
+                :label="stat.label"
+                :value="stat.value"
+                :delta="stat.hit?.text"
+                :delta-key="stat.hit?.version"
+                :delta-tone="stat.hit?.tone"
+              />
             </div>
             <div class="mb-2">
               <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />

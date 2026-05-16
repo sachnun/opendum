@@ -33,6 +33,7 @@ type QuotaSummarySkeletonRow = {
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
+const PROVIDER_DETAIL_REFRESH_MS = 30_000;
 const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
 const FREE_TIER_VALUES = new Set(["", "free", "free-tier", "guest", "unknown"]);
 const DEFAULT_QUOTA_SUMMARY_SKELETON_ROWS: QuotaSummarySkeletonRow[] = [
@@ -57,7 +58,12 @@ const detailData = computed<ProviderDetailData | null>(() => data.value ?? null)
 const accountDisplayOrder = ref<Record<string, number>>({});
 const highlightedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
+const visibleAccountIds = ref<Set<string>>(new Set());
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+let accountVisibilityObserver: IntersectionObserver | null = null;
+let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let providerDetailRefreshInFlight: Promise<void> | null = null;
+let providerDetailRefreshQueued = false;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
   return [...currentAccounts].sort((a, b) => {
@@ -80,6 +86,42 @@ const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAcc
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
 const selectedAccountId = computed(() => decodeAccountHash(route.hash));
 type QuotaAccountState = { provider: string; isActive: boolean };
+
+async function refreshProviderDetailOnce() {
+  if (pending.value || providerDetailRefreshInFlight) {
+    providerDetailRefreshQueued = true;
+    return;
+  }
+
+  providerDetailRefreshInFlight = refresh().then(() => undefined).catch(() => undefined);
+  try {
+    await providerDetailRefreshInFlight;
+  } finally {
+    providerDetailRefreshInFlight = null;
+    const shouldRefreshAgain = providerDetailRefreshQueued;
+    providerDetailRefreshQueued = false;
+
+    if (shouldRefreshAgain) {
+      void refreshProviderDetailOnce();
+    }
+  }
+}
+
+function stopProviderDetailRefresh() {
+  providerDetailRefreshQueued = false;
+  if (!providerDetailRefreshTimer) return;
+
+  clearInterval(providerDetailRefreshTimer);
+  providerDetailRefreshTimer = null;
+}
+
+function startProviderDetailRefresh() {
+  if (providerDetailRefreshTimer) return;
+
+  providerDetailRefreshTimer = setInterval(() => {
+    void refreshProviderDetailOnce();
+  }, PROVIDER_DETAIL_REFRESH_MS);
+}
 
 watch(
   detailData,
@@ -124,6 +166,7 @@ watch(
 watch(selectedProvider, () => {
   accountDisplayOrder.value = {};
   highlightedAccountIds.value = new Set();
+  visibleAccountIds.value = new Set();
   if (highlightTimer) {
     clearTimeout(highlightTimer);
     highlightTimer = null;
@@ -158,6 +201,7 @@ const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((ac
 let previousQuotaAccountKeys = new Set<string>();
 let previousQuotaAccountStates = new Map<string, QuotaAccountState>();
 let previousQuotaProvider: ProviderAccountKey | null = null;
+let queuedVisibleDeferredAccountIds = new Set<string>();
 const {
   quotaByAccountId,
   quotaErrorByAccountId,
@@ -167,11 +211,22 @@ const {
   loadAccountQuota,
   pruneQuotaState,
   runQuotaQueue,
-} = useAccountQuotaMonitor({ accounts, quotaCapableAccounts, toQuotaProvider });
+} = useAccountQuotaMonitor({
+  accounts,
+  quotaCapableAccounts,
+  toQuotaProvider,
+  shouldQueueAccount: (account) => account.isActive || visibleAccountIds.value.has(account.id),
+});
 
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
+  stopProviderDetailRefresh();
+  accountVisibilityObserver?.disconnect();
   cancelQuotaQueue();
+});
+
+onMounted(() => {
+  startProviderDetailRefresh();
 });
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
   const groups = new Map<string, QuotaSummaryGroup>();
@@ -263,6 +318,61 @@ function handleQuotaRefresh(accountId: string) {
   if (account) loadAccountQuota(account, true);
 }
 
+function getAccountCardElement(card: { accountId?: string; $el?: Element } | Element): Element | null {
+  return card instanceof Element ? card : card.$el ?? null;
+}
+
+function refreshAccountVisibilityObserver(resetVisibleAccountIds = false) {
+  if (!import.meta.client) return;
+
+  accountVisibilityObserver?.disconnect();
+
+  if (resetVisibleAccountIds || !supportsProviderQuota.value) {
+    visibleAccountIds.value = new Set();
+  } else {
+    const currentAccountIds = new Set(accounts.value.map((account) => account.id));
+    const nextVisibleAccountIds = new Set([...visibleAccountIds.value].filter((accountId) => currentAccountIds.has(accountId)));
+    if (nextVisibleAccountIds.size !== visibleAccountIds.value.size) visibleAccountIds.value = nextVisibleAccountIds;
+  }
+
+  if (!supportsProviderQuota.value) return;
+
+  accountVisibilityObserver = new IntersectionObserver((entries) => {
+    const nextVisibleAccountIds = new Set(visibleAccountIds.value);
+    let changed = false;
+
+    for (const entry of entries) {
+      const accountId = entry.target.getAttribute("data-account-id");
+      if (!accountId) continue;
+
+      if (entry.isIntersecting) {
+        if (!nextVisibleAccountIds.has(accountId)) {
+          nextVisibleAccountIds.add(accountId);
+          changed = true;
+        }
+      } else if (nextVisibleAccountIds.delete(accountId)) {
+        changed = true;
+      }
+    }
+
+    if (changed) visibleAccountIds.value = nextVisibleAccountIds;
+  });
+
+  for (const card of accountCardRefs.value) {
+    const element = getAccountCardElement(card);
+    if (element) accountVisibilityObserver.observe(element);
+  }
+}
+
+watch(
+  accounts,
+  async () => {
+    await nextTick();
+    refreshAccountVisibilityObserver();
+  },
+  { immediate: true }
+);
+
 watch(
   () => `${selectedProvider.value}|${accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|")}`,
   (_, __, onCleanup) => {
@@ -283,6 +393,7 @@ watch(
 
     pruneQuotaState();
     cancelQuotaQueue();
+    queuedVisibleDeferredAccountIds = new Set([...queuedVisibleDeferredAccountIds].filter((accountId) => currentQuotaAccountStates.has(accountId) && !quotaByAccountId.value[accountId]));
     void hydrateQuotaCache();
     previousQuotaAccountKeys = currentQuotaAccountKeys;
     previousQuotaAccountStates = currentQuotaAccountStates;
@@ -300,6 +411,23 @@ watch(
       clearTimeout(quotaLoadTimer);
       cancelQuotaQueue();
     });
+  },
+  { immediate: true }
+);
+
+watch(
+  () => `${selectedProvider.value}|${accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|")}|visible:${[...visibleAccountIds.value].sort().join(",")}`,
+  () => {
+    const accountsToFetch = quotaCapableAccounts.value.filter((account) => {
+      if (account.isActive || !visibleAccountIds.value.has(account.id)) return false;
+      if (quotaByAccountId.value[account.id] || quotaLoadingByAccountId.value[account.id]) return false;
+      return !queuedVisibleDeferredAccountIds.has(account.id);
+    });
+
+    if (accountsToFetch.length === 0) return;
+
+    queuedVisibleDeferredAccountIds = new Set([...queuedVisibleDeferredAccountIds, ...accountsToFetch.map((account) => account.id)]);
+    void runQuotaQueue(accountsToFetch, false, { append: true });
   },
   { immediate: true }
 );

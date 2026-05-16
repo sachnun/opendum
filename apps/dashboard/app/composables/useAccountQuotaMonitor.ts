@@ -12,6 +12,10 @@ type CachedAccountQuota = {
   cachedAt: number;
 };
 
+type RunQuotaQueueOptions = {
+  append?: boolean;
+};
+
 const ENABLED_QUOTA_FETCH_DELAY_MS = 500;
 const DISABLED_QUOTA_FETCH_DELAY_MS = 1500;
 const QUOTA_FETCH_TIMEOUT_MS = 7000;
@@ -55,6 +59,7 @@ export function useAccountQuotaMonitor(options: {
   accounts: ComputedRef<Account[]>;
   quotaCapableAccounts: ComputedRef<Account[]>;
   toQuotaProvider: (provider: string) => QuotaProviderKey | null;
+  shouldQueueAccount?: (account: Account) => boolean;
 }) {
   const dashboardApi = useDashboardApi();
   const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>("account-quota-by-account-id", () => ({}));
@@ -62,9 +67,11 @@ export function useAccountQuotaMonitor(options: {
   const quotaLoadingByAccountId = useState<Record<string, boolean>>("account-quota-loading-by-account-id", () => ({}));
   const hydratedAccountIds = useState<Record<string, boolean>>("account-quota-hydrated-account-ids", () => ({}));
   let quotaQueueRunId = 0;
+  let quotaQueueTail: Promise<void> = Promise.resolve();
 
   function cancelQuotaQueue() {
     quotaQueueRunId += 1;
+    quotaQueueTail = Promise.resolve();
   }
 
   function setQuotaLoading(accountId: string, loading: boolean) {
@@ -145,29 +152,36 @@ export function useAccountQuotaMonitor(options: {
     }
   }
 
-  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshExisting = false) {
-    const runId = ++quotaQueueRunId;
-    const accountsToFetch = [
-      ...accounts.filter((account) => account.isActive),
-      ...accounts.filter((account) => !account.isActive),
-    ];
+  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshExisting = false, queueOptions: RunQuotaQueueOptions = {}) {
+    const runId = queueOptions.append ? quotaQueueRunId : ++quotaQueueRunId;
+    const run = async () => {
+      const queueableAccounts = accounts.filter((account) => options.shouldQueueAccount?.(account) ?? true);
+      const accountsToFetch = [
+        ...queueableAccounts.filter((account) => account.isActive),
+        ...queueableAccounts.filter((account) => !account.isActive),
+      ];
 
-    for (const [index, account] of accountsToFetch.entries()) {
-      if (runId !== quotaQueueRunId) return;
-      if (index > 0) {
-        const delay = account.isActive ? ENABLED_QUOTA_FETCH_DELAY_MS : DISABLED_QUOTA_FETCH_DELAY_MS;
-        await new Promise((resolve) => setTimeout(resolve, delay));
+      for (const [index, account] of accountsToFetch.entries()) {
         if (runId !== quotaQueueRunId) return;
-      }
-
-      if (quotaLoadingByAccountId.value[account.id]) {
-        while (quotaLoadingByAccountId.value[account.id] && runId === quotaQueueRunId) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+        if (index > 0 || queueOptions.append) {
+          const delay = account.isActive ? ENABLED_QUOTA_FETCH_DELAY_MS : DISABLED_QUOTA_FETCH_DELAY_MS;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          if (runId !== quotaQueueRunId) return;
         }
-        if (runId !== quotaQueueRunId) return;
+
+        if (quotaLoadingByAccountId.value[account.id]) {
+          while (quotaLoadingByAccountId.value[account.id] && runId === quotaQueueRunId) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          if (runId !== quotaQueueRunId) return;
+        }
+        await loadAccountQuota(account, false, runId, refreshExisting);
       }
-      await loadAccountQuota(account, false, runId, refreshExisting);
-    }
+    };
+
+    const queueRun = queueOptions.append ? quotaQueueTail.then(run, run) : run();
+    quotaQueueTail = queueRun.catch(() => {});
+    await queueRun;
   }
 
   return {
