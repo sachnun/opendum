@@ -16,6 +16,7 @@ const dashboardApi = useDashboardApi();
 const dashboardInvalidation = useDashboardDataInvalidation();
 const localPinned = ref(props.pinned);
 const pending = ref(false);
+const pinButtonLabel = computed(() => (localPinned.value ? "Unpin provider" : "Pin provider"));
 
 watch(
   () => props.pinned,
@@ -54,6 +55,8 @@ async function togglePin(event: Event) {
         'cursor-pointer rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         localPinned ? 'text-foreground hover:text-muted-foreground' : 'text-muted-foreground/40 hover:text-muted-foreground',
       )"
+      :aria-label="pinButtonLabel"
+      :aria-pressed="localPinned"
       :disabled="pending || readonly"
       @click="togglePin"
     >
