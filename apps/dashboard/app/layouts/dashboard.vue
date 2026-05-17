@@ -19,6 +19,8 @@ const { data: session } = await useSession(useFetch);
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
 const auditDialogOpen = ref(false);
+const sharingEnabled = ref(false);
+const disableSharingDialogOpen = ref(false);
 const supportItemOpen = reactive<Record<string, boolean>>({ Tools: true });
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
@@ -261,6 +263,28 @@ function visibleSubItems(item: NavItem) {
 
 function modelCountFor(subItem: NavSubItem) {
   return subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) : 0;
+}
+
+function isSwitchSubItem(subItem: NavSubItem) {
+  return subItem.control === "switch";
+}
+
+function toggleSharing() {
+  if (sharingEnabled.value) {
+    disableSharingDialogOpen.value = true;
+    return;
+  }
+
+  sharingEnabled.value = true;
+}
+
+function disableSharing() {
+  sharingEnabled.value = false;
+  disableSharingDialogOpen.value = false;
+}
+
+function cancelDisableSharing() {
+  disableSharingDialogOpen.value = false;
 }
 
 const subNavigationAnchorIds = computed(() => primaryNavigation.flatMap((item) => visibleSubItems(item)
@@ -523,6 +547,30 @@ async function handleAuditSelected() {
                         </UiBadge>
                       </span>
                     </div>
+                    <button
+                      v-else-if="isSwitchSubItem(subItem)"
+                      type="button"
+                      role="switch"
+                      :aria-checked="sharingEnabled"
+                      class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
+                      @click="toggleSharing"
+                    >
+                      <span class="min-w-0 truncate">{{ subItem.name }}</span>
+                      <span
+                        aria-hidden="true"
+                        :class="[
+                          'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
+                          sharingEnabled ? 'bg-primary' : 'bg-input/80',
+                        ]"
+                      >
+                        <span
+                          :class="[
+                            'block size-3 rounded-full transition-transform',
+                            sharingEnabled ? 'translate-x-[calc(100%-2px)] bg-primary-foreground' : 'translate-x-0 bg-foreground',
+                          ]"
+                        />
+                      </span>
+                    </button>
                     <NuxtLink
                       v-else
                       :to="subItemHref(subItem)"
@@ -858,6 +906,30 @@ async function handleAuditSelected() {
                             </UiBadge>
                           </span>
                         </div>
+                        <button
+                          v-else-if="isSwitchSubItem(subItem)"
+                          type="button"
+                          role="switch"
+                          :aria-checked="sharingEnabled"
+                          class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
+                          @click="toggleSharing"
+                        >
+                          <span class="min-w-0 truncate">{{ subItem.name }}</span>
+                          <span
+                            aria-hidden="true"
+                            :class="[
+                              'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
+                              sharingEnabled ? 'bg-primary' : 'bg-input/80',
+                            ]"
+                          >
+                            <span
+                              :class="[
+                                'block size-3 rounded-full transition-transform',
+                                sharingEnabled ? 'translate-x-[calc(100%-2px)] bg-primary-foreground' : 'translate-x-0 bg-foreground',
+                              ]"
+                            />
+                          </span>
+                        </button>
                         <NuxtLink
                           v-else
                           :to="subItemHref(subItem)"
@@ -976,6 +1048,19 @@ async function handleAuditSelected() {
         </div>
       </template>
     </UiSheet>
+
+    <UiDialog v-model:open="disableSharingDialogOpen" :ui="{ content: 'sm:max-w-[400px]' }">
+      <template #content>
+        <div class="space-y-1.5 pr-6">
+          <h2 class="text-lg font-semibold leading-none tracking-tight">Stop Sharing</h2>
+          <p class="text-sm text-muted-foreground">Stop sharing your models with other users?</p>
+        </div>
+        <div class="flex justify-end gap-2">
+          <UiButton variant="outline" size="sm" @click="cancelDisableSharing">Cancel</UiButton>
+          <UiButton variant="destructive" size="sm" @click="disableSharing">Stop</UiButton>
+        </div>
+      </template>
+    </UiDialog>
 
     <MaintenerAuditDialog v-model:open="auditDialogOpen" @selected="handleAuditSelected" />
   </div>

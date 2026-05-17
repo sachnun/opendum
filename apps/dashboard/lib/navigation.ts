@@ -14,6 +14,7 @@ export interface NavSubItem {
   href: string;
   anchorId?: string;
   disabled?: boolean;
+  control?: "switch";
   tag?: string;
 }
 
@@ -63,7 +64,7 @@ export const primaryNavigation: NavItem[] = [
     href: "/dashboard/api-keys",
     icon: "i-lucide-key",
     children: [
-      { name: "Sharing", href: "/dashboard/api-keys/sharing", disabled: true, tag: "soon" },
+      { name: "Sharing", href: "/dashboard/api-keys/sharing", control: "switch" },
     ],
   },
   {
