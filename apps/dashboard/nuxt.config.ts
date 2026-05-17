@@ -123,6 +123,7 @@ export default defineNuxtConfig({
     },
     optimizeDeps: {
       include: [
+        "@internationalized/date",
         "@vue/devtools-core",
         "@vue/devtools-kit",
         "better-auth/vue",
