@@ -278,6 +278,10 @@ function isSwitchSubItem(subItem: NavSubItem) {
 }
 
 function isSwitchSubItemReadonly(subItem: NavSubItem) {
+  return isSwitchSubItem(subItem) && isAuditMode.value;
+}
+
+function isSwitchSubItemToggleDisabled(subItem: NavSubItem) {
   return isSwitchSubItem(subItem) && (isAuditMode.value || sharingUpdating.value);
 }
 
@@ -640,8 +644,8 @@ async function handleAuditSelected() {
                         type="button"
                         role="switch"
                         :aria-checked="sharingEnabled"
-                        :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
-                        :disabled="isSwitchSubItemReadonly(subItem)"
+                        :aria-disabled="isSwitchSubItemToggleDisabled(subItem) ? true : undefined"
+                        :disabled="isSwitchSubItemToggleDisabled(subItem)"
                         class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
                         @click.stop="toggleSharing"
                       >
@@ -649,14 +653,14 @@ async function handleAuditSelected() {
                           aria-hidden="true"
                           :class="[
                             'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
-                            isSwitchSubItemReadonly(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
+                            isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
                           ]"
                         >
                           <span
                             :class="[
                               'block size-3 rounded-full transition-transform',
                               sharingEnabled ? 'translate-x-[calc(100%-2px)]' : 'translate-x-0',
-                              isSwitchSubItemReadonly(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
+                              isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
                             ]"
                           />
                         </span>
@@ -966,8 +970,8 @@ async function handleAuditSelected() {
                             type="button"
                             role="switch"
                             :aria-checked="sharingEnabled"
-                            :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
-                            :disabled="isSwitchSubItemReadonly(subItem)"
+                            :aria-disabled="isSwitchSubItemToggleDisabled(subItem) ? true : undefined"
+                            :disabled="isSwitchSubItemToggleDisabled(subItem)"
                             class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
                             @click.stop="toggleSharing"
                           >
@@ -975,14 +979,14 @@ async function handleAuditSelected() {
                               aria-hidden="true"
                               :class="[
                                 'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
-                                isSwitchSubItemReadonly(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
+                                isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
                               ]"
                             >
                               <span
                                 :class="[
                                   'block size-3 rounded-full transition-transform',
                                   sharingEnabled ? 'translate-x-[calc(100%-2px)]' : 'translate-x-0',
-                                  isSwitchSubItemReadonly(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
+                                  isSwitchSubItemToggleDisabled(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
                                 ]"
                               />
                             </span>

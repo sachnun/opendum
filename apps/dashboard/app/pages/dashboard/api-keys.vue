@@ -328,13 +328,13 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                     <UiPopover v-model:open="roamingInfoOpenByKeyId[apiKey.id]" :content="{ align: 'start', side: 'top', class: 'w-64 px-2 py-1.5 text-xs leading-snug' }">
                       <button
                         type="button"
-                        class="inline-flex size-4 items-center justify-center rounded-full outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                        class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-muted-foreground outline-none transition-colors hover:border-border hover:bg-muted hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                         aria-label="About Roaming"
                         @pointerenter="openRoamingInfoOnHover(apiKey.id, $event)"
                         @pointerleave="closeRoamingInfoOnHover(apiKey.id, $event)"
                         @click.capture="toggleRoamingInfo(apiKey.id, $event)"
                       >
-                        <UiIcon name="i-lucide-circle-question-mark" class="size-3.5 text-muted-foreground/60 [stroke-width:1.5]" />
+                        <UiIcon name="i-lucide-circle-question-mark" class="size-3 [stroke-width:1.5]" />
                       </button>
                       <template #content>
                         <div class="space-y-1.5">
