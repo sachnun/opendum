@@ -12,8 +12,11 @@ const props = defineProps<{
   disabled?: boolean;
 }>();
 
+const { auditRefreshVersion, auditUser, isAuditMode } = useDashboardAudit();
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
+const previousStatAnimationContextKey = ref<string | null>(null);
+const pendingStatBaselineContextKey = ref<string | null>(null);
 
 const dailyValues = computed(() => props.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
@@ -78,6 +81,10 @@ const statMetrics = computed<StatMetric[]>(() => [
     getTone: (delta) => delta > 0 ? "negative" : "positive",
   },
 ]);
+const statAnimationContextKey = computed(() => {
+  const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
+  return `${props.label}:${userKey}:${auditRefreshVersion.value}`;
+});
 const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
 
 function formatHourLabel(time: string): string {
@@ -93,12 +100,23 @@ function isPreviousDayLabel(time: string): boolean {
   return date < today;
 }
 
-watch(statMetrics, (items) => {
+watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
   const nextValues = collectStatValues(items);
   const previousValues = previousStatValues.value;
+  const previousContextKey = previousStatAnimationContextKey.value;
+  const contextChanged = previousContextKey !== contextKey;
 
-  if (!previousValues) {
+  if (contextChanged) {
     previousStatValues.value = nextValues;
+    previousStatAnimationContextKey.value = contextKey;
+    pendingStatBaselineContextKey.value = previousContextKey === null ? null : contextKey;
+    statHitEffects.value = {};
+    return;
+  }
+
+  if (!previousValues || pendingStatBaselineContextKey.value === contextKey) {
+    previousStatValues.value = nextValues;
+    pendingStatBaselineContextKey.value = null;
     return;
   }
 
@@ -121,6 +139,7 @@ watch(statMetrics, (items) => {
   }
 
   previousStatValues.value = nextValues;
+  previousStatAnimationContextKey.value = contextKey;
   statHitEffects.value = nextHitEffects;
 }, { immediate: true });
 

@@ -8,12 +8,14 @@ const emptyAuditInfo: DashboardAuditInfo = {
 
 export function useDashboardAudit() {
   const dashboardMe = useState<DashboardMeData | null>("dashboard-me-state", () => null);
+  const auditRefreshVersion = useState("dashboard-audit-refresh-version", () => 0);
 
   const audit = computed(() => dashboardMe.value?.audit ?? emptyAuditInfo);
   const isAuditMode = computed(() => audit.value.active && Boolean(audit.value.user));
   const auditUser = computed(() => audit.value.user);
 
   async function refreshAfterAuditChange() {
+    auditRefreshVersion.value += 1;
     useState<Record<string, unknown>>("account-quota-by-account-id", () => ({})).value = {};
     useState<Record<string, string>>("account-quota-error-by-account-id", () => ({})).value = {};
     useState<Record<string, boolean>>("account-quota-loading-by-account-id", () => ({})).value = {};
@@ -23,6 +25,7 @@ export function useDashboardAudit() {
 
   return {
     audit,
+    auditRefreshVersion,
     auditUser,
     dashboardMe,
     isAuditMode,

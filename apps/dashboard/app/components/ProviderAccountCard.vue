@@ -169,7 +169,7 @@ const emit = defineEmits<{
 }>();
 
 const dashboardApi = useDashboardApi();
-const { auditUser, isAuditMode } = useDashboardAudit();
+const { auditRefreshVersion, auditUser, isAuditMode } = useDashboardAudit();
 const isToggling = ref(false);
 const isSubtitleVisible = ref(false);
 const editDialogOpen = ref(false);
@@ -516,7 +516,7 @@ const statMetrics = computed<StatMetric[]>(() => [
 ]);
 const statAnimationContextKey = computed(() => {
   const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
-  return `${props.account.id}:${userKey}`;
+  return `${props.account.id}:${userKey}:${auditRefreshVersion.value}`;
 });
 const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
 const effectiveTier = computed(() => {
