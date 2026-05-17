@@ -19,6 +19,7 @@ const { data: session } = await useSession(useFetch);
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
 const auditDialogOpen = ref(false);
+const supportItemOpen = reactive<Record<string, boolean>>({ Tools: true });
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
 
@@ -56,6 +57,15 @@ const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-
 const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-shell-pinned-providers", () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
+  {
+    name: "Tools",
+    href: "/dashboard/tools",
+    icon: "i-lucide-wrench",
+    children: [
+      { name: "Email", href: "/dashboard/tools/email", disabled: true, tag: "soon" },
+      { name: "OTP", href: "/dashboard/tools/otp", disabled: true, tag: "soon" },
+    ],
+  },
   { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical", disabled: playgroundNavigationDisabled.value },
 ]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
@@ -191,6 +201,20 @@ function isActive(href: string) {
 
 function isAccountsNavItem(item: NavItem) {
   return item.href === accountsNavigationHref;
+}
+
+function isSupportItemActive(item: NavItem) {
+  return isActive(item.href) || Boolean(item.children?.some((subItem) => isSubItemActive(subItem)));
+}
+
+function isSupportItemOpen(item: NavItem) {
+  return !item.children?.length || supportItemOpen[item.name] !== false;
+}
+
+function toggleSupportItem(item: NavItem) {
+  if (!item.children?.length) return;
+
+  supportItemOpen[item.name] = !isSupportItemOpen(item);
 }
 
 function subItemHref(subItem: NavSubItem) {
@@ -494,7 +518,7 @@ async function handleAuditSelected() {
                     >
                       <span class="flex min-w-0 items-center gap-2">
                         <span class="truncate">{{ subItem.name }}</span>
-                        <UiBadge v-if="subItem.tag" variant="outline" class="px-1.5 py-0 text-[10px] lowercase">
+                        <UiBadge v-if="subItem.tag" variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
                           {{ subItem.tag }}
                         </UiBadge>
                       </span>
@@ -550,20 +574,68 @@ async function handleAuditSelected() {
 
         <div class="shrink-0">
           <nav class="mt-4 space-y-1 border-t border-border/60 pt-4">
-            <NuxtLink
-              v-for="item in supportNavigation"
-              :key="item.name"
-              :to="item.href"
-              :aria-disabled="item.disabled ? true : undefined"
-              :class="[
-                'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-              ]"
-              @click="handleNavClick(item, $event)"
-            >
-              <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-              {{ item.name }}
-            </NuxtLink>
+            <div v-for="item in supportNavigation" :key="item.name" class="space-y-1">
+              <button
+                v-if="item.children?.length"
+                type="button"
+                :aria-expanded="isSupportItemOpen(item)"
+                :class="[
+                  'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
+                  isSupportItemActive(item) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                ]"
+                @click="toggleSupportItem(item)"
+              >
+                <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+                <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
+              </button>
+              <NuxtLink
+                v-else
+                :to="item.href"
+                :aria-disabled="item.disabled ? true : undefined"
+                :class="[
+                  'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                  item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                ]"
+                @click="handleNavClick(item, $event)"
+              >
+                <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                {{ item.name }}
+              </NuxtLink>
+
+              <div v-if="item.children?.length && isSupportItemOpen(item)" class="ml-6 space-y-1 border-l border-border/60 pl-3">
+                <template v-for="subItem in item.children" :key="`${item.name}-${subItem.name}`">
+                  <div
+                    v-if="subItem.disabled"
+                    class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
+                    aria-disabled="true"
+                  >
+                    <span class="flex min-w-0 items-center gap-2">
+                      <span class="truncate">{{ subItem.name }}</span>
+                      <UiBadge v-if="subItem.tag" variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
+                        {{ subItem.tag }}
+                      </UiBadge>
+                    </span>
+                  </div>
+                  <NuxtLink
+                    v-else
+                    :to="subItemHref(subItem)"
+                    :class="[
+                      'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                      isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    ]"
+                    @click="handleNavClick(subItem, $event)"
+                  >
+                    <span class="flex min-w-0 items-center gap-2">
+                      <span class="truncate">{{ subItem.name }}</span>
+                      <UiBadge v-if="subItem.tag" variant="outline" class="px-1.5 py-0 text-[10px] lowercase">
+                        {{ subItem.tag }}
+                      </UiBadge>
+                    </span>
+                  </NuxtLink>
+                </template>
+              </div>
+            </div>
           </nav>
         </div>
       </div>
@@ -701,7 +773,7 @@ async function handleAuditSelected() {
                         >
                           <span class="flex min-w-0 items-center gap-2">
                             <span class="truncate">{{ subItem.name }}</span>
-                            <UiBadge v-if="subItem.tag" variant="outline" class="px-1.5 py-0 text-[10px] lowercase">
+                            <UiBadge v-if="subItem.tag" variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
                               {{ subItem.tag }}
                             </UiBadge>
                           </span>
@@ -756,20 +828,68 @@ async function handleAuditSelected() {
 
             <div class="shrink-0">
               <nav class="mt-4 space-y-1 border-t border-border/60 pt-4">
-                <NuxtLink
-                  v-for="item in supportNavigation"
-                  :key="`mobile-${item.name}`"
-                  :to="item.href"
-                  :aria-disabled="item.disabled ? true : undefined"
-                  :class="[
-                    'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                    item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                  ]"
-                  @click="handleNavClick(item, $event)"
-                >
-                  <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-                  {{ item.name }}
-                </NuxtLink>
+                <div v-for="item in supportNavigation" :key="`mobile-${item.name}`" class="space-y-1">
+                  <button
+                    v-if="item.children?.length"
+                    type="button"
+                    :aria-expanded="isSupportItemOpen(item)"
+                    :class="[
+                      'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
+                      isSupportItemActive(item) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    ]"
+                    @click="toggleSupportItem(item)"
+                  >
+                    <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+                    <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
+                  </button>
+                  <NuxtLink
+                    v-else
+                    :to="item.href"
+                    :aria-disabled="item.disabled ? true : undefined"
+                    :class="[
+                      'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                      item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    ]"
+                    @click="handleNavClick(item, $event)"
+                  >
+                    <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    {{ item.name }}
+                  </NuxtLink>
+
+                  <div v-if="item.children?.length && isSupportItemOpen(item)" class="ml-6 space-y-1 border-l border-border/60 pl-3">
+                    <template v-for="subItem in item.children" :key="`mobile-${item.name}-${subItem.name}`">
+                      <div
+                        v-if="subItem.disabled"
+                        class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
+                        aria-disabled="true"
+                      >
+                        <span class="flex min-w-0 items-center gap-2">
+                          <span class="truncate">{{ subItem.name }}</span>
+                          <UiBadge v-if="subItem.tag" variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
+                            {{ subItem.tag }}
+                          </UiBadge>
+                        </span>
+                      </div>
+                      <NuxtLink
+                        v-else
+                        :to="subItemHref(subItem)"
+                        :class="[
+                          'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                          isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                        ]"
+                        @click="handleNavClick(subItem, $event)"
+                      >
+                        <span class="flex min-w-0 items-center gap-2">
+                          <span class="truncate">{{ subItem.name }}</span>
+                          <UiBadge v-if="subItem.tag" variant="outline" class="px-1.5 py-0 text-[10px] lowercase">
+                            {{ subItem.tag }}
+                          </UiBadge>
+                        </span>
+                      </NuxtLink>
+                    </template>
+                  </div>
+                </div>
               </nav>
             </div>
           </div>
