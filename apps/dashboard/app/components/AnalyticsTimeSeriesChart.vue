@@ -97,7 +97,10 @@ function formatValue(value: number, suffix = ""): string {
 const yTicks = computed(() => [0, maxY.value / 2, maxY.value]);
 const xTicks = computed(() => {
   if (!props.data.length) return [] as Array<{ label: string; x: number }>;
-  const indexes = Array.from(new Set([0, Math.floor((props.data.length - 1) / 2), props.data.length - 1]));
+  const tickCount = Math.min(5, props.data.length);
+  const indexes = Array.from(
+    new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (props.data.length - 1))))
+  );
   return indexes.map((index) => ({ label: formatTick(props.data[index]?.date ?? ""), x: xAt(index) }));
 });
 </script>
