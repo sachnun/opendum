@@ -123,7 +123,7 @@ onUnmounted(() => {
           type="button"
           :disabled="isLoading || readonly"
           :class="cn(
-            'flex w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-transparent px-2 py-2 text-left font-mono text-xs text-muted-foreground outline-none transition-colors hover:bg-muted/30 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
+            'flex w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-transparent px-2 py-2 text-left font-mono text-xs text-white outline-none transition-colors hover:bg-muted/30 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
             isKeyVisible ? 'min-h-9' : 'h-9',
           )"
           @click="revealKey"
