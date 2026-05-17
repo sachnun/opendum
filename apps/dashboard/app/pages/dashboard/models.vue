@@ -249,7 +249,15 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                 </div>
 
                 <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                  <UiBadge v-for="provider in model.providers" :key="provider" variant="outline" class="text-[10px] font-normal">
+                  <UiBadge
+                    v-for="provider in model.providers"
+                    :key="provider"
+                    variant="outline"
+                    :class="[
+                      'text-[10px] font-normal',
+                      activeProviders.includes(provider) ? '' : 'border-border/60 text-muted-foreground opacity-70',
+                    ]"
+                  >
                     {{ getProviderLabel(provider) }}
                   </UiBadge>
                 </div>
