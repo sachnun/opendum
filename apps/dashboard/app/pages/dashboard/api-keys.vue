@@ -323,7 +323,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                     </UiPopover>
                   </span>
                   <div class="flex items-center gap-1.5">
-                    <span v-if="priorityEnabledByKeyId[apiKey.id]" class="flex items-center gap-1 text-[11px] leading-none text-muted-foreground">
+                    <span v-if="priorityEnabledByKeyId[apiKey.id]" class="flex items-center gap-1 text-[11px] leading-none text-foreground">
                       <UiIcon name="i-lucide-coins" class="size-3" />
                       0
                     </span>
