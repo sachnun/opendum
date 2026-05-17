@@ -24,7 +24,6 @@ const createdKey = ref<string | null>(null);
 const hasCreatedKey = ref(false);
 const copied = ref(false);
 const errorMessage = ref("");
-const createButtonLabel = computed(() => (name.value.trim() ? "Create" : "Skip"));
 
 function reset() {
   name.value = "";
@@ -64,9 +63,6 @@ async function copyCreatedKey() {
   setTimeout(() => (copied.value = false), 2000);
 }
 
-function closeDialog() {
-  open.value = false;
-}
 </script>
 
 <template>
@@ -92,10 +88,6 @@ function closeDialog() {
                 {{ copied ? 'Copied' : 'Copy' }}
               </UiButton>
             </div>
-          </div>
-
-          <div class="flex justify-end">
-            <UiButton type="button" size="sm" @click="closeDialog">Done</UiButton>
           </div>
         </div>
       </template>
@@ -128,7 +120,7 @@ function closeDialog() {
             <UiButton type="button" variant="outline" size="sm" :disabled="isCreating" @click="open = false">Cancel</UiButton>
             <UiButton type="submit" size="sm" :disabled="isCreating">
               <UiIcon v-if="isCreating" name="i-lucide-loader-2" class="size-3.5 animate-spin" />
-              {{ isCreating ? 'Creating...' : createButtonLabel }}
+              {{ isCreating ? 'Creating...' : 'Create' }}
             </UiButton>
           </div>
         </form>

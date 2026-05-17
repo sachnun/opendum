@@ -138,7 +138,8 @@ export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {
 export async function createApiKey(userId: string, input: CreateApiKeyInput) {
   try {
     const key = generateApiKey();
-    const [apiKey] = await db.insert(proxyApiKey).values({ userId, keyHash: hashString(key), keyPreview: getKeyPreview(key), encryptedKey: encrypt(key), name: input?.name?.trim() || null, expiresAt: input?.expiresAt ?? null }).returning();
+    const name = input?.name?.trim() || null;
+    const [apiKey] = await db.insert(proxyApiKey).values({ userId, keyHash: hashString(key), keyPreview: getKeyPreview(key), encryptedKey: encrypt(key), name, expiresAt: input?.expiresAt ?? null }).returning();
     if (!apiKey) return { success: false, error: "Failed to create API key" } as const;
     return { success: true, data: { id: apiKey.id, key, keyPreview: apiKey.keyPreview, name: apiKey.name, expiresAt: apiKey.expiresAt } } as const;
   } catch (error) {

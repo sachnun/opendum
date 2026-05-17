@@ -71,7 +71,7 @@ const selectedApiKeyLabel = computed(() => {
   if (selectedApiKeyId.value === "all") return "All API keys";
 
   const apiKey = apiKeys.value.find((item) => item.id === selectedApiKeyId.value);
-  return apiKey ? `${apiKey.name ?? "Unnamed key"} (${apiKey.keyPreview})` : selectedApiKeyId.value;
+  return apiKey ? `${apiKey.name ?? ""} (${apiKey.keyPreview})` : selectedApiKeyId.value;
 });
 const activeFilter = computed<AnalyticsFilter>(() => {
   if (isCustomRangeActive.value && customRange.value?.start && customRange.value?.end) {
@@ -305,7 +305,7 @@ const successRateData = computed(() =>
                 :class="['h-8 w-full justify-start rounded-md px-2.5 text-xs', selectedApiKeyId === apiKey.id ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : '']"
                 @click="handleApiKeyChange(apiKey.id)"
               >
-                <span class="truncate">{{ apiKey.name ?? 'Unnamed key' }}</span>
+                <span class="truncate">{{ apiKey.name ?? '' }}</span>
                 <span class="ml-1 truncate text-[11px] text-muted-foreground">{{ apiKey.keyPreview }}</span>
               </UiButton>
             </div>
