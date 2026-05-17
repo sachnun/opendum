@@ -102,6 +102,7 @@ async function toggleModel(model: string) {
         v-for="model in visibleModels"
         :key="model"
         :text="modelButtonTitle(model)"
+        :disabled="readonly"
       >
         <button
           type="button"

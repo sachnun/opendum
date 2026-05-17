@@ -21,7 +21,7 @@ const checked = defineModel<boolean>({ default: false });
 </script>
 
 <template>
-  <UiTooltip :text="title" :disabled="!title">
+  <UiTooltip :text="title" :disabled="!title || disabled">
     <SwitchRoot
       v-model="checked"
       :disabled="disabled"

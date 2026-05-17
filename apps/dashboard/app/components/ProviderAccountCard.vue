@@ -1228,10 +1228,10 @@ function cancelErrorPreviewPointer() {
         </div>
         <div class="mt-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
-            <UiTooltip text="Edit">
+            <UiTooltip text="Edit" :disabled="readonly">
               <UiButton variant="outline" size="sm" :disabled="readonly" :aria-label="`Edit ${accountTitle}`" @click="editDialogOpen = true"><UiIcon name="i-lucide-pencil" class="size-3" /></UiButton>
             </UiTooltip>
-            <UiTooltip text="Delete">
+            <UiTooltip text="Delete" :disabled="readonly">
               <UiButton variant="outline" size="sm" :disabled="readonly" :aria-label="`Delete ${accountTitle}`" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
             </UiTooltip>
             <UiTooltip text="Playground">

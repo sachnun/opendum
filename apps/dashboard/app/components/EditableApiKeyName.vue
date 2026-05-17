@@ -102,7 +102,7 @@ async function updateName() {
 <template>
   <div class="flex min-w-0 items-center gap-1.5">
     <span v-if="showTitle" class="min-w-0 truncate text-lg font-semibold">{{ displayName }}</span>
-    <UiTooltip v-if="showEditButton" text="Edit">
+    <UiTooltip v-if="showEditButton" text="Edit" :disabled="readonly">
       <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="readonly" @click="editDialogOpen = true">
         <UiIcon name="i-lucide-pencil" class="size-4" />
       </UiButton>

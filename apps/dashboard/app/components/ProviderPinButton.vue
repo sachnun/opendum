@@ -49,7 +49,7 @@ async function togglePin(event: Event) {
 </script>
 
 <template>
-  <UiTooltip :text="localPinned ? 'Unpin' : 'Pin'">
+  <UiTooltip :text="localPinned ? 'Unpin' : 'Pin'" :disabled="readonly">
     <button
       type="button"
       :class="cn(

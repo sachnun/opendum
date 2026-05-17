@@ -118,7 +118,7 @@ onUnmounted(() => {
   <div>
     <div class="flex flex-col gap-2.5">
       <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
-      <UiTooltip :text="isKeyVisible ? 'Hide' : 'Reveal'">
+      <UiTooltip :text="isKeyVisible ? 'Hide' : 'Reveal'" :disabled="readonly">
         <button
           type="button"
           :disabled="isLoading || readonly"
@@ -135,7 +135,7 @@ onUnmounted(() => {
 
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
-          <UiTooltip text="Delete">
+          <UiTooltip text="Delete" :disabled="readonly">
             <UiButton variant="outline" size="icon-sm" class="h-8 w-8" :disabled="readonly" @click="deleteDialogOpen = true">
               <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
             </UiButton>

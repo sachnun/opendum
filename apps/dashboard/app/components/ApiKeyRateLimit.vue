@@ -136,7 +136,7 @@ const pickerItems = computed(() => {
               <UiBadge variant="outline" class="shrink-0 text-[10px]">{{ rule.targetType === 'family' ? 'Family' : 'Model' }}</UiBadge>
               <span class="truncate font-mono text-xs">{{ rule.target }}</span>
             </div>
-            <UiTooltip text="Remove">
+            <UiTooltip text="Remove" :disabled="readonly">
               <UiButton variant="ghost" size="sm" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" :disabled="isSaving || readonly" aria-label="Remove rate limit rule" @click="removeRule(index)">
                 <UiIcon name="i-lucide-trash-2" class="size-3.5" />
               </UiButton>
