@@ -270,7 +270,13 @@ function isSwitchSubItem(subItem: NavSubItem) {
   return subItem.control === "switch";
 }
 
+function isSwitchSubItemReadonly(subItem: NavSubItem) {
+  return isSwitchSubItem(subItem) && isAuditMode.value;
+}
+
 function toggleSharing() {
+  if (isAuditMode.value) return;
+
   if (sharingEnabled.value) {
     disableSharingDialogOpen.value = true;
     return;
@@ -553,7 +559,12 @@ async function handleAuditSelected() {
                       type="button"
                       role="switch"
                       :aria-checked="sharingEnabled"
-                      class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
+                      :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
+                      :disabled="isSwitchSubItemReadonly(subItem)"
+                      :class="[
+                        'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
+                        isSwitchSubItemReadonly(subItem) ? 'text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                      ]"
                       @click="toggleSharing"
                     >
                       <span class="min-w-0 truncate">{{ subItem.name }}</span>
@@ -915,7 +926,12 @@ async function handleAuditSelected() {
                           type="button"
                           role="switch"
                           :aria-checked="sharingEnabled"
-                          class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
+                          :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
+                          :disabled="isSwitchSubItemReadonly(subItem)"
+                          :class="[
+                            'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
+                            isSwitchSubItemReadonly(subItem) ? 'text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                          ]"
                           @click="toggleSharing"
                         >
                           <span class="min-w-0 truncate">{{ subItem.name }}</span>
