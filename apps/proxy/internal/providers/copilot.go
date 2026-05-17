@@ -144,7 +144,7 @@ func (p copilotProvider) MakeRequest(ctx context.Context, client *http.Client, a
 	if stream {
 		payload["stream_options"] = map[string]any{"include_usage": true}
 	}
-	if !p.isReasoningModel(modelName) {
+	if !p.supportsReasoningEffort(modelName) {
 		delete(payload, "reasoning")
 		delete(payload, "reasoning_effort")
 	}
@@ -324,6 +324,17 @@ func (p copilotProvider) isReasoningModel(model string) bool {
 		return true
 	}
 	return p.registry.IsReasoningModel(model)
+}
+
+func (p copilotProvider) supportsReasoningEffort(model string) bool {
+	if p.registry == nil {
+		return true
+	}
+	if value, ok := providerConfigValue(p.registry, model, "copilot", "reasoning_effort"); ok {
+		supported, _ := value.(bool)
+		return supported
+	}
+	return p.isReasoningModel(model)
 }
 
 func (p copilotProvider) requiresResponsesAPI(model string) bool {

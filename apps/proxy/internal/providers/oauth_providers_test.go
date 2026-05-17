@@ -65,6 +65,38 @@ func TestCopilotResponsesPayload(t *testing.T) {
 	}
 }
 
+func TestCopilotDropsUnsupportedReasoningEffort(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := copilotProvider{registry: registry}
+	var payload map[string]any
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"ok"}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":            "copilot/gemini-2.5-pro",
+		"messages":         []any{map[string]any{"role": "user", "content": "hi"}},
+		"reasoning_effort": "low",
+		"reasoning":        map[string]any{"effort": "low"},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if payload["model"] != "gemini-2.5-pro" {
+		t.Fatalf("model = %#v, want gemini-2.5-pro", payload["model"])
+	}
+	if _, ok := payload["reasoning_effort"]; ok {
+		t.Fatalf("unsupported reasoning_effort leaked: %#v", payload)
+	}
+	if _, ok := payload["reasoning"]; ok {
+		t.Fatalf("unsupported reasoning leaked: %#v", payload)
+	}
+}
+
 func TestGoogleCodeAssistConversion(t *testing.T) {
 	payload := openAIToGemini(map[string]any{
 		"messages":    []any{map[string]any{"role": "system", "content": "policy"}, map[string]any{"role": "user", "content": "hello"}},

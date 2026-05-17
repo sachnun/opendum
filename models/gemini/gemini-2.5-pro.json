@@ -22,6 +22,9 @@
     }
   },
   "providerConfig": {
+    "copilot": {
+      "reasoning_effort": false
+    },
     "gemini_cli": {
       "thinking_budgets": {
         "high": 32768,
