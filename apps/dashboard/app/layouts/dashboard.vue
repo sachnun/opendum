@@ -18,6 +18,7 @@ const { data: session } = await useSession(useFetch);
 
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
+const modelSearchFocused = ref(false);
 const auditDialogOpen = ref(false);
 const sharingEnabled = ref(false);
 const disableSharingDialogOpen = ref(false);
@@ -704,7 +705,7 @@ async function handleAuditSelected() {
           </div>
 
           <div class="min-w-0 flex-1">
-            <ModelSearchPopover />
+            <ModelSearchPopover @focus-change="modelSearchFocused = $event" />
           </div>
 
           <div class="flex items-center gap-1.5 sm:gap-2">
@@ -715,7 +716,10 @@ async function handleAuditSelected() {
                 class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-1 transition-opacity hover:opacity-80"
               >
                 <svg
-                  class="size-6 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]"
+                  :class="[
+                    'size-6 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]',
+                    modelSearchFocused ? 'hidden sm:block' : '',
+                  ]"
                   viewBox="0 0 40 40"
                   fill="none"
                   aria-hidden="true"
@@ -784,7 +788,7 @@ async function handleAuditSelected() {
                     </linearGradient>
                   </defs>
                 </svg>
-                <span class="select-none text-sm font-semibold tabular-nums text-foreground/85">1000</span>
+                <span :class="['select-none text-sm font-semibold tabular-nums text-foreground/85', modelSearchFocused ? 'hidden sm:inline' : '']">1000</span>
                 <span class="relative flex size-8 shrink-0 select-none sm:ml-1">
                   <span class="flex size-8 overflow-hidden rounded-full">
                     <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">

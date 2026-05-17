@@ -7,6 +7,9 @@ type ModelListItem = ModelSearchItem;
 
 const dashboardApi = useDashboardApi();
 const route = useRoute();
+const emit = defineEmits<{
+  focusChange: [focused: boolean];
+}>();
 
 const root = ref<HTMLElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
@@ -92,6 +95,7 @@ onBeforeUnmount(() => {
 function openSuggestions() {
   if (Date.now() < suppressFocusUntil.value) return;
 
+  emit("focusChange", true);
   suggestionsOpen.value = true;
   if (filteredModels.value.length > 0 && activeSuggestionIndex.value === -1) {
     activeSuggestionIndex.value = 0;
@@ -106,6 +110,7 @@ function closeSuggestions() {
 function handleFocusOut(event: FocusEvent) {
   const nextTarget = event.relatedTarget;
   if (nextTarget instanceof Node && root.value?.contains(nextTarget)) return;
+  emit("focusChange", false);
   closeSuggestions();
 }
 
