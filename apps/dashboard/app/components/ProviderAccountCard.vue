@@ -1120,7 +1120,7 @@ function cancelErrorPreviewPointer() {
                     <UiTooltip text="Copy">
                       <button
                         type="button"
-                        class="shrink-0 cursor-pointer rounded p-0.5 transition-colors hover:bg-muted"
+                        class="shrink-0 cursor-pointer rounded p-0.5"
                         :aria-label="activeErrorEntry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
                         @click="copyErrorPreview"
                       >

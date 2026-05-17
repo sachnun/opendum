@@ -6,6 +6,7 @@ const props = defineProps<{
   providerKey: ProviderAccountKey;
   pinned: boolean;
   readonly?: boolean;
+  class?: string | string[];
 }>();
 
 const emit = defineEmits<{
@@ -54,6 +55,7 @@ async function togglePin(event: Event) {
       :class="cn(
         'cursor-pointer rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         localPinned ? 'text-foreground hover:text-muted-foreground' : 'text-muted-foreground/40 hover:text-muted-foreground',
+        props.class,
       )"
       :aria-label="pinButtonLabel"
       :aria-pressed="localPinned"

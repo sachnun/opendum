@@ -604,8 +604,8 @@ onBeforeUnmount(() => {
               :key="providerKey"
               type="button"
               :class="cn(
-                'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:border-primary hover:bg-accent',
-                provider === providerKey ? 'border-primary bg-accent' : 'border-border',
+                'flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors hover:bg-muted/40',
+                provider === providerKey ? 'border-foreground/30 bg-muted/30' : 'border-border',
               )"
               @click="selectProvider(providerKey)"
             >
@@ -625,8 +625,8 @@ onBeforeUnmount(() => {
               :key="method.key"
               type="button"
               :class="cn(
-                'flex cursor-pointer items-start gap-3 rounded-lg border-2 p-3 text-left transition-all hover:border-primary hover:bg-accent',
-                codexLoginMethod === method.key ? 'border-primary bg-accent' : 'border-border',
+                'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40',
+                codexLoginMethod === method.key ? 'border-foreground/30 bg-muted/30' : 'border-border',
               )"
               @click="selectCodexLoginMethod(method.key)"
             >
