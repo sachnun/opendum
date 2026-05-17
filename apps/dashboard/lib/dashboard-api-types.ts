@@ -152,6 +152,7 @@ export interface ApiKeyListItem {
   accountAccessMode: string;
   accountAccessList: string[];
   roamingEnabled: boolean;
+  roamingPointsUsed: number;
 }
 
 export interface ApiKeyOptions {

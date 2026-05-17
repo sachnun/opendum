@@ -295,16 +295,33 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   <span class="text-right font-medium">{{ apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : '-' }}</span>
                 </div>
                 <div class="flex items-center justify-between gap-4">
-                  <span class="text-muted-foreground">Roaming</span>
+                  <span class="flex items-center gap-1.5 text-muted-foreground">
+                    Roaming
+                    <UiPopover :content="{ align: 'start', side: 'top', class: 'w-64 px-2 py-1.5 text-xs leading-snug' }">
+                      <button
+                        type="button"
+                        class="inline-flex size-4 items-center justify-center rounded-full outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                        aria-label="About Roaming"
+                      >
+                        <UiIcon name="i-lucide-circle-question-mark" class="size-3.5 text-muted-foreground/60 [stroke-width:1.5]" />
+                      </button>
+                      <template #content>
+                        <div class="space-y-1.5">
+                          <p class="font-medium text-popover-foreground">Roaming</p>
+                          <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Each successful roaming request uses points.</p>
+                        </div>
+                      </template>
+                    </UiPopover>
+                  </span>
                   <div class="flex items-center gap-1.5">
                     <span v-if="apiKey.roamingEnabled" class="flex items-center gap-1 text-[11px] leading-none text-foreground">
                       <UiIcon name="i-lucide-coins" class="size-3" />
-                      2/success
+                      <span class="inline-flex items-center leading-none tabular-nums">{{ apiKey.roamingPointsUsed }}</span>
                     </span>
                     <UiSwitch
                       :model-value="apiKey.roamingEnabled"
                       size="sm"
-                      :title="apiKey.roamingEnabled ? 'Disable roaming' : 'Enable roaming'"
+                      :title="apiKey.roamingEnabled ? 'Disable' : 'Enable'"
                       :disabled="isAuditMode || roamingUpdatingIds.has(apiKey.id)"
                       @update:model-value="toggleRoaming(apiKey, $event)"
                     />

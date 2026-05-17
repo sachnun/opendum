@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../lib/db";
-import { providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "../lib/db/schema";
+import { providerAccount, proxyApiKey, proxyApiKeyRateLimit, usageLog } from "../lib/db/schema";
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "../lib/proxy/authless-providers";
@@ -22,6 +22,7 @@ const apiKeyAccountAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
 const API_KEY_MIN_LENGTH = 3;
 const API_KEY_MAX_LENGTH = 100;
 const API_KEY_ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
+const ROAMING_POINT_COST = 2;
 const rateLimitRuleSchema = z.object({
   target: z.string(),
   targetType: z.enum(["model", "family"]),
@@ -136,10 +137,30 @@ export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {
       .from(proxyApiKey)
       .where(eq(proxyApiKey.userId, userId))
       .orderBy(desc(proxyApiKey.createdAt));
+    const apiKeyIds = apiKeys.map((apiKey) => apiKey.id);
+    const roamingPointRows = apiKeyIds.length > 0
+      ? await db
+          .select({
+            apiKeyId: usageLog.proxyApiKeyId,
+            pointsUsed: sql<number>`coalesce(count(*) * ${ROAMING_POINT_COST}, 0)`,
+          })
+          .from(usageLog)
+          .innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id))
+          .where(and(
+            eq(usageLog.userId, userId),
+            inArray(usageLog.proxyApiKeyId, apiKeyIds),
+            ne(providerAccount.userId, userId),
+            sql`${usageLog.statusCode} >= 200`,
+            sql`${usageLog.statusCode} < 400`,
+          ))
+          .groupBy(usageLog.proxyApiKeyId)
+      : [];
+    const roamingPointsByKeyId = new Map(roamingPointRows.map((row) => [row.apiKeyId, Number(row.pointsUsed ?? 0)]));
 
     return apiKeys.map(({ encryptedKey, ...apiKey }) => ({
       ...apiKey,
       keyPreview: encryptedKey ? getKeyPreview(decrypt(encryptedKey)) : apiKey.keyPreview,
+      roamingPointsUsed: roamingPointsByKeyId.get(apiKey.id) ?? 0,
     }));
   } catch (error) {
     console.error("Failed to list API keys:", error);
