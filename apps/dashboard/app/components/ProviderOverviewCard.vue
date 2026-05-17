@@ -36,9 +36,9 @@ function formatDuration(duration: number | null): string {
 }
 
 function compactNumber(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return n.toLocaleString();
 }
 
@@ -78,6 +78,7 @@ const durationLabelPoints = computed(() => [props.summary.stats.durationLast24Ho
 const badge = computed(() => indicatorBadge(props.summary.indicator, props.summary.active));
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.summary.stats.totalRequests.toLocaleString(), numericValue: props.summary.stats.totalRequests, formatDelta: formatSignedInteger },
+  { key: "totalTokens", label: "Token", value: compactNumber(props.summary.stats.totalTokens), numericValue: props.summary.stats.totalTokens, formatDelta: formatSignedInteger },
   { key: "successRate", label: "Success", value: props.summary.stats.successRate === null ? "-" : `${props.summary.stats.successRate}%`, numericValue: props.summary.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
   { key: "avgDuration", label: "Latency", value: formatDuration(props.summary.stats.avgDurationLastDay), numericValue: props.summary.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration },
 ]);
@@ -134,7 +135,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
 
     <UiCardContent class="pointer-events-none relative z-20 p-0">
       <div class="space-y-2 rounded-md border border-border/70 p-2.5">
-        <div class="grid grid-cols-3 gap-1.5">
+        <div class="grid grid-cols-4 gap-1.5">
           <UsageStatMetric
             v-for="stat in stats"
             :key="stat.key"

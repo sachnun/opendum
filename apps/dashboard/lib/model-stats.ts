@@ -3,6 +3,7 @@ export const MODEL_DURATION_LOOKBACK_HOURS = 24;
 
 export interface ModelStats {
   totalRequests: number;
+  totalTokens: number;
   successRate: number | null;
   dailyRequests: Array<{ date: string; count: number }>;
   avgDurationLastDay: number | null;
@@ -36,6 +37,7 @@ export function buildHourKeys(hours: number): string[] {
 export function buildEmptyModelStats(dayKeys: string[], hourKeys: string[]): ModelStats {
   return {
     totalRequests: 0,
+    totalTokens: 0,
     successRate: null,
     dailyRequests: dayKeys.map((day) => ({ date: day, count: 0 })),
     avgDurationLastDay: null,

@@ -38,6 +38,7 @@ export interface MaintenerAuditUserListResult {
 
 export interface ProviderStats {
   totalRequests: number;
+  totalTokens: number;
   successRate: number | null;
   dailyRequests: Array<{ date: string; count: number }>;
   avgDurationLastDay: number | null;

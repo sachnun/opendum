@@ -12,6 +12,7 @@ export const INDICATOR_WEIGHT = { normal: 0, warning: 1, error: 2 } as const;
 export type ProviderAccountIndicator = keyof typeof INDICATOR_WEIGHT;
 export type ProviderStats = {
   totalRequests: number;
+  totalTokens: number;
   successRate: number | null;
   dailyRequests: Array<{ date: string; count: number }>;
   avgDurationLastDay: number | null;
@@ -19,6 +20,7 @@ export type ProviderStats = {
 };
 type RawProviderStats = {
   totalRequests: number;
+  totalTokens: number;
   successfulRequests: number;
   durationTotal: number;
   durationCount: number;
@@ -58,12 +60,13 @@ function toNumber(value: number | string | null | undefined): number {
 }
 
 function createRawStats(): RawProviderStats {
-  return { totalRequests: 0, successfulRequests: 0, durationTotal: 0, durationCount: 0, dailyCounts: new Map(), durationByHour: new Map() };
+  return { totalRequests: 0, totalTokens: 0, successfulRequests: 0, durationTotal: 0, durationCount: 0, dailyCounts: new Map(), durationByHour: new Map() };
 }
 
 function buildEmptyProviderStats(dayKeys: string[], hourKeys: string[]): ProviderStats {
   return {
     totalRequests: 0,
+    totalTokens: 0,
     successRate: null,
     dailyRequests: dayKeys.map((date) => ({ date, count: 0 })),
     avgDurationLastDay: null,
@@ -75,6 +78,7 @@ function buildStatsFromRaw(raw: RawProviderStats | undefined, dayKeys: string[],
   if (!raw) return buildEmptyProviderStats(dayKeys, hourKeys);
   return {
     totalRequests: raw.totalRequests,
+    totalTokens: raw.totalTokens,
     successRate: raw.totalRequests > 0 ? Math.round((raw.successfulRequests / raw.totalRequests) * 100) : null,
     dailyRequests: dayKeys.map((date) => ({ date, count: raw.dailyCounts.get(date) ?? 0 })),
     avgDurationLastDay: raw.durationCount > 0 ? Math.round(raw.durationTotal / raw.durationCount) : null,
@@ -114,7 +118,7 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
   }
 
   const [allTimeRows, dailyUsageRows, durationRows] = await Promise.all([
-    db.select({ provider: providerAccount.provider, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...allTimeConditions)).groupBy(providerAccount.provider),
+    db.select({ provider: providerAccount.provider, requestCount: sql<number>`count(*)`, totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...allTimeConditions)).groupBy(providerAccount.provider),
     db.select({ provider: providerAccount.provider, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...dailyConditions)).groupBy(providerAccount.provider, dayBucketExpression),
     db.select({ provider: providerAccount.provider, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...durationConditions)).groupBy(providerAccount.provider, hourBucketExpression),
   ]);
@@ -124,6 +128,7 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
     if (!isKnownProvider(row.provider)) continue;
     const current = statsByProvider.get(row.provider) ?? createRawStats();
     current.totalRequests += toNumber(row.requestCount);
+    current.totalTokens += toNumber(row.totalTokens);
     current.successfulRequests += toNumber(row.successCount);
     current.durationTotal += toNumber(row.durationTotal);
     current.durationCount += toNumber(row.durationCount);
@@ -181,7 +186,7 @@ export async function buildAccountStats(userId: string, accountIds: string[]): P
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
   const [allTimeRows, dailyUsageRows, durationRows] = await Promise.all([
-    db.select({ providerAccountId: usageLog.providerAccountId, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds))).groupBy(usageLog.providerAccountId),
+    db.select({ providerAccountId: usageLog.providerAccountId, requestCount: sql<number>`count(*)`, totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds))).groupBy(usageLog.providerAccountId),
     db.select({ providerAccountId: usageLog.providerAccountId, dayBucket: dayBucketExpression, requestCount: sql<number>`count(*)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, statsStartDate))).groupBy(usageLog.providerAccountId, dayBucketExpression),
     db.select({ providerAccountId: usageLog.providerAccountId, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).where(and(eq(usageLog.userId, userId), inArray(usageLog.providerAccountId, accountIds), gte(usageLog.createdAt, durationStartDate))).groupBy(usageLog.providerAccountId, hourBucketExpression),
   ]);
@@ -190,6 +195,7 @@ export async function buildAccountStats(userId: string, accountIds: string[]): P
     if (!row.providerAccountId) continue;
     const current = rawStatsByAccountId.get(row.providerAccountId) ?? createRawStats();
     current.totalRequests += toNumber(row.requestCount);
+    current.totalTokens += toNumber(row.totalTokens);
     current.successfulRequests += toNumber(row.successCount);
     current.durationTotal += toNumber(row.durationTotal);
     current.durationCount += toNumber(row.durationCount);

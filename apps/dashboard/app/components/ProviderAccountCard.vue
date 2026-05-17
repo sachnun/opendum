@@ -295,9 +295,9 @@ function formatDuration(duration: number | null): string {
 }
 
 function compactNumber(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return n.toLocaleString();
 }
 
@@ -493,6 +493,7 @@ const durationValues = computed(() => props.account.stats.durationLast24Hours.ma
 const durationLabelPoints = computed(() => [props.account.stats.durationLast24Hours[0], props.account.stats.durationLast24Hours[Math.floor(props.account.stats.durationLast24Hours.length / 2)], props.account.stats.durationLast24Hours[props.account.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.account.stats.totalRequests.toLocaleString(), numericValue: props.account.stats.totalRequests, formatDelta: formatSignedInteger },
+  { key: "totalTokens", label: "Token", value: compactNumber(props.account.stats.totalTokens), numericValue: props.account.stats.totalTokens, formatDelta: formatSignedInteger },
   { key: "successRate", label: "Success", value: props.account.stats.successRate === null ? "-" : `${props.account.stats.successRate}%`, numericValue: props.account.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
   { key: "avgDuration", label: "Latency", value: formatDuration(props.account.stats.avgDurationLastDay), numericValue: props.account.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration },
 ]);
@@ -1060,7 +1061,7 @@ function cancelErrorPreviewPointer() {
       <UiCardContent class="flex flex-1 flex-col pt-0">
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3">
-            <div class="mb-2 grid grid-cols-3 gap-1.5">
+            <div class="mb-2 grid grid-cols-4 gap-1.5">
               <UsageStatMetric
                 v-for="stat in usageStats"
                 :key="stat.key"

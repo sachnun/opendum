@@ -7,6 +7,7 @@ import { resolveModelAlias } from "./proxy/models";
 
 interface RawModelStats {
   totalRequests: number;
+  totalTokens: number;
   successfulRequests: number;
   durationTotal: number;
   durationCount: number;
@@ -17,6 +18,7 @@ interface RawModelStats {
 function createRawModelStats(): RawModelStats {
   return {
     totalRequests: 0,
+    totalTokens: 0,
     successfulRequests: 0,
     durationTotal: 0,
     durationCount: 0,
@@ -52,6 +54,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
       .select({
         model: normalizedModelExpression,
         requestCount: sql<number>`count(*)`,
+        totalTokens: sql<number>`coalesce(sum(${usageLog.inputTokens} + ${usageLog.outputTokens}), 0)`,
         successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
         durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`,
         durationCount: sql<number>`count(${usageLog.duration})`,
@@ -89,6 +92,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
 
     const current = rawStatsByModel.get(modelId) ?? createRawModelStats();
     current.totalRequests += Number(row.requestCount) || 0;
+    current.totalTokens += Number(row.totalTokens) || 0;
     current.successfulRequests += Number(row.successCount) || 0;
     current.durationTotal += Number(row.durationTotal) || 0;
     current.durationCount += Number(row.durationCount) || 0;
@@ -153,6 +157,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
 
       return [model, {
         totalRequests: modelStats.totalRequests,
+        totalTokens: modelStats.totalTokens,
         successRate: modelStats.totalRequests > 0 ? Math.round((modelStats.successfulRequests / modelStats.totalRequests) * 100) : null,
         dailyRequests: dayKeys.map((day) => ({ date: day, count: modelStats.dailyCounts.get(day) ?? 0 })),
         avgDurationLastDay: modelStats.durationCount > 0 ? Math.round(modelStats.durationTotal / modelStats.durationCount) : null,

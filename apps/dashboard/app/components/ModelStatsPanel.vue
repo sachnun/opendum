@@ -31,9 +31,9 @@ function formatDuration(duration: number | null): string {
 }
 
 function compactNumber(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return n.toLocaleString();
 }
 
@@ -65,6 +65,7 @@ function collectStatValues(items: StatMetric[]): Record<string, number> {
 
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.stats.totalRequests.toLocaleString(), numericValue: props.stats.totalRequests, formatDelta: formatSignedInteger },
+  { key: "totalTokens", label: "Token", value: compactNumber(props.stats.totalTokens), numericValue: props.stats.totalTokens, formatDelta: formatSignedInteger },
   { key: "successRate", label: "Success", value: props.stats.successRate === null ? "-" : `${props.stats.successRate}%`, numericValue: props.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
   {
     key: "avgDuration",
@@ -123,7 +124,7 @@ watch(
 
 <template>
   <div class="space-y-2">
-    <div class="grid grid-cols-3 gap-1.5">
+    <div class="grid grid-cols-4 gap-1.5">
       <UsageStatMetric
         v-for="stat in usageStats"
         :key="stat.key"
