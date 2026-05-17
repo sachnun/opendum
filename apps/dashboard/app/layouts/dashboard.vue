@@ -660,46 +660,55 @@ async function handleAuditSelected() {
           </div>
 
           <div class="flex items-center gap-1.5 sm:gap-2">
+            <svg
+              class="pointer-events-none size-6 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]"
+              viewBox="0 0 40 40"
+              fill="none"
+              aria-hidden="true"
+            >
+              <g transform="translate(20 20)">
+                <g>
+                  <animateTransform
+                    attributeName="transform"
+                    type="scale"
+                    values="1 1;1 1;0.14 1;1 1;1 1"
+                    keyTimes="0;0.46;0.58;0.72;1"
+                    dur="2.4s"
+                    repeatCount="indefinite"
+                  />
+                  <circle r="16" fill="url(#profile-coin-face)" />
+                  <circle r="15" stroke="url(#profile-coin-rim)" stroke-width="2" />
+                  <path d="M-4.5 -7.5H5.5" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.55" />
+                  <text
+                    x="0"
+                    y="1"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    fill="currentColor"
+                    font-size="18"
+                    font-weight="800"
+                    font-family="var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif"
+                  >P</text>
+                </g>
+              </g>
+              <defs>
+                <linearGradient id="profile-coin-face" x1="8" y1="7" x2="32" y2="34" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#FAFAFA" />
+                  <stop offset="0.52" stop-color="#A3A3A3" />
+                  <stop offset="1" stop-color="#404040" />
+                </linearGradient>
+                <linearGradient id="profile-coin-rim" x1="9" y1="6" x2="30" y2="34" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#FFFFFF" />
+                  <stop offset="1" stop-color="#525252" />
+                </linearGradient>
+              </defs>
+            </svg>
             <UiPopover v-model:open="userMenuOpen" :content="{ align: 'end', sideOffset: 8 }">
               <button
                 type="button"
                 aria-label="Open account menu"
-                class="flex cursor-pointer items-center justify-center gap-2 rounded-full transition-opacity hover:opacity-80"
+                class="inline-flex h-10 cursor-pointer items-center justify-center rounded-full transition-opacity hover:opacity-80"
               >
-                <svg
-                  class="size-6 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]"
-                  viewBox="0 0 40 40"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <g transform="translate(20 20)">
-                    <g>
-                      <animateTransform
-                        attributeName="transform"
-                        type="scale"
-                        values="1 1;0.14 1;1 1;0.14 1;1 1"
-                        dur="1.45s"
-                        repeatCount="indefinite"
-                      />
-                      <circle r="16" fill="url(#profile-coin-face)" />
-                      <circle r="15" stroke="url(#profile-coin-rim)" stroke-width="2" />
-                      <path d="M0 -9.5V9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
-                      <path d="M-7 -3.5H4.25C6.05 -3.5 7.5 -2.05 7.5 -0.25C7.5 1.55 6.05 3 4.25 3H-7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-                      <path d="M-4.5 -7.5H5.5" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.55" />
-                    </g>
-                  </g>
-                  <defs>
-                    <linearGradient id="profile-coin-face" x1="8" y1="7" x2="32" y2="34" gradientUnits="userSpaceOnUse">
-                      <stop stop-color="#FAFAFA" />
-                      <stop offset="0.52" stop-color="#A3A3A3" />
-                      <stop offset="1" stop-color="#404040" />
-                    </linearGradient>
-                    <linearGradient id="profile-coin-rim" x1="9" y1="6" x2="30" y2="34" gradientUnits="userSpaceOnUse">
-                      <stop stop-color="#FFFFFF" />
-                      <stop offset="1" stop-color="#525252" />
-                    </linearGradient>
-                  </defs>
-                </svg>
                 <span class="relative flex size-8 shrink-0 select-none">
                   <span class="flex size-8 overflow-hidden rounded-full">
                     <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
