@@ -87,12 +87,10 @@ function closeDialog() {
             <p class="text-xs text-muted-foreground">Your API Key</p>
             <div class="mt-2 flex items-center gap-2">
               <code class="flex-1 break-all rounded bg-background px-2 py-1 font-mono text-xs font-medium">{{ createdKey }}</code>
-              <UiTooltip :text="copied ? 'Copied' : 'Copy'">
-                <UiButton type="button" variant="outline" size="sm" class="h-8 shrink-0 px-2" @click="copyCreatedKey">
-                  <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
-                  {{ copied ? 'Copied' : 'Copy' }}
-                </UiButton>
-              </UiTooltip>
+              <UiButton type="button" variant="outline" size="sm" class="h-8 shrink-0 px-2" @click="copyCreatedKey">
+                <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                {{ copied ? 'Copied' : 'Copy' }}
+              </UiButton>
             </div>
           </div>
 

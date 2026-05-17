@@ -678,12 +678,10 @@ onBeforeUnmount(() => {
               <p class="text-xs text-muted-foreground">Enter this code on the provider page:</p>
               <div class="mt-2 flex flex-wrap items-center gap-2">
                 <code class="rounded bg-background px-2 py-1 font-mono text-sm font-semibold tracking-[0.15em]">{{ deviceCodeInfo.userCode }}</code>
-                <UiTooltip :text="copiedDeviceCode ? 'Copied' : 'Copy'">
-                  <UiButton type="button" size="sm" variant="outline" @click="copyText(deviceCodeInfo.userCode, 'code')">
-                    <UiIcon :name="copiedDeviceCode ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
-                    {{ copiedDeviceCode ? 'Copied' : 'Copy code' }}
-                  </UiButton>
-                </UiTooltip>
+                <UiButton type="button" size="sm" variant="outline" @click="copyText(deviceCodeInfo.userCode, 'code')">
+                  <UiIcon :name="copiedDeviceCode ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                  {{ copiedDeviceCode ? 'Copied' : 'Copy code' }}
+                </UiButton>
               </div>
             </div>
             <div class="flex gap-2">

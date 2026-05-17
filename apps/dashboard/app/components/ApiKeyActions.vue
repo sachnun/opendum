@@ -141,12 +141,10 @@ onUnmounted(() => {
           </UiTooltip>
           <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" :readonly="readonly" @updated="emit('renamed', $event)" />
         </div>
-        <UiTooltip :text="copied ? 'Copied' : 'Copy'">
-          <UiButton variant="outline" size="sm" class="h-8" :disabled="isLoading || readonly" @click="copyKey">
-            <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
-            {{ copied ? 'Copied' : 'Copy' }}
-          </UiButton>
-        </UiTooltip>
+        <UiButton variant="outline" size="sm" class="h-8" :disabled="isLoading || readonly" @click="copyKey">
+          <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+          {{ copied ? 'Copied' : 'Copy' }}
+        </UiButton>
       </div>
     </div>
 
