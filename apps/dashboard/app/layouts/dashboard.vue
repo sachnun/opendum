@@ -625,12 +625,12 @@ async function handleAuditSelected() {
                           <button
                             type="button"
                             aria-label="About sharing"
-                            class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground outline-none transition-colors hover:border-border hover:bg-muted hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                            class="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 outline-none transition-colors hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                             @pointerenter="openSharingInfoOnHover('desktop', $event)"
                             @pointerleave="closeSharingInfoOnHover('desktop', $event)"
                             @click.capture="toggleSharingInfo('desktop', $event)"
                           >
-                            ?
+                            <UiIcon name="i-lucide-circle-question-mark" class="size-3 [stroke-width:1.5]" />
                           </button>
                           <template #content>
                             <div class="space-y-1 text-xs leading-relaxed">
@@ -951,12 +951,12 @@ async function handleAuditSelected() {
                               <button
                                 type="button"
                                 aria-label="About sharing"
-                                class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground outline-none transition-colors hover:border-border hover:bg-muted hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                                class="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 outline-none transition-colors hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                                 @pointerenter="openSharingInfoOnHover('mobile', $event)"
                                 @pointerleave="closeSharingInfoOnHover('mobile', $event)"
                                 @click.capture="toggleSharingInfo('mobile', $event)"
                               >
-                                ?
+                                <UiIcon name="i-lucide-circle-question-mark" class="size-3 [stroke-width:1.5]" />
                               </button>
                               <template #content>
                                 <div class="space-y-1 text-xs leading-relaxed">
