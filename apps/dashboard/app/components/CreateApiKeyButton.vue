@@ -60,7 +60,10 @@ async function copyCreatedKey() {
   if (!createdKey.value) return;
   await navigator.clipboard.writeText(createdKey.value);
   copied.value = true;
-  setTimeout(() => (copied.value = false), 2000);
+  setTimeout(() => {
+    copied.value = false;
+    open.value = false;
+  }, 2000);
 }
 
 </script>
