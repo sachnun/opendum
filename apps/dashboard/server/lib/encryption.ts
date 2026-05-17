@@ -94,14 +94,21 @@ export function generateApiKey(): string {
   const bytes = randomBytes(16);
   let result = "sk-";
   for (let i = 0; i < 16; i++) {
-    result += chars[bytes[i] % chars.length];
+    result += chars[(bytes[i] ?? 0) % chars.length];
   }
   return result;
 }
 
+function getPreviewVisibleLength(keyLength: number): number {
+  if (keyLength <= 8) return 2;
+  if (keyLength <= 16) return 4;
+  return 8;
+}
+
 /**
- * Get key preview (first 12 chars for display)
+ * Get masked key preview for display.
  */
 export function getKeyPreview(key: string): string {
-  return key.substring(0, 12) + "...";
+  const visibleLength = Math.min(getPreviewVisibleLength(key.length), Math.max(0, key.length - 1));
+  return `${key.slice(0, visibleLength)}${"*".repeat(Math.max(1, key.length - visibleLength))}`;
 }

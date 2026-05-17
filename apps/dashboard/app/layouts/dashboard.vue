@@ -726,79 +726,12 @@ async function handleAuditSelected() {
                 aria-label="Open account menu"
                 class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-1 transition-opacity hover:opacity-80"
               >
-                <svg
+                <PointCoinIcon
                   :class="[
                     'size-6 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]',
                     modelSearchFocused ? 'hidden sm:block' : '',
                   ]"
-                  viewBox="0 0 40 40"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <g transform="translate(20 20)">
-                    <g>
-                      <animateTransform
-                        attributeName="transform"
-                        type="scale"
-                        values="1 1;1 1;0.12 1;-1 1;-1 1;-0.12 1;1 1;1 1"
-                        keyTimes="0;0.68;0.74;0.8;0.86;0.92;0.97;1"
-                        dur="5s"
-                        repeatCount="indefinite"
-                      />
-                      <g>
-                        <animate
-                          attributeName="opacity"
-                          values="1;1;0;0;0;0;1;1"
-                          keyTimes="0;0.72;0.74;0.86;0.92;0.94;0.97;1"
-                          dur="5s"
-                          repeatCount="indefinite"
-                        />
-                        <circle r="16" fill="url(#profile-coin-face)" />
-                        <circle r="15" stroke="url(#profile-coin-rim)" stroke-width="2" />
-                        <path d="M-4.5 -7.5H5.5" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.55" />
-                        <text
-                          x="0"
-                          y="1"
-                          text-anchor="middle"
-                          dominant-baseline="middle"
-                          fill="#171717"
-                          font-size="18"
-                          font-weight="800"
-                          font-family="var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif"
-                        >P</text>
-                      </g>
-                      <g opacity="0">
-                        <animate
-                          attributeName="opacity"
-                          values="0;0;1;1;1;1;0;0"
-                          keyTimes="0;0.72;0.74;0.86;0.92;0.94;0.97;1"
-                          dur="5s"
-                          repeatCount="indefinite"
-                        />
-                        <circle r="16" fill="url(#profile-coin-back)" />
-                        <circle r="15" stroke="url(#profile-coin-rim)" stroke-width="2" />
-                        <circle r="8" stroke="#525252" stroke-width="2" opacity="0.55" />
-                        <path d="M-7 0H7" stroke="#FAFAFA" stroke-width="1.8" stroke-linecap="round" opacity="0.45" />
-                      </g>
-                    </g>
-                  </g>
-                  <defs>
-                    <linearGradient id="profile-coin-face" x1="8" y1="7" x2="32" y2="34" gradientUnits="userSpaceOnUse">
-                      <stop stop-color="#FAFAFA" />
-                      <stop offset="0.52" stop-color="#A3A3A3" />
-                      <stop offset="1" stop-color="#404040" />
-                    </linearGradient>
-                    <linearGradient id="profile-coin-back" x1="8" y1="7" x2="32" y2="34" gradientUnits="userSpaceOnUse">
-                      <stop stop-color="#E5E5E5" />
-                      <stop offset="0.5" stop-color="#737373" />
-                      <stop offset="1" stop-color="#262626" />
-                    </linearGradient>
-                    <linearGradient id="profile-coin-rim" x1="9" y1="6" x2="30" y2="34" gradientUnits="userSpaceOnUse">
-                      <stop stop-color="#FFFFFF" />
-                      <stop offset="1" stop-color="#525252" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+                />
                 <span :class="['select-none text-sm font-semibold tabular-nums text-foreground/85', modelSearchFocused ? 'hidden sm:inline' : '']">1000</span>
                 <span class="relative flex size-8 shrink-0 select-none sm:ml-1">
                   <span class="flex size-8 overflow-hidden rounded-full">

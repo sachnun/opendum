@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   deleted: [apiKeyId: string];
-  renamed: [value: { name: string | null }];
+  renamed: [value: { name: string | null; keyPreview?: string }];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -26,7 +26,7 @@ const errorMessage = ref("");
 let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const isKeyVisible = computed(() => (isRevealed.value || isTemporarilyRevealed.value) && Boolean(revealedKey.value));
-const displayKey = computed(() => (isKeyVisible.value && revealedKey.value ? revealedKey.value : `${props.apiKey.keyPreview.substring(0, 8)}********`));
+const displayKey = computed(() => (isKeyVisible.value && revealedKey.value ? revealedKey.value : props.apiKey.keyPreview));
 const displayName = computed(() => props.apiKey.name || "—");
 
 async function revealKey() {
@@ -140,7 +140,7 @@ onUnmounted(() => {
               <UiIcon name="i-lucide-trash-2" class="size-4 text-destructive" />
             </UiButton>
           </UiTooltip>
-          <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-title="false" :readonly="readonly" @updated="emit('renamed', $event)" />
+          <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :key-preview="apiKey.keyPreview" :show-title="false" :readonly="readonly" @updated="emit('renamed', $event)" />
         </div>
         <UiButton variant="outline" size="sm" class="h-8" :disabled="isLoading || readonly" @click="copyKey">
           <UiIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />

@@ -259,7 +259,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
           <UiCardHeader class="pb-1">
             <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <div class="min-w-0 overflow-hidden">
-                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :show-edit-button="false" :readonly="isAuditMode" @updated="updateApiKeyPatch(apiKey.id, $event)" />
+                <EditableApiKeyName :id="apiKey.id" :name="apiKey.name" :key-preview="apiKey.keyPreview" :show-edit-button="false" :readonly="isAuditMode" @updated="updateApiKeyPatch(apiKey.id, $event)" />
               </div>
               <div class="flex h-7 shrink-0 items-center justify-end gap-1.5">
                 <span class="text-[11px] leading-none text-muted-foreground">{{ isApiKeyEffectivelyActive(apiKey) ? 'On' : 'Off' }}</span>

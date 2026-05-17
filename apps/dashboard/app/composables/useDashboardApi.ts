@@ -71,7 +71,7 @@ export function useDashboardApi() {
       toggle: (body: { id: string }) => post<ActionResult<{ id: string; isActive: boolean; expiresAt: string | Date | null }>>(dashboardFetch, "/api/dashboard/api-keys/toggle", body),
       delete: (body: { id: string }) => post<ActionResult>(dashboardFetch, "/api/dashboard/api-keys/delete", body),
       reveal: (body: { id: string }) => post<ActionResult<{ key: string }>>(dashboardFetch, "/api/dashboard/api-keys/reveal", body),
-      updateName: (body: { id: string; name: string }) => post<ActionResult<{ name: string | null }>>(dashboardFetch, "/api/dashboard/api-keys/name", body),
+      updateName: (body: { id: string; name: string; key?: string }) => post<ActionResult<{ name: string | null; keyPreview: string }>>(dashboardFetch, "/api/dashboard/api-keys/name", body),
       updateExpiration: (body: { id: string; expiresAt: Date | string | null }) => post<ActionResult<{ expiresAt: string | Date | null }>>(dashboardFetch, "/api/dashboard/api-keys/expiration", body),
       updateModelAccess: (body: { id: string; mode: ApiKeyAccessMode; models: string[] }) => post<ActionResult<{ mode: ApiKeyAccessMode; models: string[] }>>(dashboardFetch, "/api/dashboard/api-keys/model-access", body),
       updateAccountAccess: (body: { id: string; mode: ApiKeyAccessMode; accounts: string[] }) => post<ActionResult<{ mode: ApiKeyAccessMode; accounts: string[] }>>(dashboardFetch, "/api/dashboard/api-keys/account-access", body),

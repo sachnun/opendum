@@ -13,11 +13,14 @@ import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 
 export const apiKeyIdInputSchema = z.object({ id: z.string() });
 export const createApiKeyInputSchema = z.object({ name: z.string().optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
-export const updateApiKeyNameInputSchema = z.object({ id: z.string(), name: z.string() });
+export const updateApiKeyNameInputSchema = z.object({ id: z.string(), name: z.string(), key: z.string().optional() });
 export const updateApiKeyExpirationInputSchema = z.object({ id: z.string(), expiresAt: z.coerce.date().nullable() });
 
 const apiKeyModelAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
 const apiKeyAccountAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
+const API_KEY_MIN_LENGTH = 3;
+const API_KEY_MAX_LENGTH = 100;
+const API_KEY_ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
 const rateLimitRuleSchema = z.object({
   target: z.string(),
   targetType: z.enum(["model", "family"]),
@@ -112,11 +115,12 @@ export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {
         .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.isActive, true), lte(proxyApiKey.expiresAt, new Date())));
     }
 
-    return await db
+    const apiKeys = await db
       .select({
         id: proxyApiKey.id,
         name: proxyApiKey.name,
         keyPreview: proxyApiKey.keyPreview,
+        encryptedKey: proxyApiKey.encryptedKey,
         isActive: proxyApiKey.isActive,
         createdAt: proxyApiKey.createdAt,
         expiresAt: proxyApiKey.expiresAt,
@@ -129,6 +133,11 @@ export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {
       .from(proxyApiKey)
       .where(eq(proxyApiKey.userId, userId))
       .orderBy(desc(proxyApiKey.createdAt));
+
+    return apiKeys.map(({ encryptedKey, ...apiKey }) => ({
+      ...apiKey,
+      keyPreview: encryptedKey ? getKeyPreview(decrypt(encryptedKey)) : apiKey.keyPreview,
+    }));
   } catch (error) {
     console.error("Failed to list API keys:", error);
     throw new Error("Failed to list API keys");
@@ -175,10 +184,26 @@ export async function revealApiKey(userId: string, id: string) {
 }
 
 export async function updateApiKeyName(userId: string, input: UpdateApiKeyNameInput) {
-  return withOwnedApiKey(userId, input.id, "Failed to update API key name", async () => {
-    const [updated] = await db.update(proxyApiKey).set({ name: input.name.trim() || null }).where(eq(proxyApiKey.id, input.id)).returning({ name: proxyApiKey.name });
-    if (!updated) return { success: false, error: "Failed to update API key name" } as const;
-    return { success: true, data: { name: updated.name } } as const;
+  return withOwnedApiKey(userId, input.id, "Failed to update API key", async (apiKey) => {
+    const normalizedKey = input.key === undefined ? undefined : input.key.trim();
+    const patch: Partial<typeof proxyApiKey.$inferInsert> = { name: input.name.trim() || null };
+
+    if (normalizedKey !== undefined) {
+      if (normalizedKey.length < API_KEY_MIN_LENGTH) return { success: false, error: `API key must be at least ${API_KEY_MIN_LENGTH} characters` } as const;
+      if (normalizedKey.length > API_KEY_MAX_LENGTH) return { success: false, error: `API key must be at most ${API_KEY_MAX_LENGTH} characters` } as const;
+      if (!API_KEY_ALLOWED_PATTERN.test(normalizedKey)) return { success: false, error: "API key can only contain letters, numbers, hyphen, and underscore" } as const;
+      const keyHash = hashString(normalizedKey);
+      const [existing] = await db.select({ id: proxyApiKey.id }).from(proxyApiKey).where(eq(proxyApiKey.keyHash, keyHash)).limit(1);
+      if (existing && existing.id !== apiKey.id) return { success: false, error: "Unable to update API key" } as const;
+      patch.keyHash = keyHash;
+      patch.keyPreview = getKeyPreview(normalizedKey);
+      patch.encryptedKey = encrypt(normalizedKey);
+    }
+
+    const [updated] = await db.update(proxyApiKey).set(patch).where(eq(proxyApiKey.id, input.id)).returning({ name: proxyApiKey.name, keyPreview: proxyApiKey.keyPreview });
+    if (!updated) return { success: false, error: "Failed to update API key" } as const;
+    if (normalizedKey) await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+    return { success: true, data: { name: updated.name, keyPreview: updated.keyPreview } } as const;
   });
 }
 
