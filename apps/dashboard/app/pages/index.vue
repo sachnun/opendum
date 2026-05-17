@@ -93,6 +93,38 @@ onMounted(() => {
     board = Array.from({ length: rows }, () => Array<TetrisCell>(columns).fill(null));
   }
 
+  function seedBottomStack() {
+    const stackHeight = Math.min(rows - 6, Math.max(5, Math.floor(rows * 0.22)));
+    const colors = tetrisPieces.map(piece => piece.color);
+    const wavePhase = Math.random() * Math.PI * 2;
+    const columnHeights = Array.from({ length: columns }, (_, x) => {
+      const progress = x / Math.max(1, columns - 1);
+      const wave = Math.sin(progress * Math.PI * 2.4 + wavePhase) * 0.5 + Math.sin(progress * Math.PI * 5.2 + wavePhase * 0.6) * 0.22;
+      const edgeFalloff = Math.sin(progress * Math.PI) * 0.9 + 0.1;
+      const targetHeight = stackHeight * (0.38 + edgeFalloff * 0.28 + wave * 0.22);
+
+      return Math.max(1, Math.min(stackHeight, Math.round(targetHeight)));
+    });
+
+    for (let rowOffset = 0; rowOffset < stackHeight; rowOffset += 1) {
+      const y = rows - 1 - rowOffset;
+
+      for (let x = 0; x < columns; x += 1) {
+        const waveGap = Math.floor((Math.sin(rowOffset * 0.9 + wavePhase) * 0.5 + 0.5) * (columns - 5)) + 2;
+        const isWaveGap = Math.abs(x - waveGap) <= (rowOffset % 5 === 0 ? 1 : 0);
+        const isSmallGap = rowOffset > 1 && rowOffset < stackHeight - 1 && (x * 3 + rowOffset) % 17 === 0 && Math.random() > 0.7;
+
+        if (!isWaveGap && !isSmallGap && rowOffset < columnHeights[x]) {
+          board[y][x] = colors[(x + Math.floor(rowOffset / 2)) % colors.length];
+        }
+      }
+
+      if (board[y].every(Boolean)) {
+        board[y][Math.floor((columns - 1) / 2)] = null;
+      }
+    }
+  }
+
   function canPlace(piece: TetrisPiece, nextX = piece.x, nextY = piece.y, shape = piece.shape) {
     return canPlaceShape(shape, nextX, nextY);
   }
@@ -261,6 +293,7 @@ onMounted(() => {
     canvas.style.height = `${height}px`;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     createBoard();
+    seedBottomStack();
     activePieces = [];
     for (let index = 0; index < maxVisibleTetrisPieces; index += 1) {
       spawnPiece();
