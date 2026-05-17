@@ -169,6 +169,7 @@ const emit = defineEmits<{
 }>();
 
 const dashboardApi = useDashboardApi();
+const { auditUser, isAuditMode } = useDashboardAudit();
 const isToggling = ref(false);
 const isSubtitleVisible = ref(false);
 const editDialogOpen = ref(false);
@@ -190,6 +191,8 @@ const historyError = ref<string | null>(null);
 const historyEntries = ref<ErrorHistoryEntry[] | null>(null);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
+const previousStatAnimationContextKey = ref<string | null>(null);
+const pendingStatBaselineContextKey = ref<string | null>(null);
 const activeErrorIndex = ref(0);
 const cardRoot = ref<HTMLElement | null>(null);
 let historyRequestId = 0;
@@ -511,6 +514,10 @@ const statMetrics = computed<StatMetric[]>(() => [
   { key: "successRate", label: "Success", value: props.account.stats.successRate === null ? "-" : `${props.account.stats.successRate}%`, numericValue: props.account.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
   { key: "avgDuration", label: "Latency", value: formatDuration(props.account.stats.avgDurationLastDay), numericValue: props.account.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration },
 ]);
+const statAnimationContextKey = computed(() => {
+  const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
+  return `${props.account.id}:${userKey}`;
+});
 const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
 const effectiveTier = computed(() => {
   const quotaTier = props.quotaInfo?.tier?.trim();
@@ -698,12 +705,23 @@ watch(
   { immediate: true }
 );
 
-watch(statMetrics, (items) => {
+watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
   const nextValues = collectStatValues(items);
   const previousValues = previousStatValues.value;
+  const previousContextKey = previousStatAnimationContextKey.value;
+  const contextChanged = previousContextKey !== contextKey;
 
-  if (!previousValues) {
+  if (contextChanged) {
     previousStatValues.value = nextValues;
+    previousStatAnimationContextKey.value = contextKey;
+    pendingStatBaselineContextKey.value = previousContextKey === null ? null : contextKey;
+    statHitEffects.value = {};
+    return;
+  }
+
+  if (!previousValues || pendingStatBaselineContextKey.value === contextKey) {
+    previousStatValues.value = nextValues;
+    pendingStatBaselineContextKey.value = null;
     return;
   }
 
@@ -726,16 +744,9 @@ watch(statMetrics, (items) => {
   }
 
   previousStatValues.value = nextValues;
+  previousStatAnimationContextKey.value = contextKey;
   statHitEffects.value = nextHitEffects;
 }, { immediate: true });
-
-watch(
-  () => props.account.id,
-  () => {
-    previousStatValues.value = null;
-    statHitEffects.value = {};
-  }
-);
 
 watch(errorPreviewEntries, (entries) => {
   if (activeErrorIndex.value >= entries.length) activeErrorIndex.value = Math.max(0, entries.length - 1);
