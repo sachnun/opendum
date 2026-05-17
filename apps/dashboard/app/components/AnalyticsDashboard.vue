@@ -19,7 +19,6 @@ const props = withDefaults(
 );
 
 const dashboardApi = useDashboardApi();
-const router = useRouter();
 
 const periods: { value: Period; label: string }[] = [
   { value: "5m", label: "Last 5 minutes" },
@@ -158,10 +157,9 @@ function handlePeriodChange(value: Period): void {
   isFilterOpen.value = false;
 }
 
-async function handleApiKeyChange(apiKeyId: string): Promise<void> {
+function handleApiKeyChange(apiKeyId: string): void {
   selectedApiKeyId.value = apiKeyId;
   isApiKeyFilterOpen.value = false;
-  await router.push(apiKeyId === "all" ? "/dashboard" : `/dashboard/analistik/${apiKeyId}`);
 }
 
 function handleApplyCustomRange(): void {

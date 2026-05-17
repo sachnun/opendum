@@ -11,7 +11,6 @@ const analyticsFilterSchema = z.union([
   z.object({ from: z.string(), to: z.string() }),
 ]);
 export const analyticsDataInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional() }).optional();
-export const analyticsByApiKeyInputSchema = z.object({ apiKeyId: z.string(), filter: analyticsFilterSchema.optional() });
 export const analyticsUsageInputSchema = z.object({ range: periodSchema.default("30d") }).optional();
 
 type Period = z.infer<typeof periodSchema>;
@@ -203,21 +202,6 @@ export async function getAnalyticsOverview(userId: string) {
     errors: Math.round(totals.totalRequests * ((100 - totals.successRate) / 100)),
     successRate: totals.successRate,
     avgDuration: totals.avgDuration,
-  };
-}
-
-export async function getAnalyticsByApiKey(userId: string, input: z.infer<typeof analyticsByApiKeyInputSchema>) {
-  const result = await getAnalyticsDataForUser(userId, input.filter ?? "30d", input.apiKeyId);
-  if (!result.success) throw new Error(result.error);
-
-  const totals = result.data.totals;
-  return {
-    ...result.data,
-    requests: totals.totalRequests,
-    totalRequests: totals.totalRequests,
-    tokens: totals.totalInputTokens + totals.totalOutputTokens,
-    totalTokens: totals.totalInputTokens + totals.totalOutputTokens,
-    errors: Math.round(totals.totalRequests * ((100 - totals.successRate) / 100)),
   };
 }
 

@@ -62,7 +62,6 @@ export function useDashboardApi() {
     analytics: {
       data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string }) => post<AnalyticsData>(dashboardFetch, "/api/dashboard/analytics/data", body),
       overview: () => dashboardFetch("/api/dashboard/analytics/overview"),
-      byApiKey: (body: { apiKeyId: string; filter?: AnalyticsFilter }) => post(dashboardFetch, "/api/dashboard/analytics/api-key", body),
       usage: (query?: { range?: string }) => dashboardFetch("/api/dashboard/analytics/usage", { query }),
     },
     apiKeys: {
