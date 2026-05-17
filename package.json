@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev:dashboard": "npm run dev --workspace @opendum/dashboard",
-    "dev:proxy": "go -C apps/proxy run ./cmd/proxy",
+    "dev:proxy": "TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy",
     "dev": "(npm run dev:dashboard & npm run dev:proxy)",
     "build:dashboard": "npm run build --workspace @opendum/dashboard",
     "build:proxy": "go -C apps/proxy build ./...",
