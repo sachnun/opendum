@@ -10,6 +10,7 @@ import { getAllFamilies, getAllModels, getModelFamily, isModelSupported, resolve
 import { compareModelEntries } from "../../lib/model-sort";
 import type { ActionResult } from "../utils/api";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
+import { API_KEY_UPDATE_POINT_COST, debitUserPoints } from "./points";
 
 export const apiKeyIdInputSchema = z.object({ id: z.string() });
 export const createApiKeyInputSchema = z.object({ name: z.string().optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
@@ -211,6 +212,7 @@ export async function updateApiKeyName(userId: string, input: UpdateApiKeyNameIn
   return withOwnedApiKey(userId, input.id, "Failed to update API key", async (apiKey) => {
     const normalizedKey = input.key === undefined ? undefined : input.key.trim();
     const patch: Partial<typeof proxyApiKey.$inferInsert> = { name: input.name.trim() || null };
+    let shouldChargeApiKeyUpdate = false;
 
     if (normalizedKey !== undefined) {
       if (normalizedKey.length < API_KEY_MIN_LENGTH) return { success: false, error: `API key must be at least ${API_KEY_MIN_LENGTH} characters` } as const;
@@ -222,12 +224,23 @@ export async function updateApiKeyName(userId: string, input: UpdateApiKeyNameIn
       patch.keyHash = keyHash;
       patch.keyPreview = getKeyPreview(normalizedKey);
       patch.encryptedKey = encrypt(normalizedKey);
+      shouldChargeApiKeyUpdate = keyHash !== apiKey.keyHash;
     }
 
-    const [updated] = await db.update(proxyApiKey).set(patch).where(eq(proxyApiKey.id, input.id)).returning({ name: proxyApiKey.name, keyPreview: proxyApiKey.keyPreview });
+    const updated = await db.transaction(async (tx) => {
+      if (shouldChargeApiKeyUpdate) {
+        const debit = await debitUserPoints(tx, userId, API_KEY_UPDATE_POINT_COST, "api_key_update");
+        if (!debit.success) return { insufficientPoints: true, balance: debit.balance } as const;
+      }
+
+      const [row] = await tx.update(proxyApiKey).set(patch).where(eq(proxyApiKey.id, input.id)).returning({ name: proxyApiKey.name, keyPreview: proxyApiKey.keyPreview });
+      return row ? { row } as const : null;
+    });
+
+    if (updated && "insufficientPoints" in updated) return { success: false, error: `Not enough points. Updating an API key costs ${API_KEY_UPDATE_POINT_COST} points.` } as const;
     if (!updated) return { success: false, error: "Failed to update API key" } as const;
     if (normalizedKey) await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
-    return { success: true, data: { name: updated.name, keyPreview: updated.keyPreview } } as const;
+    return { success: true, data: { name: updated.row.name, keyPreview: updated.row.keyPreview } } as const;
   });
 }
 

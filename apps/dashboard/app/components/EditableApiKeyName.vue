@@ -20,8 +20,10 @@ const emit = defineEmits<{
 }>();
 
 const dashboardApi = useDashboardApi();
+const { data: dashboardMe } = useNuxtData<DashboardMeData>("dashboard-me");
 const API_KEY_MIN_LENGTH = 3;
 const API_KEY_MAX_LENGTH = 100;
+const API_KEY_UPDATE_POINT_COST = 100;
 const API_KEY_ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
 const editDialogOpen = ref(false);
 const newName = ref(props.name ?? "");
@@ -35,6 +37,8 @@ const displayName = computed(() => props.name || "—");
 const maskedApiKey = computed(() => props.keyPreview || "********");
 const normalizedApiKeyValue = computed(() => apiKeyValue.value.trim());
 const saveCostsPoints = computed(() => isApiKeyDirty.value && normalizedApiKeyValue.value !== revealedApiKey.value);
+const pointBalance = computed(() => dashboardMe.value?.points?.balance ?? 0);
+const hasInsufficientPoints = computed(() => saveCostsPoints.value && pointBalance.value < API_KEY_UPDATE_POINT_COST);
 const apiKeyValidationError = computed(() => {
   if (!saveCostsPoints.value) return "";
   if (normalizedApiKeyValue.value.length < API_KEY_MIN_LENGTH) return `API key must be at least ${API_KEY_MIN_LENGTH} characters`;
@@ -78,12 +82,14 @@ function markApiKeyDirty() {
 async function updateName() {
   if (props.readonly) return;
   if (apiKeyValidationError.value) return;
+  if (hasInsufficientPoints.value) return;
   isUpdating.value = true;
   errorMessage.value = "";
   try {
     const result = await dashboardApi.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedApiKeyValue.value } : {}) });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
+    if (saveCostsPoints.value) void refreshNuxtData("dashboard-me");
     emit("updated", { name: result.data.name, keyPreview: result.data.keyPreview });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update API key";
@@ -127,14 +133,15 @@ async function updateName() {
           <UiIcon v-if="isRevealingApiKey" name="i-lucide-loader-2" class="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
         </div>
         <span v-if="apiKeyValidationError" class="text-xs font-normal text-destructive">{{ apiKeyValidationError }}</span>
+        <span v-else-if="hasInsufficientPoints" class="text-xs font-normal text-destructive">Not enough points. Updating an API key costs {{ API_KEY_UPDATE_POINT_COST }} points.</span>
       </label>
       <div class="flex justify-end gap-2">
         <UiButton variant="outline" @click="editDialogOpen = false">Cancel</UiButton>
-        <UiButton class="w-24 transition-colors" :disabled="isUpdating || isRevealingApiKey || Boolean(apiKeyValidationError)" @click="updateName">
+        <UiButton class="w-24 transition-colors" :disabled="isUpdating || isRevealingApiKey || Boolean(apiKeyValidationError) || hasInsufficientPoints" @click="updateName">
           <template v-if="isUpdating">Saving...</template>
           <template v-else-if="saveCostsPoints">
             <PointCoinIcon reverse class="size-5 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]" />
-            100
+            {{ API_KEY_UPDATE_POINT_COST }}
           </template>
           <template v-else>Save</template>
         </UiButton>
