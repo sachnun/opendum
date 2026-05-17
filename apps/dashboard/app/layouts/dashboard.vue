@@ -291,6 +291,7 @@ function setSharingInfoOpen(placement: "desktop" | "mobile", open: boolean) {
 
 function openSharingInfoOnHover(placement: "desktop" | "mobile", event: PointerEvent) {
   if (event.pointerType === "touch" || !isHoverPointer()) return;
+  if (event.currentTarget !== event.target) return;
   setSharingInfoOpen(placement, true);
 }
 
@@ -620,7 +621,7 @@ async function handleAuditSelected() {
                           <button
                             type="button"
                             aria-label="About sharing"
-                            class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                            class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground outline-none transition-colors hover:border-border hover:bg-muted hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                             @pointerenter="openSharingInfoOnHover('desktop', $event)"
                             @pointerleave="closeSharingInfoOnHover('desktop', $event)"
                             @click.capture="toggleSharingInfo('desktop', $event)"
@@ -946,7 +947,7 @@ async function handleAuditSelected() {
                               <button
                                 type="button"
                                 aria-label="About sharing"
-                                class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                                class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground outline-none transition-colors hover:border-border hover:bg-muted hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                                 @pointerenter="openSharingInfoOnHover('mobile', $event)"
                                 @pointerleave="closeSharingInfoOnHover('mobile', $event)"
                                 @click.capture="toggleSharingInfo('mobile', $event)"
