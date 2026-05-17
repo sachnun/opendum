@@ -23,6 +23,7 @@ const togglingApiKeyIds = ref(new Set<string>());
 const toggleErrors = ref<Record<string, string>>({});
 const roamingUpdatingIds = ref(new Set<string>());
 const roamingErrors = ref<Record<string, string>>({});
+const roamingInfoOpenByKeyId = ref<Record<string, boolean>>({});
 const proxyBaseUrl = computed(() => {
   const proxyUrl = String(config.public.proxyUrl || "").replace(/\/$/, "");
   return `${proxyUrl}/v1`;
@@ -52,6 +53,33 @@ onBeforeUnmount(() => {
     clearTimeout(copyProxyBaseUrlTimeout);
   }
 });
+
+function isHoverPointer() {
+  return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
+function setRoamingInfoOpen(apiKeyId: string, open: boolean) {
+  roamingInfoOpenByKeyId.value = { ...roamingInfoOpenByKeyId.value, [apiKeyId]: open };
+}
+
+function openRoamingInfoOnHover(apiKeyId: string, event: PointerEvent) {
+  if (event.pointerType === "touch" || !isHoverPointer()) return;
+  setRoamingInfoOpen(apiKeyId, true);
+}
+
+function closeRoamingInfoOnHover(apiKeyId: string, event: PointerEvent) {
+  if (event.pointerType === "touch" || !isHoverPointer()) return;
+  setRoamingInfoOpen(apiKeyId, false);
+}
+
+function toggleRoamingInfo(apiKeyId: string, event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  if (isHoverPointer() && event.detail !== 0) return;
+  setRoamingInfoOpen(apiKeyId, !roamingInfoOpenByKeyId.value[apiKeyId]);
+}
 
 function getApiKeyStatus(apiKey: ApiKeyListItem) {
   const now = new Date();
@@ -297,11 +325,14 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                 <div class="flex items-center justify-between gap-4">
                   <span class="flex items-center gap-1.5 text-muted-foreground">
                     Roaming
-                    <UiPopover :content="{ align: 'start', side: 'top', class: 'w-64 px-2 py-1.5 text-xs leading-snug' }">
+                    <UiPopover v-model:open="roamingInfoOpenByKeyId[apiKey.id]" :content="{ align: 'start', side: 'top', class: 'w-64 px-2 py-1.5 text-xs leading-snug' }">
                       <button
                         type="button"
                         class="inline-flex size-4 items-center justify-center rounded-full outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                         aria-label="About Roaming"
+                        @pointerenter="openRoamingInfoOnHover(apiKey.id, $event)"
+                        @pointerleave="closeRoamingInfoOnHover(apiKey.id, $event)"
+                        @click.capture="toggleRoamingInfo(apiKey.id, $event)"
                       >
                         <UiIcon name="i-lucide-circle-question-mark" class="size-3.5 text-muted-foreground/60 [stroke-width:1.5]" />
                       </button>

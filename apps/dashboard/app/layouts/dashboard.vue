@@ -23,6 +23,7 @@ const auditDialogOpen = ref(false);
 const sharingEnabled = ref(false);
 const sharingUpdating = ref(false);
 const disableSharingDialogOpen = ref(false);
+const sharingInfoOpenByPlacement = ref<Record<"desktop" | "mobile", boolean>>({ desktop: false, mobile: false });
 const supportItemOpen = reactive<Record<string, boolean>>({ Tools: true });
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
@@ -278,6 +279,33 @@ function isSwitchSubItem(subItem: NavSubItem) {
 
 function isSwitchSubItemReadonly(subItem: NavSubItem) {
   return isSwitchSubItem(subItem) && (isAuditMode.value || sharingUpdating.value);
+}
+
+function isHoverPointer() {
+  return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
+function setSharingInfoOpen(placement: "desktop" | "mobile", open: boolean) {
+  sharingInfoOpenByPlacement.value = { ...sharingInfoOpenByPlacement.value, [placement]: open };
+}
+
+function openSharingInfoOnHover(placement: "desktop" | "mobile", event: PointerEvent) {
+  if (event.pointerType === "touch" || !isHoverPointer()) return;
+  setSharingInfoOpen(placement, true);
+}
+
+function closeSharingInfoOnHover(placement: "desktop" | "mobile", event: PointerEvent) {
+  if (event.pointerType === "touch" || !isHoverPointer()) return;
+  setSharingInfoOpen(placement, false);
+}
+
+function toggleSharingInfo(placement: "desktop" | "mobile", event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  if (isHoverPointer() && event.detail !== 0) return;
+  setSharingInfoOpen(placement, !sharingInfoOpenByPlacement.value[placement]);
 }
 
 async function updateSharing(enabled: boolean) {
@@ -588,12 +616,14 @@ async function handleAuditSelected() {
                     >
                       <div class="flex min-w-0 items-center gap-1.5">
                         <span class="min-w-0 truncate">{{ subItem.name }}</span>
-                        <UiPopover :content="{ align: 'start', side: 'right', sideOffset: 8, class: 'w-64 p-3' }">
+                        <UiPopover v-model:open="sharingInfoOpenByPlacement.desktop" :content="{ align: 'start', side: 'right', sideOffset: 8, class: 'w-64 p-3' }">
                           <button
                             type="button"
                             aria-label="About sharing"
-                            class="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
-                            @click.stop
+                            class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                            @pointerenter="openSharingInfoOnHover('desktop', $event)"
+                            @pointerleave="closeSharingInfoOnHover('desktop', $event)"
+                            @click.capture="toggleSharingInfo('desktop', $event)"
                           >
                             ?
                           </button>
@@ -912,12 +942,14 @@ async function handleAuditSelected() {
                         >
                           <div class="flex min-w-0 items-center gap-1.5">
                             <span class="min-w-0 truncate">{{ subItem.name }}</span>
-                            <UiPopover :content="{ align: 'start', side: 'right', sideOffset: 8, class: 'w-64 p-3' }">
+                            <UiPopover v-model:open="sharingInfoOpenByPlacement.mobile" :content="{ align: 'start', side: 'right', sideOffset: 8, class: 'w-64 p-3' }">
                               <button
                                 type="button"
                                 aria-label="About sharing"
-                                class="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
-                                @click.stop
+                                class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                                @pointerenter="openSharingInfoOnHover('mobile', $event)"
+                                @pointerleave="closeSharingInfoOnHover('mobile', $event)"
+                                @click.capture="toggleSharingInfo('mobile', $event)"
                               >
                                 ?
                               </button>
