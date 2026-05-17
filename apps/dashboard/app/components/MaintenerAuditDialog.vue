@@ -188,7 +188,7 @@ async function selectUser(user: MaintenerAuditUser) {
             v-for="user in users"
             :key="user.id"
             type="button"
-            class="flex w-full cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+            class="flex w-full cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-default disabled:pointer-events-none disabled:opacity-50"
             :disabled="Boolean(selectingUserId)"
             @click="selectUser(user)"
           >

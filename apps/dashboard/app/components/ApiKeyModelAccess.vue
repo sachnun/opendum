@@ -107,7 +107,7 @@ const filteredModels = computed(() => {
 
     <div class="flex-1 space-y-3 lg:mt-5">
       <div class="grid grid-cols-3 gap-1 rounded-md border border-input bg-input/30 p-1">
-        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="setDraftMode(mode as AccessMode)">
+        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="setDraftMode(mode as AccessMode)">
           {{ mode === 'all' ? 'All' : mode === 'whitelist' ? 'Whitelist' : 'Blacklist' }}
         </button>
       </div>
@@ -128,7 +128,7 @@ const filteredModels = computed(() => {
               <input v-model="modelSearch" placeholder="Search model..." class="h-8 w-full rounded-md bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
-              <button v-for="modelId in filteredModels" :key="modelId" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-60" @click="toggleModel(modelId)">
+              <button v-for="modelId in filteredModels" :key="modelId" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleModel(modelId)">
                 <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftModels.includes(modelId) ? 'opacity-100' : 'opacity-0']" />
                 <span class="truncate font-mono text-[11px]">{{ modelId }}</span>
               </button>
@@ -143,7 +143,7 @@ const filteredModels = computed(() => {
             <UiBadge v-for="modelId in normalizedDraftModels" :key="modelId" variant="outline" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate font-mono">{{ modelId }}</span>
               <UiTooltip text="Remove">
-                <button type="button" :disabled="readonly" :aria-label="`Remove model ${modelId}`" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-60" @click="toggleModel(modelId)">
+                <button type="button" :disabled="readonly" :aria-label="`Remove model ${modelId}`" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleModel(modelId)">
                   <UiIcon name="i-lucide-x" class="size-2.5" />
                 </button>
               </UiTooltip>

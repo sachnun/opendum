@@ -544,7 +544,7 @@ async function handleAuditSelected() {
                   <template v-for="subItem in visibleSubItems(item)" :key="`${item.name}-${subItem.name}`">
                     <div
                       v-if="subItem.disabled"
-                      class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
+                      class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
                       aria-disabled="true"
                     >
                       <span class="flex min-w-0 items-center gap-2">
@@ -563,7 +563,7 @@ async function handleAuditSelected() {
                       :disabled="isSwitchSubItemReadonly(subItem)"
                       :class="[
                         'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
-                        isSwitchSubItemReadonly(subItem) ? 'text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                        isSwitchSubItemReadonly(subItem) ? 'cursor-default text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
                       ]"
                       @click="toggleSharing"
                     >
@@ -655,7 +655,7 @@ async function handleAuditSelected() {
                 :aria-disabled="item.disabled ? true : undefined"
                 :class="[
                   'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                  item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  item.disabled ? 'cursor-default text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 ]"
                 @click="handleNavClick(item, $event)"
               >
@@ -667,7 +667,7 @@ async function handleAuditSelected() {
                 <template v-for="subItem in item.children" :key="`${item.name}-${subItem.name}`">
                   <div
                     v-if="subItem.disabled"
-                    class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
+                    class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
                     aria-disabled="true"
                   >
                     <span class="flex min-w-0 items-center gap-2">
@@ -764,7 +764,7 @@ async function handleAuditSelected() {
                   </div>
                   <div class="-mx-1 my-2 h-px bg-border" />
                   <div
-                    class="relative flex w-full cursor-not-allowed select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground/50"
+                    class="relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground/50"
                     aria-disabled="true"
                   >
                     <span>Point</span>
@@ -844,7 +844,7 @@ async function handleAuditSelected() {
                       <template v-for="subItem in visibleSubItems(item)" :key="`mobile-${item.name}-${subItem.name}`">
                         <div
                           v-if="subItem.disabled"
-                          class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
+                          class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/60"
                           aria-disabled="true"
                         >
                           <span class="flex min-w-0 items-center gap-2">
@@ -863,7 +863,7 @@ async function handleAuditSelected() {
                           :disabled="isSwitchSubItemReadonly(subItem)"
                           :class="[
                             'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
-                            isSwitchSubItemReadonly(subItem) ? 'text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                            isSwitchSubItemReadonly(subItem) ? 'cursor-default text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
                           ]"
                           @click="toggleSharing"
                         >
@@ -954,7 +954,7 @@ async function handleAuditSelected() {
                     :aria-disabled="item.disabled ? true : undefined"
                     :class="[
                       'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                      item.disabled ? 'cursor-not-allowed text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      item.disabled ? 'cursor-default text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                     ]"
                     @click="handleNavClick(item, $event)"
                   >
@@ -966,7 +966,7 @@ async function handleAuditSelected() {
                     <template v-for="subItem in item.children" :key="`mobile-${item.name}-${subItem.name}`">
                       <div
                         v-if="subItem.disabled"
-                        class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
+                        class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
                         aria-disabled="true"
                       >
                         <span class="flex min-w-0 items-center gap-2">
@@ -1006,7 +1006,7 @@ async function handleAuditSelected() {
       <template #content>
         <div class="space-y-1.5 pr-6">
           <h2 class="text-lg font-semibold leading-none tracking-tight">Stop Sharing</h2>
-          <p class="text-sm text-muted-foreground">Stop sharing your models with other users?</p>
+          <p class="text-sm text-muted-foreground">Make your models private?</p>
         </div>
         <div class="flex justify-end gap-2">
           <UiButton variant="outline" size="sm" @click="cancelDisableSharing">Cancel</UiButton>

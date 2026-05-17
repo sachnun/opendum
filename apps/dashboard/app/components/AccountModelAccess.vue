@@ -107,7 +107,7 @@ async function toggleModel(model: string) {
           type="button"
           :disabled="togglingModels.has(model) || readonly"
           :class="[
-            'inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+            'inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-50',
             modelButtonClass(model),
           ]"
           @click="toggleModel(model)"

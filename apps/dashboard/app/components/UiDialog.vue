@@ -69,7 +69,7 @@ function handleCloseAutoFocus(event: Event) {
         <DialogClose
           v-if="showClose"
           :class="cn(
-            'absolute right-4 top-4 cursor-pointer rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
+            'absolute right-4 top-4 cursor-pointer rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:cursor-default disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
             props.ui.close,
           )"
         >

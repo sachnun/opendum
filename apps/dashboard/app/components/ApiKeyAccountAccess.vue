@@ -118,7 +118,7 @@ const filteredAccounts = computed(() => {
 
     <div class="flex-1 space-y-3 lg:mt-5">
       <div class="grid grid-cols-3 gap-1 rounded-md border border-input bg-input/30 p-1">
-        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="draftMode = mode as AccessMode">
+        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="draftMode = mode as AccessMode">
           {{ mode === 'all' ? 'All' : mode === 'whitelist' ? 'Whitelist' : 'Blacklist' }}
         </button>
       </div>
@@ -139,7 +139,7 @@ const filteredAccounts = computed(() => {
               <input v-model="accountSearch" placeholder="Search account..." class="h-8 w-full rounded-md bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
-              <button v-for="account in filteredAccounts" :key="account.id" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(account.id)">
+              <button v-for="account in filteredAccounts" :key="account.id" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(account.id)">
                 <UiIcon name="i-lucide-check" :class="['size-3.5', normalizedDraftAccounts.includes(account.id) ? 'opacity-100' : 'opacity-0']" />
                 <div class="flex min-w-0 flex-col">
                   <span class="truncate text-xs font-medium">{{ account.name }}</span>
@@ -157,7 +157,7 @@ const filteredAccounts = computed(() => {
             <UiBadge v-for="accountId in normalizedDraftAccounts" :key="accountId" variant="secondary" class="max-w-full gap-1 pr-1 text-[10px] font-normal">
               <span class="min-w-0 truncate">{{ accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId }}</span>
               <UiTooltip text="Remove">
-                <button type="button" :disabled="readonly" :aria-label="`Remove account ${accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId}`" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(accountId)">
+                <button type="button" :disabled="readonly" :aria-label="`Remove account ${accountMap.get(accountId) ? getAccountLabel(accountMap.get(accountId)!) : accountId}`" class="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="toggleAccount(accountId)">
                   <UiIcon name="i-lucide-x" class="size-2.5" />
                 </button>
               </UiTooltip>

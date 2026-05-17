@@ -143,9 +143,9 @@ const pickerItems = computed(() => {
             </UiTooltip>
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2">
-            <label class="text-[10px] text-muted-foreground">/ minute<input :value="rule.perMinute" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" @input="updateRule(index, 'perMinute', ($event.target as HTMLInputElement).value)"></label>
-            <label class="text-[10px] text-muted-foreground">/ hour<input :value="rule.perHour" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" @input="updateRule(index, 'perHour', ($event.target as HTMLInputElement).value)"></label>
-            <label class="text-[10px] text-muted-foreground">/ day<input :value="rule.perDay" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" @input="updateRule(index, 'perDay', ($event.target as HTMLInputElement).value)"></label>
+            <label class="text-[10px] text-muted-foreground">/ minute<input :value="rule.perMinute" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60" @input="updateRule(index, 'perMinute', ($event.target as HTMLInputElement).value)"></label>
+            <label class="text-[10px] text-muted-foreground">/ hour<input :value="rule.perHour" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60" @input="updateRule(index, 'perHour', ($event.target as HTMLInputElement).value)"></label>
+            <label class="text-[10px] text-muted-foreground">/ day<input :value="rule.perDay" placeholder="--" :disabled="readonly" class="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60" @input="updateRule(index, 'perDay', ($event.target as HTMLInputElement).value)"></label>
           </div>
         </div>
       </div>
@@ -154,8 +154,8 @@ const pickerItems = computed(() => {
         <div class="flex items-center justify-between gap-2">
           <p class="text-xs font-medium">Add rule</p>
           <div class="grid grid-cols-2 gap-1 rounded-md border border-input bg-input/30 p-1">
-            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:pointer-events-none disabled:opacity-60', addMode === 'model' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'model'; pickerOpen = false">Model</button>
-            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:pointer-events-none disabled:opacity-60', addMode === 'family' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'family'; pickerOpen = false">Family</button>
+            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', addMode === 'model' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'model'; pickerOpen = false">Model</button>
+            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', addMode === 'family' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'family'; pickerOpen = false">Family</button>
           </div>
         </div>
 
@@ -172,7 +172,7 @@ const pickerItems = computed(() => {
               <input v-model="search" :placeholder="`Search ${addMode}...`" class="h-8 w-full rounded-md bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
             </div>
             <div class="max-h-72 overflow-y-auto p-1">
-              <button v-for="item in pickerItems" :key="item" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-60" @click="addRule(item)">
+              <button v-for="item in pickerItems" :key="item" type="button" :disabled="readonly" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent disabled:cursor-default disabled:pointer-events-none disabled:opacity-60" @click="addRule(item)">
                 <span class="truncate font-mono text-[11px]">{{ item }}</span>
               </button>
               <p v-if="pickerItems.length === 0" class="px-2 py-6 text-center text-xs text-muted-foreground">No {{ addMode }} found.</p>

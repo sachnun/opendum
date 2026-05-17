@@ -41,7 +41,7 @@ const model = defineModel<DateRange | null>({ default: null });
   >
     <RangeCalendarHeader class="relative flex h-(--cell-size) items-center justify-center">
       <RangeCalendarPrev
-        class="absolute left-0 inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+        class="absolute left-0 inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50"
       >
         <UiIcon name="i-lucide-chevron-left" class="size-4" />
       </RangeCalendarPrev>
@@ -49,7 +49,7 @@ const model = defineModel<DateRange | null>({ default: null });
         {{ headingValue }}
       </RangeCalendarHeading>
       <RangeCalendarNext
-        class="absolute right-0 inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+        class="absolute right-0 inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50"
       >
         <UiIcon name="i-lucide-chevron-right" class="size-4" />
       </RangeCalendarNext>
@@ -81,7 +81,7 @@ const model = defineModel<DateRange | null>({ default: null });
                 :day="date"
                 :month="month.value"
                 :class="cn(
-                  'flex aspect-square size-auto min-w-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm leading-none font-normal transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+                  'flex aspect-square size-auto min-w-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm leading-none font-normal transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
                   today && !selected && !highlighted ? 'bg-accent text-accent-foreground' : '',
                   outsideView ? 'text-muted-foreground opacity-50' : '',
                   highlighted && !highlightedStart && !highlightedEnd ? 'rounded-none bg-accent text-accent-foreground' : '',

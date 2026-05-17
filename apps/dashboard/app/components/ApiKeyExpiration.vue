@@ -114,7 +114,7 @@ async function saveExpiration(value: Date | null) {
     <button
       type="button"
       :class="[
-        'inline-flex cursor-pointer items-center gap-1 text-sm transition-colors hover:text-primary disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex cursor-pointer items-center gap-1 text-sm transition-colors hover:text-primary disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
         isExpired ? 'text-destructive' : 'text-muted-foreground',
       ]"
       :disabled="isSaving || readonly"

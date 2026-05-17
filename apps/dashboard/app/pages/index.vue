@@ -480,7 +480,7 @@ onMounted(() => {
             type="button"
             aria-label="Continue with GitHub"
             :disabled="loadingProvider !== null"
-            class="relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-visible whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+            class="relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-visible whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
             @click="continueWithProvider('github')"
           >
             <span v-if="loadingProvider === 'github'" class="absolute inset-0 rounded-full border border-primary/70 animate-ping" aria-hidden="true" />
@@ -493,7 +493,7 @@ onMounted(() => {
             type="button"
             aria-label="Continue with Google"
             :disabled="loadingProvider !== null"
-            class="relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-visible whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+            class="relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-visible whitespace-nowrap rounded-full border border-border/70 bg-background/80 text-sm font-medium text-foreground shadow-none outline-none transition-all hover:bg-muted/60 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0"
             @click="continueWithProvider('google')"
           >
             <span v-if="loadingProvider === 'google'" class="absolute inset-0 rounded-full border border-primary/70 animate-ping" aria-hidden="true" />

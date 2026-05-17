@@ -53,7 +53,7 @@ async function togglePin(event: Event) {
     <button
       type="button"
       :class="cn(
-        'cursor-pointer rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'cursor-pointer rounded-md p-1 transition-colors disabled:cursor-default disabled:opacity-50',
         localPinned ? 'text-foreground hover:text-muted-foreground' : 'text-muted-foreground/40 hover:text-muted-foreground',
         props.class,
       )"

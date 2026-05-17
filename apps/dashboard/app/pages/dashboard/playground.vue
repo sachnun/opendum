@@ -1581,7 +1581,7 @@ function formatToolArguments(value: string): string {
                 :key="option.value"
                 type="button"
                 :class="[
-                  'flex h-auto w-full cursor-pointer flex-col items-start justify-start rounded-md border px-3 py-2 text-left text-sm transition-all disabled:pointer-events-none disabled:opacity-50',
+                  'flex h-auto w-full cursor-pointer flex-col items-start justify-start rounded-md border px-3 py-2 text-left text-sm transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
                   settings.endpoint === option.value ? 'border-primary bg-primary text-primary-foreground ring-1 ring-primary/30' : 'border-input bg-input/30 hover:bg-input/50',
                 ]"
                 :disabled="isAnyLoading"
@@ -1634,7 +1634,7 @@ function formatToolArguments(value: string): string {
                 spellcheck="false"
                 placeholder='{\n  "seed": 1234,\n  "metadata": { "case": "repro" }\n}'
                 :disabled="isAnyLoading"
-                class="min-h-40 resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                class="min-h-40 resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:opacity-50"
                 :class="additionalParametersError ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/30' : ''"
               />
               <span class="text-xs font-normal text-muted-foreground">Merged into the final request body after the selected scenario and settings. Values here can override generated fields.</span>
@@ -1732,7 +1732,7 @@ function formatToolArguments(value: string): string {
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto min-w-[72px] cursor-pointer flex-col items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50',
+              'flex h-auto min-w-[72px] cursor-pointer flex-col items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
               selectedScenario.id === scenario.id ? (scenario.isReasoning ? 'border-amber-600 bg-amber-600 text-white hover:bg-amber-700' : 'bg-primary text-primary-foreground') : (scenario.isReasoning ? 'border-dashed border-amber-700 hover:border-amber-600' : 'border-input bg-input/30 hover:bg-input/50'),
             ]"
             @click="selectScenario(scenario)"
@@ -1758,7 +1758,7 @@ function formatToolArguments(value: string): string {
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[92px]',
+              'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[92px]',
               activeFamilyPresets.includes(preset.family) ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
             ]"
             @click="applyFamilyPreset(preset.family)"
@@ -1785,7 +1785,7 @@ function formatToolArguments(value: string): string {
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto min-h-10 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
+              'flex h-auto min-h-10 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
               activeProviderPresets.includes(preset.provider) ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
             ]"
             @click="applyProviderPreset(preset.provider)"
@@ -2027,7 +2027,7 @@ function formatToolArguments(value: string): string {
         </UiCard>
 
         <UiCard v-if="canAddPanel" class="group h-[400px] overflow-hidden border-2 border-dashed border-border/80 bg-background p-0 transition-colors hover:border-muted-foreground/45">
-          <button type="button" class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Add comparison card" @click="addPanel">
+          <button type="button" class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-default disabled:opacity-50" aria-label="Add comparison card" @click="addPanel">
             <span class="inline-flex size-10 items-center justify-center rounded-full border border-muted-foreground/30 transition-colors group-hover:border-muted-foreground/45">
               <UiIcon name="i-lucide-plus" class="size-4 transition-colors group-hover:text-foreground/80" />
             </span>
