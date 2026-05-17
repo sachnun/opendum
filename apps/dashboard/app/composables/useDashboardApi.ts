@@ -64,6 +64,10 @@ export function useDashboardApi() {
       overview: () => dashboardFetch("/api/dashboard/analytics/overview"),
       usage: (query?: { range?: string }) => dashboardFetch("/api/dashboard/analytics/usage", { query }),
     },
+    sharing: {
+      get: () => dashboardFetch<{ enabled: boolean }>("/api/dashboard/sharing"),
+      update: (body: { enabled: boolean }) => post<{ enabled: boolean }>(dashboardFetch, "/api/dashboard/sharing", body),
+    },
     apiKeys: {
       list: () => dashboardFetch<ApiKeyListItem[]>("/api/dashboard/api-keys"),
       options: () => dashboardFetch<ApiKeyOptions>("/api/dashboard/api-keys/options"),
@@ -73,6 +77,7 @@ export function useDashboardApi() {
       reveal: (body: { id: string }) => post<ActionResult<{ key: string }>>(dashboardFetch, "/api/dashboard/api-keys/reveal", body),
       updateName: (body: { id: string; name: string; key?: string }) => post<ActionResult<{ name: string | null; keyPreview: string }>>(dashboardFetch, "/api/dashboard/api-keys/name", body),
       updateExpiration: (body: { id: string; expiresAt: Date | string | null }) => post<ActionResult<{ expiresAt: string | Date | null }>>(dashboardFetch, "/api/dashboard/api-keys/expiration", body),
+      updateRoaming: (body: { id: string; enabled: boolean }) => post<ActionResult<{ roamingEnabled: boolean }>>(dashboardFetch, "/api/dashboard/api-keys/roaming", body),
       updateModelAccess: (body: { id: string; mode: ApiKeyAccessMode; models: string[] }) => post<ActionResult<{ mode: ApiKeyAccessMode; models: string[] }>>(dashboardFetch, "/api/dashboard/api-keys/model-access", body),
       updateAccountAccess: (body: { id: string; mode: ApiKeyAccessMode; accounts: string[] }) => post<ActionResult<{ mode: ApiKeyAccessMode; accounts: string[] }>>(dashboardFetch, "/api/dashboard/api-keys/account-access", body),
       updateRateLimits: (body: { id: string; rules: RateLimitRule[] }) => post<ActionResult<{ rules: RateLimitRule[] }>>(dashboardFetch, "/api/dashboard/api-keys/rate-limits", body),

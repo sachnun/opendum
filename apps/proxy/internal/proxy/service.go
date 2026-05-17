@@ -122,7 +122,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		return
 	}
 
-	account, providerResp, requestStartMS, upstreamFirstResponseMS, rotationFailures, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced, startMS)
+	account, providerResp, requestStartMS, upstreamFirstResponseMS, rotationFailures, roaming, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 	if errInfo != nil {
 		s.writeRouteError(w, cfg, errInfo.Status, errInfo.Message, errInfo.Type, errInfo.Param, errInfo.Code, errInfo.RetryAfter, errInfo.RetryAfterMS)
 		return
@@ -135,16 +135,28 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 
 	if parsed.Stream {
 		if err := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+			if roaming != nil {
+				s.creditSharingPoint(context.Background(), account.UserID, roaming.DebitID, roaming.Amount)
+			}
 			go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
 		} else {
+			if roaming != nil {
+				s.refundRoamingPoint(context.Background(), roaming)
+			}
 			s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)
 		}
 		return
 	}
 
 	if err := cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+		if roaming != nil {
+			s.creditSharingPoint(context.Background(), account.UserID, roaming.DebitID, roaming.Amount)
+		}
 		go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
 	} else {
+		if roaming != nil {
+			s.refundRoamingPoint(context.Background(), roaming)
+		}
 		s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)
 	}
 }

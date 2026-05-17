@@ -32,7 +32,7 @@ func TestExecuteAccountRotationContinuesPastFiveFailures(t *testing.T) {
 		},
 	}
 
-	account, resp, _, _, failures, routeErr := executeAccountRotation(
+	account, resp, _, _, failures, _, routeErr := executeAccountRotation(
 		runner,
 		context.Background(),
 		request,
@@ -105,7 +105,7 @@ func TestExecuteAccountRotationMarksCodexUsageLimitDisabledUntil(t *testing.T) {
 		},
 	}
 
-	_, _, _, _, _, routeErr := executeAccountRotation(
+	_, _, _, _, _, _, routeErr := executeAccountRotation(
 		runner,
 		context.Background(),
 		request,
@@ -148,7 +148,7 @@ func TestExecuteAccountRotationDelaysAntigravityResourceExhaustedFailureOnRecove
 		},
 	}
 
-	account, resp, _, _, _, routeErr := executeAccountRotation(
+	account, resp, _, _, _, _, routeErr := executeAccountRotation(
 		runner,
 		context.Background(),
 		request,
@@ -191,7 +191,7 @@ func TestExecuteAccountRotationRecordsLastAntigravityResourceExhaustedFailure(t 
 		},
 	}
 
-	_, _, _, _, _, routeErr := executeAccountRotation(
+	_, _, _, _, _, _, routeErr := executeAccountRotation(
 		runner,
 		context.Background(),
 		request,
@@ -211,16 +211,147 @@ func TestExecuteAccountRotationRecordsLastAntigravityResourceExhaustedFailure(t 
 	}
 }
 
+func TestExecuteAccountRotationUsesSharedAccountAfterOwnAccountsFail(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts:       []appdb.ProviderAccount{{ID: "own-a1", UserID: "user_1", Provider: "provider_1"}},
+		sharedAccounts: []appdb.ProviderAccount{{ID: "shared-a1", UserID: "user_2", Provider: "provider_2"}},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	account, resp, _, _, _, roaming, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1", RoamingEnabled: true},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr != nil {
+		t.Fatalf("executeAccountRotation routeErr = %+v", routeErr)
+	}
+	if account == nil || account.ID != "shared-a1" {
+		t.Fatalf("selected account = %#v, want shared-a1", account)
+	}
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("response = %#v, want 200", resp)
+	}
+	if roaming == nil || roaming.DebitID != "debit_1" {
+		t.Fatalf("roaming reservation = %#v, want debit_1", roaming)
+	}
+	if got := strings.Join(runner.requested, ","); got != "own-a1,shared-a1" {
+		t.Fatalf("requested = %q, want own-a1,shared-a1", got)
+	}
+	if len(runner.reserved) != 1 || runner.reserved[0].UserID != "user_1" {
+		t.Fatalf("reserved = %#v, want one reservation for user_1", runner.reserved)
+	}
+	if len(runner.refunded) != 0 {
+		t.Fatalf("refunded = %#v, want none", runner.refunded)
+	}
+}
+
+func TestExecuteAccountRotationRefundsFailedSharedAttempt(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts:       []appdb.ProviderAccount{{ID: "own-a1", UserID: "user_1", Provider: "provider_1"}},
+		sharedAccounts: []appdb.ProviderAccount{{ID: "shared-a1", UserID: "user_2", Provider: "provider_1"}},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, roaming, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1", RoamingEnabled: true},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil || routeErr.Status != http.StatusTooManyRequests {
+		t.Fatalf("routeErr = %+v, want 429", routeErr)
+	}
+	if roaming != nil {
+		t.Fatalf("roaming reservation = %#v, want nil on failed route", roaming)
+	}
+	if len(runner.reserved) != 1 || runner.reserved[0].DebitID != "debit_1" {
+		t.Fatalf("reserved = %#v, want debit_1", runner.reserved)
+	}
+	if len(runner.refunded) != 1 || runner.refunded[0] != "debit_1" {
+		t.Fatalf("refunded = %#v, want debit_1", runner.refunded)
+	}
+}
+
+func TestExecuteAccountRotationStopsSharedAttemptWithoutPoints(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts:           []appdb.ProviderAccount{{ID: "own-a1", UserID: "user_1", Provider: "provider_1"}},
+		sharedAccounts:     []appdb.ProviderAccount{{ID: "shared-a1", UserID: "user_2", Provider: "provider_2"}},
+		insufficientPoints: true,
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1", RoamingEnabled: true},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil || routeErr.Status != http.StatusPaymentRequired || routeErr.Code == nil || *routeErr.Code != "insufficient_points" {
+		t.Fatalf("routeErr = %+v, want insufficient points", routeErr)
+	}
+	if got := strings.Join(runner.requested, ","); got != "own-a1" {
+		t.Fatalf("requested = %q, want only own-a1", got)
+	}
+	if len(runner.reserved) != 0 || len(runner.refunded) != 0 {
+		t.Fatalf("reserved=%#v refunded=%#v, want none", runner.reserved, runner.refunded)
+	}
+}
+
 const antigravityResourceExhaustedBody = `{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}`
 
 type testRotationRunner struct {
 	accounts              []appdb.ProviderAccount
+	sharedAccounts        []appdb.ProviderAccount
 	requested             []string
 	responseBody          string
 	usageLimitedAccountID string
 	usageLimitedModel     string
 	usageLimitedUntil     time.Time
 	failedAccountIDs      []string
+	reserved              []pointReservation
+	refunded              []string
+	insufficientPoints    bool
 }
 
 func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude []string, _ auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
@@ -235,6 +366,36 @@ func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string
 		}
 	}
 	return nil, false, nil
+}
+
+func (r *testRotationRunner) getNextSharedAccount(_ context.Context, _ string, _ string, _ *string, exclude []string) (*appdb.ProviderAccount, bool, error) {
+	excluded := map[string]struct{}{}
+	for _, id := range exclude {
+		excluded[id] = struct{}{}
+	}
+	for i := range r.sharedAccounts {
+		account := &r.sharedAccounts[i]
+		if _, ok := excluded[account.ID]; !ok {
+			return account, true, nil
+		}
+	}
+	return nil, len(r.sharedAccounts) > 0, nil
+}
+
+func (r *testRotationRunner) reserveRoamingPoint(_ context.Context, userID string) (*pointReservation, bool, error) {
+	if r.insufficientPoints {
+		return nil, false, nil
+	}
+	reservation := pointReservation{UserID: userID, Amount: roamingPointCost, DebitID: "debit_" + strconv.Itoa(len(r.reserved)+1)}
+	r.reserved = append(r.reserved, reservation)
+	return &reservation, true, nil
+}
+
+func (r *testRotationRunner) refundRoamingPoint(_ context.Context, reservation *pointReservation) {
+	if reservation == nil {
+		return
+	}
+	r.refunded = append(r.refunded, reservation.DebitID)
 }
 
 func (r *testRotationRunner) bumpAccountRequestCount(context.Context, string, time.Time) {}
@@ -267,3 +428,5 @@ func (r *testRotationRunner) logUsage(context.Context, usageParams) {}
 func (r *testRotationRunner) isVisionModel(string) bool { return false }
 
 func (r *testRotationRunner) isToolCallModel(string) bool { return true }
+
+func (r *testRotationRunner) canAccountUseModel(appdb.ProviderAccount, string) bool { return true }

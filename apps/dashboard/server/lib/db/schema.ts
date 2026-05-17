@@ -49,6 +49,30 @@ export const session = pgTable(
   ],
 );
 
+export const userPointBalance = pgTable("user_point_balance", {
+  userId: text("userId")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(15),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const userSharingSetting = pgTable("user_sharing_setting", {
+  userId: text("userId")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(false),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
 export const account = pgTable(
   "account",
   {
@@ -241,6 +265,8 @@ export const proxyApiKey = pgTable(
     accountAccessMode: text("accountAccessMode").notNull().default("all"),
     accountAccessList: text("accountAccessList").array().notNull().default([]),
 
+    roamingEnabled: boolean("roamingEnabled").notNull().default(false),
+
     isActive: boolean("isActive").notNull().default(true),
     expiresAt: timestamp("expiresAt"),
     lastUsedAt: timestamp("lastUsedAt"),
@@ -330,6 +356,36 @@ export const usageLog = pgTable(
     ),
     index("usage_log_providerAccountId_idx").on(table.providerAccountId),
     index("usage_log_createdAt_idx").on(table.createdAt),
+  ],
+);
+
+export const pointTransaction = pgTable(
+  "point_transaction",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    type: text("type").notNull(),
+    balanceAfter: integer("balanceAfter").notNull(),
+    idempotencyKey: text("idempotencyKey"),
+    usageLogId: text("usageLogId").references(() => usageLog.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("point_transaction_idempotencyKey_key").on(
+      table.idempotencyKey,
+    ),
+    index("point_transaction_userId_createdAt_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+    index("point_transaction_usageLogId_idx").on(table.usageLogId),
   ],
 );
 

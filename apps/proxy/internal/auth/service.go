@@ -62,7 +62,7 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 
 	var apiKey appdb.ProxyAPIKey
 	err := s.db.NewSelect().Model(&apiKey).
-		Column("id", "userId", "isActive", "expiresAt", "modelAccessMode", "modelAccessList", "accountAccessMode", "accountAccessList").
+		Column("id", "userId", "isActive", "expiresAt", "modelAccessMode", "modelAccessList", "accountAccessMode", "accountAccessList", "roamingEnabled").
 		Where("\"keyHash\" = ?", keyHash).
 		Limit(1).
 		Scan(ctx)
@@ -119,6 +119,7 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 		ModelAccessList:   modelList,
 		AccountAccessMode: accountMode,
 		AccountAccessList: accountList,
+		RoamingEnabled:    apiKey.RoamingEnabled,
 		ExpiresAtMs:       expiresAtMs,
 		RateLimitRules:    rules,
 	}
@@ -158,6 +159,7 @@ func (s *Service) resultFromCache(cached cacheValue) Result {
 		ModelAccessList:   s.normalizeModelList(cached.ModelAccessList),
 		AccountAccessMode: normalizeAccessMode(cached.AccountAccessMode),
 		AccountAccessList: normalizeAccountList(cached.AccountAccessList),
+		RoamingEnabled:    cached.RoamingEnabled,
 		RateLimitRules:    cached.RateLimitRules,
 	}
 }

@@ -75,6 +75,24 @@ type ProviderAccountErrorHistory struct {
 	CreatedAt         time.Time `bun:"createdAt"`
 }
 
+type UserPointBalance struct {
+	bun.BaseModel `bun:"table:user_point_balance"`
+
+	UserID    string    `bun:"userId,pk"`
+	Balance   int       `bun:"balance"`
+	CreatedAt time.Time `bun:"createdAt"`
+	UpdatedAt time.Time `bun:"updatedAt"`
+}
+
+type UserSharingSetting struct {
+	bun.BaseModel `bun:"table:user_sharing_setting"`
+
+	UserID    string    `bun:"userId,pk"`
+	Enabled   bool      `bun:"enabled"`
+	CreatedAt time.Time `bun:"createdAt"`
+	UpdatedAt time.Time `bun:"updatedAt"`
+}
+
 type DisabledModel struct {
 	bun.BaseModel `bun:"table:disabled_model"`
 
@@ -97,6 +115,7 @@ type ProxyAPIKey struct {
 	ModelAccessList   []string   `bun:"modelAccessList,array"`
 	AccountAccessMode string     `bun:"accountAccessMode"`
 	AccountAccessList []string   `bun:"accountAccessList,array"`
+	RoamingEnabled    bool       `bun:"roamingEnabled"`
 	IsActive          bool       `bun:"isActive"`
 	ExpiresAt         *time.Time `bun:"expiresAt"`
 	LastUsedAt        *time.Time `bun:"lastUsedAt"`
@@ -131,6 +150,19 @@ type UsageLog struct {
 	StatusCode        *int      `bun:"statusCode"`
 	Duration          *int      `bun:"duration"`
 	CreatedAt         time.Time `bun:"createdAt"`
+}
+
+type PointTransaction struct {
+	bun.BaseModel `bun:"table:point_transaction"`
+
+	ID             string    `bun:"id,pk"`
+	UserID         string    `bun:"userId"`
+	Amount         int       `bun:"amount"`
+	Type           string    `bun:"type"`
+	BalanceAfter   int       `bun:"balanceAfter"`
+	IdempotencyKey *string   `bun:"idempotencyKey"`
+	UsageLogID     *string   `bun:"usageLogId"`
+	CreatedAt      time.Time `bun:"createdAt"`
 }
 
 type ProviderAccountModelHealth struct {

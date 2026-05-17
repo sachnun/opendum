@@ -1,6 +1,8 @@
 import { relations } from "drizzle-orm";
 import {
   user,
+  userPointBalance,
+  userSharingSetting,
   session,
   account,
   providerAccount,
@@ -11,12 +13,22 @@ import {
   proxyApiKey,
   proxyApiKeyRateLimit,
   usageLog,
+  pointTransaction,
   disabledModel,
 } from "./schema.js";
 
-export const userRelations = relations(user, ({ many }) => ({
+export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),
   sessions: many(session),
+  pointBalance: one(userPointBalance, {
+    fields: [user.id],
+    references: [userPointBalance.userId],
+  }),
+  sharingSetting: one(userSharingSetting, {
+    fields: [user.id],
+    references: [userSharingSetting.userId],
+  }),
+  pointTransactions: many(pointTransaction),
   providerAccounts: many(providerAccount),
   providerAccountErrorHistoryEntries: many(providerAccountErrorHistory),
   pinnedProviders: many(pinnedProvider),
@@ -24,6 +36,26 @@ export const userRelations = relations(user, ({ many }) => ({
   usageLogs: many(usageLog),
   disabledModels: many(disabledModel),
 }));
+
+export const userPointBalanceRelations = relations(
+  userPointBalance,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [userPointBalance.userId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const userSharingSettingRelations = relations(
+  userSharingSetting,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [userSharingSetting.userId],
+      references: [user.id],
+    }),
+  }),
+);
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {
@@ -103,6 +135,20 @@ export const usageLogRelations = relations(usageLog, ({ one }) => ({
     references: [proxyApiKey.id],
   }),
 }));
+
+export const pointTransactionRelations = relations(
+  pointTransaction,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [pointTransaction.userId],
+      references: [user.id],
+    }),
+    usageLog: one(usageLog, {
+      fields: [pointTransaction.usageLogId],
+      references: [usageLog.id],
+    }),
+  }),
+);
 
 export const disabledModelRelations = relations(disabledModel, ({ one }) => ({
   user: one(user, {

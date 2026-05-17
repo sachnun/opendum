@@ -15,6 +15,7 @@ export const apiKeyIdInputSchema = z.object({ id: z.string() });
 export const createApiKeyInputSchema = z.object({ name: z.string().optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
 export const updateApiKeyNameInputSchema = z.object({ id: z.string(), name: z.string(), key: z.string().optional() });
 export const updateApiKeyExpirationInputSchema = z.object({ id: z.string(), expiresAt: z.coerce.date().nullable() });
+export const updateApiKeyRoamingInputSchema = z.object({ id: z.string(), enabled: z.boolean() });
 
 const apiKeyModelAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
 const apiKeyAccountAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
@@ -35,6 +36,7 @@ export const updateApiKeyRateLimitsInputSchema = z.object({ id: z.string(), rule
 type CreateApiKeyInput = z.infer<typeof createApiKeyInputSchema>;
 type UpdateApiKeyNameInput = z.infer<typeof updateApiKeyNameInputSchema>;
 type UpdateApiKeyExpirationInput = z.infer<typeof updateApiKeyExpirationInputSchema>;
+type UpdateApiKeyRoamingInput = z.infer<typeof updateApiKeyRoamingInputSchema>;
 type UpdateApiKeyModelAccessInput = z.infer<typeof updateApiKeyModelAccessInputSchema>;
 type UpdateApiKeyAccountAccessInput = z.infer<typeof updateApiKeyAccountAccessInputSchema>;
 type UpdateApiKeyRateLimitsInput = z.infer<typeof updateApiKeyRateLimitsInputSchema>;
@@ -129,6 +131,7 @@ export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {
         modelAccessList: proxyApiKey.modelAccessList,
         accountAccessMode: proxyApiKey.accountAccessMode,
         accountAccessList: proxyApiKey.accountAccessList,
+        roamingEnabled: proxyApiKey.roamingEnabled,
       })
       .from(proxyApiKey)
       .where(eq(proxyApiKey.userId, userId))
@@ -214,6 +217,15 @@ export async function updateApiKeyExpiration(userId: string, input: UpdateApiKey
     if (!updated) return { success: false, error: "Failed to update API key expiration" } as const;
     await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
     return { success: true, data: { expiresAt: updated.expiresAt } } as const;
+  });
+}
+
+export async function updateApiKeyRoaming(userId: string, input: UpdateApiKeyRoamingInput) {
+  return withOwnedApiKey(userId, input.id, "Failed to update API key roaming", async (apiKey) => {
+    const [updated] = await db.update(proxyApiKey).set({ roamingEnabled: input.enabled }).where(eq(proxyApiKey.id, input.id)).returning({ roamingEnabled: proxyApiKey.roamingEnabled });
+    if (!updated) return { success: false, error: "Failed to update API key roaming" } as const;
+    await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
+    return { success: true, data: { roamingEnabled: updated.roamingEnabled } } as const;
   });
 }
 

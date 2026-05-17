@@ -21,6 +21,7 @@ const userMenuOpen = ref(false);
 const modelSearchFocused = ref(false);
 const auditDialogOpen = ref(false);
 const sharingEnabled = ref(false);
+const sharingUpdating = ref(false);
 const disableSharingDialogOpen = ref(false);
 const supportItemOpen = reactive<Record<string, boolean>>({ Tools: true });
 const mainContent = ref<HTMLElement | null>(null);
@@ -88,10 +89,15 @@ watch(dashboardMe, (value) => {
   dashboardMeState.value = value ?? null;
 }, { immediate: true });
 const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
+const pointBalance = computed(() => dashboardMe.value?.points?.balance ?? 0);
 const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
 const auditUserEmail = computed(() => auditUser.value?.email || "");
 const auditUserImage = computed(() => auditUser.value?.image || "");
 const auditUserInitial = computed(() => (auditUserLabel.value[0] || "U").toUpperCase());
+
+watch(dashboardMe, (value) => {
+  sharingEnabled.value = value?.sharing?.enabled ?? false;
+}, { immediate: true });
 
 function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
   const nextAccountCounts = { ...emptyAccountCounts };
@@ -271,23 +277,41 @@ function isSwitchSubItem(subItem: NavSubItem) {
 }
 
 function isSwitchSubItemReadonly(subItem: NavSubItem) {
-  return isSwitchSubItem(subItem) && isAuditMode.value;
+  return isSwitchSubItem(subItem) && (isAuditMode.value || sharingUpdating.value);
+}
+
+async function updateSharing(enabled: boolean) {
+  if (isAuditMode.value || sharingUpdating.value) return;
+
+  sharingUpdating.value = true;
+  try {
+    const result = await dashboardApi.sharing.update({ enabled });
+    sharingEnabled.value = result.enabled;
+    if (dashboardMe.value) {
+      dashboardMe.value = {
+        ...dashboardMe.value,
+        sharing: { enabled: result.enabled },
+      };
+    }
+  } finally {
+    sharingUpdating.value = false;
+  }
 }
 
 function toggleSharing() {
-  if (isAuditMode.value) return;
+  if (isAuditMode.value || sharingUpdating.value) return;
 
   if (sharingEnabled.value) {
     disableSharingDialogOpen.value = true;
     return;
   }
 
-  sharingEnabled.value = true;
+  void updateSharing(true);
 }
 
 function disableSharing() {
-  sharingEnabled.value = false;
   disableSharingDialogOpen.value = false;
+  void updateSharing(false);
 }
 
 function cancelDisableSharing() {
@@ -756,7 +780,7 @@ async function handleAuditSelected() {
                     modelSearchFocused ? 'hidden sm:block' : '',
                   ]"
                 />
-                <span :class="['select-none text-sm font-semibold tabular-nums text-foreground/85', modelSearchFocused ? 'hidden sm:inline' : '']">1000</span>
+                <span :class="['select-none text-sm font-semibold tabular-nums text-foreground/85', modelSearchFocused ? 'hidden sm:inline' : '']">{{ pointBalance }}</span>
                 <span class="relative flex size-8 shrink-0 select-none sm:ml-1">
                   <span class="flex size-8 overflow-hidden rounded-full">
                     <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">

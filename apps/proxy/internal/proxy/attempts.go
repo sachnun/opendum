@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
@@ -12,6 +13,9 @@ import (
 
 type accountRotationRunner interface {
 	getNextAvailableAccount(context.Context, string, string, *string, []string, auth.AccountAccess) (*appdb.ProviderAccount, bool, error)
+	getNextSharedAccount(context.Context, string, string, *string, []string) (*appdb.ProviderAccount, bool, error)
+	reserveRoamingPoint(context.Context, string) (*pointReservation, bool, error)
+	refundRoamingPoint(context.Context, *pointReservation)
 	bumpAccountRequestCount(context.Context, string, time.Time)
 	makeProviderRequest(context.Context, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error)
 	markAccountFailed(context.Context, string, string, int, string) time.Time
@@ -19,6 +23,7 @@ type accountRotationRunner interface {
 	logUsage(context.Context, usageParams)
 	isVisionModel(string) bool
 	isToolCallModel(string) bool
+	canAccountUseModel(appdb.ProviderAccount, string) bool
 }
 
 type delayedAccountFailure struct {
@@ -27,47 +32,74 @@ type delayedAccountFailure struct {
 	message    string
 }
 
-func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *routeError) {
+type accountAttempt struct {
+	account *appdb.ProviderAccount
+	roaming *pointReservation
+}
+
+func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *pointReservation, *routeError) {
 	return executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 }
 
-func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *routeError) {
+func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *pointReservation, *routeError) {
 	tried := []string{}
+	sharedTried := []string{}
+	useShared := false
 	recoverableFailures := []accountRotationFailure{}
 	var lastFailure *routeError
 	var delayedFinalFailure *delayedAccountFailure
 	accountConfigured := false
 
 	for {
-		account := forced
-		if account == nil {
-			selected, configured, err := runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
+		attempt := accountAttempt{account: forced}
+		if attempt.account == nil {
+			selected, configured, err := nextAttemptAccount(runner, ctx, authResult, validation, tried, sharedTried, useShared)
 			if err != nil {
-				return nil, nil, 0, 0, recoverableFailures, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
+				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
 			accountConfigured = accountConfigured || configured
-			account = selected
+			attempt.account = selected
 		}
 
-		if account == nil {
+		if attempt.account == nil && !useShared && forced == nil && authResult.RoamingEnabled {
+			useShared = true
+			continue
+		}
+
+		if attempt.account == nil {
 			if lastFailure != nil && delayedFinalFailure != nil {
 				runner.markAccountFailed(ctx, delayedFinalFailure.account.ID, validation.Model, delayedFinalFailure.statusCode, delayedFinalFailure.message)
 			}
-			if len(tried) == 0 {
+			if len(tried)+len(sharedTried) == 0 {
 				if accountConfigured {
-					return nil, nil, 0, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "This model is temporarily unavailable. Please try again later.", Type: "api_error"}
+					return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusServiceUnavailable, Message: "This model is temporarily unavailable. Please try again later.", Type: "api_error"}
 				}
-				return nil, nil, 0, 0, recoverableFailures, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
+				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: cfg.NoAccountsStatusCode, Message: "No active accounts available for this model. Please add an account in the dashboard.", Type: "configuration_error"}
 			}
 			if lastFailure != nil {
-				return nil, nil, 0, 0, recoverableFailures, lastFailure
+				return nil, nil, 0, 0, recoverableFailures, nil, lastFailure
 			}
-			return nil, nil, 0, 0, recoverableFailures, &routeError{Status: http.StatusServiceUnavailable, Message: "No available accounts for this request.", Type: "api_error"}
+			return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusServiceUnavailable, Message: "No available accounts for this request.", Type: "api_error"}
+		}
+		if useShared && forced == nil {
+			points, allowed, err := runner.reserveRoamingPoint(ctx, authResult.UserID)
+			if err != nil {
+				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
+			}
+			if !allowed {
+				code := "insufficient_points"
+				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusPaymentRequired, Message: "Insufficient points. Please add more points to continue.", Type: "insufficient_quota", Code: &code}
+			}
+			attempt.roaming = points
 		}
 
-		tried = append(tried, account.ID)
+		if useShared {
+			sharedTried = append(sharedTried, attempt.account.ID)
+		} else {
+			tried = append(tried, attempt.account.ID)
+		}
 		if forced != nil {
-			go runner.bumpAccountRequestCount(context.Background(), account.ID, time.Now())
+			go runner.bumpAccountRequestCount(context.Background(), attempt.account.ID, time.Now())
 		}
 
 		payload := cfg.Build(parsed, validation.Model, parsed.Stream, sessionID(r))
@@ -84,7 +116,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 				upstreamFirstResponseMS = at.UnixMilli()
 			}
 		})
-		resp, err := runner.makeProviderRequest(attemptCtx, *account, payload, parsed.Stream)
+		resp, err := runner.makeProviderRequest(attemptCtx, *attempt.account, payload, parsed.Stream)
 		if upstreamFirstResponseMS == 0 && resp != nil {
 			upstreamFirstResponseMS = time.Now().UnixMilli()
 		}
@@ -92,15 +124,18 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			delayedFinalFailure = nil
 			status := http.StatusInternalServerError
 			message := err.Error()
-			detailed := buildAccountErrorMessage(message, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
-			failedAt := runner.markAccountFailed(ctx, account.ID, validation.Model, status, detailed)
-			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: status, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
+			detailed := buildAccountErrorMessage(message, accountErrorContext{Model: validation.Model, Provider: attempt.account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
+			failedAt := runner.markAccountFailed(ctx, attempt.account.ID, validation.Model, status, detailed)
+			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: attempt.account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: status, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: attempt.account.Provider})
 			lastFailure = &routeError{Status: status, Message: message, Type: "api_error"}
+			if attempt.roaming != nil {
+				runner.refundRoamingPoint(context.Background(), attempt.roaming)
+			}
 			if forced == nil {
-				recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: account.ID, FailedAt: failedAt})
+				recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: attempt.account.ID, FailedAt: failedAt})
 				continue
 			}
-			return nil, nil, 0, 0, recoverableFailures, lastFailure
+			return nil, nil, 0, 0, recoverableFailures, nil, lastFailure
 		}
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -109,30 +144,40 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			var failedAt time.Time
 			delayedFinalFailure = nil
 			if resp.StatusCode != http.StatusRequestTimeout {
-				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
-				if forced == nil && isAntigravityResourceExhausted(account.Provider, resp.StatusCode, bodyText) {
-					delayedFinalFailure = &delayedAccountFailure{account: *account, statusCode: resp.StatusCode, message: detailed}
+				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: attempt.account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
+				if forced == nil && isAntigravityResourceExhausted(attempt.account.Provider, resp.StatusCode, bodyText) {
+					delayedFinalFailure = &delayedAccountFailure{account: *attempt.account, statusCode: resp.StatusCode, message: detailed}
 				} else {
-					failedAt = runner.markAccountFailed(ctx, account.ID, validation.Model, resp.StatusCode, detailed)
-					if disabledUntil, ok := codexUsageLimitDisabledUntil(account.Provider, resp.StatusCode, bodyText, failedAt); ok {
-						runner.markAccountUsageLimited(ctx, account.ID, validation.Model, disabledUntil, failedAt)
+					failedAt = runner.markAccountFailed(ctx, attempt.account.ID, validation.Model, resp.StatusCode, detailed)
+					if disabledUntil, ok := codexUsageLimitDisabledUntil(attempt.account.Provider, resp.StatusCode, bodyText, failedAt); ok {
+						runner.markAccountUsageLimited(ctx, attempt.account.ID, validation.Model, disabledUntil, failedAt)
 					}
 				}
 			}
-			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
+			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: attempt.account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: attempt.account.Provider})
 			message, typ := sanitizedProxyError(resp.StatusCode, bodyText)
 			lastFailure = &routeError{Status: resp.StatusCode, Message: message, Type: typ}
+			if attempt.roaming != nil {
+				runner.refundRoamingPoint(context.Background(), attempt.roaming)
+			}
 			if shouldRotate(resp.StatusCode) && forced == nil {
 				if !failedAt.IsZero() {
-					recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: account.ID, FailedAt: failedAt})
+					recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: attempt.account.ID, FailedAt: failedAt})
 				}
 				continue
 			}
-			return nil, nil, 0, 0, recoverableFailures, lastFailure
+			return nil, nil, 0, 0, recoverableFailures, nil, lastFailure
 		}
 
-		return account, resp, requestStart, upstreamFirstResponseMS, recoverableFailures, nil
+		return attempt.account, resp, requestStart, upstreamFirstResponseMS, recoverableFailures, attempt.roaming, nil
 	}
+}
+
+func nextAttemptAccount(runner accountRotationRunner, ctx context.Context, authResult auth.Result, validation auth.ModelValidationResult, tried, sharedTried []string, useShared bool) (*appdb.ProviderAccount, bool, error) {
+	if useShared {
+		return runner.getNextSharedAccount(ctx, authResult.UserID, validation.Model, validation.Provider, sharedTried)
+	}
+	return runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
 }
 
 func (s *Service) isVisionModel(model string) bool {
@@ -147,6 +192,25 @@ func (s *Service) isToolCallModel(model string) bool {
 		return true
 	}
 	return s.registry.IsToolCallModel(model)
+}
+
+func (s *Service) canAccountUseModel(account appdb.ProviderAccount, model string) bool {
+	if s.registry == nil {
+		return true
+	}
+	rule, ok := s.registry.ProviderAccessRule(model, account.Provider)
+	if !ok || rule.MinTier == "" {
+		return true
+	}
+	return accountTierSatisfies(quotaFallbackTier(account), rule.MinTier)
+}
+
+func accountTierSatisfies(accountTier, minTier string) bool {
+	required := strings.ToLower(strings.TrimSpace(minTier))
+	if required == "" || required == "free" {
+		return true
+	}
+	return strings.ToLower(strings.TrimSpace(accountTier)) == required
 }
 
 func sessionID(r *http.Request) string {

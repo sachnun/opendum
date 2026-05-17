@@ -16,6 +16,7 @@ type Result struct {
 	ModelAccessList   []string
 	AccountAccessMode string
 	AccountAccessList []string
+	RoamingEnabled    bool
 	RateLimitRules    []RateLimitRule
 	Error             string
 }
@@ -56,6 +57,7 @@ type cacheValue struct {
 	ModelAccessList   []string        `json:"modelAccessList,omitempty"`
 	AccountAccessMode string          `json:"accountAccessMode,omitempty"`
 	AccountAccessList []string        `json:"accountAccessList,omitempty"`
+	RoamingEnabled    bool            `json:"roamingEnabled,omitempty"`
 	ExpiresAtMs       *int64          `json:"expiresAtMs,omitempty"`
 	RateLimitRules    []RateLimitRule `json:"rateLimitRules,omitempty"`
 	Error             string          `json:"error,omitempty"`

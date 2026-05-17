@@ -152,6 +152,69 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 		return nil, false, nil
 	}
 	prioritized := prioritizeAccounts(eligible, provider == nil, s.registry.ProvidersForModel(model))
+	return s.pickHealthyAccount(ctx, prioritized, model)
+}
+
+func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude []string) (*appdb.ProviderAccount, bool, error) {
+	targetProviders := []string{}
+	if provider != nil {
+		targetProviders = []string{*provider}
+	} else {
+		targetProviders = s.registry.ProvidersForModel(model)
+	}
+	if len(targetProviders) == 0 {
+		return nil, false, nil
+	}
+
+	query := s.db.NewSelect().Model((*appdb.ProviderAccount)(nil)).
+		Column("provider_account.id", "provider_account.userId", "provider_account.provider", "provider_account.tier", "provider_account.status", "provider_account.lastUsedAt", "provider_account.createdAt", "provider_account.accountId", "provider_account.disabledUntil").
+		Join("JOIN user_sharing_setting ON user_sharing_setting.\"userId\" = provider_account.\"userId\"").
+		Where("provider_account.\"userId\" != ?", userID).
+		Where("user_sharing_setting.enabled = TRUE").
+		Where("provider_account.provider IN (?)", bun.In(targetProviders)).
+		Where("provider_account.\"isActive\" = TRUE").
+		Where("(provider_account.\"disabledUntil\" IS NULL OR provider_account.\"disabledUntil\" <= ?)", time.Now())
+	if len(exclude) > 0 {
+		query.Where("provider_account.id NOT IN (?)", bun.In(exclude))
+	}
+
+	var rows []appdb.ProviderAccount
+	if err := query.OrderExpr("provider_account.status ASC").OrderExpr("provider_account.\"lastUsedAt\" ASC NULLS FIRST").OrderExpr("provider_account.\"createdAt\" ASC").Scan(ctx, &rows); err != nil {
+		return nil, false, err
+	}
+	if len(rows) == 0 {
+		return nil, false, nil
+	}
+
+	lookupKeys := s.registry.LookupKeys(model)
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+
+	var disabled []appdb.ProviderAccountDisabledModel
+	if err := s.db.NewSelect().Model(&disabled).Column("providerAccountId").Where("\"providerAccountId\" IN (?)", bun.In(ids)).Where("model IN (?)", bun.In(lookupKeys)).Scan(ctx); err != nil {
+		return nil, true, err
+	}
+	disabledSet := map[string]struct{}{}
+	for _, row := range disabled {
+		disabledSet[row.ProviderAccountID] = struct{}{}
+	}
+
+	enabled := make([]appdb.ProviderAccount, 0, len(rows))
+	for _, row := range rows {
+		if _, disabled := disabledSet[row.ID]; !disabled && s.canAccountUseModel(row, model) {
+			enabled = append(enabled, row)
+		}
+	}
+	if len(enabled) == 0 {
+		return nil, true, nil
+	}
+	prioritized := prioritizeAccounts(enabled, provider == nil, targetProviders)
+	return s.pickHealthyAccount(ctx, prioritized, model)
+}
+
+func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.ProviderAccount, model string) (*appdb.ProviderAccount, bool, error) {
 	ids := make([]string, 0, len(prioritized))
 	for _, account := range prioritized {
 		ids = append(ids, account.ID)

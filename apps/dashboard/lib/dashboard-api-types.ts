@@ -24,6 +24,12 @@ export interface DashboardAuditInfo {
 export interface DashboardMeData {
   role: DashboardUserRole;
   isMaintener: boolean;
+  points?: {
+    balance: number;
+  };
+  sharing?: {
+    enabled: boolean;
+  };
   actor?: DashboardUserIdentity;
   audit?: DashboardAuditInfo;
 }
@@ -145,6 +151,7 @@ export interface ApiKeyListItem {
   modelAccessList: string[];
   accountAccessMode: string;
   accountAccessList: string[];
+  roamingEnabled: boolean;
 }
 
 export interface ApiKeyOptions {
