@@ -9,6 +9,29 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 };
 
 type SocialProvider = "github" | "google";
+type TetrisCell = string | null;
+type TetrisPiece = {
+  shape: number[][];
+  targetShape: number[][];
+  targetX: number;
+  color: string;
+  x: number;
+  y: number;
+  drawX: number;
+  drawY: number;
+};
+
+const maxVisibleTetrisPieces = 1;
+
+const tetrisPieces = [
+  { shape: [[1, 1, 1, 1]], color: "rgba(148, 163, 184, 0.13)" },
+  { shape: [[1, 1], [1, 1]], color: "rgba(125, 211, 252, 0.11)" },
+  { shape: [[0, 1, 0], [1, 1, 1]], color: "rgba(196, 181, 253, 0.11)" },
+  { shape: [[1, 0, 0], [1, 1, 1]], color: "rgba(167, 243, 208, 0.10)" },
+  { shape: [[0, 0, 1], [1, 1, 1]], color: "rgba(253, 186, 116, 0.10)" },
+  { shape: [[0, 1, 1], [1, 1, 0]], color: "rgba(251, 207, 232, 0.10)" },
+  { shape: [[1, 1, 0], [0, 1, 1]], color: "rgba(191, 219, 254, 0.10)" },
+];
 
 const route = useRoute();
 const { data: session } = await useSession(useFetch);
@@ -18,6 +41,7 @@ if (session.value?.user) {
 }
 
 const loadingProvider = ref<SocialProvider | null>(null);
+const tetrisCanvas = ref<HTMLCanvasElement | null>(null);
 
 const authError = computed(() => {
   const error = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error;
@@ -43,11 +67,362 @@ async function continueWithProvider(provider: SocialProvider) {
   }
 }
 
+function rotateShape(shape: number[][]) {
+  return shape[0].map((_, columnIndex) => shape.map(row => row[columnIndex]).reverse());
+}
+
+onMounted(() => {
+  const canvas = tetrisCanvas.value;
+  const context = canvas?.getContext("2d");
+
+  if (!canvas || !context) return;
+
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let animationFrame = 0;
+  let columns = 0;
+  let rows = 0;
+  let cellSize = 18;
+  let board: TetrisCell[][] = [];
+  let activePieces: TetrisPiece[] = [];
+  let lastFrame = performance.now();
+  let dropTimer = 0;
+  let driftTimer = 0;
+  let spawnTimer = 0;
+
+  function createBoard() {
+    board = Array.from({ length: rows }, () => Array<TetrisCell>(columns).fill(null));
+  }
+
+  function canPlace(piece: TetrisPiece, nextX = piece.x, nextY = piece.y, shape = piece.shape) {
+    return canPlaceShape(shape, nextX, nextY);
+  }
+
+  function canPlaceShape(shape: number[][], nextX: number, nextY: number) {
+    return shape.every((shapeRow, shapeY) => shapeRow.every((cell, shapeX) => {
+      if (!cell) return true;
+
+      const boardX = nextX + shapeX;
+      const boardY = nextY + shapeY;
+
+      return boardX >= 0 && boardX < columns && boardY < rows && (boardY < 0 || !board[boardY][boardX]);
+    }));
+  }
+
+  function shapesEqual(first: number[][], second: number[][]) {
+    return first.length === second.length && first.every((row, rowIndex) => row.join("") === second[rowIndex]?.join(""));
+  }
+
+  function getShapeRotations(shape: number[][]) {
+    const rotations: number[][][] = [];
+    let nextShape = shape;
+
+    for (let index = 0; index < 4; index += 1) {
+      if (!rotations.some(rotation => shapesEqual(rotation, nextShape))) {
+        rotations.push(nextShape);
+      }
+      nextShape = rotateShape(nextShape);
+    }
+
+    return rotations;
+  }
+
+  function scoreLanding(shape: number[][], x: number, y: number) {
+    const testBoard = board.map(row => [...row]);
+
+    shape.forEach((shapeRow, shapeY) => {
+      shapeRow.forEach((cell, shapeX) => {
+        const boardX = x + shapeX;
+        const boardY = y + shapeY;
+
+        if (cell && boardY >= 0 && boardY < rows && boardX >= 0 && boardX < columns) {
+          testBoard[boardY][boardX] = "preview";
+        }
+      });
+    });
+
+    const completedLines = testBoard.filter(row => row.every(Boolean)).length;
+    const heights = Array.from({ length: columns }, (_, column) => {
+      const firstBlock = testBoard.findIndex(row => Boolean(row[column]));
+      return firstBlock === -1 ? 0 : rows - firstBlock;
+    });
+    const aggregateHeight = heights.reduce((total, height) => total + height, 0);
+    const bumpiness = heights.slice(1).reduce((total, height, index) => total + Math.abs(height - heights[index]), 0);
+    let holes = 0;
+
+    for (let column = 0; column < columns; column += 1) {
+      let hasBlock = false;
+      for (let row = 0; row < rows; row += 1) {
+        if (testBoard[row][column]) {
+          hasBlock = true;
+        } else if (hasBlock) {
+          holes += 1;
+        }
+      }
+    }
+
+    return completedLines * 90 - aggregateHeight * 2.2 - holes * 12 - bumpiness * 3 + Math.random() * 4;
+  }
+
+  function chooseBestMove(shape: number[][]) {
+    let bestMove: { shape: number[][]; x: number; score: number } | null = null;
+
+    getShapeRotations(shape).forEach((rotation) => {
+      const maxX = columns - rotation[0].length;
+      for (let x = 0; x <= maxX; x += 1) {
+        let y = -rotation.length;
+
+        while (canPlaceShape(rotation, x, y + 1)) {
+          y += 1;
+        }
+
+        if (!canPlaceShape(rotation, x, y)) continue;
+
+        const score = scoreLanding(rotation, x, y);
+        if (!bestMove || score > bestMove.score) {
+          bestMove = { shape: rotation, x, score };
+        }
+      }
+    });
+
+    return bestMove ?? { shape, x: Math.max(0, Math.floor((columns - shape[0].length) / 2)), score: 0 };
+  }
+
+  function planPiece(piece: TetrisPiece) {
+    const move = chooseBestMove(piece.shape);
+    piece.targetShape = move.shape;
+    piece.targetX = move.x;
+  }
+
+  function isReadyToDrop(piece: TetrisPiece) {
+    return piece.x === piece.targetX && shapesEqual(piece.shape, piece.targetShape);
+  }
+
+  function hardDrop(piece: TetrisPiece) {
+    while (canPlace(piece, piece.x, piece.y + 1)) {
+      piece.y += 1;
+    }
+    piece.drawX = piece.x;
+    piece.drawY = piece.y;
+  }
+
+  function spawnPiece() {
+    const source = tetrisPieces[Math.floor(Math.random() * tetrisPieces.length)];
+    const shape = source.shape;
+    const pieceWidth = shape[0].length;
+    const targetMove = chooseBestMove(shape);
+    const x = Math.max(0, Math.floor((columns - pieceWidth) / 2));
+    const y = -shape.length;
+
+    activePieces.push({
+      shape,
+      targetShape: targetMove.shape,
+      targetX: targetMove.x,
+      color: source.color,
+      x,
+      y,
+      drawX: x,
+      drawY: y,
+    });
+  }
+
+  function lockPiece(piece: TetrisPiece) {
+    piece.shape.forEach((shapeRow, shapeY) => {
+      shapeRow.forEach((cell, shapeX) => {
+        const boardX = piece.x + shapeX;
+        const boardY = piece.y + shapeY;
+
+        if (cell && boardY >= 0 && boardY < rows && boardX >= 0 && boardX < columns) {
+          board[boardY][boardX] = piece.color;
+        }
+      });
+    });
+
+    board = board.filter(row => row.some(cell => !cell));
+    while (board.length < rows) {
+      board.unshift(Array<TetrisCell>(columns).fill(null));
+    }
+
+    if (board.slice(0, 4).some(row => row.some(Boolean))) {
+      createBoard();
+    }
+  }
+
+  function updateCanvasSize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const ratio = window.devicePixelRatio || 1;
+
+    cellSize = width < 640 ? 14 : 18;
+    columns = Math.max(12, Math.ceil(width / cellSize));
+    rows = Math.max(18, Math.ceil(height / cellSize));
+    canvas.width = Math.ceil(width * ratio);
+    canvas.height = Math.ceil(height * ratio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    createBoard();
+    activePieces = [];
+    for (let index = 0; index < maxVisibleTetrisPieces; index += 1) {
+      spawnPiece();
+    }
+  }
+
+  function drawBlock(x: number, y: number, color: string) {
+    const inset = 1.5;
+    const size = cellSize - inset * 2;
+
+    context.fillStyle = color;
+    context.strokeStyle = "rgba(255, 255, 255, 0.035)";
+    context.lineWidth = 1;
+    context.fillRect(x * cellSize + inset, y * cellSize + inset, size, size);
+    context.strokeRect(x * cellSize + inset, y * cellSize + inset, size, size);
+  }
+
+  function draw() {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    context.strokeStyle = "rgba(255, 255, 255, 0.018)";
+    context.lineWidth = 1;
+    for (let x = 0; x <= columns; x += 1) {
+      context.beginPath();
+      context.moveTo(x * cellSize, 0);
+      context.lineTo(x * cellSize, rows * cellSize);
+      context.stroke();
+    }
+    for (let y = 0; y <= rows; y += 1) {
+      context.beginPath();
+      context.moveTo(0, y * cellSize);
+      context.lineTo(columns * cellSize, y * cellSize);
+      context.stroke();
+    }
+
+    board.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) drawBlock(x, y, cell);
+      });
+    });
+
+    activePieces.forEach((piece) => {
+      piece.shape.forEach((shapeRow, shapeY) => {
+        shapeRow.forEach((cell, shapeX) => {
+          const drawX = Math.round(piece.drawX * 2) / 2;
+          const drawY = Math.round(piece.drawY * 2) / 2;
+          const y = drawY + shapeY;
+
+          if (cell && y >= 0) drawBlock(drawX + shapeX, y, piece.color);
+        });
+      });
+    });
+  }
+
+  function tick(time: number) {
+    const delta = time - lastFrame;
+    lastFrame = time;
+    dropTimer += delta;
+    driftTimer += delta;
+    spawnTimer += delta;
+
+    if (!reducedMotion) {
+      activePieces.forEach((piece) => {
+        const ease = Math.min(1, delta / 55);
+        piece.drawX += (piece.x - piece.drawX) * ease;
+        piece.drawY += (piece.y - piece.drawY) * Math.min(1, delta / 75);
+      });
+
+      if (spawnTimer > 210 && activePieces.length < maxVisibleTetrisPieces) {
+        spawnTimer = 0;
+        spawnPiece();
+      }
+
+      if (driftTimer > 120) {
+        driftTimer = 0;
+        activePieces.forEach((piece) => {
+          if (!shapesEqual(piece.shape, piece.targetShape) && canPlace(piece, piece.x, piece.y, piece.targetShape)) {
+            piece.shape = piece.targetShape;
+          }
+
+          const urgency = Math.abs(piece.targetX - piece.x);
+          const horizontalSteps = urgency > 8 ? 3 : urgency > 3 ? 2 : 1;
+
+          for (let step = 0; step < horizontalSteps; step += 1) {
+            const nextX = piece.x + Math.sign(piece.targetX - piece.x);
+
+            if (nextX === piece.x) break;
+
+            if (canPlace(piece, nextX, piece.y)) {
+              piece.x = nextX;
+            } else {
+              planPiece(piece);
+              break;
+            }
+          }
+        });
+      }
+
+      if (dropTimer > 85) {
+        dropTimer = 0;
+        let didLockPiece = false;
+
+        for (let index = activePieces.length - 1; index >= 0; index -= 1) {
+          const piece = activePieces[index];
+
+          if (isReadyToDrop(piece)) {
+            hardDrop(piece);
+            lockPiece(piece);
+            activePieces.splice(index, 1);
+            didLockPiece = true;
+            continue;
+          }
+
+          if (canPlace(piece, piece.x, piece.y + 1)) {
+            piece.y += 1;
+          } else {
+            lockPiece(piece);
+            activePieces.splice(index, 1);
+            didLockPiece = true;
+          }
+        }
+
+        if (didLockPiece) {
+          activePieces.forEach(planPiece);
+        }
+      }
+    }
+
+    draw();
+    animationFrame = window.requestAnimationFrame(tick);
+  }
+
+  updateCanvasSize();
+  draw();
+
+  if (!reducedMotion) {
+    animationFrame = window.requestAnimationFrame(tick);
+  }
+
+  window.addEventListener("resize", updateCanvasSize);
+
+  onUnmounted(() => {
+    window.cancelAnimationFrame(animationFrame);
+    window.removeEventListener("resize", updateCanvasSize);
+  });
+});
+
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col items-center justify-center bg-background">
-    <div class="mx-auto max-w-md px-4 text-center">
+  <div class="relative flex min-h-screen overflow-hidden bg-background">
+    <canvas
+      ref="tetrisCanvas"
+      aria-hidden="true"
+      class="pointer-events-none fixed inset-0 z-0 opacity-100"
+    />
+    <div
+      class="pointer-events-none fixed inset-0 z-0"
+      style="background: radial-gradient(circle at center, transparent 0%, oklch(0.145 0 0 / 0.18) 48%, var(--background) 100%)"
+    />
+
+    <div class="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 text-center">
       <h1 class="text-3xl font-bold tracking-tighter sm:text-4xl">
         Opendum
       </h1>
