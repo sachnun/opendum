@@ -172,7 +172,7 @@ function closeDetail() {
         :aria-controls="suggestionListId"
         :aria-activedescendant="activeSuggestionModel ? `model-search-option-${activeSuggestionIndex}` : undefined"
         aria-autocomplete="list"
-        class="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-9 text-xs font-normal shadow-xs outline-none transition-all placeholder:text-muted-foreground hover:bg-input/50 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:text-sm"
+        class="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-9 text-xs font-normal shadow-xs outline-none transition-all placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:text-sm"
         :placeholder="showAnimatedPlaceholder ? '' : 'Search models...'"
         autocomplete="off"
         @focus="openSuggestions"
