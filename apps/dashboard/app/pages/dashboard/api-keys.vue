@@ -286,10 +286,6 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
               <ApiKeyActions :api-key="apiKey" :readonly="isAuditMode" @renamed="updateApiKeyPatch(apiKey.id, $event)" @deleted="deleteApiKey" />
 
               <div class="space-y-2 pt-2">
-                <div class="flex justify-between gap-4">
-                  <span class="text-muted-foreground">Created</span>
-                  <span class="text-right font-medium">{{ apiKey.createdAt ? new Date(apiKey.createdAt).toLocaleDateString() : '-' }}</span>
-                </div>
                 <div class="flex items-center justify-between gap-4">
                   <span class="text-muted-foreground">Expiration</span>
                   <div class="text-right">

@@ -554,35 +554,59 @@ async function handleAuditSelected() {
                         </UiBadge>
                       </span>
                     </div>
-                    <button
+                    <div
                       v-else-if="isSwitchSubItem(subItem)"
-                      type="button"
-                      role="switch"
-                      :aria-checked="sharingEnabled"
-                      :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
-                      :disabled="isSwitchSubItemReadonly(subItem)"
                       :class="[
                         'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
                         isSwitchSubItemReadonly(subItem) ? 'cursor-default text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
                       ]"
                       @click="toggleSharing"
                     >
-                      <span class="min-w-0 truncate">{{ subItem.name }}</span>
-                      <span
-                        aria-hidden="true"
-                        :class="[
-                          'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
-                          sharingEnabled ? 'bg-primary' : 'bg-input/80',
-                        ]"
+                      <div class="flex min-w-0 items-center gap-1.5">
+                        <span class="min-w-0 truncate">{{ subItem.name }}</span>
+                        <UiPopover :content="{ align: 'start', side: 'right', sideOffset: 8, class: 'w-64 p-3' }">
+                          <button
+                            type="button"
+                            aria-label="About sharing"
+                            class="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                            @click.stop
+                          >
+                            ?
+                          </button>
+                          <template #content>
+                            <div class="space-y-1 text-xs leading-relaxed">
+                              <p class="font-medium text-foreground">Sharing</p>
+                              <p class="text-muted-foreground">Enable sharing to let other users use your available provider accounts through roaming API keys. You earn points only when their requests succeed.</p>
+                            </div>
+                          </template>
+                        </UiPopover>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        :aria-checked="sharingEnabled"
+                        :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
+                        :disabled="isSwitchSubItemReadonly(subItem)"
+                        class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
+                        @click.stop="toggleSharing"
                       >
                         <span
+                          aria-hidden="true"
                           :class="[
-                            'block size-3 rounded-full transition-transform',
-                            sharingEnabled ? 'translate-x-[calc(100%-2px)] bg-primary-foreground' : 'translate-x-0 bg-foreground',
+                            'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
+                            isSwitchSubItemReadonly(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
                           ]"
-                        />
-                      </span>
-                    </button>
+                        >
+                          <span
+                            :class="[
+                              'block size-3 rounded-full transition-transform',
+                              sharingEnabled ? 'translate-x-[calc(100%-2px)]' : 'translate-x-0',
+                              isSwitchSubItemReadonly(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
+                            ]"
+                          />
+                        </span>
+                      </button>
+                    </div>
                     <NuxtLink
                       v-else
                       :to="subItemHref(subItem)"
@@ -854,35 +878,59 @@ async function handleAuditSelected() {
                             </UiBadge>
                           </span>
                         </div>
-                        <button
+                        <div
                           v-else-if="isSwitchSubItem(subItem)"
-                          type="button"
-                          role="switch"
-                          :aria-checked="sharingEnabled"
-                          :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
-                          :disabled="isSwitchSubItemReadonly(subItem)"
                           :class="[
                             'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
                             isSwitchSubItemReadonly(subItem) ? 'cursor-default text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
                           ]"
                           @click="toggleSharing"
                         >
-                          <span class="min-w-0 truncate">{{ subItem.name }}</span>
-                          <span
-                            aria-hidden="true"
-                            :class="[
-                              'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
-                              sharingEnabled ? 'bg-primary' : 'bg-input/80',
-                            ]"
+                          <div class="flex min-w-0 items-center gap-1.5">
+                            <span class="min-w-0 truncate">{{ subItem.name }}</span>
+                            <UiPopover :content="{ align: 'start', side: 'right', sideOffset: 8, class: 'w-64 p-3' }">
+                              <button
+                                type="button"
+                                aria-label="About sharing"
+                                class="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full border border-border/70 text-[10px] font-semibold leading-none text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                                @click.stop
+                              >
+                                ?
+                              </button>
+                              <template #content>
+                                <div class="space-y-1 text-xs leading-relaxed">
+                                  <p class="font-medium text-foreground">Sharing</p>
+                                  <p class="text-muted-foreground">Enable sharing to let other users use your available provider accounts through roaming API keys. You earn points only when their requests succeed.</p>
+                                </div>
+                              </template>
+                            </UiPopover>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="sharingEnabled"
+                            :aria-disabled="isSwitchSubItemReadonly(subItem) ? true : undefined"
+                            :disabled="isSwitchSubItemReadonly(subItem)"
+                            class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
+                            @click.stop="toggleSharing"
                           >
                             <span
+                              aria-hidden="true"
                               :class="[
-                                'block size-3 rounded-full transition-transform',
-                                sharingEnabled ? 'translate-x-[calc(100%-2px)] bg-primary-foreground' : 'translate-x-0 bg-foreground',
+                                'inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all',
+                                isSwitchSubItemReadonly(subItem) ? 'bg-muted opacity-60' : sharingEnabled ? 'bg-primary' : 'bg-input/80',
                               ]"
-                            />
-                          </span>
-                        </button>
+                            >
+                              <span
+                                :class="[
+                                  'block size-3 rounded-full transition-transform',
+                                  sharingEnabled ? 'translate-x-[calc(100%-2px)]' : 'translate-x-0',
+                                  isSwitchSubItemReadonly(subItem) ? 'bg-muted-foreground/50' : sharingEnabled ? 'bg-primary-foreground' : 'bg-foreground',
+                                ]"
+                              />
+                            </span>
+                          </button>
+                        </div>
                         <NuxtLink
                           v-else
                           :to="subItemHref(subItem)"
