@@ -1006,7 +1006,7 @@ async function handleAuditSelected() {
       <template #content>
         <div class="space-y-1.5 pr-6">
           <h2 class="text-lg font-semibold leading-none tracking-tight">Stop Sharing</h2>
-          <p class="text-sm text-muted-foreground">Make your models private?</p>
+          <p class="text-sm text-muted-foreground">You won't earn points anymore?</p>
         </div>
         <div class="flex justify-end gap-2">
           <UiButton variant="outline" size="sm" @click="cancelDisableSharing">Cancel</UiButton>
