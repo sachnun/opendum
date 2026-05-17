@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Component } from "vue";
 import {
+  Activity,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -30,12 +31,14 @@ import {
   EyeOff,
   FileText,
   FlaskConical,
+  Globe2,
   Image,
   Key,
   KeyRound,
   Gauge,
   ListFilter,
   Loader2,
+  LoaderCircle,
   Menu,
   MessageSquareText,
   Pencil,
@@ -67,6 +70,7 @@ const props = defineProps<{
 }>();
 
 const icons: Record<string, Component> = {
+  "i-lucide-activity": Activity,
   "i-lucide-arrow-down": ArrowDown,
   "i-lucide-arrow-left": ArrowLeft,
   "i-lucide-arrow-right": ArrowRight,
@@ -97,12 +101,14 @@ const icons: Record<string, Component> = {
   "i-lucide-eye-off": EyeOff,
   "i-lucide-file-text": FileText,
   "i-lucide-flask-conical": FlaskConical,
+  "i-lucide-globe-2": Globe2,
   "i-lucide-image": Image,
   "i-lucide-key": Key,
   "i-lucide-key-round": KeyRound,
   "i-lucide-gauge": Gauge,
   "i-lucide-list-filter": ListFilter,
   "i-lucide-loader-2": Loader2,
+  "i-lucide-loader-circle": LoaderCircle,
   "i-lucide-menu": Menu,
   "i-lucide-message-square-text": MessageSquareText,
   "i-lucide-pencil": Pencil,
