@@ -1172,9 +1172,9 @@ function cancelErrorPreviewPointer() {
 
             <div v-if="!quotaInfo && !quotaError" class="space-y-2" aria-hidden="true">
               <div v-for="(row, index) in quotaSkeletonRows" :key="index" class="space-y-1">
-                <div class="flex items-center justify-between gap-2">
+                <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
                   <UiSkeleton :class="['h-3', row.labelClass]" />
-                  <span class="flex items-center gap-2">
+                  <span class="flex min-w-0 max-w-28 shrink-0 items-center justify-end gap-1.5 overflow-hidden">
                     <UiSkeleton v-if="row.metaClass !== 'w-0'" :class="['h-2.5', row.metaClass]" />
                     <UiSkeleton :class="['h-3', row.valueClass]" />
                   </span>

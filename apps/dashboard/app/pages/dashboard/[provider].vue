@@ -530,7 +530,7 @@ function decodeAccountHash(hash: string): string | null {
         </div>
         <div v-else-if="quotaSummarySkeletonRows.length > 0" class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
           <div v-for="(row, index) in quotaSummarySkeletonRows" :key="index" class="space-y-1.5">
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex items-start justify-between gap-2 text-xs">
               <div class="flex min-w-0 items-center gap-1.5">
                 <UiSkeleton :class="['h-3', row.labelClass]" />
                 <UiSkeleton :class="['h-2.5', row.metaClass]" />
