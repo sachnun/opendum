@@ -21,7 +21,9 @@ const usageChartColor = computed(() => props.disabled ? "var(--muted-foreground)
 const durationChartColor = computed(() => props.disabled ? "var(--muted-foreground)" : "var(--chart-2)");
 const durationLabelPoints = computed(() => {
   const points = props.stats.durationLast24Hours;
-  return [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
+  const tickCount = Math.min(5, points.length);
+  const indexes = Array.from(new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (points.length - 1)))));
+  return indexes.map((index) => points[index]).filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
 });
 
 function formatDuration(duration: number | null): string {
@@ -145,7 +147,7 @@ watch(
         class="h-6"
         :height="24"
       />
-      <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
+      <div class="mt-0.5 grid grid-cols-5 text-[9px] text-muted-foreground">
         <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">
           {{ formatHourLabel(point.time) }}
         </span>

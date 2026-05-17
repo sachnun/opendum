@@ -490,7 +490,12 @@ const subtitle = computed(() => {
 const subtitleDisplay = computed(() => (subtitle.value ? (isSubtitleVisible.value ? subtitle.value : maskSensitiveText(subtitle.value)) : null));
 const dailyValues = computed(() => props.account.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.account.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
-const durationLabelPoints = computed(() => [props.account.stats.durationLast24Hours[0], props.account.stats.durationLast24Hours[Math.floor(props.account.stats.durationLast24Hours.length / 2)], props.account.stats.durationLast24Hours[props.account.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
+const durationLabelPoints = computed(() => {
+  const points = props.account.stats.durationLast24Hours;
+  const tickCount = Math.min(5, points.length);
+  const indexes = Array.from(new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (points.length - 1)))));
+  return indexes.map((index) => points[index]).filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
+});
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.account.stats.totalRequests.toLocaleString(), numericValue: props.account.stats.totalRequests, formatDelta: formatSignedInteger },
   { key: "totalTokens", label: "Token", value: compactNumber(props.account.stats.totalTokens), numericValue: props.account.stats.totalTokens, formatDelta: formatSignedInteger },
@@ -1074,7 +1079,7 @@ function cancelErrorPreviewPointer() {
             </div>
             <div class="mb-2">
               <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
-              <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
+              <div class="mt-0.5 grid grid-cols-5 text-[9px] text-muted-foreground">
                 <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
               </div>
             </div>

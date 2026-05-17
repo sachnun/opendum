@@ -74,7 +74,12 @@ function formatHourLabel(time: string): string {
 
 const dailyValues = computed(() => props.summary.stats.dailyRequests.map((point) => point.count));
 const durationValues = computed(() => props.summary.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
-const durationLabelPoints = computed(() => [props.summary.stats.durationLast24Hours[0], props.summary.stats.durationLast24Hours[Math.floor(props.summary.stats.durationLast24Hours.length / 2)], props.summary.stats.durationLast24Hours[props.summary.stats.durationLast24Hours.length - 1]].filter(Boolean) as Array<{ time: string; avgDuration: number | null }>);
+const durationLabelPoints = computed(() => {
+  const points = props.summary.stats.durationLast24Hours;
+  const tickCount = Math.min(5, points.length);
+  const indexes = Array.from(new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (points.length - 1)))));
+  return indexes.map((index) => points[index]).filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
+});
 const badge = computed(() => indicatorBadge(props.summary.indicator, props.summary.active));
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.summary.stats.totalRequests.toLocaleString(), numericValue: props.summary.stats.totalRequests, formatDelta: formatSignedInteger },
@@ -148,7 +153,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
         </div>
         <div>
           <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
-          <div class="mt-0.5 grid grid-cols-3 text-[9px] text-muted-foreground">
+          <div class="mt-0.5 grid grid-cols-5 text-[9px] text-muted-foreground">
             <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
           </div>
         </div>
