@@ -62,6 +62,9 @@ export const primaryNavigation: NavItem[] = [
     name: "API Keys",
     href: "/dashboard/api-keys",
     icon: "i-lucide-key",
+    children: [
+      { name: "Sharing", href: "/dashboard/api-keys/sharing", disabled: true, tag: "soon" },
+    ],
   },
   {
     name: "Models",
