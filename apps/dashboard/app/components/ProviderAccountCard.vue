@@ -470,7 +470,7 @@ function isPaidTierValue(tier: string): boolean {
 }
 
 function maskSensitiveText(value: string): string {
-  return value.replace(/[^\s@._-]/g, "•");
+  return value.replace(/\S/g, "•");
 }
 
 function getAccountHeader(account: Account): { title: string; subtitle: string | null } {
@@ -1057,19 +1057,19 @@ function cancelErrorPreviewPointer() {
             </UiBadge>
           </div>
         </div>
-        <div v-if="subtitleDisplay" :class="['grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-1', isSubtitleVisible ? 'items-start' : 'w-full items-center overflow-hidden']">
-          <p :class="['min-w-0 font-mono text-sm text-muted-foreground', isSubtitleVisible ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ subtitleDisplay }}</p>
+        <div v-if="subtitleDisplay" :class="['flex min-w-0 gap-1', isSubtitleVisible ? 'items-start' : 'w-full items-center overflow-hidden']">
           <UiTooltip :text="isSubtitleVisible ? 'Hide' : 'Show'">
             <UiButton
               variant="ghost"
               size="icon-sm"
-              class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:text-foreground"
+              class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:bg-transparent hover:text-foreground"
               :aria-label="isSubtitleVisible ? `Hide account email for ${accountTitle}` : `Show account email for ${accountTitle}`"
               @click="isSubtitleVisible = !isSubtitleVisible"
             >
               <UiIcon :name="isSubtitleVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
             </UiButton>
           </UiTooltip>
+          <p :class="['min-w-0 font-mono text-sm text-muted-foreground', isSubtitleVisible ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ subtitleDisplay }}</p>
         </div>
       </UiCardHeader>
       <UiCardContent class="flex flex-1 flex-col pt-0">
