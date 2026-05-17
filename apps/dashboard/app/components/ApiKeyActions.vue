@@ -18,18 +18,34 @@ const dashboardApi = useDashboardApi();
 const isDeleting = ref(false);
 const deleteDialogOpen = ref(false);
 const isRevealed = ref(false);
+const isTemporarilyRevealed = ref(false);
 const revealedKey = ref<string | null>(null);
 const isLoading = ref(false);
 const copied = ref(false);
 const errorMessage = ref("");
+let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const displayKey = computed(() => (isRevealed.value && revealedKey.value ? revealedKey.value : `${props.apiKey.keyPreview.substring(0, 8)}********`));
+const isKeyVisible = computed(() => (isRevealed.value || isTemporarilyRevealed.value) && Boolean(revealedKey.value));
+const displayKey = computed(() => (isKeyVisible.value && revealedKey.value ? revealedKey.value : `${props.apiKey.keyPreview.substring(0, 8)}********`));
 
 async function revealKey() {
   if (props.readonly) return;
   if (isRevealed.value) {
     isRevealed.value = false;
+    isTemporarilyRevealed.value = false;
     revealedKey.value = null;
+    return;
+  }
+
+  if (isTemporarilyRevealed.value) {
+    isTemporarilyRevealed.value = false;
+    revealedKey.value = null;
+    return;
+  }
+
+  if (revealedKey.value) {
+    isTemporarilyRevealed.value = false;
+    isRevealed.value = true;
     return;
   }
 
@@ -59,8 +75,16 @@ async function copyKey() {
       key = result.data.key;
     }
     await navigator.clipboard.writeText(key);
+    revealedKey.value = key;
+    isTemporarilyRevealed.value = !isRevealed.value;
     copied.value = true;
-    setTimeout(() => (copied.value = false), 2000);
+    if (copyTimeout) clearTimeout(copyTimeout);
+    copyTimeout = setTimeout(() => {
+      copied.value = false;
+      isTemporarilyRevealed.value = false;
+      if (!isRevealed.value) revealedKey.value = null;
+      copyTimeout = null;
+    }, 2000);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to copy API key";
   } finally {
@@ -83,24 +107,28 @@ async function deleteKey() {
     isDeleting.value = false;
   }
 }
+
+onUnmounted(() => {
+  if (copyTimeout) clearTimeout(copyTimeout);
+});
 </script>
 
 <template>
   <div>
     <div class="flex flex-col gap-2.5">
       <p v-if="errorMessage" class="text-xs text-destructive">{{ errorMessage }}</p>
-      <UiTooltip :text="isRevealed ? 'Hide' : 'Reveal'">
+      <UiTooltip :text="isKeyVisible ? 'Hide' : 'Reveal'">
         <button
           type="button"
           :disabled="isLoading || readonly"
           :class="cn(
             'flex w-full cursor-pointer items-center gap-2 rounded-sm border border-border/60 bg-transparent px-2 py-2 text-left font-mono text-xs text-muted-foreground outline-none transition-colors hover:bg-muted/30 disabled:pointer-events-none disabled:opacity-50',
-            isRevealed ? 'min-h-9' : 'h-9',
+            isKeyVisible ? 'min-h-9' : 'h-9',
           )"
           @click="revealKey"
         >
-          <span :class="['min-w-0 flex-1 pr-2', isRevealed ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ displayKey }}</span>
-          <UiIcon :name="isRevealed ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4 shrink-0 text-muted-foreground" />
+          <span :class="['min-w-0 flex-1 pr-2', isKeyVisible ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ displayKey }}</span>
+          <UiIcon :name="isKeyVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-4 shrink-0 text-muted-foreground" />
         </button>
       </UiTooltip>
 
