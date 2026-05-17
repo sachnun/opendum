@@ -771,7 +771,7 @@ async function handleAuditSelected() {
                     class="relative flex w-full cursor-not-allowed select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground/50"
                     aria-disabled="true"
                   >
-                    <span>Poin</span>
+                    <span>Point</span>
                     <UiBadge variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
                       soon
                     </UiBadge>

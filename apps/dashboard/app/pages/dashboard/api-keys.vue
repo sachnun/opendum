@@ -21,6 +21,8 @@ const options = computed<ApiKeyOptions | null>(() => data.value?.options ?? null
 const activeApiKeyCount = computed(() => apiKeys.value.filter((apiKey) => getApiKeyStatus(apiKey).label === "Active").length);
 const togglingApiKeyIds = ref(new Set<string>());
 const toggleErrors = ref<Record<string, string>>({});
+const priorityEnabledByKeyId = ref<Record<string, boolean>>({});
+const roamingInfoOpenByKeyId = ref<Record<string, boolean>>({});
 const proxyBaseUrl = computed(() => {
   const proxyUrl = String(config.public.proxyUrl || "").replace(/\/$/, "");
   return `${proxyUrl}/v1`;
@@ -50,6 +52,33 @@ onBeforeUnmount(() => {
     clearTimeout(copyProxyBaseUrlTimeout);
   }
 });
+
+function isHoverPointer() {
+  return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
+function setRoamingInfoOpen(apiKeyId: string, open: boolean) {
+  roamingInfoOpenByKeyId.value = { ...roamingInfoOpenByKeyId.value, [apiKeyId]: open };
+}
+
+function openRoamingInfoOnHover(apiKeyId: string, event: PointerEvent) {
+  if (event.pointerType === "touch" || !isHoverPointer()) return;
+  setRoamingInfoOpen(apiKeyId, true);
+}
+
+function closeRoamingInfoOnHover(apiKeyId: string, event: PointerEvent) {
+  if (event.pointerType === "touch" || !isHoverPointer()) return;
+  setRoamingInfoOpen(apiKeyId, false);
+}
+
+function toggleRoamingInfo(apiKeyId: string, event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  if (isHoverPointer() && event.detail !== 0) return;
+  setRoamingInfoOpen(apiKeyId, !roamingInfoOpenByKeyId.value[apiKeyId]);
+}
 
 function getApiKeyStatus(apiKey: ApiKeyListItem) {
   const now = new Date();
@@ -270,6 +299,42 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                 <div class="flex justify-between gap-4">
                   <span class="text-muted-foreground">Last used</span>
                   <span class="text-right font-medium">{{ apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : '-' }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                  <span class="flex items-center gap-1.5 text-muted-foreground">
+                    Roaming
+                    <UiPopover :open="roamingInfoOpenByKeyId[apiKey.id] ?? false" :content="{ align: 'start', side: 'top', class: 'w-64 px-2 py-1.5 text-xs leading-snug' }">
+                      <button
+                        type="button"
+                        class="inline-flex rounded-full outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                        aria-label="About Roaming"
+                        @pointerenter="openRoamingInfoOnHover(apiKey.id, $event)"
+                        @pointerleave="closeRoamingInfoOnHover(apiKey.id, $event)"
+                        @click="toggleRoamingInfo(apiKey.id, $event)"
+                      >
+                        <UiIcon name="i-lucide-circle-question-mark" class="size-3.5 text-muted-foreground/60 [stroke-width:1.5]" />
+                      </button>
+                      <template #content>
+                        <div class="space-y-1.5">
+                          <p class="font-medium text-popover-foreground">Roaming</p>
+                          <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Each roaming request uses points.</p>
+                        </div>
+                      </template>
+                    </UiPopover>
+                  </span>
+                  <div class="flex items-center gap-1.5">
+                    <span v-if="priorityEnabledByKeyId[apiKey.id]" class="flex items-center gap-1 text-[11px] leading-none text-muted-foreground">
+                      <UiIcon name="i-lucide-coins" class="size-3" />
+                      0
+                    </span>
+                    <UiSwitch
+                      :model-value="priorityEnabledByKeyId[apiKey.id] ?? false"
+                      size="sm"
+                      :title="priorityEnabledByKeyId[apiKey.id] ? 'Disable' : 'Enable'"
+                      :disabled="isAuditMode"
+                      @update:model-value="priorityEnabledByKeyId[apiKey.id] = $event"
+                    />
+                  </div>
                 </div>
               </div>
 
