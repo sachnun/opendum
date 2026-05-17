@@ -730,16 +730,16 @@ async function handleAuditSelected() {
                         attributeName="transform"
                         type="scale"
                         values="1 1;1 1;0.12 1;-1 1;-1 1;-0.12 1;1 1;1 1"
-                        keyTimes="0;0.52;0.59;0.66;0.76;0.83;0.9;1"
-                        dur="3.2s"
+                        keyTimes="0;0.68;0.74;0.8;0.86;0.92;0.97;1"
+                        dur="5s"
                         repeatCount="indefinite"
                       />
                       <g>
                         <animate
                           attributeName="opacity"
                           values="1;1;0;0;0;0;1;1"
-                          keyTimes="0;0.57;0.59;0.76;0.83;0.85;0.9;1"
-                          dur="3.2s"
+                          keyTimes="0;0.72;0.74;0.86;0.92;0.94;0.97;1"
+                          dur="5s"
                           repeatCount="indefinite"
                         />
                         <circle r="16" fill="url(#profile-coin-face)" />
@@ -760,8 +760,8 @@ async function handleAuditSelected() {
                         <animate
                           attributeName="opacity"
                           values="0;0;1;1;1;1;0;0"
-                          keyTimes="0;0.57;0.59;0.76;0.83;0.85;0.9;1"
-                          dur="3.2s"
+                          keyTimes="0;0.72;0.74;0.86;0.92;0.94;0.97;1"
+                          dur="5s"
                           repeatCount="indefinite"
                         />
                         <circle r="16" fill="url(#profile-coin-back)" />
