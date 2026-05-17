@@ -328,7 +328,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                     <UiPopover v-model:open="roamingInfoOpenByKeyId[apiKey.id]" :content="{ align: 'start', side: 'top', class: 'w-64 px-2 py-1.5 text-xs leading-snug' }">
                       <button
                         type="button"
-                        class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border/70 text-muted-foreground outline-none transition-colors hover:border-border hover:bg-muted hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                        class="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 outline-none transition-colors hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                         aria-label="About Roaming"
                         @pointerenter="openRoamingInfoOnHover(apiKey.id, $event)"
                         @pointerleave="closeRoamingInfoOnHover(apiKey.id, $event)"
