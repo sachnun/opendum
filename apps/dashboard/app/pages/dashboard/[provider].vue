@@ -63,6 +63,7 @@ let accountVisibilityObserver: IntersectionObserver | null = null;
 let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let providerDetailRefreshInFlight: Promise<void> | null = null;
 let providerDetailRefreshQueued = false;
+let providerDetailRefreshQueuedShouldRefreshQuota = false;
 let providerQuotaRefreshInFlight: Promise<void> | null = null;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
@@ -78,29 +79,34 @@ const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvide
 const selectedAccountId = computed(() => decodeAccountHash(route.hash));
 type QuotaAccountState = { provider: string; isActive: boolean };
 
-async function refreshProviderDetailOnce() {
+async function refreshProviderDetailOnce(options: { refreshQuota?: boolean } = {}) {
+  const shouldRefreshQuota = options.refreshQuota ?? true;
   if (pending.value || providerDetailRefreshInFlight) {
     providerDetailRefreshQueued = true;
+    providerDetailRefreshQueuedShouldRefreshQuota ||= shouldRefreshQuota;
     return;
   }
 
   providerDetailRefreshInFlight = refresh().then(() => undefined).catch(() => undefined);
   try {
     await providerDetailRefreshInFlight;
-    void refreshProviderQuotaAfterAccountPoll();
+    if (shouldRefreshQuota) void refreshProviderQuotaAfterAccountPoll();
   } finally {
     providerDetailRefreshInFlight = null;
     const shouldRefreshAgain = providerDetailRefreshQueued;
+    const shouldRefreshQuotaAgain = providerDetailRefreshQueuedShouldRefreshQuota;
     providerDetailRefreshQueued = false;
+    providerDetailRefreshQueuedShouldRefreshQuota = false;
 
     if (shouldRefreshAgain) {
-      void refreshProviderDetailOnce();
+      void refreshProviderDetailOnce({ refreshQuota: shouldRefreshQuotaAgain });
     }
   }
 }
 
 function stopProviderDetailRefresh() {
   providerDetailRefreshQueued = false;
+  providerDetailRefreshQueuedShouldRefreshQuota = false;
   if (!providerDetailRefreshTimer) return;
 
   clearInterval(providerDetailRefreshTimer);
@@ -314,7 +320,7 @@ function handleQuotaRefresh(accountId: string) {
   if (!account) return;
 
   void loadAccountQuota(account, true).finally(() => {
-    void refreshProviderDetailOnce();
+    void refreshProviderDetailOnce({ refreshQuota: false });
   });
 }
 
