@@ -84,6 +84,15 @@ function formatHourLabel(time: string): string {
   return new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function isPreviousDayLabel(time: string): boolean {
+  const date = new Date(time);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
 watch(statMetrics, (items) => {
   const nextValues = collectStatValues(items);
   const previousValues = previousStatValues.value;
@@ -147,8 +156,8 @@ watch(
         class="h-6"
         :height="24"
       />
-      <div class="mt-0.5 grid grid-cols-5 text-[9px] text-muted-foreground">
-        <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">
+      <div class="mt-0.5 grid grid-cols-5 text-[9px]">
+        <span v-for="point in durationLabelPoints" :key="point.time" :class="['truncate text-center', isPreviousDayLabel(point.time) ? 'text-muted-foreground' : 'text-foreground/80']">
           {{ formatHourLabel(point.time) }}
         </span>
       </div>

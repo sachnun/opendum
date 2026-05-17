@@ -423,6 +423,15 @@ function formatHourLabel(time: string): string {
   return Number.isNaN(date.getTime()) ? time.slice(11, 16) : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function isPreviousDayLabel(time: string): boolean {
+  const date = new Date(time);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
 function formatTierLabel(tier: string): string {
   const normalized = tier.trim().toLowerCase();
 
@@ -1079,8 +1088,8 @@ function cancelErrorPreviewPointer() {
             </div>
             <div class="mb-2">
               <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${accountTitle} over last 24 hours`" class="h-6" :height="24" />
-              <div class="mt-0.5 grid grid-cols-5 text-[9px] text-muted-foreground">
-                <span v-for="point in durationLabelPoints" :key="point.time" class="truncate text-center">{{ formatHourLabel(point.time) }}</span>
+              <div class="mt-0.5 grid grid-cols-5 text-[9px]">
+                <span v-for="point in durationLabelPoints" :key="point.time" :class="['truncate text-center', isPreviousDayLabel(point.time) ? 'text-muted-foreground' : 'text-foreground/80']">{{ formatHourLabel(point.time) }}</span>
               </div>
             </div>
             <UsageSparkline :values="dailyValues" :color="usageChartColor" :aria-label="`Requests trend for ${accountTitle}`" />
