@@ -1057,12 +1057,12 @@ function cancelErrorPreviewPointer() {
             </UiBadge>
           </div>
         </div>
-        <div v-if="subtitleDisplay" :class="['flex min-w-0 gap-1', isSubtitleVisible ? 'items-start' : 'w-full items-center overflow-hidden']">
+        <div v-if="subtitleDisplay" :class="['flex min-w-0 items-center gap-1', isSubtitleVisible ? '' : 'w-full overflow-hidden']">
           <UiTooltip :text="isSubtitleVisible ? 'Hide' : 'Show'">
             <UiButton
               variant="ghost"
               size="icon-sm"
-              class="h-7 w-7 shrink-0 self-start text-muted-foreground hover:bg-transparent hover:text-foreground"
+              class="h-7 w-7 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
               :aria-label="isSubtitleVisible ? `Hide account email for ${accountTitle}` : `Show account email for ${accountTitle}`"
               @click="isSubtitleVisible = !isSubtitleVisible"
             >
