@@ -4,8 +4,8 @@ import type { NuxtError } from "#app";
 const props = defineProps<{ error: NuxtError }>();
 const statusCode = props.error.statusCode || props.error.status;
 
-if (statusCode === 404) {
-  await clearError({ redirect: "/" });
+function goHome() {
+  clearError({ redirect: "/" });
 }
 </script>
 
@@ -15,7 +15,7 @@ if (statusCode === 404) {
       <p class="text-sm font-medium text-muted-foreground">Error {{ statusCode }}</p>
       <h1 class="text-2xl font-semibold tracking-tight">Something went wrong</h1>
       <p class="text-sm text-muted-foreground">{{ error.statusMessage || error.message || "Please try again from the home page." }}</p>
-      <UiButton type="button" @click="clearError({ redirect: '/' })">Go home</UiButton>
+      <UiButton type="button" variant="outline" @click="goHome">Go home</UiButton>
     </section>
   </main>
 </template>
