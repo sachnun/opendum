@@ -24,13 +24,13 @@ type TetrisPiece = {
 const maxVisibleTetrisPieces = 1;
 
 const tetrisPieces = [
-  { shape: [[1, 1, 1, 1]], color: "rgba(148, 163, 184, 0.13)" },
-  { shape: [[1, 1], [1, 1]], color: "rgba(125, 211, 252, 0.11)" },
-  { shape: [[0, 1, 0], [1, 1, 1]], color: "rgba(196, 181, 253, 0.11)" },
-  { shape: [[1, 0, 0], [1, 1, 1]], color: "rgba(167, 243, 208, 0.10)" },
-  { shape: [[0, 0, 1], [1, 1, 1]], color: "rgba(253, 186, 116, 0.10)" },
-  { shape: [[0, 1, 1], [1, 1, 0]], color: "rgba(251, 207, 232, 0.10)" },
-  { shape: [[1, 1, 0], [0, 1, 1]], color: "rgba(191, 219, 254, 0.10)" },
+  { shape: [[1, 1, 1, 1]], color: "rgba(226, 232, 240, 0.12)" },
+  { shape: [[1, 1], [1, 1]], color: "rgba(203, 213, 225, 0.11)" },
+  { shape: [[0, 1, 0], [1, 1, 1]], color: "rgba(241, 245, 249, 0.10)" },
+  { shape: [[1, 0, 0], [1, 1, 1]], color: "rgba(209, 213, 219, 0.10)" },
+  { shape: [[0, 0, 1], [1, 1, 1]], color: "rgba(229, 231, 235, 0.10)" },
+  { shape: [[0, 1, 1], [1, 1, 0]], color: "rgba(156, 163, 175, 0.11)" },
+  { shape: [[1, 1, 0], [0, 1, 1]], color: "rgba(148, 163, 184, 0.10)" },
 ];
 
 const route = useRoute();
