@@ -59,6 +59,7 @@ type cacheValue struct {
 	AccountAccessList []string        `json:"accountAccessList,omitempty"`
 	RoamingEnabled    bool            `json:"roamingEnabled,omitempty"`
 	ExpiresAtMs       *int64          `json:"expiresAtMs,omitempty"`
+	UpdatedAtMicros   *int64          `json:"updatedAtMicros,omitempty"`
 	RateLimitRules    []RateLimitRule `json:"rateLimitRules,omitempty"`
 	Error             string          `json:"error,omitempty"`
 }
