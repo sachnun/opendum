@@ -1767,7 +1767,6 @@ function formatToolArguments(value: string): string {
             <span :class="activeFamilyPresets.includes(preset.family) ? 'text-[10px] leading-none text-primary/80' : 'text-[10px] leading-none text-muted-foreground'">{{ preset.models.length }} models</span>
           </button>
         </div>
-        <p v-else-if="familyPresetExpanded" class="text-xs text-muted-foreground">Connect at least one provider account to use family presets.</p>
       </div>
 
       <div class="space-y-3">
