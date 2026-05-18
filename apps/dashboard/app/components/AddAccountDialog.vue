@@ -50,10 +50,10 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", flowType: "api_key_with_account_id", apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
 };
 
-const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string }> = [
+const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string; disabled?: boolean }> = [
   { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." },
   { key: "device_code", name: "Device Code", description: "Enter a short device code." },
-  { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active ChatGPT web session." },
+  { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true },
 ];
 
 const chatgptSessionPlaceholder = `{
@@ -287,6 +287,7 @@ function stopDevicePolling() {
 
 function selectCodexLoginMethod(method: CodexLoginMethod) {
   if (props.readonly) return;
+  if (codexLoginMethods.some((item) => item.key === method && item.disabled)) return;
   resetAuthProgress();
   codexLoginMethod.value = method;
   step.value = authStep.value;
@@ -663,14 +664,18 @@ onBeforeUnmount(() => {
               v-for="method in codexLoginMethods"
               :key="method.key"
               type="button"
+              :disabled="method.disabled"
               :class="cn(
-                'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40',
+                'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
                 codexLoginMethod === method.key ? 'border-foreground/30 bg-muted/30' : 'border-border',
               )"
               @click="selectCodexLoginMethod(method.key)"
             >
               <span class="space-y-1">
-                <span class="block text-sm font-medium">{{ method.name }}</span>
+                <span class="flex items-center gap-2 text-sm font-medium">
+                  {{ method.name }}
+                  <span v-if="method.disabled" class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Unavailable</span>
+                </span>
                 <span class="block text-xs text-muted-foreground">{{ method.description }}</span>
               </span>
             </button>
