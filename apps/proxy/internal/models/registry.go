@@ -8,7 +8,10 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 )
+
+const suggestionThreshold = 0.7
 
 type Meta struct {
 	Reasoning  *bool       `json:"reasoning"`
@@ -372,6 +375,90 @@ func (r *Registry) AllModels() []string {
 	return models
 }
 
+func (r *Registry) AllModelsWithAliases() []string {
+	values := []string{}
+	for model, info := range r.effective {
+		if len(info.Providers) == 0 {
+			continue
+		}
+		values = append(values, model)
+		values = append(values, info.Aliases...)
+	}
+	return uniqueSorted(values)
+}
+
+func (r *Registry) ModelsForProvider(provider string) []string {
+	values := []string{}
+	for model, info := range r.effective {
+		if !contains(info.Providers, provider) {
+			continue
+		}
+		values = append(values, model)
+		values = append(values, info.Aliases...)
+	}
+	return uniqueSorted(values)
+}
+
+func (r *Registry) SuggestedModels(model string, provider *string, candidates []string, limit int) []string {
+	term := strings.TrimSpace(model)
+	if term == "" || limit <= 0 {
+		return nil
+	}
+
+	useProviderPrefix := false
+	if len(candidates) == 0 {
+		if provider != nil {
+			providerCandidates := r.ModelsForProvider(*provider)
+			if len(providerCandidates) > 0 {
+				candidates = providerCandidates
+				useProviderPrefix = true
+			}
+		}
+		if len(candidates) == 0 {
+			candidates = r.AllModelsWithAliases()
+		}
+	} else {
+		candidates = uniqueSorted(candidates)
+		useProviderPrefix = provider != nil
+	}
+
+	type match struct {
+		value string
+		score float64
+	}
+	matches := []match{}
+	for _, candidate := range candidates {
+		score := suggestionScore(term, candidate)
+		if score >= suggestionThreshold {
+			matches = append(matches, match{value: candidate, score: score})
+		}
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].score == matches[j].score {
+			return matches[i].value < matches[j].value
+		}
+		return matches[i].score > matches[j].score
+	})
+
+	result := []string{}
+	seen := map[string]struct{}{}
+	for _, item := range matches {
+		value := item.value
+		if useProviderPrefix && provider != nil {
+			value = *provider + "/" + value
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+		if len(result) >= limit {
+			break
+		}
+	}
+	return result
+}
+
 func (r *Registry) ModelInfo(model string) (Info, bool) {
 	info, ok := r.effective[r.ResolveAlias(model)]
 	return info, ok
@@ -518,4 +605,88 @@ func contains(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func suggestionScore(term, candidate string) float64 {
+	left := normalizeSuggestionValue(term)
+	right := normalizeSuggestionValue(candidate)
+	if left == "" || right == "" {
+		return 0
+	}
+	if left == right {
+		return 1
+	}
+	if strings.Contains(right, left) || strings.Contains(left, right) {
+		shorter := len([]rune(left))
+		longer := len([]rune(right))
+		if len([]rune(right)) < shorter {
+			shorter = len([]rune(right))
+			longer = len([]rune(left))
+		}
+		return 0.8 + 0.2*(float64(shorter)/float64(longer))
+	}
+	maxLen := len([]rune(left))
+	if otherLen := len([]rune(right)); otherLen > maxLen {
+		maxLen = otherLen
+	}
+	if maxLen == 0 {
+		return 0
+	}
+	distance := levenshteinDistance(left, right)
+	return 1 - float64(distance)/float64(maxLen)
+}
+
+func normalizeSuggestionValue(value string) string {
+	var b strings.Builder
+	lastSpace := false
+	for _, r := range strings.ToLower(strings.TrimSpace(value)) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			lastSpace = false
+			continue
+		}
+		if unicode.IsSpace(r) && !lastSpace {
+			b.WriteRune(' ')
+			lastSpace = true
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func levenshteinDistance(a, b string) int {
+	left := []rune(a)
+	right := []rune(b)
+	if len(left) == 0 {
+		return len(right)
+	}
+	if len(right) == 0 {
+		return len(left)
+	}
+	previous := make([]int, len(right)+1)
+	current := make([]int, len(right)+1)
+	for j := range previous {
+		previous[j] = j
+	}
+	for i, l := range left {
+		current[0] = i + 1
+		for j, r := range right {
+			cost := 0
+			if l != r {
+				cost = 1
+			}
+			current[j+1] = minInt(current[j]+1, previous[j+1]+1, previous[j]+cost)
+		}
+		previous, current = current, previous
+	}
+	return previous[len(right)]
+}
+
+func minInt(values ...int) int {
+	min := values[0]
+	for _, value := range values[1:] {
+		if value < min {
+			min = value
+		}
+	}
+	return min
 }

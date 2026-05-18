@@ -20,7 +20,7 @@ func (s *Service) ValidateModel(modelParam string) ModelValidationResult {
 		return ModelValidationResult{Valid: false, Provider: provider, Model: model, Error: "Model \"" + rawModel + "\" is not supported for Codex when using a ChatGPT account. Use one of: " + supported + ".", Param: "model", Code: "unsupported_codex_chatgpt_model"}
 	}
 	if !s.registry.IsSupported(model) {
-		return ModelValidationResult{Valid: false, Provider: provider, Model: rawModel, Error: "Invalid model: " + modelParam + ". Use GET /v1/models for the full list.", Param: "model", Code: "invalid_model"}
+		return s.invalidModelResult(provider, rawModel, modelParam, nil)
 	}
 	if provider != nil && !s.registry.IsSupportedByProvider(model, *provider) {
 		supported := strings.Join(s.registry.ProvidersForModel(model), ", ")
@@ -64,6 +64,22 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 		return base, nil
 	}
 
+	mode := normalizeAccessMode(access.Mode)
+	modelSet := map[string]struct{}{}
+	for _, model := range s.normalizeModelList(access.Models) {
+		modelSet[model] = struct{}{}
+	}
+	if mode == "whitelist" {
+		if _, ok := modelSet[base.Model]; !ok {
+			return s.invalidModelResult(base.Provider, base.Model, modelParam, keys(modelSet)), nil
+		}
+	}
+	if mode == "blacklist" {
+		if _, ok := modelSet[base.Model]; ok {
+			return s.invalidModelResult(base.Provider, base.Model, modelParam, s.allowedModelCandidates(base.Provider, modelSet)), nil
+		}
+	}
+
 	disabled, err := s.IsModelDisabledForUser(ctx, userID, base.Model)
 	if err != nil {
 		return ModelValidationResult{}, err
@@ -72,23 +88,38 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 		return ModelValidationResult{Valid: false, Provider: base.Provider, Model: base.Model, Error: "Model \"" + base.Model + "\" is disabled. Enable it from Dashboard > Models first.", Param: "model", Code: "model_disabled"}, nil
 	}
 
-	mode := normalizeAccessMode(access.Mode)
-	modelSet := map[string]struct{}{}
-	for _, model := range s.normalizeModelList(access.Models) {
-		modelSet[model] = struct{}{}
-	}
-	if mode == "whitelist" {
-		if _, ok := modelSet[base.Model]; !ok {
-			return ModelValidationResult{Valid: false, Provider: base.Provider, Model: base.Model, Error: "Model \"" + base.Model + "\" is not allowed for this API key.", Param: "model", Code: "model_not_whitelisted"}, nil
-		}
-	}
-	if mode == "blacklist" {
-		if _, ok := modelSet[base.Model]; ok {
-			return ModelValidationResult{Valid: false, Provider: base.Provider, Model: base.Model, Error: "Model \"" + base.Model + "\" is blocked for this API key.", Param: "model", Code: "model_blacklisted"}, nil
-		}
-	}
-
 	return base, nil
+}
+
+func (s *Service) invalidModelResult(provider *string, model, modelParam string, candidates []string) ModelValidationResult {
+	suggestions := s.registry.SuggestedModels(model, provider, candidates, 5)
+	suggestionMessage := " Use GET /v1/models for the full list."
+	if len(suggestions) > 0 {
+		suggestionMessage = " Did you mean: " + strings.Join(suggestions, ", ") + "?"
+	}
+	return ModelValidationResult{Valid: false, Provider: provider, Model: model, Error: "Invalid model: " + modelParam + "." + suggestionMessage, Param: "model", Code: "invalid_model"}
+}
+
+func keys(set map[string]struct{}) []string {
+	values := make([]string, 0, len(set))
+	for value := range set {
+		values = append(values, value)
+	}
+	return values
+}
+
+func (s *Service) allowedModelCandidates(provider *string, blocked map[string]struct{}) []string {
+	candidates := s.registry.AllModelsWithAliases()
+	if provider != nil {
+		candidates = s.registry.ModelsForProvider(*provider)
+	}
+	values := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if _, ok := blocked[s.registry.ResolveAlias(candidate)]; !ok {
+			values = append(values, candidate)
+		}
+	}
+	return values
 }
 
 func ParseModelParam(modelParam string) (*string, string) {
