@@ -277,10 +277,6 @@ function isSwitchSubItem(subItem: NavSubItem) {
   return subItem.control === "switch";
 }
 
-function isSwitchSubItemReadonly(subItem: NavSubItem) {
-  return isSwitchSubItem(subItem) && isAuditMode.value;
-}
-
 function isSwitchSubItemToggleDisabled(subItem: NavSubItem) {
   return isSwitchSubItem(subItem) && (isAuditMode.value || sharingUpdating.value);
 }
@@ -615,7 +611,7 @@ async function handleAuditSelected() {
                       v-else-if="isSwitchSubItem(subItem)"
                       :class="[
                         'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
-                        isSwitchSubItemReadonly(subItem) ? 'cursor-default text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                        'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
                       ]"
                       @click="toggleSharing"
                     >
@@ -941,7 +937,7 @@ async function handleAuditSelected() {
                           v-else-if="isSwitchSubItem(subItem)"
                           :class="[
                             'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
-                            isSwitchSubItemReadonly(subItem) ? 'cursor-default text-muted-foreground/50' : 'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                            'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
                           ]"
                           @click="toggleSharing"
                         >
