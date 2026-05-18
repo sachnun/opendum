@@ -238,7 +238,7 @@ const playgroundSetupMessage = computed(() => {
   if (!hasAnyProviderAccount.value) return "Connect a provider account before running Playground.";
   if (!isProxyConfigured.value) return "Set NUXT_PUBLIC_PROXY_URL to your proxy service URL before running Playground.";
   if (providerAccounts.value.length === 0) return "Enable at least one provider account before running Playground.";
-  if (models.value.length === 0) return "Enable at least one model supported by your provider accounts before running Playground.";
+  if (models.value.length === 0) return "";
   return "";
 });
 const parsedLoopCount = computed(() => Number(loopCountInput.value));
@@ -1794,7 +1794,6 @@ function formatToolArguments(value: string): string {
             <span v-if="getProviderPresetAccountLabel(preset.accounts)" :class="activeProviderPresets.includes(preset.provider) ? 'text-[10px] leading-none text-primary/80' : 'text-[10px] leading-none text-muted-foreground'">{{ getProviderPresetAccountLabel(preset.accounts) }}</span>
           </button>
         </div>
-        <p v-else-if="providerPresetExpanded" class="text-xs text-muted-foreground">Connect at least one provider account to use provider presets.</p>
       </div>
 
       <div class="dashboard-card-grid">
