@@ -53,8 +53,23 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
 const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string }> = [
   { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." },
   { key: "device_code", name: "Device Code", description: "Enter a short device code." },
-  { key: "chatgpt_session", name: "ChatGPT Session", description: "Paste the JSON from chatgpt.com/api/auth/session." },
+  { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active ChatGPT web session." },
 ];
+
+const chatgptSessionPlaceholder = `{
+  "WARNING_BANNER": "!!!!!!!!!!!!!!!!!!!! DO NOT SHARE ANY PART OF THE INFORMATION YOU SEE HERE. THIS INFORMATION IS SENSITIVE AND CAN GRANT ACCESS TO YOUR ACCOUNT. !!!!!!!!!!!!!!!!!!!!",
+  "user": {
+    "email": "you@example.com"
+  },
+  "expires": "2026-08-16T22:42:05.747Z",
+  "account": {
+    "id": "b975c0c5-b667-4aa8-ac89-ce4ec41c6357",
+    "planType": "free"
+  },
+  "accessToken": "eyJ...",
+  "authProvider": "openai",
+  "sessionToken": "eyJ..."
+}`;
 
 const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "ollama_cloud", "openrouter", "nvidia_nim", "groq", "workers_ai"];
 
@@ -446,7 +461,7 @@ async function handleConnectCodexSession() {
 
   errorMessage.value = "";
   if (!chatgptSessionJson.value.trim()) {
-    errorMessage.value = "Please paste the ChatGPT session JSON";
+    errorMessage.value = "Please paste the ChatGPT session";
     return;
   }
 
@@ -728,9 +743,9 @@ onBeforeUnmount(() => {
 
           <template v-else-if="activeFlowType === 'chatgpt_session'">
             <div class="space-y-2">
-              <p class="text-sm font-medium">Copy ChatGPT session JSON</p>
+              <p class="text-sm font-medium">Copy ChatGPT session</p>
               <p class="text-sm text-muted-foreground">
-                Open the session page while logged in to ChatGPT, copy the full JSON response, then paste it here. This method has no refresh token, so reconnect when the access token expires.
+                Open the session page while logged in to ChatGPT, copy the full response, then paste it here. This method has no refresh token, so reconnect when the access token expires.
               </p>
             </div>
             <div class="rounded-md border border-border bg-muted/30 p-3">
@@ -746,12 +761,6 @@ onBeforeUnmount(() => {
                   <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
                 </UiButton>
               </UiTooltip>
-            </div>
-            <div class="relative w-full rounded-lg border px-4 py-3 text-sm">
-              <UiIcon name="i-lucide-alert-triangle" class="absolute left-4 top-4 size-4" />
-              <div class="pl-7 text-xs">
-                Treat this JSON like a password. It contains account access tokens and will be stored encrypted.
-              </div>
             </div>
           </template>
 
@@ -827,9 +836,9 @@ onBeforeUnmount(() => {
         >
           <div class="space-y-2">
             <label for="chatgpt-session-json" class="text-sm font-medium">
-              Paste Session JSON <span aria-hidden="true" class="text-destructive">*</span>
+              Paste Session <span aria-hidden="true" class="text-destructive">*</span>
             </label>
-            <p class="text-sm text-muted-foreground">Paste the full JSON from <code class="rounded bg-muted px-1">chatgpt.com/api/auth/session</code>.</p>
+            <p class="text-sm text-muted-foreground">Paste the full response from <code class="rounded bg-muted px-1">chatgpt.com/api/auth/session</code>.</p>
             <textarea
               id="chatgpt-session-json"
               v-model="chatgptSessionJson"
@@ -841,7 +850,7 @@ onBeforeUnmount(() => {
               data-lpignore="true"
               data-1p-ignore="true"
               :disabled="isLoading"
-              placeholder='{"accessToken":"...","expires":"...","account":{"id":"...","planType":"free"}}'
+              :placeholder="chatgptSessionPlaceholder"
               class="min-h-36 w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
             />
           </div>
