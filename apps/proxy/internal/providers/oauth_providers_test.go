@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -772,12 +773,16 @@ func TestAntigravitySanitizesUnsupportedToolSchemaFields(t *testing.T) {
 				"type":                 "object",
 				"additionalProperties": false,
 				"properties": map[string]any{
-					"timeout": map[string]any{"type": "integer", "exclusiveMinimum": 0, "maximum": 120000},
+					"timeout": map[string]any{"type": "integer", "exclusiveMinimum": 0, "maximum": 120000, "default": 120000},
 					"options": map[string]any{"type": "object", "properties": map[string]any{
 						"retries": map[string]any{"type": []any{"integer", "null"}, "minimum": 1, "exclusiveMaximum": 5},
 					}},
+					"mode": map[string]any{"anyOf": []any{
+						map[string]any{"const": "fast"},
+						map[string]any{"const": "safe"},
+					}},
 				},
-				"required": []any{"timeout"},
+				"required": []any{"timeout", "missing"},
 			},
 		}}},
 	})
@@ -792,15 +797,62 @@ func TestAntigravitySanitizesUnsupportedToolSchemaFields(t *testing.T) {
 	if _, ok := params["additionalProperties"]; ok {
 		t.Fatalf("additionalProperties leaked: %#v", params)
 	}
+	if required := params["required"].([]any); len(required) != 1 || required[0] != "timeout" {
+		t.Fatalf("required not filtered: %#v", params["required"])
+	}
 	props := params["properties"].(map[string]any)
 	timeout := props["timeout"].(map[string]any)
-	if _, ok := timeout["exclusiveMinimum"]; ok || timeout["maximum"] != 120000 {
+	if _, ok := timeout["exclusiveMinimum"]; ok || timeout["maximum"] != nil || timeout["default"] != nil {
 		t.Fatalf("timeout schema not sanitized: %#v", timeout)
 	}
 	options := props["options"].(map[string]any)
+	if required := options["required"].([]any); len(required) != 0 {
+		t.Fatalf("nested required should default to empty: %#v", options)
+	}
 	retries := options["properties"].(map[string]any)["retries"].(map[string]any)
-	if _, ok := retries["exclusiveMaximum"]; ok || retries["minimum"] != 1 || retries["nullable"] != true {
+	if _, ok := retries["exclusiveMaximum"]; ok || retries["minimum"] != nil || retries["nullable"] != nil {
 		t.Fatalf("nested schema not sanitized: %#v", retries)
+	}
+	mode := props["mode"].(map[string]any)
+	if mode["type"] != "string" || !reflect.DeepEqual(mode["enum"], []any{"fast", "safe"}) {
+		t.Fatalf("union enum not flattened: %#v", mode)
+	}
+}
+
+func TestAntigravitySanitizesWebFetchLikeDefaultSchema(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	payload := openAIToGemini(map[string]any{
+		"messages": []any{map[string]any{"role": "user", "content": "hi"}},
+		"tools": []any{map[string]any{"type": "function", "function": map[string]any{
+			"name": "webfetch",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"url":     map[string]any{"type": "string", "description": "The URL to fetch content from", "format": "uri", "minLength": 1},
+					"format":  map[string]any{"type": "string", "enum": []any{"text", "markdown", "html"}, "default": "markdown"},
+					"timeout": map[string]any{"type": "number", "maximum": 120},
+				},
+				"required": []any{"url", "format"},
+			},
+		}}},
+	})
+
+	provider.transformAntigravityPayload(t.Context(), payload, "claude-opus-4-6-thinking", "sess")
+
+	decl := payload["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
+	props := decl["parameters"].(map[string]any)["properties"].(map[string]any)
+	url := props["url"].(map[string]any)
+	if url["format"] != nil || url["minLength"] != nil {
+		t.Fatalf("url schema not sanitized: %#v", url)
+	}
+	format := props["format"].(map[string]any)
+	if format["default"] != nil || !reflect.DeepEqual(format["enum"], []any{"text", "markdown", "html"}) {
+		t.Fatalf("format schema not sanitized: %#v", format)
+	}
+	timeout := props["timeout"].(map[string]any)
+	if timeout["maximum"] != nil {
+		t.Fatalf("timeout schema not sanitized: %#v", timeout)
 	}
 }
 

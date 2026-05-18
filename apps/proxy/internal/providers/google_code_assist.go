@@ -634,12 +634,15 @@ func normalizeClaudeTools(payload map[string]any) {
 			if params == nil {
 				params = map[string]any{"type": "object", "properties": map[string]any{}}
 			}
-			params = sanitizeGoogleFunctionSchema(params)
+			params = sanitizeAntigravityClaudeToolSchema(params)
 			if params["type"] == nil {
 				params["type"] = "object"
 			}
 			if params["properties"] == nil {
 				params["properties"] = map[string]any{}
+			}
+			if params["required"] == nil {
+				params["required"] = []any{}
 			}
 			decl["parameters"] = params
 		}
@@ -2098,6 +2101,215 @@ func sanitizeGoogleFunctionSchema(schema map[string]any) map[string]any {
 		}
 	}
 	return out
+}
+
+func sanitizeAntigravityClaudeToolSchema(schema map[string]any) map[string]any {
+	if schema == nil {
+		return map[string]any{"type": "object", "properties": map[string]any{}, "required": []any{}}
+	}
+	schema = flattenAntigravityClaudeUnion(schema)
+	out := map[string]any{}
+	for key, value := range schema {
+		switch key {
+		case "type":
+			if typ := normalizeSchemaType(value); typ != "" {
+				out["type"] = typ
+			}
+		case "properties":
+			props, _ := value.(map[string]any)
+			cleaned := map[string]any{}
+			for name, rawProp := range props {
+				if prop, ok := rawProp.(map[string]any); ok {
+					cleaned[name] = sanitizeAntigravityClaudeToolSchema(prop)
+				}
+			}
+			out["properties"] = cleaned
+		case "items":
+			if items, ok := value.(map[string]any); ok {
+				out["items"] = sanitizeAntigravityClaudeToolSchema(items)
+			}
+		case "description", "enum":
+			out[key] = value
+		}
+	}
+	if value, ok := schema["const"]; ok && out["enum"] == nil {
+		out["enum"] = []any{value}
+	}
+	if out["type"] == nil {
+		out["type"] = inferAntigravityClaudeSchemaType(out)
+	}
+	if out["type"] == "object" {
+		props, _ := out["properties"].(map[string]any)
+		if props == nil {
+			props = map[string]any{}
+			out["properties"] = props
+		}
+		out["required"] = filteredSchemaRequired(schema["required"], props)
+	}
+	if out["type"] == "array" && out["items"] == nil {
+		out["items"] = map[string]any{}
+	}
+	return out
+}
+
+func flattenAntigravityClaudeUnion(schema map[string]any) map[string]any {
+	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
+		options := mapSlice(schema[key])
+		if len(options) == 0 {
+			continue
+		}
+		mergedEnum, enumOK := enumFromSchemaUnion(options)
+		base := cloneSchemaWithoutUnions(schema)
+		if enumOK {
+			base["enum"] = mergedEnum
+			if base["type"] == nil {
+				base["type"] = inferEnumType(mergedEnum)
+			}
+			return base
+		}
+		best := bestSchemaUnionOption(options)
+		for baseKey, baseValue := range base {
+			if _, exists := best[baseKey]; !exists {
+				best[baseKey] = baseValue
+			}
+		}
+		return best
+	}
+	return schema
+}
+
+func enumFromSchemaUnion(options []map[string]any) ([]any, bool) {
+	values := []any{}
+	for _, option := range options {
+		if normalizeSchemaType(option["type"]) == "null" {
+			continue
+		}
+		if value, ok := option["const"]; ok {
+			values = append(values, value)
+			continue
+		}
+		if enumValues := anySlice(option["enum"]); len(enumValues) > 0 {
+			values = append(values, enumValues...)
+			continue
+		}
+		return nil, false
+	}
+	return values, len(values) > 0
+}
+
+func bestSchemaUnionOption(options []map[string]any) map[string]any {
+	best := map[string]any{}
+	bestScore := -1
+	for _, option := range options {
+		if normalizeSchemaType(option["type"]) == "null" {
+			continue
+		}
+		score := schemaUnionOptionScore(option)
+		if score > bestScore {
+			bestScore = score
+			best = cloneAnyMap(option)
+		}
+	}
+	if bestScore == -1 && len(options) > 0 {
+		best = cloneAnyMap(options[0])
+	}
+	return best
+}
+
+func schemaUnionOptionScore(schema map[string]any) int {
+	switch normalizeSchemaType(schema["type"]) {
+	case "object":
+		if props, _ := schema["properties"].(map[string]any); len(props) > 0 {
+			return 60
+		}
+		return 50
+	case "array":
+		if schema["items"] != nil {
+			return 45
+		}
+		return 40
+	case "string":
+		if len(anySlice(schema["enum"])) > 0 {
+			return 35
+		}
+		return 30
+	case "number", "integer":
+		return 20
+	case "boolean":
+		return 10
+	}
+	if schema["properties"] != nil {
+		return 55
+	}
+	if schema["items"] != nil {
+		return 42
+	}
+	if schema["const"] != nil || schema["enum"] != nil {
+		return 32
+	}
+	return 1
+}
+
+func cloneSchemaWithoutUnions(schema map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range schema {
+		switch key {
+		case "anyOf", "oneOf", "allOf":
+			continue
+		default:
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func filteredSchemaRequired(raw any, props map[string]any) []any {
+	required := []any{}
+	seen := map[string]struct{}{}
+	for _, value := range anySlice(raw) {
+		name := stringValue(value)
+		if name == "" {
+			continue
+		}
+		if _, ok := props[name]; !ok {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		required = append(required, name)
+	}
+	return required
+}
+
+func inferAntigravityClaudeSchemaType(schema map[string]any) string {
+	if schema["properties"] != nil {
+		return "object"
+	}
+	if schema["items"] != nil {
+		return "array"
+	}
+	if enumValues := anySlice(schema["enum"]); len(enumValues) > 0 {
+		return inferEnumType(enumValues)
+	}
+	return "object"
+}
+
+func inferEnumType(values []any) string {
+	for _, value := range values {
+		switch value.(type) {
+		case string:
+			return "string"
+		case bool:
+			return "boolean"
+		case float64, float32:
+			return "number"
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+			return "integer"
+		}
+	}
+	return "string"
 }
 
 func schemaTypeAllowsNull(value any) bool {
