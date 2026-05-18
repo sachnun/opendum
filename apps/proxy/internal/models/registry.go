@@ -421,7 +421,7 @@ func (r *Registry) SuggestedModels(model string, provider *string, candidates []
 
 	useProviderPrefix := false
 	suggestionCandidates := []suggestionCandidate{}
-	if len(candidates) == 0 {
+	if candidates == nil {
 		if provider != nil {
 			providerCandidates := r.suggestionProviders[*provider]
 			if len(providerCandidates) > 0 {

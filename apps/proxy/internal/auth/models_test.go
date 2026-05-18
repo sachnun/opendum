@@ -137,3 +137,25 @@ func TestValidateModelForUserHidesAPIKeyModelAccessDenials(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateModelForUserDoesNotSuggestWhenNoUsableCandidates(t *testing.T) {
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	service := NewService(nil, nil, registry)
+
+	result, err := service.ValidateModelForUser(context.Background(), "user_1", "clod opus 4.6", ModelAccess{Mode: "whitelist", Models: []string{"gemini-2.5-flash-lite"}})
+	if err != nil {
+		t.Fatalf("ValidateModelForUser error: %v", err)
+	}
+	if result.Valid {
+		t.Fatal("ValidateModelForUser returned valid result")
+	}
+	if strings.Contains(result.Error, "claude-opus-4-6") || strings.Contains(result.Error, "Did you mean:") {
+		t.Fatalf("unexpected suggestion = %q", result.Error)
+	}
+	if !strings.Contains(result.Error, "Use GET /v1/models") {
+		t.Fatalf("error = %q", result.Error)
+	}
+}
