@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MaintenerAuditUser } from "../../lib/dashboard-api-types";
+import type { MaintenerAuditSearchUser, MaintenerAuditUser } from "../../lib/dashboard-api-types";
 
 const open = defineModel<boolean>("open", { default: false });
 
@@ -12,7 +12,7 @@ const PAGE_SIZE = 12;
 const SCROLL_LOAD_THRESHOLD = 48;
 
 const query = ref("");
-const users = ref<MaintenerAuditUser[]>([]);
+const users = ref<MaintenerAuditSearchUser[]>([]);
 const isSearching = ref(false);
 const isLoadingMore = ref(false);
 const hasMore = ref(false);
@@ -22,7 +22,7 @@ const errorMessage = ref("");
 let searchRequestId = 0;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-function userInitial(user: MaintenerAuditUser) {
+function userInitial(user: MaintenerAuditSearchUser) {
   return (user.name?.[0] || user.email?.[0] || "U").toUpperCase();
 }
 
@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
   clearSearchTimer();
 });
 
-async function selectUser(user: MaintenerAuditUser) {
+async function selectUser(user: MaintenerAuditSearchUser) {
   selectingUserId.value = user.id;
   errorMessage.value = "";
 
@@ -159,7 +159,7 @@ async function selectUser(user: MaintenerAuditUser) {
   <UiDialog v-model:open="open" :ui="{ content: 'sm:max-w-lg' }">
     <template #content>
       <div class="space-y-1.5 pr-6">
-        <h2 class="text-lg font-semibold leading-none tracking-tight">Audit User</h2>
+        <h2 class="text-lg font-semibold leading-none tracking-tight">Auditing</h2>
         <p class="text-sm text-muted-foreground sm:hidden">Search account for audit mode.</p>
         <p class="hidden text-sm text-muted-foreground sm:block">Search an account to view it in read-only audit mode.</p>
       </div>
@@ -196,6 +196,10 @@ async function selectUser(user: MaintenerAuditUser) {
               <img v-if="user.image" :src="user.image" alt="" class="aspect-square size-full">
               <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
                 {{ userInitial(user) }}
+              </span>
+              <span v-if="user.hasProviderIssue" class="absolute bottom-0 left-0 flex size-2.5" aria-label="Provider issue">
+                <span class="absolute inline-flex size-full animate-ping rounded-full bg-red-500 opacity-75" />
+                <span class="relative inline-flex size-2.5 rounded-full bg-red-500 ring-2 ring-background" />
               </span>
             </span>
             <span class="min-w-0 flex-1">

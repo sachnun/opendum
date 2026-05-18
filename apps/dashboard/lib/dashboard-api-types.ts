@@ -41,8 +41,12 @@ export interface PointStatusData {
 
 export type MaintenerAuditUser = DashboardUserIdentity;
 
+export type MaintenerAuditSearchUser = DashboardUserIdentity & {
+  hasProviderIssue: boolean;
+};
+
 export interface MaintenerAuditUserListResult {
-  users: MaintenerAuditUser[];
+  users: MaintenerAuditSearchUser[];
   hasMore: boolean;
   nextOffset: number;
 }
