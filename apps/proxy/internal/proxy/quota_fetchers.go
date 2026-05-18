@@ -160,7 +160,7 @@ func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 }
 
 func antigravityMaxRequests(model, tier string) float64 {
-	if tierMap := antigravityQuotaMaxRequests[tier]; tierMap != nil {
+	if tierMap := antigravityQuotaMaxRequests[normalizeAntigravityQuotaTier(tier)]; tierMap != nil {
 		if value := tierMap[model]; value > 0 {
 			return value
 		}
@@ -171,6 +171,19 @@ func antigravityMaxRequests(model, tier string) float64 {
 		}
 	}
 	return 100
+}
+
+func normalizeAntigravityQuotaTier(tier string) string {
+	switch strings.ToLower(strings.TrimSpace(tier)) {
+	case "standard-tier", "paid":
+		return "standard-tier"
+	case "legacy-tier":
+		return "legacy-tier"
+	case "free-tier", "free":
+		return "free-tier"
+	default:
+		return strings.ToLower(strings.TrimSpace(tier))
+	}
 }
 
 func parseResetISO(value any) *string {

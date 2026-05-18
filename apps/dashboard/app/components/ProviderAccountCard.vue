@@ -435,41 +435,18 @@ function isPreviousDayLabel(time: string): boolean {
   return date < today;
 }
 
-function formatTierLabel(tier: string): string {
-  const normalized = tier.trim().toLowerCase();
-
-  switch (normalized) {
-    case "free":
-      return "Free";
-    case "plus":
-      return "Plus";
-    case "pro":
-      return "Pro";
-    case "team":
-      return "Team";
-    case "go":
-      return "Go";
-    case "business":
-      return "Business";
-    case "enterprise":
-      return "Enterprise";
-    case "edu":
-    case "education":
-      return "Edu";
-    case "paid":
-    case "standard-tier":
-      return "Paid";
-    default:
-      return normalized
-        .split(/[-_\s]+/)
-        .filter(Boolean)
-        .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-        .join(" ");
-  }
+function isPaidTierValue(tier: string): boolean {
+  return ["paid", "standard-tier", "plus", "pro", "prolite", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu", "education", "hc"].includes(tier.trim().toLowerCase());
 }
 
-function isPaidTierValue(tier: string): boolean {
-  return ["paid", "standard-tier", "plus", "pro", "team", "go", "business", "enterprise", "edu", "education"].includes(tier.trim().toLowerCase());
+function isFreeTierValue(tier: string): boolean {
+  return ["free", "free-tier", "legacy-tier"].includes(tier.trim().toLowerCase());
+}
+
+function formatTierBadgeLabel(tier: string): "Paid" | "Free" | "" {
+  if (isPaidTierValue(tier)) return "Paid";
+  if (isFreeTierValue(tier)) return "Free";
+  return "";
 }
 
 function maskSensitiveText(value: string): string {
@@ -524,8 +501,9 @@ const effectiveTier = computed(() => {
   if (props.account.provider === "codex" && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
   return props.account.tier;
 });
-const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "free");
-const showTierBadge = computed(() => props.showTier && normalizedTier.value !== "unknown" && normalizedTier.value !== "guest");
+const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "");
+const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value));
+const showTierBadge = computed(() => props.showTier && tierBadgeLabel.value !== "");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
 const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? QUOTA_SKELETON_ROWS.copilot);
 const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
@@ -1052,7 +1030,7 @@ function cancelErrorPreviewPointer() {
           <UiCardTitle class="min-w-0 truncate text-lg">{{ accountTitle }}</UiCardTitle>
           <div class="flex shrink-0 items-center justify-end gap-1 whitespace-nowrap">
             <UiBadge v-if="showTierBadge" variant="outline" :class="isPaidTierValue(normalizedTier) ? 'border-green-500 text-green-600' : ''">
-              {{ formatTierLabel(normalizedTier) }}
+              {{ tierBadgeLabel }}
             </UiBadge>
             <UiBadge v-if="account.status === 'failed'" variant="outline" class="border-destructive/60 text-destructive gap-1">
               <UiIcon name="i-lucide-alert-circle" class="size-3" />

@@ -449,7 +449,7 @@ func TestAntigravityFetchAccountInfoUsesStandardDiscoveryMetadata(t *testing.T) 
 	})}
 
 	info := provider.fetchAccountInfo(t.Context(), client, "token")
-	if info.projectID != "project-1" || info.tier != "free" || info.email != "user@example.com" {
+	if info.projectID != "project-1" || info.tier != "standard-tier" || info.email != "user@example.com" {
 		t.Fatalf("account info = %#v", info)
 	}
 	if _, ok := loadPayload["cloudaicompanionProject"]; ok {
@@ -838,7 +838,7 @@ func TestAntigravityFetchAccountInfoOnboardsWithAllowedTier(t *testing.T) {
 	})}
 
 	info := provider.fetchAccountInfo(t.Context(), client, "token")
-	if info.projectID != "onboard-project" || info.tier != "free" || info.email != "new@example.com" {
+	if info.projectID != "onboard-project" || info.tier != "legacy-tier" || info.email != "new@example.com" {
 		t.Fatalf("account info = %#v", info)
 	}
 	if onboardPayload["tierId"] != "legacy-tier" {

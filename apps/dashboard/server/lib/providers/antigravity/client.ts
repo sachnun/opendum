@@ -21,6 +21,15 @@ function isTokenExpired(expiresAt: Date): boolean {
   return Date.now() > expiresAt.getTime() - bufferMs;
 }
 
+function normalizeAntigravityTierId(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function isPaidAntigravityTierId(value: string): boolean {
+  const normalized = normalizeAntigravityTierId(value);
+  return normalized === "paid" || normalized === "standard-tier";
+}
+
 type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "email">;
 
 export const antigravityProvider = {
@@ -154,7 +163,7 @@ async function fetchAccountInfo(
     pluginType: "GEMINI",
   };
 
-  let detectedTier = "free";
+  let detectedTier = "free-tier";
   let projectId = "";
   let currentTier: Record<string, unknown> | null = null;
   let allowedTiers: Array<Record<string, unknown>> = [];
@@ -185,20 +194,21 @@ async function fetchAccountInfo(
       currentTier = (data.currentTier as Record<string, unknown>) ?? null;
       allowedTiers = (data.allowedTiers as Array<Record<string, unknown>>) ?? [];
 
+      const currentTierId = extractTierId(currentTier);
+      if (currentTierId) {
+        detectedTier = currentTierId;
+      }
+
       const defaultTier = allowedTiers.find((tier) => tier.isDefault);
-      if (defaultTier && typeof defaultTier.id === "string") {
-        const tierId = defaultTier.id;
-        if (tierId !== "legacy-tier" && !tierId.includes("free") && !tierId.includes("zero")) {
-          detectedTier = "paid";
-        }
+      const defaultTierId = extractTierId(defaultTier ?? null);
+      if (!currentTierId && defaultTierId) {
+        detectedTier = defaultTierId;
       }
 
       const paidTier = data.paidTier as Record<string, unknown> | undefined;
-      if (paidTier && typeof paidTier.id === "string") {
-        const paidTierId = paidTier.id;
-        if (!paidTierId.includes("free") && !paidTierId.includes("zero")) {
-          detectedTier = "paid";
-        }
+      const paidTierId = extractTierId(paidTier ?? null);
+      if (!currentTierId && paidTierId && isPaidAntigravityTierId(paidTierId)) {
+        detectedTier = paidTierId;
       }
 
       if (projectId) break;
@@ -263,6 +273,11 @@ function extractProjectId(data: Record<string, unknown>): string {
   return "";
 }
 
+function extractTierId(tier: Record<string, unknown> | null): string {
+  if (!tier) return "";
+  return normalizeAntigravityTierId(tier.id) || normalizeAntigravityTierId(tier.name);
+}
+
 async function onboardUser(
   accessToken: string,
   allowedTiers: Array<Record<string, unknown>>,
@@ -324,8 +339,7 @@ async function onboardUser(
       const lroResponse = (lroData.response ?? lroData) as Record<string, unknown>;
       const projectId = extractProjectId(lroResponse);
       if (projectId) {
-        const tier = tierId.includes("free") || tierId.includes("legacy") ? "free" : "paid";
-        return { projectId, tier };
+        return { projectId, tier: normalizeAntigravityTierId(tierId) || "free-tier" };
       }
     } catch {
       continue;

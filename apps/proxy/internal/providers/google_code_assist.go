@@ -1080,7 +1080,7 @@ type googleCodeAssistAccountInfo struct {
 }
 
 func (p googleCodeAssistProvider) fetchAccountInfo(ctx context.Context, client *http.Client, accessToken string) googleCodeAssistAccountInfo {
-	info := googleCodeAssistAccountInfo{tier: "free"}
+	info := googleCodeAssistAccountInfo{tier: "free-tier"}
 	loadEndpoints := p.loadEndpoints
 	if len(loadEndpoints) == 0 {
 		loadEndpoints = []string{"https://cloudcode-pa.googleapis.com", p.endpoint}
@@ -1118,11 +1118,17 @@ func (p googleCodeAssistProvider) fetchAccountInfo(ctx context.Context, client *
 		if currentTier := data["currentTier"]; currentTier != nil {
 			currentTierPresent = true
 		}
+		currentTierID := extractGoogleTier(data)
+		if currentTierID != "" {
+			info.tier = currentTierID
+		}
 		if tiers := extractAllowedTiers(data); len(tiers) > 0 {
 			allowedTiers = tiers
 		}
-		if tier := detectAntigravityTier(data); tier != "" {
-			info.tier = tier
+		if currentTierID == "" {
+			if tier := detectAntigravityTier(data); tier != "" {
+				info.tier = tier
+			}
 		}
 		if info.projectID != "" {
 			break
@@ -1176,7 +1182,7 @@ func (p googleCodeAssistProvider) onboardUser(ctx context.Context, client *http.
 			data = response
 		}
 		if project := extractGoogleProjectID(data); project != "" {
-			return googleCodeAssistAccountInfo{projectID: project, tier: tierFromID(onboardTier)}
+			return googleCodeAssistAccountInfo{projectID: project, tier: normalizeGoogleTierID(onboardTier)}
 		}
 	}
 	return googleCodeAssistAccountInfo{}
@@ -1247,13 +1253,13 @@ func extractGoogleProjectID(data map[string]any) string {
 
 func extractGoogleTier(data map[string]any) string {
 	if value := stringValue(data["currentTier"]); value != "" {
-		return value
+		return normalizeGoogleTierID(value)
 	}
 	if tier, ok := data["currentTier"].(map[string]any); ok {
 		if id := stringValue(tier["id"]); id != "" {
-			return id
+			return normalizeGoogleTierID(id)
 		}
-		return stringValue(tier["name"])
+		return normalizeGoogleTierID(stringValue(tier["name"]))
 	}
 	return ""
 }
@@ -1274,13 +1280,13 @@ func detectAntigravityTier(data map[string]any) string {
 	detected := ""
 	for _, tier := range extractAllowedTiers(data) {
 		if tier["isDefault"] == true {
-			detected = tierFromID(stringValue(tier["id"]))
+			detected = normalizeGoogleTierID(stringValue(tier["id"]))
 			break
 		}
 	}
 	if paidTier, ok := data["paidTier"].(map[string]any); ok {
-		if id := stringValue(paidTier["id"]); id != "" && tierFromID(id) == "paid" {
-			return "paid"
+		if id := normalizeGoogleTierID(stringValue(paidTier["id"])); id != "" && isPaidGoogleTierID(id) {
+			return id
 		}
 	}
 	return detected
@@ -1308,12 +1314,18 @@ func selectOnboardTier(fallback string, allowedTiers []map[string]any) string {
 	return "free-tier"
 }
 
-func tierFromID(id string) string {
-	lower := strings.ToLower(id)
-	if lower == "" || strings.Contains(lower, "free") || strings.Contains(lower, "zero") || strings.Contains(lower, "legacy") {
-		return "free"
+func normalizeGoogleTierID(id string) string {
+	return strings.ToLower(strings.TrimSpace(id))
+}
+
+func isPaidGoogleTierID(id string) bool {
+	lower := normalizeGoogleTierID(id)
+	switch lower {
+	case "paid", "standard-tier":
+		return true
+	default:
+		return false
 	}
-	return "paid"
 }
 
 func (p googleCodeAssistProvider) setGoogleHeaders(req *http.Request, accessToken string, stream bool) {

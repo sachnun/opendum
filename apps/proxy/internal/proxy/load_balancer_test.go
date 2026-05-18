@@ -71,3 +71,12 @@ func TestPrioritizeAccountsTreatsCodexPaidPlansAsPaid(t *testing.T) {
 		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
 	}
 }
+
+func TestAntigravityMaxRequestsNormalizesStoredTierAliases(t *testing.T) {
+	if got := antigravityMaxRequests("claude-opus-4-6", "paid"); got != 150 {
+		t.Fatalf("paid max requests = %v, want 150", got)
+	}
+	if got := antigravityMaxRequests("claude-opus-4-6", "free"); got != 50 {
+		t.Fatalf("free max requests = %v, want 50", got)
+	}
+}
