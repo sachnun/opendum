@@ -6,7 +6,7 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "../../lib/navigation";
-import type { AccountOverviewData, AccountPingData } from "../../lib/dashboard-api-types";
+import type { AccountOverviewData, AccountPingData, PointStatusData } from "../../lib/dashboard-api-types";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
 import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
@@ -183,9 +183,13 @@ const HEADER_OFFSET = 112;
 const PENDING_SCROLL_RETRIES = 20;
 const PENDING_SCROLL_DELAY_MS = 60;
 const ACCOUNT_SUMMARY_REFRESH_MS = 30_000;
+const POINT_STATUS_REFRESH_MS = 15_000;
 let accountSummaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountSummaryRefreshInFlight: Promise<void> | null = null;
 let accountSummaryRefreshQueued = false;
+let pointStatusRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let pointStatusRefreshInFlight: Promise<void> | null = null;
+let pointStatusRefreshQueued = false;
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
@@ -423,7 +427,59 @@ function startAccountSummaryRefresh() {
   }, ACCOUNT_SUMMARY_REFRESH_MS);
 }
 
+function applyPointStatus(status: PointStatusData) {
+  if (dashboardMe.value) {
+    dashboardMe.value = {
+      ...dashboardMe.value,
+      points: { balance: status.balance },
+    };
+  }
+
+  dashboardInvalidation.patchApiKeyRoamingPoints(status.roamingPointsByApiKeyId);
+}
+
+async function refreshPointStatusOnce() {
+  if (pointStatusRefreshInFlight) {
+    pointStatusRefreshQueued = true;
+    return;
+  }
+
+  pointStatusRefreshInFlight = dashboardApi.points.status().then(applyPointStatus);
+  try {
+    await pointStatusRefreshInFlight;
+  } catch (error) {
+    console.error("Failed to refresh points:", error);
+  } finally {
+    pointStatusRefreshInFlight = null;
+    const shouldRefreshAgain = pointStatusRefreshQueued;
+    pointStatusRefreshQueued = false;
+
+    if (shouldRefreshAgain) {
+      void refreshPointStatusOnce();
+    }
+  }
+}
+
+function stopPointStatusRefresh() {
+  pointStatusRefreshQueued = false;
+  if (!pointStatusRefreshTimer) return;
+
+  clearInterval(pointStatusRefreshTimer);
+  pointStatusRefreshTimer = null;
+}
+
+function startPointStatusRefresh() {
+  if (pointStatusRefreshTimer) return;
+
+  void refreshPointStatusOnce();
+  pointStatusRefreshTimer = setInterval(() => {
+    void refreshPointStatusOnce();
+  }, POINT_STATUS_REFRESH_MS);
+}
+
 onMounted(() => {
+  startPointStatusRefresh();
+
   watch(shouldRefreshAccountSummary, (shouldRefresh) => {
     if (shouldRefresh) {
       startAccountSummaryRefresh();
@@ -503,6 +559,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopAccountSummaryRefresh();
+  stopPointStatusRefresh();
 });
 
 async function handleSignOut() {

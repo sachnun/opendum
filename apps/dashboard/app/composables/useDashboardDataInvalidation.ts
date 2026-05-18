@@ -106,6 +106,15 @@ function patchApiKey(apiKeyId: string, patch: Partial<ApiKeyListItem>) {
   }));
 }
 
+function patchApiKeyRoamingPoints(roamingPointsByApiKeyId: Record<string, number>) {
+  patchNuxtData<ApiKeyPageData>(dashboardDataKeys.apiKeys, (value) => ({
+    ...value,
+    apiKeys: value.apiKeys.map((apiKey) => (Object.prototype.hasOwnProperty.call(roamingPointsByApiKeyId, apiKey.id)
+      ? { ...apiKey, roamingPointsUsed: roamingPointsByApiKeyId[apiKey.id] ?? 0 }
+      : apiKey)),
+  }));
+}
+
 function removeApiKey(apiKeyId: string) {
   patchNuxtData<ApiKeyPageData>(dashboardDataKeys.apiKeys, (value) => {
     const { [apiKeyId]: _removedRateLimits, ...rateLimitsByKeyId } = value.options.rateLimitsByKeyId;
@@ -187,6 +196,7 @@ export function useDashboardDataInvalidation() {
     clearModelAvailability,
     patchAccountNameInOptions,
     patchApiKey,
+    patchApiKeyRoamingPoints,
     patchDisabledModels,
     patchModelEnabled,
     patchPinnedProvider,

@@ -11,7 +11,7 @@ import { createServiceTimer } from "../utils/timing";
 import { compareModelEntries } from "../../lib/model-sort";
 import type { ActionResult } from "../utils/api";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
-import { API_KEY_UPDATE_POINT_COST, debitUserPoints } from "./points";
+import { API_KEY_UPDATE_POINT_COST, ROAMING_POINT_COST, debitUserPoints } from "./points";
 
 export const apiKeyIdInputSchema = z.object({ id: z.string() });
 export const createApiKeyInputSchema = z.object({ name: z.string().optional(), expiresAt: z.coerce.date().nullable().optional() }).optional();
@@ -24,7 +24,6 @@ const apiKeyAccountAccessModeSchema = z.enum(["all", "whitelist", "blacklist"]);
 const API_KEY_MIN_LENGTH = 3;
 const API_KEY_MAX_LENGTH = 100;
 const API_KEY_ALLOWED_PATTERN = /^[A-Za-z0-9_-]+$/;
-const ROAMING_POINT_COST = 2;
 const rateLimitRuleSchema = z.object({
   target: z.string(),
   targetType: z.enum(["model", "family"]),

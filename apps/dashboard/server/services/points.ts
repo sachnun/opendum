@@ -1,10 +1,11 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
 
 import { db, type Database } from "../lib/db";
-import { pointTransaction, userPointBalance } from "../lib/db/schema";
+import { pointTransaction, providerAccount, proxyApiKey, usageLog, userPointBalance } from "../lib/db/schema";
 
 export const INITIAL_POINT_BALANCE = 15;
 export const API_KEY_UPDATE_POINT_COST = 100;
+export const ROAMING_POINT_COST = 2;
 
 type PointDatabase = Pick<Database, "insert" | "select" | "update">;
 
@@ -43,6 +44,42 @@ async function ensureUserPointBalanceWithClient(client: PointDatabase, userId: s
 
 export async function ensureUserPointBalance(userId: string): Promise<number> {
   return db.transaction((tx) => ensureUserPointBalanceWithClient(tx, userId));
+}
+
+export async function getUserPointStatus(userId: string): Promise<{ balance: number; roamingPointsByApiKeyId: Record<string, number> }> {
+  const [balance, roamingApiKeys] = await Promise.all([
+    ensureUserPointBalance(userId),
+    db
+      .select({ id: proxyApiKey.id })
+      .from(proxyApiKey)
+      .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.roamingEnabled, true))),
+  ]);
+  const apiKeyIds = roamingApiKeys.map((apiKey) => apiKey.id);
+  const roamingPointsByApiKeyId: Record<string, number> = Object.fromEntries(apiKeyIds.map((id) => [id, 0]));
+
+  if (apiKeyIds.length > 0) {
+    const rows = await db
+      .select({
+        apiKeyId: usageLog.proxyApiKeyId,
+        pointsUsed: sql<number>`coalesce(count(*) * ${ROAMING_POINT_COST}, 0)`,
+      })
+      .from(usageLog)
+      .innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id))
+      .where(and(
+        eq(usageLog.userId, userId),
+        inArray(usageLog.proxyApiKeyId, apiKeyIds),
+        ne(providerAccount.userId, userId),
+        sql`${usageLog.statusCode} >= 200`,
+        sql`${usageLog.statusCode} < 400`,
+      ))
+      .groupBy(usageLog.proxyApiKeyId);
+
+    for (const row of rows) {
+      if (row.apiKeyId) roamingPointsByApiKeyId[row.apiKeyId] = Number(row.pointsUsed ?? 0);
+    }
+  }
+
+  return { balance, roamingPointsByApiKeyId };
 }
 
 export async function debitUserPoints(client: PointDatabase, userId: string, amount: number, type: string): Promise<{ success: true; balance: number } | { success: false; balance: number }> {

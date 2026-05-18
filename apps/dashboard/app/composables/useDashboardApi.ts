@@ -14,6 +14,7 @@ import type {
   AccountQuotaInfo,
   ModelListItem,
   ModelSearchItem,
+  PointStatusData,
   PlaygroundOptions,
   PlaygroundProxyAuth,
   ProviderDetailData,
@@ -38,6 +39,9 @@ export function useDashboardApi() {
   return {
     me: {
       get: () => dashboardFetch<DashboardMeData>("/api/dashboard/me"),
+    },
+    points: {
+      status: () => dashboardFetch<PointStatusData>("/api/dashboard/points"),
     },
     accounts: {
       list: () => dashboardFetch("/api/dashboard/accounts"),

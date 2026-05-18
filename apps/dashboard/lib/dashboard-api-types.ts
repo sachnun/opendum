@@ -34,6 +34,11 @@ export interface DashboardMeData {
   audit?: DashboardAuditInfo;
 }
 
+export interface PointStatusData {
+  balance: number;
+  roamingPointsByApiKeyId: Record<string, number>;
+}
+
 export type MaintenerAuditUser = DashboardUserIdentity;
 
 export interface MaintenerAuditUserListResult {
