@@ -6,6 +6,7 @@ export interface NavItem {
   href: string;
   icon: string;
   disabled?: boolean;
+  collapsible?: boolean;
   children?: NavSubItem[];
 }
 

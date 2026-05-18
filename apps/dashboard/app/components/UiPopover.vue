@@ -12,6 +12,7 @@ const props = withDefaults(
       alignOffset?: number;
       side?: PopoverSide;
       sideOffset?: number;
+      arrowClass?: string | string[];
       class?: string;
     };
     modal?: boolean;
@@ -43,9 +44,9 @@ const open = defineModel<boolean>("open", { default: false });
           content.class,
           props.class,
         )"
-      >
+        >
         <slot name="content" />
-        <PopoverArrow class="fill-popover" />
+        <PopoverArrow :class="cn('fill-popover', content.arrowClass)" />
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>

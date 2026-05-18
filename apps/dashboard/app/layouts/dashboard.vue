@@ -62,6 +62,16 @@ const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-s
 
 const supportNavigation = computed<NavItem[]>(() => [
   {
+    name: "Point",
+    href: "/dashboard/point",
+    icon: "i-lucide-coins",
+    collapsible: false,
+    children: [
+      { name: "Topup", href: "/dashboard/point/topup", disabled: true, tag: "soon" },
+      { name: "Withdraw", href: "/dashboard/point/withdraw", disabled: true, tag: "soon" },
+    ],
+  },
+  {
     name: "Tools",
     href: "/dashboard/tools",
     icon: "i-lucide-wrench",
@@ -219,12 +229,16 @@ function isSupportItemActive(item: NavItem) {
   return isActive(item.href) || Boolean(item.children?.some((subItem) => isSubItemActive(subItem)));
 }
 
+function isSupportItemCollapsible(item: NavItem) {
+  return item.collapsible !== false;
+}
+
 function isSupportItemOpen(item: NavItem) {
-  return !item.children?.length || supportItemOpen[item.name] !== false;
+  return !item.children?.length || !isSupportItemCollapsible(item) || supportItemOpen[item.name] !== false;
 }
 
 function toggleSupportItem(item: NavItem) {
-  if (!item.children?.length) return;
+  if (!item.children?.length || !isSupportItemCollapsible(item)) return;
 
   supportItemOpen[item.name] = !isSupportItemOpen(item);
 }
@@ -755,8 +769,15 @@ async function handleAuditSelected() {
         <div class="shrink-0">
           <nav class="mt-4 space-y-1 border-t border-border/60 pt-4">
             <div v-for="item in supportNavigation" :key="item.name" class="space-y-1">
+              <div
+                v-if="item.children?.length && !isSupportItemCollapsible(item)"
+                class="group flex cursor-default items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
+              >
+                <UiIcon :name="item.icon" class="size-4 text-muted-foreground" />
+                <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+              </div>
               <button
-                v-if="item.children?.length"
+                v-else-if="item.children?.length"
                 type="button"
                 :aria-expanded="isSupportItemOpen(item)"
                 :class="[
@@ -840,7 +861,7 @@ async function handleAuditSelected() {
           </div>
 
           <div class="flex items-center gap-1.5 sm:gap-2">
-            <UiPopover v-model:open="userMenuOpen" :content="{ align: 'end', sideOffset: 8 }">
+            <UiPopover v-model:open="userMenuOpen" :content="{ align: 'end', sideOffset: 8, arrowClass: 'translate-x-5' }">
               <button
                 type="button"
                 aria-label="Open account menu"
@@ -1110,8 +1131,15 @@ async function handleAuditSelected() {
             <div class="shrink-0">
               <nav class="mt-4 space-y-1 border-t border-border/60 pt-4">
                 <div v-for="item in supportNavigation" :key="`mobile-${item.name}`" class="space-y-1">
+                  <div
+                    v-if="item.children?.length && !isSupportItemCollapsible(item)"
+                    class="group flex cursor-default items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
+                  >
+                    <UiIcon :name="item.icon" class="size-4 text-muted-foreground" />
+                    <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+                  </div>
                   <button
-                    v-if="item.children?.length"
+                    v-else-if="item.children?.length"
                     type="button"
                     :aria-expanded="isSupportItemOpen(item)"
                     :class="[
