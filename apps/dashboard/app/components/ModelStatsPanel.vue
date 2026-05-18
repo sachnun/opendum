@@ -154,7 +154,7 @@ watch(
 
 <template>
   <div class="space-y-2">
-    <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.18fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
+    <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
       <UsageStatMetric
         v-for="stat in usageStats"
         :key="stat.key"

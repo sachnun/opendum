@@ -1064,7 +1064,7 @@ function cancelErrorPreviewPointer() {
       <UiCardContent class="flex flex-1 flex-col pt-0">
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3">
-            <div class="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.18fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
+            <div class="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
               <UsageStatMetric
                 v-for="stat in usageStats"
                 :key="stat.key"
