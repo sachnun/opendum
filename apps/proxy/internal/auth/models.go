@@ -95,7 +95,7 @@ func (s *Service) invalidModelResult(provider *string, model, modelParam string,
 	suggestions := s.registry.SuggestedModels(model, provider, candidates, 5)
 	suggestionMessage := " Use GET /v1/models for the full list."
 	if len(suggestions) > 0 {
-		suggestionMessage = " Did you mean: " + strings.Join(suggestions, ", ") + "?"
+		suggestionMessage = " Did you mean: " + strings.Join(suggestions, ", ") + " ?"
 	}
 	return ModelValidationResult{Valid: false, Provider: provider, Model: model, Error: "Invalid model: " + modelParam + "." + suggestionMessage, Param: "model", Code: "invalid_model"}
 }
@@ -109,7 +109,7 @@ func keys(set map[string]struct{}) []string {
 }
 
 func (s *Service) allowedModelCandidates(provider *string, blocked map[string]struct{}) []string {
-	candidates := s.registry.AllModelsWithAliases()
+	candidates := s.registry.AllModels()
 	if provider != nil {
 		candidates = s.registry.ModelsForProvider(*provider)
 	}

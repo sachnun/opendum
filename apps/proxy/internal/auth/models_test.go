@@ -63,6 +63,26 @@ func TestValidateModelSuggestsSimilarModels(t *testing.T) {
 	}
 }
 
+func TestValidateModelSuggestionsExcludeAliases(t *testing.T) {
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	service := NewService(nil, nil, registry)
+
+	result := service.ValidateModel("mistral-large-3-675b-instruct-25122")
+	if result.Valid {
+		t.Fatal("ValidateModel returned valid result")
+	}
+	if !strings.Contains(result.Error, "Did you mean:") || !strings.Contains(result.Error, "mistral-large-3-675b") {
+		t.Fatalf("error = %q", result.Error)
+	}
+	suggestions := strings.TrimPrefix(result.Error[strings.Index(result.Error, "Did you mean: "):], "Did you mean: ")
+	if strings.Contains(suggestions, "mistral-large-3-675b-instruct-2512") || strings.Contains(suggestions, "mistralai/mistral-large") {
+		t.Fatalf("alias was suggested: %q", result.Error)
+	}
+}
+
 func TestValidateModelForUserHidesAPIKeyModelAccessDenials(t *testing.T) {
 	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
 	if err != nil {
@@ -77,7 +97,7 @@ func TestValidateModelForUserHidesAPIKeyModelAccessDenials(t *testing.T) {
 		notContain string
 	}{
 		{name: "whitelist", access: ModelAccess{Mode: "whitelist", Models: []string{"gemini-2.5-flash-lite"}}, wantModel: "gemini-2.5-flash-lite"},
-		{name: "blacklist", access: ModelAccess{Mode: "blacklist", Models: []string{"gemini-2.5-flash"}}, wantModel: "gemini-2.5-flash-lite", notContain: "Did you mean: gemini-2.5-flash?"},
+		{name: "blacklist", access: ModelAccess{Mode: "blacklist", Models: []string{"gemini-2.5-flash"}}, wantModel: "gemini-2.5-flash-lite", notContain: "Did you mean: gemini-2.5-flash ?"},
 	}
 
 	for _, tt := range tests {

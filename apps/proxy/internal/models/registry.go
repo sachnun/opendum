@@ -375,18 +375,6 @@ func (r *Registry) AllModels() []string {
 	return models
 }
 
-func (r *Registry) AllModelsWithAliases() []string {
-	values := []string{}
-	for model, info := range r.effective {
-		if len(info.Providers) == 0 {
-			continue
-		}
-		values = append(values, model)
-		values = append(values, info.Aliases...)
-	}
-	return uniqueSorted(values)
-}
-
 func (r *Registry) ModelsForProvider(provider string) []string {
 	values := []string{}
 	for model, info := range r.effective {
@@ -394,7 +382,6 @@ func (r *Registry) ModelsForProvider(provider string) []string {
 			continue
 		}
 		values = append(values, model)
-		values = append(values, info.Aliases...)
 	}
 	return uniqueSorted(values)
 }
@@ -415,7 +402,7 @@ func (r *Registry) SuggestedModels(model string, provider *string, candidates []
 			}
 		}
 		if len(candidates) == 0 {
-			candidates = r.AllModelsWithAliases()
+			candidates = r.AllModels()
 		}
 	} else {
 		candidates = uniqueSorted(candidates)
