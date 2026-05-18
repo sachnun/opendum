@@ -6,7 +6,7 @@ import type { AccountOverviewData } from "../../lib/dashboard-api-types";
 type ProviderOverview = AccountOverviewData["summaries"][ProviderAccountKey];
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
-type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string };
+type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string; getTone?: (delta: number) => StatDeltaTone };
 
 const props = defineProps<{
   provider: ProviderAccountDefinition;
@@ -97,7 +97,7 @@ const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.summary.stats.totalRequests.toLocaleString(), numericValue: props.summary.stats.totalRequests, formatDelta: formatSignedInteger },
   { key: "totalTokens", label: "Token", value: compactNumber(props.summary.stats.totalTokens), numericValue: props.summary.stats.totalTokens, formatDelta: formatSignedInteger },
   { key: "successRate", label: "Success", value: props.summary.stats.successRate === null ? "-" : `${props.summary.stats.successRate}%`, numericValue: props.summary.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
-  { key: "avgDuration", label: "Latency", value: formatDuration(props.summary.stats.avgDurationLastDay), numericValue: props.summary.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration },
+  { key: "avgDuration", label: "Latency", value: formatDuration(props.summary.stats.avgDurationLastDay), numericValue: props.summary.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration, getTone: (delta) => delta > 0 ? "negative" : "positive" },
 ]);
 const statAnimationContextKey = computed(() => {
   const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
@@ -138,7 +138,7 @@ watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
 
     nextHitEffects[item.key] = {
       text: item.formatDelta(delta),
-      tone: delta > 0 ? "positive" : "negative",
+      tone: item.getTone?.(delta) ?? (delta > 0 ? "positive" : "negative"),
       version: (nextHitEffects[item.key]?.version ?? 0) + 1,
     };
   }

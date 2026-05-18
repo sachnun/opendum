@@ -37,7 +37,7 @@ type ErrorStatusTag = {
 };
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
-type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string };
+type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string; getTone?: (delta: number) => StatDeltaTone };
 
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
@@ -512,7 +512,7 @@ const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.account.stats.totalRequests.toLocaleString(), numericValue: props.account.stats.totalRequests, formatDelta: formatSignedInteger },
   { key: "totalTokens", label: "Token", value: compactNumber(props.account.stats.totalTokens), numericValue: props.account.stats.totalTokens, formatDelta: formatSignedInteger },
   { key: "successRate", label: "Success", value: props.account.stats.successRate === null ? "-" : `${props.account.stats.successRate}%`, numericValue: props.account.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
-  { key: "avgDuration", label: "Latency", value: formatDuration(props.account.stats.avgDurationLastDay), numericValue: props.account.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration },
+  { key: "avgDuration", label: "Latency", value: formatDuration(props.account.stats.avgDurationLastDay), numericValue: props.account.stats.avgDurationLastDay ?? Number.NaN, formatDelta: formatSignedDuration, getTone: (delta) => delta > 0 ? "negative" : "positive" },
 ]);
 const statAnimationContextKey = computed(() => {
   const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
@@ -738,7 +738,7 @@ watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
 
     nextHitEffects[item.key] = {
       text: item.formatDelta(delta),
-      tone: delta > 0 ? "positive" : "negative",
+      tone: item.getTone?.(delta) ?? (delta > 0 ? "positive" : "negative"),
       version: (nextHitEffects[item.key]?.version ?? 0) + 1,
     };
   }
