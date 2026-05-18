@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -38,5 +39,27 @@ func TestSuccessRecoveryState(t *testing.T) {
 				t.Fatalf("successRecoveryState(%q, %d) = (%d, %q, %v), want (%d, %q, %v)", tt.status, tt.errors, gotErrors, gotStatus, gotUpdate, tt.wantErrors, tt.wantStatus, tt.wantUpdate)
 			}
 		})
+	}
+}
+
+func TestPrioritizeAccountsTreatsCodexPaidPlansAsPaid(t *testing.T) {
+	plus := "plus"
+	pro := "pro"
+	free := "free"
+	accounts := []appdb.ProviderAccount{
+		{ID: "free-codex", Provider: "codex", Tier: &free},
+		{ID: "plus-codex", Provider: "codex", Tier: &plus},
+		{ID: "unknown-codex", Provider: "codex"},
+		{ID: "pro-codex", Provider: "codex", Tier: &pro},
+	}
+
+	prioritized := prioritizeAccounts(accounts, false, nil)
+	ids := make([]string, 0, len(prioritized))
+	for _, account := range prioritized {
+		ids = append(ids, account.ID)
+	}
+	want := []string{"plus-codex", "pro-codex", "free-codex", "unknown-codex"}
+	if !reflect.DeepEqual(ids, want) {
+		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
 	}
 }

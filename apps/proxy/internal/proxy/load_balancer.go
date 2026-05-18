@@ -583,13 +583,25 @@ func paidFirst(accounts []appdb.ProviderAccount) []appdb.ProviderAccount {
 	for _, account := range accounts {
 		if isSyntheticProviderAccountID(account.ID) {
 			free = append(free, account)
-		} else if account.Tier != nil && *account.Tier == "paid" {
+		} else if isPaidAccountTier(account.Tier) {
 			paid = append(paid, account)
 		} else {
 			free = append(free, account)
 		}
 	}
 	return append(paid, free...)
+}
+
+func isPaidAccountTier(tier *string) bool {
+	if tier == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(*tier)) {
+	case "paid", "standard-tier", "plus", "pro", "team", "go", "business", "enterprise", "edu", "education":
+		return true
+	default:
+		return false
+	}
 }
 
 func nullableTimeBefore(a, b *time.Time) bool {
