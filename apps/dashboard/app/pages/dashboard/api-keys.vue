@@ -110,6 +110,10 @@ function rateLimitBadge(apiKeyId: string) {
   return count > 0 ? `${count} limit${count === 1 ? "" : "s"}` : undefined;
 }
 
+function formatPointAmount(value: number) {
+  return value.toLocaleString("en-US");
+}
+
 function updateApiKeyState(apiKeyId: string, value: { isActive: boolean; expiresAt: string | Date | null }) {
   if (!data.value) return;
   data.value = {
@@ -331,7 +335,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   <div class="flex items-center gap-1.5">
                     <span v-if="apiKey.roamingEnabled" class="flex items-center gap-1 text-[11px] leading-none text-foreground">
                       <UiIcon name="i-lucide-coins" class="size-3" />
-                      <span class="inline-flex items-center leading-none tabular-nums">{{ apiKey.roamingPointsUsed }}</span>
+                      <span class="inline-flex items-center leading-none tabular-nums">{{ formatPointAmount(apiKey.roamingPointsUsed) }}</span>
                     </span>
                     <UiSwitch
                       :model-value="apiKey.roamingEnabled"

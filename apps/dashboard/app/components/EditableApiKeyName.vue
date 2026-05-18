@@ -37,6 +37,7 @@ const maskedApiKey = computed(() => props.keyPreview || "********");
 const normalizedApiKeyValue = computed(() => apiKeyValue.value.trim());
 const saveCostsPoints = computed(() => isApiKeyDirty.value && normalizedApiKeyValue.value !== revealedApiKey.value);
 const pointBalance = computed(() => dashboardMe.value?.points?.balance ?? 0);
+const formattedApiKeyUpdatePointCost = computed(() => API_KEY_UPDATE_POINT_COST.toLocaleString("en-US"));
 const hasInsufficientPoints = computed(() => saveCostsPoints.value && pointBalance.value < API_KEY_UPDATE_POINT_COST);
 const apiKeyValidationError = computed(() => {
   if (!saveCostsPoints.value) return "";
@@ -140,7 +141,7 @@ async function updateName() {
           <template v-if="isUpdating">Saving...</template>
           <template v-else-if="saveCostsPoints">
             <PointCoinIcon reverse class="size-5 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]" />
-            {{ API_KEY_UPDATE_POINT_COST }}
+            {{ formattedApiKeyUpdatePointCost }}
           </template>
           <template v-else>Save</template>
         </UiButton>

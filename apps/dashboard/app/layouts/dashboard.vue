@@ -90,6 +90,7 @@ watch(dashboardMe, (value) => {
 }, { immediate: true });
 const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
 const pointBalance = computed(() => dashboardMe.value?.points?.balance ?? 0);
+const formattedPointBalance = computed(() => pointBalance.value.toLocaleString("en-US"));
 const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
 const auditUserEmail = computed(() => auditUser.value?.email || "");
 const auditUserImage = computed(() => auditUser.value?.image || "");
@@ -851,7 +852,7 @@ async function handleAuditSelected() {
                     modelSearchFocused ? 'hidden sm:block' : '',
                   ]"
                 />
-                <span :class="['select-none text-sm font-semibold tabular-nums text-foreground/85', modelSearchFocused ? 'hidden sm:inline' : '']">{{ pointBalance }}</span>
+                <span :class="['select-none text-sm font-semibold tabular-nums text-foreground/85', modelSearchFocused ? 'hidden sm:inline' : '']">{{ formattedPointBalance }}</span>
                 <span class="relative flex size-8 shrink-0 select-none sm:ml-1">
                   <span class="flex size-8 overflow-hidden rounded-full">
                     <img v-if="userImage" :src="userImage" alt="" class="aspect-square size-full">
