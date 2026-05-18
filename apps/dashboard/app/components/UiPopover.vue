@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
+import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui";
 import { cn } from "../../lib/utils";
 
 type PopoverSide = "top" | "right" | "bottom" | "left";
@@ -45,6 +45,7 @@ const open = defineModel<boolean>("open", { default: false });
         )"
       >
         <slot name="content" />
+        <PopoverArrow class="fill-popover" />
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>
