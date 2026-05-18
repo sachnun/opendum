@@ -5,6 +5,7 @@ import { disabledModel, providerAccount, providerAccountDisabledModel } from "..
 import { getAccountModelAvailability, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts } from "../lib/proxy/authless-providers";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";
+import { createServiceTimer } from "../utils/timing";
 import { compareModelEntries } from "../../lib/model-sort";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 
@@ -17,21 +18,22 @@ function getProxyBaseUrl(proxyBaseUrl?: string) {
 }
 
 export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
+  const timer = createServiceTimer("playground.options");
   try {
     const proxyBaseUrl = getProxyBaseUrl(proxyUrl);
     const [disabledModels, availability] = await Promise.all([
-      db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
-      getAccountModelAvailability(userId, { includeInactiveAccounts: true }),
+      timer.time("disabledModels", () => db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId))),
+      timer.time("availability", () => getAccountModelAvailability(userId, { includeInactiveAccounts: true })),
     ]);
     const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
 
     const authlessProviderAccounts = getAuthlessProviderAccounts();
-    const [accountCount] = await db
+    const [accountCount] = await timer.time("accountCount", () => db
       .select({ count: sql<number>`count(*)` })
       .from(providerAccount)
-      .where(eq(providerAccount.userId, userId));
+      .where(eq(providerAccount.userId, userId)));
 
-    const providerAccounts = await db
+    const providerAccounts = await timer.time("providerAccounts", () => db
       .select({
         id: providerAccount.id,
         provider: providerAccount.provider,
@@ -42,14 +44,14 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
       })
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS)))
-      .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
+      .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt)));
 
     const disabledModelsByAccount = new Map<string, string[]>();
     if (providerAccounts.length > 0) {
-      const perAccountDisabledModels = await db
+      const perAccountDisabledModels = await timer.time("perAccountDisabledModels", () => db
         .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
         .from(providerAccountDisabledModel)
-        .where(inArray(providerAccountDisabledModel.providerAccountId, providerAccounts.map((account) => account.id)));
+        .where(inArray(providerAccountDisabledModel.providerAccountId, providerAccounts.map((account) => account.id))));
 
       for (const entry of perAccountDisabledModels) {
         const canonical = resolveModelAlias(entry.model);
@@ -59,6 +61,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
       }
     }
 
+    const modelsStartedAt = Date.now();
     const models = getAllModels()
       .filter((model) => !disabledModelSet.has(model) && isModelUsableByAccounts(model, availability))
       .map((model) => ({
@@ -69,6 +72,8 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         meta: MODEL_REGISTRY[model]?.meta,
       }))
       .sort(compareModelEntries);
+    timer.record("models", modelsStartedAt);
+    timer.log({ providerAccounts: providerAccounts.length, authlessProviderAccounts: authlessProviderAccounts.length, models: models.length });
 
     return {
       proxyBaseUrl,
