@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/opendum/opendum/apps/proxy/internal/cryptojs"
@@ -107,6 +108,7 @@ func (s *Service) expiringRefreshableAccounts(ctx context.Context) ([]appdb.Prov
 			Where("\"isActive\" = TRUE").
 			Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", now).
 			Where("provider = ?", name).
+			Where("\"refreshToken\" <> ''").
 			Where("\"expiresAt\" <= ?", now.Add(buffer)).
 			OrderExpr("\"expiresAt\" ASC").
 			Limit(tokenRefreshBatchLimit).
@@ -147,6 +149,22 @@ func (s *Service) refreshAccountCredentialsIfDue(ctx context.Context, account ap
 	if !ok || !accountNeedsCredentialRefresh(account, providerImpl, time.Now()) {
 		return "", account, false, nil
 	}
+	if account.RefreshToken == "" {
+		if waitForLock && time.Now().After(account.ExpiresAt) {
+			return "", account, false, fmt.Errorf("provider account token has expired and cannot be refreshed")
+		}
+		return "", account, false, nil
+	}
+	refreshToken, err := cryptojs.Decrypt(s.secret, account.RefreshToken)
+	if err != nil {
+		return "", account, false, err
+	}
+	if strings.TrimSpace(refreshToken) == "" {
+		if waitForLock && time.Now().After(account.ExpiresAt) {
+			return "", account, false, fmt.Errorf("provider account token has expired and cannot be refreshed")
+		}
+		return "", account, false, nil
+	}
 
 	lockValue, acquired, err := s.acquireRefreshLock(ctx, account.ID)
 	if err != nil {
@@ -170,9 +188,21 @@ func (s *Service) refreshAccountCredentialsIfDue(ctx context.Context, account ap
 		return credentials, current, false, err
 	}
 
-	refreshToken, err := cryptojs.Decrypt(s.secret, current.RefreshToken)
+	if current.RefreshToken == "" {
+		if waitForLock && time.Now().After(current.ExpiresAt) {
+			return "", current, false, fmt.Errorf("provider account token has expired and cannot be refreshed")
+		}
+		return "", current, false, nil
+	}
+	refreshToken, err = cryptojs.Decrypt(s.secret, current.RefreshToken)
 	if err != nil {
 		return "", current, false, err
+	}
+	if strings.TrimSpace(refreshToken) == "" {
+		if waitForLock && time.Now().After(current.ExpiresAt) {
+			return "", current, false, fmt.Errorf("provider account token has expired and cannot be refreshed")
+		}
+		return "", current, false, nil
 	}
 	refreshed, err := refresher.RefreshCredentials(ctx, s.client, refreshToken, current)
 	if err != nil {

@@ -3,7 +3,7 @@
  */
 export interface OAuthResult {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
   expiresAt: Date;
   email: string;
   // Provider-specific fields

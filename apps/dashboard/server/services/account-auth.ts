@@ -7,7 +7,7 @@ import { encrypt } from "../lib/encryption";
 import { antigravityProvider } from "../lib/providers/antigravity";
 import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "../lib/providers/antigravity/constants";
 import { initiateCopilotDeviceCodeFlow, pollCopilotDeviceCodeAuthorization } from "../lib/providers/copilot";
-import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
+import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { geminiCliProvider } from "../lib/providers/gemini-cli";
 import { CLIENT_ID as geminiCliClientId, REDIRECT_URI as geminiCliRedirectUri, SCOPES as geminiCliScopes } from "../lib/providers/gemini-cli/constants";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
@@ -21,6 +21,7 @@ export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity",
 export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "gemini_cli", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
 export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]) });
 export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional() });
+export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
 
 type OAuthProviderKey = z.infer<typeof getAuthUrlInputSchema>["provider"];
 type DeviceProviderKey = z.infer<typeof initiateDeviceAuthInputSchema>["provider"];
@@ -132,6 +133,10 @@ function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string): Acti
   return { success: true, data: { code, state: url.searchParams.get("state") } };
 }
 
+function encryptOptionalRefreshToken(refreshToken: string | undefined): string {
+  return refreshToken ? encrypt(refreshToken) : "";
+}
+
 async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, label: string, oauthResult: OAuthResult, options: OAuthAccountOptions = {}): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
   const email = options.email || oauthResult.email || `${provider}-${Date.now()}`;
   const accountId = options.accountId ?? oauthResult.accountId ?? null;
@@ -142,12 +147,13 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
   const existingAccount = foundByEmail ?? foundByAccountId ?? null;
 
   if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encrypt(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), ...(oauthResult.email ? { email: oauthResult.email } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
-    return { success: true, data: { email: existingAccount.email || email, isUpdate: true } };
+    const resolvedEmail = oauthResult.email && email === oauthResult.email ? oauthResult.email : existingAccount.email || email;
+    await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email: resolvedEmail, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    return { success: true, data: { email: resolvedEmail, isUpdate: true } };
   }
 
   const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
-  await db.insert(providerAccount).values({ userId, provider, name: `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(oauthResult.accessToken), refreshToken: encrypt(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email, projectId: oauthResult.projectId, tier: oauthResult.tier, accountId, isActive: true });
+  await db.insert(providerAccount).values({ userId, provider, name: `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email, projectId: oauthResult.projectId, tier: oauthResult.tier, accountId, isActive: true });
   return { success: true, data: { email, isUpdate: false } };
 }
 
@@ -155,8 +161,9 @@ function oauthAccountOptions(provider: OAuthProviderKey, config: (typeof OAUTH_P
   if (provider === "codex") {
     const chatgptAccountId = oauthResult.accountId || null;
     const workspaceAccountId = oauthResult.workspaceId || chatgptAccountId || null;
+    const isPersonalAccount = !workspaceAccountId || workspaceAccountId === chatgptAccountId;
     return {
-      email: workspaceAccountId ? `codex-${workspaceAccountId}` : `codex-${Date.now()}`,
+      email: oauthResult.email && isPersonalAccount ? oauthResult.email : workspaceAccountId ? `codex-${workspaceAccountId}` : `codex-${Date.now()}`,
       accountId: chatgptAccountId,
       dedupeByAccountId: !workspaceAccountId || workspaceAccountId === chatgptAccountId,
     };
@@ -203,6 +210,16 @@ export async function exchangeOAuthAccount(userId: string, input: z.infer<typeof
     return await upsertOAuthAccount(userId, input.provider, config.label, oauthResult, oauthAccountOptions(input.provider, config, oauthResult));
   } catch (error) {
     console.error("Failed to exchange provider OAuth code:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;
+  }
+}
+
+export async function connectCodexSessionAccount(userId: string, input: z.infer<typeof connectCodexSessionInputSchema>) {
+  try {
+    const oauthResult = buildOAuthResultFromChatGPTSession(input.sessionJson);
+    return await upsertOAuthAccount(userId, "codex", "Codex", oauthResult, oauthAccountOptions("codex", OAUTH_PROVIDERS.codex, oauthResult));
+  } catch (error) {
+    console.error("Failed to connect Codex ChatGPT session:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to connect account" } as const;
   }
 }

@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opendum/opendum/apps/proxy/internal/cryptojs"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
 type testRefreshBufferProvider struct {
@@ -17,6 +19,16 @@ func (p testRefreshBufferProvider) RefreshBuffer() time.Duration { return p.buff
 
 func (p testRefreshBufferProvider) MakeRequest(context.Context, *http.Client, string, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error) {
 	return nil, nil
+}
+
+type testCredentialRefreshProvider struct {
+	testRefreshBufferProvider
+	called bool
+}
+
+func (p *testCredentialRefreshProvider) RefreshCredentials(context.Context, *http.Client, string, appdb.ProviderAccount) (providers.RefreshedCredentials, error) {
+	p.called = true
+	return providers.RefreshedCredentials{}, nil
 }
 
 func TestAccountNeedsCredentialRefreshUsesProviderBuffer(t *testing.T) {
@@ -34,5 +46,30 @@ func TestAccountNeedsCredentialRefreshUsesProviderBuffer(t *testing.T) {
 func TestTokenRefreshLockKey(t *testing.T) {
 	if got := tokenRefreshLockKey("acct_123"); got != "opendum:provider-account:refresh-lock:acct_123" {
 		t.Fatalf("lock key = %q", got)
+	}
+}
+
+func TestRefreshAccountCredentialsIfDueSkipsEmptyRefreshToken(t *testing.T) {
+	secret := "test-secret"
+	encryptedAccess, err := cryptojs.Encrypt(secret, "access-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encryptedRefresh, err := cryptojs.Encrypt(secret, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider := &testCredentialRefreshProvider{testRefreshBufferProvider: testRefreshBufferProvider{buffer: time.Hour}}
+	service := &Service{secret: secret}
+	_, _, didRefresh, err := service.refreshAccountCredentialsIfDue(context.Background(), appdb.ProviderAccount{ID: "acct_123", AccessToken: encryptedAccess, RefreshToken: encryptedRefresh, ExpiresAt: time.Now().Add(-time.Minute)}, provider, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if didRefresh {
+		t.Fatal("empty refresh token account should not be refreshed")
+	}
+	if provider.called {
+		t.Fatal("credential refresher should not be called for empty refresh token")
 	}
 }

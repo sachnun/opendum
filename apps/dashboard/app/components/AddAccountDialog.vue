@@ -3,8 +3,8 @@ import type { ProviderAccountKey } from "../../lib/provider-accounts";
 import { cn } from "../../lib/utils";
 
 type Provider = ProviderAccountKey;
-type FlowType = "oauth_redirect" | "device_code" | "api_key" | "api_key_with_account_id";
-type CodexLoginMethod = Extract<FlowType, "oauth_redirect" | "device_code">;
+type FlowType = "oauth_redirect" | "device_code" | "chatgpt_session" | "api_key" | "api_key_with_account_id";
+type CodexLoginMethod = Extract<FlowType, "oauth_redirect" | "device_code" | "chatgpt_session">;
 
 interface ProviderConfig {
   name: string;
@@ -53,6 +53,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
 const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string }> = [
   { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." },
   { key: "device_code", name: "Device Code", description: "Enter a short device code." },
+  { key: "chatgpt_session", name: "ChatGPT Session", description: "Paste the JSON from chatgpt.com/api/auth/session." },
 ];
 
 const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "ollama_cloud", "openrouter", "nvidia_nim", "groq", "workers_ai"];
@@ -62,6 +63,7 @@ const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
 const step = ref(minimumStep.value);
 const provider = ref<Provider | null>(props.initialProvider);
 const callbackUrl = ref("");
+const chatgptSessionJson = ref("");
 const apiKey = ref("");
 const cfAccountId = ref("");
 const authUrl = ref("");
@@ -106,7 +108,7 @@ const displayedSteps = computed(() => {
 });
 const shouldPreventOutsideClose = computed(() => {
   const flowType = activeFlowType.value;
-  return isPolling.value || (step.value === authStep.value && (flowType === "api_key" || flowType === "api_key_with_account_id")) || (step.value === finishStep.value && flowType === "oauth_redirect");
+  return isPolling.value || (step.value === authStep.value && (flowType === "api_key" || flowType === "api_key_with_account_id" || flowType === "chatgpt_session")) || (step.value === finishStep.value && flowType === "oauth_redirect");
 });
 
 watch(open, (value) => {
@@ -174,6 +176,7 @@ function resetForm() {
   step.value = minimumStep.value;
   provider.value = props.initialProvider;
   callbackUrl.value = "";
+  chatgptSessionJson.value = "";
   apiKey.value = "";
   cfAccountId.value = "";
   authUrl.value = "";
@@ -242,6 +245,7 @@ function selectProvider(providerKey: Provider) {
 
 function resetAuthProgress() {
   callbackUrl.value = "";
+  chatgptSessionJson.value = "";
   authUrl.value = "";
   oauthState.value = null;
   oauthCodeVerifier.value = null;
@@ -437,6 +441,27 @@ async function handleConnectApiKey() {
   }
 }
 
+async function handleConnectCodexSession() {
+  if (props.readonly) return;
+
+  errorMessage.value = "";
+  if (!chatgptSessionJson.value.trim()) {
+    errorMessage.value = "Please paste the ChatGPT session JSON";
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    const result = await dashboardApi.accounts.connectCodexSession({ sessionJson: chatgptSessionJson.value.trim() });
+    if (!result.success) throw new Error(result.error);
+    finishConnection(result.data);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
+  } finally {
+    isLoading.value = false;
+  }
+}
+
 async function handleExchangeOAuth() {
   if (props.readonly) return;
   if (!provider.value) return;
@@ -617,7 +642,6 @@ onBeforeUnmount(() => {
         <div v-if="step === 2 && isCodexProvider" class="space-y-4">
           <div class="space-y-2">
             <p class="text-sm font-medium">Choose Codex login method</p>
-            <p class="text-sm text-muted-foreground">Codex supports both browser OAuth and device code login. Pick the method you want to use for this account.</p>
           </div>
           <div class="grid gap-3">
             <button
@@ -702,6 +726,35 @@ onBeforeUnmount(() => {
             </div>
           </template>
 
+          <template v-else-if="activeFlowType === 'chatgpt_session'">
+            <div class="space-y-2">
+              <p class="text-sm font-medium">Copy ChatGPT session JSON</p>
+              <p class="text-sm text-muted-foreground">
+                Open the session page while logged in to ChatGPT, copy the full JSON response, then paste it here. This method has no refresh token, so reconnect when the access token expires.
+              </p>
+            </div>
+            <div class="rounded-md border border-border bg-muted/30 p-3">
+              <p class="break-all text-xs text-muted-foreground">https://chatgpt.com/api/auth/session</p>
+            </div>
+            <div class="flex gap-2">
+              <UiButton type="button" variant="outline" class="flex-1" @click="openPopup('https://chatgpt.com/api/auth/session', 'chatgpt_session', 1100, 760)">
+                <UiIcon name="i-lucide-external-link" class="size-4" />
+                Open Session Page
+              </UiButton>
+              <UiTooltip :text="copiedLink ? 'Copied' : 'Copy link'">
+                <UiButton type="button" variant="outline" @click="copyText('https://chatgpt.com/api/auth/session', 'link')">
+                  <UiIcon :name="copiedLink ? 'i-lucide-check' : 'i-lucide-copy'" class="size-4" />
+                </UiButton>
+              </UiTooltip>
+            </div>
+            <div class="relative w-full rounded-lg border px-4 py-3 text-sm">
+              <UiIcon name="i-lucide-alert-triangle" class="absolute left-4 top-4 size-4" />
+              <div class="pl-7 text-xs">
+                Treat this JSON like a password. It contains account access tokens and will be stored encrypted.
+              </div>
+            </div>
+          </template>
+
           <template v-else>
             <div class="space-y-2">
               <p class="text-sm font-medium">Get {{ selectedConfig.name }} API Key</p>
@@ -762,6 +815,43 @@ onBeforeUnmount(() => {
             </div>
             <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
           </div>
+        </form>
+
+        <form
+          v-if="step === finishStep && selectedConfig && activeFlowType === 'chatgpt_session'"
+          class="space-y-4"
+          autocomplete="off"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          @submit.prevent="handleConnectCodexSession"
+        >
+          <div class="space-y-2">
+            <label for="chatgpt-session-json" class="text-sm font-medium">
+              Paste Session JSON <span aria-hidden="true" class="text-destructive">*</span>
+            </label>
+            <p class="text-sm text-muted-foreground">Paste the full JSON from <code class="rounded bg-muted px-1">chatgpt.com/api/auth/session</code>.</p>
+            <textarea
+              id="chatgpt-session-json"
+              v-model="chatgptSessionJson"
+              name="chatgpt-session-json"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
+              spellcheck="false"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              :disabled="isLoading"
+              placeholder='{"accessToken":"...","expires":"...","account":{"id":"...","planType":"free"}}'
+              class="min-h-36 w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            />
+          </div>
+
+          <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
+
+          <UiButton type="submit" class="w-full" :disabled="isLoading">
+            <UiIcon v-if="isLoading" name="i-lucide-loader-2" class="size-4 animate-spin" />
+            {{ isLoading ? 'Connecting...' : 'Connect Codex Account' }}
+          </UiButton>
         </form>
 
         <form

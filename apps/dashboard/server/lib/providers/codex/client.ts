@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../db/index.js";
@@ -35,6 +36,22 @@ interface CodexDeviceCodeResponse {
 interface CodexDeviceTokenResponse {
   authorization_code: string;
   code_verifier: string;
+}
+
+interface ChatGPTSessionAccount {
+  id?: string;
+  planType?: string;
+}
+
+interface ChatGPTSessionUser {
+  email?: string;
+}
+
+interface ChatGPTSessionPayload {
+  accessToken?: string;
+  expires?: string;
+  account?: ChatGPTSessionAccount;
+  user?: ChatGPTSessionUser;
 }
 
 export function generateCodeVerifier(): string {
@@ -115,10 +132,35 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
     if (!payloadPart) return null;
     const payload = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
     const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
-    return asRecord(JSON.parse(atob(padded)));
+    return asRecord(JSON.parse(Buffer.from(padded, "base64").toString("utf8")));
   } catch {
     return null;
   }
+}
+
+function extractEmailFromClaims(decoded: Record<string, unknown>): string | null {
+  const profileClaims = asRecord(decoded["https://api.openai.com/profile"]);
+  const emailCandidates = [
+    toNonEmptyString(profileClaims?.email),
+    toNonEmptyString(decoded.email),
+  ];
+
+  for (const candidate of emailCandidates) {
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function extractExpiresAtFromClaims(decoded: Record<string, unknown>): Date | null {
+  if (typeof decoded.exp !== "number" || !Number.isFinite(decoded.exp) || decoded.exp <= 0) {
+    return null;
+  }
+
+  const expiresAt = new Date(decoded.exp * 1000);
+  return Number.isNaN(expiresAt.getTime()) ? null : expiresAt;
 }
 
 function extractWorkspaceIdFromClaims(decoded: Record<string, unknown>): string | null {
@@ -191,6 +233,22 @@ function extractTierFromJwt(token: string): string | null {
   return decoded ? extractTierFromClaims(decoded) : null;
 }
 
+function parseChatGPTSessionPayload(sessionJson: string): ChatGPTSessionPayload {
+  try {
+    const parsed = JSON.parse(sessionJson) as unknown;
+    const record = asRecord(parsed);
+    if (!record) {
+      throw new Error("ChatGPT session payload must be a JSON object");
+    }
+    return record as ChatGPTSessionPayload;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error("Invalid ChatGPT session JSON. Copy the full response from https://chatgpt.com/api/auth/session.");
+    }
+    throw error;
+  }
+}
+
 function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
   return Date.now() > expiresAt.getTime() - bufferMs;
@@ -215,6 +273,45 @@ function buildOAuthResult(tokens: CodexTokenResponse, refreshToken?: string): OA
     refreshToken: tokens.refresh_token || refreshToken || "",
     expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
     email: "",
+    accountId: accountId || undefined,
+    workspaceId: workspaceId || undefined,
+    tier: tier || undefined,
+  };
+}
+
+export function buildOAuthResultFromChatGPTSession(sessionJson: string): OAuthResult {
+  const session = parseChatGPTSessionPayload(sessionJson);
+  const accessToken = toNonEmptyString(session.accessToken);
+  if (!accessToken) {
+    throw new Error("ChatGPT session JSON is missing accessToken");
+  }
+
+  const jwtClaims = parseJwtClaims(accessToken);
+  if (!jwtClaims) {
+    throw new Error("ChatGPT session accessToken is not a valid JWT. Copy the full response from https://chatgpt.com/api/auth/session.");
+  }
+  const accountId =
+    (session.account ? toNonEmptyString(session.account.id) : null) ||
+    extractAccountIdFromClaims(jwtClaims);
+  const workspaceId = extractWorkspaceIdFromClaims(jwtClaims) || accountId;
+  const tier =
+    (session.account ? toNonEmptyString(session.account.planType)?.toLowerCase() ?? null : null) ||
+    extractTierFromClaims(jwtClaims);
+  const email =
+    (session.user ? toNonEmptyString(session.user.email) : null) ||
+    extractEmailFromClaims(jwtClaims) ||
+    "";
+
+  const expiresAt = extractExpiresAtFromClaims(jwtClaims);
+  if (!expiresAt || expiresAt <= new Date()) {
+    throw new Error("ChatGPT session accessToken is expired or missing an expiry. Please copy a fresh session JSON.");
+  }
+
+  return {
+    accessToken,
+    refreshToken: "",
+    expiresAt,
+    email,
     accountId: accountId || undefined,
     workspaceId: workspaceId || undefined,
     tier: tier || undefined,
@@ -287,7 +384,7 @@ export const codexProvider = {
 
   async getValidCredentials(account: CredentialAccount): Promise<string> {
     let accessToken = decrypt(account.accessToken);
-    const refreshTokenValue = decrypt(account.refreshToken);
+    const refreshTokenValue = account.refreshToken ? decrypt(account.refreshToken) : "";
 
     const resolvedAccountId = extractAccountIdFromJwt(accessToken);
     if (resolvedAccountId && resolvedAccountId !== account.accountId) {
@@ -303,20 +400,21 @@ export const codexProvider = {
     }
 
     if (isTokenExpired(account.expiresAt)) {
+      if (!refreshTokenValue.trim()) {
+        throw new Error("Codex ChatGPT session has expired. Reconnect this account with a fresh session JSON.");
+      }
+
       try {
         const newTokens = await codexProvider.refreshToken(refreshTokenValue);
         const updateData: Record<string, unknown> = {
           accessToken: encrypt(newTokens.accessToken),
-          refreshToken: encrypt(newTokens.refreshToken),
+          refreshToken: encrypt(newTokens.refreshToken ?? ""),
           expiresAt: newTokens.expiresAt,
         };
 
         if (newTokens.accountId) {
           updateData.accountId = newTokens.accountId;
           account.accountId = newTokens.accountId;
-        }
-        if (newTokens.workspaceId) {
-          updateData.workspaceId = newTokens.workspaceId;
         }
         if (newTokens.tier) {
           updateData.tier = newTokens.tier;
@@ -384,6 +482,9 @@ export async function pollCodexDeviceCodeAuthorization(deviceAuthId: string, use
 
   if (response.ok) {
     const data = (await response.json()) as CodexDeviceTokenResponse;
+    if (!data.authorization_code || !data.code_verifier) {
+      return { error: "Codex device auth polling endpoint returned incomplete authorization data" };
+    }
     return codexProvider.exchangeCode(data.authorization_code, DEVICE_REDIRECT_URI, data.code_verifier);
   }
 

@@ -1,4 +1,4 @@
-export { codexProvider, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "./client.js";
+export { buildOAuthResultFromChatGPTSession, codexProvider, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "./client.js";
 export {
   generateCodeVerifier,
   generateCodeChallenge,
