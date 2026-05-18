@@ -133,7 +133,7 @@ async function updateName() {
           <UiIcon v-if="isRevealingApiKey" name="i-lucide-loader-2" class="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
         </div>
         <span v-if="apiKeyValidationError" class="text-xs font-normal text-destructive">{{ apiKeyValidationError }}</span>
-        <span v-else-if="hasInsufficientPoints" class="text-xs font-normal text-destructive">Not enough points. Updating an API key costs {{ API_KEY_UPDATE_POINT_COST }} points.</span>
+        <span v-else-if="hasInsufficientPoints" class="text-xs font-normal text-destructive">Not enough points.</span>
       </label>
       <div class="flex justify-end gap-2">
         <UiButton variant="outline" @click="editDialogOpen = false">Cancel</UiButton>
