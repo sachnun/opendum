@@ -34,8 +34,6 @@ type QuotaSummarySkeletonRow = {
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
 const PROVIDER_DETAIL_REFRESH_MS = 30_000;
-const ACCOUNT_STATUS_ORDER: Record<string, number> = { failed: 0, degraded: 1, half_open: 2, active: 3 };
-const FREE_TIER_VALUES = new Set(["", "free", "free-tier", "guest", "unknown"]);
 const DEFAULT_QUOTA_SUMMARY_SKELETON_ROWS: QuotaSummarySkeletonRow[] = [
   { labelClass: "w-24", metaClass: "w-14", valueClass: "w-8", barClass: "w-4/5" },
   { labelClass: "w-20", metaClass: "w-12", valueClass: "w-8", barClass: "w-3/5" },
@@ -280,15 +278,6 @@ function toQuotaProvider(provider: string): QuotaProviderKey | null {
   return QUOTA_PROVIDERS.has(provider) ? provider as QuotaProviderKey : null;
 }
 
-function isTierAboveFree(tier: string | null): boolean {
-  return !FREE_TIER_VALUES.has(tier?.trim().toLowerCase() ?? "");
-}
-
-function getAccountSortGroup(account: Account): number {
-  if (!account.isActive) return 2;
-  return isTierAboveFree(account.tier) ? 0 : 1;
-}
-
 function toTimeMs(value: string | Date | null | undefined): number {
   if (!value) return 0;
 
@@ -297,10 +286,9 @@ function toTimeMs(value: string | Date | null | undefined): number {
 }
 
 function compareAccounts(a: Account, b: Account): number {
-  return getAccountSortGroup(a) - getAccountSortGroup(b)
-    || toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
-    || toTimeMs(b.lastErrorAt) - toTimeMs(a.lastErrorAt)
-    || (ACCOUNT_STATUS_ORDER[a.status] ?? ACCOUNT_STATUS_ORDER.active) - (ACCOUNT_STATUS_ORDER[b.status] ?? ACCOUNT_STATUS_ORDER.active);
+  return toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
+    || toTimeMs(b.createdAt) - toTimeMs(a.createdAt)
+    || b.id.localeCompare(a.id);
 }
 
 function quotaPercentRemaining(group: QuotaSummaryGroup): number {
