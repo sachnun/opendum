@@ -70,7 +70,7 @@ const supportNavigation = computed<NavItem[]>(() => [
       { name: "OTP", href: "/dashboard/tools/otp", disabled: true, tag: "soon" },
     ],
   },
-  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical", disabled: playgroundNavigationDisabled.value },
+  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
 ]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
@@ -141,7 +141,6 @@ const accountIndicators = computed(
   () => accountSummaryData.value?.accountIndicators ?? emptyShellAccountSummary.accountIndicators
 );
 const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptyShellAccountSummary.pinnedProviders);
-const hasConnectedAccounts = computed(() => accountSummaryData.value?.hasConnectedAccounts ?? emptyShellAccountSummary.hasConnectedAccounts);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
 const hasResolvedPinnedProviders = computed(() => hasLoadedAccountSummary.value || cachedPinnedProviders.value !== null);
 const shouldRefreshAccountSummary = computed(() => true);
@@ -154,7 +153,6 @@ const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccou
 const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
 const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
 const accountNavigationHrefs = computed(() => new Set(PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => getProviderAccountPath(definition.key))));
-const playgroundNavigationDisabled = computed(() => !isAuditMode.value && hasLoadedAccountSummary.value && !hasConnectedAccounts.value);
 
 function normalizeModelFamilyCounts(counts: Record<string, number>) {
   const nextCounts = { ...emptyModelFamilyCounts };
