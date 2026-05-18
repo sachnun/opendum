@@ -237,7 +237,7 @@ export async function updateApiKeyName(userId: string, input: UpdateApiKeyNameIn
       return row ? { row } as const : null;
     });
 
-    if (updated && "insufficientPoints" in updated) return { success: false, error: `Not enough points. Updating an API key costs ${API_KEY_UPDATE_POINT_COST} points.` } as const;
+    if (updated && "insufficientPoints" in updated) return { success: false, error: "Not enough points." } as const;
     if (!updated) return { success: false, error: "Failed to update API key" } as const;
     if (normalizedKey) await invalidateApiKeyValidationCache(apiKey.keyHash, apiKey.id);
     return { success: true, data: { name: updated.row.name, keyPreview: updated.row.keyPreview } } as const;
