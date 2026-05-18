@@ -597,7 +597,7 @@ func isPaidAccountTier(tier *string) bool {
 		return false
 	}
 	switch strings.ToLower(strings.TrimSpace(*tier)) {
-	case "paid", "standard-tier", "plus", "pro", "team", "go", "business", "enterprise", "edu", "education":
+	case "paid", "standard-tier", "plus", "pro", "prolite", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu", "education", "hc":
 		return true
 	default:
 		return false

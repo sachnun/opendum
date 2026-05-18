@@ -45,12 +45,20 @@ func TestSuccessRecoveryState(t *testing.T) {
 func TestPrioritizeAccountsTreatsCodexPaidPlansAsPaid(t *testing.T) {
 	plus := "plus"
 	pro := "pro"
+	prolite := "prolite"
+	businessUsageBased := "self_serve_business_usage_based"
+	enterpriseUsageBased := "enterprise_cbp_usage_based"
+	healthcare := "hc"
 	free := "free"
 	accounts := []appdb.ProviderAccount{
 		{ID: "free-codex", Provider: "codex", Tier: &free},
 		{ID: "plus-codex", Provider: "codex", Tier: &plus},
+		{ID: "prolite-codex", Provider: "codex", Tier: &prolite},
 		{ID: "unknown-codex", Provider: "codex"},
+		{ID: "business-usage-codex", Provider: "codex", Tier: &businessUsageBased},
 		{ID: "pro-codex", Provider: "codex", Tier: &pro},
+		{ID: "enterprise-usage-codex", Provider: "codex", Tier: &enterpriseUsageBased},
+		{ID: "hc-codex", Provider: "codex", Tier: &healthcare},
 	}
 
 	prioritized := prioritizeAccounts(accounts, false, nil)
@@ -58,7 +66,7 @@ func TestPrioritizeAccountsTreatsCodexPaidPlansAsPaid(t *testing.T) {
 	for _, account := range prioritized {
 		ids = append(ids, account.ID)
 	}
-	want := []string{"plus-codex", "pro-codex", "free-codex", "unknown-codex"}
+	want := []string{"plus-codex", "prolite-codex", "business-usage-codex", "pro-codex", "enterprise-usage-codex", "hc-codex", "free-codex", "unknown-codex"}
 	if !reflect.DeepEqual(ids, want) {
 		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
 	}

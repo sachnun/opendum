@@ -650,6 +650,18 @@ func TestCodexExtractAccountIDFromJWT(t *testing.T) {
 	}
 }
 
+func TestCodexExtractTierFromJWT(t *testing.T) {
+	token := "x." + base64.RawURLEncoding.EncodeToString([]byte(`{"https://api.openai.com/auth":{"chatgpt_plan_type":"PLUS"}}`)) + ".y"
+	if got := extractTierFromJWT(token); got != "plus" {
+		t.Fatalf("tier = %q, want plus", got)
+	}
+
+	fallbackToken := "x." + base64.RawURLEncoding.EncodeToString([]byte(`{"chatgpt_plan_type":"self_serve_business_usage_based"}`)) + ".y"
+	if got := extractTierFromJWT(fallbackToken); got != "self_serve_business_usage_based" {
+		t.Fatalf("fallback tier = %q, want self_serve_business_usage_based", got)
+	}
+}
+
 func TestAntigravityTransformsToolPayload(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()

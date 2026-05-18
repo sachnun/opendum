@@ -160,6 +160,22 @@ function extractAccountIdFromClaims(decoded: Record<string, unknown>): string | 
   return null;
 }
 
+function extractTierFromClaims(decoded: Record<string, unknown>): string | null {
+  const authClaims = asRecord(decoded["https://api.openai.com/auth"]);
+  const tierCandidates = [
+    toNonEmptyString(authClaims?.chatgpt_plan_type),
+    toNonEmptyString(decoded.chatgpt_plan_type),
+  ];
+
+  for (const candidate of tierCandidates) {
+    if (candidate) {
+      return candidate.toLowerCase();
+    }
+  }
+
+  return null;
+}
+
 function extractAccountIdFromJwt(token: string): string | null {
   const decoded = parseJwtClaims(token);
   return decoded ? extractAccountIdFromClaims(decoded) : null;
@@ -168,6 +184,11 @@ function extractAccountIdFromJwt(token: string): string | null {
 function extractWorkspaceIdFromJwt(token: string): string | null {
   const decoded = parseJwtClaims(token);
   return decoded ? extractWorkspaceIdFromClaims(decoded) : null;
+}
+
+function extractTierFromJwt(token: string): string | null {
+  const decoded = parseJwtClaims(token);
+  return decoded ? extractTierFromClaims(decoded) : null;
 }
 
 function isTokenExpired(expiresAt: Date): boolean {
@@ -185,6 +206,9 @@ function buildOAuthResult(tokens: CodexTokenResponse, refreshToken?: string): OA
     (tokens.id_token ? extractWorkspaceIdFromJwt(tokens.id_token) : null) ||
     extractWorkspaceIdFromJwt(tokens.access_token) ||
     accountId;
+  const tier =
+    (tokens.id_token ? extractTierFromJwt(tokens.id_token) : null) ||
+    extractTierFromJwt(tokens.access_token);
 
   return {
     accessToken: tokens.access_token,
@@ -193,6 +217,7 @@ function buildOAuthResult(tokens: CodexTokenResponse, refreshToken?: string): OA
     email: "",
     accountId: accountId || undefined,
     workspaceId: workspaceId || undefined,
+    tier: tier || undefined,
   };
 }
 
@@ -292,6 +317,9 @@ export const codexProvider = {
         }
         if (newTokens.workspaceId) {
           updateData.workspaceId = newTokens.workspaceId;
+        }
+        if (newTokens.tier) {
+          updateData.tier = newTokens.tier;
         }
 
         await db

@@ -80,7 +80,14 @@ func (p codexProvider) RefreshCredentials(ctx context.Context, client *http.Clie
 	if accountID == "" && token.IDToken != "" {
 		accountID = extractAccountIDFromJWT(token.IDToken)
 	}
-	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), AccountID: accountID}, nil
+	tier := ""
+	if token.IDToken != "" {
+		tier = extractTierFromJWT(token.IDToken)
+	}
+	if tier == "" {
+		tier = extractTierFromJWT(token.AccessToken)
+	}
+	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), Tier: tier, AccountID: accountID}, nil
 }
 
 func (p codexProvider) MakeRequest(ctx context.Context, client *http.Client, accessToken string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
@@ -406,6 +413,10 @@ func extractAccountIDFromJWT(token string) string {
 		return accountID
 	}
 	return extractWorkspaceIDFromClaims(claims)
+}
+
+func extractTierFromJWT(token string) string {
+	return strings.ToLower(strings.TrimSpace(jwtStringClaim(token, "chatgpt_plan_type")))
 }
 
 func extractWorkspaceIDFromClaims(claims map[string]any) string {
