@@ -1,9 +1,9 @@
-import { and, asc, ilike, ne, or } from "drizzle-orm";
+import { and, asc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDashboardQuery, requireMaintenerContext } from "../../../../utils/api";
 import { db } from "../../../../lib/db";
-import { user } from "../../../../lib/db/schema";
+import { usageLog, user } from "../../../../lib/db/schema";
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 30;
@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
   const limit = input?.limit ?? DEFAULT_LIMIT;
 
   const conditions = [ne(user.id, context.actor.id)];
+  const lastUsedAt = sql<Date | null>`max(${usageLog.createdAt})`;
 
   if (query.length > 0) {
     if (query.length < 2) return { users: [], hasMore: false, nextOffset: offset };
@@ -33,8 +34,10 @@ export default defineEventHandler(async (event) => {
   const rows = await db
     .select({ id: user.id, name: user.name, email: user.email, image: user.image })
     .from(user)
+    .leftJoin(usageLog, eq(usageLog.userId, user.id))
     .where(and(...conditions))
-    .orderBy(asc(user.name), asc(user.email), asc(user.id))
+    .groupBy(user.id)
+    .orderBy(sql`${lastUsedAt} desc nulls last`, asc(user.name), asc(user.email), asc(user.id))
     .limit(limit + 1)
     .offset(offset);
 
