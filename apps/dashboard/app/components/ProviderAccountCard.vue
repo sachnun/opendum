@@ -1145,7 +1145,7 @@ function cancelErrorPreviewPointer() {
                   </div>
                   <div class="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/80">
                     <span>{{ getErrorEntryRelativeTime(activeErrorEntry) }}</span>
-                    <span>Click for details</span>
+                    <span class="min-w-0 truncate text-right font-mono">{{ activeErrorEntry.model }}</span>
                   </div>
                 </div>
                 <div v-else class="flex h-full w-full items-center justify-center rounded-sm border border-border/60 bg-muted/20 px-2 text-center text-xs text-muted-foreground">
