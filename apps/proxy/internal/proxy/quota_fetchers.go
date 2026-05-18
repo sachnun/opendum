@@ -317,6 +317,9 @@ func (s *Service) fetchCodexQuota(ctx context.Context, account appdb.ProviderAcc
 	if tier == "" {
 		tier = fallbackTier
 	}
+	if tier != fallbackTier && account.ID != "" {
+		_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("tier = ?", tier).Where("id = ?", account.ID).Exec(ctx)
+	}
 	apiGroups := parseCodexAPIGroups(payload, tier)
 	if len(apiGroups) > 0 {
 		return baseQuotaInfo(account, tier, "success", apiGroups, time.Now().UnixMilli(), "")
