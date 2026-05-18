@@ -1877,9 +1877,7 @@ function formatToolArguments(value: string): string {
 
           <UiCardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
             <div :ref="(element) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto p-3" @scroll="handlePanelScroll(panel.id, $event)">
-              <p v-if="!panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error" class="py-8 text-center text-sm text-muted-foreground">Select a model to start</p>
-
-              <template v-if="panel.modelId && getScenarioConversationMessages(panel.id).length > 0">
+              <template v-if="getScenarioConversationMessages(panel.id).length > 0">
                 <div v-if="getPanelSystemPromptText(panel.id)" class="mb-2">
                   <button type="button" class="flex w-full cursor-pointer items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/80" @click="systemCollapsedByPanel[panel.id] = !(systemCollapsedByPanel[panel.id] ?? true)">
                     <UiIcon name="i-lucide-settings" class="size-3 shrink-0 text-muted-foreground" />
