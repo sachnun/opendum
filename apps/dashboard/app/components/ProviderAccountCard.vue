@@ -1116,7 +1116,7 @@ function cancelErrorPreviewPointer() {
                         :aria-label="activeErrorEntry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
                         @click="copyErrorPreview"
                       >
-                        <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-green-600" />
+                        <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-muted-foreground" />
                         <UiIcon v-else name="i-lucide-copy" class="size-3 text-muted-foreground" />
                       </button>
                     </UiTooltip>
@@ -1364,9 +1364,6 @@ function cancelErrorPreviewPointer() {
             {{ displayErrorMessage }}
           </p>
 
-          <div class="border-t pt-3 text-xs text-muted-foreground">
-            {{ activeErrorEntry?.isCurrent ? 'Showing current error' : `Showing previous error from ${activeErrorEntry ? getErrorEntryRelativeTime(activeErrorEntry) : 'history'}` }}
-          </div>
         </div>
       </template>
     </UiDialog>
