@@ -22,8 +22,9 @@ type Result struct {
 }
 
 type ModelAccess struct {
-	Mode   string
-	Models []string
+	Mode           string
+	Models         []string
+	RoamingEnabled bool
 }
 
 type AccountAccess struct {
@@ -41,12 +42,15 @@ type ModelValidationResult struct {
 }
 
 type AccountModelAvailability struct {
-	ActiveProviders              map[string]struct{}
-	AccountCountByProvider       map[string]int
-	DisabledCountByProviderModel map[string]int
-	ActiveAccountIDsByProvider   map[string][]string
-	AccountTierByID              map[string]string
-	AuthlessProviderModels       map[string]map[string]struct{}
+	ActiveProviders                    map[string]struct{}
+	AccountCountByProvider             map[string]int
+	DisabledCountByProviderModel       map[string]int
+	ActiveAccountIDsByProvider         map[string][]string
+	AccountTierByID                    map[string]string
+	AuthlessProviderModels             map[string]map[string]struct{}
+	SharedAccountCountByProvider       map[string]int
+	SharedDisabledCountByProviderModel map[string]int
+	SharedAccountTiersByProvider       map[string][]string
 }
 
 type cacheValue struct {

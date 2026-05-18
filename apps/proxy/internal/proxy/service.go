@@ -89,7 +89,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	r = r.WithContext(context.WithValue(ctx, requestBodyContextKey{}, body))
 	ctx = r.Context()
 
-	validation, err := s.auth.ValidateModelForUser(ctx, authResult.UserID, parsed.ModelParam, auth.ModelAccess{Mode: authResult.ModelAccessMode, Models: authResult.ModelAccessList})
+	validation, err := s.auth.ValidateModelForUser(ctx, authResult.UserID, parsed.ModelParam, auth.ModelAccess{Mode: authResult.ModelAccessMode, Models: authResult.ModelAccessList, RoamingEnabled: authResult.RoamingEnabled})
 	if err != nil {
 		s.writeRouteError(w, cfg, http.StatusInternalServerError, "Internal server error", "api_error", nil, nil, nil, nil)
 		return

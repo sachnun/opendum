@@ -98,6 +98,7 @@ func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {
 
 	var userID string
 	apiKeyModelAccessMode := "all"
+	roamingEnabled := false
 	apiKeyModelSet := map[string]struct{}{}
 	if authHeader != "" {
 		result, err := s.auth.ValidateAPIKey(ctx, authHeader)
@@ -111,6 +112,7 @@ func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		userID = result.UserID
 		apiKeyModelAccessMode = result.ModelAccessMode
+		roamingEnabled = result.RoamingEnabled
 		for _, model := range result.ModelAccessList {
 			apiKeyModelSet[s.registry.ResolveAlias(model)] = struct{}{}
 		}
@@ -127,7 +129,7 @@ func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {
 		WriteOpenAIError(w, http.StatusInternalServerError, ErrorInfo{Message: "Internal server error.", Type: "api_error"})
 		return
 	}
-	availability, err := s.auth.GetAccountModelAvailability(ctx, userID)
+	availability, err := s.auth.GetAccountModelAvailabilityWithSharing(ctx, userID, roamingEnabled)
 	if err != nil {
 		WriteOpenAIError(w, http.StatusInternalServerError, ErrorInfo{Message: "Internal server error.", Type: "api_error"})
 		return
@@ -140,7 +142,7 @@ func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {
 		if _, disabled := disabledSet[canonical]; disabled {
 			continue
 		}
-		if !s.auth.IsModelUsableByAccounts(canonical, availability) {
+		if !s.auth.IsModelUsableByAccounts(canonical, availability) && !(roamingEnabled && s.auth.IsModelUsableBySharedAccounts(canonical, availability)) {
 			continue
 		}
 		if apiKeyModelAccessMode == "whitelist" {
