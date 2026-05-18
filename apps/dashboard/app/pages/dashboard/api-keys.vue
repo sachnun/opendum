@@ -225,12 +225,14 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
 <template>
   <div class="space-y-6">
     <div class="dashboard-header-divider">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex flex-wrap items-center gap-2">
-          <h2 class="text-xl font-semibold">API Keys</h2>
-          <UiBadge variant="outline">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
+      <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
+          API Keys
+          <UiBadge v-if="apiKeys.length > 0" variant="outline" class="text-xs">{{ activeApiKeyCount }}/{{ apiKeys.length }}</UiBadge>
+        </h2>
+        <div class="flex w-full items-center sm:w-auto">
+          <CreateApiKeyButton :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
         </div>
-        <CreateApiKeyButton :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @created="refresh" />
       </div>
     </div>
 
