@@ -41,7 +41,6 @@ const promotedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
 const visibleAccountIds = ref<Set<string>>(new Set());
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
-let promotedAccountTimer: ReturnType<typeof setTimeout> | null = null;
 let accountVisibilityObserver: IntersectionObserver | null = null;
 let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let providerDetailRefreshInFlight: Promise<void> | null = null;
@@ -138,21 +137,12 @@ watch(
         clearTimeout(highlightTimer);
         highlightTimer = null;
       }
-      if (promotedAccountTimer) {
-        clearTimeout(promotedAccountTimer);
-        promotedAccountTimer = null;
-      }
       return;
     }
 
     highlightedAccountIds.value = new Set(newAccounts.map((account) => account.id));
     if (shouldPromoteNextNewAccount) {
       promotedAccountIds.value = new Set([...promotedAccountIds.value, ...newAccounts.map((account) => account.id)]);
-      if (promotedAccountTimer) clearTimeout(promotedAccountTimer);
-      promotedAccountTimer = setTimeout(() => {
-        promotedAccountIds.value = new Set();
-        promotedAccountTimer = null;
-      }, 5000);
     }
     shouldPromoteNextNewAccount = false;
     if (highlightTimer) clearTimeout(highlightTimer);
@@ -171,10 +161,6 @@ watch(selectedProvider, () => {
   if (highlightTimer) {
     clearTimeout(highlightTimer);
     highlightTimer = null;
-  }
-  if (promotedAccountTimer) {
-    clearTimeout(promotedAccountTimer);
-    promotedAccountTimer = null;
   }
   shouldPromoteNextNewAccount = false;
 });
@@ -227,7 +213,6 @@ const {
 
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
-  if (promotedAccountTimer) clearTimeout(promotedAccountTimer);
   stopProviderDetailRefresh();
   accountVisibilityObserver?.disconnect();
   cancelQuotaQueue();
