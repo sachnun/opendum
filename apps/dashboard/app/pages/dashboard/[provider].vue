@@ -37,15 +37,18 @@ const { data, error, pending, refresh } = await useAsyncData(
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
 const highlightedAccountIds = ref<Set<string>>(new Set());
+const promotedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
 const visibleAccountIds = ref<Set<string>>(new Set());
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+let promotedAccountTimer: ReturnType<typeof setTimeout> | null = null;
 let accountVisibilityObserver: IntersectionObserver | null = null;
 let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let providerDetailRefreshInFlight: Promise<void> | null = null;
 let providerDetailRefreshQueued = false;
 let providerDetailRefreshQueuedShouldRefreshQuota = false;
 let providerQuotaRefreshInFlight: Promise<void> | null = null;
+let shouldPromoteNextNewAccount = false;
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
   return [...currentAccounts].sort(compareAccounts);
@@ -129,14 +132,29 @@ watch(
     if (newAccounts.length === 0) return;
     if (newAccounts.length === value.accounts.length) {
       highlightedAccountIds.value = new Set();
+      promotedAccountIds.value = new Set();
+      shouldPromoteNextNewAccount = false;
       if (highlightTimer) {
         clearTimeout(highlightTimer);
         highlightTimer = null;
+      }
+      if (promotedAccountTimer) {
+        clearTimeout(promotedAccountTimer);
+        promotedAccountTimer = null;
       }
       return;
     }
 
     highlightedAccountIds.value = new Set(newAccounts.map((account) => account.id));
+    if (shouldPromoteNextNewAccount) {
+      promotedAccountIds.value = new Set([...promotedAccountIds.value, ...newAccounts.map((account) => account.id)]);
+      if (promotedAccountTimer) clearTimeout(promotedAccountTimer);
+      promotedAccountTimer = setTimeout(() => {
+        promotedAccountIds.value = new Set();
+        promotedAccountTimer = null;
+      }, 5000);
+    }
+    shouldPromoteNextNewAccount = false;
     if (highlightTimer) clearTimeout(highlightTimer);
     highlightTimer = setTimeout(() => {
       highlightedAccountIds.value = new Set();
@@ -148,11 +166,17 @@ watch(
 
 watch(selectedProvider, () => {
   highlightedAccountIds.value = new Set();
+  promotedAccountIds.value = new Set();
   visibleAccountIds.value = new Set();
   if (highlightTimer) {
     clearTimeout(highlightTimer);
     highlightTimer = null;
   }
+  if (promotedAccountTimer) {
+    clearTimeout(promotedAccountTimer);
+    promotedAccountTimer = null;
+  }
+  shouldPromoteNextNewAccount = false;
 });
 
 watch(
@@ -203,6 +227,7 @@ const {
 
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
+  if (promotedAccountTimer) clearTimeout(promotedAccountTimer);
   stopProviderDetailRefresh();
   accountVisibilityObserver?.disconnect();
   cancelQuotaQueue();
@@ -261,7 +286,11 @@ function toTimeMs(value: string | Date | null | undefined): number {
 }
 
 function compareAccounts(a: Account, b: Account): number {
-  return toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
+  const aPromoted = promotedAccountIds.value.has(a.id) ? 1 : 0;
+  const bPromoted = promotedAccountIds.value.has(b.id) ? 1 : 0;
+
+  return bPromoted - aPromoted
+    || toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
     || toTimeMs(b.createdAt) - toTimeMs(a.createdAt)
     || b.id.localeCompare(a.id);
 }
@@ -425,6 +454,10 @@ function handleAccountErrorsResolved() {
   void dashboardInvalidation.invalidateAccountOverview();
 }
 
+function handleAccountConnected(result: { provider: ProviderAccountKey; isUpdate: boolean }) {
+  if (result.provider === selectedProvider.value && !result.isUpdate) shouldPromoteNextNewAccount = true;
+}
+
 function decodeAccountHash(hash: string): string | null {
   const accountId = hash.startsWith("#") ? hash.slice(1) : hash;
   if (!accountId) return null;
@@ -457,6 +490,7 @@ function decodeAccountHash(hash: string): string | null {
             :initial-provider="providerMeta.key"
             :readonly="isAuditMode"
             trigger-class="flex-1 sm:w-auto sm:flex-none"
+            @connected="handleAccountConnected"
           />
         </div>
       </div>
