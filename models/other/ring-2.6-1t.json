@@ -1,11 +1,4 @@
 {
-  "providers": [
-    "opencode"
-  ],
-  "family": "InclusionAI",
-  "providerConfig": {
-    "opencode": {
-      "upstream": "ring-2.6-1t-free"
-    }
-  }
+  "providers": [],
+  "family": "InclusionAI"
 }

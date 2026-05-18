@@ -1,9 +1,7 @@
 {
-  "providers": [
-    "opencode"
-  ],
-  "ignored": true,
+  "providers": [],
   "family": "Trinity",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,
@@ -15,11 +13,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "opencode": {
-      "upstream": "trinity-large-preview-free"
     }
   }
 }
