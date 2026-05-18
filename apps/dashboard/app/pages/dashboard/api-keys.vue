@@ -102,9 +102,7 @@ function keyRateLimits(apiKeyId: string) {
 
 function accessModeLabel(mode: string) {
   const normalizedMode = mode === "whitelist" || mode === "blacklist" ? mode : "all";
-  if (normalizedMode === "whitelist") return "Whitelist";
-  if (normalizedMode === "blacklist") return "Blacklist";
-  return "All";
+  return normalizedMode;
 }
 
 function updateApiKeyState(apiKeyId: string, value: { isActive: boolean; expiresAt: string | Date | null }) {
@@ -270,13 +268,6 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
               </div>
             </div>
             <p v-if="toggleErrors[apiKey.id]" class="mt-1 text-xs text-destructive">{{ toggleErrors[apiKey.id] }}</p>
-            <div class="mt-1 flex flex-wrap items-center gap-1.5">
-              <UiBadge variant="outline" class="text-[10px] font-normal">Models: {{ accessModeLabel(apiKey.modelAccessMode) }}</UiBadge>
-              <UiBadge variant="outline" class="text-[10px] font-normal">Accounts: {{ accessModeLabel(apiKey.accountAccessMode) }}</UiBadge>
-              <UiBadge v-if="keyRateLimits(apiKey.id).length > 0" variant="outline" class="text-[10px] font-normal">
-                {{ keyRateLimits(apiKey.id).length }} limit{{ keyRateLimits(apiKey.id).length === 1 ? '' : 's' }}
-              </UiBadge>
-            </div>
           </UiCardHeader>
 
           <UiCardContent class="flex flex-1 flex-col pt-0">
@@ -348,7 +339,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
               </div>
 
               <div class="grid gap-2.5 border-t border-border/60 pt-3">
-                <ApiKeyAccessSection title="Model Access">
+                <ApiKeyAccessSection title="Model Access" :badge="accessModeLabel(apiKey.modelAccessMode)">
                   <ApiKeyModelAccess
                     :api-key-id="apiKey.id"
                     :available-models="options?.availableModels ?? []"
@@ -359,7 +350,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Account Access">
+                <ApiKeyAccessSection title="Account Access" :badge="accessModeLabel(apiKey.accountAccessMode)">
                   <ApiKeyAccountAccess
                     :api-key-id="apiKey.id"
                     :available-accounts="options?.providerAccounts ?? []"
@@ -370,7 +361,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Rate Limits">
+                <ApiKeyAccessSection title="Rate Limits" :badge="`${keyRateLimits(apiKey.id).length} limit${keyRateLimits(apiKey.id).length === 1 ? '' : 's'}`">
                   <ApiKeyRateLimit
                     :api-key-id="apiKey.id"
                     :available-models="options?.availableModels ?? []"
