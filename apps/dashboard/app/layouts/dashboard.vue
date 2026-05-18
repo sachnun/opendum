@@ -878,9 +878,25 @@ async function handleAuditSelected() {
                     </div>
                   </div>
                   <div v-if="isAuditMode" class="mx-1 mt-1 mb-2 rounded-md border border-border/70 bg-muted/30 px-2 py-2 text-sm">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Auditing</p>
-                    <p class="truncate font-medium">{{ auditUserLabel }}</p>
-                    <p class="truncate text-xs text-muted-foreground">{{ auditUserEmail }}</p>
+                    <div class="space-y-0.5">
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Auditing</p>
+                        <UiTooltip text="Change" side="left" align="center">
+                          <button
+                            type="button"
+                            aria-label="Change"
+                            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-background/80 text-muted-foreground shadow-xs outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            @click="openAuditDialog"
+                          >
+                            <UiIcon name="i-lucide-refresh-cw" class="size-3.5" />
+                          </button>
+                        </UiTooltip>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="truncate font-medium">{{ auditUserLabel }}</p>
+                        <p class="truncate text-xs text-muted-foreground">{{ auditUserEmail }}</p>
+                      </div>
+                    </div>
                   </div>
                   <div class="-mx-1 my-2 h-px bg-border" />
                   <div
