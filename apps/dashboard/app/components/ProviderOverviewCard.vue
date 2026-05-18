@@ -25,8 +25,7 @@ const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);
 const pendingStatBaselineContextKey = ref<string | null>(null);
 
-function indicatorBadge(indicator: string, activeAccounts: number) {
-  if (activeAccounts === 0) return { label: "No Accounts", class: "" };
+function indicatorBadge(indicator: string) {
   if (indicator === "error") return { label: "Issue", class: "border-destructive/60 text-destructive" };
   if (indicator === "warning") return { label: "Unhealty", class: "border-yellow-500 text-yellow-600" };
   return { label: "Healthy", class: "border-green-500 text-green-600" };
@@ -92,7 +91,7 @@ const durationLabelPoints = computed(() => {
   const indexes = Array.from(new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (points.length - 1)))));
   return indexes.map((index) => points[index]).filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
 });
-const badge = computed(() => indicatorBadge(props.summary.indicator, props.summary.active));
+const badge = computed(() => props.summary.active > 0 ? indicatorBadge(props.summary.indicator) : null);
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.summary.stats.totalRequests.toLocaleString(), numericValue: props.summary.stats.totalRequests, formatDelta: formatSignedInteger },
   { key: "totalTokens", label: "Token", value: compactNumber(props.summary.stats.totalTokens), numericValue: props.summary.stats.totalTokens, formatDelta: formatSignedInteger },
@@ -163,7 +162,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
         <UiCardTitle class="text-base">{{ provider.label }}</UiCardTitle>
         <UiBadge v-if="summary.connected > 0" variant="outline" class="text-xs">{{ summary.active }}/{{ summary.connected }}</UiBadge>
       </div>
-      <UiBadge variant="outline" :class="badge.class">{{ badge.label }}</UiBadge>
+      <UiBadge v-if="badge" variant="outline" :class="badge.class">{{ badge.label }}</UiBadge>
     </div>
 
     <UiCardContent class="pointer-events-none relative z-20 p-0">
