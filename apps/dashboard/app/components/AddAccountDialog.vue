@@ -50,9 +50,9 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", flowType: "api_key_with_account_id", apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
 };
 
-const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string; icon: string }> = [
-  { key: "oauth_redirect", name: "Browser OAuth", description: "Open the Codex login page, then paste the callback URL after redirect.", icon: "i-lucide-globe-2" },
-  { key: "device_code", name: "Device Code", description: "Enter a short code on the Codex device page and let the wizard detect completion.", icon: "i-lucide-key-round" },
+const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string }> = [
+  { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." },
+  { key: "device_code", name: "Device Code", description: "Enter a short device code." },
 ];
 
 const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "ollama_cloud", "openrouter", "nvidia_nim", "groq", "workers_ai"];
@@ -630,7 +630,6 @@ onBeforeUnmount(() => {
               )"
               @click="selectCodexLoginMethod(method.key)"
             >
-              <UiIcon :name="method.icon" class="mt-0.5 size-4 text-muted-foreground" />
               <span class="space-y-1">
                 <span class="block text-sm font-medium">{{ method.name }}</span>
                 <span class="block text-xs text-muted-foreground">{{ method.description }}</span>
