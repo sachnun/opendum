@@ -100,9 +100,14 @@ function keyRateLimits(apiKeyId: string) {
   return options.value?.rateLimitsByKeyId[apiKeyId] ?? [];
 }
 
-function accessModeLabel(mode: string) {
+function accessModeBadge(mode: string) {
   const normalizedMode = mode === "whitelist" || mode === "blacklist" ? mode : "all";
-  return normalizedMode;
+  return normalizedMode === "all" ? undefined : normalizedMode;
+}
+
+function rateLimitBadge(apiKeyId: string) {
+  const count = keyRateLimits(apiKeyId).length;
+  return count > 0 ? `${count} limit${count === 1 ? "" : "s"}` : undefined;
 }
 
 function updateApiKeyState(apiKeyId: string, value: { isActive: boolean; expiresAt: string | Date | null }) {
@@ -339,7 +344,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
               </div>
 
               <div class="grid gap-2.5 border-t border-border/60 pt-3">
-                <ApiKeyAccessSection title="Model Access" :badge="accessModeLabel(apiKey.modelAccessMode)">
+                <ApiKeyAccessSection title="Model Access" :badge="accessModeBadge(apiKey.modelAccessMode)">
                   <ApiKeyModelAccess
                     :api-key-id="apiKey.id"
                     :available-models="options?.availableModels ?? []"
@@ -350,7 +355,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Account Access" :badge="accessModeLabel(apiKey.accountAccessMode)">
+                <ApiKeyAccessSection title="Account Access" :badge="accessModeBadge(apiKey.accountAccessMode)">
                   <ApiKeyAccountAccess
                     :api-key-id="apiKey.id"
                     :available-accounts="options?.providerAccounts ?? []"
@@ -361,7 +366,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                   />
                 </ApiKeyAccessSection>
 
-                <ApiKeyAccessSection title="Rate Limits" :badge="`${keyRateLimits(apiKey.id).length} limit${keyRateLimits(apiKey.id).length === 1 ? '' : 's'}`">
+                <ApiKeyAccessSection title="Rate Limits" :badge="rateLimitBadge(apiKey.id)">
                   <ApiKeyRateLimit
                     :api-key-id="apiKey.id"
                     :available-models="options?.availableModels ?? []"
