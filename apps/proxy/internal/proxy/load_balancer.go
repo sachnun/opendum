@@ -583,7 +583,7 @@ func paidFirst(accounts []appdb.ProviderAccount) []appdb.ProviderAccount {
 	for _, account := range accounts {
 		if isSyntheticProviderAccountID(account.ID) {
 			free = append(free, account)
-		} else if isPaidAccountTier(account.Tier) {
+		} else if isPaidAccountTier(account.Provider, account.Tier) {
 			paid = append(paid, account)
 		} else {
 			free = append(free, account)
@@ -592,12 +592,19 @@ func paidFirst(accounts []appdb.ProviderAccount) []appdb.ProviderAccount {
 	return append(paid, free...)
 }
 
-func isPaidAccountTier(tier *string) bool {
+func isPaidAccountTier(provider string, tier *string) bool {
 	if tier == nil {
 		return false
 	}
-	switch strings.ToLower(strings.TrimSpace(*tier)) {
-	case "paid", "standard-tier", "plus", "pro", "prolite", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu", "education", "hc":
+	value := strings.ToLower(strings.TrimSpace(*tier))
+	switch provider {
+	case "antigravity":
+		return value == "paid" || value == "standard-tier"
+	case "kiro":
+		return value == "pro" || value == "pro+" || value == "pro-plus" || value == "power"
+	}
+	switch value {
+	case "paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu", "education", "hc":
 		return true
 	default:
 		return false

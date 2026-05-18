@@ -80,3 +80,72 @@ func TestAntigravityMaxRequestsNormalizesStoredTierAliases(t *testing.T) {
 		t.Fatalf("free max requests = %v, want 50", got)
 	}
 }
+
+func TestKiroTierNormalizesSubscriptionTypeAndTitle(t *testing.T) {
+	tests := []struct {
+		name string
+		sub  map[string]any
+		want string
+	}{
+		{name: "free type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_FREE"}, want: "free"},
+		{name: "pro type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_PRO"}, want: "pro"},
+		{name: "pro plus type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_PRO_PLUS"}, want: "pro-plus"},
+		{name: "power type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_POWER"}, want: "power"},
+		{name: "pro plus title", sub: map[string]any{"subscriptionTitle": "Kiro Pro+"}, want: "pro-plus"},
+		{name: "power title", sub: map[string]any{"subscriptionTitle": "Kiro Power"}, want: "power"},
+		{name: "free title", sub: map[string]any{"subscriptionTitle": "Kiro Free"}, want: "free"},
+		{name: "unknown title", sub: map[string]any{"subscriptionTitle": "Custom Team Tier"}, want: "custom-team-tier"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := kiroTier(map[string]any{"subscriptionInfo": tt.sub})
+			if got != tt.want {
+				t.Fatalf("kiroTier() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPrioritizeAccountsTreatsKiroPaidPlansAsPaid(t *testing.T) {
+	free := "free"
+	pro := "pro"
+	proPlus := "pro-plus"
+	power := "power"
+	accounts := []appdb.ProviderAccount{
+		{ID: "free-kiro", Provider: "kiro", Tier: &free},
+		{ID: "pro-kiro", Provider: "kiro", Tier: &pro},
+		{ID: "unknown-kiro", Provider: "kiro"},
+		{ID: "pro-plus-kiro", Provider: "kiro", Tier: &proPlus},
+		{ID: "power-kiro", Provider: "kiro", Tier: &power},
+	}
+
+	prioritized := prioritizeAccounts(accounts, false, nil)
+	ids := make([]string, 0, len(prioritized))
+	for _, account := range prioritized {
+		ids = append(ids, account.ID)
+	}
+	want := []string{"pro-kiro", "pro-plus-kiro", "power-kiro", "free-kiro", "unknown-kiro"}
+	if !reflect.DeepEqual(ids, want) {
+		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
+	}
+}
+
+func TestPrioritizeAccountsUsesProviderSpecificPaidTiers(t *testing.T) {
+	standardTier := "standard-tier"
+	team := "team"
+	accounts := []appdb.ProviderAccount{
+		{ID: "team-antigravity", Provider: "antigravity", Tier: &team},
+		{ID: "standard-antigravity", Provider: "antigravity", Tier: &standardTier},
+	}
+
+	prioritized := prioritizeAccounts(accounts, false, nil)
+	ids := make([]string, 0, len(prioritized))
+	for _, account := range prioritized {
+		ids = append(ids, account.ID)
+	}
+	want := []string{"standard-antigravity", "team-antigravity"}
+	if !reflect.DeepEqual(ids, want) {
+		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
+	}
+}

@@ -61,7 +61,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "Kiro",
     category: "oauth",
     emptyMessage: "No Kiro connections yet.",
-    showTier: false,
+    showTier: true,
   },
   {
     key: "qwen_code",

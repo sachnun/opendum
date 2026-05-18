@@ -435,16 +435,19 @@ function isPreviousDayLabel(time: string): boolean {
   return date < today;
 }
 
-function isPaidTierValue(tier: string): boolean {
-  return ["paid", "standard-tier", "plus", "pro", "prolite", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu", "education", "hc"].includes(tier.trim().toLowerCase());
+function isPaidTierValue(tier: string, provider?: string): boolean {
+  const value = tier.trim().toLowerCase();
+  if (provider === "antigravity") return ["paid", "standard-tier"].includes(value);
+  if (provider === "kiro") return ["pro", "pro-plus", "pro+", "power"].includes(value);
+  return ["paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu", "education", "hc"].includes(value);
 }
 
 function isFreeTierValue(tier: string): boolean {
   return ["free", "free-tier", "legacy-tier"].includes(tier.trim().toLowerCase());
 }
 
-function formatTierBadgeLabel(tier: string): "Paid" | "Free" | "" {
-  if (isPaidTierValue(tier)) return "Paid";
+function formatTierBadgeLabel(tier: string, provider?: string): "Paid" | "Free" | "" {
+  if (isPaidTierValue(tier, provider)) return "Paid";
   if (isFreeTierValue(tier)) return "Free";
   return "";
 }
@@ -498,11 +501,11 @@ const statAnimationContextKey = computed(() => {
 const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
 const effectiveTier = computed(() => {
   const quotaTier = props.quotaInfo?.tier?.trim();
-  if (props.account.provider === "codex" && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
+  if (["codex", "kiro"].includes(props.account.provider) && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
   return props.account.tier;
 });
 const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "");
-const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value));
+const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value, props.account.provider));
 const showTierBadge = computed(() => props.showTier && tierBadgeLabel.value !== "");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
 const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? QUOTA_SKELETON_ROWS.copilot);
@@ -1029,7 +1032,7 @@ function cancelErrorPreviewPointer() {
         <div class="flex min-w-0 items-center justify-between gap-2">
           <UiCardTitle class="min-w-0 truncate text-lg">{{ accountTitle }}</UiCardTitle>
           <div class="flex shrink-0 items-center justify-end gap-1 whitespace-nowrap">
-            <UiBadge v-if="showTierBadge" variant="outline" :class="isPaidTierValue(normalizedTier) ? 'border-green-500 text-green-600' : ''">
+            <UiBadge v-if="showTierBadge" variant="outline" :class="isPaidTierValue(normalizedTier, account.provider) ? 'border-green-500 text-green-600' : ''">
               {{ tierBadgeLabel }}
             </UiBadge>
             <UiBadge v-if="account.status === 'failed'" variant="outline" class="border-destructive/60 text-destructive gap-1">

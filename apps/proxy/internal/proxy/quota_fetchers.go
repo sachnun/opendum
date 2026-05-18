@@ -562,46 +562,111 @@ func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAcco
 	fallbackTier := quotaFallbackTier(account)
 	values := url.Values{}
 	values.Set("origin", "AI_EDITOR")
-	if account.AccountID != nil && strings.TrimSpace(*account.AccountID) != "" { values.Set("profileArn", strings.TrimSpace(*account.AccountID)) }
+	if account.AccountID != nil && strings.TrimSpace(*account.AccountID) != "" {
+		values.Set("profileArn", strings.TrimSpace(*account.AccountID))
+	}
 	target := encodeQuery("https://q.us-east-1.amazonaws.com/", values)
 	body := map[string]any{"origin": "AI_EDITOR"}
-	if profile := values.Get("profileArn"); profile != "" { body["profileArn"] = profile }
+	if profile := values.Get("profileArn"); profile != "" {
+		body["profileArn"] = profile
+	}
 	resp, raw, err := getJSON(ctx, s.client, http.MethodPost, target, map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/x-amz-json-1.0", "Accept": "application/json", "User-Agent": "KiroIDE-0.7.45", "x-amz-user-agent": "KiroIDE-0.7.45", "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits", "x-amzn-codewhisperer-optout": "true", "x-amzn-kiro-agent-mode": "vibe", "amz-sdk-request": "attempt=1; max=3"}, body)
-	if err != nil { return errorQuotaInfo(account, fallbackTier, err.Error(), time.Now().UnixMilli()) }
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 { return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Kiro usage limits quota endpoint failed: HTTP %d %s", resp.StatusCode, string(raw)), time.Now().UnixMilli()) }
+	if err != nil {
+		return errorQuotaInfo(account, fallbackTier, err.Error(), time.Now().UnixMilli())
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Kiro usage limits quota endpoint failed: HTTP %d %s", resp.StatusCode, string(raw)), time.Now().UnixMilli())
+	}
 	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil { return errorQuotaInfo(account, fallbackTier, "Kiro usage limits response was not valid JSON", time.Now().UnixMilli()) }
-	record := parseQuotaRecord(payload["data"]); if record == nil { record = payload }
-	tier := kiroTier(record); if tier == "" { tier = fallbackTier }
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return errorQuotaInfo(account, fallbackTier, "Kiro usage limits response was not valid JSON", time.Now().UnixMilli())
+	}
+	record := parseQuotaRecord(payload["data"])
+	if record == nil {
+		record = payload
+	}
+	tier := kiroTier(record)
+	if tier == "" {
+		tier = fallbackTier
+	}
 	groups := kiroGroups(record)
-	if len(groups) == 0 { return errorQuotaInfo(account, tier, "Kiro usage limits are unavailable for this account", time.Now().UnixMilli()) }
+	if len(groups) == 0 {
+		return errorQuotaInfo(account, tier, "Kiro usage limits are unavailable for this account", time.Now().UnixMilli())
+	}
 	return baseQuotaInfo(account, tier, "success", groups, time.Now().UnixMilli(), "")
 }
 
 func kiroTier(record map[string]any) string {
 	sub := parseQuotaRecord(record["subscriptionInfo"])
-	raw := strings.ToUpper(parseQuotaString(sub["type"]))
-	switch raw { case "Q_DEVELOPER_STANDALONE_FREE": return "free"; case "Q_DEVELOPER_STANDALONE_POWER": return "power"; case "Q_DEVELOPER_STANDALONE_PRO": return "pro"; case "Q_DEVELOPER_STANDALONE_PRO_PLUS": return "pro-plus" }
-	return strings.ToLower(parseQuotaString(sub["subscriptionTitle"]))
+	return normalizeKiroSubscriptionTier(parseQuotaString(sub["type"]), parseQuotaString(sub["subscriptionTitle"]))
+}
+
+func normalizeKiroSubscriptionTier(rawType, subscriptionTitle string) string {
+	switch strings.ToUpper(strings.TrimSpace(rawType)) {
+	case "Q_DEVELOPER_STANDALONE_FREE":
+		return "free"
+	case "Q_DEVELOPER_STANDALONE_POWER":
+		return "power"
+	case "Q_DEVELOPER_STANDALONE_PRO":
+		return "pro"
+	case "Q_DEVELOPER_STANDALONE_PRO_PLUS":
+		return "pro-plus"
+	case "Q_DEVELOPER_STANDALONE":
+		return "standalone"
+	}
+
+	title := strings.ToLower(strings.TrimSpace(subscriptionTitle))
+	if title == "" {
+		return ""
+	}
+	if strings.Contains(title, "pro+") || strings.Contains(title, "pro plus") {
+		return "pro-plus"
+	}
+	if strings.Contains(title, "power") {
+		return "power"
+	}
+	if strings.Contains(title, "pro") {
+		return "pro"
+	}
+	if strings.Contains(title, "free") {
+		return "free"
+	}
+	title = strings.NewReplacer("_", " ", "-", " ").Replace(title)
+	return strings.Join(strings.Fields(title), "-")
 }
 
 func kiroGroups(record map[string]any) []quotaGroupDisplay {
 	labels := map[string]string{"AI_EDITOR": "Kiro requests", "AGENTIC_REQUEST": "Agentic requests", "CODE_COMPLETIONS": "Code completions", "TRANSFORM": "Transform", "CREDIT": "Credits", "VIBE": "Vibe usage", "SPEC": "Spec usage"}
 	metrics := []map[string]any{}
-	for _, raw := range parseQuotaArray(record["limits"]) { if metric := parseQuotaRecord(raw); metric != nil { metrics = append(metrics, metric) } }
-	for _, raw := range parseQuotaArray(record["usageBreakdownList"]) { if metric := parseQuotaRecord(raw); metric != nil { metrics = append(metrics, metric) } }
+	for _, raw := range parseQuotaArray(record["limits"]) {
+		if metric := parseQuotaRecord(raw); metric != nil {
+			metrics = append(metrics, metric)
+		}
+	}
+	for _, raw := range parseQuotaArray(record["usageBreakdownList"]) {
+		if metric := parseQuotaRecord(raw); metric != nil {
+			metrics = append(metrics, metric)
+		}
+	}
 	groups := []quotaGroupDisplay{}
 	for _, metric := range metrics {
 		name := strings.ToUpper(firstNonEmpty(parseQuotaString(metric["type"]), parseQuotaString(metric["resourceType"]), parseQuotaString(metric["displayName"])))
-		if name == "" { continue }
+		if name == "" {
+			continue
+		}
 		current, okCurrent := firstNumber(metric["currentUsage"], metric["currentUsageWithPrecision"])
 		limit, okLimit := firstNumber(metric["totalUsageLimit"], metric["usageLimitWithPrecision"], metric["usageLimit"])
-		if !okCurrent || !okLimit || limit <= 0 { continue }
+		if !okCurrent || !okLimit || limit <= 0 {
+			continue
+		}
 		remaining := math.Max(0, limit-current)
 		fraction := clampFraction(remaining / limit)
-		percentUsed := int(math.Round(clampFraction(current/limit)*100))
+		percentUsed := int(math.Round(clampFraction(current/limit) * 100))
 		resetISO := parseResetISO(firstNonNil(metric["nextDateReset"], record["nextDateReset"]))
-		display := labels[name]; if display == "" { display = strings.Title(strings.ToLower(strings.ReplaceAll(name, "_", " "))) }
+		display := labels[name]
+		if display == "" {
+			display = strings.Title(strings.ToLower(strings.ReplaceAll(name, "_", " ")))
+		}
 		groups = append(groups, quotaGroupDisplay{Name: strings.ToLower(name), DisplayName: display, Models: []string{}, RemainingFraction: fraction, RemainingRequests: displayNumber(remaining), MaxRequests: displayNumber(limit), UsedRequests: displayNumber(current), PercentUsed: percentUsed, IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO)})
 	}
 	return groups
