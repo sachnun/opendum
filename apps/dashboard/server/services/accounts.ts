@@ -228,27 +228,42 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
 }
 
 export async function getAccountsByProviderDetailed(userId: string, input: z.infer<typeof providerInputSchema>) {
+  const startedAt = Date.now();
+  const timings: Record<string, number> = {};
+  const timeStep = async <T>(key: string, action: () => Promise<T>): Promise<T> => {
+    const stageStartedAt = Date.now();
+    try {
+      return await action();
+    } finally {
+      timings[key] = Date.now() - stageStartedAt;
+    }
+  };
+
   try {
     const now = new Date();
+    const accountsStartedAt = Date.now();
     const accounts = await db
       .select(providerAccountListColumns)
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider)))
       .orderBy(...providerAccountLastUsedOrder);
+    timings.accounts = Date.now() - accountsStartedAt;
 
+    const modelsStartedAt = Date.now();
     const accountIds = accounts.map((account) => account.id);
     const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
+    timings.models = Date.now() - modelsStartedAt;
     const [accountStatsById, disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
-      buildAccountStats(userId, accountIds),
-      accountIds.length > 0
-        ? db
+      timeStep("stats", () => buildAccountStats(userId, accountIds)),
+      timeStep("disabledModels", async () => accountIds.length > 0
+        ? await db
             .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
             .from(providerAccountDisabledModel)
             .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds))
-        : Promise.resolve([]),
-      accountIds.length > 0 && healthModelKeys.length > 0
-        ? db
+        : []),
+      timeStep("health", async () => accountIds.length > 0 && healthModelKeys.length > 0
+        ? await db
             .select({
               providerAccountId: providerAccountModelHealth.providerAccountId,
               model: providerAccountModelHealth.model,
@@ -262,10 +277,11 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
             })
             .from(providerAccountModelHealth)
             .where(and(inArray(providerAccountModelHealth.providerAccountId, accountIds), inArray(providerAccountModelHealth.model, healthModelKeys)))
-        : Promise.resolve([]),
-      getPinnedProviderKeys(userId),
+        : []),
+      timeStep("pinnedProviders", () => getPinnedProviderKeys(userId)),
     ]);
 
+    const mapStartedAt = Date.now();
     const disabledModelsByAccountId = disabledModelRows.reduce<Record<string, string[]>>((acc, row) => {
       acc[row.providerAccountId] = [...(acc[row.providerAccountId] ?? []), row.model];
       return acc;
@@ -299,30 +315,42 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       return acc;
     }, {});
 
-    return {
-      accounts: accounts.map((account) => {
-        const effectiveAccount = withEffectiveHealthStatus(account, now);
-        const health = healthByAccountId[effectiveAccount.id];
-        const accountWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[effectiveAccount.status] ?? 0;
-        const healthWeight = health ? ACCOUNT_HEALTH_STATUS_WEIGHT[health.status] ?? 0 : 0;
-        const useModelHealth = health && (healthWeight > accountWeight || (healthWeight === accountWeight && health.consecutiveErrors > effectiveAccount.consecutiveErrors));
+    const detailedAccounts = accounts.map((account) => {
+      const effectiveAccount = withEffectiveHealthStatus(account, now);
+      const health = healthByAccountId[effectiveAccount.id];
+      const accountWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[effectiveAccount.status] ?? 0;
+      const healthWeight = health ? ACCOUNT_HEALTH_STATUS_WEIGHT[health.status] ?? 0 : 0;
+      const useModelHealth = health && (healthWeight > accountWeight || (healthWeight === accountWeight && health.consecutiveErrors > effectiveAccount.consecutiveErrors));
 
-        return {
-          ...withEffectiveActive(effectiveAccount, now),
-          ...(useModelHealth
-            ? {
-                status: health.status,
-                statusChangedAt: health.statusChangedAt,
-                consecutiveErrors: health.consecutiveErrors,
-                lastErrorAt: health.lastErrorAt ?? account.lastErrorAt,
-                lastErrorMessage: health.lastErrorMessage ?? account.lastErrorMessage,
-                lastErrorCode: health.lastErrorCode ?? account.lastErrorCode,
-                lastSuccessAt: health.lastSuccessAt ?? account.lastSuccessAt,
-              }
-            : {}),
-          stats: accountStatsById[account.id],
-        };
-      }),
+      return {
+        ...withEffectiveActive(effectiveAccount, now),
+        ...(useModelHealth
+          ? {
+              status: health.status,
+              statusChangedAt: health.statusChangedAt,
+              consecutiveErrors: health.consecutiveErrors,
+              lastErrorAt: health.lastErrorAt ?? account.lastErrorAt,
+              lastErrorMessage: health.lastErrorMessage ?? account.lastErrorMessage,
+              lastErrorCode: health.lastErrorCode ?? account.lastErrorCode,
+              lastSuccessAt: health.lastSuccessAt ?? account.lastSuccessAt,
+            }
+          : {}),
+        stats: accountStatsById[account.id],
+      };
+    });
+    timings.map = Date.now() - mapStartedAt;
+
+    console.info("dashboard provider-detail timing", {
+      provider: input.provider,
+      accounts: accounts.length,
+      supportedModels: supportedModels.length,
+      healthModelKeys: healthModelKeys.length,
+      timings,
+      total: Date.now() - startedAt,
+    });
+
+    return {
+      accounts: detailedAccounts,
       supportedModels,
       disabledModelsByAccountId,
       modelHealthByAccountId,
