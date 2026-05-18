@@ -179,7 +179,7 @@ async function selectUser(user: MaintenerAuditUser) {
 
       <p v-if="errorMessage" class="text-sm text-destructive">{{ errorMessage }}</p>
 
-      <div class="max-h-72 overflow-y-auto rounded-md border border-border bg-muted/10 p-1" @scroll="handleUsersScroll">
+      <div class="h-72 overflow-y-auto rounded-md border border-border bg-muted/10 p-1" @scroll="handleUsersScroll">
         <p v-if="query.trim().length > 0 && query.trim().length < 2" class="px-3 py-6 text-center text-sm text-muted-foreground">Type at least 2 characters.</p>
         <p v-else-if="isSearching && users.length === 0" class="px-3 py-6 text-center text-sm text-muted-foreground">Loading users...</p>
         <p v-else-if="users.length === 0" class="px-3 py-6 text-center text-sm text-muted-foreground">No users found.</p>
