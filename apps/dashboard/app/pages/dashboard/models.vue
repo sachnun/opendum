@@ -16,9 +16,8 @@ type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number
 
 const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardInvalidation.keys.models).data.value !== undefined;
 const shouldRefreshCachedModelsOnMount = import.meta.client && !nuxtApp.isHydrating && cachedModelsBeforePageLoad;
-const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidation.keys.models, () => dashboardApi.models.list());
+const { data, error, refresh } = await useAsyncData(dashboardInvalidation.keys.models, () => dashboardApi.models.list());
 const models = computed<ModelListItem[]>(() => data.value ?? []);
-const isInitialLoading = computed(() => pending.value && !data.value);
 const availableProviders = computed(() => {
   const entries = new Map<string, string>();
 
@@ -172,9 +171,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     </div>
 
     <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
-    <DashboardEmptyState v-else-if="models.length === 0" title="No models found" description="Connect accounts or adjust your search." icon="i-lucide-cpu" />
-    <div v-else class="space-y-4 md:space-y-2">
+    <div v-if="models.length > 0" class="space-y-4 md:space-y-2">
       <div class="flex flex-wrap gap-1.5 pb-2">
         <button
           type="button"
@@ -200,7 +197,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
         </button>
       </div>
 
-      <div v-if="modelSections.length > 0" class="space-y-6">
+      <div class="space-y-6">
         <section v-for="section in modelSections" :id="section.anchorId" :key="section.name" class="scroll-mt-24 space-y-4 md:space-y-2">
           <div class="flex items-center gap-2">
             <h3 class="text-sm font-semibold">{{ section.name }}</h3>
@@ -272,10 +269,6 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
             </UiCard>
           </div>
         </section>
-      </div>
-
-      <div v-else class="rounded-lg border border-dashed border-border py-12 text-center text-muted-foreground">
-        No models found for the selected providers.
       </div>
     </div>
   </div>
