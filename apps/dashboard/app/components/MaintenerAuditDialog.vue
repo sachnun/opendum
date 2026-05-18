@@ -192,14 +192,16 @@ async function selectUser(user: MaintenerAuditSearchUser) {
             :disabled="Boolean(selectingUserId)"
             @click="selectUser(user)"
           >
-            <span class="relative flex size-9 shrink-0 overflow-hidden rounded-full select-none">
-              <img v-if="user.image" :src="user.image" alt="" class="aspect-square size-full">
-              <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
-                {{ userInitial(user) }}
+            <span class="relative flex size-9 shrink-0 select-none">
+              <span class="flex size-9 overflow-hidden rounded-full">
+                <img v-if="user.image" :src="user.image" alt="" class="aspect-square size-full">
+                <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
+                  {{ userInitial(user) }}
+                </span>
               </span>
-              <span v-if="user.hasProviderIssue" class="absolute bottom-0 left-0 flex size-2.5" aria-label="Provider issue">
-                <span class="absolute inline-flex size-full animate-ping rounded-full bg-red-500 opacity-75" />
-                <span class="relative inline-flex size-2.5 rounded-full bg-red-500 ring-2 ring-background" />
+              <span v-if="user.hasProviderIssue" class="absolute bottom-0 left-0 z-10 flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+                <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
               </span>
             </span>
             <span class="min-w-0 flex-1">
