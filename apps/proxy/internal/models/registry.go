@@ -49,24 +49,33 @@ type Info struct {
 }
 
 type Registry struct {
-	models             map[string]Info
-	ignored            map[string]struct{}
-	effective          map[string]Info
-	aliasToCanonical   map[string]string
-	canonicalToAliases map[string][]string
-	providerModelMap   map[string]map[string]string
-	providerModelSet   map[string]map[string]struct{}
+	models              map[string]Info
+	ignored             map[string]struct{}
+	effective           map[string]Info
+	aliasToCanonical    map[string]string
+	canonicalToAliases  map[string][]string
+	providerModelMap    map[string]map[string]string
+	providerModelSet    map[string]map[string]struct{}
+	suggestionModels    []suggestionCandidate
+	suggestionProviders map[string][]suggestionCandidate
+}
+
+type suggestionCandidate struct {
+	Value      string
+	Normalized string
+	Tokens     []string
 }
 
 func Load(dir string) (*Registry, error) {
 	registry := &Registry{
-		models:             map[string]Info{},
-		ignored:            map[string]struct{}{},
-		effective:          map[string]Info{},
-		aliasToCanonical:   map[string]string{},
-		canonicalToAliases: map[string][]string{},
-		providerModelMap:   map[string]map[string]string{},
-		providerModelSet:   map[string]map[string]struct{}{},
+		models:              map[string]Info{},
+		ignored:             map[string]struct{}{},
+		effective:           map[string]Info{},
+		aliasToCanonical:    map[string]string{},
+		canonicalToAliases:  map[string][]string{},
+		providerModelMap:    map[string]map[string]string{},
+		providerModelSet:    map[string]map[string]struct{}{},
+		suggestionProviders: map[string][]suggestionCandidate{},
 	}
 
 	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
@@ -106,6 +115,7 @@ func Load(dir string) (*Registry, error) {
 	}
 
 	registry.buildAliases()
+	registry.buildSuggestionCandidates()
 	return registry, nil
 }
 
@@ -234,6 +244,22 @@ func (r *Registry) buildAliases() {
 	}
 	for canonical := range r.canonicalToAliases {
 		r.canonicalToAliases[canonical] = uniqueSorted(r.canonicalToAliases[canonical])
+	}
+}
+
+func (r *Registry) buildSuggestionCandidates() {
+	for _, model := range r.AllModels() {
+		candidate := newSuggestionCandidate(model)
+		r.suggestionModels = append(r.suggestionModels, candidate)
+		info := r.effective[model]
+		for _, provider := range info.Providers {
+			r.suggestionProviders[provider] = append(r.suggestionProviders[provider], candidate)
+		}
+	}
+	for provider := range r.suggestionProviders {
+		sort.Slice(r.suggestionProviders[provider], func(i, j int) bool {
+			return r.suggestionProviders[provider][i].Value < r.suggestionProviders[provider][j].Value
+		})
 	}
 }
 
@@ -391,21 +417,26 @@ func (r *Registry) SuggestedModels(model string, provider *string, candidates []
 	if term == "" || limit <= 0 {
 		return nil
 	}
+	query := newSuggestionCandidate(term)
 
 	useProviderPrefix := false
+	suggestionCandidates := []suggestionCandidate{}
 	if len(candidates) == 0 {
 		if provider != nil {
-			providerCandidates := r.ModelsForProvider(*provider)
+			providerCandidates := r.suggestionProviders[*provider]
 			if len(providerCandidates) > 0 {
-				candidates = providerCandidates
+				suggestionCandidates = providerCandidates
 				useProviderPrefix = true
 			}
 		}
-		if len(candidates) == 0 {
-			candidates = r.AllModels()
+		if len(suggestionCandidates) == 0 {
+			suggestionCandidates = r.suggestionModels
 		}
 	} else {
 		candidates = uniqueSorted(candidates)
+		for _, candidate := range candidates {
+			suggestionCandidates = append(suggestionCandidates, newSuggestionCandidate(candidate))
+		}
 		useProviderPrefix = provider != nil
 	}
 
@@ -414,10 +445,10 @@ func (r *Registry) SuggestedModels(model string, provider *string, candidates []
 		score float64
 	}
 	matches := []match{}
-	for _, candidate := range candidates {
-		score := suggestionScore(term, candidate)
+	for _, candidate := range suggestionCandidates {
+		score := suggestionScore(query, candidate)
 		if score >= suggestionThreshold {
-			matches = append(matches, match{value: candidate, score: score})
+			matches = append(matches, match{value: candidate.Value, score: score})
 		}
 	}
 	sort.Slice(matches, func(i, j int) bool {
@@ -594,9 +625,14 @@ func contains(values []string, target string) bool {
 	return false
 }
 
-func suggestionScore(term, candidate string) float64 {
-	left := normalizeSuggestionValue(term)
-	right := normalizeSuggestionValue(candidate)
+func newSuggestionCandidate(value string) suggestionCandidate {
+	normalized := normalizeSuggestionValue(value)
+	return suggestionCandidate{Value: value, Normalized: normalized, Tokens: strings.Fields(normalized)}
+}
+
+func suggestionScore(term, candidate suggestionCandidate) float64 {
+	left := term.Normalized
+	right := candidate.Normalized
 	if left == "" || right == "" {
 		return 0
 	}
@@ -612,6 +648,9 @@ func suggestionScore(term, candidate string) float64 {
 		}
 		return 0.8 + 0.2*(float64(shorter)/float64(longer))
 	}
+	if score := tokenSuggestionScore(term.Tokens, candidate.Tokens); score > 0 {
+		return score
+	}
 	maxLen := len([]rune(left))
 	if otherLen := len([]rune(right)); otherLen > maxLen {
 		maxLen = otherLen
@@ -623,18 +662,66 @@ func suggestionScore(term, candidate string) float64 {
 	return 1 - float64(distance)/float64(maxLen)
 }
 
+func tokenSuggestionScore(termTokens, candidateTokens []string) float64 {
+	if len(termTokens) == 0 || len(candidateTokens) == 0 {
+		return 0
+	}
+
+	total := 0.0
+	for _, token := range termTokens {
+		best := 0.0
+		for _, candidateToken := range candidateTokens {
+			score := compactTokenScore(token, candidateToken)
+			if score > best {
+				best = score
+			}
+		}
+		total += best
+	}
+
+	return total / float64(len(termTokens))
+}
+
+func compactTokenScore(term, candidate string) float64 {
+	if term == candidate {
+		return 1
+	}
+	if strings.Contains(candidate, term) || strings.Contains(term, candidate) {
+		shorter := len([]rune(term))
+		longer := len([]rune(candidate))
+		if len([]rune(candidate)) < shorter {
+			shorter = len([]rune(candidate))
+			longer = len([]rune(term))
+		}
+		return 0.82 + 0.18*(float64(shorter)/float64(longer))
+	}
+	maxLen := len([]rune(term))
+	if otherLen := len([]rune(candidate)); otherLen > maxLen {
+		maxLen = otherLen
+	}
+	if maxLen == 0 {
+		return 0
+	}
+	distance := levenshteinDistance(term, candidate)
+	score := 1 - float64(distance)/float64(maxLen)
+	if score < 0 {
+		return 0
+	}
+	return score
+}
+
 func normalizeSuggestionValue(value string) string {
 	var b strings.Builder
-	lastSpace := false
+	lastSeparator := false
 	for _, r := range strings.ToLower(strings.TrimSpace(value)) {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			b.WriteRune(r)
-			lastSpace = false
+			lastSeparator = false
 			continue
 		}
-		if unicode.IsSpace(r) && !lastSpace {
+		if !lastSeparator {
 			b.WriteRune(' ')
-			lastSpace = true
+			lastSeparator = true
 		}
 	}
 	return strings.TrimSpace(b.String())

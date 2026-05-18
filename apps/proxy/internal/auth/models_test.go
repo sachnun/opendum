@@ -83,6 +83,22 @@ func TestValidateModelSuggestionsExcludeAliases(t *testing.T) {
 	}
 }
 
+func TestValidateModelSuggestsFromTokenTypos(t *testing.T) {
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	service := NewService(nil, nil, registry)
+
+	result := service.ValidateModel("clod opua 46")
+	if result.Valid {
+		t.Fatal("ValidateModel returned valid result")
+	}
+	if !strings.Contains(result.Error, "Did you mean:") || !strings.Contains(result.Error, "claude-opus-4-6") {
+		t.Fatalf("error = %q", result.Error)
+	}
+}
+
 func TestValidateModelForUserHidesAPIKeyModelAccessDenials(t *testing.T) {
 	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
 	if err != nil {
