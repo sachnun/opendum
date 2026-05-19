@@ -66,6 +66,10 @@ export default defineNuxtConfig({
   modules: ["@nuxt/eslint", "@nuxt/fonts"],
   css: ["~/assets/css/main.css"],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
+  routeRules: {
+    "/dashboard": { ssr: false },
+    "/dashboard/**": { ssr: false },
+  },
   runtimeConfig: {
     proxyUrl: "",
     public: {

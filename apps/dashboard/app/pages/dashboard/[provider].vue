@@ -32,7 +32,7 @@ const PROVIDER_DETAIL_REFRESH_MS = 30_000;
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
   () => dashboardApi.accounts.byProviderDetailed({ provider: selectedProvider.value }),
-  { server: false, watch: [selectedProvider] }
+  { watch: [selectedProvider] }
 );
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
