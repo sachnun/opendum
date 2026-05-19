@@ -6,7 +6,7 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "../../lib/navigation";
-import type { AccountOverviewData, AccountPingData, PointStatusData } from "../../lib/dashboard-api-types";
+import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData, PointStatusData } from "../../lib/dashboard-api-types";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
 import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
@@ -129,13 +129,41 @@ function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): 
   };
 }
 
+function isAccountOverviewDelta(summary: AccountOverviewResponse): summary is AccountOverviewDeltaData {
+  return "delta" in summary && summary.delta === true;
+}
+
+function applyAccountOverviewResponse(summary: AccountOverviewResponse): AccountOverviewData {
+  if (!isAccountOverviewDelta(summary)) {
+    accountsOverviewData.value = summary;
+    return summary;
+  }
+
+  const current = accountsOverviewData.value;
+  if (!current) {
+    throw new Error("Cannot apply account overview delta without a snapshot");
+  }
+
+  const next: AccountOverviewData = {
+    summaries: summary.summaries ? { ...current.summaries, ...summary.summaries } : current.summaries,
+    pinnedProviders: summary.pinnedProviders ?? current.pinnedProviders,
+    cursor: summary.cursor,
+  };
+  accountsOverviewData.value = next;
+  return next;
+}
+
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
 const { data: accountSummaryData, refresh: refreshAccountSummary } = await useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   const useOverview = isProviderOverviewRoute.value;
-  const summary = useOverview ? await dashboardApi.accounts.overview() : await dashboardApi.accounts.ping();
-  if (useOverview) accountsOverviewData.value = summary as AccountOverviewData;
-  return toShellAccountSummary(summary);
+  if (useOverview) {
+    const cursor = accountsOverviewData.value?.cursor;
+    const summary = applyAccountOverviewResponse(cursor ? await dashboardApi.accounts.overviewDelta({ cursor }) : await dashboardApi.accounts.overview());
+    return toShellAccountSummary(summary);
+  }
+
+  return toShellAccountSummary(await dashboardApi.accounts.ping());
 });
 
 const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptyShellAccountSummary.accountCounts);

@@ -100,7 +100,17 @@ export interface ProviderAccountModelHealthItem {
 export interface AccountOverviewData {
   summaries: Record<ProviderAccountKey, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
   pinnedProviders: ProviderAccountKey[];
+  cursor?: string;
 }
+
+export interface AccountOverviewDeltaData {
+  delta: true;
+  cursor: string;
+  summaries?: Partial<AccountOverviewData["summaries"]>;
+  pinnedProviders?: ProviderAccountKey[];
+}
+
+export type AccountOverviewResponse = AccountOverviewData | AccountOverviewDeltaData;
 
 export interface AccountPingData {
   summaries: Partial<Record<ProviderAccountKey, { active: number; indicator: "normal" | "warning" | "error" }>>;

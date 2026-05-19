@@ -1,7 +1,8 @@
-import { getAccountOverview } from "../../../services/accounts";
-import { requireReadableDashboardContext } from "../../../utils/api";
+import { accountOverviewInputSchema, getAccountOverview } from "../../../services/accounts";
+import { getDashboardQuery, requireReadableDashboardContext } from "../../../utils/api";
 
 export default defineEventHandler(async (event) => {
   const context = await requireReadableDashboardContext(event);
-  return getAccountOverview(context.userId, { autoPin: !context.isAuditMode });
+  const query = getDashboardQuery(event, accountOverviewInputSchema);
+  return getAccountOverview(context.userId, { autoPin: !context.isAuditMode, cursor: query.cursor });
 });

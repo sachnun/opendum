@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { db } from "../lib/db";
 import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountErrorHistory, providerAccountModelHealth } from "../lib/db/schema";
 import { getModelFamily, getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
@@ -15,6 +16,7 @@ const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degrad
 const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
 const MAX_ERROR_HISTORY_ROWS = 8;
+const ACCOUNT_OVERVIEW_CURSOR_VERSION = 1;
 
 type AccountSummarySourceRow = {
   id: string;
@@ -43,6 +45,18 @@ interface AccountReadOptions {
   autoPin?: boolean;
 }
 
+interface AccountOverviewReadOptions extends AccountReadOptions {
+  cursor?: string;
+}
+
+type AccountOverviewSummary = { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats };
+
+type AccountOverviewCursor = {
+  v: typeof ACCOUNT_OVERVIEW_CURSOR_VERSION;
+  pinned: string;
+  summaries: Partial<Record<ProviderAccountKey, string>>;
+};
+
 export const providerInputSchema = z.object({
   provider: z.string().refine(isKnownProvider, "Invalid provider"),
 });
@@ -53,6 +67,7 @@ export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(
 export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.coerce.number().int().min(1).max(200).optional() });
 export const resolveErrorsInputSchema = z.object({ accountId: z.string() });
 export const accountStatsInputSchema = z.object({ accountIds: z.array(z.string().min(1)).max(50) });
+export const accountOverviewInputSchema = z.object({ cursor: z.string().min(1).optional() });
 
 const providerAccountListColumns = {
   id: providerAccount.id,
@@ -127,6 +142,35 @@ function buildAccountHealthByAccountId(healthRows: AccountModelHealthSummaryRow[
     }
     return acc;
   }, {});
+}
+
+function hashAccountOverviewValue(value: unknown) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("base64url").slice(0, 16);
+}
+
+function encodeAccountOverviewCursor(pinnedProviders: ProviderAccountKey[], summaries: Record<ProviderAccountKey, AccountOverviewSummary>) {
+  const cursor: AccountOverviewCursor = {
+    v: ACCOUNT_OVERVIEW_CURSOR_VERSION,
+    pinned: hashAccountOverviewValue(pinnedProviders),
+    summaries: Object.fromEntries(PROVIDER_ACCOUNT_KEYS.map((provider) => [provider, hashAccountOverviewValue(summaries[provider])])),
+  };
+
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeAccountOverviewCursor(cursor: string | undefined): AccountOverviewCursor | null {
+  if (!cursor) return null;
+
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<AccountOverviewCursor>;
+    if (parsed.v !== ACCOUNT_OVERVIEW_CURSOR_VERSION || typeof parsed.pinned !== "string" || !parsed.summaries || typeof parsed.summaries !== "object") {
+      return null;
+    }
+
+    return parsed as AccountOverviewCursor;
+  } catch {
+    return null;
+  }
 }
 
 function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], healthByAccountId: Record<string, AccountModelHealthSummaryRow> = {}, now = new Date()) {
@@ -221,7 +265,7 @@ export async function listAccountsByProvider(userId: string, input: z.infer<type
   }
 }
 
-export async function getAccountOverview(userId: string, options: AccountReadOptions = {}) {
+export async function getAccountOverview(userId: string, options: AccountOverviewReadOptions = {}) {
   try {
     const now = new Date();
     const [accounts, providerStats] = await Promise.all([
@@ -258,9 +302,27 @@ export async function getAccountOverview(userId: string, options: AccountReadOpt
           stats: providerStats[provider],
         },
       ])
-    ) as Record<ProviderAccountKey, { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats }>;
+    ) as Record<ProviderAccountKey, AccountOverviewSummary>;
+    const cursor = encodeAccountOverviewCursor(pinnedProviders, summaries);
+    const previousCursor = decodeAccountOverviewCursor(options.cursor);
 
-    return { summaries, pinnedProviders };
+    if (previousCursor) {
+      const changedSummaries = Object.fromEntries(
+        PROVIDER_ACCOUNT_KEYS
+          .filter((provider) => previousCursor.summaries[provider] !== hashAccountOverviewValue(summaries[provider]))
+          .map((provider) => [provider, summaries[provider]])
+      ) as Partial<Record<ProviderAccountKey, AccountOverviewSummary>>;
+      const pinnedChanged = previousCursor.pinned !== hashAccountOverviewValue(pinnedProviders);
+
+      return {
+        delta: true,
+        cursor,
+        ...(Object.keys(changedSummaries).length > 0 ? { summaries: changedSummaries } : {}),
+        ...(pinnedChanged ? { pinnedProviders } : {}),
+      };
+    }
+
+    return { summaries, pinnedProviders, cursor };
   } catch (error) {
     console.error("Failed to load account summaries:", error);
     throw new Error("Failed to load account summaries");

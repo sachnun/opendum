@@ -1,5 +1,6 @@
 import type {
   AccountOverviewData,
+  AccountOverviewResponse,
   AccountPingData,
   ActionResult,
   AnalyticsData,
@@ -52,6 +53,7 @@ export function useDashboardApi() {
       byProviderDetailed: (query: { provider: string }) => dashboardFetch<ProviderDetailData>("/api/dashboard/accounts/provider-detail", { query }),
       stats: (body: { accountIds: string[] }) => post<Record<string, ProviderDetailData["accounts"][number]["stats"]>>(dashboardFetch, "/api/dashboard/accounts/stats", body),
       overview: () => dashboardFetch<AccountOverviewData>("/api/dashboard/accounts/overview"),
+      overviewDelta: (query: { cursor: string }) => dashboardFetch<AccountOverviewResponse>("/api/dashboard/accounts/overview", { query }),
       ping: () => dashboardFetch<AccountPingData>("/api/dashboard/accounts/ping"),
       create: (body: { provider: string; name?: string; token: string; cfAccountId?: string }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/create", body),
       update: (body: { id: string; name?: string; isActive?: boolean; disabledUntil?: string | Date | null }) => post<ActionResult<ProviderAccountUpdateData>>(dashboardFetch, "/api/dashboard/accounts/update", body),
