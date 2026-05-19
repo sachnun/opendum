@@ -23,6 +23,7 @@ const models = computed<ModelListItem[]>(() => data.value ?? []);
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = ref<Record<string, ModelStats>>({});
 const visibleModelIds = ref<Set<string>>(new Set());
+const mountedModelStatsIds = ref<Set<string>>(new Set());
 const availableProviders = computed(() => {
   const entries = new Map<string, string>();
 
@@ -146,13 +147,17 @@ function startModelStatsObserver() {
   if (!import.meta.client || modelStatsObserver) return;
 
   if (!("IntersectionObserver" in window)) {
-    queueModelStatsLoad(models.value.slice(0, MODEL_STATS_BATCH_SIZE).map((model) => model.id));
+    const initialModelIds = models.value.slice(0, MODEL_STATS_BATCH_SIZE).map((model) => model.id);
+    mountedModelStatsIds.value = new Set(initialModelIds);
+    queueModelStatsLoad(initialModelIds);
     return;
   }
 
   modelStatsObserver = new IntersectionObserver((entries) => {
     const nextVisibleModelIds = new Set(visibleModelIds.value);
+    const nextMountedModelStatsIds = new Set(mountedModelStatsIds.value);
     const enteredModelIds: string[] = [];
+    let mountedModelStatsChanged = false;
 
     for (const entry of entries) {
       const modelId = entry.target.getAttribute("data-model-id");
@@ -160,12 +165,17 @@ function startModelStatsObserver() {
 
       if (entry.isIntersecting) {
         nextVisibleModelIds.add(modelId);
+        if (!nextMountedModelStatsIds.has(modelId)) {
+          nextMountedModelStatsIds.add(modelId);
+          mountedModelStatsChanged = true;
+        }
         enteredModelIds.push(modelId);
       } else {
         nextVisibleModelIds.delete(modelId);
       }
     }
 
+    if (mountedModelStatsChanged) mountedModelStatsIds.value = nextMountedModelStatsIds;
     visibleModelIds.value = nextVisibleModelIds;
     queueModelStatsLoad(enteredModelIds);
   }, { rootMargin: "240px 0px" });
@@ -183,6 +193,10 @@ function observeModelCards() {
 
 function queueVisibleModelStatsLoad() {
   queueModelStatsLoad(visibleModelIds.value);
+}
+
+function shouldRenderModelStats(modelId: string) {
+  return mountedModelStatsIds.value.has(modelId) || modelStatsById.value[modelId] !== undefined;
 }
 
 function queueModelStatsLoad(modelIds: Iterable<string>) {
@@ -253,6 +267,7 @@ function pruneModelStats() {
   const availableModelIds = new Set(models.value.map((model) => model.id));
   modelStatsById.value = Object.fromEntries(Object.entries(modelStatsById.value).filter(([modelId]) => availableModelIds.has(modelId)));
   visibleModelIds.value = new Set([...visibleModelIds.value].filter((modelId) => availableModelIds.has(modelId)));
+  mountedModelStatsIds.value = new Set([...mountedModelStatsIds.value].filter((modelId) => availableModelIds.has(modelId)));
 }
 
 watch(models, () => {
@@ -442,7 +457,8 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
               <UiCardContent class="flex flex-1 flex-col pt-0">
                 <div class="mt-auto space-y-3">
                   <ModelFeatureBadges :meta="model.meta" />
-                  <ModelStatsPanel :stats="getModelStats(model)" :label="model.id" :disabled="!model.isEnabled" compact :animate-deltas="false" />
+                  <ModelStatsPanel v-if="shouldRenderModelStats(model.id)" :stats="getModelStats(model)" :label="model.id" :disabled="!model.isEnabled" compact :animate-deltas="false" />
+                  <div v-else class="h-[84px] rounded border border-dashed border-border/70 bg-muted/20" aria-hidden="true" />
                 </div>
               </UiCardContent>
             </UiCard>
