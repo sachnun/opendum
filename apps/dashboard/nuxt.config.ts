@@ -78,15 +78,6 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
-    preset: "cloudflare_module",
-    cloudflare: {
-      deployConfig: true,
-      nodeCompat: true,
-      wrangler: {
-        name: "opendum",
-        compatibility_flags: ["nodejs_compat"],
-      },
-    },
     commonJS: {
       ignoreTryCatch: true,
     },

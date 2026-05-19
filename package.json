@@ -19,8 +19,8 @@
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {
-    "typescript": "^6.0.3",
-    "wrangler": "^4.90.1"
+    "edgeone": "^1.5.2",
+    "typescript": "^6.0.3"
   },
   "overrides": {
     "postcss": "^8.5.10",

@@ -11,6 +11,8 @@ out/
 .output/
 .nuxt/
 .nitro/
+.edgeone/
+.edgeone-nitro-config.mjs
 .cron/
 .cache/
 .vite/
@@ -44,9 +46,6 @@ Thumbs.db
 
 # vercel
 .vercel/
-
-# cloudflare
-.wrangler/
 
 # typescript
 *.tsbuildinfo

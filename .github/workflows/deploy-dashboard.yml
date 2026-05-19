@@ -22,13 +22,13 @@ permissions:
   deployments: write
 
 concurrency:
-  group: cloudflare-workers-${{ github.ref }}
+  group: edgeone-dashboard-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   deploy:
     if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
-    name: Dashboard Worker
+    name: Dashboard EdgeOne Pages
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -50,14 +50,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build dashboard for Cloudflare Workers
-        run: npm run build --workspace @opendum/dashboard
-
-      - name: Deploy dashboard to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: 4.85.0
-          workingDirectory: apps/dashboard
-          command: --cwd .output deploy --keep-vars
+      - name: Deploy dashboard to EdgeOne Pages
+        working-directory: apps/dashboard
+        run: npx edgeone pages deploy -n opendum -t ${{ secrets.EDGEONE_API_TOKEN }} -e production
+        env:
+          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
