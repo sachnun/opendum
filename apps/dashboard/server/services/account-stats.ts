@@ -63,7 +63,7 @@ function createRawStats(): RawProviderStats {
   return { totalRequests: 0, totalTokens: 0, successfulRequests: 0, durationTotal: 0, durationCount: 0, dailyCounts: new Map(), durationByHour: new Map() };
 }
 
-function buildEmptyProviderStats(dayKeys: string[], hourKeys: string[]): ProviderStats {
+export function buildEmptyProviderStats(dayKeys = buildDayKeys(PROVIDER_STATS_DAYS), hourKeys = buildHourKeys(PROVIDER_DURATION_LOOKBACK_HOURS)): ProviderStats {
   return {
     totalRequests: 0,
     totalTokens: 0,

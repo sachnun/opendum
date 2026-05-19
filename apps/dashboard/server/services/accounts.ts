@@ -6,7 +6,7 @@ import { compareModelEntries } from "../../lib/model-sort";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
-import { buildAccountStats, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
+import { buildAccountStats, buildEmptyProviderStats, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
 
 export { createAccount, createAccountInputSchema } from "./account-connectors";
 
@@ -39,6 +39,7 @@ export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string(
 export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(), modelId: z.string(), enabled: z.boolean() });
 export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.coerce.number().int().min(1).max(200).optional() });
 export const resolveErrorsInputSchema = z.object({ accountId: z.string() });
+export const accountStatsInputSchema = z.object({ accountIds: z.array(z.string().min(1)).max(50) });
 
 const providerAccountListColumns = {
   id: providerAccount.id,
@@ -241,8 +242,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     const accountIds = accounts.map((account) => account.id);
     const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
-    const [accountStatsById, disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
-      buildAccountStats(userId, accountIds),
+    const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
       accountIds.length > 0
         ? db
             .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
@@ -321,7 +321,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
               lastSuccessAt: health.lastSuccessAt ?? account.lastSuccessAt,
             }
           : {}),
-        stats: accountStatsById[account.id],
+        stats: buildEmptyProviderStats(),
       };
     });
 
@@ -335,6 +335,23 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
   } catch (error) {
     console.error("Failed to load provider account detail:", error);
     throw new Error("Failed to load provider account detail");
+  }
+}
+
+export async function getAccountStats(userId: string, input: z.infer<typeof accountStatsInputSchema>) {
+  try {
+    const accountIds = Array.from(new Set(input.accountIds));
+    if (accountIds.length === 0) return {};
+
+    const ownedAccounts = await db
+      .select({ id: providerAccount.id })
+      .from(providerAccount)
+      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds)));
+    const ownedAccountIds = ownedAccounts.map((account) => account.id);
+    return await buildAccountStats(userId, ownedAccountIds);
+  } catch (error) {
+    console.error("Failed to load account stats:", error);
+    throw new Error("Failed to load account stats");
   }
 }
 

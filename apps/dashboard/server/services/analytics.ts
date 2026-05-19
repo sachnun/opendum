@@ -10,7 +10,9 @@ const analyticsFilterSchema = z.union([
   periodSchema,
   z.object({ from: z.string(), to: z.string() }),
 ]);
-export const analyticsDataInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional() }).optional();
+const analyticsBaseInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional() });
+export const analyticsDataInputSchema = analyticsBaseInputSchema.extend({ includeSeries: z.boolean().optional() }).optional();
+export const analyticsSeriesInputSchema = analyticsBaseInputSchema.optional();
 export const analyticsUsageInputSchema = z.object({ range: periodSchema.default("30d") }).optional();
 
 type Period = z.infer<typeof periodSchema>;
@@ -39,6 +41,14 @@ interface AnalyticsData {
     durationPercentiles: { p30: number; p50: number; p60: number; p75: number; p90: number; p95: number; p99: number };
     successRate: number;
   };
+}
+
+interface AnalyticsSeriesData {
+  requestsOverTime: AnalyticsData["requestsOverTime"];
+  tokenUsage: AnalyticsData["tokenUsage"];
+  successRate: AnalyticsData["successRate"];
+  durationOverTime: AnalyticsData["durationOverTime"];
+  granularity: AnalyticsData["granularity"];
 }
 
 const PERIOD_CONFIG: Record<Period, PeriodConfig> = {
@@ -125,12 +135,16 @@ function toDateValue(value: Date | string | null): Date | null {
 async function getAnalyticsDataForUser(
   userId: string,
   filter: AnalyticsFilter,
-  apiKeyId?: string
+  apiKeyId?: string,
+  options: { includeSummary?: boolean; includeSeries?: boolean } = {}
 ): Promise<ActionResult<AnalyticsData>> {
   const resolvedFilter = resolveFilterConfig(filter);
   if (!resolvedFilter.success) return resolvedFilter;
 
   const { startDate, endDate, config } = resolvedFilter.data;
+  const includeSummary = options.includeSummary ?? true;
+  const includeSeries = options.includeSeries ?? true;
+
   try {
     if (apiKeyId) {
       const [ownedApiKey] = await db.select({ id: proxyApiKey.id }).from(proxyApiKey).where(and(eq(proxyApiKey.id, apiKeyId), eq(proxyApiKey.userId, userId))).limit(1);
@@ -144,9 +158,15 @@ async function getAnalyticsDataForUser(
     const bucketExpression = sql<Date>`to_timestamp(floor(extract(epoch from ${usageLog.createdAt}) / ${bucketSeconds}) * ${bucketSeconds})`;
 
     const [timeSeriesRows, topModelRows, totalsRow] = await Promise.all([
-      db.select({ bucket: bucketExpression, requestCount: sql<number>`count(*)`, inputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, outputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, errorCount: sql<number>`count(*) filter (where ${usageLog.statusCode} is null or ${usageLog.statusCode} < 200 or ${usageLog.statusCode} >= 400)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)` }).from(usageLog).where(whereCondition).groupBy(bucketExpression).orderBy(bucketExpression),
-      db.select({ model: usageLog.model, count: sql<number>`count(*)` }).from(usageLog).where(whereCondition).groupBy(usageLog.model).orderBy(sql`count(*) desc`).limit(10),
-      db.select({ totalRequests: sql<number>`count(*)`, totalInputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, totalOutputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, successfulRequests: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(whereCondition).then((rows) => rows[0]),
+      includeSeries
+        ? db.select({ bucket: bucketExpression, requestCount: sql<number>`count(*)`, inputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, outputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`, errorCount: sql<number>`count(*) filter (where ${usageLog.statusCode} is null or ${usageLog.statusCode} < 200 or ${usageLog.statusCode} >= 400)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)` }).from(usageLog).where(whereCondition).groupBy(bucketExpression).orderBy(bucketExpression)
+        : Promise.resolve([]),
+      includeSummary
+        ? db.select({ model: usageLog.model, count: sql<number>`count(*)` }).from(usageLog).where(whereCondition).groupBy(usageLog.model).orderBy(sql`count(*) desc`).limit(10)
+        : Promise.resolve([]),
+      includeSummary
+        ? db.select({ totalRequests: sql<number>`count(*)`, totalInputTokens: sql<number>`coalesce(sum(${usageLog.inputTokens}), 0)`, totalOutputTokens: sql<number>`coalesce(sum(${usageLog.outputTokens}), 0)`, avgDuration: sql<number | null>`avg(${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p30: sql<number | null>`percentile_cont(0.30) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p50: sql<number | null>`percentile_cont(0.50) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p60: sql<number | null>`percentile_cont(0.60) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p75: sql<number | null>`percentile_cont(0.75) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p90: sql<number | null>`percentile_cont(0.90) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p95: sql<number | null>`percentile_cont(0.95) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, p99: sql<number | null>`percentile_cont(0.99) within group (order by ${usageLog.duration}) filter (where ${usageLog.duration} is not null)`, successfulRequests: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)` }).from(usageLog).where(whereCondition).then((rows) => rows[0])
+        : Promise.resolve(undefined),
     ]);
 
     const timeSeriesBySlot = new Map<string, { requestCount: number; inputTokens: number; outputTokens: number; successCount: number; errorCount: number; avgDuration: number | null; p30: number | null; p50: number | null; p60: number | null; p75: number | null; p90: number | null; p95: number | null; p99: number | null }>();
@@ -156,8 +176,8 @@ async function getAnalyticsDataForUser(
       timeSeriesBySlot.set(formatTimeSlot(bucketDate, config.granularity), { requestCount: toRoundedValue(row.requestCount), inputTokens: toRoundedValue(row.inputTokens), outputTokens: toRoundedValue(row.outputTokens), successCount: toRoundedValue(row.successCount), errorCount: toRoundedValue(row.errorCount), avgDuration: toRoundedNullableValue(row.avgDuration), p30: toRoundedNullableValue(row.p30), p50: toRoundedNullableValue(row.p50), p60: toRoundedNullableValue(row.p60), p75: toRoundedNullableValue(row.p75), p90: toRoundedNullableValue(row.p90), p95: toRoundedNullableValue(row.p95), p99: toRoundedNullableValue(row.p99) });
     }
 
-    const timeSlots = generateTimeSlots(startDate, endDate, config);
-    const requestsByModel = topModelRows.map((row) => ({ model: row.model, count: toRoundedValue(row.count) }));
+    const timeSlots = includeSeries ? generateTimeSlots(startDate, endDate, config) : [];
+    const requestsByModel = includeSummary ? topModelRows.map((row) => ({ model: row.model, count: toRoundedValue(row.count) })) : [];
     const totalRequests = toRoundedValue(totalsRow?.totalRequests);
     const successfulRequests = toRoundedValue(totalsRow?.successfulRequests);
     const analyticsData: AnalyticsData = {
@@ -184,13 +204,26 @@ async function getAnalyticsDataForUser(
 }
 
 export async function getAnalyticsData(userId: string, input?: z.infer<typeof analyticsDataInputSchema>) {
-  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId);
+  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, { includeSeries: input?.includeSeries ?? true });
   if (!result.success) throw new Error(result.error);
   return result.data;
 }
 
+export async function getAnalyticsSeries(userId: string, input?: z.infer<typeof analyticsSeriesInputSchema>): Promise<AnalyticsSeriesData> {
+  const result = await getAnalyticsDataForUser(userId, input?.filter ?? "30d", input?.apiKeyId, { includeSummary: false, includeSeries: true });
+  if (!result.success) throw new Error(result.error);
+
+  return {
+    requestsOverTime: result.data.requestsOverTime,
+    tokenUsage: result.data.tokenUsage,
+    successRate: result.data.successRate,
+    durationOverTime: result.data.durationOverTime,
+    granularity: result.data.granularity,
+  };
+}
+
 export async function getAnalyticsOverview(userId: string) {
-  const result = await getAnalyticsDataForUser(userId, "24h");
+  const result = await getAnalyticsDataForUser(userId, "24h", undefined, { includeSeries: false });
   if (!result.success) throw new Error(result.error);
 
   const totals = result.data.totals;

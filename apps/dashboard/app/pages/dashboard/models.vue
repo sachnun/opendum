@@ -145,11 +145,6 @@ function setModelCardRef(modelId: string, element: unknown) {
 function startModelStatsObserver() {
   if (!import.meta.client || modelStatsObserver) return;
 
-  if (!("IntersectionObserver" in window)) {
-    queueModelStatsLoad(models.value.slice(0, MODEL_STATS_BATCH_SIZE).map((model) => model.id));
-    return;
-  }
-
   modelStatsObserver = new IntersectionObserver((entries) => {
     const nextVisibleModelIds = new Set(visibleModelIds.value);
     const enteredModelIds: string[] = [];

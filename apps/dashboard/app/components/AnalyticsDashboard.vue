@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { endOfDay, format, startOfDay } from "date-fns";
 import type { DateRange as CalendarDateRange, DateValue } from "reka-ui";
-import type { AnalyticsData, ApiKeyListItem } from "../../lib/dashboard-api-types";
+import type { AnalyticsData, AnalyticsSeriesData, ApiKeyListItem } from "../../lib/dashboard-api-types";
 
 type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 type AnalyticsFilter = Period | { from: string; to: string };
@@ -42,7 +42,14 @@ const isFilterOpen = ref(false);
 const isApiKeyFilterOpen = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
+const chartSection = ref<HTMLElement | null>(null);
+const analyticsSeries = ref<AnalyticsSeriesData | null>(null);
+const analyticsSeriesError = ref<unknown>(null);
+const analyticsSeriesPending = ref(false);
+const chartSectionVisible = ref(false);
 let analyticsRefreshInFlight: Promise<void> | null = null;
+let analyticsSeriesRequestId = 0;
+let analyticsChartObserver: IntersectionObserver | null = null;
 
 watch(
   () => props.apiKeyId,
@@ -93,11 +100,13 @@ const { data, error, pending, refresh } = await useAsyncData<AnalyticsData>(
   () => dashboardApi.analytics.data({
     filter: activeFilter.value,
     apiKeyId: selectedApiKeyId.value === "all" ? undefined : selectedApiKeyId.value,
+    includeSeries: false,
   }),
   { watch: [selectedApiKeyId, activeFilterKey] }
 );
 
 const isInitialLoading = computed(() => pending.value && !data.value);
+const chartData = computed<AnalyticsSeriesData | null>(() => analyticsSeries.value);
 
 function compactNumber(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
@@ -176,14 +185,49 @@ function handleClearCustomRange(): void {
 }
 
 async function refreshAnalyticsOnce(): Promise<void> {
-  if (pending.value || analyticsRefreshInFlight) return;
+  if (pending.value || analyticsRefreshInFlight || analyticsSeriesPending.value) return;
 
   analyticsRefreshInFlight = refresh().then(() => undefined).catch(() => undefined);
   try {
     await analyticsRefreshInFlight;
+    if (chartSectionVisible.value) await loadAnalyticsSeries({ force: true });
   } finally {
     analyticsRefreshInFlight = null;
   }
+}
+
+async function loadAnalyticsSeries(options: { force?: boolean } = {}): Promise<void> {
+  if (analyticsSeriesPending.value) return;
+  if (analyticsSeries.value && !options.force) return;
+
+  const requestId = ++analyticsSeriesRequestId;
+  analyticsSeriesPending.value = true;
+  analyticsSeriesError.value = null;
+
+  try {
+    const series = await dashboardApi.analytics.series({
+      filter: activeFilter.value,
+      apiKeyId: selectedApiKeyId.value === "all" ? undefined : selectedApiKeyId.value,
+    });
+    if (requestId !== analyticsSeriesRequestId) return;
+    analyticsSeries.value = series;
+  } catch (error) {
+    if (requestId !== analyticsSeriesRequestId) return;
+    analyticsSeriesError.value = error;
+  } finally {
+    if (requestId === analyticsSeriesRequestId) analyticsSeriesPending.value = false;
+  }
+}
+
+function startAnalyticsChartObserver() {
+  if (!import.meta.client || analyticsChartObserver || !chartSection.value) return;
+
+  analyticsChartObserver = new IntersectionObserver((entries) => {
+    const isVisible = entries.some((entry) => entry.isIntersecting);
+    chartSectionVisible.value = isVisible;
+    if (isVisible) void loadAnalyticsSeries();
+  }, { rootMargin: "240px 0px" });
+  analyticsChartObserver.observe(chartSection.value);
 }
 
 const statMetrics = computed<StatMetric[]>(() => {
@@ -246,6 +290,19 @@ watch(statMetrics, (items) => {
 watch([selectedApiKeyId, activeFilterKey], () => {
   previousStatValues.value = null;
   statHitEffects.value = {};
+  analyticsSeriesRequestId += 1;
+  analyticsSeries.value = null;
+  analyticsSeriesError.value = null;
+  analyticsSeriesPending.value = false;
+  if (chartSectionVisible.value) void loadAnalyticsSeries();
+});
+
+onMounted(() => {
+  startAnalyticsChartObserver();
+});
+
+onBeforeUnmount(() => {
+  analyticsChartObserver?.disconnect();
 });
 
 const requestsSeries = [{ key: "count", label: "Requests", color: "var(--chart-1)", area: true }];
@@ -258,7 +315,7 @@ const successSeries = [
   { key: "errorRate", label: "Error", color: "var(--destructive)", suffix: "%", dashed: true },
 ];
 const successRateData = computed(() =>
-  (data.value?.successRate ?? []).map((point) => {
+  (chartData.value?.successRate ?? []).map((point) => {
     const total = point.success + point.error;
     return {
       ...point,
@@ -376,12 +433,13 @@ const successRateData = computed(() =>
           class="h-8 w-8 rounded-lg border-border bg-background sm:h-9 sm:w-9"
           @click="refreshAnalyticsOnce"
         >
-          <UiIcon name="i-lucide-refresh-cw" :class="['size-4', pending ? 'animate-spin' : '']" />
+          <UiIcon name="i-lucide-refresh-cw" :class="['size-4', pending || analyticsSeriesPending ? 'animate-spin' : '']" />
         </UiButton>
       </div>
     </div>
 
     <DashboardDataNotice :error="error" />
+    <DashboardDataNotice :error="analyticsSeriesError" />
 
     <div v-if="isInitialLoading" class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
       <div v-for="item in 6" :key="item" class="px-0 py-1">
@@ -403,32 +461,37 @@ const successRateData = computed(() =>
       />
     </div>
 
-    <div v-if="!isInitialLoading && data" class="grid gap-3 grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
+    <div ref="chartSection" class="min-h-72">
+      <div v-if="!isInitialLoading && data && analyticsSeriesPending && !chartData" class="grid gap-3 grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
+        <UiSkeleton v-for="item in 4" :key="item" class="h-72 rounded-xl" />
+      </div>
+      <div v-else-if="!isInitialLoading && data && chartData" class="grid gap-3 grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
       <AnalyticsTimeSeriesChart
         title="Requests Over Time"
-        :data="data.requestsOverTime"
-        :granularity="data.granularity"
+        :data="chartData.requestsOverTime"
+        :granularity="chartData.granularity"
         :series="requestsSeries"
       />
       <AnalyticsTimeSeriesChart
         title="Token Usage"
-        :data="data.tokenUsage"
-        :granularity="data.granularity"
+        :data="chartData.tokenUsage"
+        :granularity="chartData.granularity"
         :series="tokenSeries"
       />
       <AnalyticsRequestsByModelChart :data="data.requestsByModel" />
       <AnalyticsTimeSeriesChart
         title="Success / Error Rate"
         :data="successRateData"
-        :granularity="data.granularity"
+        :granularity="chartData.granularity"
         :series="successSeries"
         :max-value="100"
       />
+      </div>
+      <UiCard v-else-if="!isInitialLoading && chartSectionVisible" class="border-border/50 bg-card/50 py-8">
+        <UiCardContent class="px-5 text-sm text-muted-foreground sm:text-base">
+          No data in the selected time range.
+        </UiCardContent>
+      </UiCard>
     </div>
-    <UiCard v-else-if="!isInitialLoading" class="border-border/50 bg-card/50 py-8">
-      <UiCardContent class="px-5 text-sm text-muted-foreground sm:text-base">
-        No data in the selected time range.
-      </UiCardContent>
-    </UiCard>
   </div>
 </template>

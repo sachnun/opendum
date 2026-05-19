@@ -214,3 +214,5 @@ export interface AnalyticsData {
     successRate: number;
   };
 }
+
+export type AnalyticsSeriesData = Pick<AnalyticsData, "requestsOverTime" | "tokenUsage" | "successRate" | "durationOverTime" | "granularity">;
