@@ -43,6 +43,9 @@ const promotedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
 const visibleAccountIds = ref<Set<string>>(new Set());
 const accountStatsById = ref<Record<string, ProviderStats>>({});
+const accountStatsDeltaReadyById = ref<Record<string, boolean>>({});
+const accountStatsFetchedById = ref<Record<string, boolean>>({});
+const hydratedAccountStatsIds = ref<Record<string, boolean>>({});
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 let accountVisibilityObserver: IntersectionObserver | null = null;
 let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -166,6 +169,16 @@ watch(selectedProvider, () => {
   highlightedAccountIds.value = new Set();
   promotedAccountIds.value = new Set();
   visibleAccountIds.value = new Set();
+  accountStatsById.value = {};
+  accountStatsDeltaReadyById.value = {};
+  accountStatsFetchedById.value = {};
+  hydratedAccountStatsIds.value = {};
+  queuedAccountStatsIds.clear();
+  loadingAccountStatsIds.clear();
+  if (accountStatsQueueTimer) {
+    clearTimeout(accountStatsQueueTimer);
+    accountStatsQueueTimer = null;
+  }
   if (highlightTimer) {
     clearTimeout(highlightTimer);
     highlightTimer = null;
@@ -231,6 +244,7 @@ onBeforeUnmount(() => {
 onMounted(() => {
   startProviderDetailRefresh();
   refreshAccountVisibilityObserver();
+  void hydrateAccountStatsCache();
   startAccountStatsPolling();
 });
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
@@ -319,6 +333,38 @@ function getAccountWithStats(account: Account): Account {
   return stats === account.stats ? account : { ...account, stats };
 }
 
+async function hydrateAccountStatsCache() {
+  if (!import.meta.client) return;
+
+  const accountsToHydrate = accounts.value.filter((account) => !hydratedAccountStatsIds.value[account.id]);
+  if (accountsToHydrate.length === 0) return;
+
+  const cachedStats = await readCachedAccountStats(accountsToHydrate.map((account) => account.id));
+  const nextStatsById = { ...accountStatsById.value };
+  const nextDeltaReadyById = { ...accountStatsDeltaReadyById.value };
+  const nextHydratedIds = { ...hydratedAccountStatsIds.value };
+  let hasStatsChanges = false;
+
+  for (const [index, cached] of cachedStats.entries()) {
+    const account = accountsToHydrate[index];
+    if (!account) continue;
+
+    nextHydratedIds[account.id] = true;
+    if (!cached || cached.accountId !== account.id) continue;
+
+    nextStatsById[account.id] = cached.stats;
+    nextDeltaReadyById[account.id] = true;
+    hasStatsChanges = true;
+  }
+
+  for (const account of accountsToHydrate) nextHydratedIds[account.id] = true;
+  hydratedAccountStatsIds.value = nextHydratedIds;
+  if (hasStatsChanges) {
+    accountStatsById.value = nextStatsById;
+    accountStatsDeltaReadyById.value = nextDeltaReadyById;
+  }
+}
+
 function getAccountCardElement(card: { accountId?: string; $el?: Element } | Element): Element | null {
   return card instanceof Element ? card : card.$el ?? null;
 }
@@ -372,7 +418,7 @@ function queueVisibleAccountStatsLoad() {
 
 function queueAccountStatsLoad(accountIds: Iterable<string>) {
   for (const accountId of accountIds) {
-    if (accountStatsById.value[accountId] || loadingAccountStatsIds.has(accountId)) continue;
+    if (accountStatsFetchedById.value[accountId] || loadingAccountStatsIds.has(accountId)) continue;
     queuedAccountStatsIds.add(accountId);
   }
 
@@ -410,7 +456,18 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
 
   try {
     const stats = await dashboardApi.accounts.stats({ accountIds: requestedAccountIds });
+    const nextDeltaReadyById = { ...accountStatsDeltaReadyById.value };
+    const nextFetchedById = { ...accountStatsFetchedById.value };
+
+    for (const accountId of Object.keys(stats)) {
+      nextDeltaReadyById[accountId] = Boolean(accountStatsById.value[accountId] || accountStatsDeltaReadyById.value[accountId]);
+      nextFetchedById[accountId] = true;
+    }
+
     accountStatsById.value = { ...accountStatsById.value, ...stats };
+    accountStatsDeltaReadyById.value = nextDeltaReadyById;
+    accountStatsFetchedById.value = nextFetchedById;
+    void writeCachedAccountStats(stats);
   } catch (error) {
     console.error("Failed to load account stats:", error);
   } finally {
@@ -437,6 +494,9 @@ function stopAccountStatsPolling() {
 function pruneAccountStats() {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
   accountStatsById.value = Object.fromEntries(Object.entries(accountStatsById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  accountStatsDeltaReadyById.value = Object.fromEntries(Object.entries(accountStatsDeltaReadyById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  accountStatsFetchedById.value = Object.fromEntries(Object.entries(accountStatsFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  hydratedAccountStatsIds.value = Object.fromEntries(Object.entries(hydratedAccountStatsIds.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   visibleAccountIds.value = new Set([...visibleAccountIds.value].filter((accountId) => availableAccountIds.has(accountId)));
 }
 
@@ -444,6 +504,7 @@ watch(
   accounts,
   async () => {
     pruneAccountStats();
+    void hydrateAccountStatsCache();
     queueVisibleAccountStatsLoad();
     await nextTick();
     refreshAccountVisibilityObserver();
@@ -629,6 +690,7 @@ function decodeAccountHash(hash: string): string | null {
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
           :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"
           :highlight="highlightedAccountIds.has(account.id)"
+          :animate-deltas="accountStatsDeltaReadyById[account.id] === true"
           :readonly="isAuditMode"
           @renamed="handleAccountRenamed"
           @active-updated="handleAccountActiveUpdated"

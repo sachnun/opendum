@@ -156,6 +156,7 @@ const props = defineProps<{
   quotaError?: string | null;
   isQuotaLoading?: boolean;
   highlight?: boolean;
+  animateDeltas?: boolean;
   readonly?: boolean;
 }>();
 
@@ -498,7 +499,7 @@ const statAnimationContextKey = computed(() => {
   const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
   return `${props.account.id}:${userKey}:${auditRefreshVersion.value}`;
 });
-const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
+const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: props.animateDeltas === false ? undefined : statHitEffects.value[stat.key] })));
 const effectiveTier = computed(() => {
   const quotaTier = props.quotaInfo?.tier?.trim();
   if (["codex", "kiro"].includes(props.account.provider) && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
@@ -686,8 +687,17 @@ watch(
   { immediate: true }
 );
 
-watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
+watch([statMetrics, statAnimationContextKey, () => props.animateDeltas], ([items, contextKey, animateDeltas]) => {
   const nextValues = collectStatValues(items);
+
+  if (animateDeltas === false) {
+    previousStatValues.value = nextValues;
+    previousStatAnimationContextKey.value = contextKey;
+    pendingStatBaselineContextKey.value = null;
+    statHitEffects.value = {};
+    return;
+  }
+
   const previousValues = previousStatValues.value;
   const previousContextKey = previousStatAnimationContextKey.value;
   const contextChanged = previousContextKey !== contextKey;
