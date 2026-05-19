@@ -1013,7 +1013,7 @@ function handleErrorPreviewPointerEnd(event: PointerEvent) {
   if (Math.abs(deltaX) < ERROR_PREVIEW_SWIPE_THRESHOLD_PX) return;
 
   suppressNextErrorPreviewClick = true;
-  if (deltaX > 0) showPreviousErrorPreview(event);
+  if (deltaX < 0) showPreviousErrorPreview(event);
   else showNewerErrorPreview(event);
 }
 
@@ -1096,7 +1096,7 @@ function cancelErrorPreviewPointer() {
                 <div
                   v-if="account.lastErrorMessage && activeErrorEntry"
                   tabindex="-1"
-                  class="flex h-full cursor-pointer flex-col rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left hover:bg-muted/40"
+                  class="flex h-full cursor-pointer touch-pan-y flex-col rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left select-none hover:bg-muted/40"
                   @click="openActiveErrorDialog"
                   @pointerdown="handleErrorPreviewPointerDown"
                   @pointerup="handleErrorPreviewPointerEnd"
@@ -1146,7 +1146,7 @@ function cancelErrorPreviewPointer() {
                     <span
                       v-for="(entry, index) in errorPreviewEntries"
                       :key="index"
-                      :class="['h-1.5 rounded-full transition-all duration-200', getErrorPreviewSliderDotClass(entry, index === activeErrorIndex)]"
+                      :class="['h-1.5 rounded-full', getErrorPreviewSliderDotClass(entry, index === activeErrorIndex)]"
                     />
                   </template>
                 </div>
