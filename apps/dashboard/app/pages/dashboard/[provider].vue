@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProviderAccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
 import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
+import { warmDashboardIndexedDbStore } from "../../utils/dashboardIndexedDb";
 
 definePageMeta({
   middleware: "auth",
@@ -30,6 +31,9 @@ const ACCOUNT_STATS_BATCH_SIZE = 24;
 const ACCOUNT_STATS_POLL_MS = 30_000;
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
 const PROVIDER_DETAIL_REFRESH_MS = 30_000;
+const DASHBOARD_CACHE_DB_NAME = "opendum-dashboard";
+const ACCOUNT_STATS_STORE_NAME = "account-stats";
+const ACCOUNT_QUOTA_STORE_NAME = "account-quota";
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
@@ -242,6 +246,8 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
+  void warmDashboardIndexedDbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_STATS_STORE_NAME);
+  void warmDashboardIndexedDbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_QUOTA_STORE_NAME);
   startProviderDetailRefresh();
   refreshAccountVisibilityObserver();
   void hydrateAccountStatsCache();
@@ -351,6 +357,7 @@ async function hydrateAccountStatsCache() {
 
     nextHydratedIds[account.id] = true;
     if (!cached || cached.accountId !== account.id) continue;
+    if (accountStatsById.value[account.id]) continue;
 
     nextStatsById[account.id] = cached.stats;
     nextDeltaReadyById[account.id] = true;

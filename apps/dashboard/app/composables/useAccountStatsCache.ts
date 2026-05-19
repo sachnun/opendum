@@ -1,5 +1,6 @@
-import { createStore, getMany, setMany } from "idb-keyval";
+import { getMany, setMany } from "idb-keyval";
 import type { ProviderStats } from "../../lib/dashboard-api-types";
+import { createDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
 
 type CachedAccountStats = {
   accountId: string;
@@ -9,7 +10,7 @@ type CachedAccountStats = {
 
 const ACCOUNT_STATS_DB_NAME = "opendum-dashboard";
 const ACCOUNT_STATS_STORE_NAME = "account-stats";
-const accountStatsStore = import.meta.client ? createStore(ACCOUNT_STATS_DB_NAME, ACCOUNT_STATS_STORE_NAME) : null;
+const accountStatsStore = createDashboardIndexedDbStore(ACCOUNT_STATS_DB_NAME, ACCOUNT_STATS_STORE_NAME);
 
 function getAccountStatsCacheKey(accountId: string) {
   return `account-stats:${accountId}`;

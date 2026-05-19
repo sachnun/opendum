@@ -1,6 +1,7 @@
-import { createStore, getMany, set } from "idb-keyval";
+import { getMany, set } from "idb-keyval";
 import type { ComputedRef } from "vue";
 import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "../../lib/dashboard-api-types";
+import { createDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
 
 type Account = ProviderDetailData["accounts"][number];
 
@@ -25,7 +26,7 @@ type RunQuotaRefreshOptions = {
 
 const QUOTA_DB_NAME = "opendum-dashboard";
 const QUOTA_STORE_NAME = "account-quota";
-const quotaStore = import.meta.client ? createStore(QUOTA_DB_NAME, QUOTA_STORE_NAME) : null;
+const quotaStore = createDashboardIndexedDbStore(QUOTA_DB_NAME, QUOTA_STORE_NAME);
 
 function getQuotaCacheKey(accountId: string) {
   return `account-quota:${accountId}`;
@@ -192,8 +193,8 @@ export function useAccountQuotaMonitor(options: {
 
       if (runId !== quotaQueueRunId) return;
 
-      let nextQuotaByAccountId = { ...quotaByAccountId.value };
-      let nextErrorByAccountId = { ...quotaErrorByAccountId.value };
+      const nextQuotaByAccountId = { ...quotaByAccountId.value };
+      const nextErrorByAccountId = { ...quotaErrorByAccountId.value };
       const cacheWrites: Array<Promise<void>> = [];
 
       for (const providerResult of providerResults) {
@@ -209,7 +210,6 @@ export function useAccountQuotaMonitor(options: {
 
           if (accountResult.success) {
             nextQuotaByAccountId[account.id] = accountResult.data;
-            delete nextErrorByAccountId[account.id];
             cacheWrites.push(writeCachedQuota(account, providerResult.provider, accountResult.data));
           } else if (refreshExisting || !hadQuotaByAccountId[account.id]) {
             nextErrorByAccountId[account.id] = accountResult.error;
@@ -218,7 +218,7 @@ export function useAccountQuotaMonitor(options: {
       }
 
       quotaByAccountId.value = nextQuotaByAccountId;
-      quotaErrorByAccountId.value = nextErrorByAccountId;
+      quotaErrorByAccountId.value = Object.fromEntries(Object.entries(nextErrorByAccountId).filter(([accountId]) => !nextQuotaByAccountId[accountId]));
       await Promise.all(cacheWrites);
     };
 
