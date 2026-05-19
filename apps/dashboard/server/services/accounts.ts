@@ -17,13 +17,26 @@ const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
 const MAX_ERROR_HISTORY_ROWS = 8;
 
 type AccountSummarySourceRow = {
+  id: string;
   provider: string;
   isActive: boolean;
   disabledUntil: Date | string | null;
+  status: string;
+  statusChangedAt: Date | string | null;
+  consecutiveErrors: number;
   lastUsedAt: Date | string | null;
   lastErrorAt: Date | string | null;
   lastSuccessAt: Date | string | null;
   lastRecoveredByRotationAt: Date | string | null;
+};
+
+type AccountModelHealthSummaryRow = {
+  providerAccountId: string;
+  status: string;
+  statusChangedAt: Date | string | null;
+  consecutiveErrors: number;
+  lastErrorAt: Date | string | null;
+  lastSuccessAt: Date | string | null;
 };
 
 interface AccountReadOptions {
@@ -88,7 +101,35 @@ function withEffectiveHealthStatus<T extends { status: string; statusChangedAt?:
   return { ...row, status: "degraded" };
 }
 
-function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], now = new Date()) {
+async function getAccountSummaryHealthRows(accountIds: string[]): Promise<AccountModelHealthSummaryRow[]> {
+  if (accountIds.length === 0) return [];
+
+  return db
+    .select({
+      providerAccountId: providerAccountModelHealth.providerAccountId,
+      status: providerAccountModelHealth.status,
+      statusChangedAt: providerAccountModelHealth.statusChangedAt,
+      consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
+      lastErrorAt: providerAccountModelHealth.lastErrorAt,
+      lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
+    })
+    .from(providerAccountModelHealth)
+    .where(inArray(providerAccountModelHealth.providerAccountId, accountIds));
+}
+
+function buildAccountHealthByAccountId(healthRows: AccountModelHealthSummaryRow[], now = new Date()) {
+  return healthRows.map((row) => withEffectiveHealthStatus(row, now)).reduce<Record<string, AccountModelHealthSummaryRow>>((acc, row) => {
+    const current = acc[row.providerAccountId];
+    const currentWeight = current ? ACCOUNT_HEALTH_STATUS_WEIGHT[current.status] ?? 0 : 0;
+    const nextWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[row.status] ?? 0;
+    if (!current || nextWeight > currentWeight || (nextWeight === currentWeight && row.consecutiveErrors > current.consecutiveErrors)) {
+      acc[row.providerAccountId] = row;
+    }
+    return acc;
+  }, {});
+}
+
+function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], healthByAccountId: Record<string, AccountModelHealthSummaryRow> = {}, now = new Date()) {
   const summaries = Object.fromEntries(
     PROVIDER_ACCOUNT_KEYS.map((provider) => [
       provider,
@@ -109,7 +150,26 @@ function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], now = ne
     if (!accountIsEffectivelyActive(account, now)) continue;
 
     summary.active += 1;
-    const indicator = getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt, account.lastUsedAt);
+    const effectiveAccount = withEffectiveHealthStatus(account, now);
+    const health = healthByAccountId[account.id];
+    const accountWeight = ACCOUNT_HEALTH_STATUS_WEIGHT[effectiveAccount.status] ?? 0;
+    const healthWeight = health ? ACCOUNT_HEALTH_STATUS_WEIGHT[health.status] ?? 0 : 0;
+    const useModelHealth = health && (healthWeight > accountWeight || (healthWeight === accountWeight && health.consecutiveErrors > effectiveAccount.consecutiveErrors));
+    const indicatorSource = useModelHealth
+      ? {
+          ...effectiveAccount,
+          status: health.status,
+          statusChangedAt: health.statusChangedAt,
+          consecutiveErrors: health.consecutiveErrors,
+          lastErrorAt: health.lastErrorAt ?? account.lastErrorAt,
+          lastSuccessAt: health.lastSuccessAt ?? account.lastSuccessAt,
+        }
+      : effectiveAccount;
+    const indicator = indicatorSource.status === "failed"
+      ? "error"
+      : indicatorSource.status === "degraded" || indicatorSource.status === "half_open"
+        ? "warning"
+        : getAccountIndicator(indicatorSource.lastErrorAt, indicatorSource.lastSuccessAt, account.lastRecoveredByRotationAt, account.lastUsedAt);
     if (INDICATOR_WEIGHT[indicator] > INDICATOR_WEIGHT[summary.indicator]) {
       summary.indicator = indicator;
     }
@@ -167,9 +227,13 @@ export async function getAccountOverview(userId: string, options: AccountReadOpt
     const [accounts, providerStats] = await Promise.all([
       db
         .select({
+          id: providerAccount.id,
           provider: providerAccount.provider,
           isActive: providerAccount.isActive,
           disabledUntil: providerAccount.disabledUntil,
+          status: providerAccount.status,
+          statusChangedAt: providerAccount.statusChangedAt,
+          consecutiveErrors: providerAccount.consecutiveErrors,
           lastUsedAt: providerAccount.lastUsedAt,
           lastErrorAt: providerAccount.lastErrorAt,
           lastSuccessAt: providerAccount.lastSuccessAt,
@@ -179,9 +243,12 @@ export async function getAccountOverview(userId: string, options: AccountReadOpt
         .where(eq(providerAccount.userId, userId)),
       getProviderSummaryStats(userId),
     ]);
-    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options);
+    const [pinnedProviders, healthRows] = await Promise.all([
+      getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options),
+      getAccountSummaryHealthRows(accounts.map((account) => account.id)),
+    ]);
 
-    const pingSummaries = buildAccountPingSummaries(accounts, now);
+    const pingSummaries = buildAccountPingSummaries(accounts, buildAccountHealthByAccountId(healthRows, now), now);
 
     const summaries = Object.fromEntries(
       PROVIDER_ACCOUNT_KEYS.map((provider) => [
@@ -205,9 +272,13 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
     const now = new Date();
     const accounts = await db
       .select({
+        id: providerAccount.id,
         provider: providerAccount.provider,
         isActive: providerAccount.isActive,
         disabledUntil: providerAccount.disabledUntil,
+        status: providerAccount.status,
+        statusChangedAt: providerAccount.statusChangedAt,
+        consecutiveErrors: providerAccount.consecutiveErrors,
         lastUsedAt: providerAccount.lastUsedAt,
         lastErrorAt: providerAccount.lastErrorAt,
         lastSuccessAt: providerAccount.lastSuccessAt,
@@ -215,9 +286,12 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
       })
       .from(providerAccount)
       .where(eq(providerAccount.userId, userId));
-    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options);
+    const [pinnedProviders, healthRows] = await Promise.all([
+      getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options),
+      getAccountSummaryHealthRows(accounts.map((account) => account.id)),
+    ]);
 
-    const pingSummaries = buildAccountPingSummaries(accounts, now);
+    const pingSummaries = buildAccountPingSummaries(accounts, buildAccountHealthByAccountId(healthRows, now), now);
 
     return {
       summaries: Object.fromEntries(pinnedProviders.map((provider) => [provider, pingSummaries[provider]])),
