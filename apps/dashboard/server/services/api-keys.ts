@@ -7,7 +7,6 @@ import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "../lib/proxy/authless-providers";
 import { getAllFamilies, getAllModels, getModelFamily, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
-import { createServiceTimer } from "../utils/timing";
 import { compareModelEntries } from "../../lib/model-sort";
 import type { ActionResult } from "../utils/api";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
@@ -74,29 +73,25 @@ async function withOwnedApiKey<T>(userId: string, id: string, failureMessage: st
 }
 
 export async function getApiKeyOptions(userId: string) {
-  const timer = createServiceTimer("api-keys.options");
   try {
-    const apiKeys = await timer.time("apiKeys", () => db.select({ id: proxyApiKey.id }).from(proxyApiKey).where(eq(proxyApiKey.userId, userId)));
+    const apiKeys = await db.select({ id: proxyApiKey.id }).from(proxyApiKey).where(eq(proxyApiKey.userId, userId));
     const apiKeyIds = apiKeys.map((key) => key.id);
-    const rateLimitRows = await timer.time("rateLimits", () => apiKeyIds.length > 0
+    const rateLimitRows = await (apiKeyIds.length > 0
       ? db
           .select({ apiKeyId: proxyApiKeyRateLimit.apiKeyId, target: proxyApiKeyRateLimit.target, targetType: proxyApiKeyRateLimit.targetType, perMinute: proxyApiKeyRateLimit.perMinute, perHour: proxyApiKeyRateLimit.perHour, perDay: proxyApiKeyRateLimit.perDay })
           .from(proxyApiKeyRateLimit)
           .where(inArray(proxyApiKeyRateLimit.apiKeyId, apiKeyIds))
       : Promise.resolve([]));
-    const providerAccounts = await timer.time("providerAccounts", () => db
+    const providerAccounts = await db
       .select({ id: providerAccount.id, provider: providerAccount.provider, name: providerAccount.name, email: providerAccount.email })
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS)))
-      .orderBy(asc(providerAccount.provider), asc(providerAccount.name)));
+      .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
 
-    const registryStartedAt = Date.now();
     const availableModels = getAllModels().sort(compareKnownModelIds);
     const availableFamilies = getAllFamilies();
     const authlessProviderAccounts = getAuthlessProviderAccounts().map(({ disabledModels: _disabledModels, ...account }) => account);
-    timer.record("registry", registryStartedAt);
 
-    const mapStartedAt = Date.now();
     const rateLimitsByKeyId = rateLimitRows.reduce<Record<string, Array<{ target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null }>>>((acc, row) => {
       acc[row.apiKeyId] = [
         ...(acc[row.apiKeyId] ?? []),
@@ -104,8 +99,6 @@ export async function getApiKeyOptions(userId: string) {
       ];
       return acc;
     }, {});
-    timer.record("map", mapStartedAt);
-    timer.log({ apiKeys: apiKeys.length, rateLimits: rateLimitRows.length, providerAccounts: providerAccounts.length, availableModels: availableModels.length });
 
     return {
       availableModels,

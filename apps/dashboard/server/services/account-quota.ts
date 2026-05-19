@@ -4,7 +4,6 @@ import { z } from "zod";
 import { db } from "../lib/db";
 import { providerAccount } from "../lib/db/schema";
 import { fetchInternalQuota, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
-import { createServiceTimer } from "../utils/timing";
 
 const MAX_SIMULTANEOUS_QUOTA_FETCHES = 3;
 const MAX_QUOTA_BATCH_ACCOUNTS = 3;
@@ -131,18 +130,16 @@ async function fetchAccountQuota(userId: string, provider: QuotaProviderKey, acc
 }
 
 export async function getAccountQuota(userId: string, input: z.infer<typeof accountQuotaInputSchema>) {
-  const timer = createServiceTimer("accounts.quota", { provider: input.provider });
   try {
-    const [account] = await timer.time("ownership", () => db
+    const [account] = await db
       .select(quotaOwnershipColumns)
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider), eq(providerAccount.id, input.accountId)))
-      .limit(1));
+      .limit(1);
 
     if (!account) return { success: false, error: "Account not found" } as const;
-    const result = await timer.time("fetchQuota", () => fetchAccountQuota(userId, input.provider, account.id));
-    if (result.success) await timer.time("persistTier", () => persistDetectedTier(account.id, result.data));
-    timer.log({ accounts: 1, success: result.success });
+    const result = await fetchAccountQuota(userId, input.provider, account.id);
+    if (result.success) await persistDetectedTier(account.id, result.data);
     return result;
   } catch (error) {
     console.error("Failed to fetch provider quota:", error);
@@ -151,13 +148,12 @@ export async function getAccountQuota(userId: string, input: z.infer<typeof acco
 }
 
 export async function getAccountQuotas(userId: string, input: z.infer<typeof accountQuotaBatchInputSchema>) {
-  const timer = createServiceTimer("accounts.quotas", { provider: input.provider });
   try {
     const accountIds = [...new Set(input.accountIds)];
-    const accounts = await timer.time("ownership", () => db
+    const accounts = await db
       .select(quotaOwnershipColumns)
       .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider), inArray(providerAccount.id, accountIds))));
+      .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider), inArray(providerAccount.id, accountIds)));
 
     const accountById = new Map(accounts.map((account) => [account.id, account]));
     const results: Record<string, AccountQuotaResult> = {};
@@ -182,8 +178,7 @@ export async function getAccountQuotas(userId: string, input: z.infer<typeof acc
       }
     };
 
-    await timer.time("fetchQuotas", () => Promise.all(Array.from({ length: workerCount }, () => runWorker())));
-    timer.log({ requestedAccounts: accountIds.length, fetchedAccounts: accountsToFetch.length, workerCount });
+    await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
     return { success: true, data: results } as const;
   } catch (error) {
     console.error("Failed to fetch provider quotas:", error);

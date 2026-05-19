@@ -3,7 +3,6 @@ import { pinnedProvider, providerAccount, providerAccountDisabledModel, provider
 import { getModelFamily, getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { compareModelEntries } from "../../lib/model-sort";
-import { createServiceTimer } from "../utils/timing";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
@@ -162,11 +161,10 @@ export async function listAccountsByProvider(userId: string, input: z.infer<type
 }
 
 export async function getAccountOverview(userId: string, options: AccountReadOptions = {}) {
-  const timer = createServiceTimer("accounts.overview");
   try {
     const now = new Date();
     const [accounts, providerStats] = await Promise.all([
-      timer.time("accounts", () => db
+      db
         .select({
           provider: providerAccount.provider,
           isActive: providerAccount.isActive,
@@ -177,12 +175,11 @@ export async function getAccountOverview(userId: string, options: AccountReadOpt
           lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
         })
         .from(providerAccount)
-        .where(eq(providerAccount.userId, userId))),
-      timer.time("stats", () => getProviderSummaryStats(userId)),
+        .where(eq(providerAccount.userId, userId)),
+      getProviderSummaryStats(userId),
     ]);
-    const pinnedProviders = await timer.time("pinnedProviders", () => getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options));
+    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options);
 
-    const mapStartedAt = Date.now();
     const pingSummaries = buildAccountPingSummaries(accounts, now);
 
     const summaries = Object.fromEntries(
@@ -194,8 +191,6 @@ export async function getAccountOverview(userId: string, options: AccountReadOpt
         },
       ])
     ) as Record<ProviderAccountKey, { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats }>;
-    timer.record("map", mapStartedAt);
-    timer.log({ accounts: accounts.length, pinnedProviders: pinnedProviders.length });
 
     return { summaries, pinnedProviders };
   } catch (error) {
@@ -205,10 +200,9 @@ export async function getAccountOverview(userId: string, options: AccountReadOpt
 }
 
 export async function getAccountPing(userId: string, options: AccountReadOptions = {}) {
-  const timer = createServiceTimer("accounts.ping");
   try {
     const now = new Date();
-    const accounts = await timer.time("accounts", () => db
+    const accounts = await db
       .select({
         provider: providerAccount.provider,
         isActive: providerAccount.isActive,
@@ -219,13 +213,10 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
         lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
       })
       .from(providerAccount)
-      .where(eq(providerAccount.userId, userId)));
-    const pinnedProviders = await timer.time("pinnedProviders", () => getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options));
+      .where(eq(providerAccount.userId, userId));
+    const pinnedProviders = await getPinnedProviderKeys(userId, accounts.map((account) => account.provider), options);
 
-    const mapStartedAt = Date.now();
     const pingSummaries = buildAccountPingSummaries(accounts, now);
-    timer.record("map", mapStartedAt);
-    timer.log({ accounts: accounts.length, pinnedProviders: pinnedProviders.length });
 
     return {
       summaries: Object.fromEntries(pinnedProviders.map((provider) => [provider, pingSummaries[provider]])),
@@ -239,29 +230,26 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
 }
 
 export async function getAccountsByProviderDetailed(userId: string, input: z.infer<typeof providerInputSchema>) {
-  const timer = createServiceTimer("accounts.provider-detail", { provider: input.provider });
   try {
     const now = new Date();
-    const accounts = await timer.time("accounts", () => db
+    const accounts = await db
       .select(providerAccountListColumns)
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, input.provider)))
-      .orderBy(...providerAccountLastUsedOrder));
+      .orderBy(...providerAccountLastUsedOrder);
 
-    const modelsStartedAt = Date.now();
     const accountIds = accounts.map((account) => account.id);
     const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
-    timer.record("models", modelsStartedAt);
     const [accountStatsById, disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
-      timer.time("stats", () => buildAccountStats(userId, accountIds)),
-      timer.time("disabledModels", () => accountIds.length > 0
+      buildAccountStats(userId, accountIds),
+      accountIds.length > 0
         ? db
             .select({ providerAccountId: providerAccountDisabledModel.providerAccountId, model: providerAccountDisabledModel.model })
             .from(providerAccountDisabledModel)
             .where(inArray(providerAccountDisabledModel.providerAccountId, accountIds))
-        : Promise.resolve([])),
-      timer.time("health", () => accountIds.length > 0 && healthModelKeys.length > 0
+        : Promise.resolve([]),
+      accountIds.length > 0 && healthModelKeys.length > 0
         ? db
             .select({
               providerAccountId: providerAccountModelHealth.providerAccountId,
@@ -276,11 +264,10 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
             })
             .from(providerAccountModelHealth)
             .where(and(inArray(providerAccountModelHealth.providerAccountId, accountIds), inArray(providerAccountModelHealth.model, healthModelKeys)))
-        : Promise.resolve([])),
-      timer.time("pinnedProviders", () => getPinnedProviderKeys(userId)),
+        : Promise.resolve([]),
+      getPinnedProviderKeys(userId),
     ]);
 
-    const mapStartedAt = Date.now();
     const disabledModelsByAccountId = disabledModelRows.reduce<Record<string, string[]>>((acc, row) => {
       acc[row.providerAccountId] = [...(acc[row.providerAccountId] ?? []), row.model];
       return acc;
@@ -337,8 +324,6 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
         stats: accountStatsById[account.id],
       };
     });
-    timer.record("map", mapStartedAt);
-    timer.log({ accounts: accounts.length, supportedModels: supportedModels.length, healthModelKeys: healthModelKeys.length, healthRows: healthRows.length, pinnedProviders: pinnedProviders.length });
 
     return {
       accounts: detailedAccounts,

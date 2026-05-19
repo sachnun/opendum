@@ -6,7 +6,6 @@ import { disabledModel } from "../lib/db/schema";
 import { getModelStatsByModel } from "../lib/model-stats";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
-import { createServiceTimer } from "../utils/timing";
 import { compareModelEntries } from "../../lib/model-sort";
 
 export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
@@ -27,13 +26,11 @@ async function getAvailableModelsForUser(userId: string) {
 }
 
 export async function listModels(userId: string, options: { includeStats?: boolean } = {}) {
-  const timer = createServiceTimer("models.list");
   try {
     const includeStats = options.includeStats ?? true;
-    const { availability, disabledModelSet, models } = await timer.time("availability", () => getAvailableModelsForUser(userId));
-    const statsByModel = includeStats ? await timer.time("stats", () => getModelStatsByModel(userId, models)) : {};
+    const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
+    const statsByModel = includeStats ? await getModelStatsByModel(userId, models) : {};
 
-    const mapStartedAt = Date.now();
     const result = models.map((model) => ({
       id: model,
       name: model,
@@ -43,8 +40,6 @@ export async function listModels(userId: string, options: { includeStats?: boole
       isEnabled: !disabledModelSet.has(model),
       ...(includeStats ? { stats: statsByModel[model] } : {}),
     }));
-    timer.record("map", mapStartedAt);
-    timer.log({ models: models.length });
     return result;
   } catch (error) {
     console.error("Failed to list models:", error);
