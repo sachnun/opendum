@@ -26,7 +26,7 @@ type endpointAdapter struct {
 type parsedEndpointRequest struct {
 	ModelParam         string
 	Stream             bool
-	ProviderAccountID  *string
+	ForcedAccountID    *string
 	ReasoningRequested bool
 	MessagesForError   any
 	ParamsForError     map[string]any

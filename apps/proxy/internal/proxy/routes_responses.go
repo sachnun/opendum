@@ -25,20 +25,19 @@ func parseResponses(body map[string]any) (parsedEndpointRequest, *routeError) {
 		return parsedEndpointRequest{}, &routeError{Status: http.StatusBadRequest, Message: "input array is required", Type: "invalid_request_error"}
 	}
 	stream := parseStreamParam(body)
-	providerAccountID := parseProviderAccountID(body)
 	instructions, _ := body["instructions"].(string)
 	messages := convertResponsesInputToMessages(input, instructions)
-	params := cloneMapExcept(body, "model", "input", "instructions", "stream", "provider_account_id")
+	params := cloneMapExcept(body, "model", "input", "instructions", "stream")
 	if maxOutput, ok := params["max_output_tokens"]; ok {
 		params["max_tokens"] = maxOutput
 		delete(params, "max_output_tokens")
 	}
 	reasoning := reasoningRequested(params)
-	paramsForError := buildParamsForError(params, stream, providerAccountID)
+	paramsForError := buildParamsForError(params, stream)
 	if instructions != "" {
 		paramsForError["instructions"] = instructions
 	}
-	return parsedEndpointRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "responsesInput": input, "instructions": instructions, "params": params}}, nil
+	return parsedEndpointRequest{ModelParam: model, Stream: stream, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "responsesInput": input, "instructions": instructions, "params": params}}, nil
 }
 
 func buildResponses(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {

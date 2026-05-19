@@ -1196,7 +1196,7 @@ function convertScenarioMessagesToResponsesInput(messages: ScenarioMessage[]) {
   return messages.map((message) => ({ type: "message", role: message.role === "system" ? "developer" : message.role === "assistant" ? "assistant" : "user", content: message.content }));
 }
 
-function buildRequestBody(modelId: string, messages: ScenarioMessage[], currentSettings: PlaygroundSettings, accountId: string | null): Record<string, unknown> {
+function buildRequestBody(modelId: string, messages: ScenarioMessage[], currentSettings: PlaygroundSettings): Record<string, unknown> {
   if (currentSettings.endpoint === "messages") {
     const anthropicPayload = convertScenarioMessagesToAnthropic(messages);
     const requestBody: Record<string, unknown> = {
@@ -1210,7 +1210,6 @@ function buildRequestBody(modelId: string, messages: ScenarioMessage[], currentS
       frequency_penalty: currentSettings.frequencyPenalty,
     };
     if (anthropicPayload.system) requestBody.system = anthropicPayload.system;
-    if (accountId) requestBody.provider_account_id = accountId;
     if (currentSettings.reasoningEffort !== "none") {
       if (usesAdaptiveThinking(modelId)) {
         requestBody.thinking = { type: "adaptive" };
@@ -1244,9 +1243,14 @@ function buildRequestBody(modelId: string, messages: ScenarioMessage[], currentS
         frequency_penalty: currentSettings.frequencyPenalty,
       };
 
-  if (accountId) requestBody.provider_account_id = accountId;
   if (currentSettings.reasoningEffort !== "none") requestBody.reasoning_effort = currentSettings.reasoningEffort;
   return requestBody;
+}
+
+function applyAccountSelectorToRequestBody(requestBody: Record<string, unknown>, accountId: string | null) {
+  if (!accountId) return;
+  const model = typeof requestBody.model === "string" ? requestBody.model.trim() : "";
+  if (model) requestBody.model = `${accountId}/${model}`;
 }
 
 function adaptRequestOverridesForEndpoint(overrides: Record<string, unknown> | undefined, endpoint: PlaygroundEndpoint): Record<string, unknown> | null {
@@ -1327,12 +1331,13 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
   setResponse(panelId, { content: "", reasoning: "", toolCalls: [], isLoading: true, metrics: buildResponseMetrics(null, null, null), startedAt: requestStartedAt });
 
   try {
-    const requestBody = buildRequestBody(modelId, messages, currentSettings, accountId);
+    const requestBody = buildRequestBody(modelId, messages, currentSettings);
     const endpointOverrides = adaptRequestOverridesForEndpoint(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
     const additionalParameters = parseAdditionalParameters(additionalParametersInput.value);
     if (additionalParameters.error) throw new Error(`Invalid additional parameters: ${additionalParameters.error}`);
     if (additionalParameters.params) Object.assign(requestBody, additionalParameters.params);
+    applyAccountSelectorToRequestBody(requestBody, accountId);
     if (!canUsePlayground.value) throw new Error(playgroundSetupMessage.value || "Playground is not ready.");
 
     const controller = new AbortController();

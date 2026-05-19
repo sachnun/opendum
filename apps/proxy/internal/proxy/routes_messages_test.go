@@ -8,13 +8,12 @@ import (
 
 func TestParseMessagesBuildsProviderPayload(t *testing.T) {
 	body := map[string]any{
-		"model":               "claude-alias",
-		"system":              "follow policy",
-		"messages":            []any{map[string]any{"role": "user", "content": "hello"}},
-		"stream":              false,
-		"provider_account_id": "acct_3",
-		"max_tokens":          200,
-		"thinking":            map[string]any{"type": "enabled", "budget_tokens": 1024},
+		"model":      "claude-alias",
+		"system":     "follow policy",
+		"messages":   []any{map[string]any{"role": "user", "content": "hello"}},
+		"stream":     false,
+		"max_tokens": 200,
+		"thinking":   map[string]any{"type": "enabled", "budget_tokens": 1024},
 	}
 
 	parsed, routeErr := parseMessages(body)
@@ -27,8 +26,8 @@ func TestParseMessagesBuildsProviderPayload(t *testing.T) {
 	if parsed.Stream {
 		t.Fatal("Stream = true, want false")
 	}
-	if parsed.ProviderAccountID == nil || *parsed.ProviderAccountID != "acct_3" {
-		t.Fatalf("ProviderAccountID = %v, want acct_3", parsed.ProviderAccountID)
+	if parsed.ForcedAccountID != nil {
+		t.Fatalf("ForcedAccountID = %v, want nil", parsed.ForcedAccountID)
 	}
 	if !reflect.DeepEqual(parsed.MessagesForError, body["messages"]) {
 		t.Fatalf("MessagesForError = %#v, want original messages", parsed.MessagesForError)
@@ -36,8 +35,8 @@ func TestParseMessagesBuildsProviderPayload(t *testing.T) {
 	if parsed.ParamsForError["model"] != nil || parsed.ParamsForError["messages"] != nil {
 		t.Fatalf("ParamsForError contains request-only fields: %#v", parsed.ParamsForError)
 	}
-	if parsed.ParamsForError["provider_account_id"] != "acct_3" || parsed.ParamsForError["stream"] != false {
-		t.Fatalf("ParamsForError missing provider account or stream: %#v", parsed.ParamsForError)
+	if parsed.ParamsForError["stream"] != false {
+		t.Fatalf("ParamsForError missing stream: %#v", parsed.ParamsForError)
 	}
 
 	payload := buildMessages(parsed, "claude-canonical", true, "sess_3")
@@ -53,8 +52,8 @@ func TestParseMessagesBuildsProviderPayload(t *testing.T) {
 	if payload["_includeReasoning"] != true || payload["thinking_budget"] != 1024 {
 		t.Fatalf("payload missing thinking metadata: %#v", payload)
 	}
-	if payload["provider_account_id"] != nil || payload["system"] != nil {
-		t.Fatalf("payload leaked proxy/request-only fields: %#v", payload)
+	if payload["system"] != nil {
+		t.Fatalf("payload leaked request-only fields: %#v", payload)
 	}
 
 	messages, ok := payload["messages"].([]any)

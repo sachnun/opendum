@@ -86,6 +86,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		s.writeRouteError(w, cfg, routeErr.Status, routeErr.Message, routeErr.Type, routeErr.Param, routeErr.Code, routeErr.RetryAfter, routeErr.RetryAfterMS)
 		return
 	}
+	parsed = s.applyModelAccountSelector(parsed)
 	r = r.WithContext(context.WithValue(ctx, requestBodyContextKey{}, body))
 	ctx = r.Context()
 
@@ -116,7 +117,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		}
 	}
 
-	forced, forceErr := s.validateForcedAccount(ctx, authResult.UserID, validation, parsed.ProviderAccountID, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList}, playgroundAuth, cfg)
+	forced, forceErr := s.validateForcedAccount(ctx, authResult.UserID, validation, parsed.ForcedAccountID, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList}, playgroundAuth)
 	if forceErr != nil {
 		s.writeRouteError(w, cfg, forceErr.Status, forceErr.Message, forceErr.Type, forceErr.Param, forceErr.Code, forceErr.RetryAfter, forceErr.RetryAfterMS)
 		return
@@ -159,6 +160,42 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		}
 		s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)
 	}
+}
+
+func (s *Service) applyModelAccountSelector(parsed parsedEndpointRequest) parsedEndpointRequest {
+	accountID, model, ok := s.modelAccountSelector(parsed.ModelParam)
+	if !ok {
+		return parsed
+	}
+	parsed.ModelParam = model
+	parsed.ForcedAccountID = strPtr(accountID)
+	return parsed
+}
+
+func (s *Service) modelAccountSelector(modelParam string) (string, string, bool) {
+	index := strings.Index(modelParam, "/")
+	if index < 0 {
+		return "", "", false
+	}
+	prefix := strings.TrimSpace(modelParam[:index])
+	model := strings.TrimSpace(modelParam[index+1:])
+	if prefix == "" || model == "" || s.isKnownModelProviderPrefix(prefix) {
+		return "", "", false
+	}
+	return prefix, model, true
+}
+
+func (s *Service) isKnownModelProviderPrefix(prefix string) bool {
+	provider := models.NormalizeProviderAlias(prefix)
+	if provider == "" {
+		return false
+	}
+	if s.providerRegistry != nil {
+		if _, ok := s.providerRegistry.Get(provider); ok {
+			return true
+		}
+	}
+	return s.registry != nil && len(s.registry.ModelsForProvider(provider)) > 0
 }
 
 func (s *Service) recordResponseHandlerFailure(ctx context.Context, account *appdb.ProviderAccount, model, userID, apiKeyID string, err error, startMS int64) {

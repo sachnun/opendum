@@ -7,7 +7,7 @@ import (
 )
 
 func transformAnthropicToOpenAI(body map[string]any) map[string]any {
-	payload := cloneMapExcept(body, "system", "provider_account_id", "thinking", "output_config")
+	payload := cloneMapExcept(body, "system", "thinking", "output_config")
 	if _, ok := payload["max_tokens"]; !ok {
 		payload["max_tokens"] = 4096
 	}

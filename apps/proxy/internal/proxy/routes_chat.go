@@ -25,11 +25,10 @@ func parseChatCompletions(body map[string]any) (parsedEndpointRequest, *routeErr
 		return parsedEndpointRequest{}, &routeError{Status: http.StatusBadRequest, Message: "messages array is required", Type: "invalid_request_error"}
 	}
 	stream := parseStreamParam(body)
-	providerAccountID := parseProviderAccountID(body)
-	params := cloneMapExcept(body, "model", "messages", "stream", "provider_account_id")
+	params := cloneMapExcept(body, "model", "messages", "stream")
 	reasoning := reasoningRequested(body)
-	paramsForError := buildParamsForError(params, stream, providerAccountID)
-	return parsedEndpointRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "params": params}}, nil
+	paramsForError := buildParamsForError(params, stream)
+	return parsedEndpointRequest{ModelParam: model, Stream: stream, ReasoningRequested: reasoning, MessagesForError: messages, ParamsForError: paramsForError, RouteData: map[string]any{"messages": messages, "params": params}}, nil
 }
 
 func buildChatCompletions(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {

@@ -13,17 +13,17 @@ import (
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
 func TestParseChatCompletionsBuildsProviderPayload(t *testing.T) {
 	messages := []any{map[string]any{"role": "user", "content": "hello"}}
 	body := map[string]any{
-		"model":               "alias-model",
-		"messages":            messages,
-		"stream":              false,
-		"provider_account_id": "acct_1",
-		"temperature":         0.7,
-		"reasoning_effort":    "high",
+		"model":            "alias-model",
+		"messages":         messages,
+		"stream":           false,
+		"temperature":      0.7,
+		"reasoning_effort": "high",
 	}
 
 	parsed, routeErr := parseChatCompletions(body)
@@ -36,8 +36,8 @@ func TestParseChatCompletionsBuildsProviderPayload(t *testing.T) {
 	if parsed.Stream {
 		t.Fatal("Stream = true, want false")
 	}
-	if parsed.ProviderAccountID == nil || *parsed.ProviderAccountID != "acct_1" {
-		t.Fatalf("ProviderAccountID = %v, want acct_1", parsed.ProviderAccountID)
+	if parsed.ForcedAccountID != nil {
+		t.Fatalf("ForcedAccountID = %v, want nil", parsed.ForcedAccountID)
 	}
 	if !parsed.ReasoningRequested {
 		t.Fatal("ReasoningRequested = false, want true")
@@ -45,8 +45,8 @@ func TestParseChatCompletionsBuildsProviderPayload(t *testing.T) {
 	if parsed.ParamsForError["model"] != nil || parsed.ParamsForError["messages"] != nil {
 		t.Fatalf("ParamsForError contains request-only fields: %#v", parsed.ParamsForError)
 	}
-	if parsed.ParamsForError["provider_account_id"] != "acct_1" || parsed.ParamsForError["stream"] != false {
-		t.Fatalf("ParamsForError missing provider account or stream: %#v", parsed.ParamsForError)
+	if parsed.ParamsForError["stream"] != false {
+		t.Fatalf("ParamsForError missing stream: %#v", parsed.ParamsForError)
 	}
 
 	payload := buildChatCompletions(parsed, "canonical-model", true, "sess_1")
@@ -61,9 +61,6 @@ func TestParseChatCompletionsBuildsProviderPayload(t *testing.T) {
 	}
 	if payload["_includeReasoning"] != true || payload["_sessionId"] != "sess_1" {
 		t.Fatalf("payload missing proxy metadata: %#v", payload)
-	}
-	if _, ok := payload["provider_account_id"]; ok {
-		t.Fatalf("payload leaked provider_account_id: %#v", payload)
 	}
 	if payload["temperature"] != 0.7 || payload["reasoning_effort"] != "high" {
 		t.Fatalf("payload dropped provider params: %#v", payload)
@@ -125,6 +122,30 @@ func TestParseChatCompletionsReasoningNoneDoesNotRequestReasoning(t *testing.T) 
 	}
 }
 
+func TestApplyModelAccountSelectorUsesNonProviderPrefix(t *testing.T) {
+	service := &Service{providerRegistry: providers.NewRegistry(nil, nil, nil)}
+	parsed := service.applyModelAccountSelector(parsedEndpointRequest{ModelParam: "acct_1/claude-opus-4-6"})
+
+	if parsed.ModelParam != "claude-opus-4-6" {
+		t.Fatalf("ModelParam = %q, want claude-opus-4-6", parsed.ModelParam)
+	}
+	if parsed.ForcedAccountID == nil || *parsed.ForcedAccountID != "acct_1" {
+		t.Fatalf("ForcedAccountID = %v, want acct_1", parsed.ForcedAccountID)
+	}
+}
+
+func TestApplyModelAccountSelectorPreservesProviderPrefix(t *testing.T) {
+	service := &Service{providerRegistry: providers.NewRegistry(nil, nil, nil)}
+	parsed := service.applyModelAccountSelector(parsedEndpointRequest{ModelParam: "openrouter/claude-opus-4-6"})
+
+	if parsed.ModelParam != "openrouter/claude-opus-4-6" {
+		t.Fatalf("ModelParam = %q, want provider-prefixed model", parsed.ModelParam)
+	}
+	if parsed.ForcedAccountID != nil {
+		t.Fatalf("ForcedAccountID = %v, want nil", parsed.ForcedAccountID)
+	}
+}
+
 func TestParseResponsesConvertsInputAndParams(t *testing.T) {
 	input := []any{
 		map[string]any{"type": "message", "role": "developer", "content": "follow policy"},
@@ -133,13 +154,12 @@ func TestParseResponsesConvertsInputAndParams(t *testing.T) {
 		map[string]any{"type": "function_call_output", "call_id": "fc_weather", "output": "sunny"},
 	}
 	body := map[string]any{
-		"model":               "responses-model",
-		"input":               input,
-		"instructions":        "system instructions",
-		"max_output_tokens":   123,
-		"stream":              false,
-		"provider_account_id": "acct_2",
-		"reasoning":           map[string]any{"effort": "medium"},
+		"model":             "responses-model",
+		"input":             input,
+		"instructions":      "system instructions",
+		"max_output_tokens": 123,
+		"stream":            false,
+		"reasoning":         map[string]any{"effort": "medium"},
 	}
 
 	parsed, routeErr := parseResponses(body)
@@ -195,9 +215,6 @@ func TestParseResponsesConvertsInputAndParams(t *testing.T) {
 	}
 	if payload["_responsesInput"] == nil || payload["_sessionId"] != "sess_2" || payload["_includeReasoning"] != true {
 		t.Fatalf("payload missing response metadata: %#v", payload)
-	}
-	if _, ok := payload["provider_account_id"]; ok {
-		t.Fatalf("payload leaked provider_account_id: %#v", payload)
 	}
 }
 
@@ -267,15 +284,11 @@ func TestTransformAnthropicToOpenAI(t *testing.T) {
 				},
 			},
 		},
-		"max_tokens":          100,
-		"thinking":            map[string]any{"type": "enabled", "budget_tokens": 2048},
-		"provider_account_id": "acct_3",
+		"max_tokens": 100,
+		"thinking":   map[string]any{"type": "enabled", "budget_tokens": 2048},
 	}
 
 	payload := transformAnthropicToOpenAI(body)
-	if _, ok := payload["provider_account_id"]; ok {
-		t.Fatalf("payload leaked provider_account_id: %#v", payload)
-	}
 	if payload["max_tokens"] != 100 || payload["thinking_budget"] != 2048 || payload["_includeReasoning"] != true {
 		t.Fatalf("payload missing params: %#v", payload)
 	}
@@ -799,7 +812,7 @@ func TestValidatePlaygroundAuthRejectsExpiredTimestamp(t *testing.T) {
 }
 
 func TestValidateForcedAccountAvailabilityRejectsInactiveForAPIKeys(t *testing.T) {
-	param := "provider_account_id"
+	param := "model"
 	err := validateForcedAccountAvailability(appdb.ProviderAccount{ID: "acct_1", IsActive: false}, false, param)
 	if err == nil || err.Code == nil || *err.Code != "provider_account_inactive" {
 		t.Fatalf("availability error = %+v, want inactive", err)
@@ -807,7 +820,7 @@ func TestValidateForcedAccountAvailabilityRejectsInactiveForAPIKeys(t *testing.T
 }
 
 func TestValidateForcedAccountAvailabilityRejectsTemporarilyDisabledForAPIKeys(t *testing.T) {
-	param := "provider_account_id"
+	param := "model"
 	disabledUntil := time.Now().Add(time.Hour)
 	err := validateForcedAccountAvailability(appdb.ProviderAccount{ID: "acct_1", IsActive: true, DisabledUntil: &disabledUntil}, false, param)
 	if err == nil || err.Code == nil || *err.Code != "provider_account_temporarily_disabled" {
@@ -816,7 +829,7 @@ func TestValidateForcedAccountAvailabilityRejectsTemporarilyDisabledForAPIKeys(t
 }
 
 func TestValidateForcedAccountAvailabilityAllowsInactiveForPlayground(t *testing.T) {
-	param := "provider_account_id"
+	param := "model"
 	disabledUntil := time.Now().Add(time.Hour)
 	err := validateForcedAccountAvailability(appdb.ProviderAccount{ID: "acct_1", IsActive: false, DisabledUntil: &disabledUntil}, true, param)
 	if err != nil {

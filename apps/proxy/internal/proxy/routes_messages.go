@@ -21,13 +21,9 @@ func parseMessages(body map[string]any) (parsedEndpointRequest, *routeError) {
 		return parsedEndpointRequest{}, routeErr
 	}
 	stream := parseStreamParam(body)
-	providerAccountID := parseProviderAccountID(body)
-	paramsForError := cloneMapExcept(body, "model", "messages", "stream", "provider_account_id")
+	paramsForError := cloneMapExcept(body, "model", "messages", "stream")
 	paramsForError["stream"] = stream
-	if providerAccountID != nil && *providerAccountID != "" {
-		paramsForError["provider_account_id"] = *providerAccountID
-	}
-	return parsedEndpointRequest{ModelParam: model, Stream: stream, ProviderAccountID: providerAccountID, MessagesForError: body["messages"], ParamsForError: paramsForError, RouteData: map[string]any{"body": body}}, nil
+	return parsedEndpointRequest{ModelParam: model, Stream: stream, MessagesForError: body["messages"], ParamsForError: paramsForError, RouteData: map[string]any{"body": body}}, nil
 }
 
 func buildMessages(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {

@@ -21,19 +21,9 @@ func parseStreamParam(body map[string]any) bool {
 	return true
 }
 
-func parseProviderAccountID(body map[string]any) *string {
-	if value, ok := body["provider_account_id"].(string); ok {
-		return &value
-	}
-	return nil
-}
-
-func buildParamsForError(params map[string]any, stream bool, providerAccountID *string) map[string]any {
+func buildParamsForError(params map[string]any, stream bool) map[string]any {
 	out := cloneMap(params)
 	out["stream"] = stream
-	if providerAccountID != nil && *providerAccountID != "" {
-		out["provider_account_id"] = *providerAccountID
-	}
 	return out
 }
 

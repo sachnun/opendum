@@ -287,14 +287,14 @@ func (s *Service) getHealthByAccount(ctx context.Context, accountIDs, modelKeys 
 	return result, nil
 }
 
-func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, providerAccountID *string, accountAccess auth.AccountAccess, allowInactive bool, cfg endpointAdapter) (*appdb.ProviderAccount, *routeError) {
-	if providerAccountID == nil {
+func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, forcedAccountID *string, accountAccess auth.AccountAccess, allowInactive bool) (*appdb.ProviderAccount, *routeError) {
+	if forcedAccountID == nil {
 		return nil, nil
 	}
-	id := strings.TrimSpace(*providerAccountID)
-	param := "provider_account_id"
+	id := strings.TrimSpace(*forcedAccountID)
+	param := "model"
 	if id == "" {
-		return nil, &routeError{Status: http.StatusBadRequest, Message: "provider_account_id must be a non-empty string", Type: "invalid_request_error", Param: &param, Code: strPtr("invalid_provider_account")}
+		return nil, &routeError{Status: http.StatusBadRequest, Message: "model account selector must include an account prefix", Type: "invalid_request_error", Param: &param, Code: strPtr("invalid_provider_account")}
 	}
 	if account, ok := syntheticAuthlessAccount(id); ok {
 		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
