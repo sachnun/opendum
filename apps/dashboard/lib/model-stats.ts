@@ -7,7 +7,7 @@ export interface ModelStats {
   successRate: number | null;
   dailyRequests: Array<{ date: string; count: number }>;
   avgDurationLastDay: number | null;
-  durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
+  durationLast24Hours: Array<{ time: string; avgDuration: number }>;
 }
 
 export function buildDayKeys(days: number): string[] {
@@ -34,13 +34,13 @@ export function buildHourKeys(hours: number): string[] {
   });
 }
 
-export function buildEmptyModelStats(dayKeys: string[], hourKeys: string[]): ModelStats {
+export function buildEmptyModelStats(_dayKeys: string[], _hourKeys: string[]): ModelStats {
   return {
     totalRequests: 0,
     totalTokens: 0,
     successRate: null,
-    dailyRequests: dayKeys.map((day) => ({ date: day, count: 0 })),
+    dailyRequests: [],
     avgDurationLastDay: null,
-    durationLast24Hours: hourKeys.map((time) => ({ time, avgDuration: null })),
+    durationLast24Hours: [],
   };
 }

@@ -38,6 +38,7 @@ type ErrorStatusTag = {
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
 type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string; getTone?: (delta: number) => StatDeltaTone };
+type DurationPoint = { time: string; avgDuration: number | null };
 
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
@@ -331,6 +332,38 @@ function collectStatValues(items: StatMetric[]): Record<string, number> {
   return values;
 }
 
+function buildHourKeys(hours: number): string[] {
+  const now = new Date();
+  const currentHourUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()));
+
+  return Array.from({ length: hours }, (_, index) => {
+    const date = new Date(currentHourUtc);
+    date.setUTCHours(currentHourUtc.getUTCHours() - (hours - 1 - index));
+    return date.toISOString();
+  });
+}
+
+function buildDayKeys(days: number): string[] {
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(todayUtc);
+    date.setUTCDate(todayUtc.getUTCDate() - (days - 1 - index));
+    return date.toISOString().split("T")[0] ?? "";
+  });
+}
+
+function expandDailyPoints(points: Array<{ date: string; count: number }>) {
+  const valuesByDate = new Map(points.map((point) => [point.date, point.count]));
+  return buildDayKeys(30).map((date) => ({ date, count: valuesByDate.get(date) ?? 0 }));
+}
+
+function expandDurationPoints(points: Array<{ time: string; avgDuration: number }>): DurationPoint[] {
+  const valuesByTime = new Map(points.map((point) => [point.time, point.avgDuration]));
+  return buildHourKeys(24).map((time) => ({ time, avgDuration: valuesByTime.get(time) ?? null }));
+}
+
 function formatRelativeTime(value: string | Date | number): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
@@ -481,13 +514,15 @@ const subtitle = computed(() => {
   return accountHeader.value.subtitle;
 });
 const subtitleDisplay = computed(() => (subtitle.value ? (isSubtitleVisible.value ? subtitle.value : maskSensitiveText(subtitle.value)) : null));
-const dailyValues = computed(() => props.account.stats.dailyRequests.map((point) => point.count));
-const durationValues = computed(() => props.account.stats.durationLast24Hours.map((point) => point.avgDuration ?? 0));
+const dailyPoints = computed(() => expandDailyPoints(props.account.stats.dailyRequests));
+const dailyValues = computed(() => dailyPoints.value.map((point) => point.count));
+const durationPoints = computed(() => expandDurationPoints(props.account.stats.durationLast24Hours));
+const durationValues = computed(() => durationPoints.value.map((point) => point.avgDuration ?? 0));
 const durationLabelPoints = computed(() => {
-  const points = props.account.stats.durationLast24Hours;
+  const points = durationPoints.value;
   const tickCount = Math.min(5, points.length);
   const indexes = Array.from(new Set(Array.from({ length: tickCount }, (_, index) => Math.round((index / (tickCount - 1 || 1)) * (points.length - 1)))));
-  return indexes.map((index) => points[index]).filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
+  return indexes.map((index) => points[index]).filter(Boolean) as DurationPoint[];
 });
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.account.stats.totalRequests.toLocaleString(), numericValue: props.account.stats.totalRequests, formatDelta: formatSignedInteger },

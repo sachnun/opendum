@@ -16,7 +16,7 @@ export type ProviderStats = {
   successRate: number | null;
   dailyRequests: Array<{ date: string; count: number }>;
   avgDurationLastDay: number | null;
-  durationLast24Hours: Array<{ time: string; avgDuration: number | null }>;
+  durationLast24Hours: Array<{ time: string; avgDuration: number }>;
 };
 type RawProviderStats = {
   totalRequests: number;
@@ -63,14 +63,14 @@ function createRawStats(): RawProviderStats {
   return { totalRequests: 0, totalTokens: 0, successfulRequests: 0, durationTotal: 0, durationCount: 0, dailyCounts: new Map(), durationByHour: new Map() };
 }
 
-export function buildEmptyProviderStats(dayKeys = buildDayKeys(PROVIDER_STATS_DAYS), hourKeys = buildHourKeys(PROVIDER_DURATION_LOOKBACK_HOURS)): ProviderStats {
+export function buildEmptyProviderStats(_dayKeys = buildDayKeys(PROVIDER_STATS_DAYS), _hourKeys = buildHourKeys(PROVIDER_DURATION_LOOKBACK_HOURS)): ProviderStats {
   return {
     totalRequests: 0,
     totalTokens: 0,
     successRate: null,
-    dailyRequests: dayKeys.map((date) => ({ date, count: 0 })),
+    dailyRequests: [],
     avgDurationLastDay: null,
-    durationLast24Hours: hourKeys.map((time) => ({ time, avgDuration: null })),
+    durationLast24Hours: [],
   };
 }
 
@@ -80,11 +80,14 @@ function buildStatsFromRaw(raw: RawProviderStats | undefined, dayKeys: string[],
     totalRequests: raw.totalRequests,
     totalTokens: raw.totalTokens,
     successRate: raw.totalRequests > 0 ? Math.round((raw.successfulRequests / raw.totalRequests) * 100) : null,
-    dailyRequests: dayKeys.map((date) => ({ date, count: raw.dailyCounts.get(date) ?? 0 })),
+    dailyRequests: dayKeys.flatMap((date) => {
+      const count = raw.dailyCounts.get(date) ?? 0;
+      return count > 0 ? [{ date, count }] : [];
+    }),
     avgDurationLastDay: raw.durationCount > 0 ? Math.round(raw.durationTotal / raw.durationCount) : null,
-    durationLast24Hours: hourKeys.map((time) => {
+    durationLast24Hours: hourKeys.flatMap((time) => {
       const bucket = raw.durationByHour.get(time);
-      return { time, avgDuration: bucket && bucket.count > 0 ? Math.round(bucket.total / bucket.count) : null };
+      return bucket && bucket.count > 0 ? [{ time, avgDuration: Math.round(bucket.total / bucket.count) }] : [];
     }),
   };
 }

@@ -151,19 +151,19 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
         return [model, buildEmptyModelStats(dayKeys, hourKeys)];
       }
 
-      const durationLast24Hours = hourKeys.map((time) => {
+      const durationLast24Hours = hourKeys.flatMap((time) => {
         const durationBucket = modelStats.durationByHour.get(time);
-        return {
-          time,
-          avgDuration: durationBucket && durationBucket.count > 0 ? Math.round(durationBucket.total / durationBucket.count) : null,
-        };
+        return durationBucket && durationBucket.count > 0 ? [{ time, avgDuration: Math.round(durationBucket.total / durationBucket.count) }] : [];
       });
 
       return [model, {
         totalRequests: modelStats.totalRequests,
         totalTokens: modelStats.totalTokens,
         successRate: modelStats.totalRequests > 0 ? Math.round((modelStats.successfulRequests / modelStats.totalRequests) * 100) : null,
-        dailyRequests: dayKeys.map((day) => ({ date: day, count: modelStats.dailyCounts.get(day) ?? 0 })),
+        dailyRequests: dayKeys.flatMap((day) => {
+          const count = modelStats.dailyCounts.get(day) ?? 0;
+          return count > 0 ? [{ date: day, count }] : [];
+        }),
         avgDurationLastDay: modelStats.durationCount > 0 ? Math.round(modelStats.durationTotal / modelStats.durationCount) : null,
         durationLast24Hours,
       } satisfies ModelStats];
