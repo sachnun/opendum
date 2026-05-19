@@ -1,8 +1,8 @@
 /**
  * Model registry consumed by the proxy layer.
  *
- * JSON model files are statically imported by the bundler so Cloudflare Workers
- * never need runtime filesystem access.
+ * JSON model files are statically imported by the bundler so the server runtime
+ * never needs filesystem access.
  */
 export interface ModelMeta {
   reasoning?: boolean;
