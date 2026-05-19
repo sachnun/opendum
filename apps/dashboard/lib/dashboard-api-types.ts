@@ -118,13 +118,35 @@ export interface AccountPingData {
   hasConnectedAccounts: boolean;
 }
 
+export interface AccountStatsData {
+  delta: true;
+  cursors: Record<string, string>;
+  stats?: Record<string, ProviderStats>;
+}
+
 export interface ProviderDetailData {
   accounts: ProviderAccountDetailItem[];
   supportedModels: string[];
   disabledModelsByAccountId: Record<string, string[]>;
   modelHealthByAccountId: Record<string, Record<string, ProviderAccountModelHealthItem>>;
   pinnedProviders: ProviderAccountKey[];
+  cursor?: string;
 }
+
+export interface ProviderDetailDeltaData {
+  delta: true;
+  cursor: string;
+  accounts?: ProviderAccountDetailItem[];
+  deletedAccountIds?: string[];
+  supportedModels?: string[];
+  disabledModelsByAccountId?: Record<string, string[]>;
+  clearedDisabledModelsByAccountId?: string[];
+  modelHealthByAccountId?: Record<string, Record<string, ProviderAccountModelHealthItem>>;
+  clearedModelHealthByAccountId?: string[];
+  pinnedProviders?: ProviderAccountKey[];
+}
+
+export type ProviderDetailResponse = ProviderDetailData | ProviderDetailDeltaData;
 
 export type QuotaProviderKey = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter";
 
@@ -201,6 +223,12 @@ export interface ModelListItem {
   meta?: ModelMeta;
   isEnabled: boolean;
   stats?: ModelStats;
+}
+
+export interface ModelStatsData {
+  delta: true;
+  cursors: Record<string, string>;
+  stats?: Record<string, ModelStats>;
 }
 
 export type ModelSearchItem = Omit<ModelListItem, "name" | "family" | "stats">;

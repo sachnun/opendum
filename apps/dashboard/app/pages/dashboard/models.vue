@@ -22,6 +22,7 @@ const { data, error, refresh } = await useAsyncData(dashboardInvalidation.keys.m
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = ref<Record<string, ModelStats>>({});
+const modelStatsCursorById = ref<Record<string, string>>({});
 const visibleModelIds = ref<Set<string>>(new Set());
 const availableProviders = computed(() => {
   const entries = new Map<string, string>();
@@ -219,8 +220,12 @@ async function loadModelStats(modelIds: string[], options: { force?: boolean } =
   for (const modelId of requestedModelIds) loadingModelStatsIds.add(modelId);
 
   try {
-    const stats = await dashboardApi.models.stats({ models: requestedModelIds });
-    modelStatsById.value = { ...modelStatsById.value, ...stats };
+    const response = await dashboardApi.models.stats({
+      models: requestedModelIds,
+      cursors: Object.fromEntries(requestedModelIds.map((modelId) => [modelId, modelStatsCursorById.value[modelId] ?? ""])),
+    });
+    modelStatsCursorById.value = { ...modelStatsCursorById.value, ...response.cursors };
+    if (response.stats) modelStatsById.value = { ...modelStatsById.value, ...response.stats };
   } catch (error) {
     console.error("Failed to load model stats:", error);
   } finally {
@@ -247,6 +252,7 @@ function stopModelStatsPolling() {
 function pruneModelStats() {
   const availableModelIds = new Set(models.value.map((model) => model.id));
   modelStatsById.value = Object.fromEntries(Object.entries(modelStatsById.value).filter(([modelId]) => availableModelIds.has(modelId)));
+  modelStatsCursorById.value = Object.fromEntries(Object.entries(modelStatsCursorById.value).filter(([modelId]) => availableModelIds.has(modelId)));
   visibleModelIds.value = new Set([...visibleModelIds.value].filter((modelId) => availableModelIds.has(modelId)));
 }
 

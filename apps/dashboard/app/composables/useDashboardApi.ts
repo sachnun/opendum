@@ -2,6 +2,7 @@ import type {
   AccountOverviewData,
   AccountOverviewResponse,
   AccountPingData,
+  AccountStatsData,
   ActionResult,
   AnalyticsData,
   AnalyticsFilter,
@@ -18,13 +19,14 @@ import type {
   AccountQuotaRequest,
   ModelListItem,
   ModelSearchItem,
+  ModelStatsData,
   PointStatusData,
   PlaygroundOptions,
   PlaygroundProxyAuth,
   ProviderDetailData,
+  ProviderDetailResponse,
   ProviderAccountUpdateData,
 } from "../../lib/dashboard-api-types";
-import type { ModelStats } from "../../lib/model-stats";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
@@ -51,7 +53,8 @@ export function useDashboardApi() {
       list: () => dashboardFetch("/api/dashboard/accounts"),
       byProvider: (query: { provider: string }) => dashboardFetch("/api/dashboard/accounts/provider", { query }),
       byProviderDetailed: (query: { provider: string }) => dashboardFetch<ProviderDetailData>("/api/dashboard/accounts/provider-detail", { query }),
-      stats: (body: { accountIds: string[] }) => post<Record<string, ProviderDetailData["accounts"][number]["stats"]>>(dashboardFetch, "/api/dashboard/accounts/stats", body),
+      byProviderDetailedDelta: (query: { provider: string; cursor: string }) => dashboardFetch<ProviderDetailResponse>("/api/dashboard/accounts/provider-detail", { query }),
+      stats: (body: { accountIds: string[]; cursors?: Record<string, string> }) => post<AccountStatsData>(dashboardFetch, "/api/dashboard/accounts/stats", body),
       overview: () => dashboardFetch<AccountOverviewData>("/api/dashboard/accounts/overview"),
       overviewDelta: (query: { cursor: string }) => dashboardFetch<AccountOverviewResponse>("/api/dashboard/accounts/overview", { query }),
       ping: () => dashboardFetch<AccountPingData>("/api/dashboard/accounts/ping"),
@@ -97,7 +100,7 @@ export function useDashboardApi() {
     models: {
       list: (query?: { includeStats?: boolean }) => dashboardFetch<ModelListItem[]>("/api/dashboard/models", query ? { query } : undefined),
       search: () => dashboardFetch<ModelSearchItem[]>("/api/dashboard/models/search"),
-      stats: (body: { models: string[] }) => post<Record<string, ModelStats>>(dashboardFetch, "/api/dashboard/models/stats", body),
+      stats: (body: { models: string[]; cursors?: Record<string, string> }) => post<ModelStatsData>(dashboardFetch, "/api/dashboard/models/stats", body),
       familyCounts: () => dashboardFetch<Record<string, number>>("/api/dashboard/models/families"),
       setEnabled: (body: { modelId: string; enabled: boolean }) => post<ActionResult<{ model: string; enabled: boolean }>>(dashboardFetch, "/api/dashboard/models/enabled", body),
     },

@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import { db } from "../lib/db";
@@ -9,6 +10,11 @@ import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getPr
 import { compareModelEntries } from "../../lib/model-sort";
 
 export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
+export const modelStatsInputSchema = z.object({ models: z.array(z.string().min(1)).max(50), cursors: z.record(z.string(), z.string()).optional() });
+
+function hashModelStatsValue(value: unknown) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("base64url").slice(0, 16);
+}
 
 async function getAvailableModelsForUser(userId: string) {
   const [disabledModels, availability] = await Promise.all([
@@ -63,19 +69,27 @@ export async function searchModels(userId: string) {
   }
 }
 
-export async function getModelStats(userId: string, modelIds: string[]) {
+export async function getModelStats(userId: string, input: z.infer<typeof modelStatsInputSchema>) {
   try {
     const { models } = await getAvailableModelsForUser(userId);
     const availableModelSet = new Set(models);
     const requestedModels = Array.from(new Set(
-      modelIds
+      input.models
         .map((model) => resolveModelAlias(model.trim()))
         .filter((model) => model && isModelSupported(model) && availableModelSet.has(model))
     ));
 
-    if (requestedModels.length === 0) return {};
+    if (requestedModels.length === 0) return { delta: true, cursors: {} };
 
-    return getModelStatsByModel(userId, requestedModels);
+    const stats = await getModelStatsByModel(userId, requestedModels);
+    const cursors = Object.fromEntries(Object.entries(stats).map(([model, value]) => [model, hashModelStatsValue(value)]));
+    const changedStats = Object.fromEntries(Object.entries(stats).filter(([model, value]) => input.cursors?.[model] !== hashModelStatsValue(value)));
+
+    return {
+      delta: true,
+      cursors,
+      ...(Object.keys(changedStats).length > 0 ? { stats: changedStats } : {}),
+    };
   } catch (error) {
     console.error("Failed to load model stats:", error);
     throw new Error("Failed to load model stats");

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProviderAccountUpdateData, ProviderDetailData, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
+import type { ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
 import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import { warmDashboardIndexedDbStore } from "../../utils/dashboardIndexedDb";
 
@@ -47,6 +47,7 @@ const promotedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
 const visibleAccountIds = ref<Set<string>>(new Set());
 const accountStatsById = ref<Record<string, ProviderStats>>({});
+const accountStatsCursorById = ref<Record<string, string>>({});
 const accountStatsDeltaReadyById = ref<Record<string, boolean>>({});
 const accountStatsFetchedById = ref<Record<string, boolean>>({});
 const hydratedAccountStatsIds = ref<Record<string, boolean>>({});
@@ -84,7 +85,7 @@ async function refreshProviderDetailOnce(options: { refreshQuota?: boolean } = {
     return;
   }
 
-  providerDetailRefreshInFlight = refresh().then(() => undefined).catch(() => undefined);
+  providerDetailRefreshInFlight = refreshProviderDetail().then(() => undefined).catch(() => undefined);
   try {
     await providerDetailRefreshInFlight;
     queueVisibleAccountStatsLoad();
@@ -174,6 +175,7 @@ watch(selectedProvider, () => {
   promotedAccountIds.value = new Set();
   visibleAccountIds.value = new Set();
   accountStatsById.value = {};
+  accountStatsCursorById.value = {};
   accountStatsDeltaReadyById.value = {};
   accountStatsFetchedById.value = {};
   hydratedAccountStatsIds.value = {};
@@ -189,6 +191,56 @@ watch(selectedProvider, () => {
   }
   shouldPromoteNextNewAccount = false;
 });
+
+function isProviderDetailDelta(detail: ProviderDetailResponse): detail is ProviderDetailDeltaData {
+  return "delta" in detail && detail.delta === true;
+}
+
+function applyProviderDetailResponse(detail: ProviderDetailResponse): ProviderDetailData {
+  if (!isProviderDetailDelta(detail)) {
+    data.value = detail;
+    return detail;
+  }
+
+  const current = data.value;
+  if (!current) throw new Error("Cannot apply provider detail delta without a snapshot");
+
+  const deletedAccountIds = new Set(detail.deletedAccountIds ?? []);
+  const changedAccountsById = new Map((detail.accounts ?? []).map((account) => [account.id, account]));
+  const clearedDisabledModelIds = new Set(detail.clearedDisabledModelsByAccountId ?? []);
+  const clearedModelHealthIds = new Set(detail.clearedModelHealthByAccountId ?? []);
+  const nextDisabledModelsByAccountId = {
+    ...Object.fromEntries(Object.entries(current.disabledModelsByAccountId).filter(([accountId]) => !clearedDisabledModelIds.has(accountId))),
+    ...(detail.disabledModelsByAccountId ?? {}),
+  };
+  const nextModelHealthByAccountId = {
+    ...Object.fromEntries(Object.entries(current.modelHealthByAccountId).filter(([accountId]) => !clearedModelHealthIds.has(accountId))),
+    ...(detail.modelHealthByAccountId ?? {}),
+  };
+
+  const next: ProviderDetailData = {
+    accounts: [
+      ...current.accounts
+        .filter((account) => !deletedAccountIds.has(account.id))
+        .map((account) => changedAccountsById.get(account.id) ?? account),
+      ...(detail.accounts ?? []).filter((account) => !current.accounts.some((currentAccount) => currentAccount.id === account.id)),
+    ],
+    supportedModels: detail.supportedModels ?? current.supportedModels,
+    disabledModelsByAccountId: nextDisabledModelsByAccountId,
+    modelHealthByAccountId: nextModelHealthByAccountId,
+    pinnedProviders: detail.pinnedProviders ?? current.pinnedProviders,
+    cursor: detail.cursor,
+  };
+  data.value = next;
+  return next;
+}
+
+async function refreshProviderDetail() {
+  const cursor = data.value?.cursor;
+  applyProviderDetailResponse(cursor
+    ? await dashboardApi.accounts.byProviderDetailedDelta({ provider: selectedProvider.value, cursor })
+    : await dashboardApi.accounts.byProviderDetailed({ provider: selectedProvider.value }));
+}
 
 watch(
   [accounts, selectedAccountId],
@@ -462,16 +514,22 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
   for (const accountId of requestedAccountIds) loadingAccountStatsIds.add(accountId);
 
   try {
-    const stats = await dashboardApi.accounts.stats({ accountIds: requestedAccountIds });
+    const response = await dashboardApi.accounts.stats({
+      accountIds: requestedAccountIds,
+      cursors: Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, accountStatsCursorById.value[accountId] ?? ""])),
+    });
+    const stats = response.stats ?? {};
     const nextDeltaReadyById = { ...accountStatsDeltaReadyById.value };
     const nextFetchedById = { ...accountStatsFetchedById.value };
+    const nextCursorById = { ...accountStatsCursorById.value, ...response.cursors };
 
-    for (const accountId of Object.keys(stats)) {
+    for (const accountId of requestedAccountIds) {
       nextDeltaReadyById[accountId] = Boolean(accountStatsById.value[accountId] || accountStatsDeltaReadyById.value[accountId]);
       nextFetchedById[accountId] = true;
     }
 
     accountStatsById.value = { ...accountStatsById.value, ...stats };
+    accountStatsCursorById.value = nextCursorById;
     accountStatsDeltaReadyById.value = nextDeltaReadyById;
     accountStatsFetchedById.value = nextFetchedById;
     void writeCachedAccountStats(stats);
@@ -501,6 +559,7 @@ function stopAccountStatsPolling() {
 function pruneAccountStats() {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
   accountStatsById.value = Object.fromEntries(Object.entries(accountStatsById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  accountStatsCursorById.value = Object.fromEntries(Object.entries(accountStatsCursorById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   accountStatsDeltaReadyById.value = Object.fromEntries(Object.entries(accountStatsDeltaReadyById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   accountStatsFetchedById.value = Object.fromEntries(Object.entries(accountStatsFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   hydratedAccountStatsIds.value = Object.fromEntries(Object.entries(hydratedAccountStatsIds.value).filter(([accountId]) => availableAccountIds.has(accountId)));

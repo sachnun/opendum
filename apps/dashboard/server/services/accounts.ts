@@ -50,11 +50,21 @@ interface AccountOverviewReadOptions extends AccountReadOptions {
 }
 
 type AccountOverviewSummary = { connected: number; active: number; indicator: ProviderAccountIndicator; stats: ProviderStats };
+type AccountStatsResult = Awaited<ReturnType<typeof buildAccountStats>>;
 
 type AccountOverviewCursor = {
   v: typeof ACCOUNT_OVERVIEW_CURSOR_VERSION;
   pinned: string;
   summaries: Partial<Record<ProviderAccountKey, string>>;
+};
+
+type ProviderDetailCursor = {
+  v: typeof ACCOUNT_OVERVIEW_CURSOR_VERSION;
+  accounts: Record<string, string>;
+  supportedModels: string;
+  disabledModelsByAccountId: Record<string, string>;
+  modelHealthByAccountId: Record<string, string>;
+  pinnedProviders: string;
 };
 
 export const providerInputSchema = z.object({
@@ -66,8 +76,9 @@ export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string(
 export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(), modelId: z.string(), enabled: z.boolean() });
 export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.coerce.number().int().min(1).max(200).optional() });
 export const resolveErrorsInputSchema = z.object({ accountId: z.string() });
-export const accountStatsInputSchema = z.object({ accountIds: z.array(z.string().min(1)).max(50) });
+export const accountStatsInputSchema = z.object({ accountIds: z.array(z.string().min(1)).max(50), cursors: z.record(z.string(), z.string()).optional() });
 export const accountOverviewInputSchema = z.object({ cursor: z.string().min(1).optional() });
+export const providerDetailInputSchema = providerInputSchema.extend({ cursor: z.string().min(1).optional() });
 
 const providerAccountListColumns = {
   id: providerAccount.id,
@@ -171,6 +182,45 @@ function decodeAccountOverviewCursor(cursor: string | undefined): AccountOvervie
   } catch {
     return null;
   }
+}
+
+function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: ProviderAccountKey[] }) {
+  const cursor: ProviderDetailCursor = {
+    v: ACCOUNT_OVERVIEW_CURSOR_VERSION,
+    accounts: Object.fromEntries(detail.accounts.map((account) => [account.id, hashAccountOverviewValue(account)])),
+    supportedModels: hashAccountOverviewValue(detail.supportedModels),
+    disabledModelsByAccountId: Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
+    modelHealthByAccountId: Object.fromEntries(Object.entries(detail.modelHealthByAccountId).map(([accountId, health]) => [accountId, hashAccountOverviewValue(health)])),
+    pinnedProviders: hashAccountOverviewValue(detail.pinnedProviders),
+  };
+
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeProviderDetailCursor(cursor: string | undefined): ProviderDetailCursor | null {
+  if (!cursor) return null;
+
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<ProviderDetailCursor>;
+    if (parsed.v !== ACCOUNT_OVERVIEW_CURSOR_VERSION || !parsed.accounts || typeof parsed.accounts !== "object") return null;
+    if (typeof parsed.supportedModels !== "string" || !parsed.disabledModelsByAccountId || typeof parsed.disabledModelsByAccountId !== "object") return null;
+    if (!parsed.modelHealthByAccountId || typeof parsed.modelHealthByAccountId !== "object" || typeof parsed.pinnedProviders !== "string") return null;
+
+    return parsed as ProviderDetailCursor;
+  } catch {
+    return null;
+  }
+}
+
+function buildStatsDelta(stats: AccountStatsResult, cursors?: Record<string, string>) {
+  const nextCursors = Object.fromEntries(Object.entries(stats).map(([id, value]) => [id, hashAccountOverviewValue(value)]));
+  const changedStats = Object.fromEntries(Object.entries(stats).filter(([id, value]) => cursors?.[id] !== hashAccountOverviewValue(value)));
+
+  return {
+    delta: true,
+    cursors: nextCursors,
+    ...(Object.keys(changedStats).length > 0 ? { stats: changedStats } : {}),
+  };
 }
 
 function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], healthByAccountId: Record<string, AccountModelHealthSummaryRow> = {}, now = new Date()) {
@@ -366,7 +416,7 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
   }
 }
 
-export async function getAccountsByProviderDetailed(userId: string, input: z.infer<typeof providerInputSchema>) {
+export async function getAccountsByProviderDetailed(userId: string, input: z.infer<typeof providerDetailInputSchema>) {
   try {
     const now = new Date();
     const accounts = await db
@@ -461,13 +511,40 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       };
     });
 
-    return {
+    const detail = {
       accounts: detailedAccounts,
       supportedModels,
       disabledModelsByAccountId,
       modelHealthByAccountId,
       pinnedProviders,
     };
+    const cursor = encodeProviderDetailCursor(detail);
+    const previousCursor = decodeProviderDetailCursor(input.cursor);
+
+    if (previousCursor) {
+      const changedAccounts = detail.accounts.filter((account) => previousCursor.accounts[account.id] !== hashAccountOverviewValue(account));
+      const currentAccountIds = new Set(detail.accounts.map((account) => account.id));
+      const deletedAccountIds = Object.keys(previousCursor.accounts).filter((accountId) => !currentAccountIds.has(accountId));
+      const changedDisabledModels = Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).filter(([accountId, models]) => previousCursor.disabledModelsByAccountId[accountId] !== hashAccountOverviewValue(models)));
+      const clearedDisabledModelsByAccountId = Object.keys(previousCursor.disabledModelsByAccountId).filter((accountId) => !(accountId in detail.disabledModelsByAccountId));
+      const changedModelHealth = Object.fromEntries(Object.entries(detail.modelHealthByAccountId).filter(([accountId, health]) => previousCursor.modelHealthByAccountId[accountId] !== hashAccountOverviewValue(health)));
+      const clearedModelHealthByAccountId = Object.keys(previousCursor.modelHealthByAccountId).filter((accountId) => !(accountId in detail.modelHealthByAccountId));
+
+      return {
+        delta: true,
+        cursor,
+        ...(changedAccounts.length > 0 ? { accounts: changedAccounts } : {}),
+        ...(deletedAccountIds.length > 0 ? { deletedAccountIds } : {}),
+        ...(previousCursor.supportedModels !== hashAccountOverviewValue(detail.supportedModels) ? { supportedModels: detail.supportedModels } : {}),
+        ...(Object.keys(changedDisabledModels).length > 0 ? { disabledModelsByAccountId: changedDisabledModels } : {}),
+        ...(clearedDisabledModelsByAccountId.length > 0 ? { clearedDisabledModelsByAccountId } : {}),
+        ...(Object.keys(changedModelHealth).length > 0 ? { modelHealthByAccountId: changedModelHealth } : {}),
+        ...(clearedModelHealthByAccountId.length > 0 ? { clearedModelHealthByAccountId } : {}),
+        ...(previousCursor.pinnedProviders !== hashAccountOverviewValue(detail.pinnedProviders) ? { pinnedProviders: detail.pinnedProviders } : {}),
+      };
+    }
+
+    return { ...detail, cursor };
   } catch (error) {
     console.error("Failed to load provider account detail:", error);
     throw new Error("Failed to load provider account detail");
@@ -484,7 +561,7 @@ export async function getAccountStats(userId: string, input: z.infer<typeof acco
       .from(providerAccount)
       .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds)));
     const ownedAccountIds = ownedAccounts.map((account) => account.id);
-    return await buildAccountStats(userId, ownedAccountIds);
+    return buildStatsDelta(await buildAccountStats(userId, ownedAccountIds), input.cursors);
   } catch (error) {
     console.error("Failed to load account stats:", error);
     throw new Error("Failed to load account stats");
