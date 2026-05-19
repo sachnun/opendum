@@ -275,6 +275,7 @@ function compareAccounts(a: Account, b: Account): number {
   const bPromoted = promotedAccountIds.value.has(b.id) ? 1 : 0;
 
   return bPromoted - aPromoted
+    || Number(b.isActive) - Number(a.isActive)
     || toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
     || toTimeMs(b.createdAt) - toTimeMs(a.createdAt)
     || b.id.localeCompare(a.id);
