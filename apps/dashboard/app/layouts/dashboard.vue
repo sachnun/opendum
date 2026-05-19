@@ -197,6 +197,7 @@ let pointStatusRefreshQueued = false;
 let mobileSidebarSwipeStartX: number | null = null;
 let mobileSidebarSwipePointerId: number | null = null;
 let suppressNextMobileOverlayClick = false;
+let mobileSidebarSwipeResetTimer: ReturnType<typeof setTimeout> | null = null;
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
@@ -413,14 +414,28 @@ function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
 }
 
 function resetMobileSidebarSwipe() {
+  if (mobileSidebarSwipeResetTimer) {
+    clearTimeout(mobileSidebarSwipeResetTimer);
+    mobileSidebarSwipeResetTimer = null;
+  }
+
   mobileSidebarSwipeStartX = null;
   mobileSidebarSwipePointerId = null;
   isMobileSidebarDragging.value = false;
   mobileSidebarDragX.value = 0;
 }
 
-function closeMobileSidebar() {
+function closeMobileSidebar({ keepDragOffset = false } = {}) {
   mobileOpen.value = false;
+
+  if (keepDragOffset) {
+    mobileSidebarSwipeStartX = null;
+    mobileSidebarSwipePointerId = null;
+    isMobileSidebarDragging.value = false;
+    mobileSidebarSwipeResetTimer = setTimeout(resetMobileSidebarSwipe, 350);
+    return;
+  }
+
   resetMobileSidebarSwipe();
 }
 
@@ -477,7 +492,7 @@ function finishMobileOverlaySwipe(event?: PointerEvent) {
   const wasDragging = isMobileSidebarDragging.value;
   const shouldClose = Math.abs(mobileSidebarDragX.value) >= MOBILE_SIDEBAR_SWIPE_CLOSE_THRESHOLD_PX;
   if (shouldClose) {
-    closeMobileSidebar();
+    closeMobileSidebar({ keepDragOffset: true });
     return;
   }
 
