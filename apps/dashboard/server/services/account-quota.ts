@@ -5,13 +5,12 @@ import { db } from "../lib/db";
 import { providerAccount } from "../lib/db/schema";
 import { fetchInternalQuota, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 
-const MAX_SIMULTANEOUS_QUOTA_FETCHES = 3;
-const MAX_QUOTA_BATCH_ACCOUNTS = 3;
+const MAX_QUOTA_BATCH_ACCOUNTS = 100;
 const quotaProviderSchema = z.enum(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const quotaInFlight = new Map<string, Promise<AccountQuotaResult>>();
 
-export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: z.string() });
-export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS) });
+export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: z.string(), forceRefresh: z.boolean().optional().default(false) });
+export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS), forceRefresh: z.boolean().optional().default(false) });
 
 type QuotaProviderKey = z.infer<typeof quotaProviderSchema>;
 type JsonRecord = Record<string, unknown>;
@@ -35,6 +34,7 @@ interface AccountQuotaInfo {
 }
 
 type AccountQuotaResult = { success: true; data: AccountQuotaInfo } | { success: false; error: string };
+type AccountQuotaFetchOptions = { forceRefresh?: boolean };
 
 const quotaOwnershipColumns = {
   id: providerAccount.id,
@@ -94,9 +94,9 @@ async function persistDetectedTier(accountId: string, quota: AccountQuotaInfo) {
   await db.update(providerAccount).set({ tier }).where(eq(providerAccount.id, accountId));
 }
 
-async function fetchQuotaFromProxy(userId: string, provider: QuotaProviderKey, accountId: string): Promise<AccountQuotaResult> {
+async function fetchQuotaFromProxy(userId: string, provider: QuotaProviderKey, accountId: string, options: AccountQuotaFetchOptions = {}): Promise<AccountQuotaResult> {
   try {
-    const response = await fetchInternalQuota({ userId, provider, accountId });
+    const response = await fetchInternalQuota({ userId, provider, accountId, forceRefresh: options.forceRefresh === true });
     const payload = asRecord(await response.json().catch(() => null));
 
     if (!response.ok) {
@@ -115,12 +115,12 @@ async function fetchQuotaFromProxy(userId: string, provider: QuotaProviderKey, a
   }
 }
 
-async function fetchAccountQuota(userId: string, provider: QuotaProviderKey, accountId: string): Promise<AccountQuotaResult> {
-  const inFlightKey = `${userId}:${provider}:${accountId}`;
+async function fetchAccountQuota(userId: string, provider: QuotaProviderKey, accountId: string, options: AccountQuotaFetchOptions = {}): Promise<AccountQuotaResult> {
+  const inFlightKey = `${userId}:${provider}:${accountId}:${options.forceRefresh ? "force" : "cache"}`;
   const existing = quotaInFlight.get(inFlightKey);
   if (existing) return existing;
 
-  const promise = fetchQuotaFromProxy(userId, provider, accountId);
+  const promise = fetchQuotaFromProxy(userId, provider, accountId, options);
   quotaInFlight.set(inFlightKey, promise);
   try {
     return await promise;
@@ -138,7 +138,7 @@ export async function getAccountQuota(userId: string, input: z.infer<typeof acco
       .limit(1);
 
     if (!account) return { success: false, error: "Account not found" } as const;
-    const result = await fetchAccountQuota(userId, input.provider, account.id);
+    const result = await fetchAccountQuota(userId, input.provider, account.id, { forceRefresh: input.forceRefresh });
     if (result.success) await persistDetectedTier(account.id, result.data);
     return result;
   } catch (error) {
@@ -165,20 +165,11 @@ export async function getAccountQuotas(userId: string, input: z.infer<typeof acc
       else results[accountId] = { success: false, error: "Account not found" };
     }
 
-    let nextAccountIndex = 0;
-    const workerCount = Math.min(MAX_SIMULTANEOUS_QUOTA_FETCHES, accountsToFetch.length);
-    const runWorker = async () => {
-      while (true) {
-        const accountId = accountsToFetch[nextAccountIndex];
-        nextAccountIndex += 1;
-        if (!accountId) return;
-        results[accountId] = await fetchAccountQuota(userId, input.provider, accountId);
-        const result = results[accountId];
-        if (result?.success) await persistDetectedTier(accountId, result.data);
-      }
-    };
-
-    await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+    await Promise.all(accountsToFetch.map(async (accountId) => {
+      results[accountId] = await fetchAccountQuota(userId, input.provider, accountId, { forceRefresh: input.forceRefresh });
+      const result = results[accountId];
+      if (result?.success) await persistDetectedTier(accountId, result.data);
+    }));
     return { success: true, data: results } as const;
   } catch (error) {
     console.error("Failed to fetch provider quotas:", error);

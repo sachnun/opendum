@@ -5,6 +5,13 @@ type InternalRelayInit = Omit<RequestInit, "headers" | "body"> & {
   body?: BodyInit | Record<string, unknown> | null;
 };
 
+export type InternalQuotaPayload = {
+  userId: string;
+  provider: string;
+  accountId: string;
+  forceRefresh?: boolean;
+};
+
 export class InternalRelayNotConfiguredError extends Error {
   constructor() {
     super("NUXT_PUBLIC_PROXY_URL is required for external provider validation.");
@@ -70,6 +77,6 @@ export async function fetchInternalProvider(url: string, init: InternalRelayInit
   return fetchInternal("/internal/refresh", payload, init.signal ?? undefined);
 }
 
-export async function fetchInternalQuota(payload: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
+export async function fetchInternalQuota(payload: InternalQuotaPayload, signal?: AbortSignal): Promise<Response> {
   return fetchInternal("/internal/quota", payload, signal);
 }

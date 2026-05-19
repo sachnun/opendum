@@ -118,7 +118,7 @@ async function refreshProviderQuotaAfterAccountPoll() {
   providerQuotaRefreshInFlight = (async () => {
     await waitForQuotaQueue();
     const accountsToRefresh = quotaCapableAccounts.value.filter((account) => account.isActive || quotaByAccountId.value[account.id]);
-    if (accountsToRefresh.length > 0) await runQuotaQueue(accountsToRefresh, true, { append: true });
+    if (accountsToRefresh.length > 0) await runQuotaQueue(accountsToRefresh, { refreshExisting: true });
   })().catch(() => undefined);
 
   try {
@@ -309,7 +309,7 @@ function handleQuotaRefresh(accountId: string) {
   const account = accounts.value.find((account) => account.id === accountId);
   if (!account) return;
 
-  void loadAccountQuota(account, true).finally(() => {
+  void loadAccountQuota(account, { refreshExisting: true, forceRefresh: true }).finally(() => {
     void refreshProviderDetailOnce({ refreshQuota: false });
   });
 }
@@ -481,7 +481,7 @@ watch(
 
     let cancelled = false;
     const quotaLoadTimer = setTimeout(() => {
-      if (!cancelled) void runQuotaQueue(accountsToFetch, shouldRefreshExisting);
+      if (!cancelled) void runQuotaQueue(accountsToFetch, { refreshExisting: shouldRefreshExisting });
     }, QUOTA_AUTO_LOAD_DELAY_MS);
 
     onCleanup(() => {
@@ -505,7 +505,7 @@ watch(
     if (accountsToFetch.length === 0) return;
 
     queuedVisibleDeferredAccountIds = new Set([...queuedVisibleDeferredAccountIds, ...accountsToFetch.map((account) => account.id)]);
-    void runQuotaQueue(accountsToFetch, false, { append: true });
+    void runQuotaQueue(accountsToFetch);
   },
   { immediate: true }
 );

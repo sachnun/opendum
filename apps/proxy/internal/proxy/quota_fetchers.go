@@ -23,13 +23,13 @@ var antigravityQuotaMaxRequests = map[string]map[string]float64{
 	"legacy-tier":   {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150},
 }
 
-func (s *Service) fetchOpenRouterQuota(ctx context.Context, account appdb.ProviderAccount) accountQuotaInfo {
+func (s *Service) fetchOpenRouterQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) accountQuotaInfo {
 	apiKey, err := cryptojs.Decrypt(s.secret, account.AccessToken)
 	if err != nil {
 		return expiredQuotaInfo(account, "unknown", "API key is missing or invalid. Please reconnect this account.")
 	}
-	keyData, keyErr := s.fetchOpenRouterData(ctx, apiKey, "/key")
-	creditsData, creditsErr := s.fetchOpenRouterData(ctx, apiKey, "/credits")
+	keyData, keyErr := s.fetchOpenRouterData(ctx, account, apiKey, "/key", forceRefresh)
+	creditsData, creditsErr := s.fetchOpenRouterData(ctx, account, apiKey, "/credits", forceRefresh)
 	if keyErr != nil && creditsErr != nil {
 		return errorQuotaInfo(account, "unknown", keyErr.Error(), time.Now().UnixMilli())
 	}
@@ -40,22 +40,23 @@ func (s *Service) fetchOpenRouterQuota(ctx context.Context, account appdb.Provid
 	return baseQuotaInfo(account, tier, "success", openRouterGroups(keyData, creditsData), time.Now().UnixMilli(), "")
 }
 
-func (s *Service) fetchOpenRouterData(ctx context.Context, apiKey, path string) (map[string]any, error) {
-	resp, raw, err := getJSON(ctx, s.client, http.MethodGet, "https://openrouter.ai/api/v1"+path, map[string]string{"Authorization": "Bearer " + strings.TrimSpace(apiKey), "Accept": "application/json"}, nil)
+func (s *Service) fetchOpenRouterData(ctx context.Context, account appdb.ProviderAccount, apiKey, path string, forceRefresh bool) (map[string]any, error) {
+	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "openrouter:"+strings.TrimPrefix(path, "/"), http.MethodGet, "https://openrouter.ai/api/v1"+path, map[string]string{"Authorization": "Bearer " + strings.TrimSpace(apiKey), "Accept": "application/json"}, nil)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("OpenRouter%s request failed: HTTP %d %s", path, resp.StatusCode, string(raw))
+	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
+		return nil, fmt.Errorf("OpenRouter%s request failed: HTTP %d %s", path, result.Response.StatusCode, string(result.Raw))
 	}
 	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
+	if err := json.Unmarshal(result.Raw, &payload); err != nil {
 		return nil, err
 	}
 	data := parseQuotaRecord(payload["data"])
 	if data == nil {
 		return nil, fmt.Errorf("OpenRouter%s response did not include a data object", path)
 	}
+	s.putQuotaJSONCache(ctx, result)
 	return data, nil
 }
 
@@ -91,7 +92,7 @@ func openRouterGroups(keyData, creditsData map[string]any) []quotaGroupDisplay {
 	return []quotaGroupDisplay{{Name: "key-status", DisplayName: "OpenRouter key", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
 }
 
-func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string) accountQuotaInfo {
+func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
 	tier := quotaFallbackTier(account)
 	projectID := ""
 	if account.ProjectID != nil {
@@ -103,20 +104,21 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 	endpoints := []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}
 	var lastErr string
 	for _, endpoint := range endpoints {
-		resp, raw, err := getJSON(ctx, s.client, http.MethodPost, endpoint+"/v1internal:fetchAvailableModels", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "User-Agent": "antigravity/1.23.2 linux/amd64"}, map[string]any{"project": projectID})
+		result, err := s.getQuotaJSON(ctx, account, forceRefresh, "antigravity:fetchAvailableModels", http.MethodPost, endpoint+"/v1internal:fetchAvailableModels", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "User-Agent": "antigravity/1.23.2 linux/amd64"}, map[string]any{"project": projectID})
 		if err != nil {
 			lastErr = err.Error()
 			continue
 		}
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			lastErr = fmt.Sprintf("HTTP %d %s", resp.StatusCode, string(raw))
+		if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
+			lastErr = fmt.Sprintf("HTTP %d %s", result.Response.StatusCode, string(result.Raw))
 			continue
 		}
 		var payload map[string]any
-		if err := json.Unmarshal(raw, &payload); err != nil {
+		if err := json.Unmarshal(result.Raw, &payload); err != nil {
 			lastErr = err.Error()
 			continue
 		}
+		s.putQuotaJSONCache(ctx, result)
 		return baseQuotaInfo(account, tier, "success", antigravityGroups(payload, tier), time.Now().UnixMilli(), "")
 	}
 	return errorQuotaInfo(account, tier, "Failed to fetch Antigravity quota data: "+lastErr, time.Now().UnixMilli())
@@ -209,17 +211,17 @@ func parseResetISO(value any) *string {
 	return nil
 }
 
-func (s *Service) fetchCopilotQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string) accountQuotaInfo {
+func (s *Service) fetchCopilotQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
 	tier := strings.TrimSpace(quotaFallbackTier(account))
-	resp, raw, err := getJSON(ctx, s.client, http.MethodGet, "https://api.github.com/copilot_internal/user", map[string]string{"Authorization": "Bearer " + accessToken, "Accept": "application/json", "User-Agent": "GitHubCopilotChat/0.26.7", "Editor-Version": "vscode/1.96.2", "Editor-Plugin-Version": "copilot-chat/0.26.7"}, nil)
+	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "copilot:user", http.MethodGet, "https://api.github.com/copilot_internal/user", map[string]string{"Authorization": "Bearer " + accessToken, "Accept": "application/json", "User-Agent": "GitHubCopilotChat/0.26.7", "Editor-Version": "vscode/1.96.2", "Editor-Plugin-Version": "copilot-chat/0.26.7"}, nil)
 	if err != nil {
 		return errorQuotaInfo(account, tier, err.Error(), time.Now().UnixMilli())
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return errorQuotaInfo(account, tier, fmt.Sprintf("Copilot internal quota endpoint failed: HTTP %d %s", resp.StatusCode, string(raw)), time.Now().UnixMilli())
+	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
+		return errorQuotaInfo(account, tier, fmt.Sprintf("Copilot internal quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
+	if err := json.Unmarshal(result.Raw, &payload); err != nil {
 		return errorQuotaInfo(account, tier, "Copilot quota response was not valid JSON", time.Now().UnixMilli())
 	}
 	plan := strings.ToLower(parseQuotaString(payload["copilot_plan"]))
@@ -235,6 +237,7 @@ func (s *Service) fetchCopilotQuota(ctx context.Context, account appdb.ProviderA
 	resetISO := copilotResetISO(payload)
 	label := fmt.Sprintf("%s/%s used", formatFloat(used), formatFloat(entitlement))
 	group := quotaGroupDisplay{Name: "premium_requests", DisplayName: "Premium requests", Models: []string{}, RemainingFraction: fraction, RemainingRequests: displayNumber(remaining), MaxRequests: displayNumber(entitlement), UsedRequests: displayNumber(used), PercentUsed: int(math.Round(clampFraction(used/entitlement) * 100)), IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "medium", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO), RemainingLabel: &label}
+	s.putQuotaJSONCache(ctx, result)
 	return baseQuotaInfo(account, tier, "success", []quotaGroupDisplay{group}, time.Now().UnixMilli(), "")
 }
 
@@ -307,25 +310,25 @@ func formatFloat(value float64) string {
 	return fmt.Sprintf("%.2f", value)
 }
 
-func (s *Service) fetchCodexQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string) accountQuotaInfo {
+func (s *Service) fetchCodexQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
 	fallbackTier := quotaFallbackTier(account)
 	headers := map[string]string{"Authorization": "Bearer " + accessToken, "Accept": "application/json", "User-Agent": "opencode/1.14.28 (linux linux; amd64)", "Origin": "https://chatgpt.com", "Referer": "https://chatgpt.com/", "originator": "opencode"}
 	if accountID := accountIDForQuotaCodex(account, accessToken); accountID != "" {
 		headers["ChatGPT-Account-Id"] = accountID
 	}
-	resp, raw, err := getJSON(ctx, s.client, http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", headers, nil)
+	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "codex:usage", http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", headers, nil)
 	if err != nil {
 		return errorQuotaInfo(account, fallbackTier, err.Error(), time.Now().UnixMilli())
 	}
-	headerData := parseCodexQuotaHeaderGroups(resp.Header, fallbackTier)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	headerData := parseCodexQuotaHeaderGroups(result.Response.Header, fallbackTier)
+	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
 		if len(headerData) > 0 {
 			return baseQuotaInfo(account, fallbackTier, "success", headerData, time.Now().UnixMilli(), "")
 		}
-		return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Codex quota endpoint failed: HTTP %d %s", resp.StatusCode, string(raw)), time.Now().UnixMilli())
+		return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Codex quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
-	_ = json.Unmarshal(raw, &payload)
+	_ = json.Unmarshal(result.Raw, &payload)
 	tier := parseQuotaString(payload["plan_type"])
 	if tier == "" {
 		tier = fallbackTier
@@ -335,9 +338,11 @@ func (s *Service) fetchCodexQuota(ctx context.Context, account appdb.ProviderAcc
 	}
 	apiGroups := parseCodexAPIGroups(payload, tier)
 	if len(apiGroups) > 0 {
+		s.putQuotaJSONCache(ctx, result)
 		return baseQuotaInfo(account, tier, "success", apiGroups, time.Now().UnixMilli(), "")
 	}
 	if len(headerData) > 0 {
+		s.putQuotaJSONCache(ctx, result)
 		return baseQuotaInfo(account, tier, "success", headerData, time.Now().UnixMilli(), "")
 	}
 	return errorQuotaInfo(account, tier, "Codex quota payload did not include usable quota data", time.Now().UnixMilli())
@@ -443,7 +448,7 @@ func resetISOFromMillis(ms int64) *string {
 	return &iso
 }
 
-func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string) accountQuotaInfo {
+func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
 	tier := quotaFallbackTier(account)
 	if tier == "free" {
 		tier = "free-tier"
@@ -453,7 +458,7 @@ func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.Provide
 		projectID = strings.TrimSpace(*account.ProjectID)
 	}
 	if projectID == "" {
-		info := s.discoverGeminiCLIAccount(ctx, account, accessToken)
+		info := s.discoverGeminiCLIAccount(ctx, account, accessToken, forceRefresh)
 		projectID = info.projectID
 		if info.tier != "" {
 			tier = info.tier
@@ -466,16 +471,17 @@ func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.Provide
 		return errorQuotaInfo(account, tier, "Gemini CLI account is missing projectId. Re-authenticate this account.", time.Now().UnixMilli())
 	}
 	for _, endpoint := range []string{"https://daily-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"} {
-		resp, raw, err := getJSON(ctx, s.client, http.MethodPost, endpoint+"/v1internal:retrieveUserQuota", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GeminiCLI/0.34.0 (win32; x64)"}, map[string]any{"project": projectID})
-		if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		result, err := s.getQuotaJSON(ctx, account, forceRefresh, "gemini_cli:retrieveUserQuota", http.MethodPost, endpoint+"/v1internal:retrieveUserQuota", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GeminiCLI/0.34.0 (win32; x64)"}, map[string]any{"project": projectID})
+		if err != nil || result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
 			continue
 		}
 		var payload map[string]any
-		if err := json.Unmarshal(raw, &payload); err != nil {
+		if err := json.Unmarshal(result.Raw, &payload); err != nil {
 			continue
 		}
 		groups := geminiQuotaGroups(payload, tier)
 		if len(groups) > 0 {
+			s.putQuotaJSONCache(ctx, result)
 			return baseQuotaInfo(account, tier, "success", groups, time.Now().UnixMilli(), "")
 		}
 	}
@@ -484,19 +490,20 @@ func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.Provide
 
 type geminiCLIInfo struct{ projectID, tier string }
 
-func (s *Service) discoverGeminiCLIAccount(ctx context.Context, account appdb.ProviderAccount, accessToken string) geminiCLIInfo {
+func (s *Service) discoverGeminiCLIAccount(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) geminiCLIInfo {
 	for _, endpoint := range []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.sandbox.googleapis.com"} {
-		resp, raw, err := getJSON(ctx, s.client, http.MethodPost, endpoint+"/v1internal:loadCodeAssist", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "User-Agent": "GeminiCLI/0.34.0 (win32; x64)"}, map[string]any{"cloudaicompanionProject": nil, "metadata": map[string]string{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}})
-		if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		result, err := s.getQuotaJSON(ctx, account, forceRefresh, "gemini_cli:loadCodeAssist", http.MethodPost, endpoint+"/v1internal:loadCodeAssist", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "User-Agent": "GeminiCLI/0.34.0 (win32; x64)"}, map[string]any{"cloudaicompanionProject": nil, "metadata": map[string]string{"ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED", "pluginType": "GEMINI"}})
+		if err != nil || result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
 			continue
 		}
 		var payload map[string]any
-		if err := json.Unmarshal(raw, &payload); err != nil {
+		if err := json.Unmarshal(result.Raw, &payload); err != nil {
 			continue
 		}
 		projectID := googleProjectID(payload)
 		tier := googleCurrentTier(payload)
 		if projectID != "" {
+			s.putQuotaJSONCache(ctx, result)
 			return geminiCLIInfo{projectID: projectID, tier: tier}
 		}
 	}
@@ -531,22 +538,40 @@ func geminiQuotaGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 	models := map[string]quotaGroupDisplay{}
 	for _, raw := range buckets {
 		bucket := parseQuotaRecord(raw)
-		modelID := normalizeGeminiModelID(parseQuotaString(bucket["modelId"])); if modelID == "" { continue }
-		fraction, ok := parseQuotaNumber(bucket["remainingFraction"]); if !ok { continue }
+		modelID := normalizeGeminiModelID(parseQuotaString(bucket["modelId"]))
+		if modelID == "" {
+			continue
+		}
+		fraction, ok := parseQuotaNumber(bucket["remainingFraction"])
+		if !ok {
+			continue
+		}
 		fraction = clampFraction(fraction)
 		maxRequests := 100.0
 		remaining := math.Round(fraction * maxRequests)
 		if amount := parseQuotaString(bucket["remainingAmount"]); amount != "" {
-			if parsed, err := strconvParseFloat(amount); err == nil && fraction > 0 { remaining = parsed; maxRequests = math.Round(parsed / fraction) }
+			if parsed, err := strconvParseFloat(amount); err == nil && fraction > 0 {
+				remaining = parsed
+				maxRequests = math.Round(parsed / fraction)
+			}
 		}
 		resetISO := parseResetISO(bucket["resetTime"])
-		models[modelID] = quotaGroupDisplay{Name: modelID, Models: []string{modelID}, RemainingFraction: fraction, RemainingRequests: remaining, MaxRequests: maxRequests, UsedRequests: math.Max(0, maxRequests-remaining), PercentUsed: int(math.Round(clampFraction((maxRequests-remaining)/maxRequests)*100)), IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO)}
+		models[modelID] = quotaGroupDisplay{Name: modelID, Models: []string{modelID}, RemainingFraction: fraction, RemainingRequests: remaining, MaxRequests: maxRequests, UsedRequests: math.Max(0, maxRequests-remaining), PercentUsed: int(math.Round(clampFraction((maxRequests-remaining)/maxRequests) * 100)), IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO)}
 	}
-	configs := map[string]struct{ display string; models []string }{"pro": {"Gemini Pro", []string{"gemini-2.5-pro", "gemini-3.1-pro-preview"}}, "25-flash": {"Gemini 2.5 Flash", []string{"gemini-2.5-flash", "gemini-2.5-flash-lite"}}, "3-flash": {"Gemini 3 Flash", []string{"gemini-3-flash-preview", "gemini-3.1-flash-lite"}}}
+	configs := map[string]struct {
+		display string
+		models  []string
+	}{"pro": {"Gemini Pro", []string{"gemini-2.5-pro", "gemini-3.1-pro-preview"}}, "25-flash": {"Gemini 2.5 Flash", []string{"gemini-2.5-flash", "gemini-2.5-flash-lite"}}, "3-flash": {"Gemini 3 Flash", []string{"gemini-3-flash-preview", "gemini-3.1-flash-lite"}}}
 	groups := []quotaGroupDisplay{}
 	for name, cfg := range configs {
 		for _, model := range cfg.models {
-			if group, ok := models[model]; ok { group.Name = name; group.DisplayName = cfg.display; group.Models = cfg.models; groups = append(groups, group); break }
+			if group, ok := models[model]; ok {
+				group.Name = name
+				group.DisplayName = cfg.display
+				group.Models = cfg.models
+				groups = append(groups, group)
+				break
+			}
 		}
 	}
 	return groups
@@ -554,11 +579,13 @@ func geminiQuotaGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 
 func normalizeGeminiModelID(model string) string {
 	model = lastPathSegment(model)
-	if model == "gemini-3.1-flash-lite-preview" { return "gemini-3.1-flash-lite" }
+	if model == "gemini-3.1-flash-lite-preview" {
+		return "gemini-3.1-flash-lite"
+	}
 	return model
 }
 
-func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string) accountQuotaInfo {
+func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
 	fallbackTier := quotaFallbackTier(account)
 	values := url.Values{}
 	values.Set("origin", "AI_EDITOR")
@@ -570,15 +597,15 @@ func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAcco
 	if profile := values.Get("profileArn"); profile != "" {
 		body["profileArn"] = profile
 	}
-	resp, raw, err := getJSON(ctx, s.client, http.MethodPost, target, map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/x-amz-json-1.0", "Accept": "application/json", "User-Agent": "KiroIDE-0.7.45", "x-amz-user-agent": "KiroIDE-0.7.45", "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits", "x-amzn-codewhisperer-optout": "true", "x-amzn-kiro-agent-mode": "vibe", "amz-sdk-request": "attempt=1; max=3"}, body)
+	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "kiro:GetUsageLimits", http.MethodPost, target, map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/x-amz-json-1.0", "Accept": "application/json", "User-Agent": "KiroIDE-0.7.45", "x-amz-user-agent": "KiroIDE-0.7.45", "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits", "x-amzn-codewhisperer-optout": "true", "x-amzn-kiro-agent-mode": "vibe", "amz-sdk-request": "attempt=1; max=3"}, body)
 	if err != nil {
 		return errorQuotaInfo(account, fallbackTier, err.Error(), time.Now().UnixMilli())
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Kiro usage limits quota endpoint failed: HTTP %d %s", resp.StatusCode, string(raw)), time.Now().UnixMilli())
+	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
+		return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Kiro usage limits quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
-	if err := json.Unmarshal(raw, &payload); err != nil {
+	if err := json.Unmarshal(result.Raw, &payload); err != nil {
 		return errorQuotaInfo(account, fallbackTier, "Kiro usage limits response was not valid JSON", time.Now().UnixMilli())
 	}
 	record := parseQuotaRecord(payload["data"])
@@ -593,6 +620,7 @@ func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAcco
 	if len(groups) == 0 {
 		return errorQuotaInfo(account, tier, "Kiro usage limits are unavailable for this account", time.Now().UnixMilli())
 	}
+	s.putQuotaJSONCache(ctx, result)
 	return baseQuotaInfo(account, tier, "success", groups, time.Now().UnixMilli(), "")
 }
 
@@ -672,6 +700,27 @@ func kiroGroups(record map[string]any) []quotaGroupDisplay {
 	return groups
 }
 
-func firstNumber(values ...any) (float64, bool) { for _, value := range values { if parsed, ok := parseQuotaNumber(value); ok { return parsed, true } }; return 0, false }
-func firstNonNil(values ...any) any { for _, value := range values { if value != nil { return value } }; return nil }
-func firstNonEmpty(values ...string) string { for _, value := range values { if strings.TrimSpace(value) != "" { return strings.TrimSpace(value) } }; return "" }
+func firstNumber(values ...any) (float64, bool) {
+	for _, value := range values {
+		if parsed, ok := parseQuotaNumber(value); ok {
+			return parsed, true
+		}
+	}
+	return 0, false
+}
+func firstNonNil(values ...any) any {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
+}
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}

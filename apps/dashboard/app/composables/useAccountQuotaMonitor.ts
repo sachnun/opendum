@@ -12,13 +12,17 @@ type CachedAccountQuota = {
   cachedAt: number;
 };
 
-type RunQuotaQueueOptions = {
-  append?: boolean;
+type LoadAccountQuotaOptions = {
+  refreshExisting?: boolean;
+  forceRefresh?: boolean;
+  runId?: number;
 };
 
-const ENABLED_QUOTA_FETCH_DELAY_MS = 500;
-const DISABLED_QUOTA_FETCH_DELAY_MS = 1500;
-const QUOTA_BATCH_SIZE = 3;
+type RunQuotaRefreshOptions = {
+  refreshExisting?: boolean;
+  forceRefresh?: boolean;
+};
+
 const QUOTA_DB_NAME = "opendum-dashboard";
 const QUOTA_STORE_NAME = "account-quota";
 const quotaStore = import.meta.client ? createStore(QUOTA_DB_NAME, QUOTA_STORE_NAME) : null;
@@ -60,11 +64,11 @@ export function useAccountQuotaMonitor(options: {
   const quotaLoadingByAccountId = useState<Record<string, boolean>>("account-quota-loading-by-account-id", () => ({}));
   const hydratedAccountIds = useState<Record<string, boolean>>("account-quota-hydrated-account-ids", () => ({}));
   let quotaQueueRunId = 0;
-  let quotaQueueTail: Promise<void> = Promise.resolve();
+  let quotaRunInFlight: Promise<void> | null = null;
+  const quotaLoadingRunByAccountId = new Map<string, number>();
 
   function cancelQuotaQueue() {
     quotaQueueRunId += 1;
-    quotaQueueTail = Promise.resolve();
   }
 
   function setQuotaLoading(accountId: string, loading: boolean) {
@@ -77,6 +81,9 @@ export function useAccountQuotaMonitor(options: {
     const accountIds = new Set(options.accounts.value.map((account) => account.id));
     quotaErrorByAccountId.value = Object.fromEntries(Object.entries(quotaErrorByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
     quotaLoadingByAccountId.value = Object.fromEntries(Object.entries(quotaLoadingByAccountId.value).filter(([accountId]) => accountIds.has(accountId)));
+    for (const accountId of quotaLoadingRunByAccountId.keys()) {
+      if (!accountIds.has(accountId)) quotaLoadingRunByAccountId.delete(accountId);
+    }
   }
 
   async function hydrateQuotaCache() {
@@ -114,9 +121,10 @@ export function useAccountQuotaMonitor(options: {
     if (hasErrorChanges) quotaErrorByAccountId.value = nextErrorByAccountId;
   }
 
-  async function loadAccountQuota(account: Account, refreshExisting = false, runId?: number) {
+  async function loadAccountQuota(account: Account, loadOptions: LoadAccountQuotaOptions = {}) {
+    const { refreshExisting = false, forceRefresh = false, runId } = loadOptions;
     const provider = options.toQuotaProvider(account.provider);
-    if (!provider || quotaLoadingByAccountId.value[account.id]) return;
+    if (!provider || (quotaLoadingByAccountId.value[account.id] && !forceRefresh)) return;
     if (quotaByAccountId.value[account.id] && !refreshExisting) return;
 
     const hadQuota = Boolean(quotaByAccountId.value[account.id]);
@@ -124,7 +132,7 @@ export function useAccountQuotaMonitor(options: {
     quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
 
     try {
-      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id });
+      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh });
       if (runId !== undefined && runId !== quotaQueueRunId) return;
       if (!result.success) throw new Error(result.error);
 
@@ -141,26 +149,29 @@ export function useAccountQuotaMonitor(options: {
     }
   }
 
-  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshExisting = false, queueOptions: RunQuotaQueueOptions = {}) {
-    const runId = queueOptions.append ? quotaQueueRunId : ++quotaQueueRunId;
+  async function runQuotaQueue(accounts = options.quotaCapableAccounts.value, refreshOptions: RunQuotaRefreshOptions | boolean = {}) {
+    const normalizedOptions = typeof refreshOptions === "boolean" ? { refreshExisting: refreshOptions } : refreshOptions;
+    const { refreshExisting = false, forceRefresh = false } = normalizedOptions;
+    const runId = ++quotaQueueRunId;
+    let loadingAccountIds: string[] = [];
+
     const run = async () => {
       const queueableAccounts = accounts.filter((account) => options.shouldQueueAccount?.(account) ?? true);
-      const accountsToFetch = [
-        ...queueableAccounts.filter((account) => account.isActive),
-        ...queueableAccounts.filter((account) => !account.isActive),
-      ].filter((account) => {
+      const accountsToFetch = queueableAccounts.filter((account) => {
         if (quotaLoadingByAccountId.value[account.id]) return false;
         if (quotaByAccountId.value[account.id] && !refreshExisting) return false;
         return Boolean(options.toQuotaProvider(account.provider));
       });
 
       if (accountsToFetch.length === 0) return;
-      if (queueOptions.append) {
-        const firstAccount = accountsToFetch[0];
-        const delay = firstAccount?.isActive ? ENABLED_QUOTA_FETCH_DELAY_MS : DISABLED_QUOTA_FETCH_DELAY_MS;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        if (runId !== quotaQueueRunId) return;
-      }
+
+      const hadQuotaByAccountId = Object.fromEntries(accountsToFetch.map((account) => [account.id, Boolean(quotaByAccountId.value[account.id])]));
+      loadingAccountIds = accountsToFetch.map((account) => account.id);
+      accountsToFetch.forEach((account) => {
+        quotaLoadingRunByAccountId.set(account.id, runId);
+        setQuotaLoading(account.id, true);
+      });
+      quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(accountsToFetch.map((account) => [account.id, ""])) };
 
       const accountsByProvider = new Map<QuotaProviderKey, Account[]>();
       for (const account of accountsToFetch) {
@@ -169,59 +180,62 @@ export function useAccountQuotaMonitor(options: {
         accountsByProvider.set(provider, [...(accountsByProvider.get(provider) ?? []), account]);
       }
 
-      for (const [provider, providerAccounts] of accountsByProvider) {
-        if (runId !== quotaQueueRunId) return;
+      const providerResults = await Promise.all(Array.from(accountsByProvider.entries()).map(async ([provider, providerAccounts]) => {
+        try {
+          const result = await dashboardApi.accounts.quotas({ provider, accountIds: providerAccounts.map((account) => account.id), forceRefresh });
+          if (!result.success) throw new Error(result.error);
+          return { ok: true as const, provider, providerAccounts, data: result.data };
+        } catch (error) {
+          return { ok: false as const, providerAccounts, error };
+        }
+      }));
 
-        for (let batchStart = 0; batchStart < providerAccounts.length; batchStart += QUOTA_BATCH_SIZE) {
-          if (runId !== quotaQueueRunId) return;
+      if (runId !== quotaQueueRunId) return;
 
-          const batchAccounts = providerAccounts.slice(batchStart, batchStart + QUOTA_BATCH_SIZE);
-          const hadQuotaByAccountId = Object.fromEntries(batchAccounts.map((account) => [account.id, Boolean(quotaByAccountId.value[account.id])]));
-          batchAccounts.forEach((account) => setQuotaLoading(account.id, true));
-          quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(batchAccounts.map((account) => [account.id, ""])) };
+      let nextQuotaByAccountId = { ...quotaByAccountId.value };
+      let nextErrorByAccountId = { ...quotaErrorByAccountId.value };
+      const cacheWrites: Array<Promise<void>> = [];
 
-          try {
-            const result = await dashboardApi.accounts.quotas({ provider, accountIds: batchAccounts.map((account) => account.id) });
-            if (runId !== quotaQueueRunId) return;
-            if (!result.success) throw new Error(result.error);
+      for (const providerResult of providerResults) {
+        if (!providerResult.ok) {
+          const message = providerResult.error instanceof Error ? providerResult.error.message : "Failed to fetch quota data";
+          for (const account of providerResult.providerAccounts.filter((account) => refreshExisting || !hadQuotaByAccountId[account.id])) nextErrorByAccountId[account.id] = message;
+          continue;
+        }
 
-            let nextQuotaByAccountId = { ...quotaByAccountId.value };
-            let nextErrorByAccountId = { ...quotaErrorByAccountId.value };
+        for (const account of providerResult.providerAccounts) {
+          const accountResult = providerResult.data[account.id];
+          if (!accountResult) continue;
 
-            for (const account of batchAccounts) {
-              const accountResult = result.data[account.id];
-              if (!accountResult) continue;
-
-              if (accountResult.success) {
-                nextQuotaByAccountId = { ...nextQuotaByAccountId, [account.id]: accountResult.data };
-                nextErrorByAccountId = Object.fromEntries(Object.entries(nextErrorByAccountId).filter(([accountId]) => accountId !== account.id));
-                await writeCachedQuota(account, provider, accountResult.data);
-              } else if (refreshExisting || !hadQuotaByAccountId[account.id]) {
-                nextErrorByAccountId = { ...nextErrorByAccountId, [account.id]: accountResult.error };
-              }
-            }
-
-            quotaByAccountId.value = nextQuotaByAccountId;
-            quotaErrorByAccountId.value = nextErrorByAccountId;
-          } catch (error) {
-            if (runId !== quotaQueueRunId) return;
-
-            const message = error instanceof Error ? error.message : "Failed to fetch quota data";
-            quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, ...Object.fromEntries(batchAccounts.filter((account) => refreshExisting || !hadQuotaByAccountId[account.id]).map((account) => [account.id, message])) };
-          } finally {
-            batchAccounts.forEach((account) => setQuotaLoading(account.id, false));
+          if (accountResult.success) {
+            nextQuotaByAccountId[account.id] = accountResult.data;
+            delete nextErrorByAccountId[account.id];
+            cacheWrites.push(writeCachedQuota(account, providerResult.provider, accountResult.data));
+          } else if (refreshExisting || !hadQuotaByAccountId[account.id]) {
+            nextErrorByAccountId[account.id] = accountResult.error;
           }
         }
       }
+
+      quotaByAccountId.value = nextQuotaByAccountId;
+      quotaErrorByAccountId.value = nextErrorByAccountId;
+      await Promise.all(cacheWrites);
     };
 
-    const queueRun = queueOptions.append ? quotaQueueTail.then(run, run) : run();
-    quotaQueueTail = queueRun.catch(() => {});
-    await queueRun;
+    const runPromise = run().finally(() => {
+      loadingAccountIds.forEach((accountId) => {
+        if (quotaLoadingRunByAccountId.get(accountId) !== runId) return;
+        quotaLoadingRunByAccountId.delete(accountId);
+        setQuotaLoading(accountId, false);
+      });
+      if (quotaRunInFlight === runPromise) quotaRunInFlight = null;
+    });
+    quotaRunInFlight = runPromise;
+    await quotaRunInFlight;
   }
 
   async function waitForQuotaQueue() {
-    await quotaQueueTail;
+    await quotaRunInFlight;
   }
 
   return {

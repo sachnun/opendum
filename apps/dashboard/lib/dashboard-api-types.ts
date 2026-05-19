@@ -136,6 +136,18 @@ export interface AccountQuotaInfo {
   groups: QuotaGroupDisplay[];
 }
 
+export interface AccountQuotaRequest {
+  provider: QuotaProviderKey;
+  accountId: string;
+  forceRefresh?: boolean;
+}
+
+export interface AccountQuotaBatchRequest {
+  provider: QuotaProviderKey;
+  accountIds: string[];
+  forceRefresh?: boolean;
+}
+
 export type AccountQuotaBatchResult = Record<string, ActionResult<AccountQuotaInfo>>;
 
 export interface ErrorHistoryEntry {

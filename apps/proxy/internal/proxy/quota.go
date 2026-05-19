@@ -10,22 +10,43 @@ import (
 	"fmt"
 	"io"
 	"math"
+	mrand "math/rand"
 	"net/http"
 	"net/url"
-	"strconv"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
-const internalQuotaMaxBodyBytes = 64 << 10
+const (
+	internalQuotaMaxBodyBytes = 64 << 10
+	quotaRawCachePrefix       = "opendum:quota:raw"
+	quotaRawCacheMinTTL       = time.Minute
+	quotaRawCacheMaxTTL       = 5 * time.Minute
+)
 
 type quotaRequest struct {
-	UserID    string `json:"userId"`
-	Provider  string `json:"provider"`
-	AccountID string `json:"accountId"`
+	UserID       string `json:"userId"`
+	Provider     string `json:"provider"`
+	AccountID    string `json:"accountId"`
+	ForceRefresh bool   `json:"forceRefresh,omitempty"`
+}
+
+type quotaJSONResult struct {
+	Response  *http.Response
+	Raw       []byte
+	CacheKey  string
+	FromCache bool
+}
+
+type quotaRawCacheEntry struct {
+	StatusCode int                 `json:"statusCode"`
+	Header     map[string][]string `json:"header,omitempty"`
+	Body       []byte              `json:"body"`
+	CachedAt   int64               `json:"cachedAt"`
 }
 
 type quotaGroupDisplay struct {
@@ -83,7 +104,7 @@ func (s *Service) InternalQuota(w http.ResponseWriter, r *http.Request) {
 		writeQuotaJSON(w, http.StatusNotFound, map[string]any{"success": false, "error": "Account not found"})
 		return
 	}
-	result, err := s.fetchAccountQuota(r.Context(), account)
+	result, err := s.fetchAccountQuota(r.Context(), account, input.ForceRefresh)
 	if err != nil {
 		writeQuotaJSON(w, http.StatusOK, map[string]any{"success": false, "error": err.Error()})
 		return
@@ -133,9 +154,9 @@ func (s *Service) loadQuotaAccount(ctx context.Context, input quotaRequest) (app
 	return account, err
 }
 
-func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderAccount) (accountQuotaInfo, error) {
+func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) (accountQuotaInfo, error) {
 	if account.Provider == "openrouter" {
-		return s.fetchOpenRouterQuota(ctx, account), nil
+		return s.fetchOpenRouterQuota(ctx, account, forceRefresh), nil
 	}
 	providerImpl, ok := s.providerRegistry.Get(account.Provider)
 	if !ok {
@@ -148,15 +169,15 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 
 	switch account.Provider {
 	case "antigravity":
-		return s.fetchAntigravityQuota(ctx, requestAccount, credentials), nil
+		return s.fetchAntigravityQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "copilot":
-		return s.fetchCopilotQuota(ctx, requestAccount, credentials), nil
+		return s.fetchCopilotQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "codex":
-		return s.fetchCodexQuota(ctx, requestAccount, credentials), nil
+		return s.fetchCodexQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "gemini_cli":
-		return s.fetchGeminiCLIQuota(ctx, requestAccount, credentials), nil
+		return s.fetchGeminiCLIQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "kiro":
-		return s.fetchKiroQuota(ctx, requestAccount, credentials), nil
+		return s.fetchKiroQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	default:
 		return accountQuotaInfo{}, fmt.Errorf("provider %s is not supported for quota", account.Provider)
 	}
@@ -244,6 +265,87 @@ func formatTimeUntilResetISO(resetISO *string) *string {
 func stringPtr(value string) *string { return &value }
 
 func intPtrValue(value int64) *int64 { return &value }
+
+func (s *Service) getQuotaJSON(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool, cacheName, method, target string, headers map[string]string, body any) (quotaJSONResult, error) {
+	encodedBody, err := encodeQuotaBody(body)
+	if err != nil {
+		return quotaJSONResult{}, err
+	}
+	cacheKey := quotaRawCacheKey(account, cacheName, method, target, encodedBody)
+
+	if !forceRefresh && s.redis != nil {
+		if raw, err := s.redis.Get(ctx, cacheKey).Bytes(); err == nil && len(raw) > 0 {
+			var entry quotaRawCacheEntry
+			if err := json.Unmarshal(raw, &entry); err == nil && entry.StatusCode > 0 {
+				return quotaJSONResult{
+					Response:  &http.Response{StatusCode: entry.StatusCode, Header: http.Header(entry.Header), Body: io.NopCloser(bytes.NewReader(nil))},
+					Raw:       entry.Body,
+					CacheKey:  cacheKey,
+					FromCache: true,
+				}, nil
+			}
+		}
+	}
+
+	resp, raw, err := getJSON(ctx, s.client, method, target, headers, body)
+	return quotaJSONResult{Response: resp, Raw: raw, CacheKey: cacheKey}, err
+}
+
+func (s *Service) putQuotaJSONCache(ctx context.Context, result quotaJSONResult) {
+	if s.redis == nil || result.FromCache || result.Response == nil || result.CacheKey == "" {
+		return
+	}
+	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
+		return
+	}
+	data, err := json.Marshal(quotaRawCacheEntry{StatusCode: result.Response.StatusCode, Header: quotaCacheHeaders(result.Response.Header), Body: result.Raw, CachedAt: time.Now().UnixMilli()})
+	if err != nil {
+		return
+	}
+	_ = s.redis.Set(ctx, result.CacheKey, data, quotaRawCacheTTL()).Err()
+}
+
+func quotaRawCacheTTL() time.Duration {
+	spread := quotaRawCacheMaxTTL - quotaRawCacheMinTTL
+	if spread <= 0 {
+		return quotaRawCacheMinTTL
+	}
+	return quotaRawCacheMinTTL + time.Duration(mrand.Int63n(int64(spread)+1))
+}
+
+func quotaRawCacheKey(account appdb.ProviderAccount, cacheName, method, target string, encodedBody []byte) string {
+	hash := sha256.Sum256([]byte(strings.Join([]string{account.Provider, account.ID, cacheName, strings.ToUpper(method), target, string(encodedBody)}, "\n")))
+	return fmt.Sprintf("%s:%s:%s:%s", quotaRawCachePrefix, account.Provider, account.ID, hex.EncodeToString(hash[:]))
+}
+
+func quotaCacheHeaders(headers http.Header) map[string][]string {
+	allowed := []string{
+		"x-codex-primary-used-percent",
+		"x-codex-primary-window-minutes",
+		"x-codex-primary-reset-at",
+		"x-codex-secondary-used-percent",
+		"x-codex-secondary-window-minutes",
+		"x-codex-secondary-reset-at",
+		"x-codex-credits-has-credits",
+		"x-codex-credits-unlimited",
+		"x-codex-credits-balance",
+	}
+	out := map[string][]string{}
+	for _, key := range allowed {
+		values := headers.Values(key)
+		if len(values) > 0 {
+			out[http.CanonicalHeaderKey(key)] = append([]string(nil), values...)
+		}
+	}
+	return out
+}
+
+func encodeQuotaBody(body any) ([]byte, error) {
+	if body == nil {
+		return nil, nil
+	}
+	return json.Marshal(body)
+}
 
 func getJSON(ctx context.Context, client *http.Client, method, target string, headers map[string]string, body any) (*http.Response, []byte, error) {
 	var reader io.Reader
