@@ -10,6 +10,7 @@ const props = defineProps<{
   label: string;
   compact?: boolean;
   disabled?: boolean;
+  animateDeltas?: boolean;
 }>();
 
 const { auditRefreshVersion, auditUser, isAuditMode } = useDashboardAudit();
@@ -85,7 +86,7 @@ const statAnimationContextKey = computed(() => {
   const userKey = isAuditMode.value ? `audit:${auditUser.value?.id ?? ""}` : "self";
   return `${props.label}:${userKey}:${auditRefreshVersion.value}`;
 });
-const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: statHitEffects.value[stat.key] })));
+const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: props.animateDeltas === false ? undefined : statHitEffects.value[stat.key] })));
 
 function formatHourLabel(time: string): string {
   return new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -100,8 +101,17 @@ function isPreviousDayLabel(time: string): boolean {
   return date < today;
 }
 
-watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
+watch([statMetrics, statAnimationContextKey, () => props.animateDeltas], ([items, contextKey, animateDeltas]) => {
   const nextValues = collectStatValues(items);
+
+  if (animateDeltas === false) {
+    previousStatValues.value = nextValues;
+    previousStatAnimationContextKey.value = contextKey;
+    pendingStatBaselineContextKey.value = null;
+    statHitEffects.value = {};
+    return;
+  }
+
   const previousValues = previousStatValues.value;
   const previousContextKey = previousStatAnimationContextKey.value;
   const contextChanged = previousContextKey !== contextKey;

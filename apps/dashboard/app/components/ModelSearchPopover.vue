@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { getProviderLabel } from "../../lib/provider-accounts";
 import type { ModelListItem as DashboardModelListItem, ModelSearchItem } from "../../lib/dashboard-api-types";
-import type { ModelStats } from "../../lib/model-stats";
+import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
 
 type ModelListItem = ModelSearchItem;
 
@@ -34,7 +34,7 @@ const { data } = await useAsyncData("layout-model-search", () => dashboardApi.mo
   default: () => [] as ModelListItem[],
 });
 const sharedFullModels = useNuxtData<DashboardModelListItem[]>("dashboard-models");
-const { data: fullModelData, execute: loadFullModels, status: fullModelStatus } = useAsyncData("dashboard-models", () => dashboardApi.models.list(), {
+const { data: fullModelData, execute: loadFullModels } = useAsyncData("dashboard-models", () => dashboardApi.models.list(), {
   immediate: false,
 });
 
@@ -44,8 +44,8 @@ const activePlaceholderModel = computed(() => placeholderModels.value[placeholde
 const showAnimatedPlaceholder = computed(() => search.value.length === 0 && activePlaceholderModel.value !== null);
 const fullModels = computed(() => fullModelData.value ?? sharedFullModels.data.value ?? []);
 const fullModelById = computed(() => new Map(fullModels.value.map((model) => [model.id, model])));
+const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const detailModelStats = computed<ModelStats | undefined>(() => detailModel.value ? fullModelById.value.get(detailModel.value.id)?.stats : undefined);
-const isLoadingDetailStats = computed(() => detailModel.value !== null && !detailModelStats.value && fullModelStatus.value === "pending");
 const filteredModels = computed(() => {
   const term = search.value.trim().toLowerCase();
 
@@ -292,8 +292,7 @@ function closeDetail() {
 
           <div class="space-y-3 pt-1">
             <ModelFeatureBadges :meta="detailModel.meta" />
-            <UiSkeleton v-if="isLoadingDetailStats" class="h-24 rounded-lg" />
-            <ModelStatsPanel v-else-if="detailModelStats" :stats="detailModelStats" :label="detailModel.id" compact />
+            <ModelStatsPanel :stats="detailModelStats ?? emptyModelStats" :label="detailModel.id" compact :animate-deltas="false" />
           </div>
         </div>
       </template>
