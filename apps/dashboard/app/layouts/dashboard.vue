@@ -215,7 +215,7 @@ function sidebarItemClass(active: boolean, hasChildren: boolean) {
   if (!active) return "text-muted-foreground hover:bg-accent hover:text-foreground";
   if (!hasChildren) return "bg-accent text-foreground";
 
-  return "relative text-foreground before:absolute before:inset-y-0 before:left-0 before:w-[85%] before:rounded-lg before:bg-accent before:content-['']";
+  return "relative text-foreground before:absolute before:inset-y-0 before:left-0 before:w-[70%] before:rounded-lg before:bg-accent before:content-['']";
 }
 
 function parentNavItemClass(item: NavItem) {
