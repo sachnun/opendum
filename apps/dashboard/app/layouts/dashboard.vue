@@ -211,27 +211,12 @@ function isActive(href: string) {
   return route.path === href || (href !== "/dashboard" && route.path.startsWith(href));
 }
 
-function sidebarItemClass(active: boolean, hasChildren: boolean) {
-  if (!active) return "text-muted-foreground hover:bg-accent hover:text-foreground";
-  if (!hasChildren) return "bg-accent text-foreground";
-
-  return "relative text-foreground before:absolute before:inset-y-0 before:left-0 before:w-[70%] before:rounded-lg before:bg-accent before:content-['']";
-}
-
-function parentNavItemClass(item: NavItem) {
-  return sidebarItemClass(isActive(item.href), Boolean(item.children?.length));
-}
-
 function isAccountsNavItem(item: NavItem) {
   return item.href === accountsNavigationHref;
 }
 
 function isSupportItemActive(item: NavItem) {
   return isActive(item.href) || Boolean(item.children?.some((subItem) => isSubItemActive(subItem)));
-}
-
-function supportNavItemClass(item: NavItem) {
-  return sidebarItemClass(isSupportItemActive(item), Boolean(item.children?.length));
 }
 
 function isSupportItemOpen(item: NavItem) {
@@ -626,12 +611,12 @@ async function handleAuditSelected() {
                 :to="item.href"
                 :class="[
                   'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                  parentNavItemClass(item),
+                  isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 ]"
                 @click="handleNavClick(item, $event)"
               >
-                <UiIcon :name="item.icon" :class="['relative z-10 size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-                <span class="relative z-10">{{ item.name }}</span>
+                <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                {{ item.name }}
               </NuxtLink>
 
               <div v-if="item.children?.length" class="ml-6 space-y-1 border-l border-border/60 pl-3">
@@ -776,13 +761,13 @@ async function handleAuditSelected() {
                 :aria-expanded="isSupportItemOpen(item)"
                 :class="[
                   'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
-                  supportNavItemClass(item),
+                  isSupportItemActive(item) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 ]"
                 @click="toggleSupportItem(item)"
               >
-                <UiIcon :name="item.icon" :class="['relative z-10 size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-                <span class="relative z-10 min-w-0 flex-1 truncate">{{ item.name }}</span>
-                <UiIcon name="i-lucide-chevron-down" :class="['relative z-10 size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
+                <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+                <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
               </button>
               <NuxtLink
                 v-else
@@ -1002,12 +987,12 @@ async function handleAuditSelected() {
                     :to="item.href"
                     :class="[
                       'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                      parentNavItemClass(item),
+                      isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                     ]"
                     @click="handleNavClick(item, $event)"
                   >
-                    <UiIcon :name="item.icon" :class="['relative z-10 size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-                    <span class="relative z-10">{{ item.name }}</span>
+                    <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    {{ item.name }}
                   </NuxtLink>
 
                   <div v-if="item.children?.length" class="ml-6 space-y-1 border-l border-border/60 pl-3">
@@ -1151,13 +1136,13 @@ async function handleAuditSelected() {
                     :aria-expanded="isSupportItemOpen(item)"
                     :class="[
                       'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
-                      supportNavItemClass(item),
+                      isSupportItemActive(item) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                     ]"
                     @click="toggleSupportItem(item)"
                   >
-                    <UiIcon :name="item.icon" :class="['relative z-10 size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
-                    <span class="relative z-10 min-w-0 flex-1 truncate">{{ item.name }}</span>
-                    <UiIcon name="i-lucide-chevron-down" :class="['relative z-10 size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
+                    <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+                    <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
                   </button>
                   <NuxtLink
                     v-else
