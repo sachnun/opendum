@@ -4,12 +4,18 @@ import { cn } from "../../lib/utils";
 
 type Provider = ProviderAccountKey;
 type FlowType = "oauth_redirect" | "device_code" | "chatgpt_session" | "api_key" | "api_key_with_account_id";
-type CodexLoginMethod = Extract<FlowType, "oauth_redirect" | "device_code" | "chatgpt_session">;
+
+interface ProviderMethod {
+  key: FlowType;
+  name: string;
+  description: string;
+  disabled?: boolean;
+}
 
 interface ProviderConfig {
   name: string;
   description: string;
-  flowType: FlowType;
+  methods: ProviderMethod[];
   apiKeyPortalUrl?: string;
   apiKeyPlaceholder?: string;
   accountIdPlaceholder?: string;
@@ -36,25 +42,24 @@ const emit = defineEmits<{
 const dashboardApi = useDashboardApi();
 const dashboardInvalidation = useDashboardDataInvalidation();
 
-const providerConfigs: Record<Provider, ProviderConfig> = {
-  antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", flowType: "oauth_redirect" },
-  gemini_cli: { name: "Gemini CLI", description: "Access Gemini 2.5 Pro & 3 models", flowType: "oauth_redirect" },
-  qwen_code: { name: "Qwen Code", description: "Access Qwen Coder models", flowType: "device_code" },
-  copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", flowType: "device_code" },
-  codex: { name: "Codex", description: "Access GPT-5 Codex models", flowType: "oauth_redirect" },
-  kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", flowType: "oauth_redirect" },
-  nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", flowType: "api_key", apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
-  ollama_cloud: { name: "Ollama Cloud", description: "Access Ollama Cloud via OpenAI-compatible API", flowType: "api_key", apiKeyPortalUrl: "https://ollama.com/settings/keys", apiKeyPlaceholder: "ollama_..." },
-  openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", flowType: "api_key", apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
-  groq: { name: "Groq", description: "Access ultra-fast LLM inference via Groq API", flowType: "api_key", apiKeyPortalUrl: "https://console.groq.com/keys", apiKeyPlaceholder: "gsk_..." },
-  workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", flowType: "api_key_with_account_id", apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
-};
+const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." };
+const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code", description: "Enter a short device code." };
+const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key", description: "Create or copy an API key from the provider portal." };
+const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token", description: "Requires the matching account ID." };
 
-const codexLoginMethods: Array<{ key: CodexLoginMethod; name: string; description: string; disabled?: boolean }> = [
-  { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." },
-  { key: "device_code", name: "Device Code", description: "Enter a short device code." },
-  { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true },
-];
+const providerConfigs: Record<Provider, ProviderConfig> = {
+  antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", methods: [browserOAuthMethod] },
+  gemini_cli: { name: "Gemini CLI", description: "Access Gemini 2.5 Pro & 3 models", methods: [browserOAuthMethod] },
+  qwen_code: { name: "Qwen Code", description: "Access Qwen Coder models", methods: [deviceCodeMethod] },
+  copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [deviceCodeMethod] },
+  codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
+  kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
+  nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
+  ollama_cloud: { name: "Ollama Cloud", description: "Access Ollama Cloud via OpenAI-compatible API", methods: [apiKeyMethod], apiKeyPortalUrl: "https://ollama.com/settings/keys", apiKeyPlaceholder: "ollama_..." },
+  openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
+  groq: { name: "Groq", description: "Access ultra-fast LLM inference via Groq API", methods: [apiKeyMethod], apiKeyPortalUrl: "https://console.groq.com/keys", apiKeyPlaceholder: "gsk_..." },
+  workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
+};
 
 const chatgptSessionPlaceholder = `{
   "WARNING_BANNER": "!!!!!!!!!!!!!!!!!!!! DO NOT SHARE ANY PART OF THE INFORMATION YOU SEE HERE. THIS INFORMATION IS SENSITIVE AND CAN GRANT ACCESS TO YOUR ACCOUNT. !!!!!!!!!!!!!!!!!!!!",
@@ -84,7 +89,7 @@ const cfAccountId = ref("");
 const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
-const codexLoginMethod = ref<CodexLoginMethod | null>(null);
+const selectedMethod = ref<FlowType | null>(null);
 const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
@@ -102,14 +107,13 @@ let copyAutoNextTimer: ReturnType<typeof setTimeout> | null = null;
 let callbackAutoExchangeTimer: ReturnType<typeof setTimeout> | null = null;
 
 const selectedConfig = computed(() => (provider.value ? providerConfigs[provider.value] : null));
-const isCodexProvider = computed(() => provider.value === "codex");
 const activeFlowType = computed<FlowType | null>(() => {
-  if (!selectedConfig.value) return null;
-  if (isCodexProvider.value) return codexLoginMethod.value;
-  return selectedConfig.value.flowType;
+  if (!selectedConfig.value || !selectedMethod.value) return null;
+  const method = selectedConfig.value.methods.find((item) => item.key === selectedMethod.value && !item.disabled);
+  return method?.key ?? null;
 });
-const authStep = computed(() => (isCodexProvider.value ? 3 : 2));
-const finishStep = computed(() => (isCodexProvider.value ? 4 : 3));
+const authStep = computed(() => 3);
+const finishStep = computed(() => 4);
 const dialogOpen = computed({
   get: () => open.value,
   set: (value: boolean) => {
@@ -118,8 +122,7 @@ const dialogOpen = computed({
   },
 });
 const displayedSteps = computed(() => {
-  if (isCodexProvider.value) return props.initialProvider ? [2, 3, 4] : [1, 2, 3, 4];
-  return props.initialProvider ? [2, 3] : [1, 2, 3];
+  return props.initialProvider ? [2, 3, 4] : [1, 2, 3, 4];
 });
 const shouldPreventOutsideClose = computed(() => {
   const flowType = activeFlowType.value;
@@ -130,14 +133,14 @@ watch(open, (value) => {
   if (value) {
     step.value = minimumStep.value;
     provider.value = props.initialProvider;
-    codexLoginMethod.value = null;
+    selectedMethod.value = null;
     return;
   }
 
   resetForm();
 });
 
-watch([open, step, provider, codexLoginMethod], async () => {
+watch([open, step, provider, selectedMethod], async () => {
   if (props.readonly) return;
   if (!open.value || step.value !== authStep.value || !provider.value || !selectedConfig.value || !activeFlowType.value) return;
 
@@ -197,7 +200,7 @@ function resetForm() {
   authUrl.value = "";
   oauthState.value = null;
   oauthCodeVerifier.value = null;
-  codexLoginMethod.value = null;
+  selectedMethod.value = null;
   deviceCodeInfo.value = null;
   copiedLink.value = false;
   copiedDeviceCode.value = false;
@@ -254,7 +257,7 @@ function finishConnection(result: { email: string; isUpdate: boolean }) {
 function selectProvider(providerKey: Provider) {
   if (props.readonly) return;
   provider.value = providerKey;
-  codexLoginMethod.value = null;
+  selectedMethod.value = null;
   step.value = 2;
 }
 
@@ -285,11 +288,11 @@ function stopDevicePolling() {
   }
 }
 
-function selectCodexLoginMethod(method: CodexLoginMethod) {
+function selectLoginMethod(method: FlowType) {
   if (props.readonly) return;
-  if (codexLoginMethods.some((item) => item.key === method && item.disabled)) return;
+  if (!selectedConfig.value?.methods.some((item) => item.key === method && !item.disabled)) return;
   resetAuthProgress();
-  codexLoginMethod.value = method;
+  selectedMethod.value = method;
   step.value = authStep.value;
 }
 
@@ -561,12 +564,12 @@ function goBack() {
 
   if (step.value === 1) {
     provider.value = null;
-    codexLoginMethod.value = null;
+    selectedMethod.value = null;
     return;
   }
 
-  if (step.value === 2 && isCodexProvider.value) {
-    codexLoginMethod.value = null;
+  if (step.value === 2) {
+    selectedMethod.value = null;
   }
 }
 
@@ -655,21 +658,21 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div v-if="step === 2 && isCodexProvider" class="space-y-4">
+        <div v-if="step === 2 && selectedConfig" class="space-y-4">
           <div class="space-y-2">
-            <p class="text-sm font-medium">Choose Codex login method</p>
+            <p class="text-sm font-medium">Choose {{ selectedConfig.name }} connection method</p>
           </div>
           <div class="grid gap-3">
             <button
-              v-for="method in codexLoginMethods"
+              v-for="method in selectedConfig.methods"
               :key="method.key"
               type="button"
               :disabled="method.disabled"
               :class="cn(
                 'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
-                codexLoginMethod === method.key ? 'border-foreground/30 bg-muted/30' : 'border-border',
+                selectedMethod === method.key ? 'border-foreground/30 bg-muted/30' : 'border-border',
               )"
-              @click="selectCodexLoginMethod(method.key)"
+              @click="selectLoginMethod(method.key)"
             >
               <span class="space-y-1">
                 <span class="flex items-center gap-2 text-sm font-medium">
