@@ -2,7 +2,7 @@
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
 import { compareModelEntries } from "../../../lib/model-sort";
 import type { ModelFamilyCounts } from "../../../lib/navigation";
-import type { ModelStats } from "../../../lib/model-stats";
+import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../../lib/model-stats";
 import { getProviderLabel } from "../../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
@@ -13,11 +13,16 @@ const dashboardInvalidation = useDashboardDataInvalidation();
 const nuxtApp = useNuxtApp();
 
 type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
+const MODEL_STATS_BATCH_SIZE = 24;
+const MODEL_STATS_POLL_MS = 30_000;
 
 const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardInvalidation.keys.models).data.value !== undefined;
 const shouldRefreshCachedModelsOnMount = import.meta.client && !nuxtApp.isHydrating && cachedModelsBeforePageLoad;
-const { data, error, refresh } = await useAsyncData(dashboardInvalidation.keys.models, () => dashboardApi.models.list());
+const { data, error, refresh } = await useAsyncData(dashboardInvalidation.keys.models, () => dashboardApi.models.list({ includeStats: false }));
 const models = computed<ModelListItem[]>(() => data.value ?? []);
+const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
+const modelStatsById = ref<Record<string, ModelStats>>({});
+const visibleModelIds = ref<Set<string>>(new Set());
 const availableProviders = computed(() => {
   const entries = new Map<string, string>();
 
@@ -33,6 +38,12 @@ const activeProviders = ref<string[]>([]);
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
+const modelCardElements = new Map<string, Element>();
+const queuedModelStatsIds = new Set<string>();
+const loadingModelStatsIds = new Set<string>();
+let modelStatsObserver: IntersectionObserver | null = null;
+let modelStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
+let modelStatsPollTimer: ReturnType<typeof setInterval> | null = null;
 
 watchEffect(() => {
   if (activeProviders.value.length === 0 && availableProviders.value.length > 0) {
@@ -80,7 +91,173 @@ onUnmounted(() => {
 });
 
 onMounted(() => {
-  if (shouldRefreshCachedModelsOnMount) void refresh();
+  startModelStatsObserver();
+  startModelStatsPolling();
+
+  if (shouldRefreshCachedModelsOnMount) {
+    void refreshModels();
+  }
+});
+
+onBeforeUnmount(() => {
+  stopModelStatsPolling();
+  modelStatsObserver?.disconnect();
+  if (modelStatsQueueTimer) clearTimeout(modelStatsQueueTimer);
+});
+
+watch(modelSections, async () => {
+  await nextTick();
+  observeModelCards();
+});
+
+async function refreshModels() {
+  await refresh();
+  queueVisibleModelStatsLoad();
+}
+
+function getModelStats(model: ModelListItem): ModelStats {
+  return modelStatsById.value[model.id] ?? model.stats ?? emptyModelStats;
+}
+
+function getElementFromRef(element: unknown): Element | null {
+  if (element instanceof Element) return element;
+  const maybeComponent = element as { $el?: unknown } | null;
+  return maybeComponent?.$el instanceof Element ? maybeComponent.$el : null;
+}
+
+function setModelCardRef(modelId: string, element: unknown) {
+  const cardElement = getElementFromRef(element);
+  const previousElement = modelCardElements.get(modelId);
+
+  if (previousElement && previousElement !== cardElement) {
+    modelStatsObserver?.unobserve(previousElement);
+  }
+
+  if (!cardElement) {
+    modelCardElements.delete(modelId);
+    return;
+  }
+
+  modelCardElements.set(modelId, cardElement);
+  if (modelStatsObserver) modelStatsObserver.observe(cardElement);
+}
+
+function startModelStatsObserver() {
+  if (!import.meta.client || modelStatsObserver) return;
+
+  if (!("IntersectionObserver" in window)) {
+    queueModelStatsLoad(models.value.slice(0, MODEL_STATS_BATCH_SIZE).map((model) => model.id));
+    return;
+  }
+
+  modelStatsObserver = new IntersectionObserver((entries) => {
+    const nextVisibleModelIds = new Set(visibleModelIds.value);
+    const enteredModelIds: string[] = [];
+
+    for (const entry of entries) {
+      const modelId = entry.target.getAttribute("data-model-id");
+      if (!modelId) continue;
+
+      if (entry.isIntersecting) {
+        nextVisibleModelIds.add(modelId);
+        enteredModelIds.push(modelId);
+      } else {
+        nextVisibleModelIds.delete(modelId);
+      }
+    }
+
+    visibleModelIds.value = nextVisibleModelIds;
+    queueModelStatsLoad(enteredModelIds);
+  }, { rootMargin: "240px 0px" });
+
+  observeModelCards();
+}
+
+function observeModelCards() {
+  if (!modelStatsObserver) return;
+
+  for (const element of modelCardElements.values()) {
+    modelStatsObserver.observe(element);
+  }
+}
+
+function queueVisibleModelStatsLoad() {
+  queueModelStatsLoad(visibleModelIds.value);
+}
+
+function queueModelStatsLoad(modelIds: Iterable<string>) {
+  for (const modelId of modelIds) {
+    if (modelStatsById.value[modelId] || loadingModelStatsIds.has(modelId)) continue;
+    queuedModelStatsIds.add(modelId);
+  }
+
+  if (queuedModelStatsIds.size === 0 || modelStatsQueueTimer) return;
+  modelStatsQueueTimer = setTimeout(() => {
+    modelStatsQueueTimer = null;
+    void flushQueuedModelStats();
+  }, 80);
+}
+
+async function flushQueuedModelStats() {
+  const modelIds = Array.from(queuedModelStatsIds).slice(0, MODEL_STATS_BATCH_SIZE);
+  for (const modelId of modelIds) queuedModelStatsIds.delete(modelId);
+
+  await loadModelStats(modelIds);
+
+  if (queuedModelStatsIds.size > 0) {
+    modelStatsQueueTimer = setTimeout(() => {
+      modelStatsQueueTimer = null;
+      void flushQueuedModelStats();
+    }, 80);
+  }
+}
+
+async function loadModelStats(modelIds: string[], options: { force?: boolean } = {}) {
+  const availableModelIds = new Set(models.value.map((model) => model.id));
+  const requestedModelIds = Array.from(new Set(modelIds))
+    .filter((modelId) => availableModelIds.has(modelId))
+    .filter((modelId) => !loadingModelStatsIds.has(modelId))
+    .filter((modelId) => options.force || !modelStatsById.value[modelId]);
+
+  if (requestedModelIds.length === 0) return;
+
+  for (const modelId of requestedModelIds) loadingModelStatsIds.add(modelId);
+
+  try {
+    const stats = await dashboardApi.models.stats({ models: requestedModelIds });
+    modelStatsById.value = { ...modelStatsById.value, ...stats };
+  } catch (error) {
+    console.error("Failed to load model stats:", error);
+  } finally {
+    for (const modelId of requestedModelIds) loadingModelStatsIds.delete(modelId);
+  }
+}
+
+function startModelStatsPolling() {
+  if (!import.meta.client || modelStatsPollTimer) return;
+
+  modelStatsPollTimer = setInterval(() => {
+    if (document.hidden) return;
+    void loadModelStats(Array.from(visibleModelIds.value), { force: true });
+  }, MODEL_STATS_POLL_MS);
+}
+
+function stopModelStatsPolling() {
+  if (!modelStatsPollTimer) return;
+
+  clearInterval(modelStatsPollTimer);
+  modelStatsPollTimer = null;
+}
+
+function pruneModelStats() {
+  const availableModelIds = new Set(models.value.map((model) => model.id));
+  modelStatsById.value = Object.fromEntries(Object.entries(modelStatsById.value).filter(([modelId]) => availableModelIds.has(modelId)));
+  visibleModelIds.value = new Set([...visibleModelIds.value].filter((modelId) => availableModelIds.has(modelId)));
+}
+
+watch(models, () => {
+  pruneModelStats();
+  queueVisibleModelStatsLoad();
 });
 
 function getFamilyAnchorId(family: string) {
@@ -207,6 +384,8 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
             <UiCard
               v-for="model in section.models"
               :key="model.id"
+              :ref="(element) => setModelCardRef(model.id, element)"
+              :data-model-id="model.id"
               class="flex h-full flex-col bg-transparent transition-colors"
               :class="model.isEnabled === false ? 'opacity-65' : ''"
             >
@@ -263,7 +442,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
               <UiCardContent class="flex flex-1 flex-col pt-0">
                 <div class="mt-auto space-y-3">
                   <ModelFeatureBadges :meta="model.meta" />
-                  <ModelStatsPanel :stats="model.stats as ModelStats" :label="model.id" :disabled="!model.isEnabled" compact />
+                  <ModelStatsPanel :stats="getModelStats(model)" :label="model.id" :disabled="!model.isEnabled" compact :animate-deltas="false" />
                 </div>
               </UiCardContent>
             </UiCard>

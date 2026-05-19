@@ -26,11 +26,12 @@ async function getAvailableModelsForUser(userId: string) {
   };
 }
 
-export async function listModels(userId: string) {
+export async function listModels(userId: string, options: { includeStats?: boolean } = {}) {
   const timer = createServiceTimer("models.list");
   try {
+    const includeStats = options.includeStats ?? true;
     const { availability, disabledModelSet, models } = await timer.time("availability", () => getAvailableModelsForUser(userId));
-    const statsByModel = await timer.time("stats", () => getModelStatsByModel(userId, models));
+    const statsByModel = includeStats ? await timer.time("stats", () => getModelStatsByModel(userId, models)) : {};
 
     const mapStartedAt = Date.now();
     const result = models.map((model) => ({
@@ -40,7 +41,7 @@ export async function listModels(userId: string) {
       providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
       meta: MODEL_REGISTRY[model]?.meta,
       isEnabled: !disabledModelSet.has(model),
-      stats: statsByModel[model],
+      ...(includeStats ? { stats: statsByModel[model] } : {}),
     }));
     timer.record("map", mapStartedAt);
     timer.log({ models: models.length });
@@ -64,6 +65,25 @@ export async function searchModels(userId: string) {
   } catch (error) {
     console.error("Failed to search models:", error);
     throw new Error("Failed to search models");
+  }
+}
+
+export async function getModelStats(userId: string, modelIds: string[]) {
+  try {
+    const { models } = await getAvailableModelsForUser(userId);
+    const availableModelSet = new Set(models);
+    const requestedModels = Array.from(new Set(
+      modelIds
+        .map((model) => resolveModelAlias(model.trim()))
+        .filter((model) => model && isModelSupported(model) && availableModelSet.has(model))
+    ));
+
+    if (requestedModels.length === 0) return {};
+
+    return getModelStatsByModel(userId, requestedModels);
+  } catch (error) {
+    console.error("Failed to load model stats:", error);
+    throw new Error("Failed to load model stats");
   }
 }
 

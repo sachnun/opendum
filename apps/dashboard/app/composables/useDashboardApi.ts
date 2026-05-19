@@ -21,6 +21,7 @@ import type {
   ProviderAccountUpdateData,
   QuotaProviderKey,
 } from "../../lib/dashboard-api-types";
+import type { ModelStats } from "../../lib/model-stats";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
@@ -88,8 +89,9 @@ export function useDashboardApi() {
       updateRateLimits: (body: { id: string; rules: RateLimitRule[] }) => post<ActionResult<{ rules: RateLimitRule[] }>>(dashboardFetch, "/api/dashboard/api-keys/rate-limits", body),
     },
     models: {
-      list: () => dashboardFetch<ModelListItem[]>("/api/dashboard/models"),
+      list: (query?: { includeStats?: boolean }) => dashboardFetch<ModelListItem[]>("/api/dashboard/models", query ? { query } : undefined),
       search: () => dashboardFetch<ModelSearchItem[]>("/api/dashboard/models/search"),
+      stats: (body: { models: string[] }) => post<Record<string, ModelStats>>(dashboardFetch, "/api/dashboard/models/stats", body),
       familyCounts: () => dashboardFetch<Record<string, number>>("/api/dashboard/models/families"),
       setEnabled: (body: { modelId: string; enabled: boolean }) => post<ActionResult<{ model: string; enabled: boolean }>>(dashboardFetch, "/api/dashboard/models/enabled", body),
     },

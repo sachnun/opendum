@@ -1,9 +1,9 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
 import { db } from "./db";
 import { usageLog } from "./db/schema";
-import { resolveModelAlias } from "./proxy/models";
+import { getModelLookupKeys, resolveModelAlias } from "./proxy/models";
 
 interface RawModelStats {
   totalRequests: number;
@@ -34,6 +34,8 @@ function normalizeLoggedModel(model: string): string {
 }
 
 export async function getModelStatsByModel(userId: string, allModels: string[]): Promise<Record<string, ModelStats>> {
+  if (allModels.length === 0) return {};
+
   const dayKeys = buildDayKeys(MODEL_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
   const hourKeys = buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS);
@@ -41,6 +43,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
   const durationStartDate = new Date(hourKeys[0] ?? Date.now());
   const statsStartDate = new Date(`${dayKeys[0]}T00:00:00.000Z`);
   const supportedModelSet = new Set(allModels);
+  const lookupKeys = Array.from(new Set(allModels.flatMap(getModelLookupKeys)));
 
   const normalizedModelExpression = sql<string>`case
     when strpos(${usageLog.model}, '/') > 0 then split_part(${usageLog.model}, '/', 2)
@@ -48,6 +51,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
   end`;
   const dayBucketExpression = sql<Date>`date_trunc('day', ${usageLog.createdAt})`;
   const hourBucketExpression = sql<Date>`date_trunc('hour', ${usageLog.createdAt})`;
+  const modelWhere = and(eq(usageLog.userId, userId), inArray(normalizedModelExpression, lookupKeys));
 
   const [allTimeRows, dailyRows, durationRows] = await Promise.all([
     db
@@ -60,7 +64,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
         durationCount: sql<number>`count(${usageLog.duration})`,
       })
       .from(usageLog)
-      .where(eq(usageLog.userId, userId))
+      .where(modelWhere)
       .groupBy(normalizedModelExpression),
     db
       .select({
@@ -70,7 +74,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
         successCount: sql<number>`count(*) filter (where ${usageLog.statusCode} >= 200 and ${usageLog.statusCode} < 400)`,
       })
       .from(usageLog)
-      .where(and(eq(usageLog.userId, userId), gte(usageLog.createdAt, statsStartDate)))
+      .where(and(modelWhere, gte(usageLog.createdAt, statsStartDate)))
       .groupBy(normalizedModelExpression, dayBucketExpression),
     db
       .select({
@@ -80,7 +84,7 @@ export async function getModelStatsByModel(userId: string, allModels: string[]):
         durationCount: sql<number>`count(${usageLog.duration})`,
       })
       .from(usageLog)
-      .where(and(eq(usageLog.userId, userId), gte(usageLog.createdAt, durationStartDate)))
+      .where(and(modelWhere, gte(usageLog.createdAt, durationStartDate)))
       .groupBy(normalizedModelExpression, hourBucketExpression),
   ]);
 
