@@ -26,6 +26,8 @@ const disableSharingDialogOpen = ref(false);
 const supportItemOpen = reactive<Record<string, boolean>>({ Tools: true });
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
+const mobileSidebarDragX = ref(0);
+const isMobileSidebarDragging = ref(false);
 
 const userLabel = computed(() => session.value?.user?.name || session.value?.user?.email || "Account");
 const userEmail = computed(() => session.value?.user?.email || "");
@@ -185,12 +187,16 @@ const PENDING_SCROLL_RETRIES = 20;
 const PENDING_SCROLL_DELAY_MS = 60;
 const ACCOUNT_SUMMARY_REFRESH_MS = 30_000;
 const POINT_STATUS_REFRESH_MS = 15_000;
+const MOBILE_SIDEBAR_SWIPE_CLOSE_THRESHOLD_PX = 96;
 let accountSummaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountSummaryRefreshInFlight: Promise<void> | null = null;
 let accountSummaryRefreshQueued = false;
 let pointStatusRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let pointStatusRefreshInFlight: Promise<void> | null = null;
 let pointStatusRefreshQueued = false;
+let mobileSidebarSwipeStartX: number | null = null;
+let mobileSidebarSwipePointerId: number | null = null;
+let suppressNextMobileOverlayClick = false;
 
 const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
@@ -204,6 +210,22 @@ const pinnedProviderHrefs = computed(() => {
   });
 
   return hrefs;
+});
+const mobileSheetContentStyle = computed(() => {
+  if (!mobileOpen.value) return undefined;
+
+  const transform = mobileSidebarDragX.value === 0 ? undefined : `translateX(${mobileSidebarDragX.value}px)`;
+  return {
+    transform,
+    transition: isMobileSidebarDragging.value ? "none" : undefined,
+  };
+});
+const mobileSheetOverlayStyle = computed(() => {
+  if (!mobileOpen.value || mobileSidebarDragX.value === 0) return undefined;
+
+  return {
+    opacity: Math.max(0.35, 1 - Math.abs(mobileSidebarDragX.value) / 320),
+  };
 });
 
 function isActive(href: string) {
@@ -390,6 +412,79 @@ function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
   mobileOpen.value = false;
 }
 
+function resetMobileSidebarSwipe() {
+  mobileSidebarSwipeStartX = null;
+  mobileSidebarSwipePointerId = null;
+  isMobileSidebarDragging.value = false;
+  mobileSidebarDragX.value = 0;
+}
+
+function closeMobileSidebar() {
+  mobileOpen.value = false;
+  resetMobileSidebarSwipe();
+}
+
+function handleMobileOverlayClick(event: MouseEvent) {
+  if (suppressNextMobileOverlayClick) {
+    suppressNextMobileOverlayClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
+  if (isMobileSidebarDragging.value || mobileSidebarDragX.value !== 0) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
+  closeMobileSidebar();
+}
+
+function handleMobileSheetPointerDownOutside(event: Event) {
+  if (mobileSidebarSwipeStartX === null) return;
+  event.preventDefault();
+}
+
+function handleMobileOverlayPointerDown(event: PointerEvent) {
+  if (!mobileOpen.value) return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+
+  mobileSidebarSwipeStartX = event.clientX;
+  mobileSidebarSwipePointerId = event.pointerId;
+  isMobileSidebarDragging.value = false;
+  mobileSidebarDragX.value = 0;
+}
+
+function handleMobileOverlayPointerMove(event: PointerEvent) {
+  if (mobileSidebarSwipeStartX === null || mobileSidebarSwipePointerId !== event.pointerId) return;
+
+  const deltaX = event.clientX - mobileSidebarSwipeStartX;
+  if (deltaX >= 0) {
+    if (isMobileSidebarDragging.value) event.preventDefault();
+    mobileSidebarDragX.value = 0;
+    return;
+  }
+
+  isMobileSidebarDragging.value = true;
+  mobileSidebarDragX.value = deltaX;
+  event.preventDefault();
+}
+
+function finishMobileOverlaySwipe(event?: PointerEvent) {
+  if (event && mobileSidebarSwipePointerId !== event.pointerId) return;
+
+  const wasDragging = isMobileSidebarDragging.value;
+  const shouldClose = Math.abs(mobileSidebarDragX.value) >= MOBILE_SIDEBAR_SWIPE_CLOSE_THRESHOLD_PX;
+  if (shouldClose) {
+    closeMobileSidebar();
+    return;
+  }
+
+  resetMobileSidebarSwipe();
+  suppressNextMobileOverlayClick = wasDragging;
+}
+
 async function refreshAccountSummaryOnce() {
   if (!shouldRefreshAccountSummary.value) return;
 
@@ -561,6 +656,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopAccountSummaryRefresh();
   stopPointStatusRefresh();
+  resetMobileSidebarSwipe();
 });
 
 async function handleSignOut() {
@@ -957,7 +1053,19 @@ async function handleAuditSelected() {
       </main>
     </div>
 
-    <UiSheet v-model:open="mobileOpen" side="left" :ui="{ content: 'w-[78vw] max-w-[18rem] p-0' }">
+    <UiSheet
+      v-model:open="mobileOpen"
+      side="left"
+      :ui="{ overlay: 'touch-none', content: 'w-[78vw] max-w-[18rem] p-0' }"
+      :overlay-style="mobileSheetOverlayStyle"
+      :content-style="mobileSheetContentStyle"
+      @overlay-click="handleMobileOverlayClick"
+      @overlay-pointer-down="handleMobileOverlayPointerDown"
+      @overlay-pointer-move="handleMobileOverlayPointerMove"
+      @overlay-pointer-up="finishMobileOverlaySwipe"
+      @overlay-pointer-cancel="finishMobileOverlaySwipe"
+      @content-pointer-down-outside="handleMobileSheetPointerDownOutside"
+    >
       <template #content>
         <div class="flex h-full flex-col bg-background">
           <div class="flex h-16 items-center justify-between border-b border-border px-5">

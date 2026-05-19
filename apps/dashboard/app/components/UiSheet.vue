@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { StyleValue } from "vue";
 import { DialogContent, DialogOverlay, DialogPortal, DialogRoot } from "reka-ui";
 import { cn } from "../../lib/utils";
 
@@ -12,15 +13,27 @@ const props = withDefaults(
       overlay?: string;
       content?: string;
     };
+    overlayStyle?: StyleValue;
+    contentStyle?: StyleValue;
   }>(),
   {
     side: "right",
     modal: true,
     ui: () => ({}),
+    overlayStyle: undefined,
+    contentStyle: undefined,
   }
 );
 
 const open = defineModel<boolean>("open", { default: false });
+const emit = defineEmits<{
+  "overlay-pointer-down": [event: PointerEvent];
+  "overlay-pointer-move": [event: PointerEvent];
+  "overlay-pointer-up": [event: PointerEvent];
+  "overlay-pointer-cancel": [event: PointerEvent];
+  "overlay-click": [event: MouseEvent];
+  "content-pointer-down-outside": [event: Event];
+}>();
 
 const sideClasses: Record<SheetSide, string> = {
   top: "inset-x-0 top-0 h-auto border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
@@ -42,6 +55,12 @@ function handleOpenAutoFocus(event: Event) {
           'fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
           props.ui.overlay,
         )"
+        :style="props.overlayStyle"
+        @pointerdown="emit('overlay-pointer-down', $event)"
+        @pointermove="emit('overlay-pointer-move', $event)"
+        @pointerup="emit('overlay-pointer-up', $event)"
+        @pointercancel="emit('overlay-pointer-cancel', $event)"
+        @click="emit('overlay-click', $event)"
       />
       <DialogContent
         :class="cn(
@@ -49,7 +68,9 @@ function handleOpenAutoFocus(event: Event) {
           sideClasses[side],
           props.ui.content,
         )"
+        :style="props.contentStyle"
         @open-auto-focus="handleOpenAutoFocus"
+        @pointer-down-outside="emit('content-pointer-down-outside', $event)"
       >
         <slot name="content">
           <slot />
