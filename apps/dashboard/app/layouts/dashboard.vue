@@ -62,16 +62,6 @@ const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-s
 
 const supportNavigation = computed<NavItem[]>(() => [
   {
-    name: "Point",
-    href: "/dashboard/point",
-    icon: "i-lucide-coins",
-    collapsible: false,
-    children: [
-      { name: "Topup", href: "/dashboard/point/topup", disabled: true, tag: "soon" },
-      { name: "Withdraw", href: "/dashboard/point/withdraw", disabled: true, tag: "soon" },
-    ],
-  },
-  {
     name: "Tools",
     href: "/dashboard/tools",
     icon: "i-lucide-wrench",
@@ -229,16 +219,12 @@ function isSupportItemActive(item: NavItem) {
   return isActive(item.href) || Boolean(item.children?.some((subItem) => isSubItemActive(subItem)));
 }
 
-function isSupportItemCollapsible(item: NavItem) {
-  return item.collapsible !== false;
-}
-
 function isSupportItemOpen(item: NavItem) {
-  return !item.children?.length || !isSupportItemCollapsible(item) || supportItemOpen[item.name] !== false;
+  return !item.children?.length || supportItemOpen[item.name] !== false;
 }
 
 function toggleSupportItem(item: NavItem) {
-  if (!item.children?.length || !isSupportItemCollapsible(item)) return;
+  if (!item.children?.length) return;
 
   supportItemOpen[item.name] = !isSupportItemOpen(item);
 }
@@ -769,15 +755,8 @@ async function handleAuditSelected() {
         <div class="shrink-0">
           <nav class="mt-4 space-y-1 border-t border-border/60 pt-4">
             <div v-for="item in supportNavigation" :key="item.name" class="space-y-1">
-              <div
-                v-if="item.children?.length && !isSupportItemCollapsible(item)"
-                class="group flex cursor-default items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
-              >
-                <UiIcon :name="item.icon" class="size-4 text-muted-foreground" />
-                <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
-              </div>
               <button
-                v-else-if="item.children?.length"
+                v-if="item.children?.length"
                 type="button"
                 :aria-expanded="isSupportItemOpen(item)"
                 :class="[
@@ -920,14 +899,34 @@ async function handleAuditSelected() {
                     </div>
                   </div>
                   <div class="-mx-1 my-2 h-px bg-border" />
-                  <div
-                    class="relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground/50"
-                    aria-disabled="true"
-                  >
-                    <span>Point</span>
-                    <UiBadge variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
-                      soon
-                    </UiBadge>
+                  <div class="space-y-1">
+                    <div class="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-left text-sm font-medium text-foreground">
+                      <span>Point</span>
+                    </div>
+                    <div class="ml-3 space-y-1 border-l border-border/60 pl-3">
+                      <div
+                        class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
+                        aria-disabled="true"
+                      >
+                        <span class="flex min-w-0 items-center gap-2">
+                          <span class="truncate">Topup</span>
+                          <UiBadge variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
+                            soon
+                          </UiBadge>
+                        </span>
+                      </div>
+                      <div
+                        class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
+                        aria-disabled="true"
+                      >
+                        <span class="flex min-w-0 items-center gap-2">
+                          <span class="truncate">Withdraw</span>
+                          <UiBadge variant="outline" class="border-border/40 bg-muted/20 px-1.5 py-0 text-[10px] lowercase text-muted-foreground/60">
+                            soon
+                          </UiBadge>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <button
                     v-if="isMaintener && !isAuditMode"
@@ -1131,15 +1130,8 @@ async function handleAuditSelected() {
             <div class="shrink-0">
               <nav class="mt-4 space-y-1 border-t border-border/60 pt-4">
                 <div v-for="item in supportNavigation" :key="`mobile-${item.name}`" class="space-y-1">
-                  <div
-                    v-if="item.children?.length && !isSupportItemCollapsible(item)"
-                    class="group flex cursor-default items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground"
-                  >
-                    <UiIcon :name="item.icon" class="size-4 text-muted-foreground" />
-                    <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
-                  </div>
                   <button
-                    v-else-if="item.children?.length"
+                    v-if="item.children?.length"
                     type="button"
                     :aria-expanded="isSupportItemOpen(item)"
                     :class="[
