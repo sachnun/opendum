@@ -23,7 +23,6 @@ const models = computed<ModelListItem[]>(() => data.value ?? []);
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = ref<Record<string, ModelStats>>({});
 const modelStatsCursorById = ref<Record<string, string>>({});
-const visibleModelIds = ref<Set<string>>(new Set());
 const availableProviders = computed(() => {
   const entries = new Map<string, string>();
 
@@ -39,10 +38,9 @@ const activeProviders = ref<string[]>([]);
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
-const modelCardElements = new Map<string, Element>();
 const queuedModelStatsIds = new Set<string>();
+const forceQueuedModelStatsIds = new Set<string>();
 const loadingModelStatsIds = new Set<string>();
-let modelStatsObserver: IntersectionObserver | null = null;
 let modelStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let modelStatsPollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -92,7 +90,6 @@ onUnmounted(() => {
 });
 
 onMounted(() => {
-  startModelStatsObserver();
   startModelStatsPolling();
 
   if (shouldRefreshCachedModelsOnMount) {
@@ -102,89 +99,26 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopModelStatsPolling();
-  modelStatsObserver?.disconnect();
   if (modelStatsQueueTimer) clearTimeout(modelStatsQueueTimer);
-});
-
-watch(modelSections, async () => {
-  await nextTick();
-  observeModelCards();
 });
 
 async function refreshModels() {
   await refresh();
-  queueVisibleModelStatsLoad();
+  queueModelStatsLoad(models.value.map((model) => model.id), { force: true });
 }
 
 function getModelStats(model: ModelListItem): ModelStats {
   return modelStatsById.value[model.id] ?? model.stats ?? emptyModelStats;
 }
 
-function getElementFromRef(element: unknown): Element | null {
-  if (element instanceof Element) return element;
-  const maybeComponent = element as { $el?: unknown } | null;
-  return maybeComponent?.$el instanceof Element ? maybeComponent.$el : null;
-}
+function queueModelStatsLoad(modelIds: Iterable<string>, options: { force?: boolean } = {}) {
+  if (!import.meta.client) return;
 
-function setModelCardRef(modelId: string, element: unknown) {
-  const cardElement = getElementFromRef(element);
-  const previousElement = modelCardElements.get(modelId);
-
-  if (previousElement && previousElement !== cardElement) {
-    modelStatsObserver?.unobserve(previousElement);
-  }
-
-  if (!cardElement) {
-    modelCardElements.delete(modelId);
-    return;
-  }
-
-  modelCardElements.set(modelId, cardElement);
-  if (modelStatsObserver) modelStatsObserver.observe(cardElement);
-}
-
-function startModelStatsObserver() {
-  if (!import.meta.client || modelStatsObserver) return;
-
-  modelStatsObserver = new IntersectionObserver((entries) => {
-    const nextVisibleModelIds = new Set(visibleModelIds.value);
-    const enteredModelIds: string[] = [];
-
-    for (const entry of entries) {
-      const modelId = entry.target.getAttribute("data-model-id");
-      if (!modelId) continue;
-
-      if (entry.isIntersecting) {
-        nextVisibleModelIds.add(modelId);
-        enteredModelIds.push(modelId);
-      } else {
-        nextVisibleModelIds.delete(modelId);
-      }
-    }
-
-    visibleModelIds.value = nextVisibleModelIds;
-    queueModelStatsLoad(enteredModelIds);
-  }, { rootMargin: "240px 0px" });
-
-  observeModelCards();
-}
-
-function observeModelCards() {
-  if (!modelStatsObserver) return;
-
-  for (const element of modelCardElements.values()) {
-    modelStatsObserver.observe(element);
-  }
-}
-
-function queueVisibleModelStatsLoad() {
-  queueModelStatsLoad(visibleModelIds.value);
-}
-
-function queueModelStatsLoad(modelIds: Iterable<string>) {
   for (const modelId of modelIds) {
-    if (modelStatsById.value[modelId] || loadingModelStatsIds.has(modelId)) continue;
+    if (!options.force && modelStatsById.value[modelId]) continue;
+    if (loadingModelStatsIds.has(modelId)) continue;
     queuedModelStatsIds.add(modelId);
+    if (options.force) forceQueuedModelStatsIds.add(modelId);
   }
 
   if (queuedModelStatsIds.size === 0 || modelStatsQueueTimer) return;
@@ -197,8 +131,10 @@ function queueModelStatsLoad(modelIds: Iterable<string>) {
 async function flushQueuedModelStats() {
   const modelIds = Array.from(queuedModelStatsIds).slice(0, MODEL_STATS_BATCH_SIZE);
   for (const modelId of modelIds) queuedModelStatsIds.delete(modelId);
+  const force = modelIds.some((modelId) => forceQueuedModelStatsIds.has(modelId));
+  for (const modelId of modelIds) forceQueuedModelStatsIds.delete(modelId);
 
-  await loadModelStats(modelIds);
+  await loadModelStats(modelIds, { force });
 
   if (queuedModelStatsIds.size > 0) {
     modelStatsQueueTimer = setTimeout(() => {
@@ -238,7 +174,7 @@ function startModelStatsPolling() {
 
   modelStatsPollTimer = setInterval(() => {
     if (document.hidden) return;
-    void loadModelStats(Array.from(visibleModelIds.value), { force: true });
+    queueModelStatsLoad(models.value.map((model) => model.id), { force: true });
   }, MODEL_STATS_POLL_MS);
 }
 
@@ -253,13 +189,15 @@ function pruneModelStats() {
   const availableModelIds = new Set(models.value.map((model) => model.id));
   modelStatsById.value = Object.fromEntries(Object.entries(modelStatsById.value).filter(([modelId]) => availableModelIds.has(modelId)));
   modelStatsCursorById.value = Object.fromEntries(Object.entries(modelStatsCursorById.value).filter(([modelId]) => availableModelIds.has(modelId)));
-  visibleModelIds.value = new Set([...visibleModelIds.value].filter((modelId) => availableModelIds.has(modelId)));
+  for (const modelId of forceQueuedModelStatsIds) {
+    if (!availableModelIds.has(modelId)) forceQueuedModelStatsIds.delete(modelId);
+  }
 }
 
 watch(models, () => {
   pruneModelStats();
-  queueVisibleModelStatsLoad();
-});
+  queueModelStatsLoad(models.value.map((model) => model.id));
+}, { immediate: true });
 
 function getFamilyAnchorId(family: string) {
   if (family === "OpenAI") return "openai-models";
@@ -385,8 +323,6 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
             <UiCard
               v-for="model in section.models"
               :key="model.id"
-              :ref="(element) => setModelCardRef(model.id, element)"
-              :data-model-id="model.id"
               class="flex h-full flex-col bg-transparent transition-colors"
               :class="model.isEnabled === false ? 'opacity-65' : ''"
             >

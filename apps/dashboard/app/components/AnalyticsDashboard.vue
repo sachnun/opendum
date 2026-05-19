@@ -42,14 +42,11 @@ const isFilterOpen = ref(false);
 const isApiKeyFilterOpen = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
-const chartSection = ref<HTMLElement | null>(null);
 const analyticsSeries = ref<AnalyticsSeriesData | null>(null);
 const analyticsSeriesError = ref<unknown>(null);
 const analyticsSeriesPending = ref(false);
-const chartSectionVisible = ref(false);
 let analyticsRefreshInFlight: Promise<void> | null = null;
 let analyticsSeriesRequestId = 0;
-let analyticsChartObserver: IntersectionObserver | null = null;
 
 watch(
   () => props.apiKeyId,
@@ -190,13 +187,14 @@ async function refreshAnalyticsOnce(): Promise<void> {
   analyticsRefreshInFlight = refresh().then(() => undefined).catch(() => undefined);
   try {
     await analyticsRefreshInFlight;
-    if (chartSectionVisible.value) await loadAnalyticsSeries({ force: true });
+    await loadAnalyticsSeries({ force: true });
   } finally {
     analyticsRefreshInFlight = null;
   }
 }
 
 async function loadAnalyticsSeries(options: { force?: boolean } = {}): Promise<void> {
+  if (!import.meta.client) return;
   if (analyticsSeriesPending.value) return;
   if (analyticsSeries.value && !options.force) return;
 
@@ -217,17 +215,6 @@ async function loadAnalyticsSeries(options: { force?: boolean } = {}): Promise<v
   } finally {
     if (requestId === analyticsSeriesRequestId) analyticsSeriesPending.value = false;
   }
-}
-
-function startAnalyticsChartObserver() {
-  if (!import.meta.client || analyticsChartObserver || !chartSection.value) return;
-
-  analyticsChartObserver = new IntersectionObserver((entries) => {
-    const isVisible = entries.some((entry) => entry.isIntersecting);
-    chartSectionVisible.value = isVisible;
-    if (isVisible) void loadAnalyticsSeries();
-  }, { rootMargin: "240px 0px" });
-  analyticsChartObserver.observe(chartSection.value);
 }
 
 const statMetrics = computed<StatMetric[]>(() => {
@@ -294,15 +281,11 @@ watch([selectedApiKeyId, activeFilterKey], () => {
   analyticsSeries.value = null;
   analyticsSeriesError.value = null;
   analyticsSeriesPending.value = false;
-  if (chartSectionVisible.value) void loadAnalyticsSeries();
+  void loadAnalyticsSeries();
 });
 
 onMounted(() => {
-  startAnalyticsChartObserver();
-});
-
-onBeforeUnmount(() => {
-  analyticsChartObserver?.disconnect();
+  void loadAnalyticsSeries();
 });
 
 const requestsSeries = [{ key: "count", label: "Requests", color: "var(--chart-1)", area: true }];
@@ -461,7 +444,7 @@ const successRateData = computed(() =>
       />
     </div>
 
-    <div ref="chartSection" class="min-h-72">
+    <div class="min-h-72">
       <div v-if="!isInitialLoading && data && analyticsSeriesPending && !chartData" class="grid gap-3 grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(480px,1fr))]">
         <UiSkeleton v-for="item in 4" :key="item" class="h-72 rounded-xl" />
       </div>
@@ -487,7 +470,7 @@ const successRateData = computed(() =>
         :max-value="100"
       />
       </div>
-      <UiCard v-else-if="!isInitialLoading && chartSectionVisible" class="border-border/50 bg-card/50 py-8">
+      <UiCard v-else-if="!isInitialLoading && data" class="border-border/50 bg-card/50 py-8">
         <UiCardContent class="px-5 text-sm text-muted-foreground sm:text-base">
           No data in the selected time range.
         </UiCardContent>

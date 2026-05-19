@@ -45,14 +45,12 @@ const detailData = computed<ProviderDetailData | null>(() => data.value ?? null)
 const highlightedAccountIds = ref<Set<string>>(new Set());
 const promotedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
-const visibleAccountIds = ref<Set<string>>(new Set());
 const accountStatsById = ref<Record<string, ProviderStats>>({});
 const accountStatsCursorById = ref<Record<string, string>>({});
 const accountStatsDeltaReadyById = ref<Record<string, boolean>>({});
 const accountStatsFetchedById = ref<Record<string, boolean>>({});
 const hydratedAccountStatsIds = ref<Record<string, boolean>>({});
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
-let accountVisibilityObserver: IntersectionObserver | null = null;
 let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let accountStatsPollTimer: ReturnType<typeof setInterval> | null = null;
@@ -62,6 +60,7 @@ let providerDetailRefreshQueuedShouldRefreshQuota = false;
 let providerQuotaRefreshInFlight: Promise<void> | null = null;
 let shouldPromoteNextNewAccount = false;
 const queuedAccountStatsIds = new Set<string>();
+const forceQueuedAccountStatsIds = new Set<string>();
 const loadingAccountStatsIds = new Set<string>();
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
@@ -88,7 +87,7 @@ async function refreshProviderDetailOnce(options: { refreshQuota?: boolean } = {
   providerDetailRefreshInFlight = refreshProviderDetail().then(() => undefined).catch(() => undefined);
   try {
     await providerDetailRefreshInFlight;
-    queueVisibleAccountStatsLoad();
+    queueAccountStatsLoad(accounts.value.map((account) => account.id), { force: true });
     if (shouldRefreshQuota) void refreshProviderQuotaAfterAccountPoll();
   } finally {
     providerDetailRefreshInFlight = null;
@@ -173,13 +172,13 @@ watch(
 watch(selectedProvider, () => {
   highlightedAccountIds.value = new Set();
   promotedAccountIds.value = new Set();
-  visibleAccountIds.value = new Set();
   accountStatsById.value = {};
   accountStatsCursorById.value = {};
   accountStatsDeltaReadyById.value = {};
   accountStatsFetchedById.value = {};
   hydratedAccountStatsIds.value = {};
   queuedAccountStatsIds.clear();
+  forceQueuedAccountStatsIds.clear();
   loadingAccountStatsIds.clear();
   if (accountStatsQueueTimer) {
     clearTimeout(accountStatsQueueTimer);
@@ -270,7 +269,6 @@ const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((ac
 let previousQuotaAccountKeys = new Set<string>();
 let previousQuotaAccountStates = new Map<string, QuotaAccountState>();
 let previousQuotaProvider: ProviderAccountKey | null = null;
-let queuedVisibleDeferredAccountIds = new Set<string>();
 const {
   quotaByAccountId,
   quotaErrorByAccountId,
@@ -285,7 +283,7 @@ const {
   accounts,
   quotaCapableAccounts,
   toQuotaProvider,
-  shouldQueueAccount: (account) => account.isActive || visibleAccountIds.value.has(account.id),
+  shouldQueueAccount: (account) => account.isActive,
 });
 
 onBeforeUnmount(() => {
@@ -293,7 +291,6 @@ onBeforeUnmount(() => {
   if (accountStatsQueueTimer) clearTimeout(accountStatsQueueTimer);
   stopAccountStatsPolling();
   stopProviderDetailRefresh();
-  accountVisibilityObserver?.disconnect();
   cancelQuotaQueue();
 });
 
@@ -301,7 +298,6 @@ onMounted(() => {
   void warmDashboardIndexedDbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_STATS_STORE_NAME);
   void warmDashboardIndexedDbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_QUOTA_STORE_NAME);
   startProviderDetailRefresh();
-  refreshAccountVisibilityObserver();
   void hydrateAccountStatsCache();
   startAccountStatsPolling();
 });
@@ -424,61 +420,14 @@ async function hydrateAccountStatsCache() {
   }
 }
 
-function getAccountCardElement(card: { accountId?: string; $el?: Element } | Element): Element | null {
-  return card instanceof Element ? card : card.$el ?? null;
-}
-
-function refreshAccountVisibilityObserver(resetVisibleAccountIds = false) {
+function queueAccountStatsLoad(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
   if (!import.meta.client) return;
 
-  accountVisibilityObserver?.disconnect();
-
-  if (resetVisibleAccountIds) {
-    visibleAccountIds.value = new Set();
-  } else {
-    const currentAccountIds = new Set(accounts.value.map((account) => account.id));
-    const nextVisibleAccountIds = new Set([...visibleAccountIds.value].filter((accountId) => currentAccountIds.has(accountId)));
-    if (nextVisibleAccountIds.size !== visibleAccountIds.value.size) visibleAccountIds.value = nextVisibleAccountIds;
-  }
-
-  accountVisibilityObserver = new IntersectionObserver((entries) => {
-    const nextVisibleAccountIds = new Set(visibleAccountIds.value);
-    const enteredAccountIds: string[] = [];
-    let changed = false;
-
-    for (const entry of entries) {
-      const accountId = entry.target.getAttribute("data-account-id");
-      if (!accountId) continue;
-
-      if (entry.isIntersecting) {
-        if (!nextVisibleAccountIds.has(accountId)) {
-          nextVisibleAccountIds.add(accountId);
-          enteredAccountIds.push(accountId);
-          changed = true;
-        }
-      } else if (nextVisibleAccountIds.delete(accountId)) {
-        changed = true;
-      }
-    }
-
-    if (changed) visibleAccountIds.value = nextVisibleAccountIds;
-    queueAccountStatsLoad(enteredAccountIds);
-  }, { rootMargin: "240px 0px" });
-
-  for (const card of accountCardRefs.value) {
-    const element = getAccountCardElement(card);
-    if (element) accountVisibilityObserver.observe(element);
-  }
-}
-
-function queueVisibleAccountStatsLoad() {
-  queueAccountStatsLoad(visibleAccountIds.value);
-}
-
-function queueAccountStatsLoad(accountIds: Iterable<string>) {
   for (const accountId of accountIds) {
-    if (accountStatsFetchedById.value[accountId] || loadingAccountStatsIds.has(accountId)) continue;
+    if (!options.force && accountStatsFetchedById.value[accountId]) continue;
+    if (loadingAccountStatsIds.has(accountId)) continue;
     queuedAccountStatsIds.add(accountId);
+    if (options.force) forceQueuedAccountStatsIds.add(accountId);
   }
 
   if (queuedAccountStatsIds.size === 0 || accountStatsQueueTimer) return;
@@ -491,8 +440,10 @@ function queueAccountStatsLoad(accountIds: Iterable<string>) {
 async function flushQueuedAccountStats() {
   const accountIds = Array.from(queuedAccountStatsIds).slice(0, ACCOUNT_STATS_BATCH_SIZE);
   for (const accountId of accountIds) queuedAccountStatsIds.delete(accountId);
+  const force = accountIds.some((accountId) => forceQueuedAccountStatsIds.has(accountId));
+  for (const accountId of accountIds) forceQueuedAccountStatsIds.delete(accountId);
 
-  await loadAccountStats(accountIds);
+  await loadAccountStats(accountIds, { force });
 
   if (queuedAccountStatsIds.size > 0) {
     accountStatsQueueTimer = setTimeout(() => {
@@ -500,6 +451,22 @@ async function flushQueuedAccountStats() {
       void flushQueuedAccountStats();
     }, 80);
   }
+}
+
+function startAccountStatsPolling() {
+  if (!import.meta.client || accountStatsPollTimer) return;
+
+  accountStatsPollTimer = setInterval(() => {
+    if (document.hidden) return;
+    queueAccountStatsLoad(accounts.value.map((account) => account.id), { force: true });
+  }, ACCOUNT_STATS_POLL_MS);
+}
+
+function stopAccountStatsPolling() {
+  if (!accountStatsPollTimer) return;
+
+  clearInterval(accountStatsPollTimer);
+  accountStatsPollTimer = null;
 }
 
 async function loadAccountStats(accountIds: string[], options: { force?: boolean } = {}) {
@@ -540,22 +507,6 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
   }
 }
 
-function startAccountStatsPolling() {
-  if (!import.meta.client || accountStatsPollTimer) return;
-
-  accountStatsPollTimer = setInterval(() => {
-    if (document.hidden) return;
-    void loadAccountStats(Array.from(visibleAccountIds.value), { force: true });
-  }, ACCOUNT_STATS_POLL_MS);
-}
-
-function stopAccountStatsPolling() {
-  if (!accountStatsPollTimer) return;
-
-  clearInterval(accountStatsPollTimer);
-  accountStatsPollTimer = null;
-}
-
 function pruneAccountStats() {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
   accountStatsById.value = Object.fromEntries(Object.entries(accountStatsById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
@@ -563,17 +514,17 @@ function pruneAccountStats() {
   accountStatsDeltaReadyById.value = Object.fromEntries(Object.entries(accountStatsDeltaReadyById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   accountStatsFetchedById.value = Object.fromEntries(Object.entries(accountStatsFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   hydratedAccountStatsIds.value = Object.fromEntries(Object.entries(hydratedAccountStatsIds.value).filter(([accountId]) => availableAccountIds.has(accountId)));
-  visibleAccountIds.value = new Set([...visibleAccountIds.value].filter((accountId) => availableAccountIds.has(accountId)));
+  for (const accountId of forceQueuedAccountStatsIds) {
+    if (!availableAccountIds.has(accountId)) forceQueuedAccountStatsIds.delete(accountId);
+  }
 }
 
 watch(
   accounts,
-  async () => {
+  () => {
     pruneAccountStats();
     void hydrateAccountStatsCache();
-    queueVisibleAccountStatsLoad();
-    await nextTick();
-    refreshAccountVisibilityObserver();
+    queueAccountStatsLoad(accounts.value.map((account) => account.id));
   },
   { immediate: true }
 );
@@ -598,7 +549,6 @@ watch(
 
     pruneQuotaState();
     cancelQuotaQueue();
-    queuedVisibleDeferredAccountIds = new Set([...queuedVisibleDeferredAccountIds].filter((accountId) => currentQuotaAccountStates.has(accountId) && !quotaByAccountId.value[accountId]));
     void hydrateQuotaCache();
     previousQuotaAccountKeys = currentQuotaAccountKeys;
     previousQuotaAccountStates = currentQuotaAccountStates;
@@ -616,23 +566,6 @@ watch(
       clearTimeout(quotaLoadTimer);
       cancelQuotaQueue();
     });
-  },
-  { immediate: true }
-);
-
-watch(
-  () => `${selectedProvider.value}|${accounts.value.map((account) => `${account.id}:${account.provider}:${account.isActive}`).join("|")}|visible:${[...visibleAccountIds.value].sort().join(",")}`,
-  () => {
-    const accountsToFetch = quotaCapableAccounts.value.filter((account) => {
-      if (account.isActive || !visibleAccountIds.value.has(account.id)) return false;
-      if (quotaByAccountId.value[account.id] || quotaLoadingByAccountId.value[account.id]) return false;
-      return !queuedVisibleDeferredAccountIds.has(account.id);
-    });
-
-    if (accountsToFetch.length === 0) return;
-
-    queuedVisibleDeferredAccountIds = new Set([...queuedVisibleDeferredAccountIds, ...accountsToFetch.map((account) => account.id)]);
-    void runQuotaQueue(accountsToFetch);
   },
   { immediate: true }
 );
