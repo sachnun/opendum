@@ -89,6 +89,15 @@ onMounted(() => {
   let driftTimer = 0;
   let spawnTimer = 0;
 
+  function getViewportSize() {
+    const visualViewport = window.visualViewport;
+
+    return {
+      width: visualViewport?.width ?? window.innerWidth,
+      height: visualViewport?.height ?? window.innerHeight,
+    };
+  }
+
   function createBoard() {
     board = Array.from({ length: rows }, () => Array<TetrisCell>(columns).fill(null));
   }
@@ -280,8 +289,7 @@ onMounted(() => {
   }
 
   function updateCanvasSize() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const { width, height } = getViewportSize();
     const ratio = window.devicePixelRatio || 1;
 
     cellSize = width < 640 ? 14 : 18;
@@ -434,17 +442,19 @@ onMounted(() => {
   }
 
   window.addEventListener("resize", updateCanvasSize);
+  window.visualViewport?.addEventListener("resize", updateCanvasSize);
 
   onUnmounted(() => {
     window.cancelAnimationFrame(animationFrame);
     window.removeEventListener("resize", updateCanvasSize);
+    window.visualViewport?.removeEventListener("resize", updateCanvasSize);
   });
 });
 
 </script>
 
 <template>
-  <div class="relative flex min-h-screen overflow-hidden bg-background">
+  <div class="relative flex h-dvh overflow-hidden bg-background">
     <canvas
       ref="tetrisCanvas"
       aria-hidden="true"
@@ -455,7 +465,7 @@ onMounted(() => {
       style="background: radial-gradient(circle at center, transparent 0%, oklch(0.145 0 0 / 0.18) 48%, var(--background) 100%)"
     />
 
-    <div class="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 text-center">
+    <div class="relative z-10 mx-auto flex h-full w-full max-w-md flex-col items-center justify-center px-4 text-center">
       <h1 class="text-3xl font-bold tracking-tighter sm:text-4xl">
         Opendum
       </h1>
