@@ -241,16 +241,15 @@ const pinnedProviderHrefs = computed(() => {
   return hrefs;
 });
 const mobileSheetContentStyle = computed(() => {
-  if (!mobileOpen.value) return undefined;
+  if (mobileSidebarDragX.value === 0) return undefined;
 
-  const transform = mobileSidebarDragX.value === 0 ? undefined : `translateX(${mobileSidebarDragX.value}px)`;
   return {
-    transform,
+    transform: `translateX(${mobileSidebarDragX.value}px)`,
     transition: isMobileSidebarDragging.value ? "none" : undefined,
   };
 });
 const mobileSheetOverlayStyle = computed(() => {
-  if (!mobileOpen.value || mobileSidebarDragX.value === 0) return undefined;
+  if (mobileSidebarDragX.value === 0) return undefined;
 
   return {
     opacity: Math.max(0.35, 1 - Math.abs(mobileSidebarDragX.value) / 320),
@@ -438,7 +437,7 @@ function handleNavClick(item?: NavItem | NavSubItem, event?: MouseEvent) {
     }
   }
 
-  mobileOpen.value = false;
+  closeMobileSidebar();
 }
 
 function resetMobileSidebarSwipe() {
@@ -465,6 +464,11 @@ function closeMobileSidebar({ keepDragOffset = false } = {}) {
   }
 
   resetMobileSidebarSwipe();
+}
+
+function openMobileSidebar() {
+  resetMobileSidebarSwipe();
+  mobileOpen.value = true;
 }
 
 function handleMobileOverlayClick(event: MouseEvent) {
@@ -968,7 +972,7 @@ async function handleAuditSelected() {
             <button
               type="button"
               class="inline-flex size-11 cursor-pointer items-center justify-center text-foreground outline-none transition-colors hover:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 md:hidden"
-              @click="mobileOpen = true"
+              @click="openMobileSidebar"
             >
               <UiIcon name="i-lucide-menu" class="size-8" />
               <span class="sr-only">Toggle menu</span>
@@ -1115,7 +1119,7 @@ async function handleAuditSelected() {
       <template #content>
         <div class="flex h-full flex-col bg-background">
           <div class="flex h-16 items-center justify-between border-b border-border px-5">
-            <NuxtLink to="/dashboard" class="inline-flex items-center gap-2 text-base font-semibold tracking-tight" @click="mobileOpen = false">
+            <NuxtLink to="/dashboard" class="inline-flex items-center gap-2 text-base font-semibold tracking-tight" @click="closeMobileSidebar">
               <span class="relative flex h-2.5 w-2.5">
                 <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                 <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
@@ -1127,7 +1131,7 @@ async function handleAuditSelected() {
                 </span>
               </span>
             </NuxtLink>
-            <button type="button" class="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus:outline-none" @click="mobileOpen = false">
+            <button type="button" class="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus:outline-none" @click="closeMobileSidebar">
               <UiIcon name="i-lucide-x" class="size-4" />
               <span class="sr-only">Close</span>
             </button>
