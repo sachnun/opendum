@@ -1,5 +1,6 @@
 {
   "providers": [
     "copilot"
-  ]
+  ],
+  "family": "Gemini"
 }

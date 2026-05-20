@@ -124,27 +124,36 @@ export function buildModelIndex(modelsDir) {
 }
 
 const FAMILY_RULES = [
-  { test: /^claude-/, folder: "claude" },
-  { test: /^gpt-|^o\d/, folder: "openai" },
-  { test: /^gemini-/, folder: "gemini" },
-  { test: /^grok-/, folder: "xai" },
-  { test: /^gemma/, folder: "google" },
-  { test: /^llama|^codellama/, folder: "meta" },
-  { test: /^phi-/, folder: "microsoft" },
-  { test: /^qwen|^qwq-/, folder: "qwen" },
-  { test: /^deepseek-/, folder: "deepseek" },
-  { test: /^kilo-auto-/, folder: "kilo-code" },
-  { test: /^kimi-/, folder: "kimi" },
-  { test: /^minimax-/, folder: "minimax" },
-  { test: /^glm-/, folder: "zai" },
-  { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, folder: "mistral" },
-  { test: /^nemotron-|^nim-/, folder: "nvidia" },
-  { test: /^openrouter-/, folder: "openrouter" },
+  { test: /^claude-/, folder: "claude", family: "Claude" },
+  { test: /^gpt($|-)|^chatgpt-|^o($|-)|^o\d/, folder: "openai", family: "OpenAI" },
+  { test: /^gemini-?/, folder: "gemini", family: "Gemini" },
+  { test: /^grok-?/, folder: "xai", family: "xAI" },
+  { test: /^gemma/, folder: "google", family: "Gemini" },
+  { test: /^llama|^codellama/, folder: "meta", family: "Meta" },
+  { test: /^phi-?/, folder: "microsoft", family: "Microsoft" },
+  { test: /^qwen|^qwq-/, folder: "qwen", family: "Qwen" },
+  { test: /^deepseek-?/, folder: "deepseek", family: "DeepSeek" },
+  { test: /^kilo-auto-?/, folder: "kilo-code", family: "Kilo Code" },
+  { test: /^kimi-?/, folder: "kimi", family: "Kimi" },
+  { test: /^minimax-?/, folder: "minimax", family: "MiniMax" },
+  { test: /^glm-?/, folder: "zai", family: "Z.AI" },
+  { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, folder: "mistral", family: "Mistral" },
+  { test: /^nemotron-|^nim-?/, folder: "nvidia", family: "NVIDIA" },
+  { test: /^openrouter-?/, folder: "openrouter", family: "OpenRouter" },
+  { test: /^mimo-?/, folder: "other", family: "Xiaomi" },
 ];
 
 function inferModelFolder(modelKey) {
   for (const rule of FAMILY_RULES) {
-    if (rule.test.test(modelKey)) return rule.folder;
+    if (rule.test.test(modelKey.toLowerCase())) return rule.folder;
+  }
+  return null;
+}
+
+function inferModelFamily(modelKey) {
+  if (!modelKey || typeof modelKey !== "string") return null;
+  for (const rule of FAMILY_RULES) {
+    if (rule.test.test(modelKey.toLowerCase())) return rule.family;
   }
   return null;
 }
@@ -240,6 +249,9 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
       const data = {
         providers: [providerName],
       };
+
+      const family = inferModelFamily(modelKey) || inferModelFamily(upstreamName);
+      if (family) data.family = family;
 
       if (upstreamName !== modelKey) {
         data.providerConfig = {
