@@ -52,6 +52,6 @@ jobs:
 
       - name: Deploy dashboard to EdgeOne Pages
         working-directory: apps/dashboard
-        run: npx edgeone pages deploy -n opendum -t ${{ secrets.EDGEONE_API_TOKEN }} -e production
+        run: npm run deploy -- -t "$EDGEONE_API_TOKEN" -e production
         env:
           EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}

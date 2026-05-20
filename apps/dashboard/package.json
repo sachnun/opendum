@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
-    "deploy": "edgeone pages deploy -n opendum",
+    "deploy": "edgeone pages deploy -n opendum -a overseas",
     "lint": "nuxt prepare && eslint .",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
