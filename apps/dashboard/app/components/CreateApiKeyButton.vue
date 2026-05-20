@@ -24,6 +24,7 @@ const createdKey = ref<string | null>(null);
 const hasCreatedKey = ref(false);
 const copied = ref(false);
 const errorMessage = ref("");
+const createButtonLabel = computed(() => (name.value.trim() ? "Create" : "Skip"));
 
 function reset() {
   name.value = "";
@@ -123,7 +124,7 @@ async function copyCreatedKey() {
             <UiButton type="button" variant="outline" size="sm" :disabled="isCreating" @click="open = false">Cancel</UiButton>
             <UiButton type="submit" size="sm" :disabled="isCreating">
               <UiIcon v-if="isCreating" name="i-lucide-loader-2" class="size-3.5 animate-spin" />
-              {{ isCreating ? 'Creating...' : 'Create' }}
+              {{ isCreating ? 'Creating...' : createButtonLabel }}
             </UiButton>
           </div>
         </form>
