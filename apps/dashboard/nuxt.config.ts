@@ -78,8 +78,14 @@ export default defineNuxtConfig({
   },
   fonts: {
     defaults: {
+      styles: ["normal"],
+      subsets: ["latin"],
       weights: [400, 500, 600, 700],
     },
+    families: [
+      { name: "Geist", preload: true },
+      { name: "Geist Mono", preload: false },
+    ],
   },
   nitro: {
     commonJS: {
