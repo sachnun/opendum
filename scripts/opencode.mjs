@@ -33,7 +33,7 @@ function isFreeModelId(modelId) {
   return modelId === "big-pickle" || modelId.endsWith("-free");
 }
 
-async function fetchOpenCodeFreeModelIds() {
+async function fetchOpencodeFreeModelIds() {
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
@@ -44,12 +44,12 @@ async function fetchOpenCodeFreeModelIds() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch OpenCode models (${response.status} ${response.statusText})`);
+        throw new Error(`Failed to fetch Opencode models (${response.status} ${response.statusText})`);
       }
 
       const payload = await response.json();
       if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected OpenCode /zen/v1/models payload format");
+        throw new Error("Unexpected Opencode /zen/v1/models payload format");
       }
 
       return payload.data
@@ -62,7 +62,7 @@ async function fetchOpenCodeFreeModelIds() {
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Failed to fetch OpenCode model list");
+  throw lastError instanceof Error ? lastError : new Error("Failed to fetch Opencode model list");
 }
 
 function buildModelMap(modelIds) {
@@ -82,14 +82,14 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 
-  const modelIds = await fetchOpenCodeFreeModelIds();
+  const modelIds = await fetchOpencodeFreeModelIds();
   const modelMap = buildModelMap(modelIds);
   const result = syncProviderModels(modelsDir, "opencode", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
-    console.log(`OpenCode free models are already up to date (${modelMap.size} models).`);
+    console.log(`Opencode free models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`OpenCode: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
+    console.log(`Opencode: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
   }
 }
 

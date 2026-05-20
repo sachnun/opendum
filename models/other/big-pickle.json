@@ -2,7 +2,7 @@
   "providers": [
     "opencode"
   ],
-  "family": "OpenCode",
+  "family": "Opencode",
   "meta": {
     "reasoning": true,
     "toolCall": true,

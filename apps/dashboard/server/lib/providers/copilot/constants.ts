@@ -25,7 +25,7 @@ export const SCOPES: Record<CopilotAuthMethod, string> = {
   official: "read:user,read:org,repo,gist",
 };
 
-// Keep Copilot request headers aligned with OpenCode plugin behavior.
+// Keep Copilot request headers aligned with Opencode plugin behavior.
 export const USER_AGENT = "opencode/1.1.65";
 
 // Polling defaults

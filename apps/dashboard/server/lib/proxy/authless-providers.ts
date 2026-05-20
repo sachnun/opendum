@@ -24,7 +24,7 @@ export function getAuthlessProviderAccounts() {
     ...AUTHLESS_PROVIDER_KEYS.map((provider) => ({
       id: provider,
       provider,
-      name: "OpenCode",
+      name: "Opencode",
       email: null,
       isActive: true,
       disabledUntil: null as Date | null,

@@ -49,7 +49,7 @@ const dashboardInvalidation = useDashboardDataInvalidation();
 
 const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." };
 const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code", description: "Enter a short device code." };
-const copilotOpenCodeMethod: ProviderMethod = { key: "copilot_device_code_opencode", flow: "device_code", copilotAuthMethod: "opencode", name: "Device Code", tag: "OpenCode", description: "Use the OpenCode OAuth app." };
+const copilotOpencodeMethod: ProviderMethod = { key: "copilot_device_code_opencode", flow: "device_code", copilotAuthMethod: "opencode", name: "Device Code", tag: "Opencode", description: "Use the Opencode OAuth app." };
 const copilotOfficialMethod: ProviderMethod = { key: "copilot_device_code_official", flow: "device_code", copilotAuthMethod: "official", name: "Device Code", tag: "Official", description: "Use the GitHub Copilot OAuth app." };
 const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key", description: "Create or copy an API key from the provider portal." };
 const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token", description: "Requires the matching account ID." };
@@ -58,7 +58,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", methods: [browserOAuthMethod] },
   gemini_cli: { name: "Gemini CLI", description: "Access Gemini 2.5 Pro & 3 models", methods: [browserOAuthMethod] },
   qwen_code: { name: "Qwen Code", description: "Access Qwen Coder models", methods: [deviceCodeMethod] },
-  copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [copilotOpenCodeMethod, copilotOfficialMethod] },
+  copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [copilotOpencodeMethod, copilotOfficialMethod] },
   codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },

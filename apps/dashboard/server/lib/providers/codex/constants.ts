@@ -1,7 +1,7 @@
 import os from "node:os";
 
 // Codex Provider Constants
-// Based on OpenCode's codex plugin: https://github.com/anomalyco/opencode
+// Based on Opencode's codex plugin: https://github.com/anomalyco/opencode
 // Uses OAuth via auth.openai.com
 
 // OAuth Configuration
@@ -23,6 +23,6 @@ export const REFRESH_BUFFER_SECONDS = 5 * 60;
 // Originator header value (identifies us to the API)
 export const ORIGINATOR = "opencode";
 
-// Match OpenCode's Codex plugin headers.
+// Match Opencode's Codex plugin headers.
 const OPENCODE_VERSION = "1.14.28";
 export const CODEX_CHAT_USER_AGENT = `opencode/${OPENCODE_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`;

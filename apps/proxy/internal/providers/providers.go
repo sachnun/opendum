@@ -235,7 +235,7 @@ func (p opencodeProvider) Authless() bool { return true }
 func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, _ string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	payload := map[string]any{}
 	for key, value := range body {
-		if _, ok := supportedOpenCode[key]; ok && value != nil {
+		if _, ok := supportedOpencode[key]; ok && value != nil {
 			payload[key] = value
 		}
 	}
@@ -481,6 +481,6 @@ var supportedGroq = set("model", "messages", "temperature", "top_p", "max_tokens
 var supportedNvidia = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 var supportedOllama = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 var supportedKilo = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
-var supportedOpenCode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+var supportedOpencode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedWorkersAI = set("model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "function_call", "functions", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "chat_template_kwargs", "modalities", "metadata", "prediction", "logit_bias", "logprobs", "top_logprobs", "store", "service_tier", "user", "web_search_options", "n")
 var supportedQwenCode = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
