@@ -19,8 +19,9 @@ const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth
 
 export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "gemini_cli", "codex", "kiro"]) });
 export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "gemini_cli", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
-export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]) });
-export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional() });
+const copilotAuthMethodSchema = z.enum(["opencode", "official"]).optional();
+export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), method: copilotAuthMethodSchema });
+export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: copilotAuthMethodSchema });
 export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
 
 type OAuthProviderKey = z.infer<typeof getAuthUrlInputSchema>["provider"];
@@ -98,8 +99,8 @@ const DEVICE_PROVIDERS = {
   copilot: {
     label: "Copilot",
     emailPrefix: "copilot",
-    initiate: initiateCopilotDeviceCodeFlow,
-    poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCopilotDeviceCodeAuthorization(input.deviceCode),
+    initiate: (input: z.infer<typeof initiateDeviceAuthInputSchema>) => initiateCopilotDeviceCodeFlow(input.method),
+    poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCopilotDeviceCodeAuthorization(input.deviceCode, input.method),
   },
   qwen_code: {
     label: "Qwen Code",
@@ -113,7 +114,7 @@ const DEVICE_PROVIDERS = {
     initiate: initiateCodexDeviceCodeFlow,
     poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
   },
-} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: () => Promise<unknown>; poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => Promise<unknown> }>;
+} satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: (input: z.infer<typeof initiateDeviceAuthInputSchema>) => Promise<unknown>; poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => Promise<unknown> }>;
 
 function parseOAuthCallbackUrl(callbackUrl: string, providerLabel: string): ActionResult<{ code: string; state: string | null }> {
   if (!callbackUrl || typeof callbackUrl !== "string") return { success: false, error: "Callback URL is required" };
@@ -226,7 +227,7 @@ export async function connectCodexSessionAccount(userId: string, input: z.infer<
 
 export async function initiateDeviceAuth(input: z.infer<typeof initiateDeviceAuthInputSchema>) {
   try {
-    const result = await DEVICE_PROVIDERS[input.provider].initiate();
+    const result = await DEVICE_PROVIDERS[input.provider].initiate(input);
     return { success: true, data: result } as const;
   } catch (error) {
     console.error("Failed to initiate provider device auth:", error);

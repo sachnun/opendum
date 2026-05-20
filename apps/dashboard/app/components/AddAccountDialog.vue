@@ -4,10 +4,15 @@ import { cn } from "../../lib/utils";
 
 type Provider = ProviderAccountKey;
 type FlowType = "oauth_redirect" | "device_code" | "chatgpt_session" | "api_key" | "api_key_with_account_id";
+type CopilotAuthMethod = "opencode" | "official";
+type MethodKey = FlowType | "copilot_device_code_opencode" | "copilot_device_code_official";
 
 interface ProviderMethod {
-  key: FlowType;
+  key: MethodKey;
+  flow?: FlowType;
+  copilotAuthMethod?: CopilotAuthMethod;
   name: string;
+  tag?: string;
   description: string;
   disabled?: boolean;
 }
@@ -44,6 +49,8 @@ const dashboardInvalidation = useDashboardDataInvalidation();
 
 const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." };
 const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code", description: "Enter a short device code." };
+const copilotOpenCodeMethod: ProviderMethod = { key: "copilot_device_code_opencode", flow: "device_code", copilotAuthMethod: "opencode", name: "Device Code", tag: "OpenCode", description: "Use the OpenCode OAuth app." };
+const copilotOfficialMethod: ProviderMethod = { key: "copilot_device_code_official", flow: "device_code", copilotAuthMethod: "official", name: "Device Code", tag: "Official", description: "Use the GitHub Copilot OAuth app." };
 const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key", description: "Create or copy an API key from the provider portal." };
 const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token", description: "Requires the matching account ID." };
 
@@ -51,7 +58,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", methods: [browserOAuthMethod] },
   gemini_cli: { name: "Gemini CLI", description: "Access Gemini 2.5 Pro & 3 models", methods: [browserOAuthMethod] },
   qwen_code: { name: "Qwen Code", description: "Access Qwen Coder models", methods: [deviceCodeMethod] },
-  copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [deviceCodeMethod] },
+  copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [copilotOpenCodeMethod, copilotOfficialMethod] },
   codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
@@ -89,8 +96,8 @@ const cfAccountId = ref("");
 const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
-const selectedMethod = ref<FlowType | null>(null);
-const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string } | null>(null);
+const selectedMethod = ref<MethodKey | null>(null);
+const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: CopilotAuthMethod } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const copiedCallbackUrl = ref(false);
@@ -110,7 +117,12 @@ const selectedConfig = computed(() => (provider.value ? providerConfigs[provider
 const activeFlowType = computed<FlowType | null>(() => {
   if (!selectedConfig.value || !selectedMethod.value) return null;
   const method = selectedConfig.value.methods.find((item) => item.key === selectedMethod.value && !item.disabled);
-  return method?.key ?? null;
+  if (!method) return null;
+  return method.flow ?? (method.key as FlowType);
+});
+const selectedCopilotAuthMethod = computed<CopilotAuthMethod | undefined>(() => {
+  if (provider.value !== "copilot" || !selectedConfig.value || !selectedMethod.value) return undefined;
+  return selectedConfig.value.methods.find((item) => item.key === selectedMethod.value)?.copilotAuthMethod;
 });
 const authStep = computed(() => 3);
 const finishStep = computed(() => 4);
@@ -167,7 +179,8 @@ watch([open, step, provider, selectedMethod], async () => {
     }
 
     if (selectedFlowType === "device_code") {
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "qwen_code" | "copilot" | "codex" });
+      const method = selectedProvider === "copilot" ? selectedCopilotAuthMethod.value : undefined;
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "qwen_code" | "copilot" | "codex", method });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
@@ -176,6 +189,7 @@ watch([open, step, provider, selectedMethod], async () => {
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
         codeVerifier: "codeVerifier" in result.data && typeof result.data.codeVerifier === "string" ? result.data.codeVerifier : undefined,
+        method,
       };
       return;
     }
@@ -288,7 +302,7 @@ function stopDevicePolling() {
   }
 }
 
-function selectLoginMethod(method: FlowType) {
+function selectLoginMethod(method: MethodKey) {
   if (props.readonly) return;
   if (!selectedConfig.value?.methods.some((item) => item.key === method && !item.disabled)) return;
   resetAuthProgress();
@@ -404,6 +418,7 @@ function startDevicePolling(popup: Window | null) {
         deviceCode: deviceCodeInfo.value.deviceCode,
         userCode: deviceCodeInfo.value.userCode,
         codeVerifier: deviceCodeInfo.value.codeVerifier,
+        method: deviceCodeInfo.value.method,
       });
 
       if (!result.success) throw new Error(result.error);
@@ -677,6 +692,7 @@ onBeforeUnmount(() => {
               <span class="space-y-1">
                 <span class="flex items-center gap-2 text-sm font-medium">
                   {{ method.name }}
+                  <span v-if="method.tag" class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{{ method.tag }}</span>
                   <span v-if="method.disabled" class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Unavailable</span>
                 </span>
                 <span class="block text-xs text-muted-foreground">{{ method.description }}</span>

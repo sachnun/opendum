@@ -39,13 +39,14 @@ type RefreshBufferProvider interface {
 }
 
 type RefreshedCredentials struct {
-	AccessToken  string
-	RefreshToken string
-	ExpiresAt    time.Time
-	ProjectID    string
-	Tier         string
-	Email        string
-	AccountID    string
+	AccessToken      string
+	RefreshToken     string
+	ExpiresAt        time.Time
+	ProjectID        string
+	Tier             string
+	Email            string
+	AccountID        string
+	StoreAccessToken string
 }
 
 type Registry struct {

@@ -7,13 +7,15 @@ import { fetchInternalProvider } from "../../proxy/internal-relay.js";
 import type { OAuthResult } from "../types.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
 import {
-  CLIENT_ID,
+  CLIENT_IDS,
+  DEFAULT_AUTH_METHOD,
   DEVICE_CODE_ENDPOINT,
   DEVICE_CODE_EXPIRY,
   POLLING_INTERVAL,
   REFRESH_BUFFER_SECONDS,
-  SCOPE,
+  SCOPES,
   TOKEN_ENDPOINT,
+  type CopilotAuthMethod,
   USER_AGENT,
   USER_ENDPOINT,
 } from "./constants.js";
@@ -45,6 +47,14 @@ interface CopilotTokenResponse {
   error_description?: string;
 }
 
+interface CopilotTokenExchangeResponse {
+  token?: string;
+  expires_at?: number;
+  endpoints?: {
+    api?: string;
+  };
+}
+
 interface CopilotInternalUserResponse {
   access_type_sku?: unknown;
   copilot_plan?: unknown;
@@ -52,6 +62,10 @@ interface CopilotInternalUserResponse {
 }
 
 const POLLING_SAFETY_MARGIN_SECONDS = 3;
+
+function copilotAuthMethod(method?: string | null): CopilotAuthMethod {
+  return method === "official" ? "official" : DEFAULT_AUTH_METHOD;
+}
 
 function isTokenExpired(expiresAt: Date): boolean {
   const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
@@ -82,12 +96,12 @@ async function fetchCopilotIdentity(accessToken: string): Promise<string> {
   }
 }
 
-function normalizeTokenExpiry(expiresIn?: number): Date {
-  if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0) {
-    return new Date(Date.now() + expiresIn * 1000);
+function normalizeUnixExpiry(expiresAt?: number): Date {
+  if (typeof expiresAt === "number" && Number.isFinite(expiresAt) && expiresAt > 0) {
+    return new Date(expiresAt * 1000);
   }
 
-  return new Date("2100-01-01T00:00:00.000Z");
+  return new Date(Date.now() + 60 * 60 * 1000);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -167,8 +181,52 @@ async function fetchCopilotTier(accessToken: string): Promise<string | undefined
   }
 }
 
+async function fetchCopilotToken(githubToken: string): Promise<CopilotTokenExchangeResponse> {
+  const response = await fetchInternalProvider(`${GITHUB_API_BASE_URL}/copilot_internal/v2/token`, {
+    method: "GET",
+    headers: {
+      Authorization: `Token ${githubToken}`,
+      Accept: "application/json",
+      "User-Agent": USER_AGENT,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      formatProviderHttpError("Copilot", response, errorText, {
+        endpointLabel: "Copilot token endpoint",
+      })
+    );
+  }
+
+  const tokenData = (await response.json()) as CopilotTokenExchangeResponse;
+  if (!tokenData.token) throw new Error("Copilot token exchange returned empty token");
+  return tokenData;
+}
+
+async function buildOAuthResult(githubToken: string, sourceRefreshToken?: string): Promise<OAuthResult> {
+  const copilotToken = await fetchCopilotToken(githubToken);
+  const [identity, tier] = await Promise.all([
+    fetchCopilotIdentity(githubToken),
+    fetchCopilotTier(githubToken),
+  ]);
+  return {
+    accessToken: copilotToken.token || githubToken,
+    refreshToken: sourceRefreshToken || githubToken,
+    expiresAt: normalizeUnixExpiry(copilotToken.expires_at),
+    email: identity,
+    ...(tier ? { tier } : {}),
+  };
+}
+
 export const copilotProvider = {
   async refreshToken(refreshToken: string): Promise<OAuthResult> {
+    if (refreshToken.trim() && !refreshToken.startsWith("ghr_")) {
+      return buildOAuthResult(refreshToken);
+    }
+
     const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
@@ -177,7 +235,7 @@ export const copilotProvider = {
         "User-Agent": USER_AGENT,
       },
       body: JSON.stringify({
-        client_id: CLIENT_ID,
+        client_id: CLIENT_IDS[DEFAULT_AUTH_METHOD],
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       }),
@@ -198,17 +256,7 @@ export const copilotProvider = {
       throw new Error(tokenData.error_description || tokenData.error || "Missing access token");
     }
 
-    const [identity, tier] = await Promise.all([
-      fetchCopilotIdentity(tokenData.access_token),
-      fetchCopilotTier(tokenData.access_token),
-    ]);
-    return {
-      accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token || refreshToken,
-      expiresAt: normalizeTokenExpiry(tokenData.expires_in),
-      email: identity,
-      ...(tier ? { tier } : {}),
-    };
+    return buildOAuthResult(tokenData.access_token, tokenData.refresh_token || refreshToken);
   },
 
   async getValidCredentials(account: CredentialAccount): Promise<string> {
@@ -243,7 +291,7 @@ export const copilotProvider = {
   },
 };
 
-export async function initiateCopilotDeviceCodeFlow(): Promise<{
+export async function initiateCopilotDeviceCodeFlow(method?: string | null): Promise<{
   deviceCode: string;
   userCode: string;
   verificationUrl: string;
@@ -251,6 +299,7 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
   expiresIn: number;
   interval: number;
 }> {
+  const authMethod = copilotAuthMethod(method);
   const response = await fetchInternalProvider(DEVICE_CODE_ENDPOINT, {
     method: "POST",
     headers: {
@@ -259,8 +308,8 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
       "User-Agent": USER_AGENT,
     },
     body: JSON.stringify({
-      client_id: CLIENT_ID,
-      scope: SCOPE,
+      client_id: CLIENT_IDS[authMethod],
+      scope: SCOPES[authMethod],
     }),
     cache: "no-store",
   });
@@ -286,8 +335,10 @@ export async function initiateCopilotDeviceCodeFlow(): Promise<{
 }
 
 export async function pollCopilotDeviceCodeAuthorization(
-  deviceCode: string
+  deviceCode: string,
+  method?: string | null
 ): Promise<OAuthResult | { pending: true; retryAfterSeconds?: number } | { error: string }> {
+  const authMethod = copilotAuthMethod(method);
   const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
@@ -296,7 +347,7 @@ export async function pollCopilotDeviceCodeAuthorization(
       "User-Agent": USER_AGENT,
     },
     body: JSON.stringify({
-      client_id: CLIENT_ID,
+      client_id: CLIENT_IDS[authMethod],
       device_code: deviceCode,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
     }),
@@ -314,17 +365,7 @@ export async function pollCopilotDeviceCodeAuthorization(
 
   const data = (await response.json()) as CopilotTokenResponse;
   if (data.access_token) {
-    const [identity, tier] = await Promise.all([
-      fetchCopilotIdentity(data.access_token),
-      fetchCopilotTier(data.access_token),
-    ]);
-    return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || data.access_token,
-      expiresAt: normalizeTokenExpiry(data.expires_in),
-      email: identity,
-      ...(tier ? { tier } : {}),
-    };
+    return buildOAuthResult(data.access_token, data.refresh_token || data.access_token);
   }
 
   if (data.error === "authorization_pending") {

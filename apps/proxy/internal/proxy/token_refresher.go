@@ -238,7 +238,11 @@ func (s *Service) persistRefreshedCredentials(ctx context.Context, account appdb
 	if refreshed.AccessToken == "" || refreshed.RefreshToken == "" || refreshed.ExpiresAt.IsZero() {
 		return account, fmt.Errorf("provider token refresh returned incomplete credentials")
 	}
-	encryptedAccess, err := cryptojs.Encrypt(s.secret, refreshed.AccessToken)
+	storeAccessToken := refreshed.AccessToken
+	if strings.TrimSpace(refreshed.StoreAccessToken) != "" {
+		storeAccessToken = refreshed.StoreAccessToken
+	}
+	encryptedAccess, err := cryptojs.Encrypt(s.secret, storeAccessToken)
 	if err != nil {
 		return account, err
 	}
