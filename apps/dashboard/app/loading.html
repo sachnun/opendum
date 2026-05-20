@@ -1,0 +1,62 @@
+<div class="opendum-loading" role="status" aria-label="Loading Opendum">
+  <div class="opendum-loading__brand" aria-hidden="true">
+    <span class="opendum-loading__mark">
+      <span class="opendum-loading__pulse"></span>
+      <span class="opendum-loading__dot"></span>
+    </span>
+    <span class="opendum-loading__wordmark">Opendum</span>
+  </div>
+</div>
+<style>
+  .opendum-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: oklch(0.145 0 0);
+    color: oklch(0.985 0 0);
+    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .opendum-loading__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.875rem;
+  }
+
+  .opendum-loading__mark {
+    position: relative;
+    display: flex;
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  .opendum-loading__pulse,
+  .opendum-loading__dot {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+
+  .opendum-loading__pulse {
+    opacity: 0.75;
+    animation: opendum-loading-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .opendum-loading__wordmark {
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+
+  @keyframes opendum-loading-ping {
+    75%,
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+</style>
