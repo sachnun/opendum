@@ -68,6 +68,7 @@ type anthropicStreamTracker struct {
 	thinkingBlock     int
 	hasThinkingBlock  bool
 	thinkingBlockOpen bool
+	pendingText       string
 	toolBlockByID     map[string]int
 	toolBlockByIndex  map[int]anthropicToolBlock
 	openToolBlocks    map[int]bool
@@ -130,6 +131,10 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 }
 
 func (t *anthropicStreamTracker) writeTextDelta(text string) {
+	if t.keepThinkingOpen && t.thinkingBlockOpen {
+		t.pendingText += text
+		return
+	}
 	if t.openBlockType != "text" {
 		t.closeOpenToolBlocks()
 		t.closeOpenBlock()
@@ -239,6 +244,15 @@ func (t *anthropicStreamTracker) closeThinkingBlock() {
 	t.thinkingBlockOpen = false
 }
 
+func (t *anthropicStreamTracker) flushPendingText() {
+	if t.pendingText == "" {
+		return
+	}
+	text := t.pendingText
+	t.pendingText = ""
+	t.writeTextDelta(text)
+}
+
 func (t *anthropicStreamTracker) closeOpenToolBlocks() {
 	if len(t.openToolBlocks) == 0 {
 		return
@@ -257,6 +271,7 @@ func (t *anthropicStreamTracker) closeOpenToolBlocks() {
 func (t *anthropicStreamTracker) Finish() {
 	t.Flush()
 	t.closeThinkingBlock()
+	t.flushPendingText()
 	t.closeOpenBlock()
 	t.closeOpenToolBlocks()
 	stopReason := t.finishReason
