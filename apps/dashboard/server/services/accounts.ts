@@ -8,7 +8,7 @@ import { compareModelEntries } from "../../lib/model-sort";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
-import { buildAccountStats, buildEmptyProviderStats, getAccountIndicator, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
+import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
 
 export { createAccount, createAccountInputSchema } from "./account-connectors";
 
@@ -46,6 +46,7 @@ type AccountSummarySourceRow = {
   consecutiveErrors: number;
   lastUsedAt: Date | string | null;
   lastErrorAt: Date | string | null;
+  lastErrorCode: number | null;
   lastSuccessAt: Date | string | null;
   lastRecoveredByRotationAt: Date | string | null;
 };
@@ -56,6 +57,7 @@ type AccountModelHealthSummaryRow = {
   statusChangedAt: Date | string | null;
   consecutiveErrors: number;
   lastErrorAt: Date | string | null;
+  lastErrorCode: number | null;
   lastSuccessAt: Date | string | null;
   unhealthyCountUpdatedAt: Date | string | null;
 };
@@ -68,6 +70,7 @@ type AccountModelHealthRecoveryRow = AccountModelHealthSummaryRow & {
 
 type AccountHealthAggregate = {
   unhealthyCount: number;
+  warningCount: number;
   lastErrorAt: Date | string | null;
   lastSuccessAt: Date | string | null;
 };
@@ -184,6 +187,31 @@ function cooldownRecoveryCount(unhealthyCount: number): number {
   return Math.max(0, unhealthyCount - Math.round(unhealthyCount * COOLDOWN_RECOVERY_RATIO));
 }
 
+function isImmediatelyRecoverableStatusCode(code: number | null | undefined): boolean {
+  if (!code) return false;
+  return code === 408 || code === 429 || code >= 500;
+}
+
+function hasRecoveredAfterError(row: { lastErrorAt?: Date | string | null; lastSuccessAt?: Date | string | null; lastRecoveredByRotationAt?: Date | string | null; lastUsedAt?: Date | string | null }): boolean {
+  const errorMs = toTimeMs(row.lastErrorAt);
+  if (!errorMs) return false;
+  const recoveredMs = Math.max(toTimeMs(row.lastSuccessAt) ?? 0, toTimeMs(row.lastRecoveredByRotationAt) ?? 0, toTimeMs(row.lastUsedAt) ?? 0);
+  return recoveredMs > errorMs;
+}
+
+function hasActionableHealthWarning(row: { consecutiveErrors: number; lastErrorAt?: Date | string | null; lastErrorCode?: number | null; lastSuccessAt?: Date | string | null }): boolean {
+  if (row.consecutiveErrors <= 0) return false;
+  if (row.consecutiveErrors >= MODEL_DEGRADED_THRESHOLD) return true;
+  return !(isImmediatelyRecoverableStatusCode(row.lastErrorCode) && hasRecoveredAfterError(row));
+}
+
+function getRecoveredAccountIndicator(account: AccountSummarySourceRow): ProviderAccountIndicator {
+  const errorMs = toTimeMs(account.lastErrorAt);
+  if (!errorMs) return "normal";
+  if (!hasRecoveredAfterError(account)) return "error";
+  return isImmediatelyRecoverableStatusCode(account.lastErrorCode) ? "normal" : "warning";
+}
+
 function withEffectiveModelHealth<T extends AccountModelHealthSummaryRow>(row: T, now = new Date(), applyCooldownRecovery = false): T {
   const consecutiveErrors = applyCooldownRecovery ? cooldownRecoveryCount(effectiveUnhealthyCount(row, now)) : effectiveUnhealthyCount(row, now);
   return { ...row, consecutiveErrors, status: modelHealthStatus(consecutiveErrors) };
@@ -281,6 +309,7 @@ async function getAccountSummaryHealthRows(accountIds: string[]): Promise<Accoun
       statusChangedAt: providerAccountModelHealth.statusChangedAt,
       consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
       lastErrorAt: providerAccountModelHealth.lastErrorAt,
+      lastErrorCode: providerAccountModelHealth.lastErrorCode,
       lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
       unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
     })
@@ -290,8 +319,9 @@ async function getAccountSummaryHealthRows(accountIds: string[]): Promise<Accoun
 
 function buildAccountHealthByAccountId(healthRows: AccountModelHealthSummaryRow[], now = new Date(), cooldownRecoveryAccountIds = new Set<string>()) {
   return healthRows.map((row) => withEffectiveModelHealth(row, now, cooldownRecoveryAccountIds.has(row.providerAccountId))).reduce<Record<string, AccountHealthAggregate>>((acc, row) => {
-    const current = acc[row.providerAccountId] ?? { unhealthyCount: 0, lastErrorAt: null, lastSuccessAt: null };
+    const current = acc[row.providerAccountId] ?? { unhealthyCount: 0, warningCount: 0, lastErrorAt: null, lastSuccessAt: null };
     current.unhealthyCount += row.consecutiveErrors;
+    if (hasActionableHealthWarning(row)) current.warningCount += row.consecutiveErrors;
     if ((toTimeMs(row.lastErrorAt) ?? 0) > (toTimeMs(current.lastErrorAt) ?? 0)) current.lastErrorAt = row.lastErrorAt;
     if ((toTimeMs(row.lastSuccessAt) ?? 0) > (toTimeMs(current.lastSuccessAt) ?? 0)) current.lastSuccessAt = row.lastSuccessAt;
     acc[row.providerAccountId] = current;
@@ -378,11 +408,12 @@ function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], healthBy
     summary.active += 1;
     const health = healthByAccountId[account.id];
     const unhealthyCount = health?.unhealthyCount ?? account.consecutiveErrors;
+    const warningCount = health?.warningCount ?? account.consecutiveErrors;
     const indicator = account.status === "failed" || unhealthyCount >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD
       ? "error"
-      : unhealthyCount > 0
+      : warningCount > 0
         ? "warning"
-        : getAccountIndicator(account.lastErrorAt, account.lastSuccessAt, account.lastRecoveredByRotationAt, account.lastUsedAt);
+        : getRecoveredAccountIndicator(account);
     if (INDICATOR_WEIGHT[indicator] > INDICATOR_WEIGHT[summary.indicator]) {
       summary.indicator = indicator;
     }
@@ -449,6 +480,7 @@ export async function getAccountOverview(userId: string, options: AccountOvervie
           consecutiveErrors: providerAccount.consecutiveErrors,
           lastUsedAt: providerAccount.lastUsedAt,
           lastErrorAt: providerAccount.lastErrorAt,
+          lastErrorCode: providerAccount.lastErrorCode,
           lastSuccessAt: providerAccount.lastSuccessAt,
           lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
         })
@@ -508,6 +540,7 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
         consecutiveErrors: providerAccount.consecutiveErrors,
         lastUsedAt: providerAccount.lastUsedAt,
         lastErrorAt: providerAccount.lastErrorAt,
+        lastErrorCode: providerAccount.lastErrorCode,
         lastSuccessAt: providerAccount.lastSuccessAt,
         lastRecoveredByRotationAt: providerAccount.lastRecoveredByRotationAt,
       })
@@ -559,6 +592,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
               statusChangedAt: providerAccountModelHealth.statusChangedAt,
               consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
               lastErrorAt: providerAccountModelHealth.lastErrorAt,
+              lastErrorCode: providerAccountModelHealth.lastErrorCode,
               lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
               unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
             })
@@ -576,8 +610,9 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     const cooldownRecoveryAccountIds = getCooldownRecoveryAccountIds(accounts, now);
     const effectiveHealthRows = healthRows.map((row) => withEffectiveModelHealth(row, now, cooldownRecoveryAccountIds.has(row.providerAccountId)));
     const healthByAccountId = effectiveHealthRows.reduce<Record<string, AccountHealthAggregate>>((acc, row) => {
-      const current = acc[row.providerAccountId] ?? { unhealthyCount: 0, lastErrorAt: null, lastSuccessAt: null };
+      const current = acc[row.providerAccountId] ?? { unhealthyCount: 0, warningCount: 0, lastErrorAt: null, lastSuccessAt: null };
       current.unhealthyCount += row.consecutiveErrors;
+      if (hasActionableHealthWarning(row)) current.warningCount += row.consecutiveErrors;
       if ((toTimeMs(row.lastErrorAt) ?? 0) > (toTimeMs(current.lastErrorAt) ?? 0)) current.lastErrorAt = row.lastErrorAt;
       if ((toTimeMs(row.lastSuccessAt) ?? 0) > (toTimeMs(current.lastSuccessAt) ?? 0)) current.lastSuccessAt = row.lastSuccessAt;
       acc[row.providerAccountId] = current;
@@ -729,6 +764,7 @@ async function accelerateAccountCooldownForManualEnable(accountId: string, now =
         statusChangedAt: providerAccountModelHealth.statusChangedAt,
         consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
         lastErrorAt: providerAccountModelHealth.lastErrorAt,
+        lastErrorCode: providerAccountModelHealth.lastErrorCode,
         lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
         unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
         updatedAt: providerAccountModelHealth.updatedAt,
