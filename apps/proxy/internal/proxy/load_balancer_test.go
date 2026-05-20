@@ -46,6 +46,37 @@ func TestCooldownRecoveryCountReducesRoundedThirtyPercent(t *testing.T) {
 	}
 }
 
+func TestSuccessRecoveryCountReducesUnhealthyCount(t *testing.T) {
+	now := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
+	lastRequestAt := now.Add(-9 * time.Minute)
+	lastErrorCode := 429
+	health := appdb.ProviderAccountModelHealth{ConsecutiveErrors: 2, LastErrorCode: &lastErrorCode, UnhealthyCountUpdatedAt: &lastRequestAt}
+
+	if got := successRecoveryCount(health, now); got != 1 {
+		t.Fatalf("successRecoveryCount() = %d, want 1", got)
+	}
+}
+
+func TestSuccessRecoveryCountKeepsClientErrors(t *testing.T) {
+	now := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
+	lastRequestAt := now.Add(-9 * time.Minute)
+	lastErrorCode := 400
+	health := appdb.ProviderAccountModelHealth{ConsecutiveErrors: 2, LastErrorCode: &lastErrorCode, UnhealthyCountUpdatedAt: &lastRequestAt}
+
+	if got := successRecoveryCount(health, now); got != 2 {
+		t.Fatalf("successRecoveryCount() = %d, want 2", got)
+	}
+}
+
+func TestSuccessRecoveryCountDoesNotGoNegative(t *testing.T) {
+	now := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
+	health := appdb.ProviderAccountModelHealth{ConsecutiveErrors: 0}
+
+	if got := successRecoveryCount(health, now); got != 0 {
+		t.Fatalf("successRecoveryCount() = %d, want 0", got)
+	}
+}
+
 func TestPrioritizeAccountsTreatsCodexPaidPlansAsPaid(t *testing.T) {
 	plus := "plus"
 	pro := "pro"

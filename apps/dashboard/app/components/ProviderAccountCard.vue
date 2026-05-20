@@ -46,7 +46,6 @@ const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
 const ERROR_PREVIEW_VISIBLE_COUNT = 9;
 const ERROR_PREVIEW_CENTER_INDEX = 4;
-const RECOVERED_ERROR_STALE_MS = 3 * 60 * 60 * 1000;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
   { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },
   { value: "hours", label: "Hours", multiplier: 60 * 60 * 1000 },
@@ -567,6 +566,17 @@ function getRecoveredTimeMs(): number {
   return Math.max(toTimeMs(props.account.lastSuccessAt) ?? 0, toTimeMs(props.account.lastRecoveredByRotationAt) ?? 0, toTimeMs(props.account.lastUsedAt) ?? 0);
 }
 
+function isImmediatelyRecoverableErrorCode(code: number | null | undefined): boolean {
+  if (!code) return false;
+  return code === 408 || code === 429 || (code >= 500 && code <= 599);
+}
+
+function getRecoveredErrorToneClass(entry: ErrorPreviewEntry | null | undefined, recovered: boolean): string {
+  if (!recovered) return "text-red-500";
+  if (isImmediatelyRecoverableErrorCode(entry?.errorCode)) return "text-foreground";
+  return "text-amber-400";
+}
+
 function getErrorToneClass(entry: ErrorPreviewEntry | null | undefined): string {
   const errorMs = toTimeMs(entry?.createdAt);
   if (!errorMs) return "text-muted-foreground";
@@ -580,13 +590,10 @@ function getErrorToneClass(entry: ErrorPreviewEntry | null | undefined): string 
     const modelRecoveredMs = toTimeMs(health?.lastSuccessAt);
     const hasModelRecoveredAfterError = Boolean(modelRecoveredMs && modelRecoveredMs > errorMs);
 
-    if (!hasModelRecoveredAfterError) return hasRecoveredAfterError ? "text-amber-400" : "text-red-500";
-    if (health?.status === "active" && Date.now() - errorMs > RECOVERED_ERROR_STALE_MS) return "text-foreground";
-    return "text-amber-400";
+    return getRecoveredErrorToneClass(entry, hasModelRecoveredAfterError || hasRecoveredAfterError);
   }
 
-  if (hasRecoveredAfterError && Date.now() - errorMs > RECOVERED_ERROR_STALE_MS) return "text-foreground";
-  return hasRecoveredAfterError ? "text-amber-400" : "text-red-500";
+  return getRecoveredErrorToneClass(entry, hasRecoveredAfterError);
 }
 
 const latestHistoryEntry = computed<ErrorPreviewEntry | null>(() => {

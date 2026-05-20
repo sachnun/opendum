@@ -348,6 +348,21 @@ func cooldownRecoveryCount(unhealthyCount int) int {
 	return unhealthyCount - reduction
 }
 
+func isImmediatelyRecoverableStatusCode(code int) bool {
+	return code == http.StatusRequestTimeout || code == http.StatusTooManyRequests || code >= http.StatusInternalServerError
+}
+
+func successRecoveryCount(row appdb.ProviderAccountModelHealth, now time.Time) int {
+	count := effectiveUnhealthyCount(row, now)
+	if row.LastErrorCode != nil && !isImmediatelyRecoverableStatusCode(*row.LastErrorCode) {
+		return count
+	}
+	if count > 0 {
+		count--
+	}
+	return count
+}
+
 func (s *Service) normalizeModelHealthRows(ctx context.Context, rows []appdb.ProviderAccountModelHealth, now time.Time, applyCooldownRecovery bool) (int, error) {
 	total := 0
 	for _, row := range rows {
@@ -518,7 +533,7 @@ func (s *Service) markAccountSuccess(ctx context.Context, accountID, model strin
 		_, _ = s.refreshAccountHealthFromModels(ctx, accountID, now)
 		return
 	}
-	nextErrors := effectiveUnhealthyCount(health, now)
+	nextErrors := successRecoveryCount(health, now)
 	nextStatus := modelHealthStatus(nextErrors)
 	query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).
 		Set("\"consecutiveErrors\" = ?", nextErrors).
