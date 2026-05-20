@@ -155,7 +155,6 @@ const props = defineProps<{
   modelHealth?: ProviderDetailData["modelHealthByAccountId"][string];
   quotaInfo?: AccountQuotaInfo | null;
   quotaError?: string | null;
-  isQuotaLoading?: boolean;
   highlight?: boolean;
   animateDeltas?: boolean;
   readonly?: boolean;
@@ -167,7 +166,6 @@ const emit = defineEmits<{
   "temporarily-disabled": [account: ProviderAccountUpdateData];
   deleted: [accountId: string];
   "errors-resolved": [accountId: string];
-  refreshQuota: [accountId: string];
 }>();
 
 const dashboardApi = useDashboardApi();
@@ -856,10 +854,6 @@ function handleTemporaryOffToggleClick(event: Event) {
   }, 0);
 }
 
-function refreshQuota() {
-  emit("refreshQuota", props.account.id);
-}
-
 onBeforeUnmount(() => {
   clearTemporaryOffLongPress();
 });
@@ -1205,21 +1199,8 @@ function cancelErrorPreviewPointer() {
           </div>
 
           <div v-if="supportsQuotaMonitor" class="mt-3 space-y-2 border-t pt-3">
-            <div class="flex items-center justify-between gap-2">
+            <div>
               <span class="text-xs font-medium text-muted-foreground">Quota</span>
-              <UiTooltip text="Refresh">
-                <UiButton
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  class="h-6 w-6"
-                  :disabled="isQuotaLoading"
-                  :aria-label="`Refresh quota for ${accountTitle}`"
-                  @click="refreshQuota"
-                >
-                  <UiIcon name="i-lucide-refresh-cw" :class="['size-3.5', isQuotaLoading ? 'animate-spin' : '']" />
-                </UiButton>
-              </UiTooltip>
             </div>
 
             <div v-if="!quotaInfo && !quotaError" class="space-y-2" aria-hidden="true">

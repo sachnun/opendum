@@ -272,10 +272,8 @@ let previousQuotaProvider: ProviderAccountKey | null = null;
 const {
   quotaByAccountId,
   quotaErrorByAccountId,
-  quotaLoadingByAccountId,
   cancelQuotaQueue,
   hydrateQuotaCache,
-  loadAccountQuota,
   pruneQuotaState,
   runQuotaQueue,
   waitForQuotaQueue,
@@ -283,7 +281,6 @@ const {
   accounts,
   quotaCapableAccounts,
   toQuotaProvider,
-  shouldQueueAccount: (account) => account.isActive,
 });
 
 onBeforeUnmount(() => {
@@ -371,15 +368,6 @@ function quotaBarColor(group: QuotaSummaryGroup): string {
   if (percentRemaining <= 25) return "bg-orange-500";
   if (percentRemaining <= 50) return "bg-yellow-500";
   return "bg-green-500";
-}
-
-function handleQuotaRefresh(accountId: string) {
-  const account = accounts.value.find((account) => account.id === accountId);
-  if (!account) return;
-
-  void loadAccountQuota(account, { refreshExisting: true, forceRefresh: true }).finally(() => {
-    void refreshProviderDetailOnce({ refreshQuota: false });
-  });
 }
 
 function getAccountWithStats(account: Account): Account {
@@ -684,7 +672,6 @@ function decodeAccountHash(hash: string): string | null {
           :model-health="modelHealthByAccountId[account.id] ?? {}"
           :quota-info="quotaByAccountId[account.id] ?? null"
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
-          :is-quota-loading="Boolean(quotaLoadingByAccountId[account.id])"
           :highlight="highlightedAccountIds.has(account.id)"
           :animate-deltas="accountStatsDeltaReadyById[account.id] === true"
           :readonly="isAuditMode"
@@ -693,7 +680,6 @@ function decodeAccountHash(hash: string): string | null {
           @temporarily-disabled="handleAccountActiveUpdated"
           @deleted="handleAccountDeleted"
           @errors-resolved="handleAccountErrorsResolved"
-          @refresh-quota="handleQuotaRefresh"
         />
       </div>
     </section>
