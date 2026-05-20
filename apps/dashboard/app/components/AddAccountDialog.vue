@@ -50,7 +50,7 @@ const dashboardInvalidation = useDashboardDataInvalidation();
 const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." };
 const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code", description: "Enter a short device code." };
 const copilotOpencodeMethod: ProviderMethod = { key: "copilot_device_code_opencode", flow: "device_code", copilotAuthMethod: "opencode", name: "Device Code", tag: "Opencode", description: "Use the Opencode OAuth app." };
-const copilotOfficialMethod: ProviderMethod = { key: "copilot_device_code_official", flow: "device_code", copilotAuthMethod: "official", name: "Device Code", tag: "Official", description: "Use the GitHub Copilot OAuth app." };
+const copilotOfficialMethod: ProviderMethod = { key: "copilot_device_code_official", flow: "device_code", copilotAuthMethod: "official", name: "Device Code", description: "Use the GitHub Copilot OAuth app." };
 const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key", description: "Create or copy an API key from the provider portal." };
 const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token", description: "Requires the matching account ID." };
 
