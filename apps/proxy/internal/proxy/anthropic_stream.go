@@ -126,14 +126,21 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 		}
 	}
 	if finish := stringValue(choice["finish_reason"]); finish != "" {
+		t.closeThinkingBlock()
+		t.flushPendingText()
 		t.finishReason = mapOpenAIFinishReasonToAnthropic(finish)
 	}
 }
 
 func (t *anthropicStreamTracker) writeTextDelta(text string) {
 	if t.keepThinkingOpen && t.thinkingBlockOpen {
-		t.pendingText += text
-		return
+		if t.pendingText != "" {
+			t.closeThinkingBlock()
+			t.flushPendingText()
+		} else {
+			t.pendingText += text
+			return
+		}
 	}
 	if t.openBlockType != "text" {
 		t.closeOpenToolBlocks()
@@ -146,6 +153,16 @@ func (t *anthropicStreamTracker) writeTextDelta(text string) {
 
 func (t *anthropicStreamTracker) writeThinkingDelta(thinking string) {
 	if !t.keepThinkingOpen {
+		if t.openBlockType != "thinking" {
+			t.closeOpenToolBlocks()
+			t.closeOpenBlock()
+			writeAnthropicEvent(t.writer, t.flusher, "content_block_start", map[string]any{"type": "content_block_start", "index": t.blockIndex, "content_block": map[string]any{"type": "thinking", "thinking": ""}})
+			t.openBlockType = "thinking"
+		}
+		writeAnthropicEvent(t.writer, t.flusher, "content_block_delta", map[string]any{"type": "content_block_delta", "index": t.blockIndex, "delta": map[string]any{"type": "thinking_delta", "thinking": thinking}})
+		return
+	}
+	if t.hasThinkingBlock && !t.thinkingBlockOpen {
 		if t.openBlockType != "thinking" {
 			t.closeOpenToolBlocks()
 			t.closeOpenBlock()
@@ -170,6 +187,8 @@ func (t *anthropicStreamTracker) writeThinkingDelta(thinking string) {
 }
 
 func (t *anthropicStreamTracker) writeToolCallDelta(raw any) {
+	t.closeThinkingBlock()
+	t.flushPendingText()
 	call, _ := raw.(map[string]any)
 	fn, _ := call["function"].(map[string]any)
 	openAIIndex := numberAsInt(call["index"])
@@ -227,7 +246,7 @@ func (t *anthropicStreamTracker) closeOpenBlock() {
 	if t.openBlockType == "" {
 		return
 	}
-	if t.keepThinkingOpen && t.openBlockType == "thinking" {
+	if t.keepThinkingOpen && t.thinkingBlockOpen && t.openBlockType == "thinking" {
 		t.openBlockType = ""
 		return
 	}
@@ -242,6 +261,9 @@ func (t *anthropicStreamTracker) closeThinkingBlock() {
 	}
 	writeAnthropicEvent(t.writer, t.flusher, "content_block_stop", map[string]any{"type": "content_block_stop", "index": t.thinkingBlock})
 	t.thinkingBlockOpen = false
+	if t.openBlockType == "thinking" {
+		t.openBlockType = ""
+	}
 }
 
 func (t *anthropicStreamTracker) flushPendingText() {

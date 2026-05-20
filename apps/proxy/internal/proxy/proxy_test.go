@@ -661,6 +661,33 @@ func TestAnthropicStreamTrackerKeepsKiroReasoningInOneBlock(t *testing.T) {
 	}
 }
 
+func TestAnthropicStreamTrackerOnlyDelaysFirstKiroTextChunk(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	tracker := &anthropicStreamTracker{writer: recorder, keepThinkingOpen: true}
+
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"reasoning_content": "think"}}}}))
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"content": "answer "}}}}))
+	if events := parseRecordedSSE(t, recorder.Body.String()); len(events) != 2 {
+		t.Fatalf("events before second text = %d, want 2: %#v", len(events), events)
+	}
+
+	tracker.Process(openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"content": "continues"}}}}))
+	events := parseRecordedSSE(t, recorder.Body.String())
+	if len(events) != 6 {
+		t.Fatalf("events after second text = %d, want 6: %#v", len(events), events)
+	}
+	if events[2].event != "content_block_stop" || int(events[2].data["index"].(float64)) != 0 {
+		t.Fatalf("thinking stop = %#v", events[2])
+	}
+	assertSSEEvent(t, events[3], "content_block_start", "text", 1)
+	if delta := events[4].data["delta"].(map[string]any); delta["text"] != "answer " {
+		t.Fatalf("first text delta = %#v", events[4])
+	}
+	if delta := events[5].data["delta"].(map[string]any); delta["text"] != "continues" {
+		t.Fatalf("second text delta = %#v", events[5])
+	}
+}
+
 func TestAnthropicStreamTrackerFinishReasonMappingAndFlush(t *testing.T) {
 	tests := []struct {
 		finish string
