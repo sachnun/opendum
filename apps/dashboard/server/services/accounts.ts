@@ -14,6 +14,7 @@ export { createAccount, createAccountInputSchema } from "./account-connectors";
 
 const AUTO_PIN_SENTINEL = "_auto_pinned";
 const UNHEALTHY_IDLE_DECAY_MS = 10 * 60 * 1000;
+const ACCOUNT_COOLDOWN_MS = 10 * 60 * 1000;
 const MODEL_DEGRADED_THRESHOLD = 2;
 const ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD = 10;
 const COOLDOWN_RECOVERY_RATIO = 0.30;
@@ -57,6 +58,12 @@ type AccountModelHealthSummaryRow = {
   lastErrorAt: Date | string | null;
   lastSuccessAt: Date | string | null;
   unhealthyCountUpdatedAt: Date | string | null;
+};
+
+type AccountModelHealthRecoveryRow = AccountModelHealthSummaryRow & {
+  id: string;
+  updatedAt: Date | string | null;
+  createdAt: Date | string | null;
 };
 
 type AccountHealthAggregate = {
@@ -667,7 +674,7 @@ export async function getAccountStats(userId: string, input: z.infer<typeof acco
 
 export async function updateAccount(userId: string, input: z.infer<typeof updateAccountInputSchema>) {
     try {
-      const [account] = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
+      const [account] = await db.select({ id: providerAccount.id, status: providerAccount.status }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
       if (!account) return { success: false, error: "Account not found" } as const;
 
       const updates: { name?: string; isActive?: boolean; disabledUntil?: Date | null } = {};
@@ -694,7 +701,7 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
 
       if (Object.keys(updates).length > 0) {
         await db.update(providerAccount).set(updates).where(eq(providerAccount.id, input.id));
-        if (manuallyReenabled) await downgradeAccountFailureForManualEnable(input.id, now);
+        if (manuallyReenabled && account.status === "failed") await accelerateAccountCooldownForManualEnable(input.id, now);
         if (updates.isActive !== undefined || updates.disabledUntil !== undefined) await invalidateDisabledModelsCache(userId);
       }
 
@@ -712,17 +719,50 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
     }
 }
 
-async function downgradeAccountFailureForManualEnable(accountId: string, now = new Date()): Promise<void> {
-  await Promise.all([
-    db
+async function accelerateAccountCooldownForManualEnable(accountId: string, now = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    const rows: AccountModelHealthRecoveryRow[] = await tx
+      .select({
+        id: providerAccountModelHealth.id,
+        providerAccountId: providerAccountModelHealth.providerAccountId,
+        status: providerAccountModelHealth.status,
+        statusChangedAt: providerAccountModelHealth.statusChangedAt,
+        consecutiveErrors: providerAccountModelHealth.consecutiveErrors,
+        lastErrorAt: providerAccountModelHealth.lastErrorAt,
+        lastSuccessAt: providerAccountModelHealth.lastSuccessAt,
+        unhealthyCountUpdatedAt: providerAccountModelHealth.unhealthyCountUpdatedAt,
+        updatedAt: providerAccountModelHealth.updatedAt,
+        createdAt: providerAccountModelHealth.createdAt,
+      })
+      .from(providerAccountModelHealth)
+      .where(eq(providerAccountModelHealth.providerAccountId, accountId));
+
+    let total = 0;
+    for (const row of rows) {
+      const recovered = withEffectiveModelHealth(row, now, true);
+      total += recovered.consecutiveErrors;
+      const patch: { consecutiveErrors: number; unhealthyCountUpdatedAt: Date; status?: string; statusChangedAt?: Date } = {
+        consecutiveErrors: recovered.consecutiveErrors,
+        unhealthyCountUpdatedAt: now,
+      };
+      if (row.status === "failed" || recovered.status !== row.status) {
+        patch.status = recovered.status;
+        patch.statusChangedAt = now;
+      }
+      await tx.update(providerAccountModelHealth).set(patch).where(eq(providerAccountModelHealth.id, row.id));
+    }
+
+    const stillCoolingDown = total >= ACCOUNT_COOLDOWN_UNHEALTHY_THRESHOLD;
+    await tx
       .update(providerAccount)
-      .set({ status: "active", statusChangedAt: now, disabledUntil: null })
-      .where(eq(providerAccount.id, accountId)),
-    db
-      .update(providerAccountModelHealth)
-      .set({ status: "active", statusChangedAt: now, unhealthyCountUpdatedAt: now })
-      .where(and(eq(providerAccountModelHealth.providerAccountId, accountId), eq(providerAccountModelHealth.status, "failed"))),
-  ]);
+      .set({
+        status: stillCoolingDown ? "failed" : "active",
+        statusChangedAt: now,
+        consecutiveErrors: total,
+        disabledUntil: stillCoolingDown ? new Date(now.getTime() + ACCOUNT_COOLDOWN_MS) : null,
+      })
+      .where(eq(providerAccount.id, accountId));
+  });
 }
 
 export async function deleteAccount(userId: string, input: z.infer<typeof deleteAccountInputSchema>) {
