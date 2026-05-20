@@ -23,6 +23,13 @@
   },
   "providerConfig": {
     "copilot": {
+      "allowedTiers": [
+        "student",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ],
       "reasoning_effort": false
     },
     "gemini_cli": {

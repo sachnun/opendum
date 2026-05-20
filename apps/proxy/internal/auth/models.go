@@ -339,10 +339,10 @@ func (s *Service) IsModelUsableByAccounts(model string, availability AccountMode
 				total--
 			}
 		}
-		if rule, ok := s.registry.ProviderAccessRule(canonical, provider); ok && rule.MinTier != "" {
+		if rule, ok := s.registry.ProviderAccessRule(canonical, provider); ok && accessRuleRestrictsTier(rule.MinTier, rule.AllowedTiers) {
 			eligible := false
 			for _, accountID := range availability.ActiveAccountIDsByProvider[provider] {
-				if tierSatisfies(availability.AccountTierByID[accountID], rule.MinTier) {
+				if tierSatisfiesRule(availability.AccountTierByID[accountID], rule.MinTier, rule.AllowedTiers) {
 					eligible = true
 					break
 				}
@@ -365,10 +365,10 @@ func (s *Service) IsModelUsableBySharedAccounts(model string, availability Accou
 		if total == 0 {
 			continue
 		}
-		if rule, ok := s.registry.ProviderAccessRule(canonical, provider); ok && rule.MinTier != "" {
+		if rule, ok := s.registry.ProviderAccessRule(canonical, provider); ok && accessRuleRestrictsTier(rule.MinTier, rule.AllowedTiers) {
 			eligible := false
 			for _, tier := range availability.SharedAccountTiersByProvider[provider] {
-				if tierSatisfies(tier, rule.MinTier) {
+				if tierSatisfiesRule(tier, rule.MinTier, rule.AllowedTiers) {
 					eligible = true
 					break
 				}
@@ -440,12 +440,44 @@ func uniqueSorted(values []string) []string {
 	return result
 }
 
-func tierSatisfies(accountTier, minTier string) bool {
+func tierSatisfiesRule(accountTier, minTier string, allowedTiers []string) bool {
+	normalizedAccountTier := normalizeTierAlias(accountTier)
+	if len(allowedTiers) > 0 {
+		for _, tier := range allowedTiers {
+			if normalizeTierAlias(tier) == normalizedAccountTier {
+				return true
+			}
+		}
+		return false
+	}
+
 	required := strings.ToLower(strings.TrimSpace(minTier))
 	if required == "" || required == "free" {
 		return true
 	}
-	return strings.ToLower(strings.TrimSpace(accountTier)) == required
+	return normalizedAccountTier == normalizeTierAlias(required)
+}
+
+func accessRuleRestrictsTier(minTier string, allowedTiers []string) bool {
+	if len(allowedTiers) > 0 {
+		return true
+	}
+	required := normalizeTierAlias(minTier)
+	return required != "" && required != "free"
+}
+
+func normalizeTierAlias(tier string) string {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(tier), "_", "-"))
+	if normalized == "pro-plus" || normalized == "proplus" {
+		return "pro+"
+	}
+	if normalized == "free-tier" || normalized == "free-limited-copilot" {
+		return "free"
+	}
+	if normalized == "education" || normalized == "educational" || normalized == "edu" || normalized == "free-educational-quota" {
+		return "student"
+	}
+	return normalized
 }
 
 func defaultString(value, fallback string) string {

@@ -42,6 +42,15 @@
       },
       "thinking_format": "budget"
     },
+    "copilot": {
+      "allowedTiers": [
+        "student",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    },
     "gemini_cli": {
       "thinking_budgets": {
         "high": 32768,

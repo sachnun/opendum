@@ -68,7 +68,97 @@ func (p copilotProvider) RefreshCredentials(ctx context.Context, client *http.Cl
 	if token.ExpiresIn <= 0 {
 		token.ExpiresIn = int64((24 * time.Hour).Seconds())
 	}
-	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), Email: fetchCopilotIdentity(ctx, client, token.AccessToken)}, nil
+	tier := fetchCopilotTier(ctx, client, token.AccessToken)
+	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), Email: fetchCopilotIdentity(ctx, client, token.AccessToken), Tier: tier}, nil
+}
+
+func fetchCopilotTier(ctx context.Context, client *http.Client, accessToken string) string {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/copilot_internal/user", nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "GitHubCopilotChat/0.26.7")
+	req.Header.Set("Editor-Version", "vscode/1.96.2")
+	req.Header.Set("Editor-Plugin-Version", "copilot-chat/0.26.7")
+	req.Header.Set("X-GitHub-Api-Version", "2025-04-01")
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ""
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return ""
+	}
+	return normalizeCopilotTier(payload)
+}
+
+func normalizeCopilotTier(payload map[string]any) string {
+	for _, raw := range []string{copilotString(payload["access_type_sku"]), copilotString(payload["copilot_plan"])} {
+		value := normalizeCopilotTierValue(raw)
+		if value == "" {
+			continue
+		}
+		if strings.Contains(value, "education") || strings.Contains(value, "student") {
+			return "student"
+		}
+		if strings.Contains(value, "free") {
+			return "free"
+		}
+		if strings.Contains(value, "enterprise") {
+			return "enterprise"
+		}
+		if strings.Contains(value, "business") {
+			return "business"
+		}
+		if value == "pro-plus" || value == "proplus" || value == "pro+" {
+			return "pro+"
+		}
+		if value == "pro" || strings.Contains(value, "-pro-") {
+			return "pro"
+		}
+	}
+
+	snapshots, _ := payload["quota_snapshots"].(map[string]any)
+	premium, _ := snapshots["premium_interactions"].(map[string]any)
+	switch copilotNumber(premium["entitlement"]) {
+	case 50:
+		return "free"
+	case 300:
+		return "pro"
+	case 1000:
+		return "enterprise"
+	case 1500:
+		return "pro+"
+	}
+	return ""
+}
+
+func normalizeCopilotTierValue(value string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(value), "_", "-"))
+}
+
+func copilotString(value any) string {
+	str, _ := value.(string)
+	return str
+}
+
+func copilotNumber(value any) int {
+	switch typed := value.(type) {
+	case float64:
+		return int(typed)
+	case int:
+		return typed
+	case json.Number:
+		parsed, _ := typed.Int64()
+		return int(parsed)
+	}
+	return 0
 }
 
 func fetchCopilotIdentity(ctx context.Context, client *http.Client, accessToken string) string {

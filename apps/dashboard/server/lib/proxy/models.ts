@@ -10,6 +10,7 @@ export { MODEL_REGISTRY };
 
 export interface ProviderAccessRule {
   minTier?: string;
+  allowedTiers?: string[];
 }
 
 function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
@@ -126,7 +127,14 @@ export function getProviderAccessRule(
   const canonical = resolveModelAlias(model);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
   const minTier = info?.providerConfig?.[provider]?.minTier;
-  return minTier ? { minTier } : null;
+  const allowedTiers = info?.providerConfig?.[provider]?.allowedTiers;
+  if (minTier || allowedTiers?.length) {
+    return {
+      ...(minTier ? { minTier } : {}),
+      ...(allowedTiers?.length ? { allowedTiers } : {}),
+    };
+  }
+  return null;
 }
 
 export function isAuthlessProviderModel(model: string, provider: string): boolean {

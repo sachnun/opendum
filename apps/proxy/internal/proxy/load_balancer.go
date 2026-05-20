@@ -133,7 +133,7 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 			enabled = append(enabled, row)
 			continue
 		}
-		if _, disabled := disabledSet[row.ID]; !disabled {
+		if _, disabled := disabledSet[row.ID]; !disabled && s.canAccountUseModel(row, model) {
 			enabled = append(enabled, row)
 		}
 	}

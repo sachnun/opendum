@@ -101,7 +101,6 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 		if forced != nil {
 			go runner.bumpAccountRequestCount(context.Background(), attempt.account.ID, time.Now())
 		}
-
 		payload := cfg.Build(parsed, validation.Model, parsed.Stream, sessionID(r))
 		if !runner.isVisionModel(validation.Model) {
 			stripImageContent(payload)
@@ -199,18 +198,50 @@ func (s *Service) canAccountUseModel(account appdb.ProviderAccount, model string
 		return true
 	}
 	rule, ok := s.registry.ProviderAccessRule(model, account.Provider)
-	if !ok || rule.MinTier == "" {
+	if !ok || !accountAccessRuleRestrictsTier(rule.MinTier, rule.AllowedTiers) {
 		return true
 	}
-	return accountTierSatisfies(quotaFallbackTier(account), rule.MinTier)
+	return accountTierSatisfiesRule(quotaFallbackTier(account), rule.MinTier, rule.AllowedTiers)
 }
 
-func accountTierSatisfies(accountTier, minTier string) bool {
+func accountTierSatisfiesRule(accountTier, minTier string, allowedTiers []string) bool {
+	normalizedAccountTier := normalizeAccountTierAlias(accountTier)
+	if len(allowedTiers) > 0 {
+		for _, tier := range allowedTiers {
+			if normalizeAccountTierAlias(tier) == normalizedAccountTier {
+				return true
+			}
+		}
+		return false
+	}
+
 	required := strings.ToLower(strings.TrimSpace(minTier))
 	if required == "" || required == "free" {
 		return true
 	}
-	return strings.ToLower(strings.TrimSpace(accountTier)) == required
+	return normalizedAccountTier == normalizeAccountTierAlias(required)
+}
+
+func accountAccessRuleRestrictsTier(minTier string, allowedTiers []string) bool {
+	if len(allowedTiers) > 0 {
+		return true
+	}
+	required := normalizeAccountTierAlias(minTier)
+	return required != "" && required != "free"
+}
+
+func normalizeAccountTierAlias(tier string) string {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(tier), "_", "-"))
+	if normalized == "pro-plus" || normalized == "proplus" {
+		return "pro+"
+	}
+	if normalized == "free-tier" || normalized == "free-limited-copilot" {
+		return "free"
+	}
+	if normalized == "education" || normalized == "educational" || normalized == "edu" || normalized == "free-educational-quota" {
+		return "student"
+	}
+	return normalized
 }
 
 func sessionID(r *http.Request) string {

@@ -3,5 +3,14 @@
     "codex",
     "copilot"
   ],
-  "family": "OpenAI"
+  "family": "OpenAI",
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    }
+  }
 }

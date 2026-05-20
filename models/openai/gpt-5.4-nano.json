@@ -5,6 +5,9 @@
   "family": "OpenAI",
   "providerConfig": {
     "copilot": {
+      "allowedTiers": [
+        "pro+"
+      ],
       "responses_api": true
     }
   }

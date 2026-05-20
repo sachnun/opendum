@@ -28,6 +28,7 @@ export interface ModelInfo {
     {
       upstream?: string;
       minTier?: string;
+      allowedTiers?: string[];
       aliases?: string[];
       [key: string]: unknown;
     }

@@ -43,18 +43,25 @@ function getDisabledModelsCacheKey(userId: string): string {
 
 function normalizeTierForProvider(tier: string | null | undefined): string | null {
   if (!tier) return null;
-  const normalized = tier.trim().toLowerCase();
+  const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
+  if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
+  if (normalized === "free-tier" || normalized === "free-limited-copilot") return "free";
+  if (normalized === "education" || normalized === "educational" || normalized === "edu" || normalized === "free-educational-quota") return "student";
   return normalized || null;
 }
 
 function doesAccountTierSatisfyRule(
   accountTier: string | null | undefined,
-  minTier: string | null | undefined
+  minTier: string | null | undefined,
+  allowedTiers: string[] | undefined = undefined
 ): boolean {
+  const normalizedAccountTier = normalizeTierForProvider(accountTier);
+  if (allowedTiers?.length) {
+    return allowedTiers.some((tier) => normalizeTierForProvider(tier) === normalizedAccountTier);
+  }
+
   const normalizedRequiredTier = normalizeTierForProvider(minTier);
   if (!normalizedRequiredTier || normalizedRequiredTier === "free") return true;
-
-  const normalizedAccountTier = normalizeTierForProvider(accountTier);
   return normalizedAccountTier === normalizedRequiredTier;
 }
 
@@ -108,10 +115,10 @@ export function isModelUsableByAccounts(
     }
 
     const accessRule = getProviderAccessRule(canonical, provider);
-    if (accessRule?.minTier) {
+    if (accessRule?.minTier || accessRule?.allowedTiers?.length) {
       const accountIds = availability.activeAccountIdsByProvider.get(provider) ?? [];
       const hasEligibleTierAccount = accountIds.some((accountId) =>
-        doesAccountTierSatisfyRule(availability.accountTierById.get(accountId), accessRule.minTier)
+        doesAccountTierSatisfyRule(availability.accountTierById.get(accountId), accessRule.minTier, accessRule.allowedTiers)
       );
       if (!hasEligibleTierAccount) continue;
     }

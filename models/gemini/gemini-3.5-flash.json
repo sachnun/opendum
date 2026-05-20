@@ -2,5 +2,15 @@
   "providers": [
     "copilot"
   ],
-  "family": "Gemini"
+  "family": "Gemini",
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    }
+  }
 }

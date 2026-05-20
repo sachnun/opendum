@@ -43,6 +43,15 @@
         "xhigh": "high"
       }
     },
+    "copilot": {
+      "allowedTiers": [
+        "student",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    },
     "gemini_cli": {
       "thinking_format": "level",
       "thinking_levels": {

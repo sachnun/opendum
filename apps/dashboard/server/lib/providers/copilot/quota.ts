@@ -168,7 +168,23 @@ function normalizePlanName(raw: unknown): string {
   if (typeof raw !== "string") {
     return "";
   }
-  return raw.trim().toLowerCase();
+  return raw.trim().toLowerCase().replace(/_/g, "-");
+}
+
+function normalizeDetectedPlan(payload: Record<string, unknown>): string {
+  for (const raw of [payload.access_type_sku, payload.copilot_plan]) {
+    const value = normalizePlanName(raw);
+    if (!value) continue;
+
+    if (value.includes("education") || value.includes("student")) return "student";
+    if (value.includes("free")) return "free";
+    if (value.includes("enterprise")) return "enterprise";
+    if (value.includes("business")) return "business";
+    if (value === "pro-plus" || value === "proplus" || value === "pro+") return "pro+";
+    if (value === "pro" || value.includes("-pro-")) return "pro";
+  }
+
+  return "";
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +319,7 @@ async function fetchCopilotInternalUser(
 
     const payload = (await response.json()) as Record<string, unknown>;
 
-    const plan = normalizePlanName(payload.copilot_plan);
+    let plan = normalizeDetectedPlan(payload);
 
     // quota_snapshots can be an object keyed by quota_id or an array
     const rawSnapshots = payload.quota_snapshots;
@@ -346,6 +362,17 @@ async function fetchCopilotInternalUser(
       toFiniteNumber(premiumSnapshot?.entitlement) ??
       PLAN_LIMITS[plan] ??
       0;
+    if (!plan && entitlement > 0) {
+      plan = entitlement === 50
+        ? "free"
+        : entitlement === 1500
+          ? "pro+"
+          : entitlement === 1000
+            ? "enterprise"
+            : entitlement === 300
+              ? "pro"
+              : "";
+    }
     const remaining =
       toFiniteNumber(premiumSnapshot?.quota_remaining) ??
       toFiniteNumber(premiumSnapshot?.remaining) ??

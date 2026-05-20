@@ -21,7 +21,7 @@ const META_PROPERTY_ORDER = [
   "modalities",
 ];
 
-const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "authless", "minTier", "aliases"];
+const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "authless", "minTier", "allowedTiers", "aliases"];
 const FIRST_PROVIDERS = new Set(["opencode"]);
 
 function isPlainObject(value) {
@@ -164,13 +164,41 @@ function inferModelFamily(modelKey) {
  * @param {string} modelsDir Path to models/ directory
  * @param {string} providerName e.g. "nvidia_nim"
  * @param {Map<string,string>} modelMap modelKey -> upstreamName
+ * @param {{ providerConfigByModel?: Map<string, Record<string, unknown>>, managedProviderConfigKeys?: string[] }} [options]
  * @returns {{ added: string[], removed: string[], updated: string[] }}
  */
-export function syncProviderModels(modelsDir, providerName, modelMap) {
+export function syncProviderModels(modelsDir, providerName, modelMap, options = {}) {
   const index = buildModelIndex(modelsDir);
   const added = [];
   const removed = [];
   const updated = [];
+
+  function extraProviderConfig(modelKey) {
+    return options.providerConfigByModel?.get(modelKey) ?? {};
+  }
+
+  function applyManagedProviderConfig(providerConfig, modelKey) {
+    let changed = false;
+    const extraConfig = extraProviderConfig(modelKey);
+    const managedKeys = options.managedProviderConfigKeys ?? Object.keys(extraConfig);
+
+    for (const key of managedKeys) {
+      const nextValue = extraConfig[key];
+      if (nextValue === undefined) {
+        if (providerConfig[key] !== undefined) {
+          delete providerConfig[key];
+          changed = true;
+        }
+        continue;
+      }
+      if (JSON.stringify(providerConfig[key]) !== JSON.stringify(nextValue)) {
+        providerConfig[key] = nextValue;
+        changed = true;
+      }
+    }
+
+    return changed;
+  }
 
   function entryMatchesProviderMap(entry) {
     return modelMap.has(entry.fileId) || modelMap.has(entry.id);
@@ -217,19 +245,26 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
         changed = true;
       }
 
+      const extraConfig = extraProviderConfig(modelKey);
+      const managedKeys = options.managedProviderConfigKeys ?? Object.keys(extraConfig);
       const providerConfig = existing.data.providerConfig?.[providerName] || {};
+      const hasManagedProviderConfig = managedKeys.some((key) => providerConfig[key] !== undefined);
 
-      if (upstreamName !== existing.id) {
+      if (upstreamName !== existing.id || Object.keys(extraConfig).length > 0 || hasManagedProviderConfig || providerConfig.upstream !== undefined) {
         if (!existing.data.providerConfig) existing.data.providerConfig = {};
         if (!existing.data.providerConfig[providerName]) existing.data.providerConfig[providerName] = {};
-        if (existing.data.providerConfig[providerName].upstream !== upstreamName) {
-          existing.data.providerConfig[providerName].upstream = upstreamName;
+        const nextProviderConfig = existing.data.providerConfig[providerName];
+        if (applyManagedProviderConfig(nextProviderConfig, modelKey)) {
           changed = true;
         }
-      } else if (providerConfig.upstream !== undefined) {
-        delete providerConfig.upstream;
-        changed = true;
-        if (Object.keys(providerConfig).length === 0) {
+        if (upstreamName !== existing.id && nextProviderConfig.upstream !== upstreamName) {
+          nextProviderConfig.upstream = upstreamName;
+          changed = true;
+        } else if (upstreamName === existing.id && nextProviderConfig.upstream !== undefined) {
+          delete nextProviderConfig.upstream;
+          changed = true;
+        }
+        if (Object.keys(nextProviderConfig).length === 0) {
           delete existing.data.providerConfig[providerName];
         }
         if (existing.data.providerConfig && Object.keys(existing.data.providerConfig).length === 0) {
@@ -253,9 +288,13 @@ export function syncProviderModels(modelsDir, providerName, modelMap) {
       const family = inferModelFamily(modelKey) || inferModelFamily(upstreamName);
       if (family) data.family = family;
 
+      const providerConfig = { ...extraProviderConfig(modelKey) };
       if (upstreamName !== modelKey) {
+        providerConfig.upstream = upstreamName;
+      }
+      if (Object.keys(providerConfig).length > 0) {
         data.providerConfig = {
-          [providerName]: { upstream: upstreamName },
+          [providerName]: providerConfig,
         };
       }
 

@@ -88,12 +88,6 @@ function toPublicQuotaInfo(quota: AccountQuotaInfo): AccountQuotaInfo {
   };
 }
 
-async function persistDetectedTier(accountId: string, quota: AccountQuotaInfo) {
-  const tier = quota.tier.trim();
-  if (!tier || tier.toLowerCase() === "unknown") return;
-  await db.update(providerAccount).set({ tier }).where(eq(providerAccount.id, accountId));
-}
-
 async function fetchQuotaFromProxy(userId: string, provider: QuotaProviderKey, accountId: string, options: AccountQuotaFetchOptions = {}): Promise<AccountQuotaResult> {
   try {
     const response = await fetchInternalQuota({ userId, provider, accountId, forceRefresh: options.forceRefresh === true });
@@ -139,7 +133,6 @@ export async function getAccountQuota(userId: string, input: z.infer<typeof acco
 
     if (!account) return { success: false, error: "Account not found" } as const;
     const result = await fetchAccountQuota(userId, input.provider, account.id, { forceRefresh: input.forceRefresh });
-    if (result.success) await persistDetectedTier(account.id, result.data);
     return result;
   } catch (error) {
     console.error("Failed to fetch provider quota:", error);
@@ -167,8 +160,6 @@ export async function getAccountQuotas(userId: string, input: z.infer<typeof acc
 
     await Promise.all(accountsToFetch.map(async (accountId) => {
       results[accountId] = await fetchAccountQuota(userId, input.provider, accountId, { forceRefresh: input.forceRefresh });
-      const result = results[accountId];
-      if (result?.success) await persistDetectedTier(accountId, result.data);
     }));
     return { success: true, data: results } as const;
   } catch (error) {

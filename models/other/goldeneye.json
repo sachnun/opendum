@@ -3,5 +3,12 @@
     "copilot"
   ],
   "family": "OpenAI",
-  "ignored": true
+  "ignored": true,
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "free"
+      ]
+    }
+  }
 }

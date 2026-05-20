@@ -25,7 +25,12 @@
   },
   "providerConfig": {
     "copilot": {
-      "upstream": "claude-opus-4.7"
+      "upstream": "claude-opus-4.7",
+      "allowedTiers": [
+        "pro+",
+        "business",
+        "enterprise"
+      ]
     },
     "kiro": {
       "upstream": "claude-opus-4.7"

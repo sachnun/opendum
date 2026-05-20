@@ -20,6 +20,13 @@
   },
   "providerConfig": {
     "copilot": {
+      "allowedTiers": [
+        "student",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ],
       "responses_api": true
     }
   }

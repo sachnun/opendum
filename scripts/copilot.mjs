@@ -3,11 +3,13 @@
 /**
  * GitHub Copilot model discovery script.
  *
- * Fetches the official supported-models table from the GitHub docs repo and
- * syncs it into the JSON model registry.  No authentication is required — the
- * data is publicly available.
+ * Fetches the official supported-models and supported-plans tables from the
+ * GitHub docs repo and syncs them into the JSON model registry. No
+ * authentication is required — the data is publicly available.
  *
- * Source: https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-release-status.yml
+ * Sources:
+ *   - https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-release-status.yml
+ *   - https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-supported-plans.yml
  *
  * This file only lists models that are **currently supported** by GitHub
  * Copilot.  Retired models are tracked separately in model-deprecation-history.yml
@@ -28,9 +30,19 @@ import { syncProviderModels } from "./model-registry.mjs";
 
 const MODEL_TABLE_URL =
   "https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-release-status.yml";
+const SUPPORTED_PLANS_TABLE_URL =
+  "https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-supported-plans.yml";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 const PROVIDER_NAME = "copilot";
+const COPILOT_TIER_NAMES = {
+  free: "free",
+  student: "student",
+  pro: "pro",
+  pro_plus: "pro+",
+  business: "business",
+  enterprise: "enterprise",
+};
 
 // ---------------------------------------------------------------------------
 // Display name → { canonicalKey, upstreamName }
@@ -73,26 +85,26 @@ function sleep(ms) {
 }
 
 // ---------------------------------------------------------------------------
-// Fetch model-release-status.yml
+// Fetch GitHub docs YAML tables
 // ---------------------------------------------------------------------------
 
 /**
  * Fetch the supported-models table YAML from the GitHub docs repo.
  * @returns {Promise<string>} Raw YAML content.
  */
-async function fetchModelTable() {
+async function fetchText(url, label) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
     try {
-      const response = await fetch(MODEL_TABLE_URL, {
+      const response = await fetch(url, {
         headers: { Accept: "text/plain" },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch model-release-status.yml: ${response.status} ${response.statusText}`
+          `Failed to fetch ${label}: ${response.status} ${response.statusText}`
         );
       }
 
@@ -110,7 +122,15 @@ async function fetchModelTable() {
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("Failed to fetch model-release-status.yml");
+    : new Error(`Failed to fetch ${label}`);
+}
+
+async function fetchModelTable() {
+  return fetchText(MODEL_TABLE_URL, "model-release-status.yml");
+}
+
+async function fetchSupportedPlansTable() {
+  return fetchText(SUPPORTED_PLANS_TABLE_URL, "model-supported-plans.yml");
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +165,64 @@ function parseModelDisplayNames(yaml) {
   }
 
   return names;
+}
+
+function unquoteYamlScalar(value) {
+  const trimmed = value.trim();
+  const quote = trimmed[0];
+  if ((quote === "'" || quote === '"') && trimmed.endsWith(quote)) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function parseSupportedPlans(yaml) {
+  const entries = [];
+  let current = null;
+
+  for (const rawLine of yaml.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+
+    const nameMatch = line.match(/^-\s*name:\s*(.+)$/);
+    if (nameMatch) {
+      if (current) entries.push(current);
+      current = { name: unquoteYamlScalar(nameMatch[1]), plans: [] };
+      continue;
+    }
+
+    const planMatch = line.match(/^(free|student|pro|pro_plus|business|enterprise):\s*(true|false)$/);
+    if (current && planMatch && planMatch[2] === "true") {
+      current.plans.push(COPILOT_TIER_NAMES[planMatch[1]]);
+    }
+  }
+
+  if (current) entries.push(current);
+
+  if (entries.length === 0) {
+    throw new Error("No supported plan entries found in model-supported-plans.yml");
+  }
+
+  return entries;
+}
+
+function planConfigByModel(displayNames) {
+  const config = new Map();
+  const allTiers = Object.values(COPILOT_TIER_NAMES);
+  const seenKeys = new Set();
+
+  for (const entry of displayNames) {
+    const { key } = toCanonical(entry.name);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
+    const tiers = entry.plans.filter((tier) => allTiers.includes(tier));
+    if (tiers.length > 0 && tiers.length < allTiers.length) {
+      config.set(key, { allowedTiers: tiers });
+    }
+  }
+
+  return config;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,13 +276,19 @@ async function main() {
   const verbose =
     process.argv.includes("--verbose") || process.argv.includes("-v");
 
-  // 1. Fetch model-release-status.yml (only currently supported models)
+  // 1. Fetch public GitHub Docs YAML tables
   console.log(`[copilot] Fetching supported models from GitHub docs repo ...`);
-  const yaml = await fetchModelTable();
+  const [yaml, supportedPlansYaml] = await Promise.all([
+    fetchModelTable(),
+    fetchSupportedPlansTable(),
+  ]);
 
   // 2. Parse display names
   const displayNames = parseModelDisplayNames(yaml);
   console.log(`[copilot] Found ${displayNames.length} supported model display names.`);
+  const supportedPlans = parseSupportedPlans(supportedPlansYaml);
+  const providerConfigByModel = planConfigByModel(supportedPlans);
+  console.log(`[copilot] Found tier restrictions for ${providerConfigByModel.size} models.`);
 
   // 3. Build model map: canonical key → upstream name
   const modelMap = new Map();
@@ -230,6 +314,12 @@ async function main() {
     )) {
       console.log(`  ${key}${key !== upstream ? ` → ${upstream}` : ""}`);
     }
+    console.log("\n[copilot] Tier restrictions:");
+    for (const [key, config] of [...providerConfigByModel.entries()].sort(([a], [b]) =>
+      a.localeCompare(b)
+    )) {
+      console.log(`  ${key}: ${config.allowedTiers.join(", ")}`);
+    }
     console.log();
   }
 
@@ -242,7 +332,10 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
+    providerConfigByModel,
+    managedProviderConfigKeys: ["allowedTiers"],
+  });
 
   if (
     result.added.length === 0 &&

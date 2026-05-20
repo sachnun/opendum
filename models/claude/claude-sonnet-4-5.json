@@ -25,7 +25,13 @@
   },
   "providerConfig": {
     "copilot": {
-      "upstream": "claude-sonnet-4.5"
+      "upstream": "claude-sonnet-4.5",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
     },
     "kiro": {
       "upstream": "claude-sonnet-4.5"

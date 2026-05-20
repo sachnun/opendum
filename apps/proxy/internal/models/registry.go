@@ -26,15 +26,17 @@ type Modalities struct {
 }
 
 type ProviderAccessRule struct {
-	MinTier string
+	MinTier      string
+	AllowedTiers []string
 }
 
 type ProviderModelConfig struct {
-	Upstream string
-	MinTier  string
-	Authless bool
-	Aliases  []string
-	Custom   map[string]any
+	Upstream      string
+	MinTier       string
+	AllowedTiers  []string
+	Authless      bool
+	Aliases       []string
+	Custom        map[string]any
 }
 
 type Info struct {
@@ -189,6 +191,11 @@ func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			cfg.MinTier = strings.TrimSpace(minTier)
+		case "allowedTiers":
+			if err := json.Unmarshal(value, &cfg.AllowedTiers); err != nil {
+				return err
+			}
+			cfg.AllowedTiers = compactStrings(cfg.AllowedTiers)
 		case "authless":
 			if err := json.Unmarshal(value, &cfg.Authless); err != nil {
 				return err
@@ -314,8 +321,9 @@ func (r *Registry) ProviderAccessRule(model, provider string) (ProviderAccessRul
 	if !ok {
 		return ProviderAccessRule{}, false
 	}
-	if minTier := info.ProviderConfig[provider].MinTier; minTier != "" {
-		return ProviderAccessRule{MinTier: minTier}, true
+	cfg := info.ProviderConfig[provider]
+	if cfg.MinTier != "" || len(cfg.AllowedTiers) > 0 {
+		return ProviderAccessRule{MinTier: cfg.MinTier, AllowedTiers: append([]string(nil), cfg.AllowedTiers...)}, true
 	}
 	return ProviderAccessRule{}, false
 }

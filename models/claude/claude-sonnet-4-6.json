@@ -36,7 +36,13 @@
       "system_instruction": true
     },
     "copilot": {
-      "upstream": "claude-sonnet-4.6"
+      "upstream": "claude-sonnet-4.6",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
     },
     "kiro": {
       "upstream": "claude-sonnet-4.6"

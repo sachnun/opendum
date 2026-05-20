@@ -224,8 +224,11 @@ func (s *Service) fetchCopilotQuota(ctx context.Context, account appdb.ProviderA
 	if err := json.Unmarshal(result.Raw, &payload); err != nil {
 		return errorQuotaInfo(account, tier, "Copilot quota response was not valid JSON", time.Now().UnixMilli())
 	}
-	plan := strings.ToLower(parseQuotaString(payload["copilot_plan"]))
-	if plan != "" {
+	plan := strings.ToLower(strings.ReplaceAll(parseQuotaString(payload["copilot_plan"]), "_", "-"))
+	if detected := normalizeCopilotTier(payload); detected != "" {
+		tier = detected
+		plan = detected
+	} else if plan != "" {
 		tier = plan
 	}
 	entitlement, remaining := copilotEntitlement(payload, plan)
@@ -269,6 +272,52 @@ func copilotEntitlement(payload map[string]any, plan string) (float64, float64) 
 		remaining = entitlement
 	}
 	return entitlement, math.Max(0, remaining)
+}
+
+func normalizeCopilotTier(payload map[string]any) string {
+	for _, raw := range []string{parseQuotaString(payload["access_type_sku"]), parseQuotaString(payload["copilot_plan"])} {
+		value := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(raw), "_", "-"))
+		if value == "" {
+			continue
+		}
+		if strings.Contains(value, "education") || strings.Contains(value, "student") {
+			return "student"
+		}
+		if strings.Contains(value, "free") {
+			return "free"
+		}
+		if strings.Contains(value, "enterprise") {
+			return "enterprise"
+		}
+		if strings.Contains(value, "business") {
+			return "business"
+		}
+		if value == "pro-plus" || value == "proplus" || value == "pro+" {
+			return "pro+"
+		}
+		if value == "pro" || strings.Contains(value, "-pro-") {
+			return "pro"
+		}
+	}
+
+	snapshots := parseQuotaRecord(payload["quota_snapshots"])
+	premium := parseQuotaRecord(snapshots["premium_interactions"])
+	entitlement, ok := parseQuotaNumber(premium["entitlement"])
+	if !ok {
+		return ""
+	}
+	switch int(entitlement) {
+	case 50:
+		return "free"
+	case 300:
+		return "pro"
+	case 1000:
+		return "enterprise"
+	case 1500:
+		return "pro+"
+	default:
+		return ""
+	}
 }
 
 func parseSnapshotValues(value any) []any {
@@ -332,9 +381,6 @@ func (s *Service) fetchCodexQuota(ctx context.Context, account appdb.ProviderAcc
 	tier := parseQuotaString(payload["plan_type"])
 	if tier == "" {
 		tier = fallbackTier
-	}
-	if tier != fallbackTier && account.ID != "" {
-		_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("tier = ?", tier).Where("id = ?", account.ID).Exec(ctx)
 	}
 	apiGroups := parseCodexAPIGroups(payload, tier)
 	if len(apiGroups) > 0 {
@@ -464,7 +510,7 @@ func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.Provide
 			tier = info.tier
 		}
 		if projectID != "" {
-			_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"projectId\" = ?", projectID).Set("tier = ?", tier).Where("id = ?", account.ID).Exec(ctx)
+			_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"projectId\" = ?", projectID).Where("id = ?", account.ID).Exec(ctx)
 		}
 	}
 	if projectID == "" {

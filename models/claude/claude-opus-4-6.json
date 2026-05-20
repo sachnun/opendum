@@ -26,6 +26,7 @@
   },
   "providerConfig": {
     "antigravity": {
+      "upstream": "claude-opus-4-6-thinking",
       "anthropic_beta": true,
       "anthropic_beta_thinking": true,
       "convert_external_images": true,
@@ -36,11 +37,14 @@
       "strict_tool_schema": true,
       "system_instruction": true,
       "thinking_model": true,
-      "top_p_min_095": true,
-      "upstream": "claude-opus-4-6-thinking"
+      "top_p_min_095": true
     },
     "copilot": {
-      "upstream": "claude-opus-4.6"
+      "upstream": "claude-opus-4.6",
+      "allowedTiers": [
+        "business",
+        "enterprise"
+      ]
     },
     "kiro": {
       "upstream": "claude-opus-4.6"
