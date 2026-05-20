@@ -153,7 +153,6 @@ export const providerAccount = pgTable(
     errorCount: integer("errorCount").notNull().default(0),
     consecutiveErrors: integer("consecutiveErrors").notNull().default(0),
     lastErrorAt: timestamp("lastErrorAt"),
-    lastErrorMessage: text("lastErrorMessage"),
     lastErrorCode: integer("lastErrorCode"),
     lastRecoveredByRotationAt: timestamp("lastRecoveredByRotationAt"),
 
@@ -374,8 +373,8 @@ export const providerAccountModelHealth = pgTable(
 
     lastErrorAt: timestamp("lastErrorAt"),
     lastErrorCode: integer("lastErrorCode"),
-    lastErrorMessage: text("lastErrorMessage"),
     lastSuccessAt: timestamp("lastSuccessAt"),
+    unhealthyCountUpdatedAt: timestamp("unhealthyCountUpdatedAt"),
 
     createdAt: timestamp("createdAt").notNull().defaultNow(),
     updatedAt: timestamp("updatedAt")

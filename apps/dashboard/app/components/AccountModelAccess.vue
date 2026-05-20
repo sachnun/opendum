@@ -33,32 +33,17 @@ const hiddenCount = computed(() => props.supportedModels.length - visibleCount);
 
 function modelSortWeight(model: string): number {
   const status = props.modelHealth[model]?.status;
-  if (status === "failed") return 0;
-  if (status === "half_open") return 1;
-  if (status === "degraded") return 2;
-  return 3;
-}
-
-function modelHealthLabel(model: string): string | null {
-  const health = props.modelHealth[model];
-  if (!health || health.status === "active") return null;
-  if (health.status === "failed") return `Failed (${health.consecutiveErrors})`;
-  if (health.status === "half_open") return `Recovering (${health.consecutiveErrors})`;
-  if (health.status === "degraded") return `Degraded (${health.consecutiveErrors})`;
-  return null;
+  if (status === "degraded") return 0;
+  return 1;
 }
 
 function modelButtonTitle(model: string): string {
-  const action = disabledModels.value.has(model) ? "Enable" : "Disable";
-  const health = modelHealthLabel(model);
-  return health ? `${health}. ${action}` : action;
+  return disabledModels.value.has(model) ? "Enable" : "Disable";
 }
 
 function modelButtonClass(model: string): string {
   if (disabledModels.value.has(model)) return "border border-border/60 bg-transparent text-muted-foreground/60 line-through";
   const status = props.modelHealth[model]?.status;
-  if (status === "failed") return "border border-red-500/45 bg-transparent text-red-600";
-  if (status === "half_open") return "border border-yellow-500/45 bg-transparent text-yellow-700";
   if (status === "degraded") return "border border-yellow-500/45 bg-transparent text-yellow-700";
   return "border border-border bg-transparent text-foreground hover:bg-muted/30";
 }

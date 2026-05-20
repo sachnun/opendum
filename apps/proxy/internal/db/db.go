@@ -52,7 +52,6 @@ type ProviderAccount struct {
 	ErrorCount                int        `bun:"errorCount"`
 	ConsecutiveErrors         int        `bun:"consecutiveErrors"`
 	LastErrorAt               *time.Time `bun:"lastErrorAt"`
-	LastErrorMessage          *string    `bun:"lastErrorMessage"`
 	LastErrorCode             *int       `bun:"lastErrorCode"`
 	LastRecoveredByRotationAt *time.Time `bun:"lastRecoveredByRotationAt"`
 	Status                    string     `bun:"status"`
@@ -156,18 +155,18 @@ type PointTransaction struct {
 type ProviderAccountModelHealth struct {
 	bun.BaseModel `bun:"table:provider_account_model_health"`
 
-	ID                string     `bun:"id,pk"`
-	ProviderAccountID string     `bun:"providerAccountId"`
-	Model             string     `bun:"model"`
-	ConsecutiveErrors int        `bun:"consecutiveErrors"`
-	Status            string     `bun:"status"`
-	StatusChangedAt   *time.Time `bun:"statusChangedAt"`
-	LastErrorAt       *time.Time `bun:"lastErrorAt"`
-	LastErrorCode     *int       `bun:"lastErrorCode"`
-	LastErrorMessage  *string    `bun:"lastErrorMessage"`
-	LastSuccessAt     *time.Time `bun:"lastSuccessAt"`
-	CreatedAt         time.Time  `bun:"createdAt"`
-	UpdatedAt         time.Time  `bun:"updatedAt"`
+	ID                      string     `bun:"id,pk"`
+	ProviderAccountID       string     `bun:"providerAccountId"`
+	Model                   string     `bun:"model"`
+	ConsecutiveErrors       int        `bun:"consecutiveErrors"`
+	Status                  string     `bun:"status"`
+	StatusChangedAt         *time.Time `bun:"statusChangedAt"`
+	LastErrorAt             *time.Time `bun:"lastErrorAt"`
+	LastErrorCode           *int       `bun:"lastErrorCode"`
+	LastSuccessAt           *time.Time `bun:"lastSuccessAt"`
+	UnhealthyCountUpdatedAt *time.Time `bun:"unhealthyCountUpdatedAt"`
+	CreatedAt               time.Time  `bun:"createdAt"`
+	UpdatedAt               time.Time  `bun:"updatedAt"`
 }
 
 type ProviderAccountDisabledModel struct {

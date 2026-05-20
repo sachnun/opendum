@@ -10,7 +10,6 @@ type ErrorPreviewEntry = {
   errorCode: number | null;
   errorMessage: string;
   createdAt: string | Date | null;
-  isCurrent: boolean;
 };
 
 type TemporaryOffUnit = "minutes" | "hours" | "days";
@@ -590,62 +589,28 @@ function getErrorToneClass(entry: ErrorPreviewEntry | null | undefined): string 
   return hasRecoveredAfterError ? "text-amber-400" : "text-red-500";
 }
 
-const currentErrorMessage = computed(() => props.account.lastErrorMessage ?? "");
-const currentHistoryEntry = computed(() => {
-  const currentErrorAtMs = toTimeMs(props.account.lastErrorAt);
-
-  return (historyEntries.value ?? []).find((entry) => {
-    const entryCreatedAtMs = toTimeMs(entry.createdAt);
-    const isSameError = entry.errorCode === props.account.lastErrorCode && entry.errorMessage === currentErrorMessage.value;
-    if (!isSameError) return false;
-    if (!currentErrorAtMs) return true;
-
-    return !entryCreatedAtMs || Math.abs(entryCreatedAtMs - currentErrorAtMs) <= 1000;
-  }) ?? null;
+const latestHistoryEntry = computed<ErrorPreviewEntry | null>(() => {
+  const entry = historyEntries.value?.[0];
+  if (!entry) return null;
+  return {
+    id: entry.id,
+    model: entry.model ?? getErrorMessageModel(entry.errorMessage, entry.errorCode),
+    errorCode: entry.errorCode,
+    errorMessage: entry.errorMessage,
+    createdAt: entry.createdAt,
+  };
 });
-const currentErrorModel = computed(() => currentHistoryEntry.value?.model ?? getErrorMessageModel(currentErrorMessage.value, props.account.lastErrorCode));
-const currentErrorPreviewEntry = computed<ErrorPreviewEntry>(() => ({
-  id: "current",
-  model: currentErrorModel.value,
-  errorCode: props.account.lastErrorCode,
-  errorMessage: currentErrorMessage.value,
-  createdAt: props.account.lastErrorAt,
-  isCurrent: true,
-}));
-const errorToneClass = computed(() => getErrorToneClass(currentErrorPreviewEntry.value));
+const errorToneClass = computed(() => getErrorToneClass(latestHistoryEntry.value));
 const allErrorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
-  if (!currentErrorMessage.value) return [];
-
-  const currentErrorAtMs = toTimeMs(props.account.lastErrorAt);
-  const history = (historyEntries.value ?? []).filter((entry) => {
-    const entryCreatedAtMs = toTimeMs(entry.createdAt);
-    if (currentErrorAtMs && entryCreatedAtMs && entryCreatedAtMs > currentErrorAtMs + 1000) return false;
-
-    const isSameError = entry.errorCode === props.account.lastErrorCode && entry.errorMessage === currentErrorMessage.value;
-    if (!isSameError) return true;
-    if (!currentErrorAtMs) return false;
-
-    return !entryCreatedAtMs || Math.abs(entryCreatedAtMs - currentErrorAtMs) > 1000;
-  }).sort((a, b) => (toTimeMs(b.createdAt) ?? 0) - (toTimeMs(a.createdAt) ?? 0));
-
-  return [
-    {
-      id: "current",
-      model: currentErrorModel.value,
-      errorCode: props.account.lastErrorCode,
-      errorMessage: currentErrorMessage.value,
-      createdAt: props.account.lastErrorAt,
-      isCurrent: true,
-    },
-    ...history.map((entry) => ({
+  return (historyEntries.value ?? [])
+    .map((entry) => ({
       id: entry.id,
       model: entry.model ?? getErrorMessageModel(entry.errorMessage, entry.errorCode),
       errorCode: entry.errorCode,
       errorMessage: entry.errorMessage,
       createdAt: entry.createdAt,
-      isCurrent: false,
-    })),
-  ];
+    }))
+    .sort((a, b) => (toTimeMs(b.createdAt) ?? 0) - (toTimeMs(a.createdAt) ?? 0));
 });
 const errorPreviewWindowStart = computed(() => {
   const total = allErrorPreviewEntries.value.length;
@@ -716,14 +681,12 @@ const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < allError
 const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
 
 watch(
-  () => [props.account.id, props.account.lastErrorMessage, props.account.lastErrorAt, props.account.lastErrorCode] as const,
-  ([id, message], previous) => {
+  () => [props.account.id, props.account.lastErrorAt] as const,
+  ([id], previous) => {
     activeErrorIndex.value = 0;
     historyRequestId += 1;
     if (previous && id !== previous[0]) historyEntries.value = null;
     historyError.value = null;
-
-    if (!message) return;
     loadErrorHistory();
   },
   { immediate: true }
@@ -1000,7 +963,7 @@ async function copyErrorDetails() {
 }
 
 async function copyAllErrors() {
-  const parts: string[] = [`[Current Error]\n${currentErrorMessage.value}`];
+  const parts: string[] = [];
 
   if (historyEntries.value && historyEntries.value.length > 0) {
     for (const entry of historyEntries.value) {
@@ -1008,13 +971,15 @@ async function copyAllErrors() {
     }
   }
 
+  if (parts.length === 0) return;
+
   if (!(await copyToClipboard(parts.join("\n\n---\n\n")))) return;
   copiedAllErrors.value = true;
   resetFlag(copiedAllErrors);
 }
 
 function getErrorEntryRelativeTime(entry: ErrorPreviewEntry): string {
-  if (!entry.createdAt) return entry.isCurrent ? "Current" : "Unknown time";
+  if (!entry.createdAt) return "Unknown time";
   const createdAt = new Date(entry.createdAt);
   return Number.isNaN(createdAt.getTime()) ? "Unknown time" : formatRelativeTime(createdAt);
 }
@@ -1085,15 +1050,11 @@ function cancelErrorPreviewPointer() {
             </UiBadge>
             <UiBadge v-if="account.status === 'failed'" variant="outline" class="border-destructive/60 text-destructive gap-1">
               <UiIcon name="i-lucide-alert-circle" class="size-3" />
-              {{ account.consecutiveErrors }}
+              {{ account.unhealthyCount }}
             </UiBadge>
-            <UiBadge v-else-if="account.status === 'degraded'" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
+            <UiBadge v-else-if="account.unhealthyCount > 0" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
               <UiIcon name="i-lucide-triangle-alert" class="size-3" />
-              {{ account.consecutiveErrors }}
-            </UiBadge>
-            <UiBadge v-else-if="account.status === 'half_open'" variant="outline" class="border-yellow-500 text-yellow-600 gap-1">
-              <UiIcon name="i-lucide-activity" class="size-3" />
-              Unhealty
+              {{ account.unhealthyCount }}
             </UiBadge>
           </div>
         </div>
@@ -1142,7 +1103,7 @@ function cancelErrorPreviewPointer() {
             <div class="space-y-1.5 pt-2">
               <div class="h-32 pb-1">
                 <div
-                  v-if="account.lastErrorMessage && activeErrorEntry"
+                  v-if="activeErrorEntry"
                   tabindex="-1"
                   class="flex h-full cursor-pointer touch-pan-y flex-col rounded-sm border border-border/60 bg-muted/30 px-2 pt-2 pb-2 text-left select-none hover:bg-muted/40"
                   @click="openActiveErrorDialog"
@@ -1161,7 +1122,7 @@ function cancelErrorPreviewPointer() {
                       <button
                         type="button"
                         class="shrink-0 cursor-pointer rounded p-0.5"
-                        :aria-label="activeErrorEntry.isCurrent ? 'Copy current error message' : 'Copy previous error message'"
+                        aria-label="Copy error message"
                         @click="copyErrorPreview"
                       >
                         <UiIcon v-if="copiedErrorPreview" name="i-lucide-check" class="size-3 text-muted-foreground" />

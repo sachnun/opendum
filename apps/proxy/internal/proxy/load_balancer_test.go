@@ -8,37 +8,41 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
-func TestEffectiveHealthStatusDowngradesExpiredFailed(t *testing.T) {
+func TestEffectiveUnhealthyCountDecaysAfterIdleIntervals(t *testing.T) {
 	now := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
-	changedAt := now.Add(-failedCooldown)
-	health := effectiveHealthStatus(appdb.ProviderAccountModelHealth{Status: "failed", StatusChangedAt: &changedAt}, now)
+	lastRequestAt := now.Add(-31 * time.Minute)
+	health := appdb.ProviderAccountModelHealth{ConsecutiveErrors: 5, UnhealthyCountUpdatedAt: &lastRequestAt}
 
-	if health.Status != "degraded" {
-		t.Fatalf("expired failed health status = %q, want degraded", health.Status)
+	if got := effectiveUnhealthyCount(health, now); got != 2 {
+		t.Fatalf("effective unhealthy count = %d, want 2", got)
 	}
 }
 
-func TestSuccessRecoveryState(t *testing.T) {
-	tests := []struct {
-		name       string
-		status     string
-		errors     int
-		wantErrors int
-		wantStatus string
-		wantUpdate bool
-	}{
-		{name: "degraded counts down", status: "degraded", errors: 3, wantErrors: 2, wantStatus: "degraded", wantUpdate: true},
-		{name: "degraded recovers", status: "degraded", errors: 1, wantErrors: 0, wantStatus: "active", wantUpdate: true},
-		{name: "active only counts down", status: "active", errors: 2, wantErrors: 1, wantStatus: "active", wantUpdate: false},
-	}
+func TestEffectiveUnhealthyCountDoesNotDecayBeforeIdleInterval(t *testing.T) {
+	now := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
+	lastRequestAt := now.Add(-9 * time.Minute)
+	health := appdb.ProviderAccountModelHealth{ConsecutiveErrors: 5, UnhealthyCountUpdatedAt: &lastRequestAt}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotErrors, gotStatus, gotUpdate := successRecoveryState(tt.status, tt.errors)
-			if gotErrors != tt.wantErrors || gotStatus != tt.wantStatus || gotUpdate != tt.wantUpdate {
-				t.Fatalf("successRecoveryState(%q, %d) = (%d, %q, %v), want (%d, %q, %v)", tt.status, tt.errors, gotErrors, gotStatus, gotUpdate, tt.wantErrors, tt.wantStatus, tt.wantUpdate)
-			}
-		})
+	if got := effectiveUnhealthyCount(health, now); got != 5 {
+		t.Fatalf("effective unhealthy count = %d, want 5", got)
+	}
+}
+
+func TestModelHealthStatusStartsDegradedAtTwo(t *testing.T) {
+	if got := modelHealthStatus(1); got != "active" {
+		t.Fatalf("status for 1 unhealthy = %q, want active", got)
+	}
+	if got := modelHealthStatus(2); got != "degraded" {
+		t.Fatalf("status for 2 unhealthy = %q, want degraded", got)
+	}
+}
+
+func TestCooldownRecoveryCountReducesRoundedThirtyPercent(t *testing.T) {
+	tests := map[int]int{1: 1, 2: 1, 3: 2, 5: 3, 10: 7}
+	for input, want := range tests {
+		if got := cooldownRecoveryCount(input); got != want {
+			t.Fatalf("cooldownRecoveryCount(%d) = %d, want %d", input, got, want)
+		}
 	}
 }
 

@@ -78,8 +78,8 @@ export interface ProviderAccountItem {
   lastErrorAt: string | Date | null;
   lastSuccessAt: string | Date | null;
   lastRecoveredByRotationAt: string | Date | null;
-  lastErrorMessage: string | null;
   lastErrorCode: number | null;
+  unhealthyCount: number;
   successCount: number;
   createdAt: string | Date;
 }
@@ -88,7 +88,7 @@ export interface ProviderAccountDetailItem extends ProviderAccountItem {
   stats: ProviderStats;
 }
 
-export type ProviderAccountUpdateData = Pick<ProviderAccountItem, "id" | "name" | "isActive" | "disabledUntil" | "status" | "statusChangedAt" | "consecutiveErrors">;
+export type ProviderAccountUpdateData = Pick<ProviderAccountItem, "id" | "name" | "isActive" | "disabledUntil" | "status" | "statusChangedAt" | "consecutiveErrors" | "unhealthyCount">;
 
 export interface ProviderAccountModelHealthItem {
   status: string;

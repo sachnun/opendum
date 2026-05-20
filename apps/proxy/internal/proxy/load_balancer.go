@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -17,8 +18,10 @@ import (
 
 const (
 	failedCooldown                     = 10 * time.Minute
-	degradedThreshold                  = 3
-	failedThreshold                    = 7
+	unhealthyIdleDecayInterval         = 10 * time.Minute
+	modelDegradedThreshold             = 2
+	accountCooldownUnhealthyThreshold  = 10
+	cooldownRecoveryRatio              = 0.30
 	maxStoredErrorLen                  = 10000
 	providerModelAuthlessAccountPrefix = "authless:"
 )
@@ -214,8 +217,29 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 }
 
 func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.ProviderAccount, model string) (*appdb.ProviderAccount, bool, error) {
-	ids := make([]string, 0, len(prioritized))
-	for _, account := range prioritized {
+	now := time.Now()
+	ready := make([]appdb.ProviderAccount, 0, len(prioritized))
+	for i := range prioritized {
+		account := prioritized[i]
+		if isSyntheticProviderAccountID(account.ID) {
+			ready = append(ready, account)
+			continue
+		}
+		coolingDown, err := s.refreshAccountHealthFromModels(ctx, account.ID, now)
+		if err != nil {
+			return nil, true, err
+		}
+		if coolingDown {
+			continue
+		}
+		ready = append(ready, account)
+	}
+	if len(ready) == 0 {
+		return nil, true, nil
+	}
+
+	ids := make([]string, 0, len(ready))
+	for _, account := range ready {
 		ids = append(ids, account.ID)
 	}
 	health, err := s.getHealthByAccount(ctx, ids, s.registry.LookupKeys(model))
@@ -223,23 +247,12 @@ func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.Pr
 		return nil, true, err
 	}
 
-	now := time.Now()
 	var selected *appdb.ProviderAccount
-	for i := range prioritized {
-		account := &prioritized[i]
+	for i := range ready {
+		account := &ready[i]
 		row, ok := health[account.ID]
 		if ok {
-			updatedRow := effectiveHealthStatus(row, now)
-			if updatedRow.Status != row.Status {
-				_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("status = ?", updatedRow.Status).Set("\"statusChangedAt\" = ?", now).Where("id = ?", row.ID).Exec(ctx)
-			}
-			row = updatedRow
-			if row.Status == "failed" {
-				if row.StatusChangedAt != nil && now.Sub(*row.StatusChangedAt) < failedCooldown {
-					continue
-				}
-			}
-			if row.Status == "half_open" || row.Status == "degraded" {
+			if row.Status == "degraded" {
 				if selected == nil {
 					selected = account
 				}
@@ -254,14 +267,6 @@ func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.Pr
 	}
 	go s.bumpAccountRequestCount(context.Background(), selected.ID, now)
 	return selected, true, nil
-}
-
-func effectiveHealthStatus(row appdb.ProviderAccountModelHealth, now time.Time) appdb.ProviderAccountModelHealth {
-	if row.Status != "failed" || row.StatusChangedAt == nil || now.Sub(*row.StatusChangedAt) < failedCooldown {
-		return row
-	}
-	row.Status = "degraded"
-	return row
 }
 
 func (s *Service) bumpAccountRequestCount(ctx context.Context, accountID string, usedAt time.Time) {
@@ -284,6 +289,146 @@ func (s *Service) getHealthByAccount(ctx context.Context, accountIDs, modelKeys 
 		result[row.ProviderAccountID] = row
 	}
 	return result, nil
+}
+
+func latestHealthRequestAt(row appdb.ProviderAccountModelHealth) *time.Time {
+	latest := row.UnhealthyCountUpdatedAt
+	if row.LastErrorAt != nil && (latest == nil || row.LastErrorAt.After(*latest)) {
+		latest = row.LastErrorAt
+	}
+	if row.LastSuccessAt != nil && (latest == nil || row.LastSuccessAt.After(*latest)) {
+		latest = row.LastSuccessAt
+	}
+	if latest == nil && !row.UpdatedAt.IsZero() {
+		latest = &row.UpdatedAt
+	}
+	if latest == nil && !row.CreatedAt.IsZero() {
+		latest = &row.CreatedAt
+	}
+	return latest
+}
+
+func effectiveUnhealthyCount(row appdb.ProviderAccountModelHealth, now time.Time) int {
+	count := row.ConsecutiveErrors
+	if count <= 0 {
+		return 0
+	}
+	lastRequestAt := latestHealthRequestAt(row)
+	if lastRequestAt == nil || lastRequestAt.After(now) {
+		return count
+	}
+	decay := int(now.Sub(*lastRequestAt) / unhealthyIdleDecayInterval)
+	if decay <= 0 {
+		return count
+	}
+	if decay >= count {
+		return 0
+	}
+	return count - decay
+}
+
+func modelHealthStatus(unhealthyCount int) string {
+	if unhealthyCount >= modelDegradedThreshold {
+		return "degraded"
+	}
+	return "active"
+}
+
+func cooldownRecoveryCount(unhealthyCount int) int {
+	if unhealthyCount <= 0 {
+		return 0
+	}
+	reduction := int(math.Round(float64(unhealthyCount) * cooldownRecoveryRatio))
+	if reduction < 0 {
+		reduction = 0
+	}
+	if reduction > unhealthyCount {
+		return 0
+	}
+	return unhealthyCount - reduction
+}
+
+func (s *Service) normalizeModelHealthRows(ctx context.Context, rows []appdb.ProviderAccountModelHealth, now time.Time, applyCooldownRecovery bool) (int, error) {
+	total := 0
+	for _, row := range rows {
+		count := effectiveUnhealthyCount(row, now)
+		if applyCooldownRecovery {
+			count = cooldownRecoveryCount(count)
+		}
+		status := modelHealthStatus(count)
+		statusChanged := status != row.Status
+		total += count
+
+		if count == row.ConsecutiveErrors && !statusChanged && !applyCooldownRecovery {
+			continue
+		}
+		query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).
+			Set("\"consecutiveErrors\" = ?", count).
+			Set("\"unhealthyCountUpdatedAt\" = ?", now).
+			Where("id = ?", row.ID)
+		if row.Status == "failed" || statusChanged {
+			query.Set("status = ?", status).Set("\"statusChangedAt\" = ?", now)
+		}
+		if _, err := query.Exec(ctx); err != nil {
+			return total, err
+		}
+	}
+	return total, nil
+}
+
+func (s *Service) refreshAccountHealthFromModels(ctx context.Context, accountID string, now time.Time) (bool, error) {
+	if isSyntheticProviderAccountID(accountID) {
+		return false, nil
+	}
+
+	var account appdb.ProviderAccount
+	if err := s.db.NewSelect().Model(&account).Column("id", "status", "disabledUntil", "consecutiveErrors").Where("id = ?", accountID).Limit(1).Scan(ctx); err != nil {
+		return false, err
+	}
+
+	var rows []appdb.ProviderAccountModelHealth
+	if err := s.db.NewSelect().Model(&rows).Where("\"providerAccountId\" = ?", accountID).Scan(ctx); err != nil {
+		return false, err
+	}
+
+	applyCooldownRecovery := account.Status == "failed" && account.DisabledUntil != nil && !account.DisabledUntil.After(now)
+	total, err := s.normalizeModelHealthRows(ctx, rows, now, applyCooldownRecovery)
+	if err != nil {
+		return false, err
+	}
+
+	if account.DisabledUntil != nil && account.DisabledUntil.After(now) {
+		if account.ConsecutiveErrors != total {
+			_, err := s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"consecutiveErrors\" = ?", total).Set("status = ?", "failed").Set("\"statusChangedAt\" = ?", now).Where("id = ?", accountID).Exec(ctx)
+			return true, err
+		}
+		return true, nil
+	}
+
+	if total >= accountCooldownUnhealthyThreshold {
+		cooldownUntil := failedCooldownUntil(now)
+		_, err := s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
+			Set("status = ?", "failed").
+			Set("\"statusChangedAt\" = ?", now).
+			Set("\"consecutiveErrors\" = ?", total).
+			Set("\"disabledUntil\" = ?", cooldownUntil).
+			Where("id = ?", accountID).
+			Exec(ctx)
+		return true, err
+	}
+
+	if account.Status != "active" || account.DisabledUntil != nil && !account.DisabledUntil.After(now) || account.ConsecutiveErrors != total {
+		_, err := s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
+			Set("status = ?", "active").
+			Set("\"statusChangedAt\" = ?", now).
+			Set("\"consecutiveErrors\" = ?", total).
+			Set("\"disabledUntil\" = NULL").
+			Where("id = ?", accountID).
+			Exec(ctx)
+		return false, err
+	}
+
+	return false, nil
 }
 
 func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, forcedAccountID *string, accountAccess auth.AccountAccess, allowInactive bool) (*appdb.ProviderAccount, *routeError) {
@@ -327,6 +472,11 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		}
 		return nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 	}
+	if coolingDown, err := s.refreshAccountHealthFromModels(ctx, account.ID, time.Now()); err != nil {
+		return nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
+	} else if coolingDown {
+		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected provider account is temporarily disabled", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_temporarily_disabled")}
+	}
 	if availabilityErr := validateForcedAccountAvailability(account, allowInactive, param); availabilityErr != nil {
 		return nil, availabilityErr
 	}
@@ -365,28 +515,21 @@ func (s *Service) markAccountSuccess(ctx context.Context, accountID, model strin
 	var health appdb.ProviderAccountModelHealth
 	err := s.db.NewSelect().Model(&health).Where("\"providerAccountId\" = ?", accountID).Where("model = ?", resolved).Limit(1).Scan(ctx)
 	if err != nil {
+		_, _ = s.refreshAccountHealthFromModels(ctx, accountID, now)
 		return
 	}
-	nextErrors, nextStatus, recovering := successRecoveryState(health.Status, health.ConsecutiveErrors)
-	query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("\"consecutiveErrors\" = ?", nextErrors).Set("\"lastSuccessAt\" = ?", now).Where("id = ?", health.ID)
-	if recovering {
+	nextErrors := effectiveUnhealthyCount(health, now)
+	nextStatus := modelHealthStatus(nextErrors)
+	query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).
+		Set("\"consecutiveErrors\" = ?", nextErrors).
+		Set("\"lastSuccessAt\" = ?", now).
+		Set("\"unhealthyCountUpdatedAt\" = ?", now).
+		Where("id = ?", health.ID)
+	if nextStatus != health.Status {
 		query.Set("status = ?", nextStatus).Set("\"statusChangedAt\" = ?", now)
 	}
 	_, _ = query.Exec(ctx)
-}
-
-func successRecoveryState(status string, consecutiveErrors int) (int, string, bool) {
-	nextErrors := consecutiveErrors
-	if nextErrors > 0 {
-		nextErrors--
-	}
-	if status != "degraded" && status != "failed" && status != "half_open" {
-		return nextErrors, status, false
-	}
-	if nextErrors > 0 {
-		return nextErrors, "degraded", true
-	}
-	return nextErrors, "active", true
+	_, _ = s.refreshAccountHealthFromModels(ctx, accountID, now)
 }
 
 func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, durationMS int, stream bool, requestStartMS, upstreamFirstResponseMS int64) {
@@ -405,34 +548,28 @@ func (s *Service) markAccountFailed(ctx context.Context, accountID, model string
 	if len(message) > maxStoredErrorLen {
 		message = message[:maxStoredErrorLen]
 	}
-	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"errorCount\" = \"errorCount\" + 1").Set("\"lastErrorAt\" = ?", now).Set("\"lastErrorMessage\" = ?", message).Set("\"lastErrorCode\" = ?", statusCode).Where("id = ?", accountID).Exec(ctx)
+	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"errorCount\" = \"errorCount\" + 1").Set("\"lastErrorAt\" = ?", now).Set("\"lastErrorCode\" = ?", statusCode).Where("id = ?", accountID).Exec(ctx)
 	resolved := s.registry.ResolveAlias(model)
-	healthID := appdb.NewID()
-	_, _ = s.db.NewInsert().Model(&appdb.ProviderAccountModelHealth{ID: healthID, ProviderAccountID: accountID, Model: resolved, ConsecutiveErrors: 1, LastErrorAt: &now, LastErrorCode: &statusCode, LastErrorMessage: &message, CreatedAt: now, UpdatedAt: now}).
-		On("CONFLICT (\"providerAccountId\", model) DO UPDATE").
-		Set("\"consecutiveErrors\" = provider_account_model_health.\"consecutiveErrors\" + 1").
-		Set("\"lastErrorAt\" = ?", now).
-		Set("\"lastErrorCode\" = ?", statusCode).
-		Set("\"lastErrorMessage\" = ?", message).
-		Exec(ctx)
-
 	var health appdb.ProviderAccountModelHealth
 	if err := s.db.NewSelect().Model(&health).Where("\"providerAccountId\" = ?", accountID).Where("model = ?", resolved).Limit(1).Scan(ctx); err == nil {
-		newStatus := ""
-		if health.Status == "half_open" {
-			newStatus = "failed"
-		} else if health.ConsecutiveErrors >= failedThreshold && health.Status != "failed" {
-			newStatus = "failed"
-		} else if health.ConsecutiveErrors >= degradedThreshold && health.Status == "active" {
-			newStatus = "degraded"
+		nextErrors := effectiveUnhealthyCount(health, now) + 1
+		nextStatus := modelHealthStatus(nextErrors)
+		query := s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).
+			Set("\"consecutiveErrors\" = ?", nextErrors).
+			Set("\"lastErrorAt\" = ?", now).
+			Set("\"lastErrorCode\" = ?", statusCode).
+			Set("\"unhealthyCountUpdatedAt\" = ?", now).
+			Where("id = ?", health.ID)
+		if nextStatus != health.Status {
+			query.Set("status = ?", nextStatus).Set("\"statusChangedAt\" = ?", now)
 		}
-		if newStatus != "" {
-			_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).Set("status = ?", newStatus).Set("\"statusChangedAt\" = ?", now).Where("id = ?", health.ID).Exec(ctx)
-			if newStatus == "failed" {
-				s.disableAccountForFailedCooldown(ctx, accountID, now)
-			}
-		}
+		_, _ = query.Exec(ctx)
+	} else {
+		nextErrors := 1
+		nextStatus := modelHealthStatus(nextErrors)
+		_, _ = s.db.NewInsert().Model(&appdb.ProviderAccountModelHealth{ID: appdb.NewID(), ProviderAccountID: accountID, Model: resolved, ConsecutiveErrors: nextErrors, Status: nextStatus, LastErrorAt: &now, LastErrorCode: &statusCode, UnhealthyCountUpdatedAt: &now, CreatedAt: now, UpdatedAt: now}).Exec(ctx)
 	}
+	_, _ = s.refreshAccountHealthFromModels(ctx, accountID, now)
 
 	var account appdb.ProviderAccount
 	if err := s.db.NewSelect().Model(&account).Column("userId").Where("id = ?", accountID).Limit(1).Scan(ctx); err == nil {
@@ -446,31 +583,26 @@ func failedCooldownUntil(failedAt time.Time) time.Time {
 	return failedAt.Add(failedCooldown)
 }
 
-func (s *Service) disableAccountForFailedCooldown(ctx context.Context, accountID string, failedAt time.Time) {
-	if isSyntheticProviderAccountID(accountID) {
-		return
-	}
-	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
-		Set("\"disabledUntil\" = ?", failedCooldownUntil(failedAt)).
-		Where("id = ?", accountID).
-		Exec(ctx)
-}
-
 func (s *Service) markAccountUsageLimited(ctx context.Context, accountID, model string, disabledUntil, failedAt time.Time) {
 	if isSyntheticProviderAccountID(accountID) {
 		return
 	}
-	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
-		Set("\"disabledUntil\" = ?", disabledUntil).
-		Where("id = ?", accountID).
-		Exec(ctx)
-
 	resolved := s.registry.ResolveAlias(model)
 	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccountModelHealth)(nil)).
 		Set("status = ?", "failed").
 		Set("\"statusChangedAt\" = ?", failedAt).
+		Set("\"consecutiveErrors\" = ?", accountCooldownUnhealthyThreshold).
+		Set("\"lastErrorAt\" = ?", failedAt).
+		Set("\"unhealthyCountUpdatedAt\" = ?", failedAt).
 		Where("\"providerAccountId\" = ?", accountID).
 		Where("model = ?", resolved).
+		Exec(ctx)
+	_, _ = s.refreshAccountHealthFromModels(ctx, accountID, failedAt)
+	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
+		Set("\"disabledUntil\" = ?", disabledUntil).
+		Set("status = ?", "failed").
+		Set("\"statusChangedAt\" = ?", failedAt).
+		Where("id = ?", accountID).
 		Exec(ctx)
 }
 
