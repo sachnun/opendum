@@ -1800,7 +1800,7 @@ function formatToolArguments(value: string): string {
         </div>
       </div>
 
-      <div class="dashboard-card-grid">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))]">
         <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
           <UiTooltip v-if="panels.length > 1" text="Remove">
             <UiButton variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" aria-label="Remove comparison card" @click="removePanel(panel.id)">

@@ -319,7 +319,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
             <h3 class="text-sm font-semibold">{{ section.name }}</h3>
             <UiBadge variant="outline" class="text-[10px] font-normal">{{ section.models.length }} models</UiBadge>
           </div>
-          <div class="dashboard-card-grid">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))]">
             <UiCard
               v-for="model in section.models"
               :key="model.id"
