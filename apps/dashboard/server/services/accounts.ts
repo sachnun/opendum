@@ -16,7 +16,8 @@ const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degrad
 const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
 const MAX_ERROR_HISTORY_ROWS = 8;
-const ACCOUNT_OVERVIEW_CURSOR_VERSION = 1;
+const ACCOUNT_OVERVIEW_CURSOR_VERSION = 2;
+const PROVIDER_DETAIL_CURSOR_VERSION = 1;
 
 type AccountSummarySourceRow = {
   id: string;
@@ -53,13 +54,12 @@ type AccountOverviewSummary = { connected: number; active: number; indicator: Pr
 type AccountStatsResult = Awaited<ReturnType<typeof buildAccountStats>>;
 
 type AccountOverviewCursor = {
-  v: typeof ACCOUNT_OVERVIEW_CURSOR_VERSION;
   pinned: string;
-  summaries: Partial<Record<ProviderAccountKey, string>>;
+  summaries: string;
 };
 
 type ProviderDetailCursor = {
-  v: typeof ACCOUNT_OVERVIEW_CURSOR_VERSION;
+  v: typeof PROVIDER_DETAIL_CURSOR_VERSION;
   accounts: Record<string, string>;
   supportedModels: string;
   disabledModelsByAccountId: Record<string, string>;
@@ -166,33 +166,21 @@ function hashAccountOverviewValue(value: unknown) {
 }
 
 function encodeAccountOverviewCursor(pinnedProviders: ProviderAccountKey[], summaries: Record<ProviderAccountKey, AccountOverviewSummary>) {
-  const cursor: AccountOverviewCursor = {
-    v: ACCOUNT_OVERVIEW_CURSOR_VERSION,
-    pinned: hashAccountOverviewValue(pinnedProviders),
-    summaries: Object.fromEntries(PROVIDER_ACCOUNT_KEYS.map((provider) => [provider, hashAccountOverviewValue(summaries[provider])])),
-  };
-
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+  return [ACCOUNT_OVERVIEW_CURSOR_VERSION, hashAccountOverviewValue(pinnedProviders), hashAccountOverviewValue(summaries)].join(".");
 }
 
 function decodeAccountOverviewCursor(cursor: string | undefined): AccountOverviewCursor | null {
   if (!cursor) return null;
 
-  try {
-    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<AccountOverviewCursor>;
-    if (parsed.v !== ACCOUNT_OVERVIEW_CURSOR_VERSION || typeof parsed.pinned !== "string" || !parsed.summaries || typeof parsed.summaries !== "object") {
-      return null;
-    }
+  const [version, pinned, summaries, extra] = cursor.split(".");
+  if (version !== String(ACCOUNT_OVERVIEW_CURSOR_VERSION) || !pinned || !summaries || extra) return null;
 
-    return parsed as AccountOverviewCursor;
-  } catch {
-    return null;
-  }
+  return { pinned, summaries };
 }
 
 function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: ProviderAccountKey[] }) {
   const cursor: ProviderDetailCursor = {
-    v: ACCOUNT_OVERVIEW_CURSOR_VERSION,
+    v: PROVIDER_DETAIL_CURSOR_VERSION,
     accounts: Object.fromEntries(detail.accounts.map((account) => [account.id, hashAccountOverviewValue(account)])),
     supportedModels: hashAccountOverviewValue(detail.supportedModels),
     disabledModelsByAccountId: Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
@@ -208,7 +196,7 @@ function decodeProviderDetailCursor(cursor: string | undefined): ProviderDetailC
 
   try {
     const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<ProviderDetailCursor>;
-    if (parsed.v !== ACCOUNT_OVERVIEW_CURSOR_VERSION || !parsed.accounts || typeof parsed.accounts !== "object") return null;
+    if (parsed.v !== PROVIDER_DETAIL_CURSOR_VERSION || !parsed.accounts || typeof parsed.accounts !== "object") return null;
     if (typeof parsed.supportedModels !== "string" || !parsed.disabledModelsByAccountId || typeof parsed.disabledModelsByAccountId !== "object") return null;
     if (!parsed.modelHealthByAccountId || typeof parsed.modelHealthByAccountId !== "object" || typeof parsed.pinnedProviders !== "string") return null;
 
@@ -363,17 +351,13 @@ export async function getAccountOverview(userId: string, options: AccountOvervie
     const previousCursor = decodeAccountOverviewCursor(options.cursor);
 
     if (previousCursor) {
-      const changedSummaries = Object.fromEntries(
-        PROVIDER_ACCOUNT_KEYS
-          .filter((provider) => previousCursor.summaries[provider] !== hashAccountOverviewValue(summaries[provider]))
-          .map((provider) => [provider, summaries[provider]])
-      ) as Partial<Record<ProviderAccountKey, AccountOverviewSummary>>;
+      const summariesChanged = previousCursor.summaries !== hashAccountOverviewValue(summaries);
       const pinnedChanged = previousCursor.pinned !== hashAccountOverviewValue(pinnedProviders);
 
       return {
         delta: true,
         cursor,
-        ...(Object.keys(changedSummaries).length > 0 ? { summaries: changedSummaries } : {}),
+        ...(summariesChanged ? { summaries } : {}),
         ...(pinnedChanged ? { pinnedProviders } : {}),
       };
     }
