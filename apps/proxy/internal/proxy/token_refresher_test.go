@@ -43,6 +43,23 @@ func TestAccountNeedsCredentialRefreshUsesProviderBuffer(t *testing.T) {
 	}
 }
 
+func TestCopilotAccountNeedsCredentialRefreshForMissingOrLegacyTier(t *testing.T) {
+	now := time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC)
+	provider := testRefreshBufferProvider{buffer: 30 * time.Minute}
+	legacyTier := "individual"
+	proTier := "pro"
+
+	if !accountNeedsCredentialRefresh(appdb.ProviderAccount{Provider: "copilot", Tier: &legacyTier, ExpiresAt: now.Add(24 * time.Hour)}, provider, now) {
+		t.Fatal("copilot account with legacy tier should refresh even when token is not expiring")
+	}
+	if !accountNeedsCredentialRefresh(appdb.ProviderAccount{Provider: "copilot", ExpiresAt: now.Add(24 * time.Hour)}, provider, now) {
+		t.Fatal("copilot account with missing tier should refresh even when token is not expiring")
+	}
+	if accountNeedsCredentialRefresh(appdb.ProviderAccount{Provider: "copilot", Tier: &proTier, ExpiresAt: now.Add(24 * time.Hour)}, provider, now) {
+		t.Fatal("copilot account with canonical tier should not refresh before provider buffer")
+	}
+}
+
 func TestTokenRefreshLockKey(t *testing.T) {
 	if got := tokenRefreshLockKey("acct_123"); got != "opendum:provider-account:refresh-lock:acct_123" {
 		t.Fatalf("lock key = %q", got)

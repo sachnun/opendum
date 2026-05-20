@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/opendum/opendum/apps/proxy/internal/cryptojs"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/providers"
@@ -109,7 +111,7 @@ func (s *Service) expiringRefreshableAccounts(ctx context.Context) ([]appdb.Prov
 			Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", now).
 			Where("provider = ?", name).
 			Where("\"refreshToken\" <> ''").
-			Where("\"expiresAt\" <= ?", now.Add(buffer)).
+			Where("(\"expiresAt\" <= ? OR (provider = 'copilot' AND (tier IS NULL OR tier NOT IN (?))))", now.Add(buffer), bun.In(copilotCanonicalTiers)).
 			OrderExpr("\"expiresAt\" ASC").
 			Limit(tokenRefreshBatchLimit).
 			Scan(ctx)
@@ -323,7 +325,25 @@ func (s *Service) waitForRefreshedAccount(ctx context.Context, previous appdb.Pr
 }
 
 func accountNeedsCredentialRefresh(account appdb.ProviderAccount, providerImpl providers.Provider, now time.Time) bool {
+	if account.Provider == "copilot" && !isCanonicalCopilotTier(account.Tier) {
+		return true
+	}
 	return now.After(account.ExpiresAt.Add(-providers.RefreshBufferFor(providerImpl)))
+}
+
+var copilotCanonicalTiers = []string{"free", "student", "pro", "pro+", "business", "enterprise"}
+
+func isCanonicalCopilotTier(tier *string) bool {
+	if tier == nil {
+		return false
+	}
+	value := strings.ToLower(strings.TrimSpace(*tier))
+	for _, canonical := range copilotCanonicalTiers {
+		if value == canonical {
+			return true
+		}
+	}
+	return false
 }
 
 func tokenRefreshLockKey(accountID string) string {
