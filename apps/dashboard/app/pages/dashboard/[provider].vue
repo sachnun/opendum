@@ -395,7 +395,6 @@ async function hydrateAccountStatsCache() {
 
   const cachedStats = await readCachedAccountStats(accountsToHydrate.map((account) => account.id));
   const nextStatsById = { ...accountStatsById.value };
-  const nextDeltaReadyById = { ...accountStatsDeltaReadyById.value };
   const nextHydratedIds = { ...hydratedAccountStatsIds.value };
   let hasStatsChanges = false;
 
@@ -408,7 +407,6 @@ async function hydrateAccountStatsCache() {
     if (accountStatsById.value[account.id]) continue;
 
     nextStatsById[account.id] = cached.stats;
-    nextDeltaReadyById[account.id] = true;
     hasStatsChanges = true;
   }
 
@@ -416,7 +414,6 @@ async function hydrateAccountStatsCache() {
   hydratedAccountStatsIds.value = nextHydratedIds;
   if (hasStatsChanges) {
     accountStatsById.value = nextStatsById;
-    accountStatsDeltaReadyById.value = nextDeltaReadyById;
   }
 }
 
@@ -474,7 +471,7 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
   const requestedAccountIds = Array.from(new Set(accountIds))
     .filter((accountId) => availableAccountIds.has(accountId))
     .filter((accountId) => !loadingAccountStatsIds.has(accountId))
-    .filter((accountId) => options.force || !accountStatsById.value[accountId]);
+    .filter((accountId) => options.force || !accountStatsFetchedById.value[accountId]);
 
   if (requestedAccountIds.length === 0) return;
 
