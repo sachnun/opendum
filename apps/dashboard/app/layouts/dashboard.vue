@@ -726,7 +726,7 @@ async function handleAuditSelected() {
 
 <template>
   <div class="min-h-svh bg-background text-foreground">
-    <div class="relative mx-auto flex min-h-svh w-full md:max-w-screen-md md:border-x md:border-border lg:max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-screen-2xl min-[1920px]:max-w-[120rem]">
+    <div class="dashboard-layout-frame relative mx-auto flex min-h-svh w-full md:max-w-screen-md lg:max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-screen-2xl min-[1920px]:max-w-[120rem]">
     <aside class="sticky top-0 hidden border-r border-border bg-background md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col">
       <div class="flex h-16 items-center border-b border-border px-5">
         <NuxtLink to="/dashboard" class="inline-flex items-center gap-2.5">

@@ -159,6 +159,20 @@
     @apply w-full;
   }
 
+  .dashboard-layout-frame {
+    @apply border-border;
+  }
+
+  @media (min-width: 50rem) and (max-width: 63.999rem),
+    (min-width: 66rem) and (max-width: 79.999rem),
+    (min-width: 82rem) and (max-width: 95.999rem),
+    (min-width: 98rem) and (max-width: 119.999rem),
+    (min-width: 122rem) {
+    .dashboard-layout-frame {
+      @apply border-x;
+    }
+  }
+
   .dashboard-card-grid {
     @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),22rem))] sm:justify-center;
   }
