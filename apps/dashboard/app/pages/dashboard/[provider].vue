@@ -670,7 +670,7 @@ function decodeAccountHash(hash: string): string | null {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))]">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))]">
         <ProviderAccountCard
           v-for="account in accounts"
           :id="account.id"
