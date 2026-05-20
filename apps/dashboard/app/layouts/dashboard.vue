@@ -751,11 +751,11 @@ async function handleAuditSelected() {
                 :to="item.href"
                 :class="[
                   'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                  isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  isActive(item.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                 ]"
                 @click="handleNavClick(item, $event)"
               >
-                <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                 {{ item.name }}
               </NuxtLink>
 
@@ -778,7 +778,7 @@ async function handleAuditSelected() {
                       v-else-if="isSwitchSubItem(subItem)"
                       :class="[
                         'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
-                        'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                        'cursor-pointer text-muted-foreground hover:text-foreground/70',
                       ]"
                       @click="toggleSharing"
                     >
@@ -848,7 +848,7 @@ async function handleAuditSelected() {
                       :to="subItemHref(subItem)"
                       :class="[
                         'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                        isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                        isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                       ]"
                       @click="handleNavClick(subItem, $event)"
                     >
@@ -901,11 +901,11 @@ async function handleAuditSelected() {
                 :aria-expanded="isSupportItemOpen(item)"
                 :class="[
                   'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
-                  isSupportItemActive(item) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                 ]"
                 @click="toggleSupportItem(item)"
               >
-                <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                 <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
                 <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
               </button>
@@ -915,11 +915,11 @@ async function handleAuditSelected() {
                 :aria-disabled="item.disabled ? true : undefined"
                 :class="[
                   'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                  item.disabled ? 'cursor-default text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  item.disabled ? 'cursor-default text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                 ]"
                 @click="handleNavClick(item, $event)"
               >
-                <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                 {{ item.name }}
               </NuxtLink>
 
@@ -942,7 +942,7 @@ async function handleAuditSelected() {
                     :to="subItemHref(subItem)"
                     :class="[
                       'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                      isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                     ]"
                     @click="handleNavClick(subItem, $event)"
                   >
@@ -1141,11 +1141,11 @@ async function handleAuditSelected() {
                     :to="item.href"
                     :class="[
                       'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                      isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      isActive(item.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                     ]"
                     @click="handleNavClick(item, $event)"
                   >
-                    <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    <UiIcon :name="item.icon" :class="['size-4', isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                     {{ item.name }}
                   </NuxtLink>
 
@@ -1168,7 +1168,7 @@ async function handleAuditSelected() {
                           v-else-if="isSwitchSubItem(subItem)"
                           :class="[
                             'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium outline-none transition-colors',
-                            'cursor-pointer text-muted-foreground hover:bg-accent hover:text-foreground',
+                            'cursor-pointer text-muted-foreground hover:text-foreground/70',
                           ]"
                           @click="toggleSharing"
                         >
@@ -1238,7 +1238,7 @@ async function handleAuditSelected() {
                           :to="subItemHref(subItem)"
                           :class="[
                             'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                            isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                            isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                           ]"
                           @click="handleNavClick(subItem, $event)"
                         >
@@ -1290,11 +1290,11 @@ async function handleAuditSelected() {
                     :aria-expanded="isSupportItemOpen(item)"
                     :class="[
                       'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all',
-                      isSupportItemActive(item) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                     ]"
                     @click="toggleSupportItem(item)"
                   >
-                    <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    <UiIcon :name="item.icon" :class="['size-4', isSupportItemActive(item) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                     <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
                     <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', isSupportItemOpen(item) ? 'rotate-0' : '-rotate-90']" />
                   </button>
@@ -1304,11 +1304,11 @@ async function handleAuditSelected() {
                     :aria-disabled="item.disabled ? true : undefined"
                     :class="[
                       'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                      item.disabled ? 'cursor-default text-muted-foreground/45' : isActive(item.href) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      item.disabled ? 'cursor-default text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                     ]"
                     @click="handleNavClick(item, $event)"
                   >
-                    <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground']" />
+                    <UiIcon :name="item.icon" :class="['size-4', item.disabled ? 'text-muted-foreground/45' : isActive(item.href) ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/70']" />
                     {{ item.name }}
                   </NuxtLink>
 
@@ -1331,7 +1331,7 @@ async function handleAuditSelected() {
                         :to="subItemHref(subItem)"
                         :class="[
                           'flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                          isSubItemActive(subItem) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                          isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
                         ]"
                         @click="handleNavClick(subItem, $event)"
                       >
