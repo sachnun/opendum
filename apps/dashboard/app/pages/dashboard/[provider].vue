@@ -42,6 +42,7 @@ const { data, error, pending, refresh } = await useAsyncData(
 );
 
 const detailData = computed<ProviderDetailData | null>(() => data.value ?? null);
+const accountDisplayOrder = ref<Record<string, number>>({});
 const highlightedAccountIds = ref<Set<string>>(new Set());
 const promotedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
@@ -64,7 +65,7 @@ const forceQueuedAccountStatsIds = new Set<string>();
 const loadingAccountStatsIds = new Set<string>();
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
-  return [...currentAccounts].sort(compareAccounts);
+  return [...currentAccounts].sort(compareDisplayAccounts);
 });
 const activeAccountCount = computed(() => accounts.value.filter((account) => account.isActive).length);
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
@@ -139,12 +140,18 @@ watch(
   detailData,
   (value, previousValue) => {
     if (!value) return;
-    if (!previousValue) return;
+
+    const sortedAccounts = [...value.accounts].sort(compareAccounts);
+    if (!previousValue || Object.keys(accountDisplayOrder.value).length === 0) {
+      accountDisplayOrder.value = Object.fromEntries(sortedAccounts.map((account, index) => [account.id, index]));
+      if (!previousValue) return;
+    }
 
     const previousAccountIds = new Set(previousValue.accounts.map((account) => account.id));
     const newAccounts = value.accounts.filter((account) => !previousAccountIds.has(account.id));
     if (newAccounts.length === 0) return;
     if (newAccounts.length === value.accounts.length) {
+      accountDisplayOrder.value = Object.fromEntries(sortedAccounts.map((account, index) => [account.id, index]));
       highlightedAccountIds.value = new Set();
       promotedAccountIds.value = new Set();
       shouldPromoteNextNewAccount = false;
@@ -159,6 +166,16 @@ watch(
     if (shouldPromoteNextNewAccount) {
       promotedAccountIds.value = new Set([...promotedAccountIds.value, ...newAccounts.map((account) => account.id)]);
     }
+
+    const currentOrder = accountDisplayOrder.value;
+    const orderedNewAccounts = [...newAccounts].sort(compareAccounts);
+    accountDisplayOrder.value = Object.fromEntries([
+      ...orderedNewAccounts.map((account, index) => [account.id, index] as const),
+      ...Object.entries(currentOrder)
+        .filter(([accountId]) => value.accounts.some((account) => account.id === accountId))
+        .map(([accountId, order]) => [accountId, order + orderedNewAccounts.length] as const),
+    ]);
+
     shouldPromoteNextNewAccount = false;
     if (highlightTimer) clearTimeout(highlightTimer);
     highlightTimer = setTimeout(() => {
@@ -170,6 +187,7 @@ watch(
 );
 
 watch(selectedProvider, () => {
+  accountDisplayOrder.value = {};
   highlightedAccountIds.value = new Set();
   promotedAccountIds.value = new Set();
   accountStatsById.value = {};
@@ -356,6 +374,16 @@ function compareAccounts(a: Account, b: Account): number {
     || toTimeMs(b.lastUsedAt) - toTimeMs(a.lastUsedAt)
     || toTimeMs(b.createdAt) - toTimeMs(a.createdAt)
     || b.id.localeCompare(a.id);
+}
+
+function compareDisplayAccounts(a: Account, b: Account): number {
+  const aOrder = accountDisplayOrder.value[a.id];
+  const bOrder = accountDisplayOrder.value[b.id];
+
+  if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+  if (aOrder !== undefined) return -1;
+  if (bOrder !== undefined) return 1;
+  return compareAccounts(a, b);
 }
 
 function quotaPercentRemaining(group: QuotaSummaryGroup): number {
