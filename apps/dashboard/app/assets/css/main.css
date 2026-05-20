@@ -111,8 +111,45 @@
     @apply pb-1;
   }
 
+  .dashboard-shell {
+    @apply w-full;
+  }
+
   .dashboard-card-grid {
-    @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),22rem))] sm:justify-start;
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),22rem))] sm:justify-center;
+  }
+
+  @media (min-width: 48rem) {
+    .dashboard-shell {
+      --dashboard-sidebar-width: 15rem;
+      --dashboard-main-x-padding: 1.5rem;
+      --dashboard-card-width: 22rem;
+      --dashboard-card-gap: 0.75rem;
+      --dashboard-card-step: calc(var(--dashboard-card-width) + var(--dashboard-card-gap));
+
+      @apply mx-auto;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .dashboard-shell {
+      --dashboard-main-x-padding: 2rem;
+    }
+  }
+
+  @supports (width: round(down, 10px, 1px)) {
+    @media (min-width: 48rem) {
+      .dashboard-shell {
+        --dashboard-grid-available-with-gap: calc(100% - var(--dashboard-sidebar-width) - (var(--dashboard-main-x-padding) * 2) + var(--dashboard-card-gap));
+        --dashboard-grid-step-width: round(down, var(--dashboard-grid-available-with-gap), var(--dashboard-card-step));
+        --dashboard-grid-width: max(var(--dashboard-card-width), calc(var(--dashboard-grid-step-width) - var(--dashboard-card-gap)));
+
+        width: min(
+          100%,
+          calc(var(--dashboard-sidebar-width) + (var(--dashboard-main-x-padding) * 2) + var(--dashboard-grid-width))
+        );
+      }
+    }
   }
 
   .shiki,
