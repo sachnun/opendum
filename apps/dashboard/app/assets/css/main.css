@@ -116,7 +116,7 @@
   }
 
   .dashboard-card-grid {
-    @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),22rem))] sm:justify-center;
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),22rem))] sm:justify-start;
   }
 
   @media (min-width: 48rem) {
