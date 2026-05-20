@@ -76,7 +76,13 @@ export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string(
 export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(), modelId: z.string(), enabled: z.boolean() });
 export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.coerce.number().int().min(1).max(200).optional() });
 export const resolveErrorsInputSchema = z.object({ accountId: z.string() });
-export const accountStatsInputSchema = z.object({ accountIds: z.array(z.string().min(1)).max(50), cursors: z.record(z.string(), z.string()).optional() });
+const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));
+const statsCursorsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string()).max(50)).optional();
+
+export const accountStatsInputSchema = z.object({ ids: statsIdsQuerySchema, cursors: statsCursorsQuerySchema }).transform(({ ids, cursors }) => ({
+  accountIds: ids,
+  cursors: cursors ? Object.fromEntries(ids.map((id, index) => [id, cursors[index] ?? ""])) : undefined,
+}));
 export const accountOverviewInputSchema = z.object({ cursor: z.string().min(1).optional() });
 export const providerDetailInputSchema = providerInputSchema.extend({ cursor: z.string().min(1).optional() });
 

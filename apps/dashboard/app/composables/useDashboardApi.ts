@@ -34,9 +34,19 @@ type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute
 
 type DashboardFetch = ReturnType<typeof useRequestFetch>;
 type DashboardFetchOptions = Parameters<DashboardFetch>[1];
+type DashboardFetchBody = NonNullable<DashboardFetchOptions>["body"];
 
-function post<T>(fetcher: DashboardFetch, url: string, body?: Record<string, unknown>, options?: DashboardFetchOptions) {
+function post<T>(fetcher: DashboardFetch, url: string, body?: DashboardFetchBody, options?: DashboardFetchOptions) {
   return fetcher<T>(url, { ...options, method: "POST", body });
+}
+
+function cursorQuery(ids: string[], cursors?: Record<string, string>) {
+  const cursorValues = ids.map((id) => cursors?.[id] ?? "");
+
+  return {
+    ids,
+    ...(cursorValues.some(Boolean) ? { cursors: cursorValues } : {}),
+  };
 }
 
 export function useDashboardApi() {
@@ -54,7 +64,7 @@ export function useDashboardApi() {
       byProvider: (query: { provider: string }) => dashboardFetch("/api/dashboard/accounts/provider", { query }),
       byProviderDetailed: (query: { provider: string }) => dashboardFetch<ProviderDetailData>("/api/dashboard/accounts/provider-detail", { query }),
       byProviderDetailedDelta: (query: { provider: string; cursor: string }) => dashboardFetch<ProviderDetailResponse>("/api/dashboard/accounts/provider-detail", { query }),
-      stats: (body: { accountIds: string[]; cursors?: Record<string, string> }) => post<AccountStatsData>(dashboardFetch, "/api/dashboard/accounts/stats", body),
+      stats: (query: { accountIds: string[]; cursors?: Record<string, string> }) => dashboardFetch<AccountStatsData>("/api/dashboard/accounts/stats", { query: cursorQuery(query.accountIds, query.cursors) }),
       overview: () => dashboardFetch<AccountOverviewData>("/api/dashboard/accounts/overview"),
       overviewDelta: (query: { cursor: string }) => dashboardFetch<AccountOverviewResponse>("/api/dashboard/accounts/overview", { query }),
       ping: () => dashboardFetch<AccountPingData>("/api/dashboard/accounts/ping"),
@@ -100,7 +110,7 @@ export function useDashboardApi() {
     models: {
       list: (query?: { includeStats?: boolean }) => dashboardFetch<ModelListItem[]>("/api/dashboard/models", query ? { query } : undefined),
       search: () => dashboardFetch<ModelSearchItem[]>("/api/dashboard/models/search"),
-      stats: (body: { models: string[]; cursors?: Record<string, string> }) => post<ModelStatsData>(dashboardFetch, "/api/dashboard/models/stats", body),
+      stats: (query: { models: string[]; cursors?: Record<string, string> }) => dashboardFetch<ModelStatsData>("/api/dashboard/models/stats", { query: cursorQuery(query.models, query.cursors) }),
       familyCounts: () => dashboardFetch<Record<string, number>>("/api/dashboard/models/families"),
       setEnabled: (body: { modelId: string; enabled: boolean }) => post<ActionResult<{ model: string; enabled: boolean }>>(dashboardFetch, "/api/dashboard/models/enabled", body),
     },

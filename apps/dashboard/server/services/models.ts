@@ -10,7 +10,13 @@ import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getPr
 import { compareModelEntries } from "../../lib/model-sort";
 
 export const setModelEnabledInputSchema = z.object({ modelId: z.string(), enabled: z.boolean() });
-export const modelStatsInputSchema = z.object({ models: z.array(z.string().min(1)).max(50), cursors: z.record(z.string(), z.string()).optional() });
+const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));
+const statsCursorsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string()).max(50)).optional();
+
+export const modelStatsInputSchema = z.object({ ids: statsIdsQuerySchema, cursors: statsCursorsQuerySchema }).transform(({ ids, cursors }) => ({
+  models: ids,
+  cursors: cursors ? Object.fromEntries(ids.map((id, index) => [id, cursors[index] ?? ""])) : undefined,
+}));
 
 function hashModelStatsValue(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url").slice(0, 16);
