@@ -926,7 +926,7 @@ async function loadErrorHistory() {
     if (requestId !== historyRequestId) return;
 
     if (!result.success) {
-      historyError.value = result.error;
+      historyError.value = null;
       historyEntries.value = [];
       return;
     }
@@ -934,7 +934,7 @@ async function loadErrorHistory() {
     historyEntries.value = result.data.entries;
   } catch {
     if (requestId !== historyRequestId) return;
-    historyError.value = "Failed to load error history";
+    historyError.value = null;
     historyEntries.value = [];
   }
 }

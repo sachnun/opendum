@@ -865,12 +865,17 @@ export async function setAccountModelEnabled(userId: string, input: z.infer<type
 }
 
 export async function getAccountErrorHistory(userId: string, input: z.infer<typeof errorHistoryInputSchema>) {
+  try {
     const [account] = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId))).limit(1);
     if (!account) return { success: false, error: "Account not found" } as const;
 
     const entries = await readRedisErrorHistory(input.accountId, Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS));
 
     return { success: true, data: { entries } } as const;
+  } catch (error) {
+    console.error("Failed to read provider account error history:", error);
+    return { success: true, data: { entries: [] } } as const;
+  }
 }
 
 export async function resolveAccountErrors(userId: string, input: z.infer<typeof resolveErrorsInputSchema>) {
