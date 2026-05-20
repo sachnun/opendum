@@ -45,6 +45,8 @@ type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
+const ERROR_PREVIEW_VISIBLE_COUNT = 9;
+const ERROR_PREVIEW_CENTER_INDEX = 4;
 const RECOVERED_ERROR_STALE_MS = 3 * 60 * 60 * 1000;
 const TEMPORARY_OFF_UNITS: Array<{ value: TemporaryOffUnit; label: string; multiplier: number }> = [
   { value: "minutes", label: "Minutes", multiplier: 60 * 1000 },
@@ -611,7 +613,7 @@ const currentErrorPreviewEntry = computed<ErrorPreviewEntry>(() => ({
   isCurrent: true,
 }));
 const errorToneClass = computed(() => getErrorToneClass(currentErrorPreviewEntry.value));
-const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
+const allErrorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   if (!currentErrorMessage.value) return [];
 
   const currentErrorAtMs = toTimeMs(props.account.lastErrorAt);
@@ -643,9 +645,16 @@ const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
       createdAt: entry.createdAt,
       isCurrent: false,
     })),
-  ].slice(0, 8);
+  ];
 });
-const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => errorPreviewEntries.value[activeErrorIndex.value] ?? errorPreviewEntries.value[0] ?? null);
+const errorPreviewWindowStart = computed(() => {
+  const total = allErrorPreviewEntries.value.length;
+  if (total <= ERROR_PREVIEW_VISIBLE_COUNT) return 0;
+
+  return Math.min(Math.max(activeErrorIndex.value - ERROR_PREVIEW_CENTER_INDEX, 0), total - ERROR_PREVIEW_VISIBLE_COUNT);
+});
+const errorPreviewEntries = computed<ErrorPreviewEntry[]>(() => allErrorPreviewEntries.value.slice(errorPreviewWindowStart.value, errorPreviewWindowStart.value + ERROR_PREVIEW_VISIBLE_COUNT));
+const activeErrorEntry = computed<ErrorPreviewEntry | null>(() => allErrorPreviewEntries.value[activeErrorIndex.value] ?? allErrorPreviewEntries.value[0] ?? null);
 const errorPreviewToneClass = computed(() => {
   const toneClass = getErrorToneClass(activeErrorEntry.value);
   return toneClass === "text-foreground" ? "text-foreground/80" : toneClass;
@@ -703,7 +712,7 @@ const errorPlaygroundRoute = computed(() => {
 
   return { path: "/dashboard/playground", query };
 });
-const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < errorPreviewEntries.value.length - 1);
+const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < allErrorPreviewEntries.value.length - 1);
 const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
 
 watch(
@@ -772,7 +781,7 @@ watch([statMetrics, statAnimationContextKey, () => props.animateDeltas], ([items
   statHitEffects.value = nextHitEffects;
 }, { immediate: true });
 
-watch(errorPreviewEntries, (entries) => {
+watch(allErrorPreviewEntries, (entries) => {
   if (activeErrorIndex.value >= entries.length) activeErrorIndex.value = Math.max(0, entries.length - 1);
 });
 
@@ -943,7 +952,7 @@ async function loadErrorHistory() {
   const requestId = ++historyRequestId;
 
   try {
-    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id, limit: 8 });
+    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id, limit: 100 });
     if (requestId !== historyRequestId) return;
 
     if (!result.success) {
@@ -1026,7 +1035,7 @@ function showNewerErrorPreview(event?: Event) {
 
 function showPreviousErrorPreview(event?: Event) {
   event?.stopPropagation();
-  activeErrorIndex.value = Math.min(errorPreviewEntries.value.length - 1, activeErrorIndex.value + 1);
+  activeErrorIndex.value = Math.min(allErrorPreviewEntries.value.length - 1, activeErrorIndex.value + 1);
 }
 
 function openActiveErrorDialog() {
@@ -1185,7 +1194,7 @@ function cancelErrorPreviewPointer() {
                     <span
                       v-for="(entry, index) in errorPreviewEntries"
                       :key="index"
-                      :class="['h-1.5 rounded-full', getErrorPreviewSliderDotClass(entry, index === activeErrorIndex)]"
+                      :class="['h-1.5 rounded-full', getErrorPreviewSliderDotClass(entry, errorPreviewWindowStart + index === activeErrorIndex)]"
                     />
                   </template>
                 </div>

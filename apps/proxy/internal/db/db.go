@@ -63,18 +63,6 @@ type ProviderAccount struct {
 	UpdatedAt                 time.Time  `bun:"updatedAt"`
 }
 
-type ProviderAccountErrorHistory struct {
-	bun.BaseModel `bun:"table:provider_account_error_history"`
-
-	ID                string    `bun:"id,pk"`
-	ProviderAccountID string    `bun:"providerAccountId"`
-	UserID            string    `bun:"userId"`
-	Model             *string   `bun:"model"`
-	ErrorCode         int       `bun:"errorCode"`
-	ErrorMessage      string    `bun:"errorMessage"`
-	CreatedAt         time.Time `bun:"createdAt"`
-}
-
 type UserPointBalance struct {
 	bun.BaseModel `bun:"table:user_point_balance"`
 

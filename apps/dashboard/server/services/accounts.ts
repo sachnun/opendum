@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { db } from "../lib/db";
-import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountErrorHistory, providerAccountModelHealth } from "../lib/db/schema";
+import { getRedisClient } from "../lib/redis";
+import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "../lib/db/schema";
 import { getModelFamily, getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { compareModelEntries } from "../../lib/model-sort";
@@ -15,9 +16,23 @@ const AUTO_PIN_SENTINEL = "_auto_pinned";
 const ACCOUNT_HEALTH_STATUS_WEIGHT: Record<string, number> = { active: 0, degraded: 1, half_open: 2, failed: 3 };
 const FAILED_COOLDOWN_MS = 10 * 60 * 1000;
 const INITIAL_DEGRADED_CONSECUTIVE_ERRORS = 3;
-const MAX_ERROR_HISTORY_ROWS = 8;
+const DEFAULT_ERROR_HISTORY_ROWS = 100;
+const MAX_ERROR_HISTORY_ROWS = 200;
+const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
+const ERROR_HISTORY_ENTRY_KEY_PREFIX = "opendum:provider-account:error-history-entry";
 const ACCOUNT_OVERVIEW_CURSOR_VERSION = 2;
 const PROVIDER_DETAIL_CURSOR_VERSION = 1;
+
+type RedisErrorHistoryEntry = {
+  id: string;
+  providerAccountId: string;
+  userId: string;
+  model: string | null;
+  errorCode: number;
+  errorMessage: string;
+  createdAt: string;
+  dedupeKey?: string;
+};
 
 type AccountSummarySourceRow = {
   id: string;
@@ -131,6 +146,74 @@ function withEffectiveHealthStatus<T extends { status: string; statusChangedAt?:
   if (Number.isNaN(statusChangedAt.getTime()) || now.getTime() - statusChangedAt.getTime() < FAILED_COOLDOWN_MS) return row;
 
   return { ...row, status: "degraded" };
+}
+
+function errorHistoryKey(accountId: string) {
+  return `${ERROR_HISTORY_KEY_PREFIX}:${accountId}`;
+}
+
+function errorHistoryEntryKey(entryId: string) {
+  return `${ERROR_HISTORY_ENTRY_KEY_PREFIX}:${entryId}`;
+}
+
+function parseRedisErrorHistoryEntry(value: string | null): RedisErrorHistoryEntry | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<RedisErrorHistoryEntry>;
+    if (!parsed.id || !parsed.providerAccountId || typeof parsed.errorCode !== "number" || typeof parsed.errorMessage !== "string" || !parsed.createdAt) return null;
+    return {
+      id: parsed.id,
+      providerAccountId: parsed.providerAccountId,
+      userId: parsed.userId ?? "",
+      model: typeof parsed.model === "string" ? parsed.model : null,
+      errorCode: parsed.errorCode,
+      errorMessage: parsed.errorMessage,
+      createdAt: parsed.createdAt,
+      dedupeKey: parsed.dedupeKey,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function readRedisErrorHistory(accountId: string, limit: number) {
+  const redis = await getRedisClient();
+  const key = errorHistoryKey(accountId);
+  const ids = await redis.zRange(key, 0, Math.max(0, limit - 1), { REV: true });
+  if (ids.length === 0) return [];
+
+  const values = await redis.mGet(ids.map(errorHistoryEntryKey));
+  const missingIds: string[] = [];
+  const entries = values.flatMap((value, index) => {
+    const entry = parseRedisErrorHistoryEntry(value);
+    if (!entry || entry.providerAccountId !== accountId) {
+      missingIds.push(ids[index] ?? "");
+      return [];
+    }
+    return [{ id: entry.id, model: entry.model, errorCode: entry.errorCode, errorMessage: entry.errorMessage, createdAt: entry.createdAt }];
+  });
+
+  if (missingIds.length > 0) await redis.zRem(key, missingIds.filter(Boolean));
+  return entries;
+}
+
+async function deleteRedisErrorHistory(accountId: string) {
+  const redis = await getRedisClient();
+  const key = errorHistoryKey(accountId);
+  const ids = await redis.zRange(key, 0, -1);
+  if (ids.length === 0) {
+    await redis.del(key);
+    return;
+  }
+
+  const values = await redis.mGet(ids.map(errorHistoryEntryKey));
+  const keysToDelete = new Set<string>([key]);
+  ids.forEach((id) => keysToDelete.add(errorHistoryEntryKey(id)));
+  for (const value of values) {
+    const entry = parseRedisErrorHistoryEntry(value);
+    if (entry?.dedupeKey) keysToDelete.add(entry.dedupeKey);
+  }
+  await redis.del(Array.from(keysToDelete));
 }
 
 async function getAccountSummaryHealthRows(accountIds: string[]): Promise<AccountModelHealthSummaryRow[]> {
@@ -685,12 +768,7 @@ export async function getAccountErrorHistory(userId: string, input: z.infer<type
     const [account] = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId))).limit(1);
     if (!account) return { success: false, error: "Account not found" } as const;
 
-    const entries = await db
-      .select({ id: providerAccountErrorHistory.id, model: providerAccountErrorHistory.model, errorCode: providerAccountErrorHistory.errorCode, errorMessage: providerAccountErrorHistory.errorMessage, createdAt: providerAccountErrorHistory.createdAt })
-      .from(providerAccountErrorHistory)
-      .where(eq(providerAccountErrorHistory.providerAccountId, input.accountId))
-      .orderBy(desc(providerAccountErrorHistory.createdAt), desc(providerAccountErrorHistory.id))
-      .limit(Math.min(input.limit ?? MAX_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS));
+    const entries = await readRedisErrorHistory(input.accountId, Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS));
 
     return { success: true, data: { entries } } as const;
 }
@@ -712,7 +790,7 @@ export async function resolveAccountErrors(userId: string, input: z.infer<typeof
         ...(account.status === "degraded" || account.status === "failed" ? { status: "active", statusChangedAt: new Date() } : {}),
       })
       .where(eq(providerAccount.id, input.accountId));
-    await db.delete(providerAccountErrorHistory).where(eq(providerAccountErrorHistory.providerAccountId, input.accountId));
+    await deleteRedisErrorHistory(input.accountId);
     await db.delete(providerAccountModelHealth).where(eq(providerAccountModelHealth.providerAccountId, input.accountId));
     return { success: true, data: undefined } as const;
   } catch (error) {
