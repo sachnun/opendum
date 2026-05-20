@@ -726,8 +726,8 @@ async function handleAuditSelected() {
 
 <template>
   <div class="min-h-svh bg-background text-foreground">
-    <div class="dashboard-shell relative flex min-h-svh">
-    <aside class="sticky top-0 hidden border-r border-border bg-card md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col">
+    <div class="dashboard-shell relative flex min-h-svh border-x border-border">
+    <aside class="sticky top-0 hidden border-r border-border bg-background md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col">
       <div class="flex h-16 items-center border-b border-border px-5">
         <NuxtLink to="/dashboard" class="inline-flex items-center gap-2.5">
           <span class="relative flex h-2.5 w-2.5">
@@ -744,7 +744,7 @@ async function handleAuditSelected() {
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col px-3 py-4">
-        <nav class="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
+        <nav class="scrollbar-none min-h-0 flex-1 overflow-y-auto pr-1">
           <div class="space-y-1">
             <div v-for="item in primaryNavigation" :key="item.name" class="space-y-1">
               <NuxtLink
@@ -1134,7 +1134,7 @@ async function handleAuditSelected() {
           </div>
 
           <div class="flex min-h-0 flex-1 flex-col px-3 py-4">
-            <nav class="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]">
+            <nav class="scrollbar-none min-h-0 flex-1 overflow-y-auto pr-1">
               <div class="space-y-1">
                 <div v-for="item in primaryNavigation" :key="`mobile-${item.name}`" class="space-y-1">
                   <NuxtLink
