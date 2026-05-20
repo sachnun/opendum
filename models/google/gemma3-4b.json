@@ -5,7 +5,7 @@
   "aliases": [
     "gemma-3-4b-it"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

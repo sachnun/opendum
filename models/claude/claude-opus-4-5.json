@@ -7,7 +7,7 @@
     "claude-opus-4.5",
     "claude-opus4.5"
   ],
-  "family": "Claude",
+  "family": "Anthropic",
   "meta": {
     "reasoning": true,
     "toolCall": true,

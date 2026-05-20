@@ -2,7 +2,7 @@
   "providers": [
     "nvidia_nim"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

@@ -6,8 +6,8 @@ const FAMILY_ORDER = new Map<ModelFamily, number>(MODEL_FAMILY_SORT_ORDER.map((f
 
 const INFERRED_FAMILY_RULES: Array<{ test: RegExp; family: string }> = [
   { test: /^gpt-|^gpt\d|^o\d/, family: "OpenAI" },
-  { test: /^claude-/, family: "Claude" },
-  { test: /^gemini-/, family: "Gemini" },
+  { test: /^claude-/, family: "Anthropic" },
+  { test: /^gemini-/, family: "Google" },
   { test: /^grok-/, family: "xAI" },
   { test: /^llama|^codellama/, family: "Meta" },
   { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, family: "Mistral" },
@@ -91,7 +91,7 @@ function extractVersion(modelId: string, family: ModelFamily): number[] {
     if (oSeries) return parseVersionParts(oSeries[1]);
   }
 
-  if (family === "Gemini") return parseVersionParts(normalized.match(/^gemini-(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
+  if (family === "Google") return parseVersionParts(normalized.match(/^gemini-(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
   if (family === "Qwen") return parseVersionParts(normalized.match(/^qwen(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
   if (family === "DeepSeek") return parseVersionParts(normalized.match(/^deepseek-[a-z-]*?v?(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
   if (family === "Kimi") return parseVersionParts(normalized.match(/^kimi-k(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
@@ -196,7 +196,7 @@ function compareOpenAI(left: string, right: string): number {
 
 function compareClaude(left: string, right: string): number {
   return compareAsc(claudeTierRank(left), claudeTierRank(right))
-    || compareVersionDesc(extractVersion(left, "Claude"), extractVersion(right, "Claude"))
+    || compareVersionDesc(extractVersion(left, "Anthropic"), extractVersion(right, "Anthropic"))
     || compareAsc(contextRank(left), contextRank(right))
     || compareAsc(previewRank(left), previewRank(right))
     || compareFallback(left, right);
@@ -204,7 +204,7 @@ function compareClaude(left: string, right: string): number {
 
 function compareGemini(left: string, right: string): number {
   return compareAsc(geminiTierRank(left), geminiTierRank(right))
-    || compareVersionDesc(extractVersion(left, "Gemini"), extractVersion(right, "Gemini"))
+    || compareVersionDesc(extractVersion(left, "Google"), extractVersion(right, "Google"))
     || compareAsc(hasToken(left, "image") ? 1 : 0, hasToken(right, "image") ? 1 : 0)
     || compareAsc(previewRank(left), previewRank(right))
     || compareFallback(left, right);
@@ -230,8 +230,8 @@ function compareGeneric(left: string, right: string, family: ModelFamily): numbe
 
 function compareWithinFamily(left: string, right: string, family: ModelFamily): number {
   if (family === "OpenAI") return compareOpenAI(left, right);
-  if (family === "Claude") return compareClaude(left, right);
-  if (family === "Gemini") return compareGemini(left, right);
+  if (family === "Anthropic") return compareClaude(left, right);
+  if (family === "Google") return compareGemini(left, right);
   if (family === "Mistral") return compareMistral(left, right);
   return compareGeneric(left, right, family);
 }

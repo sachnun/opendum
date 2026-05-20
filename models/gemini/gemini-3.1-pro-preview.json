@@ -9,7 +9,7 @@
     "gemini-3.1-pro-high",
     "gemini-3.1-pro-low"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "meta": {
     "reasoning": true,
     "toolCall": true,

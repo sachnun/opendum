@@ -1,6 +1,6 @@
 {
   "providers": [],
-  "family": "Claude",
+  "family": "Anthropic",
   "meta": {
     "reasoning": false,
     "toolCall": true,

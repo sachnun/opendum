@@ -2,7 +2,7 @@
   "providers": [
     "gemini_cli"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "meta": {
     "reasoning": true,
     "toolCall": true,

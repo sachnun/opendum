@@ -1,7 +1,7 @@
 const FEATURED_MODEL_FAMILIES = [
   "OpenAI",
-  "Claude",
-  "Gemini",
+  "Anthropic",
+  "Google",
   "Meta",
   "Mistral",
   "Qwen",
@@ -18,8 +18,8 @@ export type ModelFamily = FeaturedModelFamily | "Others";
 
 const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   OpenAI: "openai-models",
-  Claude: "claude-models",
-  Gemini: "gemini-models",
+  Anthropic: "anthropic-models",
+  Google: "google-models",
   Meta: "meta-models",
   Mistral: "mistral-models",
   Qwen: "qwen-models",

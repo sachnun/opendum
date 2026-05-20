@@ -6,7 +6,7 @@
     "google-gemma-2-2b-it",
     "google/gemma-2-2b-it"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

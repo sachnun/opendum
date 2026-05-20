@@ -1,6 +1,6 @@
 {
   "providers": [],
-  "family": "Gemini",
+  "family": "Google",
   "meta": {
     "reasoning": true,
     "toolCall": true,

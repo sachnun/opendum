@@ -19,7 +19,7 @@ export interface ModelInfo {
   providers: string[];
   aliases?: string[];
   description?: string;
-  /** Model family name (e.g. "Claude", "OpenAI"). */
+  /** Model family name (e.g. "Anthropic", "OpenAI"). */
   family?: string;
   ignored?: boolean;
   meta?: ModelMeta;

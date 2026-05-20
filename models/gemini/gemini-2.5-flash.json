@@ -6,7 +6,7 @@
   "aliases": [
     "gemini-2.5-flash-thinking"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "meta": {
     "reasoning": true,
     "toolCall": true,

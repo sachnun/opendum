@@ -4,7 +4,7 @@
     "google-gemma-3-1b-it",
     "google/gemma-3-1b-it"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

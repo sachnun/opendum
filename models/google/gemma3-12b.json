@@ -2,7 +2,7 @@
   "providers": [
     "ollama_cloud"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

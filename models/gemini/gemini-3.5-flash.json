@@ -2,7 +2,7 @@
   "providers": [
     "copilot"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "providerConfig": {
     "copilot": {
       "allowedTiers": [

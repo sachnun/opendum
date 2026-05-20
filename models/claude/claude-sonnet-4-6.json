@@ -8,7 +8,7 @@
     "claude-sonnet-4.6",
     "claude-sonnet4.6"
   ],
-  "family": "Claude",
+  "family": "Anthropic",
   "meta": {
     "reasoning": true,
     "toolCall": true,

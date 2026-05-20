@@ -7,7 +7,7 @@
     "claude-haiku-4.5",
     "claude-haiku4.5"
   ],
-  "family": "Claude",
+  "family": "Anthropic",
   "meta": {
     "reasoning": true,
     "toolCall": true,

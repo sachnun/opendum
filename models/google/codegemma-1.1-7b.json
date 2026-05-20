@@ -4,7 +4,7 @@
     "google-codegemma-1.1-7b",
     "google/codegemma-1.1-7b"
   ],
-  "family": "Gemini",
+  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,
