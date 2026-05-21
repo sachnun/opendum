@@ -47,5 +47,8 @@ Thumbs.db
 # vercel
 .vercel/
 
+# agent instructions
+AGENTS.md
+
 # typescript
 *.tsbuildinfo
