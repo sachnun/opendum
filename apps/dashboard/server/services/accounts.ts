@@ -189,6 +189,10 @@ function sortProviderModels(models: string[]): string[] {
   return [...models].sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
 }
 
+export function getProviderModelsForAccountTier(provider: string, tier: string | null | undefined): string[] {
+  return sortProviderModels(Array.from(getProviderModelSet(provider)).filter((model) => accountTierCanAccessModel(tier, model, provider)));
+}
+
 function toTimeMs(value: Date | string | null | undefined): number | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -612,7 +616,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     const providerModels = Array.from(getProviderModelSet(input.provider));
     const supportedModelsByAccountId = Object.fromEntries(accounts.map((account) => [
       account.id,
-      sortProviderModels(providerModels.filter((model) => accountTierCanAccessModel(account.tier, model, input.provider))),
+      getProviderModelsForAccountTier(input.provider, account.tier),
     ]));
     const supportedModels = sortProviderModels(providerModels.filter((model) => providerModelIsAccessibleByAccounts(model, input.provider, accounts)));
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));

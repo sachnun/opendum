@@ -6,6 +6,7 @@ import { getAccountModelAvailability, isModelUsableByAccounts } from "../lib/pro
 import { getAuthlessProviderAccounts } from "../lib/proxy/authless-providers";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";
 import { compareModelEntries } from "../../lib/model-sort";
+import { getProviderModelsForAccountTier } from "./accounts";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 
 function normalizeProxyBaseUrl(value: unknown) {
@@ -37,6 +38,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         provider: providerAccount.provider,
         name: providerAccount.name,
         email: providerAccount.email,
+        tier: providerAccount.tier,
         isActive: providerAccount.isActive,
         disabledUntil: providerAccount.disabledUntil,
       })
@@ -79,7 +81,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         ...providerAccounts.map((account) => ({
         ...account,
         disabledModels: disabledModelsByAccount.get(account.id) ?? [],
-        supportedModels: null,
+        supportedModels: getProviderModelsForAccountTier(account.provider, account.tier),
         })),
       ],
     };
