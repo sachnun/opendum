@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -52,37 +54,47 @@ func (s *Service) refreshExpiringTokens(ctx context.Context) {
 		return
 	}
 
-	refreshed := 0
-	skipped := 0
-	failed := 0
+	var refreshed, skipped, failed atomic.Int64
+	sem := make(chan struct{}, 3)
+	var wg sync.WaitGroup
+
 	for _, account := range accounts {
 		if ctx.Err() != nil {
-			return
+			break
 		}
-		providerImpl, ok := s.providerRegistry.Get(account.Provider)
-		if !ok {
-			skipped++
-			continue
-		}
+		sem <- struct{}{}
+		wg.Add(1)
+		go func(acc appdb.ProviderAccount) {
+			defer wg.Done()
+			defer func() { <-sem }()
 
-		accountCtx, cancel := context.WithTimeout(ctx, tokenRefreshAccountTimeout)
-		_, _, didRefresh, err := s.refreshAccountCredentialsIfDue(accountCtx, account, providerImpl, false)
-		cancel()
+			providerImpl, ok := s.providerRegistry.Get(acc.Provider)
+			if !ok {
+				skipped.Add(1)
+				return
+			}
 
-		if err != nil {
-			failed++
-			slog.Warn("failed to refresh provider token", "account", account.ID, "provider", account.Provider, "error", err)
-			continue
-		}
-		if didRefresh {
-			refreshed++
-			continue
-		}
-		skipped++
+			accountCtx, cancel := context.WithTimeout(ctx, tokenRefreshAccountTimeout)
+			defer cancel()
+			_, _, didRefresh, err := s.refreshAccountCredentialsIfDue(accountCtx, acc, providerImpl, false)
+			if err != nil {
+				failed.Add(1)
+				slog.Warn("failed to refresh provider token", "account", acc.ID, "provider", acc.Provider, "error", err)
+				return
+			}
+			if didRefresh {
+				refreshed.Add(1)
+				return
+			}
+			skipped.Add(1)
+		}(account)
 	}
 
-	if len(accounts) > 0 || failed > 0 {
-		slog.Info("token refresh scan complete", "scanned", len(accounts), "refreshed", refreshed, "skipped", skipped, "failed", failed)
+	wg.Wait()
+
+	n := len(accounts)
+	if n > 0 || failed.Load() > 0 {
+		slog.Info("token refresh scan complete", "scanned", n, "refreshed", refreshed.Load(), "skipped", skipped.Load(), "failed", failed.Load())
 	}
 }
 
@@ -107,12 +119,11 @@ func (s *Service) expiringRefreshableAccounts(ctx context.Context) ([]appdb.Prov
 		var rows []appdb.ProviderAccount
 		err := s.db.NewSelect().Model(&rows).
 			Column("id", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email").
-			Where("\"isActive\" = TRUE").
 			Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", now).
 			Where("provider = ?", name).
 			Where("\"refreshToken\" <> ''").
 			Where("(\"expiresAt\" <= ? OR (provider = 'copilot' AND (tier IS NULL OR tier NOT IN (?))))", now.Add(buffer), bun.In(copilotCanonicalTiers)).
-			OrderExpr("\"expiresAt\" ASC").
+			OrderExpr("\"isActive\" DESC, \"expiresAt\" ASC").
 			Limit(tokenRefreshBatchLimit).
 			Scan(ctx)
 		if err != nil {
