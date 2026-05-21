@@ -121,19 +121,6 @@ function shouldExchangeCopilotToken(githubToken: string): boolean {
   return githubToken.trim().startsWith("ghu_");
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
-}
-
-function toFiniteNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
-}
-
 function normalizeCopilotTierValue(value: unknown): string {
   if (typeof value !== "string") return "";
   const normalized = value.trim().toLowerCase().replace(/_/g, "-");
@@ -143,12 +130,6 @@ function normalizeCopilotTierValue(value: unknown): string {
   if (normalized === "free-tier" || normalized === "free-limited-copilot") return "free";
   if (normalized === "education" || normalized === "educational" || normalized === "free-educational-quota" || normalized === "edu") return "student";
   return normalized;
-}
-
-function copilotPremiumEntitlement(payload: CopilotInternalUserResponse): number | null {
-  const snapshots = asRecord(payload.quota_snapshots);
-  const premium = asRecord(snapshots?.premium_interactions);
-  return toFiniteNumber(premium?.entitlement);
 }
 
 function normalizeCopilotAccountTier(payload: CopilotInternalUserResponse): string | undefined {
@@ -170,12 +151,6 @@ function normalizeCopilotAccountTier(payload: CopilotInternalUserResponse): stri
     case "enterprise":
       return plan;
   }
-
-  const entitlement = copilotPremiumEntitlement(payload);
-  if (entitlement === 50) return "free";
-  if (entitlement === 1500) return "pro+";
-  if (entitlement === 1000) return "enterprise";
-  if (entitlement === 300) return "pro";
 
   return undefined;
 }

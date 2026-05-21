@@ -306,24 +306,7 @@ func normalizeCopilotTier(payload map[string]any) string {
 		}
 	}
 
-	snapshots := parseQuotaRecord(payload["quota_snapshots"])
-	premium := parseQuotaRecord(snapshots["premium_interactions"])
-	entitlement, ok := parseQuotaNumber(premium["entitlement"])
-	if !ok {
-		return ""
-	}
-	switch int(entitlement) {
-	case 50:
-		return "free"
-	case 300:
-		return "pro"
-	case 1000:
-		return "enterprise"
-	case 1500:
-		return "pro+"
-	default:
-		return ""
-	}
+	return ""
 }
 
 func parseSnapshotValues(value any) []any {

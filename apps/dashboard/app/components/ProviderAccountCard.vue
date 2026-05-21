@@ -471,7 +471,7 @@ function isPaidTierValue(tier: string, provider?: string): boolean {
   const value = tier.trim().toLowerCase();
   if (provider === "antigravity") return ["paid", "standard-tier"].includes(value);
   if (provider === "kiro") return ["pro", "pro-plus", "pro+", "power"].includes(value);
-  return ["paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "edu", "education", "hc"].includes(value);
+  return ["paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "student", "edu", "education", "hc"].includes(value);
 }
 
 function isFreeTierValue(tier: string): boolean {

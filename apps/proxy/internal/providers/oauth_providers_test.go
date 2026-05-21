@@ -100,6 +100,42 @@ func TestCopilotDropsUnsupportedReasoningEffort(t *testing.T) {
 	}
 }
 
+func TestNormalizeCopilotTierFromInternalUserPayload(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload map[string]any
+		want    string
+	}{
+		{
+			name: "opencode free limited sku",
+			payload: map[string]any{
+				"access_type_sku": "free_limited_copilot",
+				"copilot_plan":    "individual",
+			},
+			want: "free",
+		},
+		{
+			name: "education sku wins over individual plan",
+			payload: map[string]any{
+				"access_type_sku": "free_educational_quota",
+				"copilot_plan":    "individual",
+				"quota_snapshots": map[string]any{
+					"premium_interactions": map[string]any{"entitlement": float64(300)},
+				},
+			},
+			want: "student",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeCopilotTier(tt.payload); got != tt.want {
+				t.Fatalf("tier = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCopilotRefreshCredentialsExchangesStoredGitHubToken(t *testing.T) {
 	provider := copilotProvider{}
 	expiresAt := time.Now().Add(time.Hour).Unix()

@@ -45,7 +45,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "Copilot",
     category: "oauth",
     emptyMessage: "No Copilot connections yet.",
-    showTier: false,
+    showTier: true,
   },
   {
     key: "gemini_cli",

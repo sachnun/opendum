@@ -362,17 +362,6 @@ async function fetchCopilotInternalUser(
       toFiniteNumber(premiumSnapshot?.entitlement) ??
       PLAN_LIMITS[plan] ??
       0;
-    if (!plan && entitlement > 0) {
-      plan = entitlement === 50
-        ? "free"
-        : entitlement === 1500
-          ? "pro+"
-          : entitlement === 1000
-            ? "enterprise"
-            : entitlement === 300
-              ? "pro"
-              : "";
-    }
     const remaining =
       toFiniteNumber(premiumSnapshot?.quota_remaining) ??
       toFiniteNumber(premiumSnapshot?.remaining) ??

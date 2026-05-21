@@ -190,18 +190,6 @@ func normalizeCopilotTier(payload map[string]any) string {
 		}
 	}
 
-	snapshots, _ := payload["quota_snapshots"].(map[string]any)
-	premium, _ := snapshots["premium_interactions"].(map[string]any)
-	switch copilotNumber(premium["entitlement"]) {
-	case 50:
-		return "free"
-	case 300:
-		return "pro"
-	case 1000:
-		return "enterprise"
-	case 1500:
-		return "pro+"
-	}
 	return ""
 }
 
@@ -212,19 +200,6 @@ func normalizeCopilotTierValue(value string) string {
 func copilotString(value any) string {
 	str, _ := value.(string)
 	return str
-}
-
-func copilotNumber(value any) int {
-	switch typed := value.(type) {
-	case float64:
-		return int(typed)
-	case int:
-		return typed
-	case json.Number:
-		parsed, _ := typed.Int64()
-		return int(parsed)
-	}
-	return 0
 }
 
 func fetchCopilotIdentity(ctx context.Context, client *http.Client, accessToken string) string {
