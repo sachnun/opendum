@@ -42,6 +42,15 @@ const EXCLUDED_IDS = new Set([
   "flash-lite",
 ]);
 
+const PAID_GEMINI_CLI_TIERS = [
+  "standard-tier",
+  "paid",
+  "pro",
+  "pro+",
+  "business",
+  "enterprise",
+];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -151,6 +160,21 @@ function parseValidModels(source) {
 function isExcluded(modelId) {
   if (EXCLUDED_IDS.has(modelId)) return true;
   return EXCLUDED_PATTERNS.some((pattern) => pattern.test(modelId));
+}
+
+function isPaidOnlyModel(modelId) {
+  return /(^|-)pro($|-)/.test(modelId);
+}
+
+function buildProviderConfigByModel(modelIds) {
+  const config = new Map();
+
+  for (const modelId of modelIds) {
+    if (isExcluded(modelId) || !isPaidOnlyModel(modelId)) continue;
+    config.set(modelId, { allowedTiers: PAID_GEMINI_CLI_TIERS });
+  }
+
+  return config;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,9 +358,13 @@ async function main() {
 
   // 2. Build model map (filter out internal/alias models)
   const modelMap = buildModelMap(validModels);
+  const providerConfigByModel = buildProviderConfigByModel(validModels);
 
   // 3. Sync to JSON registry
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
+    providerConfigByModel,
+    managedProviderConfigKeys: ["allowedTiers"],
+  });
 
   // 4. Enrich newly created JSON files with metadata from public Gemini API
   if (result.added.length > 0) {

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { db } from "../lib/db";
 import { getRedisClient } from "../lib/redis";
 import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "../lib/db/schema";
-import { getModelFamily, getModelLookupKeys, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
+import { getModelFamily, getModelLookupKeys, getProviderAccessRule, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { compareModelEntries } from "../../lib/model-sort";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
@@ -154,6 +154,35 @@ function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil:
 
 function withEffectiveActive<T extends { isActive: boolean; disabledUntil: Date | string | null }>(account: T, now = new Date()): T {
   return { ...account, isActive: accountIsEffectivelyActive(account, now) };
+}
+
+function normalizeTierForModelAccess(tier: string | null | undefined): string | null {
+  if (!tier) return null;
+  const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
+  if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
+  if (normalized === "free-tier" || normalized === "free-limited-copilot") return "free";
+  if (normalized === "education" || normalized === "educational" || normalized === "edu" || normalized === "free-educational-quota") return "student";
+  return normalized || null;
+}
+
+function accountTierCanAccessModel(accountTier: string | null | undefined, model: string, provider: string): boolean {
+  const accessRule = getProviderAccessRule(model, provider);
+  if (!accessRule?.allowedTiers?.length && !accessRule?.minTier) return true;
+
+  const normalizedAccountTier = normalizeTierForModelAccess(accountTier);
+  if (accessRule.allowedTiers?.length) {
+    return accessRule.allowedTiers.some((tier) => normalizeTierForModelAccess(tier) === normalizedAccountTier);
+  }
+
+  const requiredTier = normalizeTierForModelAccess(accessRule.minTier);
+  return !requiredTier || requiredTier === "free" || normalizedAccountTier === requiredTier;
+}
+
+function providerModelIsAccessibleByAccounts(model: string, provider: string, accounts: Array<{ tier: string | null }>): boolean {
+  if (provider !== "gemini_cli") return true;
+  const accessRule = getProviderAccessRule(model, provider);
+  if (!accessRule?.allowedTiers?.length && !accessRule?.minTier) return true;
+  return accounts.some((account) => accountTierCanAccessModel(account.tier, model, provider));
 }
 
 function toTimeMs(value: Date | string | null | undefined): number | null {
@@ -574,7 +603,9 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       .orderBy(...providerAccountLastUsedOrder);
 
     const accountIds = accounts.map((account) => account.id);
-    const supportedModels = Array.from(getProviderModelSet(input.provider)).sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
+    const supportedModels = Array.from(getProviderModelSet(input.provider))
+      .filter((model) => providerModelIsAccessibleByAccounts(model, input.provider, accounts))
+      .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
     const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
       accountIds.length > 0

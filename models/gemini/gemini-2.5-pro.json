@@ -33,6 +33,14 @@
       "reasoning_effort": false
     },
     "gemini_cli": {
+      "allowedTiers": [
+        "standard-tier",
+        "paid",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ],
       "thinking_budgets": {
         "high": 32768,
         "low": 8192,

@@ -7,5 +7,17 @@
     "reasoning": true,
     "toolCall": true,
     "vision": true
+  },
+  "providerConfig": {
+    "gemini_cli": {
+      "allowedTiers": [
+        "standard-tier",
+        "paid",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    }
   }
 }

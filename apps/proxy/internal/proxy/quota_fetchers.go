@@ -595,12 +595,6 @@ func geminiQuotaGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 		fraction = clampFraction(fraction)
 		maxRequests := 100.0
 		remaining := math.Round(fraction * maxRequests)
-		if amount := parseQuotaString(bucket["remainingAmount"]); amount != "" {
-			if parsed, err := strconvParseFloat(amount); err == nil && fraction > 0 {
-				remaining = parsed
-				maxRequests = math.Round(parsed / fraction)
-			}
-		}
 		resetISO := parseResetISO(bucket["resetTime"])
 		models[modelID] = quotaGroupDisplay{Name: modelID, Models: []string{modelID}, RemainingFraction: fraction, RemainingRequests: remaining, MaxRequests: maxRequests, UsedRequests: math.Max(0, maxRequests-remaining), PercentUsed: int(math.Round(clampFraction((maxRequests-remaining)/maxRequests) * 100)), IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO)}
 	}
@@ -610,6 +604,9 @@ func geminiQuotaGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 	}{"pro": {"Gemini Pro", []string{"gemini-2.5-pro", "gemini-3.1-pro-preview"}}, "25-flash": {"Gemini 2.5 Flash", []string{"gemini-2.5-flash", "gemini-2.5-flash-lite"}}, "3-flash": {"Gemini 3 Flash", []string{"gemini-3-flash-preview", "gemini-3.1-flash-lite"}}}
 	groups := []quotaGroupDisplay{}
 	for name, cfg := range configs {
+		if isFreeGeminiCLITier(tier) && name == "pro" {
+			continue
+		}
 		for _, model := range cfg.models {
 			if group, ok := models[model]; ok {
 				group.Name = name
@@ -621,6 +618,15 @@ func geminiQuotaGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 		}
 	}
 	return groups
+}
+
+func isFreeGeminiCLITier(tier string) bool {
+	switch strings.ToLower(strings.TrimSpace(tier)) {
+	case "", "free", "free-tier", "legacy-tier":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeGeminiModelID(model string) string {

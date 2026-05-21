@@ -64,3 +64,52 @@ func TestQuotaRequestAcceptsForceRefresh(t *testing.T) {
 		t.Fatal("ForceRefresh = false, want true")
 	}
 }
+
+func TestGeminiQuotaGroupsHideProForFreeTier(t *testing.T) {
+	payload := map[string]any{
+		"buckets": []any{
+			map[string]any{"modelId": "gemini-3.1-pro-preview", "remainingFraction": 0.5},
+			map[string]any{"modelId": "gemini-3-flash-preview", "remainingFraction": 0.75},
+		},
+	}
+
+	groups := geminiQuotaGroups(payload, "free-tier")
+	if len(groups) != 1 {
+		t.Fatalf("groups len = %d, want 1: %#v", len(groups), groups)
+	}
+	flash := quotaGroupByName(groups, "3-flash")
+	if flash == nil || flash.MaxRequests != 100 || flash.RemainingRequests != 75 {
+		t.Fatalf("flash group = %#v", groups[0])
+	}
+}
+
+func TestGeminiQuotaGroupsIncludeProForStandardTier(t *testing.T) {
+	payload := map[string]any{
+		"buckets": []any{
+			map[string]any{"modelId": "gemini-3.1-pro-preview", "remainingFraction": 0.5},
+			map[string]any{"modelId": "gemini-3-flash-preview", "remainingFraction": 0.75},
+		},
+	}
+
+	groups := geminiQuotaGroups(payload, "standard-tier")
+	if len(groups) != 2 {
+		t.Fatalf("groups len = %d, want 2: %#v", len(groups), groups)
+	}
+	pro := quotaGroupByName(groups, "pro")
+	if pro == nil || pro.MaxRequests != 100 || pro.RemainingRequests != 50 {
+		t.Fatalf("pro group = %#v", groups)
+	}
+	flash := quotaGroupByName(groups, "3-flash")
+	if flash == nil || flash.MaxRequests != 100 || flash.RemainingRequests != 75 {
+		t.Fatalf("flash group = %#v", groups)
+	}
+}
+
+func quotaGroupByName(groups []quotaGroupDisplay, name string) *quotaGroupDisplay {
+	for i := range groups {
+		if groups[i].Name == name {
+			return &groups[i]
+		}
+	}
+	return nil
+}

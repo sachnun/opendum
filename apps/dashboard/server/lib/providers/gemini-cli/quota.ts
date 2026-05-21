@@ -5,37 +5,10 @@ import {
 import { fetchInternalProvider } from "../../proxy/internal-relay.js";
 import { formatQuotaHttpError } from "../provider-http-errors.js";
 
-const DEFAULT_MAX_REQUESTS = 1000;
+const NORMALIZED_MAX_REQUESTS = 100;
 
 const MODEL_ALIASES: Record<string, string> = {
   "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite",
-};
-
-const MAX_REQUESTS_BY_TIER: Record<string, Record<string, number>> = {
-  "standard-tier": {
-    "gemini-2.5-pro": 250,
-    "gemini-3.1-pro-preview": 250,
-    "gemini-2.5-flash": 1500,
-    "gemini-2.5-flash-lite": 1500,
-    "gemini-3.1-flash-lite": 1500,
-    "gemini-3-flash-preview": 1500,
-  },
-  "free-tier": {
-    "gemini-2.5-pro": 100,
-    "gemini-3.1-pro-preview": 100,
-    "gemini-2.5-flash": 1000,
-    "gemini-2.5-flash-lite": 1000,
-    "gemini-3.1-flash-lite": 1000,
-    "gemini-3-flash-preview": 1000,
-  },
-  "legacy-tier": {
-    "gemini-2.5-pro": 100,
-    "gemini-3.1-pro-preview": 100,
-    "gemini-2.5-flash": 1000,
-    "gemini-2.5-flash-lite": 1000,
-    "gemini-3.1-flash-lite": 1000,
-    "gemini-3-flash-preview": 1000,
-  },
 };
 
 const QUOTA_GROUPS: Record<
@@ -117,13 +90,9 @@ function normalizeTier(tier: string | null | undefined): string {
   return normalized;
 }
 
-function getMaxRequestsForModel(model: string, tier: string): number {
-  const rawModel = model.includes("/") ? model.split("/").pop() ?? model : model;
-  const cleanModel = MODEL_ALIASES[rawModel] ?? rawModel;
+function isFreeGeminiCliTier(tier: string): boolean {
   const normalizedTier = normalizeTier(tier);
-  const tierLimits =
-    MAX_REQUESTS_BY_TIER[normalizedTier] ?? MAX_REQUESTS_BY_TIER["free-tier"];
-  return tierLimits?.[cleanModel] ?? DEFAULT_MAX_REQUESTS;
+  return normalizedTier === "free-tier" || normalizedTier === "legacy-tier";
 }
 
 function normalizeModelId(model: string): string {
@@ -157,6 +126,10 @@ function buildQuotaGroups(
   const groups: GeminiCliQuotaGroupInfo[] = [];
 
   for (const [groupName, groupConfig] of Object.entries(QUOTA_GROUPS)) {
+    if (isFreeGeminiCliTier(tier) && groupName === "pro") {
+      continue;
+    }
+
     const representative = groupConfig.models.find((model) => models[model]);
     if (!representative) {
       continue;
@@ -166,15 +139,13 @@ function buildQuotaGroups(
     if (!modelQuota) {
       continue;
     }
-    const maxRequests = getMaxRequestsForModel(representative, tier);
-
     groups.push({
       name: groupName,
       displayName: groupConfig.displayName,
       models: groupConfig.models,
       remainingFraction: modelQuota.remainingFraction,
       remainingRequests: modelQuota.remainingRequests,
-      maxRequests: modelQuota.maxRequests || maxRequests,
+      maxRequests: modelQuota.maxRequests,
       isExhausted: modelQuota.isExhausted,
       resetTimeIso: modelQuota.resetTimeIso,
       resetTimestamp: modelQuota.resetTimestamp,
@@ -193,23 +164,7 @@ function quotaFromBucket(
   }
 
   const remainingFraction = Math.max(0, Math.min(1, bucket.remainingFraction));
-  if (bucket.remainingAmount) {
-    const remainingRequests = Number.parseInt(bucket.remainingAmount, 10);
-    const maxRequests =
-      remainingFraction > 0
-        ? Math.round(remainingRequests / remainingFraction)
-        : getMaxRequestsForModel(bucket.modelId, tier);
-    if (Number.isFinite(remainingRequests) && Number.isFinite(maxRequests) && maxRequests > 0) {
-      return {
-        remainingRequests: Math.max(0, remainingRequests),
-        maxRequests,
-        remainingFraction,
-      };
-    }
-  }
-
-  // Mirrors Gemini CLI: if the backend only sends a fraction, display a normalized percentage scale.
-  const maxRequests = 100;
+  const maxRequests = NORMALIZED_MAX_REQUESTS;
   return {
     remainingRequests: Math.round(remainingFraction * maxRequests),
     maxRequests,
