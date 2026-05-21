@@ -256,7 +256,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
     </UiCard>
 
     <section v-if="apiKeys.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))]">
+      <div class="dashboard-card-grid">
         <UiCard
           v-for="apiKey in apiKeys"
           :key="apiKey.id"
@@ -310,7 +310,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                       </button>
                       <template #content>
                         <div class="space-y-1.5">
-                          <p class="font-medium text-popover-foreground">Roaming</p>
+                          <p class="font-medium text-foreground">Roaming</p>
                           <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Each successful roaming request uses points.</p>
                         </div>
                       </template>
@@ -326,7 +326,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                       </button>
                       <template #content>
                         <div class="space-y-1.5">
-                          <p class="font-medium text-popover-foreground">Roaming</p>
+                          <p class="font-medium text-foreground">Roaming</p>
                           <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Each successful roaming request uses points.</p>
                         </div>
                       </template>

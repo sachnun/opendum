@@ -730,9 +730,9 @@ async function handleAuditSelected() {
 
 <template>
   <div class="min-h-svh bg-background text-foreground">
-    <div class="dashboard-layout-frame relative mx-auto flex min-h-svh w-full md:max-w-screen-md lg:max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-screen-2xl min-[1920px]:max-w-[120rem]">
+    <div class="dashboard-layout-frame relative mx-auto flex min-h-svh w-full md:max-w-screen-md lg:max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-[118rem] min-[1920px]:max-w-[128rem]">
     <aside class="sticky top-0 hidden border-r border-border bg-background md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col">
-      <div class="flex h-16 items-center border-b border-border px-5">
+      <div class="flex h-16 items-center border-b border-border px-6">
         <NuxtLink to="/dashboard" class="inline-flex items-center gap-2.5">
           <span class="relative flex h-2.5 w-2.5">
             <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
@@ -1014,7 +1014,7 @@ async function handleAuditSelected() {
               </button>
 
               <template #content>
-                <div class="w-64 max-w-[calc(100vw-2rem)] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+                <div class="w-64 max-w-[calc(100vw-2rem)] p-1">
                   <div class="px-2 py-1.5 text-sm font-medium">
                     <div class="flex flex-col">
                       <span class="truncate">{{ userLabel }}</span>
@@ -1118,7 +1118,7 @@ async function handleAuditSelected() {
     >
       <template #content>
         <div class="flex h-full flex-col bg-background">
-          <div class="flex h-16 items-center justify-between border-b border-border px-5">
+          <div class="flex h-16 items-center justify-between border-b border-border px-6">
             <NuxtLink to="/dashboard" class="inline-flex items-center gap-2 text-base font-semibold tracking-tight" @click="closeMobileSidebar">
               <span class="relative flex h-2.5 w-2.5">
                 <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />

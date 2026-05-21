@@ -116,16 +116,8 @@ const pickerItems = computed(() => {
 </script>
 
 <template>
-  <section class="flex h-full flex-col p-4 max-lg:p-0">
-    <div class="hidden items-start justify-between gap-3 lg:flex">
-      <div class="inline-flex items-center gap-2 text-sm font-semibold">
-        <UiIcon name="i-lucide-gauge" class="size-4 text-muted-foreground" />
-        <span>Rate Limits</span>
-      </div>
-      <UiBadge variant="outline" class="shrink-0">{{ savedRules.length }} rule{{ savedRules.length === 1 ? '' : 's' }}</UiBadge>
-    </div>
-
-    <div class="flex-1 space-y-3 lg:mt-5">
+  <section class="flex h-full flex-col">
+    <div class="flex-1 space-y-3">
       <div v-if="draftRules.length === 0" class="px-1 py-4 text-xs text-muted-foreground">
         No rate limits configured. Requests use the default unlimited behavior.
       </div>
@@ -153,9 +145,9 @@ const pickerItems = computed(() => {
       <div class="space-y-2 pt-1">
         <div class="flex items-center justify-between gap-2">
           <p class="text-xs font-medium">Add rule</p>
-          <div class="grid grid-cols-2 gap-1 rounded-md border border-input bg-input/30 p-1">
-            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', addMode === 'model' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'model'; pickerOpen = false">Model</button>
-            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm px-2 text-[11px] font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', addMode === 'family' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground']" @click="addMode = 'family'; pickerOpen = false">Family</button>
+          <div class="grid grid-cols-2 gap-1 rounded-md border border-border/70 bg-card/30 p-1">
+            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm border px-2 text-[11px] font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', addMode === 'model' ? 'border-primary/35 bg-primary/10 text-primary' : 'border-transparent text-muted-foreground']" @click="addMode = 'model'; pickerOpen = false">Model</button>
+            <button type="button" :disabled="readonly" :class="['h-7 rounded-sm border px-2 text-[11px] font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', addMode === 'family' ? 'border-primary/35 bg-primary/10 text-primary' : 'border-transparent text-muted-foreground']" @click="addMode = 'family'; pickerOpen = false">Family</button>
           </div>
         </div>
 

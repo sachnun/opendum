@@ -186,7 +186,6 @@ const pendingModelByPanel = reactive<Record<string, string | null>>({});
 const modelSearchByPanel = reactive<Record<string, string>>({});
 const routeSearchByPanel = reactive<Record<string, string>>({});
 const chatMessagesByPanel = reactive<Record<string, ScenarioMessage[]>>({});
-const systemCollapsedByPanel = reactive<Record<string, boolean>>({});
 const autoScrollByPanel = reactive<Record<string, boolean>>({});
 const initializedFromRoute = ref(false);
 const liveNow = ref(Date.now());
@@ -1586,14 +1585,14 @@ function formatToolArguments(value: string): string {
                 :key="option.value"
                 type="button"
                 :class="[
-                  'flex h-auto w-full cursor-pointer flex-col items-start justify-start rounded-md border px-3 py-2 text-left text-sm transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
-                  settings.endpoint === option.value ? 'border-primary bg-primary text-primary-foreground ring-1 ring-primary/30' : 'border-input bg-input/30 hover:bg-input/50',
+                  'flex h-auto w-full cursor-pointer flex-col items-start justify-start rounded-md border px-3 py-2 text-left text-sm disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
+                  settings.endpoint === option.value ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
                 ]"
                 :disabled="isAnyLoading"
                 @click="settings.endpoint = option.value"
               >
                 <span class="text-xs font-medium">{{ option.label }}</span>
-                <span :class="settings.endpoint === option.value ? 'text-[11px] text-primary-foreground/80' : 'text-[11px] text-muted-foreground'">{{ option.description }}</span>
+                <span :class="settings.endpoint === option.value ? 'text-[11px] text-primary/80' : 'text-[11px] text-muted-foreground'">{{ option.description }}</span>
               </button>
               <p class="text-xs text-muted-foreground">Pick the API style you want to test in Playground.</p>
             </div>
@@ -1674,8 +1673,8 @@ function formatToolArguments(value: string): string {
                   v-for="option in REASONING_OPTIONS"
                   :key="option.value"
                   size="sm"
-                  :variant="settings.reasoningEffort === option.value ? 'default' : 'outline'"
-                  :class="['flex-1', settings.reasoningEffort === option.value && option.value !== 'none' ? 'bg-amber-600 hover:bg-amber-700' : '']"
+                  variant="outline"
+                  :class="['flex-1 border-border/70 bg-card/30 text-muted-foreground shadow-none hover:bg-card/30', settings.reasoningEffort === option.value ? (option.value === 'none' ? 'border-primary/35 bg-primary/10 text-primary hover:bg-primary/10' : 'border-amber-500/35 bg-amber-500/10 text-amber-200 hover:bg-amber-500/10') : '']"
                   :disabled="isAnyLoading"
                   @click="settings.reasoningEffort = option.value"
                 >
@@ -1737,8 +1736,8 @@ function formatToolArguments(value: string): string {
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto min-w-[72px] cursor-pointer flex-col items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
-              selectedScenario.id === scenario.id ? (scenario.isReasoning ? 'border-amber-600 bg-amber-600 text-white hover:bg-amber-700' : 'bg-primary text-primary-foreground') : (scenario.isReasoning ? 'border-dashed border-amber-700 hover:border-amber-600' : 'border-input bg-input/30 hover:bg-input/50'),
+              'flex h-auto min-w-[72px] cursor-pointer flex-col items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
+              selectedScenario.id === scenario.id ? (scenario.isReasoning ? 'border-amber-500/35 bg-amber-500/10 text-amber-200' : 'border-primary/35 bg-primary/10 text-primary') : (scenario.isReasoning ? 'border-dashed border-amber-500/25 bg-card/30 text-muted-foreground' : 'border-border/70 bg-card/30 text-muted-foreground'),
             ]"
             @click="selectScenario(scenario)"
           >
@@ -1763,8 +1762,8 @@ function formatToolArguments(value: string): string {
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[92px]',
-              activeFamilyPresets.includes(preset.family) ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
+              'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[92px]',
+              activeFamilyPresets.includes(preset.family) ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
             ]"
             @click="applyFamilyPreset(preset.family)"
           >
@@ -1789,8 +1788,8 @@ function formatToolArguments(value: string): string {
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto min-h-10 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium transition-all disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
-              activeProviderPresets.includes(preset.provider) ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
+              'flex h-auto min-h-10 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
+              activeProviderPresets.includes(preset.provider) ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
             ]"
             @click="applyProviderPreset(preset.provider)"
           >
@@ -1800,23 +1799,23 @@ function formatToolArguments(value: string): string {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))]">
-        <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden py-0">
+      <div class="dashboard-card-grid">
+        <UiCard v-for="panel in panels" :key="panel.id" class="relative flex h-[400px] flex-col gap-0 overflow-hidden border-border/70 bg-card/40 py-0 shadow-none">
           <UiTooltip v-if="panels.length > 1" text="Remove">
-            <UiButton variant="outline" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full border bg-background/95" aria-label="Remove comparison card" @click="removePanel(panel.id)">
+            <UiButton variant="ghost" size="icon-xs" class="absolute right-2 top-2 z-10 h-7 w-7 rounded-full bg-transparent p-0 text-muted-foreground" aria-label="Remove comparison card" @click="removePanel(panel.id)">
               <UiIcon name="i-lucide-x" class="size-3.5" />
             </UiButton>
           </UiTooltip>
 
-          <UiCardHeader class="flex-none gap-0 border-b py-2 pl-3" :class="panels.length > 1 ? 'pr-11' : 'pr-3'">
+          <UiCardHeader class="flex-none gap-0 bg-muted/10 py-2 pl-3" :class="panels.length > 1 ? 'pr-11' : 'pr-3'">
             <UiPopover v-model:open="selectionOpenByPanel[panel.id]" :content="{ align: 'start', class: 'w-[340px] max-w-[calc(100vw-2rem)] p-0' }">
-              <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between px-2 font-normal" :disabled="responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
+              <UiButton type="button" variant="ghost" class="h-8 flex-1 justify-between bg-transparent px-0 font-normal shadow-none" :disabled="responses[panel.id]?.isLoading" @click="openPanelPicker(panel)">
                 <span v-if="panel.modelId && modelsById.get(panel.modelId)" class="flex min-w-0 items-center gap-2">
                   <UiTooltip v-if="shouldShowVisionWarning(modelsById.get(panel.modelId))" text="This model may not support vision input">
                     <UiIcon name="i-lucide-triangle-alert" class="size-3.5 shrink-0 text-yellow-500" />
                   </UiTooltip>
                   <span class="truncate">{{ modelsById.get(panel.modelId)?.name }}</span>
-                  <UiBadge variant="secondary" class="shrink-0 whitespace-nowrap px-1.5 py-0 text-[10px]">
+                  <UiBadge variant="secondary" class="shrink-0 whitespace-nowrap bg-muted/40 px-1.5 py-0 text-[10px] text-muted-foreground">
                     {{ getValidAccountIdForPanel(panel) ? getProviderLabel(providerAccountsById.get(getValidAccountIdForPanel(panel)!)?.provider ?? '') : responses[panel.id]?.usedAccountId ? `Auto - ${getProviderLabel(providerAccountsById.get(responses[panel.id]?.usedAccountId ?? '')?.provider ?? '')}` : 'Auto' }}
                   </UiBadge>
                 </span>
@@ -1879,26 +1878,17 @@ function formatToolArguments(value: string): string {
           </UiCardHeader>
 
           <UiCardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-            <div :ref="(element) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto p-3" @scroll="handlePanelScroll(panel.id, $event)">
+            <div :ref="(element) => setPanelScrollElement(panel.id, element)" class="min-h-0 flex-1 overflow-y-auto bg-background/20 p-3" @scroll="handlePanelScroll(panel.id, $event)">
               <template v-if="getScenarioConversationMessages(panel.id).length > 0">
-                <div v-if="getPanelSystemPromptText(panel.id)" class="mb-2">
-                  <button type="button" class="flex w-full cursor-pointer items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/80" @click="systemCollapsedByPanel[panel.id] = !(systemCollapsedByPanel[panel.id] ?? true)">
-                    <UiIcon name="i-lucide-settings" class="size-3 shrink-0 text-muted-foreground" />
-                    <span class="flex-1 text-[11px] font-medium text-muted-foreground">System</span>
-                    <UiIcon :name="(systemCollapsedByPanel[panel.id] ?? true) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" class="size-3 shrink-0 text-muted-foreground" />
-                  </button>
-                  <div v-if="!(systemCollapsedByPanel[panel.id] ?? true)" class="mt-1 rounded-md bg-muted/30 px-2.5 py-2">
-                    <pre class="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ getPanelSystemPromptText(panel.id) }}</pre>
-                  </div>
-                </div>
+                <pre v-if="getPanelSystemPromptText(panel.id)" class="mb-2 whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-muted-foreground">{{ getPanelSystemPromptText(panel.id) }}</pre>
 
                 <div v-for="(message, index) in getPanelUserScenarioMessages(panel.id)" :key="`${panel.id}-message-${index}`" class="mb-2 flex gap-2">
-                  <div :class="message.role === 'assistant' ? 'bg-secondary' : 'bg-primary/10'" class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
+                  <div :class="message.role === 'assistant' ? 'bg-secondary/80' : 'bg-primary/10'" class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
                     <UiIcon :name="message.role === 'assistant' ? 'i-lucide-bot' : 'i-lucide-user'" :class="message.role === 'assistant' ? 'text-secondary-foreground' : 'text-primary'" class="size-3" />
                   </div>
                   <div class="min-w-0 flex-1">
                     <p :class="message.role === 'assistant' ? 'text-muted-foreground' : 'text-primary'" class="mb-1 text-[11px] font-medium">{{ message.role === 'assistant' ? 'Assistant' : 'User' }}</p>
-                    <div :class="message.role === 'assistant' ? 'border border-border bg-card' : 'bg-muted'" class="rounded-lg px-3 py-2">
+                    <div :class="message.role === 'assistant' ? 'bg-card/50' : 'bg-primary/10'" class="rounded-lg px-3 py-2">
                       <pre v-if="extractMessageText(message.content)" class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ extractMessageText(message.content) }}</pre>
                       <div v-if="extractImageUrls(message.content).length > 0" class="mt-1.5 flex flex-wrap gap-1.5">
                         <a v-for="(url, imageIndex) in extractImageUrls(message.content)" :key="`${panel.id}-${imageIndex}`" :href="url" target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded border border-border">
@@ -1911,7 +1901,7 @@ function formatToolArguments(value: string): string {
               </template>
 
               <div v-if="responses[panel.id]?.error" class="space-y-2">
-                <div role="alert" class="relative grid w-full grid-cols-[1rem_1fr] items-start gap-x-3 rounded-lg border border-destructive/40 bg-card px-4 py-3 text-sm text-destructive">
+                <div role="alert" class="relative grid w-full grid-cols-[1rem_1fr] items-start gap-x-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   <UiIcon name="i-lucide-alert-circle" class="size-4 translate-y-0.5" />
                   <div>
                     <p class="font-medium">Error</p>
@@ -1925,33 +1915,33 @@ function formatToolArguments(value: string): string {
               </div>
 
               <div v-if="panel.modelId && !isChatScenario && (responses[panel.id]?.content || responses[panel.id]?.reasoning || responses[panel.id]?.toolCalls?.length || responses[panel.id]?.isLoading)" class="mb-2 flex gap-2">
-                <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary">
+                <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary/80">
                   <UiIcon name="i-lucide-bot" class="size-3 text-secondary-foreground" />
                 </div>
                 <div class="min-w-0 flex-1">
                   <p class="mb-1 text-[11px] font-medium text-muted-foreground">Assistant</p>
                   <div class="space-y-2">
-                    <div v-if="responses[panel.id]?.reasoning" class="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2">
+                    <div v-if="responses[panel.id]?.reasoning" class="rounded-lg bg-amber-500/10 px-3 py-2 text-amber-100">
                       <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Reasoning</p>
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.reasoning }}<span v-if="responses[panel.id]?.isLoading && !responses[panel.id]?.content" class="animate-pulse text-primary">▌</span></pre>
                     </div>
-                    <div v-if="responses[panel.id]?.content" class="rounded-lg border border-border bg-card px-3 py-2">
+                    <div v-if="responses[panel.id]?.content" class="rounded-lg bg-card/50 px-3 py-2">
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.content }}<span v-if="responses[panel.id]?.isLoading" class="animate-pulse text-primary">▌</span></pre>
                     </div>
-                    <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning && responses[panel.id]?.isLoading" class="rounded-lg border border-border bg-card px-3 py-2">
+                    <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning && responses[panel.id]?.isLoading" class="rounded-lg bg-card/50 px-3 py-2">
                       <div class="space-y-1.5">
                         <UiSkeleton class="h-3 w-full" />
                         <UiSkeleton class="h-3 w-4/5" />
                         <UiSkeleton class="h-3 w-3/5" />
                       </div>
                     </div>
-                    <div v-if="responses[panel.id]?.toolCalls?.length" class="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
+                    <div v-if="responses[panel.id]?.toolCalls?.length" class="rounded-lg bg-muted/20 px-3 py-2">
                       <div class="mb-1.5 flex items-center gap-1.5">
                         <UiIcon name="i-lucide-wrench" class="size-3 text-muted-foreground" />
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tool Calls</p>
                       </div>
                       <div class="space-y-1.5">
-                        <div v-for="(toolCall, index) in responses[panel.id]?.toolCalls" :key="`${toolCall.name}-${index}`" class="rounded border border-border bg-background px-2 py-1.5">
+                        <div v-for="(toolCall, index) in responses[panel.id]?.toolCalls" :key="`${toolCall.name}-${index}`" class="rounded bg-background/70 px-2 py-1.5">
                           <p class="text-[11px] font-semibold text-foreground">{{ toolCall.name }}</p>
                           <pre class="mt-0.5 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground">{{ formatToolArguments(toolCall.arguments) }}</pre>
                         </div>
@@ -1962,20 +1952,20 @@ function formatToolArguments(value: string): string {
               </div>
 
               <div v-if="panel.modelId && isChatScenario && responses[panel.id]?.isLoading" class="mb-2 flex gap-2">
-                <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary">
+                <div class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary/80">
                   <UiIcon name="i-lucide-bot" class="size-3 text-secondary-foreground" />
                 </div>
                 <div class="min-w-0 flex-1">
                   <p class="mb-1 text-[11px] font-medium text-muted-foreground">Assistant</p>
                   <div class="space-y-2">
-                    <div v-if="responses[panel.id]?.reasoning" class="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2">
+                    <div v-if="responses[panel.id]?.reasoning" class="rounded-lg bg-amber-500/10 px-3 py-2 text-amber-100">
                       <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Reasoning</p>
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.reasoning }}<span v-if="!responses[panel.id]?.content" class="animate-pulse text-primary">▌</span></pre>
                     </div>
-                    <div v-if="responses[panel.id]?.content" class="rounded-lg border border-border bg-card px-3 py-2">
+                    <div v-if="responses[panel.id]?.content" class="rounded-lg bg-card/50 px-3 py-2">
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.content }}<span class="animate-pulse text-primary">▌</span></pre>
                     </div>
-                    <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning" class="rounded-lg border border-border bg-card px-3 py-2">
+                    <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning" class="rounded-lg bg-card/50 px-3 py-2">
                       <div class="space-y-1.5">
                         <UiSkeleton class="h-3 w-full" />
                         <UiSkeleton class="h-3 w-4/5" />
@@ -1989,7 +1979,7 @@ function formatToolArguments(value: string): string {
               <p v-if="panel.modelId && !responses[panel.id]?.isLoading && !responses[panel.id]?.content && !responses[panel.id]?.reasoning && !responses[panel.id]?.error && !responses[panel.id]?.toolCalls?.length && getScenarioConversationMessages(panel.id).length === 0" class="py-8 text-center text-sm text-muted-foreground">Response will appear here</p>
             </div>
 
-            <div class="shrink-0 border-t bg-card px-3 py-2 text-[11px]">
+            <div class="shrink-0 bg-muted/15 px-3 py-2 text-[11px]">
               <div class="flex items-center justify-between gap-2">
                 <span class="text-muted-foreground">Wait</span>
                 <div class="flex items-center gap-2">
@@ -2027,10 +2017,10 @@ function formatToolArguments(value: string): string {
           </UiCardContent>
         </UiCard>
 
-        <UiCard v-if="canAddPanel" class="group h-[400px] overflow-hidden border-2 border-dashed border-border/80 bg-background p-0 transition-colors hover:border-muted-foreground/45">
-          <button type="button" class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-muted-foreground transition-colors hover:bg-muted/15 hover:text-foreground/90 disabled:cursor-default disabled:opacity-50" aria-label="Add comparison card" @click="addPanel">
-            <span class="inline-flex size-10 items-center justify-center rounded-full border border-muted-foreground/30 transition-colors group-hover:border-muted-foreground/45">
-              <UiIcon name="i-lucide-plus" class="size-4 transition-colors group-hover:text-foreground/80" />
+        <UiCard v-if="canAddPanel" class="group h-[400px] overflow-hidden border border-dashed border-border/70 bg-card/20 p-0 shadow-none">
+          <button type="button" class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 text-muted-foreground disabled:cursor-default disabled:opacity-50" aria-label="Add comparison card" @click="addPanel">
+            <span class="inline-flex size-10 items-center justify-center rounded-full bg-muted/20">
+              <UiIcon name="i-lucide-plus" class="size-4" />
             </span>
             <span class="text-sm font-medium">Add comparison</span>
           </button>

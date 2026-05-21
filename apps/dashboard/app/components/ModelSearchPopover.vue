@@ -222,7 +222,7 @@ function closeDetail() {
       v-if="suggestionsOpen"
       :id="suggestionListId"
       role="listbox"
-      class="absolute left-0 right-0 top-full z-40 mt-1 max-h-[min(22rem,calc(100vh-5rem))] overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+      class="absolute left-0 right-0 top-full z-40 mt-1 max-h-[min(22rem,calc(100vh-5rem))] overflow-y-auto rounded-lg border border-border bg-background p-1 text-foreground shadow-lg"
     >
       <p v-if="filteredModels.length === 0" class="py-6 text-center text-sm text-muted-foreground">No model found.</p>
       <div v-else class="space-y-1">

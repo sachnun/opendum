@@ -40,12 +40,6 @@ function sameList(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
-function getModeLabel(mode: AccessMode): string {
-  if (mode === "all") return "All accounts";
-  if (mode === "whitelist") return "Whitelist";
-  return "Blacklist";
-}
-
 function getAccountLabel(account: ProviderAccountOption): string {
   return account.email ? `${account.name} (${account.email})` : account.name;
 }
@@ -107,18 +101,10 @@ const filteredAccounts = computed(() => {
 </script>
 
 <template>
-  <section class="flex h-full flex-col p-4 max-lg:p-0">
-    <div class="hidden items-start justify-between gap-3 lg:flex">
-      <div class="inline-flex items-center gap-2 text-sm font-semibold">
-        <UiIcon name="i-lucide-shield-check" class="size-4 text-muted-foreground" />
-        <span>Account Access</span>
-      </div>
-      <UiBadge variant="outline" class="shrink-0">{{ getModeLabel(savedMode) }}</UiBadge>
-    </div>
-
-    <div class="flex-1 space-y-3 lg:mt-5">
-      <div class="grid grid-cols-3 gap-1 rounded-md border border-input bg-input/30 p-1">
-        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm px-2 text-xs font-medium transition-colors disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']" @click="draftMode = mode as AccessMode">
+  <section class="flex h-full flex-col">
+    <div class="flex-1 space-y-3">
+      <div class="grid grid-cols-3 gap-1 rounded-md border border-border/70 bg-card/30 p-1">
+        <button v-for="mode in ['all', 'whitelist', 'blacklist']" :key="mode" type="button" :disabled="readonly" :class="['h-8 rounded-sm border px-2 text-xs font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-60', draftMode === mode ? 'border-primary/35 bg-primary/10 text-primary' : 'border-transparent text-muted-foreground']" @click="draftMode = mode as AccessMode">
           {{ mode === 'all' ? 'All' : mode === 'whitelist' ? 'Whitelist' : 'Blacklist' }}
         </button>
       </div>

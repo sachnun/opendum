@@ -58,7 +58,7 @@ function refreshAccountsOverview() {
 
     <DashboardDataNotice :error="error" />
     <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
-    <div v-else-if="summaries" class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))]">
+    <div v-else-if="summaries" class="dashboard-card-grid">
       <ProviderOverviewCard
         v-for="provider in sortedProviders"
         :key="provider.key"

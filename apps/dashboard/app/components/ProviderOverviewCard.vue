@@ -200,7 +200,7 @@ function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
     </div>
 
     <UiCardContent class="pointer-events-none relative z-20 p-0">
-      <div class="space-y-2 rounded-md border border-border/70 p-2.5">
+      <div class="space-y-2 rounded-md border border-border/70 p-2.5 transition-colors group-hover:border-border">
         <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
           <UsageStatMetric
             v-for="stat in stats"

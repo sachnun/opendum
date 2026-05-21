@@ -47,13 +47,13 @@ const props = withDefaults(
         :side-offset="sideOffset"
         :align-offset="alignOffset"
         :class="cn(
-          'z-50 max-w-72 rounded-md border border-border bg-popover px-2 py-1.5 text-xs leading-snug text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 [@media(hover:none)]:hidden [@media(pointer:coarse)]:hidden',
+          'z-50 max-w-72 rounded-md border border-border bg-background px-2 py-1.5 text-xs leading-snug text-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 [@media(hover:none)]:hidden [@media(pointer:coarse)]:hidden',
           contentClass,
           props.class,
         )"
       >
         <slot name="content">{{ text }}</slot>
-        <TooltipArrow v-if="arrow" class="fill-popover" />
+        <TooltipArrow v-if="arrow" class="fill-background" />
       </TooltipContent>
     </TooltipPortal>
   </TooltipRoot>

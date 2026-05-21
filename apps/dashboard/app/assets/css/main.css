@@ -174,14 +174,14 @@
   }
 
   .dashboard-card-grid {
-    @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),22rem))] sm:justify-center;
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))];
   }
 
   @media (min-width: 48rem) {
     .dashboard-shell {
       --dashboard-sidebar-width: 15rem;
       --dashboard-main-x-padding: 1.5rem;
-      --dashboard-card-width: 22rem;
+      --dashboard-card-width: 20rem;
       --dashboard-card-gap: 0.75rem;
       --dashboard-card-step: calc(var(--dashboard-card-width) + var(--dashboard-card-gap));
 

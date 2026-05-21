@@ -669,7 +669,7 @@ function decodeAccountHash(hash: string): string | null {
     </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div v-if="supportsProviderQuota && quotaSummaryGroups.length > 0" class="space-y-2 pb-2 md:mb-4 md:rounded-xl md:border md:border-border md:bg-card md:p-4">
-        <div class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1920px]:grid-cols-5">
           <div v-for="group in quotaSummaryGroups" :key="group.name" class="space-y-1.5">
             <div class="flex items-start justify-between gap-2 text-xs">
               <div class="flex min-w-0 items-center gap-1.5">
@@ -685,7 +685,7 @@ function decodeAccountHash(hash: string): string | null {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))]">
+      <div class="dashboard-card-grid">
         <ProviderAccountCard
           v-for="account in accounts"
           :id="account.id"

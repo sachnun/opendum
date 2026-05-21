@@ -292,8 +292,8 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
         <button
           type="button"
           :class="[
-            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium transition-colors',
-            allSelected ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
+            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium',
+            allSelected ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
           ]"
           @click="toggleProvider('all')"
         >
@@ -304,8 +304,8 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
           :key="provider.id"
           type="button"
           :class="[
-            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium transition-colors',
-            activeProviders.includes(provider.id) ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15' : 'border-input bg-input/30 hover:bg-input/50',
+            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium',
+            activeProviders.includes(provider.id) ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
           ]"
           @click="toggleProvider(provider.id)"
         >
@@ -319,7 +319,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
             <h3 class="text-sm font-semibold">{{ section.name }}</h3>
             <UiBadge variant="outline" class="text-[10px] font-normal">{{ section.models.length }} models</UiBadge>
           </div>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))]">
+          <div class="dashboard-card-grid">
             <UiCard
               v-for="model in section.models"
               :key="model.id"

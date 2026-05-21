@@ -638,7 +638,7 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
-      <div class="flex items-center justify-center">
+      <div class="flex items-center justify-center py-2">
         <template v-for="(stepNumber, index) in displayedSteps" :key="stepNumber">
           <div class="flex items-center">
             <div
@@ -675,7 +675,7 @@ onBeforeUnmount(() => {
 
         <div v-if="step === 2 && selectedConfig" class="space-y-4">
           <div class="space-y-2">
-            <p class="text-sm font-medium">Choose {{ selectedConfig.name }} connection method</p>
+            <p class="text-sm font-medium">Choose {{ selectedConfig.name }} method</p>
           </div>
           <div class="grid gap-3">
             <button
