@@ -25,7 +25,8 @@
   },
   "providerConfig": {
     "copilot": {
-      "upstream": "claude-haiku-4.5"
+      "upstream": "claude-haiku-4.5",
+      "reasoning_effort": false
     },
     "kiro": {
       "upstream": "claude-haiku-4.5"
