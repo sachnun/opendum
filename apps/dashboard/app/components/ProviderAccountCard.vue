@@ -42,6 +42,7 @@ type DurationPoint = { time: string; avgDuration: number | null };
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
+const DEFAULT_MAX_QUOTA_SKELETON_ROWS = 3;
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
 const ERROR_PREVIEW_VISIBLE_COUNT = 9;
@@ -155,6 +156,7 @@ const props = defineProps<{
   modelHealth?: ProviderDetailData["modelHealthByAccountId"][string];
   quotaInfo?: AccountQuotaInfo | null;
   quotaError?: string | null;
+  quotaSkeletonLimit?: number | null;
   highlight?: boolean;
   animateDeltas?: boolean;
   readonly?: boolean;
@@ -542,7 +544,11 @@ const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() 
 const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value, props.account.provider));
 const showTierBadge = computed(() => props.showTier && tierBadgeLabel.value !== "");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
-const quotaSkeletonRows = computed(() => QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? QUOTA_SKELETON_ROWS.copilot);
+const quotaSkeletonRows = computed(() => {
+  const rows = QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? QUOTA_SKELETON_ROWS.copilot;
+  const limit = props.quotaSkeletonLimit ?? DEFAULT_MAX_QUOTA_SKELETON_ROWS;
+  return limit > 0 ? rows.slice(0, limit) : rows;
+});
 const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
 const usageChartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
 const activeDisabledUntil = computed(() => {
