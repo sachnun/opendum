@@ -37,7 +37,7 @@ func (p copilotProvider) RefreshBuffer() time.Duration { return 5 * time.Minute 
 func (p copilotProvider) RefreshCredentials(ctx context.Context, client *http.Client, refreshToken string, _ appdb.ProviderAccount) (RefreshedCredentials, error) {
 	refreshToken = strings.TrimSpace(refreshToken)
 	if refreshToken != "" && !strings.HasPrefix(refreshToken, "ghr_") {
-		return refreshCopilotFromGitHubToken(ctx, client, refreshToken)
+		return refreshCopilotFromOAuthToken(ctx, client, refreshToken, refreshToken, 0)
 	}
 
 	payload, _ := json.Marshal(map[string]any{"client_id": copilotClientID, "grant_type": "refresh_token", "refresh_token": strings.TrimSpace(refreshToken)})
@@ -68,7 +68,7 @@ func (p copilotProvider) RefreshCredentials(ctx context.Context, client *http.Cl
 	if token.AccessToken == "" {
 		return RefreshedCredentials{}, fmt.Errorf("copilot token refresh returned empty access token")
 	}
-	refreshed, err := refreshCopilotFromGitHubToken(ctx, client, token.AccessToken)
+	refreshed, err := refreshCopilotFromOAuthToken(ctx, client, token.AccessToken, refreshToken, token.ExpiresIn)
 	if err != nil {
 		return RefreshedCredentials{}, err
 	}
@@ -80,7 +80,27 @@ func (p copilotProvider) RefreshCredentials(ctx context.Context, client *http.Cl
 	return refreshed, nil
 }
 
-func refreshCopilotFromGitHubToken(ctx context.Context, client *http.Client, githubToken string) (RefreshedCredentials, error) {
+func refreshCopilotFromOAuthToken(ctx context.Context, client *http.Client, githubToken, sourceRefreshToken string, expiresIn int64) (RefreshedCredentials, error) {
+	githubToken = strings.TrimSpace(githubToken)
+	if shouldExchangeCopilotToken(githubToken) {
+		return refreshCopilotFromGitHubToken(ctx, client, githubToken, sourceRefreshToken)
+	}
+	expiresAt := time.Now().Add(time.Hour)
+	if expiresIn > 0 {
+		expiresAt = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	}
+	if strings.TrimSpace(sourceRefreshToken) == "" {
+		sourceRefreshToken = githubToken
+	}
+	tier := fetchCopilotTier(ctx, client, githubToken)
+	return RefreshedCredentials{AccessToken: githubToken, RefreshToken: strings.TrimSpace(sourceRefreshToken), ExpiresAt: expiresAt, Email: fetchCopilotIdentity(ctx, client, githubToken), Tier: tier}, nil
+}
+
+func shouldExchangeCopilotToken(githubToken string) bool {
+	return strings.HasPrefix(strings.TrimSpace(githubToken), "ghu_")
+}
+
+func refreshCopilotFromGitHubToken(ctx context.Context, client *http.Client, githubToken, sourceRefreshToken string) (RefreshedCredentials, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, copilotInternalTokenEndpoint, nil)
 	if err != nil {
 		return RefreshedCredentials{}, err
@@ -112,7 +132,10 @@ func refreshCopilotFromGitHubToken(ctx context.Context, client *http.Client, git
 		expiresAt = time.Unix(token.ExpiresAt, 0)
 	}
 	tier := fetchCopilotTier(ctx, client, githubToken)
-	return RefreshedCredentials{AccessToken: token.Token, RefreshToken: githubToken, StoreAccessToken: token.Token, ExpiresAt: expiresAt, Email: fetchCopilotIdentity(ctx, client, githubToken), Tier: tier}, nil
+	if strings.TrimSpace(sourceRefreshToken) == "" {
+		sourceRefreshToken = githubToken
+	}
+	return RefreshedCredentials{AccessToken: token.Token, RefreshToken: strings.TrimSpace(sourceRefreshToken), StoreAccessToken: token.Token, ExpiresAt: expiresAt, Email: fetchCopilotIdentity(ctx, client, githubToken), Tier: tier}, nil
 }
 
 func fetchCopilotTier(ctx context.Context, client *http.Client, accessToken string) string {

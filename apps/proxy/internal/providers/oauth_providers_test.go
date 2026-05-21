@@ -108,19 +108,19 @@ func TestCopilotRefreshCredentialsExchangesStoredGitHubToken(t *testing.T) {
 		switch req.URL.String() {
 		case copilotInternalTokenEndpoint:
 			seen["token"] = true
-			if req.Header.Get("Authorization") != "Token github-token" {
+			if req.Header.Get("Authorization") != "Token ghu_github-token" {
 				t.Fatalf("exchange auth = %q", req.Header.Get("Authorization"))
 			}
 			return jsonTestResponse(http.StatusOK, fmt.Sprintf(`{"token":"copilot-token","expires_at":%d}`, expiresAt)), nil
 		case "https://api.github.com/copilot_internal/user":
 			seen["tier"] = true
-			if req.Header.Get("Authorization") != "Bearer github-token" {
+			if req.Header.Get("Authorization") != "Bearer ghu_github-token" {
 				t.Fatalf("tier auth = %q", req.Header.Get("Authorization"))
 			}
 			return jsonTestResponse(http.StatusOK, `{"access_type_sku":"free_limited_copilot"}`), nil
 		case copilotUserEndpoint:
 			seen["identity"] = true
-			if req.Header.Get("Authorization") != "Bearer github-token" {
+			if req.Header.Get("Authorization") != "Bearer ghu_github-token" {
 				t.Fatalf("identity auth = %q", req.Header.Get("Authorization"))
 			}
 			return jsonTestResponse(http.StatusOK, `{"login":"octocat"}`), nil
@@ -130,11 +130,11 @@ func TestCopilotRefreshCredentialsExchangesStoredGitHubToken(t *testing.T) {
 		return nil, nil
 	})}
 
-	refreshed, err := provider.RefreshCredentials(t.Context(), client, " github-token ", appdb.ProviderAccount{})
+	refreshed, err := provider.RefreshCredentials(t.Context(), client, " ghu_github-token ", appdb.ProviderAccount{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if refreshed.AccessToken != "copilot-token" || refreshed.StoreAccessToken != "copilot-token" || refreshed.RefreshToken != "github-token" {
+	if refreshed.AccessToken != "copilot-token" || refreshed.StoreAccessToken != "copilot-token" || refreshed.RefreshToken != "ghu_github-token" {
 		t.Fatalf("tokens = %#v", refreshed)
 	}
 	if refreshed.Tier != "free" || refreshed.Email != "octocat" {
@@ -144,6 +144,48 @@ func TestCopilotRefreshCredentialsExchangesStoredGitHubToken(t *testing.T) {
 		t.Fatalf("expiresAt = %v, want %d", refreshed.ExpiresAt, expiresAt)
 	}
 	for _, key := range []string{"token", "tier", "identity"} {
+		if !seen[key] {
+			t.Fatalf("missing %s request", key)
+		}
+	}
+}
+
+func TestCopilotRefreshCredentialsKeepsStoredOpencodeTokenRaw(t *testing.T) {
+	provider := copilotProvider{}
+	seen := map[string]bool{}
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.String() {
+		case copilotInternalTokenEndpoint:
+			t.Fatalf("raw opencode token should not be exchanged")
+		case "https://api.github.com/copilot_internal/user":
+			seen["tier"] = true
+			if req.Header.Get("Authorization") != "Bearer gho_github-token" {
+				t.Fatalf("tier auth = %q", req.Header.Get("Authorization"))
+			}
+			return jsonTestResponse(http.StatusOK, `{"copilot_plan":"pro"}`), nil
+		case copilotUserEndpoint:
+			seen["identity"] = true
+			if req.Header.Get("Authorization") != "Bearer gho_github-token" {
+				t.Fatalf("identity auth = %q", req.Header.Get("Authorization"))
+			}
+			return jsonTestResponse(http.StatusOK, `{"login":"octocat"}`), nil
+		default:
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+		}
+		return nil, nil
+	})}
+
+	refreshed, err := provider.RefreshCredentials(t.Context(), client, " gho_github-token ", appdb.ProviderAccount{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.AccessToken != "gho_github-token" || refreshed.StoreAccessToken != "" || refreshed.RefreshToken != "gho_github-token" {
+		t.Fatalf("tokens = %#v", refreshed)
+	}
+	if refreshed.Tier != "pro" || refreshed.Email != "octocat" {
+		t.Fatalf("metadata = %#v", refreshed)
+	}
+	for _, key := range []string{"tier", "identity"} {
 		if !seen[key] {
 			t.Fatalf("missing %s request", key)
 		}
@@ -165,9 +207,9 @@ func TestCopilotRefreshCredentialsUsesOAuthRefreshTokenThenExchanges(t *testing.
 			if payload["refresh_token"] != "ghr_refresh" || payload["grant_type"] != "refresh_token" {
 				t.Fatalf("refresh payload = %#v", payload)
 			}
-			return jsonTestResponse(http.StatusOK, `{"access_token":"github-token","refresh_token":"ghr_next"}`), nil
+			return jsonTestResponse(http.StatusOK, `{"access_token":"ghu_github-token","refresh_token":"ghr_next"}`), nil
 		case copilotInternalTokenEndpoint:
-			if req.Header.Get("Authorization") != "Token github-token" {
+			if req.Header.Get("Authorization") != "Token ghu_github-token" {
 				t.Fatalf("exchange auth = %q", req.Header.Get("Authorization"))
 			}
 			return jsonTestResponse(http.StatusOK, `{"token":"copilot-token"}`), nil
@@ -189,6 +231,36 @@ func TestCopilotRefreshCredentialsUsesOAuthRefreshTokenThenExchanges(t *testing.
 		t.Fatalf("tokens = %#v", refreshed)
 	}
 	if refreshed.Tier != "pro" || refreshed.Email != "user@example.com" {
+		t.Fatalf("metadata = %#v", refreshed)
+	}
+}
+
+func TestCopilotRefreshCredentialsUsesOAuthRefreshTokenThenKeepsOpencodeTokenRaw(t *testing.T) {
+	provider := copilotProvider{}
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.String() {
+		case copilotTokenEndpoint:
+			return jsonTestResponse(http.StatusOK, `{"access_token":"gho_github-token","refresh_token":"ghr_next","expires_in":7200}`), nil
+		case copilotInternalTokenEndpoint:
+			t.Fatalf("refreshed opencode token should not be exchanged")
+		case "https://api.github.com/copilot_internal/user":
+			return jsonTestResponse(http.StatusOK, `{"copilot_plan":"free"}`), nil
+		case copilotUserEndpoint:
+			return jsonTestResponse(http.StatusOK, `{"login":"octocat"}`), nil
+		default:
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+		}
+		return nil, nil
+	})}
+
+	refreshed, err := provider.RefreshCredentials(t.Context(), client, "ghr_refresh", appdb.ProviderAccount{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.AccessToken != "gho_github-token" || refreshed.StoreAccessToken != "" || refreshed.RefreshToken != "ghr_next" {
+		t.Fatalf("tokens = %#v", refreshed)
+	}
+	if refreshed.Tier != "free" || refreshed.Email != "octocat" {
 		t.Fatalf("metadata = %#v", refreshed)
 	}
 }

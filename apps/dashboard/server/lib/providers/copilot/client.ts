@@ -55,6 +55,11 @@ interface CopilotTokenExchangeResponse {
   };
 }
 
+type CopilotOAuthResultOptions = {
+  sourceRefreshToken?: string;
+  expiresInSeconds?: number;
+};
+
 interface CopilotInternalUserResponse {
   access_type_sku?: unknown;
   copilot_plan?: unknown;
@@ -102,6 +107,18 @@ function normalizeUnixExpiry(expiresAt?: number): Date {
   }
 
   return new Date(Date.now() + 60 * 60 * 1000);
+}
+
+function normalizeRelativeExpiry(expiresInSeconds?: number): Date {
+  if (typeof expiresInSeconds === "number" && Number.isFinite(expiresInSeconds) && expiresInSeconds > 0) {
+    return new Date(Date.now() + expiresInSeconds * 1000);
+  }
+
+  return new Date(Date.now() + 60 * 60 * 1000);
+}
+
+function shouldExchangeCopilotToken(githubToken: string): boolean {
+  return githubToken.trim().startsWith("ghu_");
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -206,15 +223,26 @@ async function fetchCopilotToken(githubToken: string): Promise<CopilotTokenExcha
   return tokenData;
 }
 
-async function buildOAuthResult(githubToken: string, sourceRefreshToken?: string): Promise<OAuthResult> {
-  const copilotToken = await fetchCopilotToken(githubToken);
+async function buildOAuthResult(githubToken: string, options: CopilotOAuthResultOptions = {}): Promise<OAuthResult> {
   const [identity, tier] = await Promise.all([
     fetchCopilotIdentity(githubToken),
     fetchCopilotTier(githubToken),
   ]);
+
+  if (!shouldExchangeCopilotToken(githubToken)) {
+    return {
+      accessToken: githubToken,
+      refreshToken: options.sourceRefreshToken || githubToken,
+      expiresAt: normalizeRelativeExpiry(options.expiresInSeconds),
+      email: identity,
+      ...(tier ? { tier } : {}),
+    };
+  }
+
+  const copilotToken = await fetchCopilotToken(githubToken);
   return {
     accessToken: copilotToken.token || githubToken,
-    refreshToken: sourceRefreshToken || githubToken,
+    refreshToken: options.sourceRefreshToken || githubToken,
     expiresAt: normalizeUnixExpiry(copilotToken.expires_at),
     email: identity,
     ...(tier ? { tier } : {}),
@@ -256,7 +284,10 @@ export const copilotProvider = {
       throw new Error(tokenData.error_description || tokenData.error || "Missing access token");
     }
 
-    return buildOAuthResult(tokenData.access_token, tokenData.refresh_token || refreshToken);
+    return buildOAuthResult(tokenData.access_token, {
+      sourceRefreshToken: tokenData.refresh_token || refreshToken,
+      expiresInSeconds: tokenData.expires_in,
+    });
   },
 
   async getValidCredentials(account: CredentialAccount): Promise<string> {
@@ -365,7 +396,10 @@ export async function pollCopilotDeviceCodeAuthorization(
 
   const data = (await response.json()) as CopilotTokenResponse;
   if (data.access_token) {
-    return buildOAuthResult(data.access_token, data.refresh_token || data.access_token);
+    return buildOAuthResult(data.access_token, {
+      sourceRefreshToken: data.refresh_token || data.access_token,
+      expiresInSeconds: data.expires_in,
+    });
   }
 
   if (data.error === "authorization_pending") {
