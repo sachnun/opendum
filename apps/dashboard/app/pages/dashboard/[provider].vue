@@ -71,6 +71,7 @@ const activeAccountCount = computed(() => accounts.value.filter((account) => acc
 const isLoadingAccounts = computed(() => pending.value || (!detailData.value && !error.value));
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
+const supportedModelsByAccountId = computed(() => detailData.value?.supportedModelsByAccountId ?? {});
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
 const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
@@ -224,8 +225,13 @@ function applyProviderDetailResponse(detail: ProviderDetailResponse): ProviderDe
 
   const deletedAccountIds = new Set(detail.deletedAccountIds ?? []);
   const changedAccountsById = new Map((detail.accounts ?? []).map((account) => [account.id, account]));
+  const clearedSupportedModelIds = new Set(detail.clearedSupportedModelsByAccountId ?? []);
   const clearedDisabledModelIds = new Set(detail.clearedDisabledModelsByAccountId ?? []);
   const clearedModelHealthIds = new Set(detail.clearedModelHealthByAccountId ?? []);
+  const nextSupportedModelsByAccountId = {
+    ...Object.fromEntries(Object.entries(current.supportedModelsByAccountId).filter(([accountId]) => !clearedSupportedModelIds.has(accountId))),
+    ...(detail.supportedModelsByAccountId ?? {}),
+  };
   const nextDisabledModelsByAccountId = {
     ...Object.fromEntries(Object.entries(current.disabledModelsByAccountId).filter(([accountId]) => !clearedDisabledModelIds.has(accountId))),
     ...(detail.disabledModelsByAccountId ?? {}),
@@ -243,6 +249,7 @@ function applyProviderDetailResponse(detail: ProviderDetailResponse): ProviderDe
       ...(detail.accounts ?? []).filter((account) => !current.accounts.some((currentAccount) => currentAccount.id === account.id)),
     ],
     supportedModels: detail.supportedModels ?? current.supportedModels,
+    supportedModelsByAccountId: nextSupportedModelsByAccountId,
     disabledModelsByAccountId: nextDisabledModelsByAccountId,
     modelHealthByAccountId: nextModelHealthByAccountId,
     pinnedProviders: detail.pinnedProviders ?? current.pinnedProviders,
@@ -694,7 +701,7 @@ function decodeAccountHash(hash: string): string | null {
           :account="getAccountWithStats(account)"
           :data-account-id="account.id"
           :show-tier="providerMeta?.showTier"
-          :supported-models="supportedModels"
+          :supported-models="supportedModelsByAccountId[account.id] ?? supportedModels"
           :disabled-models="disabledModelsByAccountId[account.id] ?? []"
           :model-health="modelHealthByAccountId[account.id] ?? {}"
           :quota-info="quotaByAccountId[account.id] ?? null"

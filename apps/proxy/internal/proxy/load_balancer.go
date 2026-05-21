@@ -459,11 +459,8 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 			return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 		}
-		if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
-			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
-		}
-		if validation.Provider != nil && account.Provider != *validation.Provider {
-			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
+		if modelErr := s.validateSelectedAccountModel(account, validation, param); modelErr != nil {
+			return nil, modelErr
 		}
 		return &account, nil
 	}
@@ -471,11 +468,8 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 			return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 		}
-		if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
-			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
-		}
-		if validation.Provider != nil && account.Provider != *validation.Provider {
-			return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
+		if modelErr := s.validateSelectedAccountModel(account, validation, param); modelErr != nil {
+			return nil, modelErr
 		}
 		return &account, nil
 	}
@@ -498,13 +492,23 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 	if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 		return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 	}
-	if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
-		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
-	}
-	if validation.Provider != nil && account.Provider != *validation.Provider {
-		return nil, &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
+	if modelErr := s.validateSelectedAccountModel(account, validation, param); modelErr != nil {
+		return nil, modelErr
 	}
 	return &account, nil
+}
+
+func (s *Service) validateSelectedAccountModel(account appdb.ProviderAccount, validation auth.ModelValidationResult, param string) *routeError {
+	if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
+		return &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
+	}
+	if validation.Provider != nil && account.Provider != *validation.Provider {
+		return &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not match model provider \"" + *validation.Provider + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_provider_mismatch")}
+	}
+	if !s.canAccountUseModel(account, validation.Model) {
+		return &routeError{Status: http.StatusBadRequest, Message: "Selected provider account tier does not allow model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_tier_mismatch")}
+	}
+	return nil
 }
 
 func validateForcedAccountAvailability(account appdb.ProviderAccount, allowInactive bool, param string) *routeError {

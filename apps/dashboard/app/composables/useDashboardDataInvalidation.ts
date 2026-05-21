@@ -64,6 +64,7 @@ function removeProviderAccount(provider: string, accountId: string) {
   patchNuxtData<ProviderDetailData>(dashboardDataKeys.accountsDetail(provider), (value) => ({
     ...value,
     accounts: value.accounts.filter((account) => account.id !== accountId),
+    supportedModelsByAccountId: Object.fromEntries(Object.entries(value.supportedModelsByAccountId).filter(([id]) => id !== accountId)),
     disabledModelsByAccountId: Object.fromEntries(Object.entries(value.disabledModelsByAccountId).filter(([id]) => id !== accountId)),
     modelHealthByAccountId: Object.fromEntries(Object.entries(value.modelHealthByAccountId).filter(([id]) => id !== accountId)),
   }));

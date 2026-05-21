@@ -23,7 +23,7 @@ const MAX_ERROR_HISTORY_ROWS = 200;
 const ERROR_HISTORY_KEY_PREFIX = "opendum:provider-account:error-history";
 const ERROR_HISTORY_ENTRY_KEY_PREFIX = "opendum:provider-account:error-history-entry";
 const ACCOUNT_OVERVIEW_CURSOR_VERSION = 2;
-const PROVIDER_DETAIL_CURSOR_VERSION = 1;
+const PROVIDER_DETAIL_CURSOR_VERSION = 2;
 
 type RedisErrorHistoryEntry = {
   id: string;
@@ -95,6 +95,7 @@ type ProviderDetailCursor = {
   v: typeof PROVIDER_DETAIL_CURSOR_VERSION;
   accounts: Record<string, string>;
   supportedModels: string;
+  supportedModelsByAccountId: Record<string, string>;
   disabledModelsByAccountId: Record<string, string>;
   modelHealthByAccountId: Record<string, string>;
   pinnedProviders: string;
@@ -179,10 +180,13 @@ function accountTierCanAccessModel(accountTier: string | null | undefined, model
 }
 
 function providerModelIsAccessibleByAccounts(model: string, provider: string, accounts: Array<{ tier: string | null }>): boolean {
-  if (provider !== "gemini_cli") return true;
   const accessRule = getProviderAccessRule(model, provider);
   if (!accessRule?.allowedTiers?.length && !accessRule?.minTier) return true;
   return accounts.some((account) => accountTierCanAccessModel(account.tier, model, provider));
+}
+
+function sortProviderModels(models: string[]): string[] {
+  return [...models].sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
 }
 
 function toTimeMs(value: Date | string | null | undefined): number | null {
@@ -375,11 +379,12 @@ function decodeAccountOverviewCursor(cursor: string | undefined): AccountOvervie
   return { pinned, summaries };
 }
 
-function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: ProviderAccountKey[] }) {
+function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; supportedModelsByAccountId: Record<string, string[]>; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: ProviderAccountKey[] }) {
   const cursor: ProviderDetailCursor = {
     v: PROVIDER_DETAIL_CURSOR_VERSION,
     accounts: Object.fromEntries(detail.accounts.map((account) => [account.id, hashAccountOverviewValue(account)])),
     supportedModels: hashAccountOverviewValue(detail.supportedModels),
+    supportedModelsByAccountId: Object.fromEntries(Object.entries(detail.supportedModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
     disabledModelsByAccountId: Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
     modelHealthByAccountId: Object.fromEntries(Object.entries(detail.modelHealthByAccountId).map(([accountId, health]) => [accountId, hashAccountOverviewValue(health)])),
     pinnedProviders: hashAccountOverviewValue(detail.pinnedProviders),
@@ -394,7 +399,8 @@ function decodeProviderDetailCursor(cursor: string | undefined): ProviderDetailC
   try {
     const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<ProviderDetailCursor>;
     if (parsed.v !== PROVIDER_DETAIL_CURSOR_VERSION || !parsed.accounts || typeof parsed.accounts !== "object") return null;
-    if (typeof parsed.supportedModels !== "string" || !parsed.disabledModelsByAccountId || typeof parsed.disabledModelsByAccountId !== "object") return null;
+    if (typeof parsed.supportedModels !== "string" || !parsed.supportedModelsByAccountId || typeof parsed.supportedModelsByAccountId !== "object") return null;
+    if (!parsed.disabledModelsByAccountId || typeof parsed.disabledModelsByAccountId !== "object") return null;
     if (!parsed.modelHealthByAccountId || typeof parsed.modelHealthByAccountId !== "object" || typeof parsed.pinnedProviders !== "string") return null;
 
     return parsed as ProviderDetailCursor;
@@ -603,9 +609,12 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       .orderBy(...providerAccountLastUsedOrder);
 
     const accountIds = accounts.map((account) => account.id);
-    const supportedModels = Array.from(getProviderModelSet(input.provider))
-      .filter((model) => providerModelIsAccessibleByAccounts(model, input.provider, accounts))
-      .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }));
+    const providerModels = Array.from(getProviderModelSet(input.provider));
+    const supportedModelsByAccountId = Object.fromEntries(accounts.map((account) => [
+      account.id,
+      sortProviderModels(providerModels.filter((model) => accountTierCanAccessModel(account.tier, model, input.provider))),
+    ]));
+    const supportedModels = sortProviderModels(providerModels.filter((model) => providerModelIsAccessibleByAccounts(model, input.provider, accounts)));
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
     const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
       accountIds.length > 0
@@ -684,6 +693,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     const detail = {
       accounts: detailedAccounts,
       supportedModels,
+      supportedModelsByAccountId,
       disabledModelsByAccountId,
       modelHealthByAccountId,
       pinnedProviders,
@@ -695,6 +705,8 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       const changedAccounts = detail.accounts.filter((account) => previousCursor.accounts[account.id] !== hashAccountOverviewValue(account));
       const currentAccountIds = new Set(detail.accounts.map((account) => account.id));
       const deletedAccountIds = Object.keys(previousCursor.accounts).filter((accountId) => !currentAccountIds.has(accountId));
+      const changedSupportedModels = Object.fromEntries(Object.entries(detail.supportedModelsByAccountId).filter(([accountId, models]) => previousCursor.supportedModelsByAccountId[accountId] !== hashAccountOverviewValue(models)));
+      const clearedSupportedModelsByAccountId = Object.keys(previousCursor.supportedModelsByAccountId).filter((accountId) => !(accountId in detail.supportedModelsByAccountId));
       const changedDisabledModels = Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).filter(([accountId, models]) => previousCursor.disabledModelsByAccountId[accountId] !== hashAccountOverviewValue(models)));
       const clearedDisabledModelsByAccountId = Object.keys(previousCursor.disabledModelsByAccountId).filter((accountId) => !(accountId in detail.disabledModelsByAccountId));
       const changedModelHealth = Object.fromEntries(Object.entries(detail.modelHealthByAccountId).filter(([accountId, health]) => previousCursor.modelHealthByAccountId[accountId] !== hashAccountOverviewValue(health)));
@@ -706,6 +718,8 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
         ...(changedAccounts.length > 0 ? { accounts: changedAccounts } : {}),
         ...(deletedAccountIds.length > 0 ? { deletedAccountIds } : {}),
         ...(previousCursor.supportedModels !== hashAccountOverviewValue(detail.supportedModels) ? { supportedModels: detail.supportedModels } : {}),
+        ...(Object.keys(changedSupportedModels).length > 0 ? { supportedModelsByAccountId: changedSupportedModels } : {}),
+        ...(clearedSupportedModelsByAccountId.length > 0 ? { clearedSupportedModelsByAccountId } : {}),
         ...(Object.keys(changedDisabledModels).length > 0 ? { disabledModelsByAccountId: changedDisabledModels } : {}),
         ...(clearedDisabledModelsByAccountId.length > 0 ? { clearedDisabledModelsByAccountId } : {}),
         ...(Object.keys(changedModelHealth).length > 0 ? { modelHealthByAccountId: changedModelHealth } : {}),
@@ -872,7 +886,7 @@ export async function togglePinnedProvider(userId: string, input: z.infer<typeof
 export async function setAccountModelEnabled(userId: string, input: z.infer<typeof setAccountModelEnabledInputSchema>) {
   try {
     const [account] = await db
-      .select({ id: providerAccount.id, provider: providerAccount.provider })
+      .select({ id: providerAccount.id, provider: providerAccount.provider, tier: providerAccount.tier })
       .from(providerAccount)
       .where(and(eq(providerAccount.id, input.accountId), eq(providerAccount.userId, userId)))
       .limit(1);
@@ -881,6 +895,9 @@ export async function setAccountModelEnabled(userId: string, input: z.infer<type
     const normalizedModel = resolveModelAlias(input.modelId.trim());
     if (!normalizedModel || !getProviderModelSet(account.provider).has(normalizedModel)) {
       return { success: false, error: `Model "${normalizedModel || input.modelId}" is not supported by provider "${account.provider}"` } as const;
+    }
+    if (!accountTierCanAccessModel(account.tier, normalizedModel, account.provider)) {
+      return { success: false, error: `Model "${normalizedModel}" is not available for this account tier` } as const;
     }
 
     const lookupKeys = getModelLookupKeys(normalizedModel);
