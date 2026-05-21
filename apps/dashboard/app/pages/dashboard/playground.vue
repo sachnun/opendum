@@ -1937,9 +1937,9 @@ function formatToolArguments(value: string): string {
               <div v-if="responses[panel.id]?.error" class="space-y-2">
                 <div role="alert" class="relative grid w-full grid-cols-[1rem_1fr] items-start gap-x-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   <UiIcon name="i-lucide-alert-circle" class="size-4 translate-y-0.5" />
-                  <div>
+                  <div class="min-w-0">
                     <p class="font-medium">Error</p>
-                    <p class="text-sm text-destructive/90">{{ responses[panel.id]?.error }}</p>
+                    <p class="break-words text-sm text-destructive/90">{{ responses[panel.id]?.error }}</p>
                   </div>
                 </div>
                 <UiButton v-if="panel.modelId" type="button" variant="outline" size="sm" class="w-full gap-1.5" :disabled="responses[panel.id]?.isLoading" @click="retryPanel(panel.id)">
