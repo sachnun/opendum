@@ -8,9 +8,9 @@ import type { ActionResult } from "../utils/api";
 const periodSchema = z.enum(["5m", "15m", "30m", "1h", "6h", "24h", "7d", "30d", "90d"]);
 const analyticsFilterSchema = z.union([
   periodSchema,
-  z.object({ from: z.string(), to: z.string() }),
+  z.object({ from: z.string().min(1), to: z.string().min(1) }),
 ]);
-const analyticsBaseInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().optional() });
+const analyticsBaseInputSchema = z.object({ filter: analyticsFilterSchema.optional(), apiKeyId: z.string().trim().min(1).optional() });
 export const analyticsDataInputSchema = analyticsBaseInputSchema.extend({ includeSeries: z.boolean().optional() }).optional();
 export const analyticsSeriesInputSchema = analyticsBaseInputSchema.optional();
 export const analyticsUsageInputSchema = z.object({ range: periodSchema.default("30d") }).optional();

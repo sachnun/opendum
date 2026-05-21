@@ -102,15 +102,16 @@ type ProviderDetailCursor = {
 };
 
 export const providerInputSchema = z.object({
-  provider: z.string().refine(isKnownProvider, "Invalid provider"),
+  provider: z.string().trim().refine(isKnownProvider, "Invalid provider"),
 });
-export const updateAccountInputSchema = z.object({ id: z.string(), name: z.string().optional(), isActive: z.boolean().optional(), disabledUntil: z.coerce.date().nullable().optional() });
-export const deleteAccountInputSchema = z.object({ id: z.string() });
-export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string() });
-export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(), modelId: z.string(), enabled: z.boolean() });
-export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.coerce.number().int().min(1).max(200).optional() });
-export const errorHistoryBatchInputSchema = z.object({ accountIds: z.array(z.string().min(1)).max(50), limit: z.coerce.number().int().min(1).max(200).optional() });
-export const resolveErrorsInputSchema = z.object({ accountId: z.string() });
+const accountIdSchema = z.string().trim().min(1);
+export const updateAccountInputSchema = z.object({ id: accountIdSchema, name: z.string().max(120).optional(), isActive: z.boolean().optional(), disabledUntil: z.coerce.date().nullable().optional() });
+export const deleteAccountInputSchema = z.object({ id: accountIdSchema });
+export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string().trim().min(1) });
+export const setAccountModelEnabledInputSchema = z.object({ accountId: accountIdSchema, modelId: z.string().trim().min(1), enabled: z.boolean() });
+export const errorHistoryInputSchema = z.object({ accountId: accountIdSchema, limit: z.coerce.number().int().min(1).max(200).optional() });
+export const errorHistoryBatchInputSchema = z.object({ accountIds: z.array(accountIdSchema).max(50), limit: z.coerce.number().int().min(1).max(200).optional() });
+export const resolveErrorsInputSchema = z.object({ accountId: accountIdSchema });
 const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));
 const statsCursorsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string()).max(50)).optional();
 

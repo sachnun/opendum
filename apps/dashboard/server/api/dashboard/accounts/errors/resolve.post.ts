@@ -1,4 +1,4 @@
 import { resolveAccountErrors, resolveErrorsInputSchema } from "../../../../services/accounts";
-import { readDashboardBody, requireReadableUserId } from "../../../../utils/api";
+import { readDashboardBody, requireWritableUserId } from "../../../../utils/api";
 
-export default defineEventHandler(async (event) => resolveAccountErrors(await requireReadableUserId(event), await readDashboardBody(event, resolveErrorsInputSchema)));
+export default defineEventHandler(async (event) => resolveAccountErrors(await requireWritableUserId(event), await readDashboardBody(event, resolveErrorsInputSchema)));

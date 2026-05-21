@@ -8,9 +8,10 @@ import { fetchInternalQuota, InternalRelayNotConfiguredError } from "../lib/prox
 const MAX_QUOTA_BATCH_ACCOUNTS = 100;
 const quotaProviderSchema = z.enum(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const quotaInFlight = new Map<string, Promise<AccountQuotaResult>>();
+const accountIdSchema = z.string().trim().min(1);
 
-export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: z.string(), forceRefresh: z.boolean().optional().default(false) });
-export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(z.string()).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS), forceRefresh: z.boolean().optional().default(false) });
+export const accountQuotaInputSchema = z.object({ provider: quotaProviderSchema, accountId: accountIdSchema, forceRefresh: z.boolean().optional().default(false) });
+export const accountQuotaBatchInputSchema = z.object({ provider: quotaProviderSchema, accountIds: z.array(accountIdSchema).min(1).max(MAX_QUOTA_BATCH_ACCOUNTS), forceRefresh: z.boolean().optional().default(false) });
 
 type QuotaProviderKey = z.infer<typeof quotaProviderSchema>;
 type JsonRecord = Record<string, unknown>;
