@@ -319,7 +319,7 @@ async function fetchCopilotInternalUser(
 
     const payload = (await response.json()) as Record<string, unknown>;
 
-    let plan = normalizeDetectedPlan(payload);
+    const plan = normalizeDetectedPlan(payload);
 
     // quota_snapshots can be an object keyed by quota_id or an array
     const rawSnapshots = payload.quota_snapshots;
