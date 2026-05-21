@@ -351,8 +351,7 @@ const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
       ...group,
       remainingFraction: group.maxRequests > 0 ? Math.max(0, Math.min(1, group.remainingRequests / group.maxRequests)) : 0,
       percentUsed: group.maxRequests > 0 ? Math.round(Math.max(0, Math.min(100, (group.usedRequests / group.maxRequests) * 100))) : 0,
-    }))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    }));
 });
 function toQuotaProvider(provider: string): QuotaProviderKey | null {
   return QUOTA_PROVIDERS.has(provider) ? provider as QuotaProviderKey : null;

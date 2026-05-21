@@ -17,7 +17,7 @@ const QUOTA_GROUPS: Record<
 > = {
   pro: {
     displayName: "Gemini Pro",
-    models: ["gemini-2.5-pro", "gemini-3.1-pro-preview"],
+    models: ["gemini-3.1-pro-preview", "gemini-2.5-pro"],
   },
   "25-flash": {
     displayName: "Gemini 2.5 Flash",
@@ -157,7 +157,7 @@ function buildQuotaGroups(
 
 function quotaFromBucket(
   bucket: RetrieveUserQuotaBucket,
-  tier: string
+  _tier: string
 ): { remainingRequests: number; maxRequests: number; remainingFraction: number } | null {
   if (!bucket.modelId || bucket.remainingFraction === null || bucket.remainingFraction === undefined) {
     return null;

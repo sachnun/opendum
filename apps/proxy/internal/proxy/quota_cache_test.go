@@ -69,17 +69,21 @@ func TestGeminiQuotaGroupsHideProForFreeTier(t *testing.T) {
 	payload := map[string]any{
 		"buckets": []any{
 			map[string]any{"modelId": "gemini-3.1-pro-preview", "remainingFraction": 0.5},
+			map[string]any{"modelId": "gemini-2.5-flash", "remainingFraction": 0.8},
 			map[string]any{"modelId": "gemini-3-flash-preview", "remainingFraction": 0.75},
 		},
 	}
 
 	groups := geminiQuotaGroups(payload, "free-tier")
-	if len(groups) != 1 {
-		t.Fatalf("groups len = %d, want 1: %#v", len(groups), groups)
+	if len(groups) != 2 {
+		t.Fatalf("groups len = %d, want 2: %#v", len(groups), groups)
+	}
+	if groups[0].Name != "3-flash" || groups[1].Name != "25-flash" {
+		t.Fatalf("group order = %v, want 3-flash, 25-flash", quotaGroupNames(groups))
 	}
 	flash := quotaGroupByName(groups, "3-flash")
 	if flash == nil || flash.MaxRequests != 100 || flash.RemainingRequests != 75 {
-		t.Fatalf("flash group = %#v", groups[0])
+		t.Fatalf("flash group = %#v", groups)
 	}
 }
 
@@ -87,21 +91,45 @@ func TestGeminiQuotaGroupsIncludeProForStandardTier(t *testing.T) {
 	payload := map[string]any{
 		"buckets": []any{
 			map[string]any{"modelId": "gemini-3.1-pro-preview", "remainingFraction": 0.5},
+			map[string]any{"modelId": "gemini-2.5-flash", "remainingFraction": 0.8},
 			map[string]any{"modelId": "gemini-3-flash-preview", "remainingFraction": 0.75},
 		},
 	}
 
 	groups := geminiQuotaGroups(payload, "standard-tier")
-	if len(groups) != 2 {
-		t.Fatalf("groups len = %d, want 2: %#v", len(groups), groups)
+	if len(groups) != 3 {
+		t.Fatalf("groups len = %d, want 3: %#v", len(groups), groups)
+	}
+	if groups[0].Name != "pro" || groups[1].Name != "3-flash" || groups[2].Name != "25-flash" {
+		t.Fatalf("group order = %v, want pro, 3-flash, 25-flash", quotaGroupNames(groups))
 	}
 	pro := quotaGroupByName(groups, "pro")
 	if pro == nil || pro.MaxRequests != 100 || pro.RemainingRequests != 50 {
 		t.Fatalf("pro group = %#v", groups)
 	}
+	if pro.Models[0] != "gemini-3.1-pro-preview" || pro.Models[1] != "gemini-2.5-pro" {
+		t.Fatalf("pro models = %v, want 3.1 pro before 2.5 pro", pro.Models)
+	}
 	flash := quotaGroupByName(groups, "3-flash")
 	if flash == nil || flash.MaxRequests != 100 || flash.RemainingRequests != 75 {
 		t.Fatalf("flash group = %#v", groups)
+	}
+}
+
+func TestAntigravityQuotaGroupsKeepFrontierFirst(t *testing.T) {
+	payload := map[string]any{
+		"models": map[string]any{
+			"gemini-3.1-pro-high":      map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.8}},
+			"claude-opus-4-6-thinking": map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.5}},
+		},
+	}
+
+	groups := antigravityGroups(payload, "standard-tier")
+	if len(groups) != 2 {
+		t.Fatalf("groups len = %d, want 2: %#v", len(groups), groups)
+	}
+	if groups[0].Name != "claude" || groups[1].Name != "g3-pro" {
+		t.Fatalf("group order = %v, want claude, g3-pro", quotaGroupNames(groups))
 	}
 }
 
@@ -112,4 +140,12 @@ func quotaGroupByName(groups []quotaGroupDisplay, name string) *quotaGroupDispla
 		}
 	}
 	return nil
+}
+
+func quotaGroupNames(groups []quotaGroupDisplay) []string {
+	names := make([]string, 0, len(groups))
+	for _, group := range groups {
+		names = append(names, group.Name)
+	}
+	return names
 }

@@ -126,14 +126,20 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 
 func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay {
 	models := parseQuotaRecord(payload["models"])
-	configs := map[string][]string{"claude": {"claude-opus-4-6", "claude-sonnet-4-6"}, "g3-pro": {"gemini-3.1-pro-preview"}}
-	display := map[string]string{"claude": "Claude", "g3-pro": "Gemini 3.1 Pro"}
 	apiNames := map[string]string{"claude-opus-4-6": "claude-opus-4-6-thinking", "gemini-3.1-pro-preview": "gemini-3.1-pro-high"}
+	configs := []struct {
+		name    string
+		display string
+		models  []string
+	}{
+		{name: "claude", display: "Claude", models: []string{"claude-opus-4-6", "claude-sonnet-4-6"}},
+		{name: "g3-pro", display: "Gemini 3.1 Pro", models: []string{"gemini-3.1-pro-preview"}},
+	}
 	groups := []quotaGroupDisplay{}
-	for name, modelList := range configs {
+	for _, cfg := range configs {
 		remainingFraction := 1.0
 		var resetISO *string
-		for _, model := range modelList {
+		for _, model := range cfg.models {
 			apiModel := apiNames[model]
 			if apiModel == "" {
 				apiModel = model
@@ -153,10 +159,10 @@ func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 			}
 			break
 		}
-		maxRequests := antigravityMaxRequests(modelList[0], tier)
+		maxRequests := antigravityMaxRequests(cfg.models[0], tier)
 		remaining := math.Max(0, math.Floor(remainingFraction*maxRequests))
 		percentUsed := int(math.Round(clampFraction((maxRequests-remaining)/maxRequests) * 100))
-		groups = append(groups, quotaGroupDisplay{Name: name, DisplayName: display[name], Models: modelList, RemainingFraction: remainingFraction, RemainingRequests: remaining, MaxRequests: maxRequests, UsedRequests: maxRequests - remaining, PercentUsed: percentUsed, IsExhausted: remainingFraction <= 0, IsEstimated: true, Confidence: "medium", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO), RemainingLabel: stringPtr(fmt.Sprintf("%d%%", int(math.Round(remainingFraction*100))))})
+		groups = append(groups, quotaGroupDisplay{Name: cfg.name, DisplayName: cfg.display, Models: cfg.models, RemainingFraction: remainingFraction, RemainingRequests: remaining, MaxRequests: maxRequests, UsedRequests: maxRequests - remaining, PercentUsed: percentUsed, IsExhausted: remainingFraction <= 0, IsEstimated: true, Confidence: "medium", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO), RemainingLabel: stringPtr(fmt.Sprintf("%d%%", int(math.Round(remainingFraction*100))))})
 	}
 	return groups
 }
@@ -598,18 +604,23 @@ func geminiQuotaGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 		resetISO := parseResetISO(bucket["resetTime"])
 		models[modelID] = quotaGroupDisplay{Name: modelID, Models: []string{modelID}, RemainingFraction: fraction, RemainingRequests: remaining, MaxRequests: maxRequests, UsedRequests: math.Max(0, maxRequests-remaining), PercentUsed: int(math.Round(clampFraction((maxRequests-remaining)/maxRequests) * 100)), IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO)}
 	}
-	configs := map[string]struct {
+	configs := []struct {
+		name    string
 		display string
 		models  []string
-	}{"pro": {"Gemini Pro", []string{"gemini-2.5-pro", "gemini-3.1-pro-preview"}}, "25-flash": {"Gemini 2.5 Flash", []string{"gemini-2.5-flash", "gemini-2.5-flash-lite"}}, "3-flash": {"Gemini 3 Flash", []string{"gemini-3-flash-preview", "gemini-3.1-flash-lite"}}}
+	}{
+		{name: "pro", display: "Gemini Pro", models: []string{"gemini-3.1-pro-preview", "gemini-2.5-pro"}},
+		{name: "3-flash", display: "Gemini 3 Flash", models: []string{"gemini-3-flash-preview", "gemini-3.1-flash-lite"}},
+		{name: "25-flash", display: "Gemini 2.5 Flash", models: []string{"gemini-2.5-flash", "gemini-2.5-flash-lite"}},
+	}
 	groups := []quotaGroupDisplay{}
-	for name, cfg := range configs {
-		if isFreeGeminiCLITier(tier) && name == "pro" {
+	for _, cfg := range configs {
+		if isFreeGeminiCLITier(tier) && cfg.name == "pro" {
 			continue
 		}
 		for _, model := range cfg.models {
 			if group, ok := models[model]; ok {
-				group.Name = name
+				group.Name = cfg.name
 				group.DisplayName = cfg.display
 				group.Models = cfg.models
 				groups = append(groups, group)
