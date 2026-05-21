@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
+import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
 import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import { warmDashboardIndexedDbStore } from "../../utils/dashboardIndexedDb";
 
@@ -17,6 +17,7 @@ const selectedProvider = computed<ProviderAccountKey>(() => getProviderFromSlug(
 const providerMeta = computed(() => BY_KEY[selectedProvider.value]);
 
 type Account = ProviderDetailData["accounts"][number];
+type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
 type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
   remainingRequests: number;
   maxRequests: number;
@@ -28,6 +29,7 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
 
 const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
 const ACCOUNT_STATS_BATCH_SIZE = 24;
+const ERROR_HISTORY_BATCH_SIZE = 20;
 const ACCOUNT_STATS_POLL_MS = 30_000;
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
 const PROVIDER_DETAIL_REFRESH_MS = 30_000;
@@ -51,9 +53,13 @@ const accountStatsCursorById = ref<Record<string, string>>({});
 const accountStatsDeltaReadyById = ref<Record<string, boolean>>({});
 const accountStatsFetchedById = ref<Record<string, boolean>>({});
 const hydratedAccountStatsIds = ref<Record<string, boolean>>({});
+const errorHistoryByAccountId = ref<Record<string, ErrorHistoryEntry[] | null>>({});
+const errorHistoryErrorByAccountId = ref<Record<string, string | null>>({});
+const errorHistoryFetchedById = ref<Record<string, boolean>>({});
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
+let errorHistoryQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let accountStatsPollTimer: ReturnType<typeof setInterval> | null = null;
 let providerDetailRefreshInFlight: Promise<void> | null = null;
 let providerDetailRefreshQueued = false;
@@ -63,6 +69,8 @@ let shouldPromoteNextNewAccount = false;
 const queuedAccountStatsIds = new Set<string>();
 const forceQueuedAccountStatsIds = new Set<string>();
 const loadingAccountStatsIds = new Set<string>();
+const queuedErrorHistoryIds = new Set<string>();
+const loadingErrorHistoryIds = new Set<string>();
 const accounts = computed(() => {
   const currentAccounts = detailData.value?.accounts ?? [];
   return [...currentAccounts].sort(compareDisplayAccounts);
@@ -196,12 +204,21 @@ watch(selectedProvider, () => {
   accountStatsDeltaReadyById.value = {};
   accountStatsFetchedById.value = {};
   hydratedAccountStatsIds.value = {};
+  errorHistoryByAccountId.value = {};
+  errorHistoryErrorByAccountId.value = {};
+  errorHistoryFetchedById.value = {};
   queuedAccountStatsIds.clear();
   forceQueuedAccountStatsIds.clear();
   loadingAccountStatsIds.clear();
+  queuedErrorHistoryIds.clear();
+  loadingErrorHistoryIds.clear();
   if (accountStatsQueueTimer) {
     clearTimeout(accountStatsQueueTimer);
     accountStatsQueueTimer = null;
+  }
+  if (errorHistoryQueueTimer) {
+    clearTimeout(errorHistoryQueueTimer);
+    errorHistoryQueueTimer = null;
   }
   if (highlightTimer) {
     clearTimeout(highlightTimer);
@@ -311,6 +328,7 @@ const {
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
   if (accountStatsQueueTimer) clearTimeout(accountStatsQueueTimer);
+  if (errorHistoryQueueTimer) clearTimeout(errorHistoryQueueTimer);
   stopAccountStatsPolling();
   stopProviderDetailRefresh();
   cancelQuotaQueue();
@@ -456,6 +474,36 @@ function queueAccountStatsLoad(accountIds: Iterable<string>, options: { force?: 
   }, 80);
 }
 
+function queueErrorHistoryLoad(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
+  if (!import.meta.client) return;
+
+  for (const accountId of accountIds) {
+    if (!options.force && errorHistoryFetchedById.value[accountId]) continue;
+    if (loadingErrorHistoryIds.has(accountId)) continue;
+    queuedErrorHistoryIds.add(accountId);
+  }
+
+  if (queuedErrorHistoryIds.size === 0 || errorHistoryQueueTimer) return;
+  errorHistoryQueueTimer = setTimeout(() => {
+    errorHistoryQueueTimer = null;
+    void flushQueuedErrorHistory();
+  }, 80);
+}
+
+async function flushQueuedErrorHistory() {
+  const accountIds = Array.from(queuedErrorHistoryIds).slice(0, ERROR_HISTORY_BATCH_SIZE);
+  for (const accountId of accountIds) queuedErrorHistoryIds.delete(accountId);
+
+  await loadErrorHistories(accountIds);
+
+  if (queuedErrorHistoryIds.size > 0) {
+    errorHistoryQueueTimer = setTimeout(() => {
+      errorHistoryQueueTimer = null;
+      void flushQueuedErrorHistory();
+    }, 80);
+  }
+}
+
 async function flushQueuedAccountStats() {
   const accountIds = Array.from(queuedAccountStatsIds).slice(0, ACCOUNT_STATS_BATCH_SIZE);
   for (const accountId of accountIds) queuedAccountStatsIds.delete(accountId);
@@ -526,6 +574,50 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
   }
 }
 
+async function loadErrorHistories(accountIds: string[]) {
+  const availableAccountIds = new Set(accounts.value.map((account) => account.id));
+  const requestedAccountIds = Array.from(new Set(accountIds))
+    .filter((accountId) => availableAccountIds.has(accountId))
+    .filter((accountId) => !loadingErrorHistoryIds.has(accountId));
+
+  if (requestedAccountIds.length === 0) return;
+
+  for (const accountId of requestedAccountIds) loadingErrorHistoryIds.add(accountId);
+
+  try {
+    const response = await dashboardApi.accounts.errorHistories({ accountIds: requestedAccountIds, limit: 100 });
+    const nextHistoryById = { ...errorHistoryByAccountId.value };
+    const nextErrorById = { ...errorHistoryErrorByAccountId.value };
+    const nextFetchedById = { ...errorHistoryFetchedById.value };
+
+    if (!response.success) throw new Error(response.error);
+
+    for (const accountId of requestedAccountIds) {
+      const result = response.data[accountId];
+      nextFetchedById[accountId] = true;
+      if (!result?.success) {
+        nextHistoryById[accountId] = [];
+        nextErrorById[accountId] = null;
+        continue;
+      }
+
+      nextHistoryById[accountId] = result.data.entries;
+      nextErrorById[accountId] = null;
+    }
+
+    errorHistoryByAccountId.value = nextHistoryById;
+    errorHistoryErrorByAccountId.value = nextErrorById;
+    errorHistoryFetchedById.value = nextFetchedById;
+  } catch (error) {
+    console.error("Failed to load account error histories:", error);
+    errorHistoryByAccountId.value = { ...errorHistoryByAccountId.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, []])) };
+    errorHistoryErrorByAccountId.value = { ...errorHistoryErrorByAccountId.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, null])) };
+    errorHistoryFetchedById.value = { ...errorHistoryFetchedById.value, ...Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, true])) };
+  } finally {
+    for (const accountId of requestedAccountIds) loadingErrorHistoryIds.delete(accountId);
+  }
+}
+
 function pruneAccountStats() {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
   accountStatsById.value = Object.fromEntries(Object.entries(accountStatsById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
@@ -538,14 +630,30 @@ function pruneAccountStats() {
   }
 }
 
+function pruneErrorHistories() {
+  const availableAccountIds = new Set(accounts.value.map((account) => account.id));
+  errorHistoryByAccountId.value = Object.fromEntries(Object.entries(errorHistoryByAccountId.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  errorHistoryErrorByAccountId.value = Object.fromEntries(Object.entries(errorHistoryErrorByAccountId.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  errorHistoryFetchedById.value = Object.fromEntries(Object.entries(errorHistoryFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+}
+
 watch(
   accounts,
   () => {
     pruneAccountStats();
+    pruneErrorHistories();
     void hydrateAccountStatsCache();
     queueAccountStatsLoad(accounts.value.map((account) => account.id));
+    queueErrorHistoryLoad(accounts.value.map((account) => account.id));
   },
   { immediate: true }
+);
+
+watch(
+  () => accounts.value.map((account) => `${account.id}:${toTimeMs(account.lastErrorAt)}`).join("|"),
+  () => {
+    queueErrorHistoryLoad(accounts.value.map((account) => account.id), { force: true });
+  }
 );
 
 watch(
@@ -608,7 +716,10 @@ function handleAccountDeleted(accountId: string) {
   dashboardInvalidation.clearModelAvailability();
 }
 
-function handleAccountErrorsResolved() {
+function handleAccountErrorsResolved(accountId: string) {
+  errorHistoryByAccountId.value = { ...errorHistoryByAccountId.value, [accountId]: [] };
+  errorHistoryErrorByAccountId.value = { ...errorHistoryErrorByAccountId.value, [accountId]: null };
+  errorHistoryFetchedById.value = { ...errorHistoryFetchedById.value, [accountId]: true };
   void refresh();
   void dashboardInvalidation.invalidateAccountOverview();
 }
@@ -704,6 +815,8 @@ function decodeAccountHash(hash: string): string | null {
           :supported-models="supportedModelsByAccountId[account.id] ?? supportedModels"
           :disabled-models="disabledModelsByAccountId[account.id] ?? []"
           :model-health="modelHealthByAccountId[account.id] ?? {}"
+          :error-history="errorHistoryByAccountId[account.id] ?? null"
+          :error-history-error="errorHistoryErrorByAccountId[account.id] ?? null"
           :quota-info="quotaByAccountId[account.id] ?? null"
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
           :highlight="highlightedAccountIds.has(account.id)"

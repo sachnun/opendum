@@ -154,6 +154,8 @@ const props = defineProps<{
   supportedModels?: string[];
   disabledModels?: string[];
   modelHealth?: ProviderDetailData["modelHealthByAccountId"][string];
+  errorHistory?: ErrorHistoryEntry[] | null;
+  errorHistoryError?: string | null;
   quotaInfo?: AccountQuotaInfo | null;
   quotaError?: string | null;
   quotaSkeletonLimit?: number | null;
@@ -189,15 +191,12 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
-const historyError = ref<string | null>(null);
-const historyEntries = ref<ErrorHistoryEntry[] | null>(null);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);
 const pendingStatBaselineContextKey = ref<string | null>(null);
 const activeErrorIndex = ref(0);
 const cardRoot = ref<HTMLElement | null>(null);
-let historyRequestId = 0;
 let temporaryOffLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 let suppressNextToggle = false;
 let errorPreviewDragStartX: number | null = null;
@@ -510,6 +509,8 @@ function getAccountHeader(account: Account): { title: string; subtitle: string |
 
 const accountHeader = computed(() => getAccountHeader(props.account));
 const accountTitle = computed(() => accountHeader.value.title || "Provider account");
+const historyError = computed(() => props.errorHistoryError ?? null);
+const historyEntries = computed(() => props.errorHistory ?? null);
 const subtitle = computed(() => {
   return accountHeader.value.subtitle;
 });
@@ -695,12 +696,8 @@ const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
 
 watch(
   () => [props.account.id, props.account.lastErrorAt] as const,
-  ([id], previous) => {
+  () => {
     activeErrorIndex.value = 0;
-    historyRequestId += 1;
-    if (previous && id !== previous[0]) historyEntries.value = null;
-    historyError.value = null;
-    loadErrorHistory();
   },
   { immediate: true }
 );
@@ -915,33 +912,9 @@ async function resolveErrors() {
     if (!result.success) throw new Error(result.error);
     errorDialogOpen.value = false;
     activeErrorIndex.value = 0;
-    historyRequestId += 1;
-    historyEntries.value = null;
-    historyError.value = null;
     emit("errors-resolved", props.account.id);
   } finally {
     resolvingErrors.value = false;
-  }
-}
-
-async function loadErrorHistory() {
-  const requestId = ++historyRequestId;
-
-  try {
-    const result = await dashboardApi.accounts.errorHistory({ accountId: props.account.id, limit: 100 });
-    if (requestId !== historyRequestId) return;
-
-    if (!result.success) {
-      historyError.value = null;
-      historyEntries.value = [];
-      return;
-    }
-
-    historyEntries.value = result.data.entries;
-  } catch {
-    if (requestId !== historyRequestId) return;
-    historyError.value = null;
-    historyEntries.value = [];
   }
 }
 

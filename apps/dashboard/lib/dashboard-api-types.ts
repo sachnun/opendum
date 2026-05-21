@@ -194,6 +194,7 @@ export interface ErrorHistoryEntry {
 }
 
 export type ErrorHistoryResult = ActionResult<{ entries: ErrorHistoryEntry[] }>;
+export type ErrorHistoryBatchResult = ActionResult<Record<string, ErrorHistoryResult>>;
 
 export interface ApiKeyListItem {
   id: string;

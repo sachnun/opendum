@@ -109,6 +109,7 @@ export const deleteAccountInputSchema = z.object({ id: z.string() });
 export const togglePinnedProviderInputSchema = z.object({ providerKey: z.string() });
 export const setAccountModelEnabledInputSchema = z.object({ accountId: z.string(), modelId: z.string(), enabled: z.boolean() });
 export const errorHistoryInputSchema = z.object({ accountId: z.string(), limit: z.coerce.number().int().min(1).max(200).optional() });
+export const errorHistoryBatchInputSchema = z.object({ accountIds: z.array(z.string().min(1)).max(50), limit: z.coerce.number().int().min(1).max(200).optional() });
 export const resolveErrorsInputSchema = z.object({ accountId: z.string() });
 const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));
 const statsCursorsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string()).max(50)).optional();
@@ -315,6 +316,36 @@ async function readRedisErrorHistory(accountId: string, limit: number) {
 
   if (missingIds.length > 0) await redis.zRem(key, missingIds.filter(Boolean));
   return entries;
+}
+
+async function readRedisErrorHistories(accountIds: string[], limit: number) {
+  const redis = await getRedisClient();
+  const idsByAccountId = Object.fromEntries(await Promise.all(accountIds.map(async (accountId) => [
+    accountId,
+    await redis.zRange(errorHistoryKey(accountId), 0, Math.max(0, limit - 1), { REV: true }),
+  ] as const)));
+  const entryRefs = Object.entries(idsByAccountId).flatMap(([accountId, ids]) => ids.map((id) => ({ accountId, id })));
+  const entriesByAccountId: Record<string, Array<{ id: string; model: string | null; errorCode: number; errorMessage: string; createdAt: string }>> = Object.fromEntries(accountIds.map((accountId) => [accountId, []]));
+  if (entryRefs.length === 0) return entriesByAccountId;
+
+  const values = await redis.mGet(entryRefs.map(({ id }) => errorHistoryEntryKey(id)));
+  const missingIdsByAccountId: Record<string, string[]> = {};
+
+  for (const [index, value] of values.entries()) {
+    const ref = entryRefs[index];
+    if (!ref) continue;
+
+    const entry = parseRedisErrorHistoryEntry(value);
+    if (!entry || entry.providerAccountId !== ref.accountId) {
+      missingIdsByAccountId[ref.accountId] = [...(missingIdsByAccountId[ref.accountId] ?? []), ref.id];
+      continue;
+    }
+
+    entriesByAccountId[ref.accountId]?.push({ id: entry.id, model: entry.model, errorCode: entry.errorCode, errorMessage: entry.errorMessage, createdAt: entry.createdAt });
+  }
+
+  await Promise.all(Object.entries(missingIdsByAccountId).map(([accountId, missingIds]) => redis.zRem(errorHistoryKey(accountId), missingIds.filter(Boolean))));
+  return entriesByAccountId;
 }
 
 async function deleteRedisErrorHistory(accountId: string) {
@@ -927,6 +958,29 @@ export async function getAccountErrorHistory(userId: string, input: z.infer<type
   } catch (error) {
     console.error("Failed to read provider account error history:", error);
     return { success: true, data: { entries: [] } } as const;
+  }
+}
+
+export async function getAccountErrorHistories(userId: string, input: z.infer<typeof errorHistoryBatchInputSchema>) {
+  const accountIds = Array.from(new Set(input.accountIds));
+  if (accountIds.length === 0) return { success: true, data: {} } as const;
+
+  try {
+    const ownedAccounts = await db
+      .select({ id: providerAccount.id })
+      .from(providerAccount)
+      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.id, accountIds)));
+    const ownedAccountIds = ownedAccounts.map((account) => account.id);
+    const entriesByAccountId = await readRedisErrorHistories(ownedAccountIds, Math.min(input.limit ?? DEFAULT_ERROR_HISTORY_ROWS, MAX_ERROR_HISTORY_ROWS));
+    const results = Object.fromEntries(accountIds.map((accountId) => {
+      if (!entriesByAccountId[accountId]) return [accountId, { success: false, error: "Account not found" }];
+      return [accountId, { success: true, data: { entries: entriesByAccountId[accountId] } }];
+    }));
+
+    return { success: true, data: results } as const;
+  } catch (error) {
+    console.error("Failed to read provider account error histories:", error);
+    return { success: true, data: Object.fromEntries(accountIds.map((accountId) => [accountId, { success: true, data: { entries: [] } }])) } as const;
   }
 }
 
