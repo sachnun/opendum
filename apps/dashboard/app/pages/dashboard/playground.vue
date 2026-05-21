@@ -47,7 +47,7 @@ const route = useRoute();
 
 type ModelOption = PlaygroundOptions["models"][number];
 type ProviderAccountOption = PlaygroundOptions["providerAccounts"][number];
-type PanelState = { id: string; modelId: string | null; accountId: string | null };
+type PanelState = { id: string; modelId: string | null; provider: string | null; accountId: string | null };
 
 const DEFAULT_SETTINGS: PlaygroundSettings = {
   endpoint: "chat_completions",
@@ -169,7 +169,7 @@ const canUsePlayground = computed(() => hasAnyProviderAccount.value && isProxyCo
 const selectedScenario = ref<Scenario>(SCENARIOS[0]!);
 const settings = reactive<PlaygroundSettings>({ ...DEFAULT_SETTINGS });
 const settingsOpen = ref(false);
-const panels = ref<PanelState[]>([{ id: generateId(), modelId: null, accountId: null }]);
+const panels = ref<PanelState[]>([{ id: generateId(), modelId: null, provider: null, accountId: null }]);
 const responses = ref<Record<string, ResponseData>>({});
 const loopDialogOpen = ref(false);
 const loopCountInput = ref("2");
@@ -259,7 +259,7 @@ watch(options, (value) => {
   const accountId = normalizeQueryParam(route.query.accountId);
 
   if (modelId && modelsById.value.has(modelId)) {
-    panels.value = [{ id: generateId(), modelId, accountId: getValidRouteAccountId(accountId, modelId) }];
+    panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
     initializedFromRoute.value = true;
     return;
   }
@@ -269,8 +269,8 @@ watch(options, (value) => {
     if (account) {
       const compatibleModels = models.value.filter((model) => accountSupportsModel(account, model));
       panels.value = compatibleModels.length > 0
-        ? compatibleModels.map((model) => ({ id: generateId(), modelId: model.id, accountId }))
-        : [{ id: generateId(), modelId: null, accountId }];
+        ? compatibleModels.map((model) => ({ id: generateId(), modelId: model.id, provider: null, accountId }))
+        : [{ id: generateId(), modelId: null, provider: null, accountId }];
       initializedFromRoute.value = true;
       return;
     }
@@ -288,7 +288,7 @@ watch(() => route.query, (query) => {
   const accountId = normalizeQueryParam(query.accountId);
 
   if (modelId && modelsById.value.has(modelId)) {
-    panels.value = [{ id: generateId(), modelId, accountId: getValidRouteAccountId(accountId, modelId) }];
+    panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
     responses.value = {};
     return;
   }
@@ -298,8 +298,8 @@ watch(() => route.query, (query) => {
     if (account) {
       const compatibleModels = models.value.filter((m) => accountSupportsModel(account, m));
       panels.value = compatibleModels.length > 0
-        ? compatibleModels.map((m) => ({ id: generateId(), modelId: m.id, accountId }))
-        : [{ id: generateId(), modelId: null, accountId }];
+        ? compatibleModels.map((m) => ({ id: generateId(), modelId: m.id, provider: null, accountId }))
+        : [{ id: generateId(), modelId: null, provider: null, accountId }];
       responses.value = {};
       return;
     }
@@ -307,7 +307,7 @@ watch(() => route.query, (query) => {
 });
 
 watch([filteredModelIds, familyPresets, providerPresets], ([availableIds]) => {
-  panels.value = panels.value.map((panel) => panel.modelId && !availableIds.has(panel.modelId) ? { ...panel, modelId: null, accountId: null } : panel);
+  panels.value = panels.value.map((panel) => panel.modelId && !availableIds.has(panel.modelId) ? { ...panel, modelId: null, provider: null, accountId: null } : panel);
 
   activeFamilyPresets.value = activeFamilyPresets.value.filter((family) => familyPresets.value.some((preset) => preset.family === family));
   activeProviderPresets.value = activeProviderPresets.value.filter((provider) => providerPresets.value.some((preset) => preset.provider === provider));
@@ -434,9 +434,21 @@ function accountSupportsModel(account: ProviderAccountOption, model: ModelOption
   return !account.supportedModels || account.supportedModels.includes(modelId);
 }
 
+function providerSupportsModel(provider: string | null, model: ModelOption | string): boolean {
+  if (!provider) return false;
+  const modelOption = typeof model === "string" ? modelsById.value.get(model) : model;
+  if (!modelOption?.providers.includes(provider)) return false;
+  return providerAccounts.value.some((account) => account.provider === provider && accountSupportsModel(account, modelOption));
+}
+
 function getValidRouteAccountId(accountId: string | null, modelId: string): string | null {
   const account = accountId ? providerAccountsById.value.get(accountId) : null;
   return account && accountSupportsModel(account, modelId) ? account.id : null;
+}
+
+function getValidProviderForPanel(panel: PanelState): string | null {
+  if (!panel.provider || !panel.modelId || panel.accountId) return null;
+  return providerSupportsModel(panel.provider, panel.modelId) ? panel.provider : null;
 }
 
 function buildFamilyPresets(modelOptions: ModelOption[], accounts: ProviderAccountOption[]) {
@@ -471,15 +483,7 @@ function buildProviderPresets(modelOptions: ModelOption[], accounts: ProviderAcc
 
   return Array.from(accountsByProvider.entries()).flatMap(([provider, providerAccountsForProvider]) => {
     const modelsForProvider = modelOptions.filter((model) => model.providers.includes(provider) && providerAccountsForProvider.some((account) => accountSupportsModel(account, model)));
-    const presetPanels: Array<{ modelId: string; accountId: string }> = [];
-
-    for (const model of modelsForProvider) {
-      for (const account of providerAccountsForProvider) {
-        if (accountSupportsModel(account, model)) {
-          presetPanels.push({ modelId: model.id, accountId: account.id });
-        }
-      }
-    }
+    const presetPanels = modelsForProvider.map((model) => ({ modelId: model.id, provider, accountId: null }));
 
     return presetPanels.length > 0 ? [{ provider, accounts: providerAccountsForProvider, models: modelsForProvider, panels: presetPanels }] : [];
   });
@@ -511,6 +515,21 @@ function getProviderPresetAccountLabel(accounts: ProviderAccountOption[]): strin
   return `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}`;
 }
 
+function getProviderScopedRouteLabel(provider: string): string {
+  return `${getProviderLabel(provider)} (load balancer)`;
+}
+
+function getPendingModelProviders(panel: PanelState): string[] {
+  const pendingModelId = pendingModelByPanel[panel.id];
+  const pendingModel = pendingModelId ? modelsById.value.get(pendingModelId) : null;
+  if (!pendingModel) return [];
+
+  const routeSearch = routeSearchByPanel[panel.id]?.trim().toLowerCase();
+  return pendingModel.providers
+    .filter((provider) => providerSupportsModel(provider, pendingModel))
+    .filter((provider) => !routeSearch || `${provider} ${getProviderLabel(provider)}`.toLowerCase().includes(routeSearch));
+}
+
 function getValidAccountIdForPanel(panel: PanelState): string | null {
   if (!panel.accountId || !panel.modelId) return null;
   const model = modelsById.value.get(panel.modelId);
@@ -522,10 +541,12 @@ function getValidAccountIdForPanel(panel: PanelState): string | null {
 function getSelectedRouteLabel(panel: PanelState): string {
   const selectedAccountId = getValidAccountIdForPanel(panel);
   const selectedAccount = selectedAccountId ? providerAccountsById.value.get(selectedAccountId) : null;
+  const selectedProvider = getValidProviderForPanel(panel);
   const response = responses.value[panel.id];
   const usedAccount = response?.usedAccountId ? providerAccountsById.value.get(response.usedAccountId) : null;
 
   if (selectedAccount) return `${getAccountLabel(selectedAccount)} (${getProviderLabel(selectedAccount.provider)})`;
+  if (selectedProvider) return usedAccount ? `Auto (${getAccountLabel(usedAccount)} - ${getProviderLabel(usedAccount.provider)})` : getProviderScopedRouteLabel(selectedProvider);
   if (panel.modelId) return usedAccount ? `Auto (${getAccountLabel(usedAccount)} - ${getProviderLabel(usedAccount.provider)})` : "Auto (load balancer)";
   return "-";
 }
@@ -551,6 +572,7 @@ function getPanelProviderAccountHref(panel: PanelState): string | null {
 function getPanelModels(panel: PanelState): ModelOption[] {
   let nextModels = activePresetModelIds.value ? filteredModels.value.filter((model) => activePresetModelIds.value?.has(model.id)) : filteredModels.value;
   const account = panel.accountId ? providerAccountsById.value.get(panel.accountId) : null;
+  const provider = panel.accountId ? null : panel.provider;
 
   if (account?.disabledModels?.length) {
     const disabled = new Set(account.disabledModels);
@@ -560,6 +582,10 @@ function getPanelModels(panel: PanelState): ModelOption[] {
   if (account?.supportedModels) {
     const supported = new Set(account.supportedModels);
     nextModels = nextModels.filter((model) => supported.has(model.id));
+  }
+
+  if (provider) {
+    nextModels = nextModels.filter((model) => providerSupportsModel(provider, model));
   }
 
   const search = modelSearchByPanel[panel.id]?.trim().toLowerCase();
@@ -630,11 +656,11 @@ function selectPendingModel(panel: PanelState, modelId: string) {
   selectionStepByPanel[panel.id] = "routing";
 }
 
-function selectPanelRoute(panel: PanelState, accountId: string | null) {
+function selectPanelRoute(panel: PanelState, route: { provider: string | null; accountId: string | null }) {
   const modelId = pendingModelByPanel[panel.id];
   if (!modelId) return;
 
-  panels.value = panels.value.map((item) => item.id === panel.id ? { ...item, modelId, accountId } : item);
+  panels.value = panels.value.map((item) => item.id === panel.id ? { ...item, modelId, provider: route.accountId ? null : route.provider, accountId: route.accountId } : item);
   selectionOpenByPanel[panel.id] = false;
   selectionStepByPanel[panel.id] = "model";
   pendingModelByPanel[panel.id] = null;
@@ -644,7 +670,7 @@ function selectPanelRoute(panel: PanelState, accountId: string | null) {
 
 function addPanel() {
   if (!canAddPanel.value) return;
-  panels.value = [...panels.value, { id: generateId(), modelId: null, accountId: null }];
+  panels.value = [...panels.value, { id: generateId(), modelId: null, provider: null, accountId: null }];
 }
 
 function removePanel(panelId: string) {
@@ -669,8 +695,8 @@ function applyFamilyPresets(families: string[]) {
   const selected = familyPresets.value.filter((preset) => families.includes(preset.family));
   const nextModels = selected.flatMap((preset) => preset.models);
   panels.value = nextModels.length > 0
-    ? nextModels.map((model) => ({ id: generateId(), modelId: model.id, accountId: accountByModel.get(model.id) ?? null }))
-    : [{ id: generateId(), modelId: null, accountId: null }];
+    ? nextModels.map((model) => ({ id: generateId(), modelId: model.id, provider: null, accountId: accountByModel.get(model.id) ?? null }))
+    : [{ id: generateId(), modelId: null, provider: null, accountId: null }];
   responses.value = {};
 }
 
@@ -678,8 +704,8 @@ function applyProviderPresets(providers: string[]) {
   const selected = providerPresets.value.filter((preset) => providers.includes(preset.provider));
   const nextPanels = selected.flatMap((preset) => preset.panels);
   panels.value = nextPanels.length > 0
-    ? nextPanels.map((panel) => ({ id: generateId(), modelId: panel.modelId, accountId: panel.accountId }))
-    : [{ id: generateId(), modelId: null, accountId: null }];
+    ? nextPanels.map((panel) => ({ id: generateId(), modelId: panel.modelId, provider: panel.provider, accountId: panel.accountId }))
+    : [{ id: generateId(), modelId: null, provider: null, accountId: null }];
   responses.value = {};
 }
 
@@ -1246,10 +1272,11 @@ function buildRequestBody(modelId: string, messages: ScenarioMessage[], currentS
   return requestBody;
 }
 
-function applyAccountSelectorToRequestBody(requestBody: Record<string, unknown>, accountId: string | null) {
-  if (!accountId) return;
+function applyRouteSelectorToRequestBody(requestBody: Record<string, unknown>, provider: string | null, accountId: string | null) {
+  const selector = accountId ?? provider;
+  if (!selector) return;
   const model = typeof requestBody.model === "string" ? requestBody.model.trim() : "";
-  if (model) requestBody.model = `${accountId}/${model}`;
+  if (model) requestBody.model = `${selector}/${model}`;
 }
 
 function adaptRequestOverridesForEndpoint(overrides: Record<string, unknown> | undefined, endpoint: PlaygroundEndpoint): Record<string, unknown> | null {
@@ -1297,7 +1324,7 @@ async function runChatScenarioForPanel(panel: PanelState & { modelId: string }, 
   for (let step = 0; step <= followUps.length; step += 1) {
     if (!isBatchRunActive.value || stoppedBatchPanelIds.has(panel.id)) return "aborted";
 
-    const result = await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidAccountIdForPanel(panel), messages);
+    const result = await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidProviderForPanel(panel), getValidAccountIdForPanel(panel), messages);
     if (result !== "success") return result;
 
     const response = responses.value[panel.id];
@@ -1317,7 +1344,7 @@ async function runChatScenarioForPanel(panel: PanelState & { modelId: string }, 
   return "success";
 }
 
-async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, accountId: string | null, messages = getPanelScenarioMessages(panelId, scenario)): Promise<FetchModelResult> {
+async function fetchFromModel(panelId: string, modelId: string, scenario: Scenario, currentSettings: PlaygroundSettings, provider: string | null, accountId: string | null, messages = getPanelScenarioMessages(panelId, scenario)): Promise<FetchModelResult> {
   const requestStartedAt = Date.now();
   const requestId = generateId();
   let waitMs: number | null = null;
@@ -1336,7 +1363,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
     const additionalParameters = parseAdditionalParameters(additionalParametersInput.value);
     if (additionalParameters.error) throw new Error(`Invalid additional parameters: ${additionalParameters.error}`);
     if (additionalParameters.params) Object.assign(requestBody, additionalParameters.params);
-    applyAccountSelectorToRequestBody(requestBody, accountId);
+    applyRouteSelectorToRequestBody(requestBody, provider, accountId);
     if (!canUsePlayground.value) throw new Error(playgroundSetupMessage.value || "Playground is not ready.");
 
     const controller = new AbortController();
@@ -1456,7 +1483,7 @@ async function runSelectedScenario(requestedLoopCount = 1) {
 
         const result = scenario.id === "chat"
           ? await runChatScenarioForPanel(panel, scenario, currentSettings)
-          : await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidAccountIdForPanel(panel));
+          : await fetchFromModel(panel.id, panel.modelId, scenario, currentSettings, getValidProviderForPanel(panel), getValidAccountIdForPanel(panel));
         if (result !== "success") {
           stoppedBatchPanelIds.add(panel.id);
           break;
@@ -1503,7 +1530,7 @@ async function retryPanel(panelId: string) {
     }
     return;
   }
-  await fetchFromModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, getValidAccountIdForPanel(panel));
+  await fetchFromModel(panel.id, panel.modelId, selectedScenario.value, { ...settings }, getValidProviderForPanel(panel), getValidAccountIdForPanel(panel));
 }
 
 function handleStartPointerDown(event: PointerEvent) {
@@ -1816,7 +1843,7 @@ function formatToolArguments(value: string): string {
                   </UiTooltip>
                   <span class="truncate">{{ modelsById.get(panel.modelId)?.name }}</span>
                   <UiBadge variant="secondary" class="shrink-0 whitespace-nowrap bg-muted/40 px-1.5 py-0 text-[10px] text-muted-foreground">
-                    {{ getValidAccountIdForPanel(panel) ? getProviderLabel(providerAccountsById.get(getValidAccountIdForPanel(panel)!)?.provider ?? '') : responses[panel.id]?.usedAccountId ? `Auto - ${getProviderLabel(providerAccountsById.get(responses[panel.id]?.usedAccountId ?? '')?.provider ?? '')}` : 'Auto' }}
+                    {{ getValidAccountIdForPanel(panel) ? getProviderLabel(providerAccountsById.get(getValidAccountIdForPanel(panel)!)?.provider ?? '') : responses[panel.id]?.usedAccountId ? `Auto - ${getProviderLabel(providerAccountsById.get(responses[panel.id]?.usedAccountId ?? '')?.provider ?? '')}` : getValidProviderForPanel(panel) ? getProviderScopedRouteLabel(getValidProviderForPanel(panel)!) : 'Auto' }}
                   </UiBadge>
                 </span>
                 <span v-else class="text-muted-foreground">Select model...</span>
@@ -1855,13 +1882,20 @@ function formatToolArguments(value: string): string {
                   </div>
                   <div class="max-h-[330px] overflow-y-auto p-1">
                     <p class="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">Routing</p>
-                    <button type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && !panel.accountId ? 'bg-accent' : ''" @click="selectPanelRoute(panel, null)">
+                    <button type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && !panel.provider && !panel.accountId ? 'bg-accent' : ''" @click="selectPanelRoute(panel, { provider: null, accountId: null })">
                       <div class="min-w-0 flex-1">
                         <p class="truncate text-xs font-medium">Auto (load balancer)</p>
                         <p class="truncate text-[10px] text-muted-foreground">System chooses best provider account</p>
                       </div>
                     </button>
-                    <button v-for="account in getPendingModelAccounts(panel)" :key="account.id" type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && panel.accountId === account.id ? 'bg-accent' : ''" @click="selectPanelRoute(panel, account.id)">
+                    <button v-for="provider in getPendingModelProviders(panel)" :key="`provider-${provider}`" type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && panel.provider === provider && !panel.accountId ? 'bg-accent' : ''" @click="selectPanelRoute(panel, { provider, accountId: null })">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-xs font-medium">{{ getProviderScopedRouteLabel(provider) }}</p>
+                        <p class="truncate text-[10px] text-muted-foreground">Load balance within {{ getProviderLabel(provider) }}</p>
+                      </div>
+                      <UiBadge variant="outline" class="ml-2 shrink-0 text-[10px]">{{ getProviderLabel(provider) }}</UiBadge>
+                    </button>
+                    <button v-for="account in getPendingModelAccounts(panel)" :key="account.id" type="button" class="flex w-full cursor-pointer items-center rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground" :class="panel.modelId === pendingModelByPanel[panel.id] && panel.accountId === account.id ? 'bg-accent' : ''" @click="selectPanelRoute(panel, { provider: null, accountId: account.id })">
                       <div class="min-w-0 flex-1">
                         <p class="truncate text-xs font-medium">{{ getAccountLabel(account) }}</p>
                         <p class="truncate text-[10px] text-muted-foreground">{{ getProviderLabel(account.provider) }}</p>
