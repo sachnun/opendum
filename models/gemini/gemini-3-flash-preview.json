@@ -50,7 +50,8 @@
         "pro+",
         "business",
         "enterprise"
-      ]
+      ],
+      "reasoning_effort": false
     },
     "gemini_cli": {
       "thinking_format": "level",

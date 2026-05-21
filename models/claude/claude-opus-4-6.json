@@ -44,7 +44,8 @@
       "allowedTiers": [
         "business",
         "enterprise"
-      ]
+      ],
+      "reasoning_effort": false
     },
     "kiro": {
       "upstream": "claude-opus-4.6"

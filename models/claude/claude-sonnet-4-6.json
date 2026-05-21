@@ -42,7 +42,8 @@
         "pro+",
         "business",
         "enterprise"
-      ]
+      ],
+      "reasoning_effort": false
     },
     "kiro": {
       "upstream": "claude-sonnet-4.6"
