@@ -1,9 +1,22 @@
 {
   "providers": [
-    "ollama_cloud"
+    "ollama_cloud",
+    "antigravity"
   ],
   "family": "OpenAI",
-  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
   "providerConfig": {
     "ollama_cloud": {
       "upstream": "gpt-oss:120b"

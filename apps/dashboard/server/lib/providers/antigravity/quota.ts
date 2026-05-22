@@ -59,19 +59,32 @@ const QUOTA_GROUPS: Record<string, { displayName: string; models: string[] }> = 
 };
 
 const USER_TO_API_MODEL_MAP: Record<string, string> = {
-  "claude-opus-4-6": "claude-opus-4-6-thinking", // Opus only exists as -thinking in API
-  "gemini-3.1-pro-preview": "gemini-3.1-pro-high", // Preview maps to high by default
+  "claude-opus-4-6": "claude-opus-4-6-thinking",
+  "claude-sonnet-4-6": "claude-sonnet-4-6-thinking",
   "gemini-3-flash-preview": "gemini-3-flash",
+  "gemini-3-pro-image-preview": "gemini-3-pro-image",
+  "gemini-3.1-flash-image-preview": "gemini-3.1-flash-image",
+  "gemini-3.1-pro-preview": "gemini-3.1-pro-high",
 };
 
 // API name -> User-facing name (for normalizing API responses)
 const API_TO_USER_MODEL_MAP: Record<string, string> = {
   "claude-opus-4-6-thinking": "claude-opus-4-6",
+  "claude-opus-4.6": "claude-opus-4-6",
+  "claude-opus4.6": "claude-opus-4-6",
   "claude-sonnet-4-6-thinking": "claude-sonnet-4-6",
+  "claude-sonnet-4.6": "claude-sonnet-4-6",
+  "claude-sonnet4.6": "claude-sonnet-4-6",
+  "gemini-2.5-flash-thinking": "gemini-2.5-flash",
+  "gemini-3-flash": "gemini-3-flash-preview",
+  "gemini-3-flash-image": "gemini-3.1-flash-image-preview",
+  "gemini-3-flash-preview-latest": "gemini-3-flash-preview",
+  "gemini-3-pro-image": "gemini-3-pro-image-preview",
+  "gemini-3.1-flash-image": "gemini-3.1-flash-image-preview",
+  "gemini-3.1-pro": "gemini-3.1-pro-preview",
   "gemini-3.1-pro-high": "gemini-3.1-pro-preview",
   "gemini-3.1-pro-low": "gemini-3.1-pro-preview",
-  "gemini-3-flash": "gemini-3-flash-preview",
-  "gemini-2.5-flash-thinking": "gemini-2.5-flash",
+  "gemini-3.1-pro-medium": "gemini-3.1-pro-preview",
 };
 
 /**

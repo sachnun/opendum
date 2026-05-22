@@ -333,11 +333,6 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	}
 	p.applyAntigravitySystemInstruction(payload, model)
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
-	if model == "claude-sonnet-4-6" {
-		if generation, ok := payload["generationConfig"].(map[string]any); ok {
-			delete(generation, "thinkingConfig")
-		}
-	}
 	payload["sessionId"] = sessionID
 }
 
@@ -1917,8 +1912,18 @@ func (p googleCodeAssistProvider) applyAntigravitySystemInstruction(payload map[
 	if isImageGenerationModel(p.registry, model) {
 		return
 	}
-	normalizedModel := strings.ToLower(model)
-	needsInjection := strings.Contains(normalizedModel, "claude") || strings.Contains(normalizedModel, "gemini-3-pro") || strings.Contains(normalizedModel, "gemini-3.1-pro") || strings.Contains(normalizedModel, "gemini-3-flash")
+	needsInjection := false
+	if p.registry != nil {
+		needsInjection = providerConfigBool(p.registry, model, p.name, "system_instruction")
+		if !needsInjection {
+			if _, ok := p.registry.ProviderModelConfig(model, p.name); ok {
+				return
+			}
+			needsInjection = fallbackAntigravitySystemInstructionModel(model)
+		}
+	} else {
+		needsInjection = fallbackAntigravitySystemInstructionModel(model)
+	}
 	if !needsInjection {
 		return
 	}
@@ -1935,6 +1940,14 @@ func (p googleCodeAssistProvider) applyAntigravitySystemInstruction(payload map[
 	existingRecord["role"] = "user"
 	existingRecord["parts"] = parts
 	payload["systemInstruction"] = existingRecord
+}
+
+func fallbackAntigravitySystemInstructionModel(model string) bool {
+	normalizedModel := strings.ToLower(lastModelSegment(model))
+	if strings.Contains(normalizedModel, "image") {
+		return false
+	}
+	return strings.Contains(normalizedModel, "claude") || isGemini3ModelName(normalizedModel)
 }
 
 func openAIContentToGeminiParts(content any) []any {

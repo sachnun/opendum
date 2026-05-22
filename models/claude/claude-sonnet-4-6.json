@@ -26,14 +26,18 @@
   },
   "providerConfig": {
     "antigravity": {
+      "upstream": "claude-sonnet-4-6-thinking",
       "anthropic_beta": true,
+      "anthropic_beta_thinking": true,
       "convert_external_images": true,
       "force_stream_non_stream": true,
       "sanitize_tool_blocks": true,
       "signature_family": "claude",
       "strict_thought_signatures": true,
       "strict_tool_schema": true,
-      "system_instruction": true
+      "system_instruction": true,
+      "thinking_model": true,
+      "top_p_min_095": true
     },
     "copilot": {
       "upstream": "claude-sonnet-4.6",

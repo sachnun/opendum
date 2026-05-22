@@ -776,6 +776,50 @@ func TestAntigravitySystemInstructionAndThinking(t *testing.T) {
 	}
 }
 
+func TestAntigravityGemini35FlashComesFromRegistry(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	cfg, ok := registry.ProviderModelConfig("gemini-3.5-flash", "antigravity")
+	if !ok {
+		t.Fatal("missing antigravity config for gemini-3.5-flash")
+	}
+	if got := provider.resolveModel("gemini-3.5-flash"); got != "gemini-3.5-flash" {
+		t.Fatalf("resolveModel = %q, want gemini-3.5-flash", got)
+	}
+	if !customBool(cfg, "system_instruction") {
+		t.Fatalf("gemini-3.5-flash should enable system_instruction: %#v", cfg.Custom)
+	}
+	levels := customMap(cfg, "thinking_levels")
+	if levels["medium"] != "medium" || levels["none"] != "minimal" {
+		t.Fatalf("gemini-3.5-flash thinking levels = %#v", levels)
+	}
+
+	payload := openAIToGemini(map[string]any{"messages": []any{map[string]any{"role": "user", "content": "hi"}}})
+	provider.applyAntigravitySystemInstruction(payload, "gemini-3.5-flash")
+	system := payload["systemInstruction"].(map[string]any)
+	parts := system["parts"].([]any)
+	if !strings.Contains(parts[0].(map[string]any)["text"].(string), "Antigravity") {
+		t.Fatalf("antigravity instruction missing: %#v", parts[0])
+	}
+	provider.applyThinkingConfig(payload, "gemini-3.5-flash", "medium", 0)
+	generation := payload["generationConfig"].(map[string]any)
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinkingLevel"] != "medium" || thinking["includeThoughts"] != true {
+		t.Fatalf("thinking config = %#v", thinking)
+	}
+}
+
+func TestAntigravityGPTOSS120BIsSupported(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	if !registry.IsSupportedByProvider("gpt-oss-120b", "antigravity") {
+		t.Fatal("gpt-oss-120b should be supported by antigravity")
+	}
+	if got := provider.resolveModel("gpt-oss-120b"); got != "gpt-oss-120b" {
+		t.Fatalf("resolveModel = %q, want gpt-oss-120b", got)
+	}
+}
+
 func TestCodexModelGuardUsesRegistryWhenPresent(t *testing.T) {
 	provider := codexProvider{}
 	if !provider.isModelAllowed("anything-without-registry") {
@@ -812,7 +856,7 @@ func TestAntigravityClaudeUpstreamsComeFromRegistry(t *testing.T) {
 	provider := antigravityProvider{registry: registry}.delegate()
 	cases := map[string]string{
 		"claude-opus-4-6":   "claude-opus-4-6-thinking",
-		"claude-sonnet-4-6": "claude-sonnet-4-6",
+		"claude-sonnet-4-6": "claude-sonnet-4-6-thinking",
 	}
 	for model, want := range cases {
 		cfg, ok := registry.ProviderModelConfig(model, "antigravity")
