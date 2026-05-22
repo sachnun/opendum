@@ -23,7 +23,7 @@ const qwenCodeClientID = "f0304373b74a44d2b584a3fb70ca9e56"
 const opencodeChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
 const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
-const opencodeUserAgent = "opencode/1.15.7"
+const opencodeUserAgent = "opencode/1.15.8"
 const oauthRefreshBuffer = 3 * time.Hour
 
 type Provider interface {
@@ -258,7 +258,7 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 func opencodeHeaders(body map[string]any) map[string]string {
 	sessionID := stringValue(body["_sessionId"])
 	if sessionID == "" {
-		sessionID = randomID("session")
+		sessionID = randomID("ses")
 	}
 	requestID := stringValue(body["_requestId"])
 	if requestID == "" {
@@ -272,6 +272,9 @@ func opencodeHeaders(body map[string]any) map[string]string {
 	}
 	if realIP := stringValue(body["_realIP"]); realIP != "" {
 		headers["X-Real-IP"] = realIP
+	}
+	if projectID := stringValue(body["_projectId"]); projectID != "" {
+		headers["X-Opencode-Project"] = projectID
 	}
 	return headers
 }

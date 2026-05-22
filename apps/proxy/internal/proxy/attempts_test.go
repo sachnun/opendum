@@ -80,27 +80,42 @@ func TestSessionIDFallsBackToXSessionID(t *testing.T) {
 	}
 }
 
-func TestAddOpencodeForwardedIPUsesClientIPHeaders(t *testing.T) {
+func TestAddOpencodeRequestMetadataUsesClientIPHeaders(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	request.Header.Set("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
 	payload := map[string]any{}
 
-	addOpencodeForwardedIP(appdb.ProviderAccount{Provider: "opencode"}, payload, request)
+	addOpencodeRequestMetadata(appdb.ProviderAccount{Provider: "opencode"}, payload, request)
 
 	if payload["_realIP"] != "203.0.113.10" {
 		t.Fatalf("_realIP = %#v, want 203.0.113.10", payload["_realIP"])
 	}
+	if payload["_projectId"] != "global" {
+		t.Fatalf("_projectId = %#v, want global", payload["_projectId"])
+	}
 }
 
-func TestAddOpencodeForwardedIPIgnoresOtherProviders(t *testing.T) {
+func TestAddOpencodeRequestMetadataUsesProjectHeader(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	request.Header.Set("X-Opencode-Project", "project_1")
+	payload := map[string]any{}
+
+	addOpencodeRequestMetadata(appdb.ProviderAccount{Provider: "opencode"}, payload, request)
+
+	if payload["_projectId"] != "project_1" {
+		t.Fatalf("_projectId = %#v, want project_1", payload["_projectId"])
+	}
+}
+
+func TestAddOpencodeRequestMetadataIgnoresOtherProviders(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	request.Header.Set("X-Real-IP", "203.0.113.10")
 	payload := map[string]any{}
 
-	addOpencodeForwardedIP(appdb.ProviderAccount{Provider: "openrouter"}, payload, request)
+	addOpencodeRequestMetadata(appdb.ProviderAccount{Provider: "openrouter"}, payload, request)
 
-	if _, ok := payload["_realIP"]; ok {
-		t.Fatalf("unexpected _realIP for non-opencode provider: %#v", payload)
+	if len(payload) != 0 {
+		t.Fatalf("unexpected metadata for non-opencode provider: %#v", payload)
 	}
 }
 

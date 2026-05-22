@@ -468,6 +468,7 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 		"messages":   []any{map[string]any{"role": "user", "content": "hello"}},
 		"_sessionId": "sess_1",
 		"_realIP":    "203.0.113.10",
+		"_projectId": "global",
 	}, false)
 	if err != nil {
 		t.Fatal(err)
@@ -485,6 +486,9 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 	}
 	if headers.Get("X-Real-IP") != "203.0.113.10" {
 		t.Fatalf("X-Real-IP = %q, want 203.0.113.10", headers.Get("X-Real-IP"))
+	}
+	if headers.Get("X-Opencode-Project") != "global" {
+		t.Fatalf("X-Opencode-Project = %q, want global", headers.Get("X-Opencode-Project"))
 	}
 	if headers.Get("X-Opencode-Request") == "" || headers.Get("X-Opencode-Client") != opencodeClient || headers.Get("User-Agent") != opencodeUserAgent {
 		t.Fatalf("missing opencode headers: %#v", headers)

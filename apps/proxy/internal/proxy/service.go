@@ -262,7 +262,7 @@ func playgroundSignature(secret, userID, timestamp, method, path string) string 
 }
 
 func (s *Service) makeProviderRequest(ctx context.Context, r *http.Request, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {
-	addOpencodeForwardedIP(account, payload, r)
+	addOpencodeRequestMetadata(account, payload, r)
 	providerImpl, ok := s.providerRegistry.Get(account.Provider)
 	if !ok {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
@@ -277,13 +277,18 @@ func (s *Service) makeProviderRequest(ctx context.Context, r *http.Request, acco
 	return providerImpl.MakeRequest(ctx, s.client, credentials, requestAccount, payload, stream)
 }
 
-func addOpencodeForwardedIP(account appdb.ProviderAccount, payload map[string]any, r *http.Request) {
+func addOpencodeRequestMetadata(account appdb.ProviderAccount, payload map[string]any, r *http.Request) {
 	if account.Provider != "opencode" || payload == nil || r == nil {
 		return
 	}
 	if ip := clientIPForUpstream(r); ip != "" {
 		payload["_realIP"] = ip
 	}
+	projectID := strings.TrimSpace(r.Header.Get("X-Opencode-Project"))
+	if projectID == "" {
+		projectID = "global"
+	}
+	payload["_projectId"] = projectID
 }
 
 func clientIPForUpstream(r *http.Request) string {
