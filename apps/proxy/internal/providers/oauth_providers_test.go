@@ -467,7 +467,6 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 		"model":      "opencode/deepseek-v4-flash",
 		"messages":   []any{map[string]any{"role": "user", "content": "hello"}},
 		"_sessionId": "sess_1",
-		"_realIP":    "203.0.113.10",
 		"_projectId": "global",
 	}, false)
 	if err != nil {
@@ -483,9 +482,6 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 	}
 	if headers.Get("X-Opencode-Session") != "sess_1" {
 		t.Fatalf("X-Opencode-Session = %q, want sess_1", headers.Get("X-Opencode-Session"))
-	}
-	if headers.Get("X-Real-IP") != "203.0.113.10" {
-		t.Fatalf("X-Real-IP = %q, want 203.0.113.10", headers.Get("X-Real-IP"))
 	}
 	if headers.Get("X-Opencode-Project") != "global" {
 		t.Fatalf("X-Opencode-Project = %q, want global", headers.Get("X-Opencode-Project"))

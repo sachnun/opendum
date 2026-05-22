@@ -17,7 +17,7 @@ type accountRotationRunner interface {
 	reserveRoamingPoint(context.Context, string) (*pointReservation, bool, error)
 	refundRoamingPoint(context.Context, *pointReservation)
 	bumpAccountRequestCount(context.Context, string, time.Time)
-	makeProviderRequest(context.Context, *http.Request, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error)
+	makeProviderRequest(context.Context, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error)
 	markAccountFailed(context.Context, string, string, int, string) time.Time
 	markAccountUsageLimited(context.Context, string, string, time.Time, time.Time)
 	logUsage(context.Context, usageParams)
@@ -115,7 +115,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 				upstreamFirstResponseMS = at.UnixMilli()
 			}
 		})
-		resp, err := runner.makeProviderRequest(attemptCtx, r, *attempt.account, payload, parsed.Stream)
+		resp, err := runner.makeProviderRequest(attemptCtx, *attempt.account, payload, parsed.Stream)
 		if upstreamFirstResponseMS == 0 && resp != nil {
 			upstreamFirstResponseMS = time.Now().UnixMilli()
 		}
