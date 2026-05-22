@@ -143,43 +143,32 @@ func TestNvidiaNemotronNanoVLDisablesToolCalling(t *testing.T) {
 	}
 }
 
-func TestShortenedModelAliasesUseHostedUpstreams(t *testing.T) {
+func TestProviderAliasesUseConfiguredUpstreams(t *testing.T) {
 	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tests := []struct {
-		alias     string
-		canonical string
-		provider  string
-		upstream  string
-	}{
-		{alias: "qwen3-coder-480b-a35b-instruct", canonical: "qwen3-coder-480b", provider: "nvidia_nim", upstream: "qwen/qwen3-coder-480b-a35b-instruct"},
-		{alias: "llama-4-maverick-17b-128e-instruct", canonical: "llama-4-maverick", provider: "nvidia_nim", upstream: "meta/llama-4-maverick-17b-128e-instruct"},
-		{alias: "llama-4-scout-17b-16e-instruct", canonical: "llama-4-scout", provider: "groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct"},
-		{alias: "mistral-small-3.1-24b-instruct", canonical: "mistral-small-3.1", provider: "workers_ai", upstream: "@cf/mistralai/mistral-small-3.1-24b-instruct"},
-		{alias: "gemini-3.1-flash-lite-preview", canonical: "gemini-3.1-flash-lite", provider: "gemini_cli", upstream: "gemini-3.1-flash-lite-preview"},
-		{alias: "qwen3-vl-235b-instruct", canonical: "qwen3-vl-instruct", provider: "ollama_cloud", upstream: "qwen3-vl:235b-instruct"},
-		{alias: "nemotron-3-super-120b-a12b", canonical: "nemotron-3-super", provider: "nvidia_nim", upstream: "nvidia/nemotron-3-super-120b-a12b"},
-		{alias: "mistral-small-4-119b-2603", canonical: "mistral-small-4", provider: "nvidia_nim", upstream: "mistralai/mistral-small-4-119b-2603"},
-		{alias: "mistral-medium-3.5-128b", canonical: "mistral-medium-3.5", provider: "nvidia_nim", upstream: "mistralai/mistral-medium-3.5-128b"},
-		{alias: "qwen3-next-80b-a3b-instruct", canonical: "qwen3-next-instruct", provider: "nvidia_nim", upstream: "qwen/qwen3-next-80b-a3b-instruct"},
-		{alias: "qwen3-next-80b-a3b-thinking", canonical: "qwen3-next-thinking", provider: "nvidia_nim", upstream: "qwen/qwen3-next-80b-a3b-thinking"},
-		{alias: "ministral-14b-instruct-2512", canonical: "ministral-3-14b", provider: "nvidia_nim", upstream: "mistralai/ministral-14b-instruct-2512"},
-		{alias: "llama-3.1-nemotron-nano-8b-v1", canonical: "nemotron-nano-8b", provider: "nvidia_nim", upstream: "nvidia/llama-3.1-nemotron-nano-8b-v1"},
-		{alias: "llama-3.2-90b-vision-instruct", canonical: "llama-3.2-90b-vision", provider: "nvidia_nim", upstream: "meta/llama-3.2-90b-vision-instruct"},
+	checked := 0
+	for canonical, info := range registry.effective {
+		aliases := registry.LookupKeys(canonical)
+		for provider, cfg := range info.ProviderConfig {
+			if cfg.Upstream == "" || !contains(info.Providers, provider) {
+				continue
+			}
+			checked++
+			for _, alias := range aliases {
+				if registry.ResolveAlias(alias) != canonical {
+					continue
+				}
+				if got := registry.UpstreamModelName(alias, provider); got != cfg.Upstream {
+					t.Fatalf("UpstreamModelName(%q, %q) = %q, want %q", alias, provider, got, cfg.Upstream)
+				}
+			}
+		}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.canonical, func(t *testing.T) {
-			if got := registry.ResolveAlias(tt.alias); got != tt.canonical {
-				t.Fatalf("ResolveAlias(%q) = %q, want %q", tt.alias, got, tt.canonical)
-			}
-			if got := registry.UpstreamModelName(tt.alias, tt.provider); got != tt.upstream {
-				t.Fatalf("UpstreamModelName(%q, %q) = %q, want %q", tt.alias, tt.provider, got, tt.upstream)
-			}
-		})
+	if checked == 0 {
+		t.Fatal("expected at least one configured provider upstream")
 	}
 }
 
