@@ -20,6 +20,10 @@ import (
 
 const qwenCodeTokenEndpoint = "https://chat.qwen.ai/api/v1/oauth2/token"
 const qwenCodeClientID = "f0304373b74a44d2b584a3fb70ca9e56"
+const opencodeChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
+const opencodePublicAPIKey = "public"
+const opencodeClient = "cli"
+const opencodeUserAgent = "opencode/1.15.7"
 const oauthRefreshBuffer = 3 * time.Hour
 
 type Provider interface {
@@ -248,7 +252,24 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	}
 	payload["model"] = model
 	payload["stream"] = stream
-	return postJSONWithoutAuth(ctx, client, "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions", payload, stream)
+	return postJSONWithHeaders(ctx, client, opencodeChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, opencodeHeaders(body))
+}
+
+func opencodeHeaders(body map[string]any) map[string]string {
+	sessionID := stringValue(body["_sessionId"])
+	if sessionID == "" {
+		sessionID = randomID("session")
+	}
+	requestID := stringValue(body["_requestId"])
+	if requestID == "" {
+		requestID = randomID("msg")
+	}
+	return map[string]string{
+		"User-Agent":         opencodeUserAgent,
+		"X-Opencode-Session": sessionID,
+		"X-Opencode-Request": requestID,
+		"X-Opencode-Client":  opencodeClient,
+	}
 }
 
 type workersAIProvider struct {

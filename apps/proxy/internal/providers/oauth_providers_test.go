@@ -451,6 +451,42 @@ func TestOpenAICompatibleProviderKeepsAuthForKiloAccount(t *testing.T) {
 	}
 }
 
+func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
+	provider := opencodeProvider{registry: testModelsRegistry(t)}
+	var payload map[string]any
+	var headers http.Header
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		headers = req.Header.Clone()
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"ok"}}]}`))}, nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "", appdb.ProviderAccount{}, map[string]any{
+		"model":      "opencode/deepseek-v4-flash",
+		"messages":   []any{map[string]any{"role": "user", "content": "hello"}},
+		"_sessionId": "sess_1",
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if payload["model"] != "deepseek-v4-flash-free" {
+		t.Fatalf("model = %#v, want deepseek-v4-flash-free", payload["model"])
+	}
+	if headers.Get("Authorization") != "Bearer public" {
+		t.Fatalf("Authorization = %q, want Bearer public", headers.Get("Authorization"))
+	}
+	if headers.Get("X-Opencode-Session") != "sess_1" {
+		t.Fatalf("X-Opencode-Session = %q, want sess_1", headers.Get("X-Opencode-Session"))
+	}
+	if headers.Get("X-Opencode-Request") == "" || headers.Get("X-Opencode-Client") != opencodeClient || headers.Get("User-Agent") != opencodeUserAgent {
+		t.Fatalf("missing opencode headers: %#v", headers)
+	}
+}
+
 func TestOpenAICompatibleGroqFiltersUnsupportedReasoningEffort(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq, registry: registry}
