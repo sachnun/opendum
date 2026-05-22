@@ -80,6 +80,30 @@ func TestSessionIDFallsBackToXSessionID(t *testing.T) {
 	}
 }
 
+func TestAddOpencodeForwardedIPUsesClientIPHeaders(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	request.Header.Set("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
+	payload := map[string]any{}
+
+	addOpencodeForwardedIP(appdb.ProviderAccount{Provider: "opencode"}, payload, request)
+
+	if payload["_realIP"] != "203.0.113.10" {
+		t.Fatalf("_realIP = %#v, want 203.0.113.10", payload["_realIP"])
+	}
+}
+
+func TestAddOpencodeForwardedIPIgnoresOtherProviders(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	request.Header.Set("X-Real-IP", "203.0.113.10")
+	payload := map[string]any{}
+
+	addOpencodeForwardedIP(appdb.ProviderAccount{Provider: "openrouter"}, payload, request)
+
+	if _, ok := payload["_realIP"]; ok {
+		t.Fatalf("unexpected _realIP for non-opencode provider: %#v", payload)
+	}
+}
+
 func TestFailedCooldownUntilUsesConfiguredCooldown(t *testing.T) {
 	failedAt := time.Date(2026, 5, 11, 12, 0, 0, 0, time.UTC)
 	want := failedAt.Add(10 * time.Minute)
@@ -400,7 +424,7 @@ func (r *testRotationRunner) refundRoamingPoint(_ context.Context, reservation *
 
 func (r *testRotationRunner) bumpAccountRequestCount(context.Context, string, time.Time) {}
 
-func (r *testRotationRunner) makeProviderRequest(_ context.Context, account appdb.ProviderAccount, _ map[string]any, _ bool) (*http.Response, error) {
+func (r *testRotationRunner) makeProviderRequest(_ context.Context, _ *http.Request, account appdb.ProviderAccount, _ map[string]any, _ bool) (*http.Response, error) {
 	r.requested = append(r.requested, account.ID)
 	if account.Provider == "provider_2" {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(http.NoBody)}, nil

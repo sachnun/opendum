@@ -264,12 +264,16 @@ func opencodeHeaders(body map[string]any) map[string]string {
 	if requestID == "" {
 		requestID = randomID("msg")
 	}
-	return map[string]string{
+	headers := map[string]string{
 		"User-Agent":         opencodeUserAgent,
 		"X-Opencode-Session": sessionID,
 		"X-Opencode-Request": requestID,
 		"X-Opencode-Client":  opencodeClient,
 	}
+	if realIP := stringValue(body["_realIP"]); realIP != "" {
+		headers["X-Real-IP"] = realIP
+	}
+	return headers
 }
 
 type workersAIProvider struct {

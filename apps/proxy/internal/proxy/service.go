@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -260,7 +261,8 @@ func playgroundSignature(secret, userID, timestamp, method, path string) string 
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func (s *Service) makeProviderRequest(ctx context.Context, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {
+func (s *Service) makeProviderRequest(ctx context.Context, r *http.Request, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {
+	addOpencodeForwardedIP(account, payload, r)
 	providerImpl, ok := s.providerRegistry.Get(account.Provider)
 	if !ok {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
@@ -273,6 +275,36 @@ func (s *Service) makeProviderRequest(ctx context.Context, account appdb.Provide
 		return nil, err
 	}
 	return providerImpl.MakeRequest(ctx, s.client, credentials, requestAccount, payload, stream)
+}
+
+func addOpencodeForwardedIP(account appdb.ProviderAccount, payload map[string]any, r *http.Request) {
+	if account.Provider != "opencode" || payload == nil || r == nil {
+		return
+	}
+	if ip := clientIPForUpstream(r); ip != "" {
+		payload["_realIP"] = ip
+	}
+}
+
+func clientIPForUpstream(r *http.Request) string {
+	for _, header := range []string{"X-Real-IP", "CF-Connecting-IP"} {
+		if ip := strings.TrimSpace(r.Header.Get(header)); ip != "" {
+			return ip
+		}
+	}
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
+		if index := strings.Index(forwarded, ","); index >= 0 {
+			forwarded = forwarded[:index]
+		}
+		return strings.TrimSpace(forwarded)
+	}
+	if host := strings.TrimSpace(r.RemoteAddr); host != "" {
+		if ip, _, err := net.SplitHostPort(host); err == nil {
+			return ip
+		}
+		return host
+	}
+	return ""
 }
 
 func isAuthlessProvider(provider providers.Provider) bool {
