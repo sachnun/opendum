@@ -126,16 +126,14 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 
 func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay {
 	models := parseQuotaRecord(payload["models"])
-	apiNames := map[string]string{"claude-opus-4-6": "claude-opus-4-6-thinking", "gemini-3.1-pro-preview": "gemini-3.1-pro-high", "gemini-3.5-flash": "gemini-3.5-flash-medium", "gpt-oss-120b": "gpt-oss-120b-medium"}
+	apiNames := map[string]string{"claude-opus-4-6": "claude-opus-4-6-thinking", "gemini-2.5-flash": "gemini-2.5-flash-thinking", "gemini-3.1-pro-preview": "gemini-3.1-pro-high", "gemini-3.5-flash": "gemini-3.5-flash-medium", "gpt-oss-120b": "gpt-oss-120b-medium"}
 	configs := []struct {
 		name    string
 		display string
 		models  []string
 	}{
-		{name: "claude", display: "Claude", models: []string{"claude-opus-4-6", "claude-sonnet-4-6"}},
-		{name: "g3-pro", display: "Gemini 3.1 Pro", models: []string{"gemini-3.1-pro-preview"}},
-		{name: "g35-flash", display: "Gemini 3.5 Flash", models: []string{"gemini-3.5-flash"}},
-		{name: "gpt-oss", display: "GPT-OSS", models: []string{"gpt-oss-120b"}},
+		{name: "claude", display: "Claude", models: []string{"claude-opus-4-6", "claude-sonnet-4-6", "gpt-oss-120b"}},
+		{name: "gemini", display: "Gemini", models: []string{"gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"}},
 	}
 	groups := []quotaGroupDisplay{}
 	for _, cfg := range configs {

@@ -127,11 +127,23 @@ func TestAntigravityQuotaGroupsKeepFrontierFirst(t *testing.T) {
 	}
 
 	groups := antigravityGroups(payload, "standard-tier")
-	if len(groups) != 4 {
-		t.Fatalf("groups len = %d, want 4: %#v", len(groups), groups)
+	if len(groups) != 2 {
+		t.Fatalf("groups len = %d, want 2: %#v", len(groups), groups)
 	}
-	if groups[0].Name != "claude" || groups[1].Name != "g3-pro" || groups[2].Name != "g35-flash" || groups[3].Name != "gpt-oss" {
-		t.Fatalf("group order = %v, want claude, g3-pro, g35-flash, gpt-oss", quotaGroupNames(groups))
+	if groups[0].Name != "claude" || groups[1].Name != "gemini" {
+		t.Fatalf("group order = %v, want claude, gemini", quotaGroupNames(groups))
+	}
+	if groups[0].DisplayName != "Claude" || groups[1].DisplayName != "Gemini" {
+		t.Fatalf("group labels = %q/%q, want Claude/Gemini", groups[0].DisplayName, groups[1].DisplayName)
+	}
+	if groups[0].RemainingFraction != 0.5 {
+		t.Fatalf("claude remaining = %v, want claude shared bucket value 0.5", groups[0].RemainingFraction)
+	}
+	if groups[1].RemainingFraction != 0.8 {
+		t.Fatalf("gemini remaining = %v, want pro shared bucket value 0.8", groups[1].RemainingFraction)
+	}
+	if groups[0].Models[2] != "gpt-oss-120b" || groups[1].Models[1] != "gemini-3.5-flash" {
+		t.Fatalf("shared quota models = %v/%v", groups[0].Models, groups[1].Models)
 	}
 }
 

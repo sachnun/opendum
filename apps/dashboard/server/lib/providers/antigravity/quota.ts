@@ -50,11 +50,17 @@ const QUOTA_GROUPS: Record<string, { displayName: string; models: string[] }> = 
     models: [
       "claude-opus-4-6",
       "claude-sonnet-4-6",
+      "gpt-oss-120b",
     ],
   },
-  "g3-pro": {
-    displayName: "Gemini 3.1 Pro",
-    models: ["gemini-3.1-pro-preview"],
+  gemini: {
+    displayName: "Gemini",
+    models: [
+      "gemini-3.1-pro-preview",
+      "gemini-3.5-flash",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
+    ],
   },
 };
 
