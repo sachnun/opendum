@@ -1,7 +1,8 @@
 {
   "providers": [
     "ollama_cloud",
-    "antigravity"
+    "antigravity",
+    "workers_ai"
   ],
   "family": "OpenAI",
   "meta": {
@@ -20,6 +21,9 @@
   "providerConfig": {
     "ollama_cloud": {
       "upstream": "gpt-oss:120b"
+    },
+    "workers_ai": {
+      "upstream": "@cf/openai/gpt-oss-120b"
     }
   }
 }
