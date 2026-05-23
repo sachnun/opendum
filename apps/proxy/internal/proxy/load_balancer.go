@@ -58,7 +58,7 @@ func stringSliceContains(values []string, target string) bool {
 	return false
 }
 
-func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string, provider *string, exclude []string, accountAccess auth.AccountAccess) ([]appdb.ProviderAccount, error) {
+func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, accountAccess auth.AccountAccess) ([]appdb.ProviderAccount, error) {
 	targetProviders := []string{}
 	if provider != nil {
 		targetProviders = []string{*provider}
@@ -82,6 +82,9 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 		if len(exclude) > 0 && stringSliceContains(exclude, account.ID) {
 			continue
 		}
+		if len(excludeProviders) > 0 && stringSliceContains(excludeProviders, account.Provider) {
+			continue
+		}
 		if err := accountAllowed(account.ID, accountAccess); err != nil {
 			continue
 		}
@@ -96,6 +99,9 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 		Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", time.Now())
 	if len(exclude) > 0 {
 		query.Where("id NOT IN (?)", bun.In(exclude))
+	}
+	if len(excludeProviders) > 0 {
+		query.Where("provider NOT IN (?)", bun.In(excludeProviders))
 	}
 	accountMode := normalizeAccessMode(accountAccess.Mode)
 	accounts := normalizeAccountIDs(accountAccess.Accounts)
@@ -145,8 +151,8 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	return enabled, nil
 }
 
-func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude []string, accountAccess auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
-	eligible, err := s.getEligibleAccounts(ctx, userID, model, provider, exclude, accountAccess)
+func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, accountAccess auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
+	eligible, err := s.getEligibleAccounts(ctx, userID, model, provider, exclude, excludeProviders, accountAccess)
 	if err != nil {
 		return nil, false, err
 	}
@@ -157,7 +163,7 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 	return s.pickHealthyAccount(ctx, prioritized, model)
 }
 
-func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude []string) (*appdb.ProviderAccount, bool, error) {
+func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string) (*appdb.ProviderAccount, bool, error) {
 	targetProviders := []string{}
 	if provider != nil {
 		targetProviders = []string{*provider}
@@ -178,6 +184,9 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 		Where("(provider_account.\"disabledUntil\" IS NULL OR provider_account.\"disabledUntil\" <= ?)", time.Now())
 	if len(exclude) > 0 {
 		query.Where("provider_account.id NOT IN (?)", bun.In(exclude))
+	}
+	if len(excludeProviders) > 0 {
+		query.Where("provider_account.provider NOT IN (?)", bun.In(excludeProviders))
 	}
 
 	var rows []appdb.ProviderAccount

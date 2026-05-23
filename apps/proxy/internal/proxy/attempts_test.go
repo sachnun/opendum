@@ -260,6 +260,140 @@ func TestExecuteAccountRotationUsesSharedAccountAfterOwnAccountsFail(t *testing.
 	}
 }
 
+func TestExecuteAccountRotationFallsBackAcrossProvidersOnBadRequest(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "p1-a1", Provider: "provider_1"},
+			{ID: "p1-a2", Provider: "provider_1"},
+			{ID: "p2-a1", Provider: "provider_2"},
+		},
+		statusByProvider: map[string]int{"provider_1": http.StatusBadRequest},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	account, resp, _, _, failures, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr != nil {
+		t.Fatalf("executeAccountRotation routeErr = %+v", routeErr)
+	}
+	if account == nil || account.ID != "p2-a1" {
+		t.Fatalf("selected account = %#v, want p2-a1", account)
+	}
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("response = %#v, want 200", resp)
+	}
+	if got := strings.Join(runner.requested, ","); got != "p1-a1,p2-a1" {
+		t.Fatalf("requested = %q, want p1-a1,p2-a1", got)
+	}
+	if len(runner.failedAccountIDs) != 0 {
+		t.Fatalf("failed accounts = %#v, want none", runner.failedAccountIDs)
+	}
+	if len(failures) != 0 {
+		t.Fatalf("recoverable failures = %#v, want none", failures)
+	}
+}
+
+func TestExecuteAccountRotationReturnsBadRequestAfterProviderFallbacksExhausted(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "p1-a1", Provider: "provider_1"},
+			{ID: "p1-a2", Provider: "provider_1"},
+			{ID: "p2-a1", Provider: "provider_2"},
+		},
+		statusByProvider: map[string]int{"provider_1": http.StatusBadRequest, "provider_2": http.StatusBadRequest},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, failures, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil || routeErr.Status != http.StatusBadRequest {
+		t.Fatalf("routeErr = %+v, want 400", routeErr)
+	}
+	if got := strings.Join(runner.requested, ","); got != "p1-a1,p2-a1" {
+		t.Fatalf("requested = %q, want p1-a1,p2-a1", got)
+	}
+	if len(runner.failedAccountIDs) != 0 {
+		t.Fatalf("failed accounts = %#v, want none", runner.failedAccountIDs)
+	}
+	if len(failures) != 0 {
+		t.Fatalf("recoverable failures = %#v, want none", failures)
+	}
+}
+
+func TestExecuteAccountRotationDoesNotFallbackOnBadRequestWithForcedProvider(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "p1-a1", Provider: "provider_1"},
+			{ID: "p2-a1", Provider: "provider_2"},
+		},
+		statusByProvider: map[string]int{"provider_1": http.StatusBadRequest},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model", Provider: strPtr("provider_1")},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil || routeErr.Status != http.StatusBadRequest {
+		t.Fatalf("routeErr = %+v, want 400", routeErr)
+	}
+	if got := strings.Join(runner.requested, ","); got != "p1-a1" {
+		t.Fatalf("requested = %q, want p1-a1", got)
+	}
+	if len(runner.failedAccountIDs) != 0 {
+		t.Fatalf("failed accounts = %#v, want none", runner.failedAccountIDs)
+	}
+}
+
 func TestExecuteAccountRotationRefundsFailedSharedAttempt(t *testing.T) {
 	runner := &testRotationRunner{
 		accounts:       []appdb.ProviderAccount{{ID: "own-a1", UserID: "user_1", Provider: "provider_1"}},
@@ -345,6 +479,7 @@ type testRotationRunner struct {
 	sharedAccounts        []appdb.ProviderAccount
 	requested             []string
 	responseBody          string
+	statusByProvider      map[string]int
 	usageLimitedAccountID string
 	usageLimitedModel     string
 	usageLimitedUntil     time.Time
@@ -354,30 +489,46 @@ type testRotationRunner struct {
 	insufficientPoints    bool
 }
 
-func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude []string, _ auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
+func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude, excludeProviders []string, _ auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
 	excluded := map[string]struct{}{}
 	for _, id := range exclude {
 		excluded[id] = struct{}{}
 	}
+	excludedProviderSet := map[string]struct{}{}
+	for _, provider := range excludeProviders {
+		excludedProviderSet[provider] = struct{}{}
+	}
 	for i := range r.accounts {
 		account := &r.accounts[i]
-		if _, ok := excluded[account.ID]; !ok {
-			return account, true, nil
+		if _, ok := excluded[account.ID]; ok {
+			continue
 		}
+		if _, ok := excludedProviderSet[account.Provider]; ok {
+			continue
+		}
+		return account, true, nil
 	}
 	return nil, false, nil
 }
 
-func (r *testRotationRunner) getNextSharedAccount(_ context.Context, _ string, _ string, _ *string, exclude []string) (*appdb.ProviderAccount, bool, error) {
+func (r *testRotationRunner) getNextSharedAccount(_ context.Context, _ string, _ string, _ *string, exclude, excludeProviders []string) (*appdb.ProviderAccount, bool, error) {
 	excluded := map[string]struct{}{}
 	for _, id := range exclude {
 		excluded[id] = struct{}{}
 	}
+	excludedProviderSet := map[string]struct{}{}
+	for _, provider := range excludeProviders {
+		excludedProviderSet[provider] = struct{}{}
+	}
 	for i := range r.sharedAccounts {
 		account := &r.sharedAccounts[i]
-		if _, ok := excluded[account.ID]; !ok {
-			return account, true, nil
+		if _, ok := excluded[account.ID]; ok {
+			continue
 		}
+		if _, ok := excludedProviderSet[account.Provider]; ok {
+			continue
+		}
+		return account, true, nil
 	}
 	return nil, len(r.sharedAccounts) > 0, nil
 }
@@ -402,6 +553,13 @@ func (r *testRotationRunner) bumpAccountRequestCount(context.Context, string, ti
 
 func (r *testRotationRunner) makeProviderRequest(_ context.Context, account appdb.ProviderAccount, _ map[string]any, _ bool) (*http.Response, error) {
 	r.requested = append(r.requested, account.ID)
+	if status := r.statusByProvider[account.Provider]; status != 0 {
+		var body io.ReadCloser = http.NoBody
+		if r.responseBody != "" {
+			body = io.NopCloser(strings.NewReader(r.responseBody))
+		}
+		return &http.Response{StatusCode: status, Body: body}, nil
+	}
 	if account.Provider == "provider_2" {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(http.NoBody)}, nil
 	}

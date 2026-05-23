@@ -12,8 +12,8 @@ import (
 )
 
 type accountRotationRunner interface {
-	getNextAvailableAccount(context.Context, string, string, *string, []string, auth.AccountAccess) (*appdb.ProviderAccount, bool, error)
-	getNextSharedAccount(context.Context, string, string, *string, []string) (*appdb.ProviderAccount, bool, error)
+	getNextAvailableAccount(context.Context, string, string, *string, []string, []string, auth.AccountAccess) (*appdb.ProviderAccount, bool, error)
+	getNextSharedAccount(context.Context, string, string, *string, []string, []string) (*appdb.ProviderAccount, bool, error)
 	reserveRoamingPoint(context.Context, string) (*pointReservation, bool, error)
 	refundRoamingPoint(context.Context, *pointReservation)
 	bumpAccountRequestCount(context.Context, string, time.Time)
@@ -44,6 +44,7 @@ func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Reques
 func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *pointReservation, *routeError) {
 	tried := []string{}
 	sharedTried := []string{}
+	excludedProviders := []string{}
 	useShared := false
 	recoverableFailures := []accountRotationFailure{}
 	var lastFailure *routeError
@@ -53,7 +54,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 	for {
 		attempt := accountAttempt{account: forced}
 		if attempt.account == nil {
-			selected, configured, err := nextAttemptAccount(runner, ctx, authResult, validation, tried, sharedTried, useShared)
+			selected, configured, err := nextAttemptAccount(runner, ctx, authResult, validation, tried, sharedTried, excludedProviders, useShared)
 			if err != nil {
 				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
@@ -142,7 +143,9 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			_ = resp.Body.Close()
 			var failedAt time.Time
 			delayedFinalFailure = nil
-			if resp.StatusCode != http.StatusRequestTimeout {
+			badRequestFromProvider := resp.StatusCode == http.StatusBadRequest
+			fallbackAcrossProviders := badRequestFromProvider && forced == nil && validation.Provider == nil
+			if resp.StatusCode != http.StatusRequestTimeout && !badRequestFromProvider {
 				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: attempt.account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
 				if forced == nil && isAntigravityResourceExhausted(attempt.account.Provider, resp.StatusCode, bodyText) {
 					delayedFinalFailure = &delayedAccountFailure{account: *attempt.account, statusCode: resp.StatusCode, message: detailed}
@@ -159,6 +162,10 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			if attempt.roaming != nil {
 				runner.refundRoamingPoint(context.Background(), attempt.roaming)
 			}
+			if fallbackAcrossProviders {
+				excludedProviders = appendIfMissing(excludedProviders, attempt.account.Provider)
+				continue
+			}
 			if shouldRotate(resp.StatusCode) && forced == nil {
 				if !failedAt.IsZero() {
 					recoverableFailures = append(recoverableFailures, accountRotationFailure{AccountID: attempt.account.ID, FailedAt: failedAt})
@@ -172,11 +179,20 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 	}
 }
 
-func nextAttemptAccount(runner accountRotationRunner, ctx context.Context, authResult auth.Result, validation auth.ModelValidationResult, tried, sharedTried []string, useShared bool) (*appdb.ProviderAccount, bool, error) {
+func nextAttemptAccount(runner accountRotationRunner, ctx context.Context, authResult auth.Result, validation auth.ModelValidationResult, tried, sharedTried, excludedProviders []string, useShared bool) (*appdb.ProviderAccount, bool, error) {
 	if useShared {
-		return runner.getNextSharedAccount(ctx, authResult.UserID, validation.Model, validation.Provider, sharedTried)
+		return runner.getNextSharedAccount(ctx, authResult.UserID, validation.Model, validation.Provider, sharedTried, excludedProviders)
 	}
-	return runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
+	return runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, excludedProviders, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
+}
+
+func appendIfMissing(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 func (s *Service) isVisionModel(model string) bool {
