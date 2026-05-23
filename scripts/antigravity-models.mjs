@@ -77,6 +77,21 @@ const GEMINI_PRO_BUDGETS = {
   xhigh: 32768,
 };
 
+const GEMINI_35_FLASH_LEVELS = ["minimal", "low", "medium", "high"];
+
+// Official docs expose user-facing labels, but cloudcode-pa v1internal can use
+// backend IDs that are not derivable from the display name alone.
+const DOCUMENTED_BACKEND_OVERRIDES = new Map([
+  ["Gemini 3.5 Flash", { key: "gemini-3.5-flash", upstream: "gemini-3.5-flash-medium" }],
+  ["Claude Sonnet 4.6 (thinking)", { key: "claude-sonnet-4-6", upstream: "claude-sonnet-4-6" }],
+  ["Claude Opus 4.6 (thinking)", { key: "claude-opus-4-6", upstream: "claude-opus-4-6-thinking" }],
+  ["GPT-OSS-120b", { key: "gpt-oss-120b", upstream: "gpt-oss-120b-medium" }],
+]);
+
+const MODEL_ALIASES_BY_KEY = new Map([
+  ["gemini-3.5-flash", GEMINI_35_FLASH_LEVELS.map((level) => `gemini-3.5-flash-${level}`)],
+]);
+
 // Models proven to exist in the Antigravity backend but not shown in the public
 // reasoning-model docs. Kept separate so documented model changes still sync.
 const PRESERVED_EXTRAS = [
@@ -216,6 +231,16 @@ function modelIDFromDisplayName(displayName) {
 
 function canonicalizeDiscoveredModel(displayName) {
   const lower = displayName.toLowerCase();
+  const override = DOCUMENTED_BACKEND_OVERRIDES.get(displayName);
+  if (override) {
+    return {
+      displayName,
+      key: override.key,
+      upstream: override.upstream,
+      thinking: lower.includes("thinking"),
+    };
+  }
+
   const base = modelIDFromDisplayName(displayName);
   if (!base) return null;
 
@@ -223,6 +248,7 @@ function canonicalizeDiscoveredModel(displayName) {
     displayName,
     key: base,
     upstream: base,
+    thinking: lower.includes("thinking"),
   };
 
   if (base.startsWith("gemini-")) {
@@ -338,7 +364,7 @@ function inferUpstream(modelKey) {
 // Provider config and metadata
 // ---------------------------------------------------------------------------
 
-function buildProviderConfigByModel(modelMap) {
+function buildProviderConfigByModel(modelMap, thinkingClaudeModelKeys = new Set()) {
   const config = new Map();
   const index = buildModelIndex(modelsDir);
 
@@ -356,7 +382,7 @@ function buildProviderConfigByModel(modelMap) {
     }
 
     if (key.startsWith("claude-")) {
-      config.set(key, claudeProviderConfig(upstream));
+      config.set(key, claudeProviderConfig(upstream, thinkingClaudeModelKeys.has(key)));
       continue;
     }
   }
@@ -393,8 +419,8 @@ function geminiProviderConfig(modelKey) {
   return config;
 }
 
-function claudeProviderConfig(upstream) {
-  const thinking = upstream.endsWith("-thinking");
+function claudeProviderConfig(upstream, documentedThinking = false) {
+  const thinking = documentedThinking || upstream.endsWith("-thinking");
   return {
     anthropic_beta: true,
     ...(thinking ? { anthropic_beta_thinking: true } : {}),
@@ -456,6 +482,19 @@ function enrichModelMetadata(result, documentedModelKeys) {
     if (!data.family && familyForModel(entry.id || entry.fileId)) {
       data.family = familyForModel(entry.id || entry.fileId);
       changed = true;
+    }
+
+    const desiredAliases = MODEL_ALIASES_BY_KEY.get(modelKey) || [];
+    if (desiredAliases.length > 0) {
+      const aliases = new Set(data.aliases || []);
+      for (const alias of desiredAliases) {
+        aliases.add(alias);
+      }
+      const nextAliases = [...aliases].sort();
+      if (JSON.stringify(data.aliases || []) !== JSON.stringify(nextAliases)) {
+        data.aliases = nextAliases;
+        changed = true;
+      }
     }
 
     if (changed) {
@@ -595,6 +634,13 @@ function updateQuotaTs(modelMap, dryRun) {
       apiToUser[`${base}-medium`] = key;
       apiToUser[`${base}-high`] = key;
     }
+
+    if (key === "gemini-3.5-flash") {
+      const base = upstream.replace(/-(minimal|low|medium|high)$/, "");
+      for (const level of GEMINI_35_FLASH_LEVELS) {
+        apiToUser[`${base}-${level}`] = key;
+      }
+    }
   }
 
   const userToApiBlock = Object.fromEntries(
@@ -651,7 +697,12 @@ async function main() {
   const { modelMap, discovered } = buildDiscoveredModelMap(displayNames);
   const documentedModelKeys = new Set(modelMap.keys());
   const extras = mergePreservedExtras(modelMap);
-  const providerConfigByModel = buildProviderConfigByModel(modelMap);
+  const thinkingClaudeModelKeys = new Set(
+    discovered
+      .filter((entry) => entry.key.startsWith("claude-") && entry.thinking)
+      .map((entry) => entry.key)
+  );
+  const providerConfigByModel = buildProviderConfigByModel(modelMap, thinkingClaudeModelKeys);
 
   console.log(
     `[antigravity] Found ${discovered.length} documented reasoning models ` +

@@ -26,7 +26,6 @@
   },
   "providerConfig": {
     "antigravity": {
-      "upstream": "claude-sonnet-4-6-thinking",
       "anthropic_beta": true,
       "anthropic_beta_thinking": true,
       "convert_external_images": true,

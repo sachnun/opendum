@@ -18,9 +18,9 @@ import (
 const copilotDefaultMonthlyLimit = 300.0
 
 var antigravityQuotaMaxRequests = map[string]map[string]float64{
-	"standard-tier": {"claude-opus-4-6": 150, "claude-sonnet-4-6": 150, "gemini-3.1-pro-preview": 320},
-	"free-tier":     {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150},
-	"legacy-tier":   {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150},
+	"standard-tier": {"claude-opus-4-6": 150, "claude-sonnet-4-6": 150, "gemini-3.1-pro-preview": 320, "gemini-3.5-flash": 400, "gpt-oss-120b": 100},
+	"free-tier":     {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150, "gemini-3.5-flash": 500, "gpt-oss-120b": 100},
+	"legacy-tier":   {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150, "gemini-3.5-flash": 500, "gpt-oss-120b": 100},
 }
 
 func (s *Service) fetchOpenRouterQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) accountQuotaInfo {
@@ -126,7 +126,7 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 
 func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay {
 	models := parseQuotaRecord(payload["models"])
-	apiNames := map[string]string{"claude-opus-4-6": "claude-opus-4-6-thinking", "gemini-3.1-pro-preview": "gemini-3.1-pro-high"}
+	apiNames := map[string]string{"claude-opus-4-6": "claude-opus-4-6-thinking", "gemini-3.1-pro-preview": "gemini-3.1-pro-high", "gemini-3.5-flash": "gemini-3.5-flash-medium", "gpt-oss-120b": "gpt-oss-120b-medium"}
 	configs := []struct {
 		name    string
 		display string
@@ -134,6 +134,8 @@ func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 	}{
 		{name: "claude", display: "Claude", models: []string{"claude-opus-4-6", "claude-sonnet-4-6"}},
 		{name: "g3-pro", display: "Gemini 3.1 Pro", models: []string{"gemini-3.1-pro-preview"}},
+		{name: "g35-flash", display: "Gemini 3.5 Flash", models: []string{"gemini-3.5-flash"}},
+		{name: "gpt-oss", display: "GPT-OSS", models: []string{"gpt-oss-120b"}},
 	}
 	groups := []quotaGroupDisplay{}
 	for _, cfg := range configs {

@@ -276,11 +276,10 @@ func (p googleCodeAssistProvider) wrapCodeAssistPayload(projectID, model string,
 }
 
 func (p googleCodeAssistProvider) shouldSetAnthropicBeta(model string) bool {
+	if providerConfigBool(p.registry, model, p.name, "anthropic_beta") {
+		return true
+	}
 	return strings.Contains(model, "claude") && strings.Contains(model, "thinking")
-}
-
-func isOpusThinkingModel(model string) bool {
-	return strings.HasPrefix(model, "claude-opus-") && strings.HasSuffix(model, "-thinking")
 }
 
 func randomHyphenID(prefix string) string {
@@ -453,10 +452,24 @@ func (p googleCodeAssistProvider) resolveModel(model string) string {
 }
 
 func (p googleCodeAssistProvider) resolveAntigravityGemini3ModelVariant(model string, body map[string]any) string {
-	if !isGemini3ModelName(model) || !strings.Contains(strings.ToLower(model), "pro") {
+	if !isGemini3ModelName(model) {
 		return model
 	}
-	base := strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(model, "-low"), "-medium"), "-high")
+	if strings.Contains(strings.ToLower(model), "flash") && strings.Contains(strings.ToLower(model), "3.5") {
+		base := trimGeminiThinkingLevelSuffix(model)
+		level := geminiThinkingLevelFromModel(model)
+		if bodyLevel := p.requestedGemini3ThinkingLevel(model, body); bodyLevel != "" {
+			level = bodyLevel
+		}
+		if level == "" {
+			level = "medium"
+		}
+		return base + "-" + level
+	}
+	if !strings.Contains(strings.ToLower(model), "pro") {
+		return model
+	}
+	base := trimGeminiThinkingLevelSuffix(model)
 	level := geminiThinkingLevelFromModel(model)
 	if bodyLevel := p.requestedGemini3ThinkingLevel(model, body); bodyLevel != "" {
 		level = bodyLevel
@@ -465,6 +478,15 @@ func (p googleCodeAssistProvider) resolveAntigravityGemini3ModelVariant(model st
 		level = "high"
 	}
 	return base + "-" + level
+}
+
+func trimGeminiThinkingLevelSuffix(model string) string {
+	for _, suffix := range []string{"-minimal", "-low", "-medium", "-high"} {
+		if strings.HasSuffix(strings.ToLower(model), suffix) {
+			return model[:len(model)-len(suffix)]
+		}
+	}
+	return model
 }
 
 func (p googleCodeAssistProvider) requestedGemini3ThinkingLevel(model string, body map[string]any) string {
@@ -479,12 +501,16 @@ func (p googleCodeAssistProvider) requestedGemini3ThinkingLevel(model string, bo
 	if budget := numberFromAny(body["thinking_budget"]); budget > 0 {
 		return p.thinkingLevelFromBudget(model, budget)
 	}
-	if level := p.thinkingLevelFromEffort(model, stringValue(body["reasoning_effort"])); level != "" {
-		return level
+	if effort := stringValue(body["reasoning_effort"]); effort != "" {
+		if level := p.thinkingLevelFromEffort(model, effort); level != "" {
+			return level
+		}
 	}
 	if reasoning, ok := body["reasoning"].(map[string]any); ok {
-		if level := p.thinkingLevelFromEffort(model, stringValue(reasoning["effort"])); level != "" {
-			return level
+		if effort := stringValue(reasoning["effort"]); effort != "" {
+			if level := p.thinkingLevelFromEffort(model, effort); level != "" {
+				return level
+			}
 		}
 	}
 	return ""

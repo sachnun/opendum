@@ -779,8 +779,8 @@ func TestAntigravityGemini35FlashComesFromRegistry(t *testing.T) {
 	if !ok {
 		t.Fatal("missing antigravity config for gemini-3.5-flash")
 	}
-	if got := provider.resolveModel("gemini-3.5-flash"); got != "gemini-3.5-flash" {
-		t.Fatalf("resolveModel = %q, want gemini-3.5-flash", got)
+	if got := provider.resolveModel("gemini-3.5-flash"); got != "gemini-3.5-flash-medium" {
+		t.Fatalf("resolveModel = %q, want gemini-3.5-flash-medium", got)
 	}
 	if !customBool(cfg, "system_instruction") {
 		t.Fatalf("gemini-3.5-flash should enable system_instruction: %#v", cfg.Custom)
@@ -790,17 +790,25 @@ func TestAntigravityGemini35FlashComesFromRegistry(t *testing.T) {
 		t.Fatalf("gemini-3.5-flash thinking levels = %#v", levels)
 	}
 
+	model := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel("gemini-3.5-flash"), map[string]any{"reasoning_effort": "low"})
+	if model != "gemini-3.5-flash-low" {
+		t.Fatalf("resolved model = %q, want gemini-3.5-flash-low", model)
+	}
+	if got := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel("gemini-3.5-flash"), map[string]any{}); got != "gemini-3.5-flash-medium" {
+		t.Fatalf("default resolved model = %q, want gemini-3.5-flash-medium", got)
+	}
+
 	payload := openAIToGemini(map[string]any{"messages": []any{map[string]any{"role": "user", "content": "hi"}}})
-	provider.applyAntigravitySystemInstruction(payload, "gemini-3.5-flash")
+	provider.applyAntigravitySystemInstruction(payload, model)
 	system := payload["systemInstruction"].(map[string]any)
 	parts := system["parts"].([]any)
 	if !strings.Contains(parts[0].(map[string]any)["text"].(string), "Antigravity") {
 		t.Fatalf("antigravity instruction missing: %#v", parts[0])
 	}
-	provider.applyThinkingConfig(payload, "gemini-3.5-flash", "medium", 0)
+	provider.applyThinkingConfig(payload, model, "low", 0)
 	generation := payload["generationConfig"].(map[string]any)
 	thinking := generation["thinkingConfig"].(map[string]any)
-	if thinking["thinkingLevel"] != "medium" || thinking["includeThoughts"] != true {
+	if thinking["thinkingLevel"] != "low" || thinking["includeThoughts"] != true {
 		t.Fatalf("thinking config = %#v", thinking)
 	}
 }
@@ -811,8 +819,8 @@ func TestAntigravityGPTOSS120BIsSupported(t *testing.T) {
 	if !registry.IsSupportedByProvider("gpt-oss-120b", "antigravity") {
 		t.Fatal("gpt-oss-120b should be supported by antigravity")
 	}
-	if got := provider.resolveModel("gpt-oss-120b"); got != "gpt-oss-120b" {
-		t.Fatalf("resolveModel = %q, want gpt-oss-120b", got)
+	if got := provider.resolveModel("gpt-oss-120b"); got != "gpt-oss-120b-medium" {
+		t.Fatalf("resolveModel = %q, want gpt-oss-120b-medium", got)
 	}
 }
 
@@ -852,7 +860,7 @@ func TestAntigravityClaudeUpstreamsComeFromRegistry(t *testing.T) {
 	provider := antigravityProvider{registry: registry}.delegate()
 	cases := map[string]string{
 		"claude-opus-4-6":   "claude-opus-4-6-thinking",
-		"claude-sonnet-4-6": "claude-sonnet-4-6-thinking",
+		"claude-sonnet-4-6": "claude-sonnet-4-6",
 	}
 	for model, want := range cases {
 		cfg, ok := registry.ProviderModelConfig(model, "antigravity")

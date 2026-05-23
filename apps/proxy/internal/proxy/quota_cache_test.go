@@ -120,16 +120,18 @@ func TestAntigravityQuotaGroupsKeepFrontierFirst(t *testing.T) {
 	payload := map[string]any{
 		"models": map[string]any{
 			"gemini-3.1-pro-high":      map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.8}},
+			"gemini-3.5-flash-medium":  map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.9}},
+			"gpt-oss-120b-medium":      map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.7}},
 			"claude-opus-4-6-thinking": map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.5}},
 		},
 	}
 
 	groups := antigravityGroups(payload, "standard-tier")
-	if len(groups) != 2 {
-		t.Fatalf("groups len = %d, want 2: %#v", len(groups), groups)
+	if len(groups) != 4 {
+		t.Fatalf("groups len = %d, want 4: %#v", len(groups), groups)
 	}
-	if groups[0].Name != "claude" || groups[1].Name != "g3-pro" {
-		t.Fatalf("group order = %v, want claude, g3-pro", quotaGroupNames(groups))
+	if groups[0].Name != "claude" || groups[1].Name != "g3-pro" || groups[2].Name != "g35-flash" || groups[3].Name != "gpt-oss" {
+		t.Fatalf("group order = %v, want claude, g3-pro, g35-flash, gpt-oss", quotaGroupNames(groups))
 	}
 }
 

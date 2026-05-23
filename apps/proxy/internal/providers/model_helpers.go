@@ -65,11 +65,26 @@ func providerConfigValue(registry *models.Registry, model, provider, key string)
 		return nil, false
 	}
 	cfg, ok := registry.ProviderModelConfig(model, provider)
+	if !ok && provider == "antigravity" {
+		if normalized := normalizeAntigravityTieredModel(model); normalized != model {
+			cfg, ok = registry.ProviderModelConfig(normalized, provider)
+		}
+	}
 	if !ok || cfg.Custom == nil {
 		return nil, false
 	}
 	value, ok := cfg.Custom[key]
 	return value, ok
+}
+
+func normalizeAntigravityTieredModel(model string) string {
+	model = strings.ToLower(strings.TrimSpace(model))
+	for _, suffix := range []string{"-minimal", "-low", "-medium", "-high"} {
+		if strings.HasSuffix(model, suffix) {
+			return strings.TrimSuffix(model, suffix)
+		}
+	}
+	return model
 }
 
 func isImageGenerationModel(registry *models.Registry, model string) bool {

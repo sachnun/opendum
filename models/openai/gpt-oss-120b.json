@@ -19,6 +19,9 @@
     }
   },
   "providerConfig": {
+    "antigravity": {
+      "upstream": "gpt-oss-120b-medium"
+    },
     "ollama_cloud": {
       "upstream": "gpt-oss:120b"
     },
