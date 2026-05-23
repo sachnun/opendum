@@ -5,16 +5,9 @@ import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
 
 const OPENCODE_MODELS_URL = "https://unroxy.koyeb.app/opencode.ai/zen/v1/models";
+const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
-
-const MODEL_KEY_OVERRIDES = new Map([
-  ["deepseek-v4-flash-free", "deepseek-v4-flash"],
-  ["minimax-m2.5-free", "minimax-m2.5"],
-  ["ring-2.6-1t-free", "ring-2.6-1t"],
-  ["trinity-large-preview-free", "trinity-large-preview"],
-  ["nemotron-3-super-free", "nemotron-3-super"],
-]);
 
 function sleep(ms) {
   return new Promise((resolvePromise) => {
@@ -23,46 +16,146 @@ function sleep(ms) {
 }
 
 function toModelKey(modelId) {
-  const override = MODEL_KEY_OVERRIDES.get(modelId);
-  if (override) return override;
   if (modelId.endsWith("-free")) return modelId.slice(0, -"-free".length);
   return modelId;
 }
 
-function isFreeModelId(modelId) {
-  return modelId === "big-pickle" || modelId.endsWith("-free");
-}
-
-async function fetchOpencodeFreeModelIds() {
+async function fetchText(url, sourceName) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(OPENCODE_MODELS_URL, {
-        headers: { Accept: "application/json" },
+      const response = await fetch(url, {
+        headers: { Accept: "text/plain" },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch Opencode models (${response.status} ${response.statusText})`);
+        throw new Error(`Failed to fetch ${sourceName} (${response.status} ${response.statusText})`);
       }
 
-      const payload = await response.json();
-      if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected Opencode /zen/v1/models payload format");
-      }
-
-      return payload.data
-        .map((model) => typeof model?.id === "string" ? model.id.trim() : "")
-        .filter((id) => id && isFreeModelId(id))
-        .sort((a, b) => a.localeCompare(b));
+      return await response.text();
     } catch (error) {
       lastError = error;
       if (attempt < MAX_FETCH_ATTEMPTS) await sleep(attempt * 1_000);
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Failed to fetch Opencode model list");
+  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${sourceName}`);
+}
+
+async function fetchJson(url, sourceName) {
+  const text = await fetchText(url, sourceName);
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`Unexpected ${sourceName} JSON payload format`);
+  }
+}
+
+function parseMarkdownTables(markdown) {
+  const tables = [];
+  const lines = markdown.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    if (!lines[i].trim().startsWith("|") || !/^\s*\|?\s*:?-{3,}:?\s*\|/.test(lines[i + 1])) continue;
+
+    const rows = [];
+    for (let j = i; j < lines.length && lines[j].trim().startsWith("|"); j += 1) {
+      rows.push(lines[j]);
+      i = j;
+    }
+
+    const headers = splitMarkdownTableRow(rows[0]);
+    const body = rows.slice(2).map((row) => splitMarkdownTableRow(row));
+    tables.push({ headers, body });
+  }
+
+  return tables;
+}
+
+function splitMarkdownTableRow(row) {
+  return row
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.replace(/`/g, "").trim());
+}
+
+function headerIndex(headers, name) {
+  return headers.findIndex((header) => header.toLowerCase() === name.toLowerCase());
+}
+
+function modelNameKey(name) {
+  return name.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function extractFreeModelIdsFromDocs(markdown) {
+  const tables = parseMarkdownTables(markdown);
+  const endpointsTable = tables.find((table) => headerIndex(table.headers, "Model ID") !== -1 && headerIndex(table.headers, "Endpoint") !== -1);
+  const pricingTable = tables.find((table) => headerIndex(table.headers, "Input") !== -1 && headerIndex(table.headers, "Output") !== -1 && headerIndex(table.headers, "Cached Read") !== -1);
+
+  if (!endpointsTable || !pricingTable) {
+    throw new Error("Unexpected OpenCode Zen docs format: model endpoint or pricing table not found");
+  }
+
+  const endpointModelIndex = headerIndex(endpointsTable.headers, "Model");
+  const endpointModelIDIndex = headerIndex(endpointsTable.headers, "Model ID");
+  const pricingModelIndex = headerIndex(pricingTable.headers, "Model");
+  const pricingInputIndex = headerIndex(pricingTable.headers, "Input");
+  const pricingOutputIndex = headerIndex(pricingTable.headers, "Output");
+  const pricingCachedReadIndex = headerIndex(pricingTable.headers, "Cached Read");
+  const modelIdsByName = new Map();
+
+  for (const row of endpointsTable.body) {
+    const modelName = row[endpointModelIndex];
+    const modelId = row[endpointModelIDIndex];
+    if (modelName && modelId) modelIdsByName.set(modelNameKey(modelName), modelId);
+  }
+
+  const modelIds = [];
+  for (const row of pricingTable.body) {
+    const isFree = [row[pricingInputIndex], row[pricingOutputIndex], row[pricingCachedReadIndex]]
+      .every((value) => value?.toLowerCase() === "free");
+    if (!isFree) continue;
+
+    const modelName = row[pricingModelIndex];
+    const modelId = modelIdsByName.get(modelNameKey(modelName));
+    if (!modelId) throw new Error(`OpenCode Zen docs pricing model is missing from endpoint table: ${modelName}`);
+    modelIds.push(modelId);
+  }
+
+  if (modelIds.length === 0) {
+    throw new Error("OpenCode Zen docs did not list any free models");
+  }
+
+  return modelIds.sort((a, b) => a.localeCompare(b));
+}
+
+async function fetchOpencodeFreeModelIds() {
+  const [docsMarkdown, modelsPayload] = await Promise.all([
+    fetchText(OPENCODE_ZEN_DOCS_URL, "OpenCode Zen docs"),
+    fetchJson(OPENCODE_MODELS_URL, "OpenCode model list"),
+  ]);
+
+  if (!modelsPayload || !Array.isArray(modelsPayload.data)) {
+    throw new Error("Unexpected Opencode /zen/v1/models payload format");
+  }
+
+  const availableModelIds = new Set(
+    modelsPayload.data
+      .map((model) => typeof model?.id === "string" ? model.id.trim() : "")
+      .filter(Boolean),
+  );
+  const freeModelIds = extractFreeModelIdsFromDocs(docsMarkdown);
+  const missingModelIds = freeModelIds.filter((id) => !availableModelIds.has(id));
+
+  if (missingModelIds.length > 0) {
+    throw new Error(`OpenCode Zen docs list free models missing from /zen/v1/models: ${missingModelIds.join(", ")}`);
+  }
+
+  return freeModelIds;
 }
 
 function buildModelMap(modelIds) {

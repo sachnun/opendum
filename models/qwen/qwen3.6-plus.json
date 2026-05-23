@@ -1,11 +1,4 @@
 {
-  "providers": [
-    "opencode"
-  ],
-  "family": "Qwen",
-  "providerConfig": {
-    "opencode": {
-      "upstream": "qwen3.6-plus-free"
-    }
-  }
+  "providers": [],
+  "family": "Qwen"
 }
