@@ -1808,14 +1808,14 @@ function formatToolArguments(value: string): string {
             <UiIcon :name="providerPresetExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4" />
           </span>
         </button>
-        <div v-if="providerPresetExpanded && providerPresets.length > 0" class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <div v-if="providerPresetExpanded && providerPresets.length > 0" class="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
           <button
             v-for="preset in providerPresets"
             :key="preset.provider"
             type="button"
             :disabled="isAnyLoading"
             :class="[
-              'flex h-auto min-h-10 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[112px]',
+              'flex h-auto w-full min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-md border px-3 py-2 text-center text-sm font-medium disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:min-w-[92px]',
               activeProviderPresets.includes(preset.provider) ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
             ]"
             @click="applyProviderPreset(preset.provider)"
