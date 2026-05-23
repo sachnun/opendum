@@ -787,7 +787,7 @@ function decodeAccountHash(hash: string): string | null {
     </section>
     <section v-else-if="accounts.length > 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div v-if="supportsProviderQuota && quotaSummaryGroups.length > 0" class="space-y-2 pb-2 md:mb-4 md:rounded-xl md:border md:border-border md:bg-card md:p-4">
-        <div class="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1920px]:grid-cols-5">
+        <div class="grid gap-x-6 gap-y-3 md:grid-cols-[repeat(var(--quota-summary-columns),minmax(0,1fr))]" :style="{ '--quota-summary-columns': quotaSummaryGroups.length }">
           <div v-for="group in quotaSummaryGroups" :key="group.name" class="space-y-1.5">
             <div class="flex items-start justify-between gap-2 text-xs">
               <div class="flex min-w-0 items-center gap-1.5">
