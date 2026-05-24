@@ -97,6 +97,9 @@ func TestParseChatCompletionsAcceptsEmptyMessages(t *testing.T) {
 	if routeErr != nil {
 		t.Fatalf("parseChatCompletions returned error: %+v", routeErr)
 	}
+	if parsed.Stream {
+		t.Fatal("Stream = true, want default false")
+	}
 
 	payload := buildChatCompletions(parsed, "test-model", false, "")
 	messages, ok := payload["messages"].([]any)
@@ -234,6 +237,9 @@ func TestParseResponsesAcceptsEmptyInput(t *testing.T) {
 	parsed, routeErr := parseResponses(map[string]any{"model": "test-model", "input": []any{}})
 	if routeErr != nil {
 		t.Fatalf("parseResponses returned error: %+v", routeErr)
+	}
+	if parsed.Stream {
+		t.Fatal("Stream = true, want default false")
 	}
 
 	payload := buildResponses(parsed, "test-model", false, "")

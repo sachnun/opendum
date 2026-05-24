@@ -18,7 +18,7 @@ func parseStreamParam(body map[string]any) bool {
 	if value, ok := body["stream"].(bool); ok {
 		return value
 	}
-	return true
+	return false
 }
 
 func buildParamsForError(params map[string]any, stream bool) map[string]any {

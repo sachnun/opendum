@@ -64,7 +64,7 @@ func TestParseMessagesBuildsProviderPayload(t *testing.T) {
 	assertMessage(t, messages[1], "user", "hello")
 }
 
-func TestParseMessagesDefaultsStreamAndValidatesModel(t *testing.T) {
+func TestParseMessagesDefaultsStreamFalseAndValidatesModel(t *testing.T) {
 	parsed, routeErr := parseMessages(map[string]any{
 		"model":    "claude-alias",
 		"messages": []any{},
@@ -72,8 +72,8 @@ func TestParseMessagesDefaultsStreamAndValidatesModel(t *testing.T) {
 	if routeErr != nil {
 		t.Fatalf("parseMessages returned error: %+v", routeErr)
 	}
-	if !parsed.Stream {
-		t.Fatal("Stream = false, want default true")
+	if parsed.Stream {
+		t.Fatal("Stream = true, want default false")
 	}
 
 	_, routeErr = parseMessages(map[string]any{"messages": []any{}})
