@@ -1,6 +1,5 @@
 {
   "providers": [
-    "kilo_code",
     "nvidia_nim"
   ],
   "family": "StepFun",
@@ -18,10 +17,6 @@
     }
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "stepfun/step-3.5-flash:free",
-      "authless": true
-    },
     "nvidia_nim": {
       "upstream": "stepfun-ai/step-3.5-flash"
     }
