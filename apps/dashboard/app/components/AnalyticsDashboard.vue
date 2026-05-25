@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { endOfDay, format, startOfDay } from "date-fns";
-import type { DateRange as CalendarDateRange, DateValue } from "reka-ui";
+import type { DateRange as CalendarDateRange } from "reka-ui";
 import type { AnalyticsData, AnalyticsSeriesData, ApiKeyListItem } from "../../lib/dashboard-api-types";
 
 type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
@@ -37,6 +37,10 @@ const period = ref<Period>("30d");
 const selectedApiKeyId = ref(props.apiKeyId || "all");
 const customRange = ref<CalendarDateRange | null>(null);
 const draftCustomRange = ref<CalendarDateRange | null>(null);
+const draftCustomRangeModel = computed<any>({
+  get: () => draftCustomRange.value,
+  set: (v: any) => { draftCustomRange.value = v; },
+});
 const isCustomRangeActive = ref(false);
 const isFilterOpen = ref(false);
 const isApiKeyFilterOpen = ref(false);
@@ -143,17 +147,17 @@ function collectStatValues(items: StatMetric[]): Record<string, number> {
   return values;
 }
 
-function toDateOnlyString(value: DateValue): string {
+function toDateOnlyString(value: { toString(): string }): string {
   return value.toString().slice(0, 10);
 }
 
-function toLocalDate(value: DateValue | undefined): Date {
+function toLocalDate(value: { toString(): string } | undefined): Date {
   if (!value) return new Date();
   const [year, month, day] = toDateOnlyString(value).split("-").map(Number);
-  return new Date(year, (month ?? 1) - 1, day ?? 1);
+  return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
 }
 
-function isFutureCalendarDate(value: DateValue): boolean {
+function isFutureCalendarDate(value: { toString(): string }): boolean {
   return toDateOnlyString(value) > format(new Date(), "yyyy-MM-dd");
 }
 
@@ -385,7 +389,7 @@ const successRateData = computed(() =>
             <div class="h-px bg-border" />
             <div class="space-y-3 p-3">
               <p class="text-xs font-medium text-muted-foreground">Custom range</p>
-              <UiRangeCalendar v-model="draftCustomRange" :is-date-disabled="isFutureCalendarDate" class="max-w-[calc(100vw-3rem)]" />
+              <UiRangeCalendar v-model="draftCustomRangeModel" :is-date-disabled="isFutureCalendarDate" class="max-w-[calc(100vw-3rem)]" />
               <div class="flex items-center justify-between gap-2">
                 <UiButton
                   variant="ghost"

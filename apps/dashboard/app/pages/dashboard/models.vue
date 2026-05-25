@@ -369,7 +369,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                     :class="[
                       'text-[10px] font-normal',
                       activeProviders.includes(provider) ? '' : 'border-border/60 text-muted-foreground opacity-70',
-                    ]"
+                    ].join(' ')"
                   >
                     {{ getProviderLabel(provider) }}
                   </UiBadge>

@@ -134,7 +134,7 @@ export const antigravityProvider = {
           .update(providerAccount)
           .set({
             accessToken: encrypt(newTokens.accessToken),
-            refreshToken: encrypt(newTokens.refreshToken),
+            refreshToken: encrypt(newTokens.refreshToken!),
             expiresAt: newTokens.expiresAt,
             projectId: newTokens.projectId,
             tier: newTokens.tier,

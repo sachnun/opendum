@@ -91,7 +91,7 @@ watch(dashboardMe, (value) => {
   dashboardMeState.value = value ?? null;
 }, { immediate: true });
 const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
-const pointBalance = computed(() => dashboardMe.value?.points?.balance ?? 0);
+const pointBalance = computed(() => (dashboardMe.value as any)?.points?.balance ?? 0);
 const formattedPointBalance = computed(() => pointBalance.value.toLocaleString("en-US"));
 const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
 const auditUserEmail = computed(() => auditUser.value?.email || "");
@@ -99,7 +99,7 @@ const auditUserImage = computed(() => auditUser.value?.image || "");
 const auditUserInitial = computed(() => (auditUserLabel.value[0] || "U").toUpperCase());
 
 watch(dashboardMe, (value) => {
-  sharingEnabled.value = value?.sharing?.enabled ?? false;
+  sharingEnabled.value = (value as any)?.sharing?.enabled ?? false;
 }, { immediate: true });
 
 function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
@@ -452,7 +452,8 @@ function resetMobileSidebarSwipe() {
   mobileSidebarDragX.value = 0;
 }
 
-function closeMobileSidebar({ keepDragOffset = false } = {}) {
+function closeMobileSidebar(raw?: unknown) {
+  const keepDragOffset = (raw as { keepDragOffset?: boolean } | undefined)?.keepDragOffset ?? false;
   mobileOpen.value = false;
 
   if (keepDragOffset) {

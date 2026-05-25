@@ -129,7 +129,7 @@ export const geminiCliProvider = {
           .update(providerAccount)
           .set({
             accessToken: encrypt(newTokens.accessToken),
-            refreshToken: encrypt(newTokens.refreshToken),
+            refreshToken: encrypt(newTokens.refreshToken!),
             expiresAt: newTokens.expiresAt,
             projectId: newTokens.projectId || account.projectId,
             tier: newTokens.tier || account.tier,

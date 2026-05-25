@@ -207,6 +207,7 @@ watch(selectedProvider, () => {
   errorHistoryByAccountId.value = {};
   errorHistoryErrorByAccountId.value = {};
   errorHistoryFetchedById.value = {};
+  previousLastErrorAtById.value = {};
   queuedAccountStatsIds.clear();
   forceQueuedAccountStatsIds.clear();
   loadingAccountStatsIds.clear();
@@ -649,10 +650,30 @@ watch(
   { immediate: true }
 );
 
+const previousLastErrorAtById = ref<Record<string, number>>({});
+
 watch(
   () => accounts.value.map((account) => `${account.id}:${toTimeMs(account.lastErrorAt)}`).join("|"),
   () => {
-    queueErrorHistoryLoad(accounts.value.map((account) => account.id), { force: true });
+    const previousByAccountId = previousLastErrorAtById.value;
+    const changedAccountIds: string[] = [];
+    const nextByAccountId: Record<string, number> = {};
+
+    for (const account of accounts.value) {
+      const lastErrorMs = toTimeMs(account.lastErrorAt);
+      nextByAccountId[account.id] = lastErrorMs;
+
+      const previousMs = previousByAccountId[account.id];
+      if (previousMs === undefined || lastErrorMs > previousMs) {
+        changedAccountIds.push(account.id);
+      }
+    }
+
+    previousLastErrorAtById.value = nextByAccountId;
+
+    if (changedAccountIds.length > 0) {
+      queueErrorHistoryLoad(changedAccountIds, { force: true });
+    }
   }
 );
 

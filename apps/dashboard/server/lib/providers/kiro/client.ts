@@ -206,7 +206,7 @@ export const kiroProvider = {
       .update(providerAccount)
       .set({
         accessToken: encrypt(refreshed.accessToken),
-        refreshToken: encrypt(refreshed.refreshToken),
+        refreshToken: encrypt(refreshed.refreshToken!),
         expiresAt: refreshed.expiresAt,
         ...(refreshed.accountId ? { accountId: refreshed.accountId } : {}),
       })

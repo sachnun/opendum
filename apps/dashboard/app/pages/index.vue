@@ -74,7 +74,7 @@ async function continueWithProvider(provider: SocialProvider) {
 }
 
 function rotateShape(shape: number[][]) {
-  return shape[0].map((_, columnIndex) => shape.map(row => row[columnIndex]).reverse());
+  return shape[0]!.map((_, columnIndex) => shape.map(row => row[columnIndex]!).reverse());
 }
 
 onMounted(() => {
@@ -129,13 +129,13 @@ onMounted(() => {
         const isWaveGap = Math.abs(x - waveGap) <= (rowOffset % 5 === 0 ? 1 : 0);
         const isSmallGap = rowOffset > 1 && rowOffset < stackHeight - 1 && (x * 3 + rowOffset) % 17 === 0 && Math.random() > 0.7;
 
-        if (!isWaveGap && !isSmallGap && rowOffset < columnHeights[x]) {
-          board[y][x] = colors[(x + Math.floor(rowOffset / 2)) % colors.length];
+        if (!isWaveGap && !isSmallGap && rowOffset < columnHeights[x]!) {
+          board[y]![x] = colors[(x + Math.floor(rowOffset / 2)) % colors.length]!;
         }
       }
 
-      if (board[y].every(Boolean)) {
-        board[y][Math.floor((columns - 1) / 2)] = null;
+      if (board[y]!.every(Boolean)) {
+        board[y]![Math.floor((columns - 1) / 2)] = null;
       }
     }
   }
@@ -151,7 +151,7 @@ onMounted(() => {
       const boardX = nextX + shapeX;
       const boardY = nextY + shapeY;
 
-      return boardX >= 0 && boardX < columns && boardY < rows && (boardY < 0 || !board[boardY][boardX]);
+      return boardX >= 0 && boardX < columns && boardY < rows && (boardY < 0 || !board[boardY]![boardX]);
     }));
   }
 
@@ -182,7 +182,7 @@ onMounted(() => {
         const boardY = y + shapeY;
 
         if (cell && boardY >= 0 && boardY < rows && boardX >= 0 && boardX < columns) {
-          testBoard[boardY][boardX] = "preview";
+          testBoard[boardY]![boardX] = "preview";
         }
       });
     });
@@ -193,13 +193,13 @@ onMounted(() => {
       return firstBlock === -1 ? 0 : rows - firstBlock;
     });
     const aggregateHeight = heights.reduce((total, height) => total + height, 0);
-    const bumpiness = heights.slice(1).reduce((total, height, index) => total + Math.abs(height - heights[index]), 0);
+    const bumpiness = heights.slice(1).reduce((total, height, index) => total + Math.abs(height - heights[index]!), 0);
     let holes = 0;
 
     for (let column = 0; column < columns; column += 1) {
       let hasBlock = false;
       for (let row = 0; row < rows; row += 1) {
-        if (testBoard[row][column]) {
+        if (testBoard[row]![column]) {
           hasBlock = true;
         } else if (hasBlock) {
           holes += 1;
@@ -214,7 +214,7 @@ onMounted(() => {
     let bestMove: { shape: number[][]; x: number; score: number } | null = null;
 
     getShapeRotations(shape).forEach((rotation) => {
-      const maxX = columns - rotation[0].length;
+      const maxX = columns - rotation[0]!.length;
       for (let x = 0; x <= maxX; x += 1) {
         let y = -rotation.length;
 
@@ -231,7 +231,7 @@ onMounted(() => {
       }
     });
 
-    return bestMove ?? { shape, x: Math.max(0, Math.floor((columns - shape[0].length) / 2)), score: 0 };
+    return bestMove ?? { shape, x: Math.max(0, Math.floor((columns - shape[0]!.length) / 2)), score: 0 };
   }
 
   function planPiece(piece: TetrisPiece) {
@@ -253,9 +253,9 @@ onMounted(() => {
   }
 
   function spawnPiece() {
-    const source = tetrisPieces[Math.floor(Math.random() * tetrisPieces.length)];
+    const source = tetrisPieces[Math.floor(Math.random() * tetrisPieces.length)]!;
     const shape = source.shape;
-    const pieceWidth = shape[0].length;
+    const pieceWidth = shape[0]!.length;
     const targetMove = chooseBestMove(shape);
     const x = Math.max(0, Math.floor((columns - pieceWidth) / 2));
     const y = -shape.length;
@@ -279,7 +279,7 @@ onMounted(() => {
         const boardY = piece.y + shapeY;
 
         if (cell && boardY >= 0 && boardY < rows && boardX >= 0 && boardX < columns) {
-          board[boardY][boardX] = piece.color;
+          board[boardY]![boardX] = piece.color;
         }
       });
     });
@@ -301,11 +301,11 @@ onMounted(() => {
     cellSize = width < 640 ? 14 : 18;
     columns = Math.max(12, Math.ceil(width / cellSize));
     rows = Math.max(18, Math.ceil(height / cellSize));
-    canvas.width = Math.ceil(width * ratio);
-    canvas.height = Math.ceil(height * ratio);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    canvas!.width = Math.ceil(width * ratio);
+    canvas!.height = Math.ceil(height * ratio);
+    canvas!.style.width = `${width}px`;
+    canvas!.style.height = `${height}px`;
+    context!.setTransform(ratio, 0, 0, ratio, 0, 0);
     createBoard();
     seedBottomStack();
     activePieces = [];
@@ -318,29 +318,29 @@ onMounted(() => {
     const inset = 1.5;
     const size = cellSize - inset * 2;
 
-    context.fillStyle = color;
-    context.strokeStyle = "rgba(255, 255, 255, 0.035)";
-    context.lineWidth = 1;
-    context.fillRect(x * cellSize + inset, y * cellSize + inset, size, size);
-    context.strokeRect(x * cellSize + inset, y * cellSize + inset, size, size);
+    context!.fillStyle = color;
+    context!.strokeStyle = "rgba(255, 255, 255, 0.035)";
+    context!.lineWidth = 1;
+    context!.fillRect(x * cellSize + inset, y * cellSize + inset, size, size);
+    context!.strokeRect(x * cellSize + inset, y * cellSize + inset, size, size);
   }
 
   function draw() {
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    context!.clearRect(0, 0, canvas!.width, canvas!.height);
 
-    context.strokeStyle = "rgba(255, 255, 255, 0.018)";
-    context.lineWidth = 1;
+    context!.strokeStyle = "rgba(255, 255, 255, 0.018)";
+    context!.lineWidth = 1;
     for (let x = 0; x <= columns; x += 1) {
-      context.beginPath();
-      context.moveTo(x * cellSize, 0);
-      context.lineTo(x * cellSize, rows * cellSize);
-      context.stroke();
+      context!.beginPath();
+      context!.moveTo(x * cellSize, 0);
+      context!.lineTo(x * cellSize, rows * cellSize);
+      context!.stroke();
     }
     for (let y = 0; y <= rows; y += 1) {
-      context.beginPath();
-      context.moveTo(0, y * cellSize);
-      context.lineTo(columns * cellSize, y * cellSize);
-      context.stroke();
+      context!.beginPath();
+      context!.moveTo(0, y * cellSize);
+      context!.lineTo(columns * cellSize, y * cellSize);
+      context!.stroke();
     }
 
     board.forEach((row, y) => {
@@ -411,7 +411,7 @@ onMounted(() => {
         let didLockPiece = false;
 
         for (let index = activePieces.length - 1; index >= 0; index -= 1) {
-          const piece = activePieces[index];
+          const piece = activePieces[index]!;
 
           if (isReadyToDrop(piece)) {
             hardDrop(piece);

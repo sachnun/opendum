@@ -1,3 +1,4 @@
+/// <reference path="../../../types/model-registry.d.ts" />
 /**
  * Model registry consumed by the proxy layer.
  *

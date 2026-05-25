@@ -697,9 +697,10 @@ const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
 watch(
   () => [props.account.id, props.account.lastErrorAt] as const,
   () => {
-    activeErrorIndex.value = 0;
+    if (!errorDialogOpen.value && activeErrorIndex.value === 0) {
+      activeErrorIndex.value = 0;
+    }
   },
-  { immediate: true }
 );
 
 watch([statMetrics, statAnimationContextKey, () => props.animateDeltas], ([items, contextKey, animateDeltas]) => {
@@ -1159,24 +1160,24 @@ function cancelErrorPreviewPointer() {
               <span class="text-xs font-medium text-muted-foreground">Quota</span>
             </div>
 
-            <div v-if="!quotaInfo && !quotaError" class="space-y-2" aria-hidden="true">
-              <div v-for="(row, index) in quotaSkeletonRows" :key="index" class="space-y-1">
-                <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
-                  <UiSkeleton :class="['h-3', row.labelClass]" />
-                  <span class="flex min-w-0 max-w-28 shrink-0 items-center justify-end gap-1.5 overflow-hidden">
-                    <UiSkeleton v-if="row.metaClass !== 'w-0'" :class="['h-2.5', row.metaClass]" />
-                    <UiSkeleton :class="['h-3', row.valueClass]" />
-                  </span>
-                </div>
-                <div class="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <UiSkeleton :class="['h-full rounded-full', row.barClass]" />
+              <div v-if="!quotaInfo && !quotaError" class="space-y-2" aria-hidden="true">
+                <div v-for="(row, index) in quotaSkeletonRows" :key="index" class="space-y-1">
+                  <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
+                    <UiSkeleton :class="['h-3', row.labelClass].filter(Boolean).join(' ')" />
+                    <span class="flex min-w-0 max-w-28 shrink-0 items-center justify-end gap-1.5 overflow-hidden">
+                      <UiSkeleton v-if="row.metaClass !== 'w-0'" :class="['h-2.5', row.metaClass].filter(Boolean).join(' ')" />
+                      <UiSkeleton :class="['h-3', row.valueClass].filter(Boolean).join(' ')" />
+                    </span>
+                  </div>
+                  <div class="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <UiSkeleton :class="['h-full rounded-full', row.barClass].filter(Boolean).join(' ')" />
+                  </div>
                 </div>
               </div>
-            </div>
 
             <template v-else>
               <p v-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
-              <div v-else-if="quotaInfo.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
+              <div v-else-if="quotaInfo?.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
                 <div v-for="group in quotaInfo.groups" :key="group.name" class="space-y-1">
                   <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
                     <span class="min-w-0 overflow-hidden truncate text-muted-foreground">{{ group.displayName }}</span>
@@ -1194,7 +1195,7 @@ function cancelErrorPreviewPointer() {
                   </div>
                 </div>
               </div>
-              <p v-else class="text-xs text-red-500">{{ quotaInfo.error ?? 'Failed to fetch quota data.' }}</p>
+              <p v-else class="text-xs text-red-500">{{ quotaInfo?.error ?? 'Failed to fetch quota data.' }}</p>
             </template>
           </div>
 

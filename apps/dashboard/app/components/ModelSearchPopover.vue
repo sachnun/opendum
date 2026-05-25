@@ -21,7 +21,7 @@ const copiedModelId = ref<string | null>(null);
 const suppressFocusUntil = ref(0);
 const suggestionListId = "model-search-suggestions";
 const placeholderModelIndex = ref(0);
-let placeholderTimer: ReturnType<typeof window.setInterval> | null = null;
+let placeholderTimer: number | null = null;
 
 const detailOpen = computed({
   get: () => detailModel.value !== null,

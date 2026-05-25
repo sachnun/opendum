@@ -76,15 +76,10 @@ const model = defineModel<DateValue | undefined>({ default: undefined });
             class="relative aspect-square h-full w-full p-0 text-center select-none"
           >
             <CalendarCellTrigger
-              v-slot="{ dayValue, today, outsideView, selected }"
+              v-slot="{ dayValue }"
               :day="date"
               :month="month.value"
-              :class="cn(
-                'flex aspect-square size-auto min-w-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm leading-none font-normal transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50',
-                today && !selected ? 'bg-accent text-accent-foreground' : '',
-                outsideView ? 'text-muted-foreground opacity-50' : '',
-                selected ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground' : '',
-              )"
+              class="flex aspect-square size-auto min-w-(--cell-size) cursor-pointer items-center justify-center rounded-md text-sm leading-none font-normal transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:pointer-events-none disabled:opacity-50 data-[selected]:bg-primary data-[selected]:text-primary-foreground data-[selected]:hover:bg-primary data-[selected]:hover:text-primary-foreground data-[today]:bg-accent data-[today]:text-accent-foreground data-[outside-view]:text-muted-foreground data-[outside-view]:opacity-50"
             >
               {{ dayValue }}
             </CalendarCellTrigger>

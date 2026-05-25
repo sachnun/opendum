@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { DashboardMeData } from "../../lib/dashboard-api-types";
+
 const props = withDefaults(
   defineProps<{
     id: string;

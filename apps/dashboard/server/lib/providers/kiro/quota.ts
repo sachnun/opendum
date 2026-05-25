@@ -117,8 +117,8 @@ function toDisplayName(metricName: string): string {
   return normalizedName
     .toLowerCase()
     .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .filter((part): part is string => Boolean(part))
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
     .join(" ");
 }
 

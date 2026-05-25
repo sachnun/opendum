@@ -18,21 +18,29 @@ const dashboardApi = useDashboardApi();
 const open = ref(false);
 const isSaving = ref(false);
 const expiresAt = ref<Date | null>(props.initialExpiresAt ? new Date(props.initialExpiresAt) : null);
-const draftDate = ref<DateValue | undefined>(toCalendarDate(expiresAt.value));
-const draftTime = ref<Time>(toTimeValue(expiresAt.value));
+const draftDate = ref<DateValue | undefined>(toCalendarDate(expiresAt.value) as DateValue | undefined);
+const draftTime = ref<Time>(toTimeValue(expiresAt.value) as Time);
 const errorMessage = ref("");
 
 watch(open, (value) => {
   if (value) {
-    draftDate.value = toCalendarDate(expiresAt.value);
-    draftTime.value = toTimeValue(expiresAt.value);
+    draftDate.value = toCalendarDate(expiresAt.value) as DateValue | undefined;
+    draftTime.value = toTimeValue(expiresAt.value) as Time;
     errorMessage.value = "";
   }
 });
 
 const isExpired = computed(() => expiresAt.value != null && expiresAt.value < new Date());
 const displayText = computed(() => (expiresAt.value ? format(expiresAt.value, "MMM d, yyyy HH:mm") : "No expiry"));
-const draftExpiresAt = computed(() => toLocalDateTime(draftDate.value, draftTime.value));
+const draftDateModel = computed<any>({
+  get: () => draftDate.value,
+  set: (v: any) => { draftDate.value = v; },
+});
+const draftTimeModel = computed<any>({
+  get: () => draftTime.value,
+  set: (v: any) => { draftTime.value = v; },
+});
+const draftExpiresAt = computed(() => toLocalDateTime(draftDate.value as any, draftTime.value as any));
 const isDraftInPast = computed(() => {
   if (!draftExpiresAt.value) return false;
   return draftExpiresAt.value <= new Date();
@@ -43,8 +51,8 @@ watch(
   (value) => {
     expiresAt.value = value ? new Date(value) : null;
     if (!open.value) {
-      draftDate.value = toCalendarDate(expiresAt.value);
-      draftTime.value = toTimeValue(expiresAt.value);
+      draftDate.value = toCalendarDate(expiresAt.value) as DateValue | undefined;
+      draftTime.value = toTimeValue(expiresAt.value) as Time;
     }
   }
 );
@@ -61,7 +69,7 @@ function toDateOnlyString(value: DateValue): string {
 function toLocalDate(value: DateValue | undefined): Date | null {
   if (!value) return null;
   const [year, month, day] = toDateOnlyString(value).split("-").map(Number);
-  return new Date(year, (month ?? 1) - 1, day ?? 1);
+  return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
 }
 
 function toTimeValue(value: Date | null): Time {
@@ -126,13 +134,13 @@ async function saveExpiration(value: Date | null) {
       <div class="space-y-3 p-3">
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration date</p>
-          <UiCalendar v-model="draftDate" :is-date-disabled="isPastDate" class="border-0 p-0" />
+          <UiCalendar v-model="draftDateModel" :is-date-disabled="isPastDate" class="border-0 p-0" />
         </div>
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration time</p>
           <TimeFieldRoot
             v-slot="{ segments }"
-            v-model="draftTime"
+            v-model="draftTimeModel"
             granularity="minute"
             :hour-cycle="24"
             class="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm outline-none focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
