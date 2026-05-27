@@ -428,6 +428,7 @@ func newKiroSSEReader(source io.Reader, model string, parseThinking bool) io.Rea
 		toolCallCount := 0
 		activeToolID := ""
 		toolIndex := map[string]int{}
+		hasNativeReasoning := false
 		totalContent := ""
 		outputText := ""
 		contextUsagePercentage := 0.0
@@ -471,12 +472,17 @@ func newKiroSSEReader(source io.Reader, model string, parseThinking bool) io.Rea
 				return
 			}
 			if reasoning := kiroReasoningContent(event); reasoning != "" {
+				hasNativeReasoning = true
 				emitContent("", reasoning)
 				return
 			}
 			if content, ok := event["content"].(string); ok && event["followupPrompt"] == nil {
 				totalContent += content
-				emitContent(splitter.Process(content, false))
+				contentDelta, reasoningDelta := splitter.Process(content, false)
+				if hasNativeReasoning && reasoningDelta != "" {
+					reasoningDelta = ""
+				}
+				emitContent(contentDelta, reasoningDelta)
 			}
 			if name := stringValue(event["name"]); name != "" && stringValue(event["toolUseId"]) != "" {
 				ensureRole()
@@ -527,7 +533,11 @@ func newKiroSSEReader(source io.Reader, model string, parseThinking bool) io.Rea
 		for _, event := range parseKiroJSONEvents("", state) {
 			processEvent(event)
 		}
-		emitContent(splitter.Flush())
+		flushContent, flushReasoning := splitter.Flush()
+		if hasNativeReasoning {
+			flushReasoning = ""
+		}
+		emitContent(flushContent, flushReasoning)
 		for _, call := range parseKiroBracketToolCalls(totalContent) {
 			idx := toolCallCount
 			toolCallCount++
@@ -557,6 +567,7 @@ func convertKiroEventsToCompletion(events []map[string]any, model string, parseT
 	contextUsagePercentage := 0.0
 	explicitUsage := map[string]any(nil)
 	splitter := &kiroThinkingSplitter{enabled: parseThinking}
+	hasNativeReasoning := false
 	type callState struct {
 		index      int
 		name, args string
@@ -573,13 +584,16 @@ func convertKiroEventsToCompletion(events []map[string]any, model string, parseT
 			continue
 		}
 		if reasoningDelta := kiroReasoningContent(event); reasoningDelta != "" {
+			hasNativeReasoning = true
 			reasoning += reasoningDelta
 			outputText += reasoningDelta
 		}
 		if value, ok := event["content"].(string); ok && event["followupPrompt"] == nil {
 			textDelta, reasoningDelta := splitter.Process(value, false)
 			content += textDelta
-			reasoning += reasoningDelta
+			if !hasNativeReasoning {
+				reasoning += reasoningDelta
+			}
 			outputText += textDelta + reasoningDelta
 		}
 		if name := stringValue(event["name"]); name != "" && stringValue(event["toolUseId"]) != "" {
@@ -601,7 +615,9 @@ func convertKiroEventsToCompletion(events []map[string]any, model string, parseT
 	}
 	textDelta, reasoningDelta := splitter.Flush()
 	content += textDelta
-	reasoning += reasoningDelta
+	if !hasNativeReasoning {
+		reasoning += reasoningDelta
+	}
 	outputText += textDelta + reasoningDelta
 
 	toolCalls := make([]any, len(toolByID))

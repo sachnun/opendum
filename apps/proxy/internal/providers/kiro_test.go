@@ -385,6 +385,41 @@ func TestKiroCompletionExtractsDirectReasoningContentEvent(t *testing.T) {
 	}
 }
 
+func TestKiroCompletionDedupsReasoningContentEventAndThinkingTags(t *testing.T) {
+	events := parseKiroJSONEvents(`{"reasoningContentEvent":{"text":"native plan","signature":"sig"}}{"content":"<thinking>native plan</thinking>\n\nanswer"}`, &kiroParserState{})
+	if len(events) != 2 {
+		t.Fatalf("events len = %d, want 2: %#v", len(events), events)
+	}
+	completion := convertKiroEventsToCompletion(events, "unit-test-model", true)
+	choice := completion["choices"].([]any)[0].(map[string]any)
+	message := choice["message"].(map[string]any)
+	if message["content"] != "answer" {
+		t.Fatalf("content = %#v, want answer", message["content"])
+	}
+	if message["reasoning_content"] != "native plan" {
+		t.Fatalf("reasoning_content = %#v, want native plan (only from reasoningContentEvent, not duplicated)", message["reasoning_content"])
+	}
+}
+
+func TestKiroSSEReaderDedupsReasoningContentEventAndThinkingTags(t *testing.T) {
+	reader := newKiroSSEReader(strings.NewReader(`{"reasoningContentEvent":{"text":"native plan","signature":"sig"}}{"content":"<thinking>native plan</thinking>\n\nanswer"}{"stop":true}`), "unit-test-model", true)
+	out, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	if !strings.Contains(text, `"reasoning_content":"native plan"`) {
+		t.Fatalf("missing native reasoning chunk: %s", text)
+	}
+	if !strings.Contains(text, `"content":"answer"`) {
+		t.Fatalf("missing answer content chunk: %s", text)
+	}
+	reasoningCount := strings.Count(text, `"reasoning_content"`)
+	if reasoningCount != 1 {
+		t.Fatalf("reasoning_content appeared %d times, want 1 (dedup): %s", reasoningCount, text)
+	}
+}
+
 func TestKiroCompletionParsesBracketToolCalls(t *testing.T) {
 	events := parseKiroJSONEvents(`{"content":"I will call [Called lookup with args: {\"city\":\"Jakarta\"}]"}`, &kiroParserState{})
 	completion := convertKiroEventsToCompletion(events, "unit-test-model", false)
