@@ -1,17 +1,12 @@
 {
   "providers": [
     "opencode",
-    "kilo_code",
     "nvidia_nim",
     "ollama_cloud",
     "openrouter"
   ],
   "family": "DeepSeek",
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "deepseek/deepseek-v4-flash:free",
-      "authless": true
-    },
     "nvidia_nim": {
       "upstream": "deepseek-ai/deepseek-v4-flash"
     },

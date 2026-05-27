@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "kilo_code"
-  ],
+  "providers": [],
   "family": "xAI",
   "meta": {
     "reasoning": true,
@@ -14,13 +12,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "x-ai/grok-code-fast-1:optimized:free",
-      "authless": true,
-      "responses_api": true
     }
   }
 }

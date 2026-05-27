@@ -1,11 +1,4 @@
 {
-  "providers": [
-    "openrouter"
-  ],
-  "family": "Trinity",
-  "providerConfig": {
-    "openrouter": {
-      "upstream": "arcee-ai/trinity-large-thinking:free"
-    }
-  }
+  "providers": [],
+  "family": "Trinity"
 }
