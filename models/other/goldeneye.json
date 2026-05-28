@@ -1,14 +1,5 @@
 {
-  "providers": [
-    "copilot"
-  ],
+  "providers": [],
   "family": "OpenAI",
-  "ignored": true,
-  "providerConfig": {
-    "copilot": {
-      "allowedTiers": [
-        "free"
-      ]
-    }
-  }
+  "ignored": true
 }

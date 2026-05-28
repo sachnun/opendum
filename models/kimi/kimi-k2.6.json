@@ -1,7 +1,9 @@
 {
   "providers": [
     "ollama_cloud",
-    "workers_ai"
+    "workers_ai",
+    "kilo_code",
+    "openrouter"
   ],
   "family": "Kimi",
   "meta": {
@@ -19,6 +21,13 @@
     }
   },
   "providerConfig": {
+    "kilo_code": {
+      "upstream": "moonshotai/kimi-k2.6:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "moonshotai/kimi-k2.6:free"
+    },
     "workers_ai": {
       "upstream": "@cf/moonshotai/kimi-k2.6"
     }
