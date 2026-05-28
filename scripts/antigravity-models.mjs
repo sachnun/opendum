@@ -26,7 +26,7 @@ import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-reg
 // ---------------------------------------------------------------------------
 
 const ANTIGRAVITY_MODELS_URL =
-  "https://antigravity.google/assets/docs/agent/models.md";
+  "https://antigravity.google/assets/docs/antigravity-2-0/models.md";
 const FETCH_TIMEOUT_MS = 20_000;
 const MAX_FETCH_ATTEMPTS = 3;
 const PROVIDER_NAME = "antigravity";
