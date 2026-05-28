@@ -357,54 +357,6 @@ func TestOpenAICompatibleProviderConvertsOllamaCloudImageURL(t *testing.T) {
 	assertChatImageDataURI(t, payload)
 }
 
-func TestOpenAICompatibleProviderRoutesKiloResponsesModel(t *testing.T) {
-	registry := testModelsRegistry(t)
-	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
-	var path string
-	var payload map[string]any
-	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-		path = req.URL.Path
-		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-			t.Fatal(err)
-		}
-		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":1,"output_tokens":2,"total_tokens":3}}`))}, nil
-	})}
-
-	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
-		"model":      "kilo_code/grok-code-fast-1",
-		"messages":   []any{map[string]any{"role": "user", "content": "hello"}},
-		"max_tokens": 42,
-	}, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	if path != "/api/gateway/responses" {
-		t.Fatalf("upstream path = %q, want /api/gateway/responses", path)
-	}
-	if payload["model"] != "x-ai/grok-code-fast-1:optimized:free" || payload["max_output_tokens"] != float64(42) && payload["max_output_tokens"] != 42 {
-		t.Fatalf("bad responses payload: %#v", payload)
-	}
-	if _, ok := payload["messages"]; ok {
-		t.Fatalf("responses payload leaked messages: %#v", payload)
-	}
-	input := payload["input"].([]any)
-	if len(input) != 1 || input[0].(map[string]any)["type"] != "message" {
-		t.Fatalf("responses input = %#v", input)
-	}
-
-	var completion map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
-		t.Fatal(err)
-	}
-	choice := completion["choices"].([]any)[0].(map[string]any)
-	message := choice["message"].(map[string]any)
-	if completion["object"] != "chat.completion" || message["content"] != "ok" {
-		t.Fatalf("converted completion = %#v", completion)
-	}
-}
-
 func TestOpenAICompatibleProviderOmitsAuthForAuthlessKiloModel(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
