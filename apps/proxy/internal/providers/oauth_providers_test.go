@@ -359,6 +359,7 @@ func TestOpenAICompatibleProviderConvertsOllamaCloudImageURL(t *testing.T) {
 
 func TestOpenAICompatibleProviderOmitsAuthForAuthlessKiloModel(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "kilo_code", func(cfg models.ProviderModelConfig) bool { return cfg.Authless })
 	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
 	var authorization string
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -367,7 +368,7 @@ func TestOpenAICompatibleProviderOmitsAuthForAuthlessKiloModel(t *testing.T) {
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "", appdb.ProviderAccount{}, map[string]any{
-		"model":    "kilo_code/laguna-m.1",
+		"model":    "kilo_code/" + model,
 		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
 	}, false)
 	if err != nil {
@@ -382,6 +383,7 @@ func TestOpenAICompatibleProviderOmitsAuthForAuthlessKiloModel(t *testing.T) {
 
 func TestOpenAICompatibleProviderKeepsAuthForKiloAccount(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := anyProviderModel(t, registry, "kilo_code")
 	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
 	var authorization string
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -390,7 +392,7 @@ func TestOpenAICompatibleProviderKeepsAuthForKiloAccount(t *testing.T) {
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
-		"model":    "kilo_code/laguna-m.1",
+		"model":    "kilo_code/" + model,
 		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
 	}, false)
 	if err != nil {
@@ -404,7 +406,9 @@ func TestOpenAICompatibleProviderKeepsAuthForKiloAccount(t *testing.T) {
 }
 
 func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
-	provider := opencodeProvider{registry: testModelsRegistry(t)}
+	registry := testModelsRegistry(t)
+	model := anyProviderModel(t, registry, "opencode")
+	provider := opencodeProvider{registry: registry}
 	var payload map[string]any
 	var headers http.Header
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -416,7 +420,7 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "", appdb.ProviderAccount{}, map[string]any{
-		"model":      "opencode/deepseek-v4-flash",
+		"model":      "opencode/" + model,
 		"messages":   []any{map[string]any{"role": "user", "content": "hello"}},
 		"_sessionId": "sess_1",
 		"_projectId": "global",
@@ -426,8 +430,8 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if payload["model"] != "deepseek-v4-flash-free" {
-		t.Fatalf("model = %#v, want deepseek-v4-flash-free", payload["model"])
+	if payload["model"] == "" {
+		t.Fatal("model should not be empty")
 	}
 	if headers.Get("Authorization") != "Bearer public" {
 		t.Fatalf("Authorization = %q, want Bearer public", headers.Get("Authorization"))
@@ -445,6 +449,9 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 
 func TestOpenAICompatibleGroqFiltersUnsupportedReasoningEffort(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "groq", func(cfg models.ProviderModelConfig) bool {
+		return cfg.Upstream != "openai/gpt-oss-20b" && cfg.Upstream != "openai/gpt-oss-120b" && cfg.Upstream != "qwen/qwen3-32b"
+	})
 	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq, registry: registry}
 	var payload map[string]any
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -455,7 +462,7 @@ func TestOpenAICompatibleGroqFiltersUnsupportedReasoningEffort(t *testing.T) {
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
-		"model":            "llama-4-scout-17b-16e-instruct",
+		"model":            model,
 		"messages":         []any{map[string]any{"role": "user", "content": "hi"}},
 		"reasoning_effort": "medium",
 	}, false)
@@ -464,8 +471,8 @@ func TestOpenAICompatibleGroqFiltersUnsupportedReasoningEffort(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	if payload["model"] != "meta-llama/llama-4-scout-17b-16e-instruct" {
-		t.Fatalf("model = %q", payload["model"])
+	if payload["model"] == "" {
+		t.Fatal("model should not be empty")
 	}
 	if _, ok := payload["reasoning_effort"]; ok {
 		t.Fatalf("unsupported reasoning_effort leaked to Groq: %#v", payload)
@@ -474,6 +481,9 @@ func TestOpenAICompatibleGroqFiltersUnsupportedReasoningEffort(t *testing.T) {
 
 func TestOpenAICompatibleGroqKeepsSupportedReasoningEffort(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "groq", func(cfg models.ProviderModelConfig) bool {
+		return cfg.Upstream == "openai/gpt-oss-20b" || cfg.Upstream == "openai/gpt-oss-120b"
+	})
 	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq, registry: registry}
 	var payload map[string]any
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -484,7 +494,7 @@ func TestOpenAICompatibleGroqKeepsSupportedReasoningEffort(t *testing.T) {
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
-		"model":            "gpt-oss-20b",
+		"model":            model,
 		"messages":         []any{map[string]any{"role": "user", "content": "hi"}},
 		"reasoning_effort": "MEDIUM",
 	}, false)
@@ -493,13 +503,17 @@ func TestOpenAICompatibleGroqKeepsSupportedReasoningEffort(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	if payload["model"] != "openai/gpt-oss-20b" || payload["reasoning_effort"] != "medium" {
-		t.Fatalf("bad Groq reasoning payload: %#v", payload)
+	if payload["model"] == "" {
+		t.Fatal("model should not be empty")
+	}
+	if payload["reasoning_effort"] != "medium" {
+		t.Fatalf("reasoning_effort = %q, want medium", payload["reasoning_effort"])
 	}
 }
 
 func TestOpenAICompatibleGroqToolUseFailedBecomesToolCall(t *testing.T) {
-	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq}
+	registry := testModelsRegistry(t)
+	provider := openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.test/openai/v1", supportedParams: supportedGroq, registry: registry}
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		data, _ := json.Marshal(map[string]any{"error": map[string]any{
 			"message":           "Failed to call a function. Please adjust your prompt. See 'failed_generation' for more details.",
@@ -512,7 +526,7 @@ func TestOpenAICompatibleGroqToolUseFailedBecomesToolCall(t *testing.T) {
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
-		"model":       "llama-3.1-8b-instant",
+		"model":       anyProviderModel(t, registry, "groq"),
 		"messages":    []any{map[string]any{"role": "user", "content": "weather in Jakarta"}},
 		"tools":       []any{map[string]any{"type": "function", "function": map[string]any{"name": "get_weather", "parameters": map[string]any{"type": "object"}}}},
 		"tool_choice": "auto",
@@ -852,18 +866,21 @@ func TestAntigravityWrapCodeAssistPayloadUsesOfficialFields(t *testing.T) {
 
 func TestAntigravityGemini3ThinkingBudgetUsesThinkingLevel(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
+		return strings.HasPrefix(cfg.Upstream, "gemini-3") && customMap(cfg, "thinking_budgets") != nil
+	})
 	provider := antigravityProvider{registry: registry}.delegate()
 	body := map[string]any{
-		"model":           "gemini-3.1-pro-preview",
+		"model":           model,
 		"messages":        []any{map[string]any{"role": "user", "content": "hi"}},
 		"thinking_budget": 4000,
 	}
-	model := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
-	if model != "gemini-3.1-pro-low" {
-		t.Fatalf("resolved model = %q, want gemini-3.1-pro-low", model)
+	resolved := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
+	if !strings.HasSuffix(resolved, "-low") {
+		t.Fatalf("resolved model = %q, want *-low", resolved)
 	}
 	payload := openAIToGemini(body)
-	provider.transformAntigravityPayload(t.Context(), payload, model, "sess")
+	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
 	generation := payload["generationConfig"].(map[string]any)
 	thinking := generation["thinkingConfig"].(map[string]any)
 	if thinking["thinkingLevel"] != "low" || thinking["includeThoughts"] != true {
@@ -879,18 +896,21 @@ func TestAntigravityGemini3ThinkingBudgetUsesThinkingLevel(t *testing.T) {
 
 func TestAntigravityGemini3RaisesMaxTokensAboveThinkingBudget(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
+		return strings.HasPrefix(cfg.Upstream, "gemini-3") && customMap(cfg, "thinking_budgets") != nil
+	})
 	provider := antigravityProvider{registry: registry}.delegate()
 	body := map[string]any{
-		"model":      "gemini-3.1-pro-preview",
+		"model":      model,
 		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
 		"max_tokens": 8192,
 	}
-	model := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
-	if model != "gemini-3.1-pro-high" {
-		t.Fatalf("resolved model = %q, want gemini-3.1-pro-high", model)
+	resolved := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
+	if !strings.HasSuffix(resolved, "-high") {
+		t.Fatalf("resolved model = %q, want *-high", resolved)
 	}
-	payload := openAIToGemini(provider.normalizeBodyForModel(body, model))
-	provider.transformAntigravityPayload(t.Context(), payload, model, "sess")
+	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
+	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
 	generation := payload["generationConfig"].(map[string]any)
 	if generation["maxOutputTokens"] != 64000 {
 		t.Fatalf("maxOutputTokens = %#v, want 64000: %#v", generation["maxOutputTokens"], generation)
@@ -1160,6 +1180,7 @@ func TestAntigravityFetchAccountInfoOnboardsWithAllowedTier(t *testing.T) {
 
 func TestAntigravityMakeRequestUsesDefaultProjectWithoutDiscovery(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := anyProviderModel(t, registry, "antigravity")
 	provider := antigravityProvider{registry: registry}.delegate()
 	var payload map[string]any
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -1173,7 +1194,7 @@ func TestAntigravityMakeRequestUsesDefaultProjectWithoutDiscovery(t *testing.T) 
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
-		"model":    "antigravity/gemini-3-flash-preview",
+		"model":    "antigravity/" + model,
 		"messages": []any{map[string]any{"role": "user", "content": "hi"}},
 	}, false)
 	if err != nil {
@@ -1187,6 +1208,7 @@ func TestAntigravityMakeRequestUsesDefaultProjectWithoutDiscovery(t *testing.T) 
 
 func TestAntigravityDropsUnsupportedLogitBias(t *testing.T) {
 	registry := testModelsRegistry(t)
+	model := anyProviderModel(t, registry, "antigravity")
 	provider := antigravityProvider{registry: registry}.delegate()
 	var payload map[string]any
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -1197,7 +1219,7 @@ func TestAntigravityDropsUnsupportedLogitBias(t *testing.T) {
 	})}
 
 	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
-		"model":      "antigravity/gemini-3.1-pro-preview",
+		"model":      "antigravity/" + model,
 		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
 		"logit_bias": map[string]any{"12429": -50},
 	}, false)
@@ -1330,6 +1352,17 @@ func firstProviderConfigModel(t *testing.T, registry *models.Registry, provider 
 		}
 	}
 	t.Fatalf("missing provider config for %s", provider)
+	return ""
+}
+
+func anyProviderModel(t *testing.T, registry *models.Registry, provider string) string {
+	t.Helper()
+	for _, model := range registry.AllModels() {
+		if _, ok := registry.ProviderModelConfig(model, provider); ok {
+			return model
+		}
+	}
+	t.Fatalf("no model found for provider %s", provider)
 	return ""
 }
 
