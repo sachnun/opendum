@@ -691,7 +691,17 @@ async function main() {
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
 
   console.log("[antigravity] Fetching official Antigravity model docs ...");
-  const markdown = await fetchText(ANTIGRAVITY_MODELS_URL, "Antigravity model docs");
+  let markdown;
+  try {
+    markdown = await fetchText(ANTIGRAVITY_MODELS_URL, "Antigravity model docs");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("404")) {
+      console.warn(`[antigravity] Docs unavailable (404). Skipping sync — existing models preserved.`);
+      return;
+    }
+    throw error;
+  }
 
   const displayNames = parseReasoningModelNames(markdown);
   const { modelMap, discovered } = buildDiscoveredModelMap(displayNames);
