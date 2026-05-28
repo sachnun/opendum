@@ -1,4 +1,6 @@
 {
-  "providers": [],
+  "providers": [
+    "groq"
+  ],
   "family": "Meta"
 }
