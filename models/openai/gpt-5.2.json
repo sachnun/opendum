@@ -21,7 +21,6 @@
   "providerConfig": {
     "copilot": {
       "allowedTiers": [
-        "student",
         "pro",
         "pro+",
         "business",

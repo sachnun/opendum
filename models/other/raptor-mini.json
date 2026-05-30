@@ -7,8 +7,6 @@
   "providerConfig": {
     "copilot": {
       "allowedTiers": [
-        "free",
-        "student",
         "pro",
         "pro+"
       ]

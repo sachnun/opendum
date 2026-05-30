@@ -26,6 +26,12 @@
   "providerConfig": {
     "copilot": {
       "upstream": "claude-haiku-4.5",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ],
       "reasoning_effort": false
     },
     "kiro": {

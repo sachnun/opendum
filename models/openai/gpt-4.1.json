@@ -16,5 +16,15 @@
         "text"
       ]
     }
+  },
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    }
   }
 }
