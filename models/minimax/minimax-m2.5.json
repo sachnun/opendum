@@ -1,8 +1,7 @@
 {
   "providers": [
     "kiro",
-    "ollama_cloud",
-    "openrouter"
+    "ollama_cloud"
   ],
   "family": "MiniMax",
   "meta": {
@@ -16,11 +15,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "openrouter": {
-      "upstream": "minimax/minimax-m2.5:free"
     }
   }
 }
