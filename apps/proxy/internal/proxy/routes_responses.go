@@ -20,7 +20,6 @@ func responsesToolsToChat(tools []any) []any {
 	for _, raw := range tools {
 		tool, ok := raw.(map[string]any)
 		if !ok {
-			out = append(out, raw)
 			continue
 		}
 		switch tool["type"] {
@@ -47,8 +46,6 @@ func responsesToolsToChat(tools []any) []any {
 			} else {
 				out = append(out, raw)
 			}
-		default:
-			out = append(out, raw)
 		}
 	}
 	return out
