@@ -15,6 +15,29 @@ func responsesConfig(s *Service) endpointAdapter {
 	}
 }
 
+func responsesToolsToChat(tools []any) []any {
+	out := make([]any, 0, len(tools))
+	for _, raw := range tools {
+		tool, ok := raw.(map[string]any)
+		if !ok {
+			out = append(out, raw)
+			continue
+		}
+		if _, hasFunction := tool["function"]; hasFunction {
+			out = append(out, raw)
+			continue
+		}
+		if tool["type"] == "function" {
+			fn := cloneMap(tool)
+			delete(fn, "type")
+			out = append(out, map[string]any{"type": "function", "function": fn})
+		} else {
+			out = append(out, raw)
+		}
+	}
+	return out
+}
+
 func responsesContentToChat(content any) any {
 	parts, ok := content.([]any)
 	if !ok {
@@ -72,6 +95,9 @@ func buildResponses(parsed parsedEndpointRequest, model string, stream bool, ses
 	body := cloneMap(params)
 	body["model"] = model
 	body["messages"] = parsed.RouteData["messages"]
+	if tools, ok := body["tools"].([]any); ok {
+		body["tools"] = responsesToolsToChat(tools)
+	}
 	body["stream"] = stream
 	body["_includeReasoning"] = parsed.ReasoningRequested
 	body["_responsesInput"] = parsed.RouteData["responsesInput"]
