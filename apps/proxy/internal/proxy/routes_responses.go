@@ -23,15 +23,31 @@ func responsesToolsToChat(tools []any) []any {
 			out = append(out, raw)
 			continue
 		}
-		if _, hasFunction := tool["function"]; hasFunction {
-			out = append(out, raw)
-			continue
-		}
-		if tool["type"] == "function" {
-			fn := cloneMap(tool)
-			delete(fn, "type")
-			out = append(out, map[string]any{"type": "function", "function": fn})
-		} else {
+		switch tool["type"] {
+		case "namespace":
+			name, _ := tool["name"].(string)
+			subs, _ := tool["tools"].([]any)
+			for _, sub := range subs {
+				subMap, ok := sub.(map[string]any)
+				if !ok {
+					continue
+				}
+				fn := cloneMap(subMap)
+				delete(fn, "type")
+				if childName, ok := fn["name"].(string); ok {
+					fn["name"] = name + childName
+				}
+				out = append(out, map[string]any{"type": "function", "function": fn})
+			}
+		case "function":
+			if _, hasFunction := tool["function"]; !hasFunction {
+				fn := cloneMap(tool)
+				delete(fn, "type")
+				out = append(out, map[string]any{"type": "function", "function": fn})
+			} else {
+				out = append(out, raw)
+			}
+		default:
 			out = append(out, raw)
 		}
 	}
