@@ -354,3 +354,193 @@ func numberFromAny(value any) int {
 		return 0
 	}
 }
+
+func chatCompletionToResponsesJSON(data map[string]any, model string) map[string]any {
+	choices, _ := data["choices"].([]any)
+	message := map[string]any{}
+	finishReason := "stop"
+	if len(choices) > 0 {
+		choice, _ := choices[0].(map[string]any)
+		if choice != nil {
+			if msg, _ := choice["message"].(map[string]any); msg != nil {
+				message = msg
+			}
+			if fr := stringValue(choice["finish_reason"]); fr != "" {
+				finishReason = fr
+			}
+		}
+	}
+	output := []any{}
+	content := stringValue(message["content"])
+	reasoning := stringValue(message["reasoning_content"])
+	if reasoning != "" {
+		output = append(output, map[string]any{"type": "reasoning", "text": reasoning})
+	}
+	if content != "" {
+		output = append(output, map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": content}}})
+	}
+	if tcs, _ := message["tool_calls"].([]any); len(tcs) > 0 {
+		for _, raw := range tcs {
+			tc, _ := raw.(map[string]any)
+			if tc == nil {
+				continue
+			}
+			fn, _ := tc["function"].(map[string]any)
+			name := stringValue(fn["name"])
+			if name == "" {
+				continue
+			}
+			id := toResponsesAPIID(stringValue(tc["id"]))
+			output = append(output, map[string]any{"type": "function_call", "id": id, "call_id": id, "name": name, "arguments": defaultStringValue(fn["arguments"], "{}")})
+		}
+	}
+	usage, _ := data["usage"].(map[string]any)
+	status := "completed"
+	if finishReason == "length" {
+		status = "incomplete"
+	}
+	return map[string]any{
+		"id":      randomID("resp"),
+		"object":  "response",
+		"model":   model,
+		"output":  output,
+		"status":  status,
+		"usage":   map[string]any{"input_tokens": numberFromAny(usage["prompt_tokens"]), "output_tokens": numberFromAny(usage["completion_tokens"]), "total_tokens": numberFromAny(usage["prompt_tokens"]) + numberFromAny(usage["completion_tokens"])},
+	}
+}
+
+type chatToolCallState struct {
+	id   string
+	name string
+	args string
+}
+
+func chatSSEToResponsesSSEReader(source io.Reader, model string) io.Reader {
+	reader, writer := io.Pipe()
+	go func() {
+		transformChatSSEToResponses(source, writer, model)
+		_ = writer.Close()
+	}()
+	return reader
+}
+
+func transformChatSSEToResponses(source io.Reader, writer io.Writer, model string) {
+	responseID := randomID("resp")
+	outputItemID := randomID("item")
+	textContent := ""
+	reasoningContent := ""
+	toolCallsAt := map[int]chatToolCallState{}
+	toolCallIDs := []int{}
+	writtenToolCall := map[int]bool{}
+	var promptTokens, completionTokens int
+
+	writeEvent := func(event map[string]any) {
+		encoded, _ := json.Marshal(event)
+		_, _ = writer.Write([]byte("data: " + string(encoded) + "\n\n"))
+	}
+
+	scanner := bufio.NewScanner(source)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+		var chunk map[string]any
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			continue
+		}
+		choices, _ := chunk["choices"].([]any)
+		if len(choices) == 0 {
+			if usage, ok := chunk["usage"].(map[string]any); ok {
+				promptTokens = numberFromAny(usage["prompt_tokens"])
+				completionTokens = numberFromAny(usage["completion_tokens"])
+			}
+			continue
+		}
+		choice, _ := choices[0].(map[string]any)
+		if choice == nil {
+			continue
+		}
+		delta, _ := choice["delta"].(map[string]any)
+		finishReason, _ := choice["finish_reason"].(string)
+
+		if delta != nil {
+			if content := stringValue(delta["content"]); content != "" {
+				textContent += content
+				writeEvent(map[string]any{"type": "response.output_text.delta", "delta": content, "item_id": outputItemID, "output_index": 0, "content_index": 0})
+			}
+			if reasoning := stringValue(delta["reasoning_content"]); reasoning != "" {
+				reasoningContent += reasoning
+				writeEvent(map[string]any{"type": "response.reasoning_text.delta", "delta": reasoning, "item_id": outputItemID, "output_index": 0, "content_index": 0})
+			}
+			if tcs, _ := delta["tool_calls"].([]any); len(tcs) > 0 {
+				for _, raw := range tcs {
+					tc, _ := raw.(map[string]any)
+					if tc == nil {
+						continue
+					}
+					idx := numberFromAny(tc["index"])
+					fn, _ := tc["function"].(map[string]any)
+					if fn == nil {
+						fn = map[string]any{}
+					}
+					if _, exists := toolCallsAt[idx]; !exists {
+						id := toResponsesAPIID(stringValue(tc["id"]))
+						name := stringValue(fn["name"])
+						toolCallsAt[idx] = chatToolCallState{id: id, name: name, args: ""}
+						toolCallIDs = append(toolCallIDs, idx)
+					}
+					entry := toolCallsAt[idx]
+					if args := stringValue(fn["arguments"]); args != "" {
+						entry.args += args
+						toolCallsAt[idx] = entry
+					}
+					if !writtenToolCall[idx] {
+						writeEvent(map[string]any{"type": "response.output_item.added", "item": map[string]any{"type": "function_call", "id": entry.id, "call_id": entry.id, "name": entry.name, "arguments": ""}})
+						writtenToolCall[idx] = true
+					}
+					if args := stringValue(fn["arguments"]); args != "" {
+						writeEvent(map[string]any{"type": "response.function_call_arguments.delta", "delta": args, "item_id": entry.id, "output_index": idx})
+					}
+				}
+			}
+		}
+
+		if usage, ok := choice["usage"].(map[string]any); ok {
+			promptTokens = numberFromAny(usage["prompt_tokens"])
+			completionTokens = numberFromAny(usage["completion_tokens"])
+		}
+
+		if finishReason != "" {
+			output := []any{}
+			if reasoningContent != "" {
+				output = append(output, map[string]any{"type": "reasoning", "text": reasoningContent})
+			}
+			if textContent != "" {
+				output = append(output, map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": textContent}}})
+			}
+			for _, idx := range toolCallIDs {
+				if entry, ok := toolCallsAt[idx]; ok {
+					output = append(output, map[string]any{"type": "function_call", "id": entry.id, "call_id": entry.id, "name": entry.name, "arguments": entry.args})
+				}
+			}
+			status := "completed"
+			if finishReason == "length" {
+				status = "incomplete"
+			}
+			writeEvent(map[string]any{"type": "response.completed", "response": map[string]any{
+				"id":     responseID,
+				"object": "response",
+				"model":  model,
+				"output": output,
+				"status": status,
+				"usage":  map[string]any{"input_tokens": promptTokens, "output_tokens": completionTokens, "total_tokens": promptTokens + completionTokens},
+			}})
+		}
+	}
+}

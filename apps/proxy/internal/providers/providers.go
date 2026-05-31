@@ -143,6 +143,21 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	if p.name == "groq" && err == nil && !stream && resp != nil && resp.StatusCode == http.StatusBadRequest {
 		return p.recoverGroqToolUseFailed(resp, modelName)
 	}
+	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return resp, err
+	}
+	if _, nativeResponses := body["_responsesInput"].([]any); nativeResponses {
+		if stream {
+			return sseResponse(chatSSEToResponsesSSEReader(resp.Body, modelName), resp.Body), nil
+		}
+		var data map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
+		_ = resp.Body.Close()
+		return jsonResponse(http.StatusOK, chatCompletionToResponsesJSON(data, modelName)), nil
+	}
 	return resp, err
 }
 
