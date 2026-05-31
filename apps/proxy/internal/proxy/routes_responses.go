@@ -15,6 +15,33 @@ func responsesConfig(s *Service) endpointAdapter {
 	}
 }
 
+func responsesContentToChat(content any) any {
+	parts, ok := content.([]any)
+	if !ok {
+		return content
+	}
+	out := make([]any, 0, len(parts))
+	for _, raw := range parts {
+		part, ok := raw.(map[string]any)
+		if !ok {
+			out = append(out, raw)
+			continue
+		}
+		copyPart := cloneMap(part)
+		switch copyPart["type"] {
+		case "input_text", "output_text":
+			copyPart["type"] = "text"
+		case "input_image":
+			copyPart["type"] = "image_url"
+			if url, ok := copyPart["image_url"].(string); ok {
+				copyPart["image_url"] = map[string]any{"url": url}
+			}
+		}
+		out = append(out, copyPart)
+	}
+	return out
+}
+
 func parseResponses(body map[string]any) (parsedEndpointRequest, *routeError) {
 	model, routeErr := parseRequiredModel(body)
 	if routeErr != nil {
@@ -88,7 +115,7 @@ func convertResponsesInputToMessages(input []any, instructions string) []any {
 			if role == "" {
 				role = "user"
 			}
-			messages = append(messages, map[string]any{"role": role, "content": item["content"]})
+			messages = append(messages, map[string]any{"role": role, "content": responsesContentToChat(item["content"])})
 		case "function_call":
 			id := stringValue(item["call_id"])
 			if id == "" {
