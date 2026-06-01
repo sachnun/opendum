@@ -1,0 +1,6 @@
+{
+  "providers": [
+    "ollama_cloud"
+  ],
+  "family": "MiniMax"
+}

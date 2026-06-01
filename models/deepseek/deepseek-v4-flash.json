@@ -2,8 +2,7 @@
   "providers": [
     "opencode",
     "nvidia_nim",
-    "ollama_cloud",
-    "openrouter"
+    "ollama_cloud"
   ],
   "family": "DeepSeek",
   "providerConfig": {
@@ -12,9 +11,6 @@
     },
     "opencode": {
       "upstream": "deepseek-v4-flash-free"
-    },
-    "openrouter": {
-      "upstream": "deepseek/deepseek-v4-flash:free"
     }
   }
 }
