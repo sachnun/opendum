@@ -2,7 +2,6 @@
   "providers": [
     "antigravity",
     "copilot",
-    "gemini_cli",
     "ollama_cloud"
   ],
   "aliases": [
@@ -51,16 +50,6 @@
         "enterprise"
       ],
       "reasoning_effort": false
-    },
-    "gemini_cli": {
-      "thinking_format": "level",
-      "thinking_levels": {
-        "high": "high",
-        "low": "low",
-        "medium": "medium",
-        "none": "minimal",
-        "xhigh": "high"
-      }
     }
   }
 }
