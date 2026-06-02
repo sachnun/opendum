@@ -464,15 +464,26 @@ func codexWindowGroup(name string, record map[string]any, tier string, apiNames 
 	if name == "secondary" {
 		display = "Weekly usage"
 	} else if windowMinutes > 0 {
-		display = fmt.Sprintf("%.0fm usage", windowMinutes)
-		if windowMinutes == 300 {
-			display = "5 hour usage"
-		}
+		display = codexWindowDisplayName(windowMinutes)
 	}
-	if strings.Contains(strings.ToLower(tier), "free") && (name == "secondary" || windowMinutes == 10080) {
-		display = "Weekly usage (free)"
+	if strings.Contains(strings.ToLower(tier), "free") && (name == "secondary" || windowMinutes >= 1440) {
+		display = display + " (free)"
 	}
 	return quotaGroupDisplay{Name: name, DisplayName: display, Models: []string{}, RemainingFraction: remainingPercent / 100, RemainingRequests: math.Round(remainingPercent), MaxRequests: 100, UsedRequests: 100 - math.Round(remainingPercent), PercentUsed: int(math.Round(used)), IsExhausted: used >= 100, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISOFromMillis(resetTimestamp), ResetInHuman: formatTimeUntilReset(resetTimestamp)}, true
+}
+
+func codexWindowDisplayName(windowMinutes float64) string {
+	roundedMinutes := int(math.Round(windowMinutes))
+	if roundedMinutes == 300 {
+		return "5 hour usage"
+	}
+	if roundedMinutes > 0 && roundedMinutes%1440 == 0 {
+		return fmt.Sprintf("%dd usage", roundedMinutes/1440)
+	}
+	if roundedMinutes > 0 && roundedMinutes%60 == 0 {
+		return fmt.Sprintf("%d hour usage", roundedMinutes/60)
+	}
+	return fmt.Sprintf("%.0fm usage", windowMinutes)
 }
 
 func resetISOFromMillis(ms int64) *string {

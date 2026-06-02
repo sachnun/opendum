@@ -65,6 +65,29 @@ func TestQuotaRequestAcceptsForceRefresh(t *testing.T) {
 	}
 }
 
+func TestCodexWindowGroupFormatsFreeDayWindows(t *testing.T) {
+	tests := []struct {
+		name          string
+		windowMinutes float64
+		want          string
+	}{
+		{name: "weekly", windowMinutes: 10080, want: "7d usage (free)"},
+		{name: "monthly", windowMinutes: 43200, want: "30d usage (free)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			group, ok := codexWindowGroup("primary", map[string]any{"used_percent": 25, "window_minutes": tt.windowMinutes}, "free", true)
+			if !ok {
+				t.Fatal("codexWindowGroup returned no group")
+			}
+			if group.DisplayName != tt.want {
+				t.Fatalf("DisplayName = %q, want %q", group.DisplayName, tt.want)
+			}
+		})
+	}
+}
+
 func TestGeminiQuotaGroupsHideProForFreeTier(t *testing.T) {
 	payload := map[string]any{
 		"buckets": []any{
