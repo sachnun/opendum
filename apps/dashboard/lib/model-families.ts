@@ -1,3 +1,26 @@
+const FAMILY_BENCHMARK_SCORES: Record<string, number> = {
+  Anthropic: 96,
+  OpenAI: 95,
+  Google: 91,
+  DeepSeek: 87,
+  Kimi: 84,
+  Qwen: 82,
+  Meta: 80,
+  Mistral: 79,
+  xAI: 78,
+  "Z.AI": 75,
+  MiniMax: 73,
+  Xiaomi: 71,
+  StepFun: 70,
+};
+
+function compareModelFamilies(a: string, b: string): number {
+  const aScore = FAMILY_BENCHMARK_SCORES[a] ?? 0;
+  const bScore = FAMILY_BENCHMARK_SCORES[b] ?? 0;
+  if (aScore !== bScore) return bScore - aScore;
+  return a.localeCompare(b);
+}
+
 const FEATURED_MODEL_FAMILIES = [
   "OpenAI",
   "Anthropic",
@@ -11,6 +34,7 @@ const FEATURED_MODEL_FAMILIES = [
   "Xiaomi",
   "xAI",
   "Z.AI",
+  "StepFun",
 ] as const;
 
 export type FeaturedModelFamily = (typeof FEATURED_MODEL_FAMILIES)[number];
@@ -29,6 +53,7 @@ const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   Xiaomi: "xiaomi-models",
   xAI: "xai-models",
   "Z.AI": "zai-models",
+  StepFun: "stepfun-models",
 };
 
 const FEATURED_SET: ReadonlySet<string> = new Set<string>(FEATURED_MODEL_FAMILIES);
@@ -41,13 +66,15 @@ export function categorizeModelFamily(family: string | undefined): ModelFamily {
   return "Others";
 }
 
+const SORTED_FEATURED_FAMILIES: readonly FeaturedModelFamily[] = [...FEATURED_MODEL_FAMILIES].sort(compareModelFamilies);
+
 export const MODEL_FAMILY_SORT_ORDER: readonly ModelFamily[] = [
-  ...FEATURED_MODEL_FAMILIES,
+  ...SORTED_FEATURED_FAMILIES,
   "Others",
 ];
 
 export const MODEL_FAMILY_NAV_ITEMS: Array<{ name: ModelFamily; anchorId: string }> = [
-  ...FEATURED_MODEL_FAMILIES.map((family) => ({
+  ...SORTED_FEATURED_FAMILIES.map((family) => ({
     name: family,
     anchorId: MODEL_FAMILY_ANCHOR_IDS[family],
   })),

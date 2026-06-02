@@ -212,6 +212,7 @@ function getFamilyAnchorId(family: string) {
   if (family === "Xiaomi") return "xiaomi-models";
   if (family === "xAI") return "xai-models";
   if (family === "Z.AI") return "zai-models";
+  if (family === "StepFun") return "stepfun-models";
   return "other-models";
 }
 

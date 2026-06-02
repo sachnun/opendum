@@ -2,6 +2,7 @@
   "providers": [
     "kilo_code"
   ],
+  "family": "StepFun",
   "providerConfig": {
     "kilo_code": {
       "upstream": "stepfun/step-3.7-flash:free",
