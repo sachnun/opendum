@@ -2,7 +2,14 @@
   "providers": [
     "antigravity",
     "copilot",
+<<<<<<< HEAD
     "ollama_cloud"
+||||||| parent of 1eb60b2 (chore: remove groq and ollama_cloud providers)
+    "gemini_cli",
+    "ollama_cloud"
+=======
+    "gemini_cli"
+>>>>>>> 1eb60b2 (chore: remove groq and ollama_cloud providers)
   ],
   "aliases": [
     "gemini-3-flash",

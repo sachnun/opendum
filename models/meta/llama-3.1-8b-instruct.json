@@ -1,6 +1,5 @@
 {
   "providers": [
-    "groq",
     "nvidia_nim",
     "workers_ai"
   ],
@@ -19,9 +18,6 @@
     }
   },
   "providerConfig": {
-    "groq": {
-      "upstream": "llama-3.1-8b-instant"
-    },
     "nvidia_nim": {
       "upstream": "meta/llama-3.1-8b-instruct"
     },

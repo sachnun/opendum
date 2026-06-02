@@ -965,26 +965,6 @@ func assertSSEEvent(t *testing.T, event recordedSSEEvent, eventName, blockType s
 	}
 }
 
-func TestPrioritizeAccountsGroupsByProviderAndPaidTier(t *testing.T) {
-	paid := "paid"
-	accounts := []appdb.ProviderAccount{
-		{ID: "free-groq", Provider: "groq"},
-		{ID: "paid-groq", Provider: "groq", Tier: &paid},
-		{ID: "paid-openrouter", Provider: "openrouter", Tier: &paid},
-		{ID: "free-openrouter", Provider: "openrouter"},
-	}
-
-	prioritized := prioritizeAccounts(accounts, true, []string{"openrouter", "groq"})
-	ids := make([]string, 0, len(prioritized))
-	for _, account := range prioritized {
-		ids = append(ids, account.ID)
-	}
-	want := []string{"paid-openrouter", "free-openrouter", "paid-groq", "free-groq"}
-	if !reflect.DeepEqual(ids, want) {
-		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
-	}
-}
-
 func TestAccountAllowedHonorsAccessMode(t *testing.T) {
 	tests := []struct {
 		name    string

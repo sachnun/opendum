@@ -27,7 +27,6 @@ var internalRelayAllowedHosts = map[string]struct{}{
 	"api.cloudflare.com":    {},
 	"api.github.com":        {},
 	"api.githubcopilot.com": {},
-	"api.groq.com":          {},
 	"api.kilo.ai":           {},
 	"auth.openai.com":       {},
 	"autopush-cloudcode-pa.sandbox.googleapis.com": {},

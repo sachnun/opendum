@@ -1,7 +1,5 @@
 {
   "providers": [
-    "groq",
-    "ollama_cloud",
     "openrouter",
     "workers_ai",
     "nvidia_nim"
@@ -24,14 +22,8 @@
     }
   },
   "providerConfig": {
-    "groq": {
-      "upstream": "openai/gpt-oss-20b"
-    },
     "nvidia_nim": {
       "upstream": "openai/gpt-oss-20b"
-    },
-    "ollama_cloud": {
-      "upstream": "gpt-oss:20b"
     },
     "openrouter": {
       "upstream": "openai/gpt-oss-20b:free"

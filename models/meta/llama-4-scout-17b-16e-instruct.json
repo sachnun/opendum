@@ -1,7 +1,6 @@
 {
   "id": "llama-4-scout",
   "providers": [
-    "groq",
     "workers_ai"
   ],
   "aliases": [
@@ -24,9 +23,6 @@
     }
   },
   "providerConfig": {
-    "groq": {
-      "upstream": "meta-llama/llama-4-scout-17b-16e-instruct"
-    },
     "workers_ai": {
       "upstream": "@cf/meta/llama-4-scout-17b-16e-instruct"
     }

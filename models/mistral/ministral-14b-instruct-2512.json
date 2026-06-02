@@ -1,8 +1,7 @@
 {
   "id": "ministral-3-14b",
   "providers": [
-    "nvidia_nim",
-    "ollama_cloud"
+    "nvidia_nim"
   ],
   "family": "Mistral",
   "meta": {
@@ -21,9 +20,6 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/ministral-14b-instruct-2512"
-    },
-    "ollama_cloud": {
-      "upstream": "ministral-3:14b"
     }
   }
 }

@@ -3,10 +3,8 @@ export type ProviderAccountKey =
   | "codex"
   | "copilot"
   | "gemini_cli"
-  | "groq"
   | "kiro"
   | "nvidia_nim"
-  | "ollama_cloud"
   | "openrouter"
   | "qwen_code"
   | "workers_ai";
@@ -80,27 +78,11 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     showTier: false,
   },
   {
-    key: "ollama_cloud",
-    slug: "ollama-cloud",
-    label: "Ollama Cloud",
-    category: "api_key",
-    emptyMessage: "No Ollama Cloud connections yet.",
-    showTier: false,
-  },
-  {
     key: "openrouter",
     slug: "openrouter",
     label: "OpenRouter",
     category: "api_key",
     emptyMessage: "No OpenRouter connections yet.",
-    showTier: false,
-  },
-  {
-    key: "groq",
-    slug: "groq",
-    label: "Groq",
-    category: "api_key",
-    emptyMessage: "No Groq accounts connected yet.",
     showTier: false,
   },
   {

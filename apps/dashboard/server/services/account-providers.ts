@@ -6,9 +6,7 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "kiro",
   "qwen_code",
   "nvidia_nim",
-  "ollama_cloud",
   "openrouter",
-  "groq",
   "workers_ai",
 ] as const;
 

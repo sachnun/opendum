@@ -62,9 +62,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
-  ollama_cloud: { name: "Ollama Cloud", description: "Access Ollama Cloud via OpenAI-compatible API", methods: [apiKeyMethod], apiKeyPortalUrl: "https://ollama.com/settings/keys", apiKeyPlaceholder: "ollama_..." },
   openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
-  groq: { name: "Groq", description: "Access ultra-fast LLM inference via Groq API", methods: [apiKeyMethod], apiKeyPortalUrl: "https://console.groq.com/keys", apiKeyPlaceholder: "gsk_..." },
   workers_ai: { name: "Workers AI", description: "Access open-source models on Cloudflare's global network", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
 };
 
@@ -83,7 +81,7 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "ollama_cloud", "openrouter", "nvidia_nim", "groq", "workers_ai"];
+const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "openrouter", "nvidia_nim", "workers_ai"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));

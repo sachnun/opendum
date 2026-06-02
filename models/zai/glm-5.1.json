@@ -1,6 +1,5 @@
 {
   "providers": [
-    "ollama_cloud",
     "nvidia_nim"
   ],
   "family": "Z.AI",

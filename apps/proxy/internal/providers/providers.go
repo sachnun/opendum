@@ -61,9 +61,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 	return &Registry{providers: map[string]Provider{
 		"opencode":     opencodeProvider{registry: registry},
 		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
-		"groq":         openAICompatibleProvider{name: "groq", baseURL: "https://api.groq.com/openai/v1", supportedParams: supportedGroq, registry: registry},
 		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
-		"ollama_cloud": openAICompatibleProvider{name: "ollama_cloud", baseURL: "https://ollama.com/v1", supportedParams: supportedOllama, registry: registry},
 		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
 		"workers_ai":   workersAIProvider{registry: registry},
 		"qwen_code":    qwenCodeProvider{registry: registry},
@@ -134,15 +132,7 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	}
 
 	payload := p.buildPayload(body, modelName, stream)
-	if p.name == "ollama_cloud" {
-		if messages, ok := payload["messages"].([]any); ok {
-			payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
-		}
-	}
 	resp, err := p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model)
-	if p.name == "groq" && err == nil && !stream && resp != nil && resp.StatusCode == http.StatusBadRequest {
-		return p.recoverGroqToolUseFailed(resp, modelName)
-	}
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
@@ -177,9 +167,6 @@ func (p openAICompatibleProvider) buildPayload(body map[string]any, modelName st
 	}
 	payload["model"] = modelName
 	payload["stream"] = stream
-	if p.name == "groq" {
-		filterGroqPayload(payload, modelName)
-	}
 	return payload
 }
 
@@ -518,9 +505,9 @@ func set(values ...string) map[string]struct{} {
 }
 
 var supportedOpenRouter = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
-var supportedGroq = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "n")
+
 var supportedNvidia = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
-var supportedOllama = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
+
 var supportedKilo = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedOpencode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedWorkersAI = set("model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "function_call", "functions", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "chat_template_kwargs", "modalities", "metadata", "prediction", "logit_bias", "logprobs", "top_logprobs", "store", "service_tier", "user", "web_search_options", "n")

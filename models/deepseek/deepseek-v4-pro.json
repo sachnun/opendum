@@ -1,7 +1,6 @@
 {
   "providers": [
-    "nvidia_nim",
-    "ollama_cloud"
+    "nvidia_nim"
   ],
   "family": "DeepSeek",
   "providerConfig": {

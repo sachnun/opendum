@@ -1,6 +1,5 @@
 {
   "providers": [
-    "ollama_cloud",
     "workers_ai"
   ],
   "family": "Kimi",

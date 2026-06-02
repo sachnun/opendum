@@ -1,7 +1,6 @@
 {
   "providers": [
-    "kiro",
-    "ollama_cloud"
+    "kiro"
   ],
   "family": "DeepSeek",
   "meta": {
