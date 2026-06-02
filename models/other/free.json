@@ -2,7 +2,7 @@
   "providers": [
     "kilo_code"
   ],
-  "family": "OpenRouter",
+  "family": "Openrouter",
   "ignored": true,
   "providerConfig": {
     "kilo_code": {

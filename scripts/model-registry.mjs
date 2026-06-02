@@ -139,7 +139,7 @@ const FAMILY_RULES = [
   { test: /^glm-?/, folder: "zai", family: "Z.AI" },
   { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, folder: "mistral", family: "Mistral" },
   { test: /^nemotron-|^nim-?/, folder: "nvidia", family: "NVIDIA" },
-  { test: /^openrouter-?/, folder: "openrouter", family: "OpenRouter" },
+  { test: /^openrouter-?/, folder: "openrouter", family: "Openrouter" },
   { test: /^mimo-?/, folder: "other", family: "Xiaomi" },
 ];
 

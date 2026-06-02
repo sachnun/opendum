@@ -46,7 +46,7 @@ func (s *Service) fetchOpenRouterData(ctx context.Context, account appdb.Provide
 		return nil, err
 	}
 	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return nil, fmt.Errorf("OpenRouter%s request failed: HTTP %d %s", path, result.Response.StatusCode, string(result.Raw))
+		return nil, fmt.Errorf("Openrouter%s request failed: HTTP %d %s", path, result.Response.StatusCode, string(result.Raw))
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(result.Raw, &payload); err != nil {
@@ -54,7 +54,7 @@ func (s *Service) fetchOpenRouterData(ctx context.Context, account appdb.Provide
 	}
 	data := parseQuotaRecord(payload["data"])
 	if data == nil {
-		return nil, fmt.Errorf("OpenRouter%s response did not include a data object", path)
+		return nil, fmt.Errorf("Openrouter%s response did not include a data object", path)
 	}
 	s.putQuotaJSONCache(ctx, result)
 	return data, nil
@@ -89,7 +89,7 @@ func openRouterGroups(keyData, creditsData map[string]any) []quotaGroupDisplay {
 	if value, ok := keyData["is_free_tier"].(bool); ok && value {
 		label = "free tier"
 	}
-	return []quotaGroupDisplay{{Name: "key-status", DisplayName: "OpenRouter key", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
+	return []quotaGroupDisplay{{Name: "key-status", DisplayName: "Openrouter key", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
 }
 
 func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {

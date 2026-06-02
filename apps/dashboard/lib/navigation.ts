@@ -50,7 +50,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "Gemini CLI", href: getProviderAccountPath("gemini_cli") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
-      { name: "OpenRouter", href: getProviderAccountPath("openrouter") },
+      { name: "Openrouter", href: getProviderAccountPath("openrouter") },
       { name: "Workers AI", href: getProviderAccountPath("workers_ai") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],

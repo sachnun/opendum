@@ -121,7 +121,7 @@ async function fetchOpenRouterFreeModelIds() {
 
       const payload = await response.json();
       if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected OpenRouter /v1/models payload format");
+        throw new Error("Unexpected Openrouter /v1/models payload format");
       }
 
       const ids = payload.data
@@ -141,7 +141,7 @@ async function fetchOpenRouterFreeModelIds() {
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("Failed to fetch OpenRouter free model list");
+    : new Error("Failed to fetch Openrouter free model list");
 }
 
 async function main() {
@@ -154,9 +154,9 @@ async function main() {
   const result = syncProviderModels(modelsDir, "openrouter", modelMap);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
-    console.log(`OpenRouter free models are already up to date (${modelMap.size} models).`);
+    console.log(`Openrouter free models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`OpenRouter: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
+    console.log(`Openrouter: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
   }
 }
 
