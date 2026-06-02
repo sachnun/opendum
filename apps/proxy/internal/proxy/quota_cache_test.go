@@ -71,8 +71,8 @@ func TestCodexWindowGroupFormatsFreeDayWindows(t *testing.T) {
 		windowMinutes float64
 		want          string
 	}{
-		{name: "weekly", windowMinutes: 10080, want: "7d usage (free)"},
-		{name: "monthly", windowMinutes: 43200, want: "30d usage (free)"},
+		{name: "weekly", windowMinutes: 10080, want: "7d usage"},
+		{name: "monthly", windowMinutes: 43200, want: "30d usage"},
 	}
 
 	for _, tt := range tests {

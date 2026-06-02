@@ -466,9 +466,7 @@ func codexWindowGroup(name string, record map[string]any, tier string, apiNames 
 	} else if windowMinutes > 0 {
 		display = codexWindowDisplayName(windowMinutes)
 	}
-	if strings.Contains(strings.ToLower(tier), "free") && (name == "secondary" || windowMinutes >= 1440) {
-		display = display + " (free)"
-	}
+
 	return quotaGroupDisplay{Name: name, DisplayName: display, Models: []string{}, RemainingFraction: remainingPercent / 100, RemainingRequests: math.Round(remainingPercent), MaxRequests: 100, UsedRequests: 100 - math.Round(remainingPercent), PercentUsed: int(math.Round(used)), IsExhausted: used >= 100, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISOFromMillis(resetTimestamp), ResetInHuman: formatTimeUntilReset(resetTimestamp)}, true
 }
 
