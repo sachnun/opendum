@@ -22,7 +22,8 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "./model-registry.mjs";
+import { buildModelIndex, syncProviderModels } from "./model-registry.mjs";
+import { sleep, fetchText, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -32,8 +33,6 @@ const MODEL_TABLE_URL =
   "https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-release-status.yml";
 const SUPPORTED_PLANS_TABLE_URL =
   "https://raw.githubusercontent.com/github/docs/main/data/tables/copilot/model-supported-plans.yml";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 const PROVIDER_NAME = "copilot";
 const COPILOT_TIER_NAMES = {
   free: "free",
@@ -77,60 +76,15 @@ const DISPLAY_NAME_OVERRIDES = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-// ---------------------------------------------------------------------------
 // Fetch GitHub docs YAML tables
 // ---------------------------------------------------------------------------
 
-/**
- * Fetch the supported-models table YAML from the GitHub docs repo.
- * @returns {Promise<string>} Raw YAML content.
- */
-async function fetchText(url, label) {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(url, {
-        headers: { Accept: "text/plain" },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch ${label}: ${response.status} ${response.statusText}`
-        );
-      }
-
-      return await response.text();
-    } catch (error) {
-      lastError = error;
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        console.warn(
-          `[copilot] Attempt ${attempt} failed: ${error.message}. Retrying...`
-        );
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`Failed to fetch ${label}`);
-}
-
 async function fetchModelTable() {
-  return fetchText(MODEL_TABLE_URL, "model-release-status.yml");
+  return fetchText(MODEL_TABLE_URL, { label: "model-release-status.yml" });
 }
 
 async function fetchSupportedPlansTable() {
-  return fetchText(SUPPORTED_PLANS_TABLE_URL, "model-supported-plans.yml");
+  return fetchText(SUPPORTED_PLANS_TABLE_URL, { label: "model-supported-plans.yml" });
 }
 
 // ---------------------------------------------------------------------------

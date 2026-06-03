@@ -3,54 +3,14 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
+import { sleep, fetchText, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 const OPENCODE_MODELS_URL = "https://unroxy.koyeb.app/opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
-
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    setTimeout(resolvePromise, ms);
-  });
-}
 
 function toModelKey(modelId) {
   if (modelId.endsWith("-free")) return modelId.slice(0, -"-free".length);
   return modelId;
-}
-
-async function fetchText(url, sourceName) {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(url, {
-        headers: { Accept: "text/plain" },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${sourceName} (${response.status} ${response.statusText})`);
-      }
-
-      return await response.text();
-    } catch (error) {
-      lastError = error;
-      if (attempt < MAX_FETCH_ATTEMPTS) await sleep(attempt * 1_000);
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${sourceName}`);
-}
-
-async function fetchJson(url, sourceName) {
-  const text = await fetchText(url, sourceName);
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    throw new Error(`Unexpected ${sourceName} JSON payload format`);
-  }
 }
 
 function parseMarkdownTables(markdown) {
@@ -135,8 +95,8 @@ function extractFreeModelIdsFromDocs(markdown) {
 
 async function fetchOpencodeFreeModelIds() {
   const [docsMarkdown, modelsPayload] = await Promise.all([
-    fetchText(OPENCODE_ZEN_DOCS_URL, "OpenCode Zen docs"),
-    fetchJson(OPENCODE_MODELS_URL, "OpenCode model list"),
+    fetchText(OPENCODE_ZEN_DOCS_URL, { label: "OpenCode Zen docs" }),
+    fetchJson(OPENCODE_MODELS_URL, { label: "OpenCode model list" }),
   ]);
 
   if (!modelsPayload || !Array.isArray(modelsPayload.data)) {

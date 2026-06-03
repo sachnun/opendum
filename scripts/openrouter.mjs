@@ -3,10 +3,9 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 
 const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b"]);
 
@@ -93,12 +92,6 @@ function buildModelMap(modelIds) {
   }
 
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
-}
-
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    setTimeout(resolvePromise, ms);
-  });
 }
 
 async function fetchOpenRouterFreeModelIds() {

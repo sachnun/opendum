@@ -14,15 +14,13 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson, getProviderUpstream } from "./model-registry.mjs";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 const PROVIDER_NAME = "qwen_code";
 
 // Raw URL for the Qwen Code CLI model constants (source of truth for OAuth models)
 const QWEN_CONSTANTS_URL =
   "https://raw.githubusercontent.com/QwenLM/qwen-code/main/packages/core/src/models/constants.ts";
-
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 
 // ---------------------------------------------------------------------------
 // Known mapping: Qwen OAuth model ID → canonical JSON model key
@@ -40,12 +38,6 @@ const OAUTH_MODEL_KEY_MAP = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    setTimeout(resolvePromise, ms);
-  });
-}
 
 /**
  * Fetch the raw TypeScript source of the Qwen Code model constants.

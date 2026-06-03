@@ -3,11 +3,10 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels, buildModelIndex, writeModelJson } from "./model-registry.mjs";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 
 // Codex's public models feed includes CLI/API variants that are not accepted by
 // the ChatGPT-backed Codex account flow used by this project. Keep the synced
@@ -23,12 +22,6 @@ const CHATGPT_COMPATIBLE_CODEX_MODELS = new Set([
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    setTimeout(resolvePromise, ms);
-  });
-}
 
 /**
  * Fetch the public models.json from the openai/codex GitHub repo.

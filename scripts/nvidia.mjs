@@ -3,6 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, getProviderUpstream } from "./model-registry.mjs";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 const PROVIDER_NAME = "nvidia_nim";
 const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
@@ -11,8 +12,6 @@ const NVIDIA_MODEL_DOCS_URLS = [
   "https://docs.api.nvidia.com/nim/reference/multimodal-apis",
   "https://docs.api.nvidia.com/nim/reference/visual-models-apis",
 ];
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 
 const MODEL_KEY_OVERRIDES = {
   "baichuan-inc/baichuan2-13b-chat": "baichuan2-13b-chat",
@@ -35,12 +34,6 @@ const EXCLUDED_MODEL_KEY_TOKENS = [
 ];
 
 const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b", "mistral-large"]);
-
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    setTimeout(resolvePromise, ms);
-  });
-}
 
 function toModelKey(modelId) {
   const normalizedModelId = modelId.replace(/^library\//, "");

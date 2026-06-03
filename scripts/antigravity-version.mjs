@@ -10,13 +10,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sleep, fetchText, MAX_FETCH_ATTEMPTS } from "./lib/shared.mjs";
 
 const VERSION_SOURCES = [
   "https://releasebot.io/updates/google/antigravity",
   "https://antigravity.google/changelog",
 ];
 const FETCH_TIMEOUT_MS = 15_000;
-const MAX_FETCH_ATTEMPTS = 3;
 
 const PROXY_PROVIDER_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -31,43 +31,6 @@ const PROXY_USER_AGENT_REGEX =
   /((?:userAgent:\s*)"antigravity\/)(\d+\.\d+\.\d+)(\s+"\s*\+\s*platform)/;
 const DASHBOARD_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
-
-function sleep(ms) {
-  return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
-}
-
-async function fetchWithRetry(url, label = "resource") {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(url, {
-        headers: {
-          Accept: "text/html",
-          "User-Agent": "opendum-version-check/1.0",
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch ${label} (${response.status} ${response.statusText})`
-        );
-      }
-
-      return await response.text();
-    } catch (error) {
-      lastError = error;
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`Failed to fetch ${label}`);
-}
 
 function parseLatestVersion(html) {
   const versionRegex = /\b(\d+\.\d+\.\d+)\b/g;
@@ -131,7 +94,7 @@ async function main() {
   let latestVersion;
   for (const source of VERSION_SOURCES) {
     try {
-      const html = await fetchWithRetry(source, source);
+      const html = await fetchText(source, { label: source, timeout: FETCH_TIMEOUT_MS, headers: { Accept: "text/html", "User-Agent": "opendum-version-check/1.0" } });
       latestVersion = parseLatestVersion(html);
       if (latestVersion) {
         console.log(`Antigravity: latest version from ${source} is ${latestVersion}`);

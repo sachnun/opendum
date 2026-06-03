@@ -19,14 +19,13 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 const PROVIDER_NAME = "kiro";
 
 // Display names to skip (not real models)
@@ -52,10 +51,6 @@ const MODEL_KEY_OVERRIDES = {};
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /**
  * Strip HTML tags and decode common HTML entities.

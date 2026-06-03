@@ -20,6 +20,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -27,8 +28,6 @@ import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-reg
 
 const ANTIGRAVITY_MODELS_URL =
   "https://antigravity.google/assets/docs/antigravity-2-0/models.md";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 const PROVIDER_NAME = "antigravity";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -119,50 +118,6 @@ const MANAGED_PROVIDER_CONFIG_KEYS = [
   "thinking_model",
   "top_p_min_095",
 ];
-
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
-
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    setTimeout(resolvePromise, ms);
-  });
-}
-
-async function fetchText(url, label, headers = {}) {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(url, {
-        headers: { Accept: "text/plain", ...headers },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch ${label}: ${response.status} ${response.statusText}`
-        );
-      }
-
-      return await response.text();
-    } catch (error) {
-      lastError = error;
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(
-          `[antigravity] Attempt ${attempt} failed: ${message}. Retrying...`
-        );
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`Failed to fetch ${label}`);
-}
 
 // ---------------------------------------------------------------------------
 // Antigravity docs parsing
@@ -693,7 +648,7 @@ async function main() {
   console.log("[antigravity] Fetching official Antigravity model docs ...");
   let markdown;
   try {
-    markdown = await fetchText(ANTIGRAVITY_MODELS_URL, "Antigravity model docs");
+    markdown = await fetchText(ANTIGRAVITY_MODELS_URL, { label: "Antigravity model docs" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("404")) {

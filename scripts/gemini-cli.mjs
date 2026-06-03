@@ -12,6 +12,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 const PROVIDER_NAME = "gemini_cli";
 
@@ -22,9 +23,6 @@ const GEMINI_CLI_MODELS_URL =
 // Public Gemini API for metadata enrichment (no auth required for listing)
 const GEMINI_API_MODELS_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
-
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_ATTEMPTS = 3;
 
 // Models to exclude – internal routing variants, not user-facing
 const EXCLUDED_PATTERNS = [
@@ -54,12 +52,6 @@ const PAID_GEMINI_CLI_TIERS = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function sleep(ms) {
-  return new Promise((resolvePromise) => {
-    setTimeout(resolvePromise, ms);
-  });
-}
 
 async function fetchWithRetry(url, headers = {}, label = "resource") {
   let lastError = null;
