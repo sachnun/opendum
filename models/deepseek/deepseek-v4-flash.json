@@ -1,8 +1,7 @@
 {
   "providers": [
     "opencode",
-    "nvidia_nim",
-    "openrouter"
+    "nvidia_nim"
   ],
   "family": "DeepSeek",
   "providerConfig": {

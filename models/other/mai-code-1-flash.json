@@ -1,0 +1,13 @@
+{
+  "providers": [
+    "copilot"
+  ],
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "pro",
+        "pro+"
+      ]
+    }
+  }
+}
