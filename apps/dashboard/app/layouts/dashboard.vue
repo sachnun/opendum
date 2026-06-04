@@ -64,7 +64,6 @@ const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-
 const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-shell-pinned-providers", () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
-  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
   {
     name: "Tools",
     href: "/dashboard/tools",
@@ -74,6 +73,7 @@ const supportNavigation = computed<NavItem[]>(() => [
       { name: "OTP", href: "/dashboard/tools/otp", disabled: true, tag: "soon" },
     ],
   },
+  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
 ]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
