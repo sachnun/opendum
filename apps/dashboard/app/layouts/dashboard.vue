@@ -24,6 +24,7 @@ const sharingEnabled = ref(false);
 const sharingUpdating = ref(false);
 const disableSharingDialogOpen = ref(false);
 const supportItemOpen = reactive<Record<string, boolean>>({ Tools: false });
+const pointMenuOpen = ref(false);
 const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
 const mobileSidebarDragX = ref(0);
@@ -63,6 +64,7 @@ const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-
 const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-shell-pinned-providers", () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
+  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
   {
     name: "Tools",
     href: "/dashboard/tools",
@@ -72,7 +74,6 @@ const supportNavigation = computed<NavItem[]>(() => [
       { name: "OTP", href: "/dashboard/tools/otp", disabled: true, tag: "soon" },
     ],
   },
-  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
 ]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
@@ -1045,10 +1046,16 @@ async function handleAuditSelected() {
                   </div>
                   <div class="-mx-1 my-2 h-px bg-border" />
                   <div class="space-y-1">
-                    <div class="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-left text-sm font-medium text-foreground">
-                      <span>Point</span>
-                    </div>
-                    <div class="ml-3 space-y-1 border-l border-border/60 pl-3">
+                    <button
+                      type="button"
+                      :aria-expanded="pointMenuOpen"
+                      class="group flex w-full cursor-pointer items-center gap-3 rounded-sm px-2 py-1.5 text-left text-sm font-medium text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      @click="pointMenuOpen = !pointMenuOpen"
+                    >
+                      <span class="min-w-0 flex-1">Point</span>
+                      <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', pointMenuOpen ? 'rotate-0' : '-rotate-90']" />
+                    </button>
+                    <div v-if="pointMenuOpen" class="ml-3 space-y-1 border-l border-border/60 pl-3">
                       <div
                         class="flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50"
                         aria-disabled="true"
