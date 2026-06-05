@@ -31,6 +31,9 @@ const PROVIDER_NAME = "kiro";
 // Display names to skip (not real models)
 const IGNORED_DISPLAY_NAMES = new Set(["Auto"]);
 
+// Tiers that can access premium (paid-only) models on Kiro.
+const PAID_KIRO_TIERS = ["pro", "pro+", "power", "standalone"];
+
 // Display name → Kiro API model ID overrides (non-standard mappings)
 const MODEL_ID_OVERRIDES = {
   "Claude Sonnet 4.0": "claude-sonnet-4",
@@ -170,6 +173,10 @@ function parseModelsFromHtml(html) {
   );
   const ctxIdx = header.findIndex((h) => h.includes("context"));
   const regionIdx = header.findIndex((h) => h.includes("region"));
+  const freeIdx = header.findIndex((h) => h === "free");
+  const proIdx = header.findIndex((h) => h === "pro");
+  const proPlusIdx = header.findIndex((h) => h === "pro+" || h === "pro plus" || (h.startsWith("pro") && h.includes("+")));
+  const powerIdx = header.findIndex((h) => h === "power");
 
   if (nameIdx < 0) {
     throw new Error("Could not find 'Model' column in comparison table.");
@@ -181,10 +188,22 @@ function parseModelsFromHtml(html) {
     const name = row[nameIdx]?.trim();
     if (!name) continue;
 
+    const freeCell = freeIdx >= 0 ? (row[freeIdx]?.trim() || "") : "";
+    const proCell = proIdx >= 0 ? (row[proIdx]?.trim() || "") : "";
+    const proPlusCell = proPlusIdx >= 0 ? (row[proPlusIdx]?.trim() || "") : "";
+    const powerCell = powerIdx >= 0 ? (row[powerIdx]?.trim() || "") : "";
+
+    // A model is free-available if the Free column has content (e.g. ✓)
+    const freeAvailable = freeCell.length > 0;
+    // If any paid column has content, the model is available on that tier
+    const paidAvailable = proCell.length > 0 || proPlusCell.length > 0 || powerCell.length > 0;
+
     models.push({
       name,
       contextWindow: ctxIdx >= 0 ? (row[ctxIdx]?.trim() || "") : "",
       region: regionIdx >= 0 ? (row[regionIdx]?.trim() || "") : "",
+      freeAvailable,
+      paidAvailable,
     });
   }
 
@@ -327,7 +346,23 @@ async function main() {
     `[kiro] Found ${officialModels.length} models on docs page: ${officialModels.map((m) => m.name).join(", ")}`
   );
 
-  // 2. Convert display names to Kiro API model IDs
+  // 2. Determine which models are paid-only (not available on free tier)
+  const paidOnlyDisplayNames = new Set(
+    officialModels
+      .filter((m) => !IGNORED_DISPLAY_NAMES.has(m.name) && !m.freeAvailable && m.paidAvailable)
+      .map((m) => m.name)
+  );
+
+  if (verbose || dryRun) {
+    const freeModels = officialModels.filter((m) => !IGNORED_DISPLAY_NAMES.has(m.name) && m.freeAvailable);
+    const paidModels = officialModels.filter((m) => paidOnlyDisplayNames.has(m.name));
+    console.log(`\n[kiro] Tier breakdown:`);
+    console.log(`  Free models (${freeModels.length}): ${freeModels.map((m) => m.name).join(", ")}`);
+    console.log(`  Paid-only models (${paidModels.length}): ${paidModels.map((m) => m.name).join(", ")}`);
+    console.log();
+  }
+
+  // 3. Convert display names to Kiro API model IDs
   const allKiroIds = [];
   for (const model of officialModels) {
     if (IGNORED_DISPLAY_NAMES.has(model.name)) {
@@ -351,7 +386,7 @@ async function main() {
 
   console.log(`[kiro] Generated ${allKiroIds.length} Kiro API model IDs.`);
 
-  // 3. Build model map: canonical key → Kiro upstream name
+  // 4. Build model map: canonical key → Kiro upstream name
   const modelMap = new Map();
   for (const kiroId of allKiroIds) {
     const { key, upstream } = toCanonical(kiroId);
@@ -370,16 +405,43 @@ async function main() {
     console.log();
   }
 
+  // 5. Build per-model provider config with tier restrictions for paid-only models
+  const providerConfigByModel = new Map();
+  for (const model of officialModels) {
+    if (IGNORED_DISPLAY_NAMES.has(model.name)) continue;
+    if (!paidOnlyDisplayNames.has(model.name)) continue;
+
+    const baseId = displayNameToKiroId(model.name);
+    const variants = expandVariants(baseId);
+    for (const kiroId of variants) {
+      const { key } = toCanonical(kiroId);
+      providerConfigByModel.set(key, { allowedTiers: PAID_KIRO_TIERS });
+    }
+  }
+
+  if (verbose || dryRun) {
+    console.log("\n[kiro] Provider config by model (allowedTiers):");
+    for (const [key, config] of [...providerConfigByModel.entries()].sort(([a], [b]) =>
+      a.localeCompare(b)
+    )) {
+      console.log(`  ${key}: allowedTiers = [${config.allowedTiers.join(", ")}]`);
+    }
+    console.log();
+  }
+
   if (dryRun) {
     console.log("[kiro] Dry run - no JSON files modified.");
     return;
   }
 
-  // 4. Sync into JSON files
+  // 6. Sync into JSON files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
+    providerConfigByModel,
+    managedProviderConfigKeys: ["allowedTiers"],
+  });
 
   if (
     result.added.length === 0 &&

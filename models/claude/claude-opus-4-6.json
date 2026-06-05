@@ -48,7 +48,13 @@
       "reasoning_effort": false
     },
     "kiro": {
-      "upstream": "claude-opus-4.6"
+      "upstream": "claude-opus-4.6",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }

@@ -6,8 +6,8 @@
     "claude-sonnet-4.6-1m",
     "claude-sonnet-4-6-1m"
   ],
-  "ignored": true,
   "family": "Anthropic",
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
@@ -25,7 +25,13 @@
   },
   "providerConfig": {
     "kiro": {
-      "upstream": "claude-sonnet-4.6-1m"
+      "upstream": "claude-sonnet-4.6-1m",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }

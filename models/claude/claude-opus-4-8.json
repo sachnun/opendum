@@ -14,7 +14,13 @@
       ]
     },
     "kiro": {
-      "upstream": "claude-opus-4.8"
+      "upstream": "claude-opus-4.8",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }

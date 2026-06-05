@@ -35,7 +35,13 @@
       "reasoning_effort": false
     },
     "kiro": {
-      "upstream": "claude-haiku-4.5"
+      "upstream": "claude-haiku-4.5",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }

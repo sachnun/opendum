@@ -6,8 +6,8 @@
     "claude-opus-4.6-1m",
     "claude-opus-4-6-1m"
   ],
-  "ignored": true,
   "family": "Anthropic",
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
@@ -25,7 +25,13 @@
   },
   "providerConfig": {
     "kiro": {
-      "upstream": "claude-opus-4.6-1m"
+      "upstream": "claude-opus-4.6-1m",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }

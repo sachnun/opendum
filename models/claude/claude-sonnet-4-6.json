@@ -49,7 +49,13 @@
       "reasoning_effort": false
     },
     "kiro": {
-      "upstream": "claude-sonnet-4.6"
+      "upstream": "claude-sonnet-4.6",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }
