@@ -6,6 +6,7 @@ export type ProviderAccountKey =
   | "kiro"
   | "nvidia_nim"
   | "openrouter"
+  | "qoder"
   | "qwen_code"
   | "workers_ai";
 
@@ -91,6 +92,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "Workers AI",
     category: "api_key",
     emptyMessage: "No Workers AI accounts connected yet.",
+    showTier: false,
+  },
+  {
+    key: "qoder",
+    slug: "qoder",
+    label: "Qoder",
+    category: "api_key",
+    emptyMessage: "No Qoder connections yet.",
     showTier: false,
   },
 ];

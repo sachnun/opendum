@@ -16,7 +16,7 @@ const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter"]);
+const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "qoder"]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional() });
 type ApiKeyProvider = z.infer<typeof apiKeyProviderSchema>;
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
@@ -24,6 +24,7 @@ type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 const API_KEY_PROVIDER_SETTINGS = {
   nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   openrouter: { label: "Openrouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
+  qoder: { label: "Qoder", baseUrl: "https://openapi.qoder.sh/api/v1", modelMap: getProviderModelMap("qoder"), validationPath: "/models", requireSuccessfulStatus: true },
 } satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
 
 function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {

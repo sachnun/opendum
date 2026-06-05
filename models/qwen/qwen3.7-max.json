@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "qoder"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  }
+}
