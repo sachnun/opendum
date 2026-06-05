@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
-const KILO_CODE_MODELS_URL = "https://unroxy.koyeb.app/api.kilo.ai/api/gateway/models";
+const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 
 const MODEL_KEY_OVERRIDES = new Map([
   ["x-ai/grok-code-fast-1:optimized:free", "grok-code-fast-1"],

@@ -20,7 +20,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchText, sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
