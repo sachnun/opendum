@@ -3,7 +3,6 @@
   "providers": [
     "kilo_code",
     "nvidia_nim",
-    "opencode",
     "openrouter",
     "workers_ai"
   ],
@@ -28,9 +27,6 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b"
-    },
-    "opencode": {
-      "upstream": "nemotron-3-super-free"
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free"

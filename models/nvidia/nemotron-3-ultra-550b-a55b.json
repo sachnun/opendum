@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter",
+    "nvidia_nim"
+  ],
+  "family": "NVIDIA",
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "authless": true
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free"
+    }
+  }
+}

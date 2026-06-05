@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "copilot"
-  ],
+  "providers": [],
   "family": "OpenAI",
   "meta": {
     "reasoning": false,
@@ -14,16 +12,6 @@
       ],
       "output": [
         "text"
-      ]
-    }
-  },
-  "providerConfig": {
-    "copilot": {
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
       ]
     }
   }

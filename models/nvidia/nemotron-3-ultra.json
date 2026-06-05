@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "family": "NVIDIA",
+  "providerConfig": {
+    "opencode": {
+      "upstream": "nemotron-3-ultra-free"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "family": "NVIDIA",
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3.5-content-safety:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3.5-content-safety:free"
+    }
+  }
+}
