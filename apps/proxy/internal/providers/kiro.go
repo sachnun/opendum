@@ -78,7 +78,79 @@ func (p kiroProvider) RefreshCredentials(ctx context.Context, client *http.Clien
 	if token.ExpiresIn <= 0 {
 		token.ExpiresIn = 3600
 	}
-	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)}, nil
+	tier := fetchKiroSubscriptionTier(ctx, client, token.AccessToken)
+	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), Tier: tier}, nil
+}
+
+func fetchKiroSubscriptionTier(ctx context.Context, client *http.Client, accessToken string) string {
+	body := map[string]any{"origin": "AI_EDITOR"}
+	encoded, _ := json.Marshal(body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://q.us-east-1.amazonaws.com/", bytes.NewReader(encoded))
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+	req.Header.Set("Content-Type", "application/x-amz-json-1.0")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("x-amz-target", "AmazonCodeWhispererService.GetUsageLimits")
+	req.Header.Set("User-Agent", "KiroIDE-0.7.45")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ""
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return ""
+	}
+	record, _ := payload["data"].(map[string]any)
+	if record == nil {
+		record = payload
+	}
+	sub, _ := record["subscriptionInfo"].(map[string]any)
+	if sub == nil {
+		return ""
+	}
+	rawType, _ := sub["type"].(string)
+	rawTitle, _ := sub["subscriptionTitle"].(string)
+	return normalizeKiroTier(rawType, rawTitle)
+}
+
+func normalizeKiroTier(rawType, subscriptionTitle string) string {
+	switch strings.ToUpper(strings.TrimSpace(rawType)) {
+	case "Q_DEVELOPER_STANDALONE_FREE":
+		return "free"
+	case "Q_DEVELOPER_STANDALONE_POWER":
+		return "power"
+	case "Q_DEVELOPER_STANDALONE_PRO":
+		return "pro"
+	case "Q_DEVELOPER_STANDALONE_PRO_PLUS":
+		return "pro-plus"
+	case "Q_DEVELOPER_STANDALONE":
+		return "standalone"
+	}
+	title := strings.ToLower(strings.TrimSpace(subscriptionTitle))
+	if title == "" {
+		return ""
+	}
+	if strings.Contains(title, "pro+") || strings.Contains(title, "pro plus") {
+		return "pro-plus"
+	}
+	if strings.Contains(title, "power") {
+		return "power"
+	}
+	if strings.Contains(title, "pro") {
+		return "pro"
+	}
+	if strings.Contains(title, "free") {
+		return "free"
+	}
+	return strings.Join(strings.Fields(strings.NewReplacer("_", " ", "-", " ").Replace(title)), "-")
 }
 
 func (p kiroProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {

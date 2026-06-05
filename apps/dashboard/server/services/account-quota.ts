@@ -28,7 +28,6 @@ interface QuotaGroupDisplay {
 }
 
 interface AccountQuotaInfo {
-  tier: string;
   status: "success" | "error" | "expired";
   error?: string;
   groups: QuotaGroupDisplay[];
@@ -64,7 +63,6 @@ function isAccountQuotaInfo(value: unknown): value is AccountQuotaInfo {
   const record = asRecord(value);
   return Boolean(
     record &&
-    typeof record.tier === "string" &&
     (record.status === "success" || record.status === "error" || record.status === "expired") &&
     Array.isArray(record.groups) &&
     record.groups.every(isQuotaGroup)
@@ -73,7 +71,6 @@ function isAccountQuotaInfo(value: unknown): value is AccountQuotaInfo {
 
 function toPublicQuotaInfo(quota: AccountQuotaInfo): AccountQuotaInfo {
   return {
-    tier: quota.tier,
     status: quota.status,
     ...(quota.error ? { error: quota.error } : {}),
     groups: quota.groups.map((group) => ({

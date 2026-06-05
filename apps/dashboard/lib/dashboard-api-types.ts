@@ -165,7 +165,6 @@ export interface QuotaGroupDisplay {
 }
 
 export interface AccountQuotaInfo {
-  tier: string;
   status: "success" | "error" | "expired";
   error?: string;
   groups: QuotaGroupDisplay[];

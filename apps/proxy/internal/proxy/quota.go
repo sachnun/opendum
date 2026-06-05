@@ -67,7 +67,6 @@ type quotaGroupDisplay struct {
 }
 
 type accountQuotaInfo struct {
-	Tier   string              `json:"tier"`
 	Status string              `json:"status"`
 	Error  string              `json:"error,omitempty"`
 	Groups []quotaGroupDisplay `json:"groups"`
@@ -164,7 +163,7 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 	}
 	credentials, requestAccount, err := s.credentialsForAccount(ctx, account, providerImpl)
 	if err != nil {
-		return expiredQuotaInfo(account, quotaFallbackTier(account), "Token expired - please re-authenticate"), nil
+		return expiredQuotaInfo(account, "Token expired - please re-authenticate"), nil
 	}
 
 	switch account.Provider {
@@ -190,16 +189,16 @@ func quotaFallbackTier(account appdb.ProviderAccount) string {
 	return "free"
 }
 
-func baseQuotaInfo(_ appdb.ProviderAccount, tier, status string, groups []quotaGroupDisplay, _ int64, message string) accountQuotaInfo {
-	return accountQuotaInfo{Tier: tier, Status: status, Error: message, Groups: groups}
+func baseQuotaInfo(_ appdb.ProviderAccount, status string, groups []quotaGroupDisplay, _ int64, message string) accountQuotaInfo {
+	return accountQuotaInfo{Status: status, Error: message, Groups: groups}
 }
 
-func expiredQuotaInfo(account appdb.ProviderAccount, tier, message string) accountQuotaInfo {
-	return baseQuotaInfo(account, tier, "expired", []quotaGroupDisplay{}, time.Now().UnixMilli(), message)
+func expiredQuotaInfo(account appdb.ProviderAccount, message string) accountQuotaInfo {
+	return baseQuotaInfo(account, "expired", []quotaGroupDisplay{}, time.Now().UnixMilli(), message)
 }
 
-func errorQuotaInfo(account appdb.ProviderAccount, tier, message string, fetchedAt int64) accountQuotaInfo {
-	return baseQuotaInfo(account, tier, "error", []quotaGroupDisplay{}, fetchedAt, message)
+func errorQuotaInfo(account appdb.ProviderAccount, message string, fetchedAt int64) accountQuotaInfo {
+	return baseQuotaInfo(account, "error", []quotaGroupDisplay{}, fetchedAt, message)
 }
 
 func writeQuotaJSON(w http.ResponseWriter, status int, value any) {

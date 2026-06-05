@@ -536,11 +536,7 @@ const statAnimationContextKey = computed(() => {
   return `${props.account.id}:${userKey}:${auditRefreshVersion.value}`;
 });
 const usageStats = computed(() => statMetrics.value.map((stat) => ({ ...stat, hit: props.animateDeltas === false ? undefined : statHitEffects.value[stat.key] })));
-const effectiveTier = computed(() => {
-  const quotaTier = props.quotaInfo?.tier?.trim();
-  if (["codex", "kiro"].includes(props.account.provider) && quotaTier && quotaTier.toLowerCase() !== "unknown") return quotaTier;
-  return props.account.tier;
-});
+const effectiveTier = computed(() => props.account.tier);
 const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() || "");
 const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value, props.account.provider));
 const showTierBadge = computed(() => props.showTier && tierBadgeLabel.value !== "");

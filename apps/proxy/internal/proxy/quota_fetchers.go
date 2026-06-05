@@ -26,18 +26,14 @@ var antigravityQuotaMaxRequests = map[string]map[string]float64{
 func (s *Service) fetchOpenRouterQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) accountQuotaInfo {
 	apiKey, err := cryptojs.Decrypt(s.secret, account.AccessToken)
 	if err != nil {
-		return expiredQuotaInfo(account, "unknown", "API key is missing or invalid. Please reconnect this account.")
+		return expiredQuotaInfo(account, "API key is missing or invalid. Please reconnect this account.")
 	}
 	keyData, keyErr := s.fetchOpenRouterData(ctx, account, apiKey, "/key", forceRefresh)
 	creditsData, creditsErr := s.fetchOpenRouterData(ctx, account, apiKey, "/credits", forceRefresh)
 	if keyErr != nil && creditsErr != nil {
-		return errorQuotaInfo(account, "unknown", keyErr.Error(), time.Now().UnixMilli())
+		return errorQuotaInfo(account, keyErr.Error(), time.Now().UnixMilli())
 	}
-	tier := "paid"
-	if value, ok := keyData["is_free_tier"].(bool); ok && value {
-		tier = "free"
-	}
-	return baseQuotaInfo(account, tier, "success", openRouterGroups(keyData, creditsData), time.Now().UnixMilli(), "")
+	return baseQuotaInfo(account, "success", openRouterGroups(keyData, creditsData), time.Now().UnixMilli(), "")
 }
 
 func (s *Service) fetchOpenRouterData(ctx context.Context, account appdb.ProviderAccount, apiKey, path string, forceRefresh bool) (map[string]any, error) {
@@ -99,7 +95,7 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 		projectID = strings.TrimSpace(*account.ProjectID)
 	}
 	if projectID == "" {
-		return errorQuotaInfo(account, tier, "Antigravity account is missing projectId. Re-authenticate this account.", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Antigravity account is missing projectId. Re-authenticate this account.", time.Now().UnixMilli())
 	}
 	endpoints := []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}
 	var lastErr string
@@ -119,9 +115,9 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 			continue
 		}
 		s.putQuotaJSONCache(ctx, result)
-		return baseQuotaInfo(account, tier, "success", antigravityGroups(payload, tier), time.Now().UnixMilli(), "")
+		return baseQuotaInfo(account, "success", antigravityGroups(payload, tier), time.Now().UnixMilli(), "")
 	}
-	return errorQuotaInfo(account, tier, "Failed to fetch Antigravity quota data: "+lastErr, time.Now().UnixMilli())
+	return errorQuotaInfo(account, "Failed to fetch Antigravity quota data: "+lastErr, time.Now().UnixMilli())
 }
 
 func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay {
@@ -218,24 +214,20 @@ func parseResetISO(value any) *string {
 }
 
 func (s *Service) fetchCopilotQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
-	tier := strings.TrimSpace(quotaFallbackTier(account))
 	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "copilot:user", http.MethodGet, "https://api.github.com/copilot_internal/user", map[string]string{"Authorization": "Bearer " + accessToken, "Accept": "application/json", "User-Agent": "GitHubCopilotChat/0.26.7", "Editor-Version": "vscode/1.96.2", "Editor-Plugin-Version": "copilot-chat/0.26.7"}, nil)
 	if err != nil {
-		return errorQuotaInfo(account, tier, err.Error(), time.Now().UnixMilli())
+		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
 	}
 	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return errorQuotaInfo(account, tier, fmt.Sprintf("Copilot internal quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
+		return errorQuotaInfo(account, fmt.Sprintf("Copilot internal quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(result.Raw, &payload); err != nil {
-		return errorQuotaInfo(account, tier, "Copilot quota response was not valid JSON", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Copilot quota response was not valid JSON", time.Now().UnixMilli())
 	}
 	plan := strings.ToLower(strings.ReplaceAll(parseQuotaString(payload["copilot_plan"]), "_", "-"))
 	if detected := normalizeCopilotTier(payload); detected != "" {
-		tier = detected
 		plan = detected
-	} else if plan != "" {
-		tier = plan
 	}
 	entitlement, remaining := copilotEntitlement(payload, plan)
 	used := math.Max(0, entitlement-remaining)
@@ -247,7 +239,7 @@ func (s *Service) fetchCopilotQuota(ctx context.Context, account appdb.ProviderA
 	label := fmt.Sprintf("%s/%s used", formatFloat(used), formatFloat(entitlement))
 	group := quotaGroupDisplay{Name: "premium_requests", DisplayName: "Premium requests", Models: []string{}, RemainingFraction: fraction, RemainingRequests: displayNumber(remaining), MaxRequests: displayNumber(entitlement), UsedRequests: displayNumber(used), PercentUsed: int(math.Round(clampFraction(used/entitlement) * 100)), IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "medium", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO), RemainingLabel: &label}
 	s.putQuotaJSONCache(ctx, result)
-	return baseQuotaInfo(account, tier, "success", []quotaGroupDisplay{group}, time.Now().UnixMilli(), "")
+	return baseQuotaInfo(account, "success", []quotaGroupDisplay{group}, time.Now().UnixMilli(), "")
 }
 
 func copilotEntitlement(payload map[string]any, plan string) (float64, float64) {
@@ -356,14 +348,14 @@ func (s *Service) fetchCodexQuota(ctx context.Context, account appdb.ProviderAcc
 	}
 	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "codex:usage", http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", headers, nil)
 	if err != nil {
-		return errorQuotaInfo(account, fallbackTier, err.Error(), time.Now().UnixMilli())
+		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
 	}
 	headerData := parseCodexQuotaHeaderGroups(result.Response.Header, fallbackTier)
 	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
 		if len(headerData) > 0 {
-			return baseQuotaInfo(account, fallbackTier, "success", headerData, time.Now().UnixMilli(), "")
+			return baseQuotaInfo(account, "success", headerData, time.Now().UnixMilli(), "")
 		}
-		return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Codex quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
+		return errorQuotaInfo(account, fmt.Sprintf("Codex quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
 	_ = json.Unmarshal(result.Raw, &payload)
@@ -374,13 +366,13 @@ func (s *Service) fetchCodexQuota(ctx context.Context, account appdb.ProviderAcc
 	apiGroups := parseCodexAPIGroups(payload, tier)
 	if len(apiGroups) > 0 {
 		s.putQuotaJSONCache(ctx, result)
-		return baseQuotaInfo(account, tier, "success", apiGroups, time.Now().UnixMilli(), "")
+		return baseQuotaInfo(account, "success", apiGroups, time.Now().UnixMilli(), "")
 	}
 	if len(headerData) > 0 {
 		s.putQuotaJSONCache(ctx, result)
-		return baseQuotaInfo(account, tier, "success", headerData, time.Now().UnixMilli(), "")
+		return baseQuotaInfo(account, "success", headerData, time.Now().UnixMilli(), "")
 	}
-	return errorQuotaInfo(account, tier, "Codex quota payload did not include usable quota data", time.Now().UnixMilli())
+	return errorQuotaInfo(account, "Codex quota payload did not include usable quota data", time.Now().UnixMilli())
 }
 
 func accountIDForQuotaCodex(account appdb.ProviderAccount, accessToken string) string {
@@ -512,7 +504,7 @@ func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.Provide
 		}
 	}
 	if projectID == "" {
-		return errorQuotaInfo(account, tier, "Gemini CLI account is missing projectId. Re-authenticate this account.", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Gemini CLI account is missing projectId. Re-authenticate this account.", time.Now().UnixMilli())
 	}
 	for _, endpoint := range []string{"https://daily-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"} {
 		result, err := s.getQuotaJSON(ctx, account, forceRefresh, "gemini_cli:retrieveUserQuota", http.MethodPost, endpoint+"/v1internal:retrieveUserQuota", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GeminiCLI/0.34.0 (win32; x64)"}, map[string]any{"project": projectID})
@@ -526,10 +518,10 @@ func (s *Service) fetchGeminiCLIQuota(ctx context.Context, account appdb.Provide
 		groups := geminiQuotaGroups(payload, tier)
 		if len(groups) > 0 {
 			s.putQuotaJSONCache(ctx, result)
-			return baseQuotaInfo(account, tier, "success", groups, time.Now().UnixMilli(), "")
+			return baseQuotaInfo(account, "success", groups, time.Now().UnixMilli(), "")
 		}
 	}
-	return errorQuotaInfo(account, tier, "Failed to fetch Gemini CLI quota data", time.Now().UnixMilli())
+	return errorQuotaInfo(account, "Failed to fetch Gemini CLI quota data", time.Now().UnixMilli())
 }
 
 type geminiCLIInfo struct{ projectID, tier string }
@@ -641,7 +633,6 @@ func normalizeGeminiModelID(model string) string {
 }
 
 func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
-	fallbackTier := quotaFallbackTier(account)
 	values := url.Values{}
 	values.Set("origin", "AI_EDITOR")
 	if account.AccountID != nil && strings.TrimSpace(*account.AccountID) != "" {
@@ -654,14 +645,14 @@ func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAcco
 	}
 	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "kiro:GetUsageLimits", http.MethodPost, target, map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/x-amz-json-1.0", "Accept": "application/json", "User-Agent": "KiroIDE-0.7.45", "x-amz-user-agent": "KiroIDE-0.7.45", "x-amz-target": "AmazonCodeWhispererService.GetUsageLimits", "x-amzn-codewhisperer-optout": "true", "x-amzn-kiro-agent-mode": "vibe", "amz-sdk-request": "attempt=1; max=3"}, body)
 	if err != nil {
-		return errorQuotaInfo(account, fallbackTier, err.Error(), time.Now().UnixMilli())
+		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
 	}
 	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return errorQuotaInfo(account, fallbackTier, fmt.Sprintf("Kiro usage limits quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
+		return errorQuotaInfo(account, fmt.Sprintf("Kiro usage limits quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(result.Raw, &payload); err != nil {
-		return errorQuotaInfo(account, fallbackTier, "Kiro usage limits response was not valid JSON", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Kiro usage limits response was not valid JSON", time.Now().UnixMilli())
 	}
 	record := parseQuotaRecord(payload["data"])
 	if record == nil {
@@ -669,14 +660,14 @@ func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAcco
 	}
 	tier := kiroTier(record)
 	if tier == "" {
-		tier = fallbackTier
+		tier = quotaFallbackTier(account)
 	}
 	groups := kiroGroups(record)
 	if len(groups) == 0 {
-		return errorQuotaInfo(account, tier, "Kiro usage limits are unavailable for this account", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Kiro usage limits are unavailable for this account", time.Now().UnixMilli())
 	}
 	s.putQuotaJSONCache(ctx, result)
-	return baseQuotaInfo(account, tier, "success", groups, time.Now().UnixMilli(), "")
+	return baseQuotaInfo(account, "success", groups, time.Now().UnixMilli(), "")
 }
 
 func kiroTier(record map[string]any) string {
