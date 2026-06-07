@@ -151,7 +151,7 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	return enabled, nil
 }
 
-func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, accountAccess auth.AccountAccess, sessionID string) (*appdb.ProviderAccount, bool, error) {
+func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, accountAccess auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
 	eligible, err := s.getEligibleAccounts(ctx, userID, model, provider, exclude, excludeProviders, accountAccess)
 	if err != nil {
 		return nil, false, err
@@ -160,13 +160,10 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 		return nil, false, nil
 	}
 	prioritized := prioritizeAccounts(eligible, provider == nil, s.registry.ProvidersForModel(model))
-	if affinityID := getAffinityAccountID(ctx, s.redis, userID, sessionID); affinityID != "" {
-		prioritized = boostAffinityAccount(prioritized, affinityID)
-	}
 	return s.pickHealthyAccount(ctx, prioritized, model)
 }
 
-func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, sessionID string) (*appdb.ProviderAccount, bool, error) {
+func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string) (*appdb.ProviderAccount, bool, error) {
 	targetProviders := []string{}
 	if provider != nil {
 		targetProviders = []string{*provider}
@@ -225,9 +222,6 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 		return nil, true, nil
 	}
 	prioritized := prioritizeAccounts(enabled, provider == nil, targetProviders)
-	if affinityID := getAffinityAccountID(ctx, s.redis, userID, sessionID); affinityID != "" {
-		prioritized = boostAffinityAccount(prioritized, affinityID)
-	}
 	return s.pickHealthyAccount(ctx, prioritized, model)
 }
 

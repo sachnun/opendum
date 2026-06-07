@@ -12,8 +12,8 @@ import (
 )
 
 type accountRotationRunner interface {
-	getNextAvailableAccount(context.Context, string, string, *string, []string, []string, auth.AccountAccess, string) (*appdb.ProviderAccount, bool, error)
-	getNextSharedAccount(context.Context, string, string, *string, []string, []string, string) (*appdb.ProviderAccount, bool, error)
+	getNextAvailableAccount(context.Context, string, string, *string, []string, []string, auth.AccountAccess) (*appdb.ProviderAccount, bool, error)
+	getNextSharedAccount(context.Context, string, string, *string, []string, []string) (*appdb.ProviderAccount, bool, error)
 	reserveRoamingPoint(context.Context, string) (*pointReservation, bool, error)
 	refundRoamingPoint(context.Context, *pointReservation)
 	bumpAccountRequestCount(context.Context, string, time.Time)
@@ -38,12 +38,7 @@ type accountAttempt struct {
 }
 
 func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *pointReservation, *routeError) {
-	account, resp, reqStart, upstreamMS, failures, roaming, routeErr := executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
-	sid := sessionID(r)
-	if routeErr == nil && account != nil && sid != "" {
-		setAffinityAccountID(ctx, s.redis, authResult.UserID, sid, account.ID)
-	}
-	return account, resp, reqStart, upstreamMS, failures, roaming, routeErr
+	return executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 }
 
 func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *pointReservation, *routeError) {
@@ -55,12 +50,11 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 	var lastFailure *routeError
 	var delayedFinalFailure *delayedAccountFailure
 	accountConfigured := false
-	sid := sessionID(r)
 
 	for {
 		attempt := accountAttempt{account: forced}
 		if attempt.account == nil {
-			selected, configured, err := nextAttemptAccount(runner, ctx, authResult, validation, tried, sharedTried, excludedProviders, useShared, sid)
+			selected, configured, err := nextAttemptAccount(runner, ctx, authResult, validation, tried, sharedTried, excludedProviders, useShared)
 			if err != nil {
 				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
@@ -185,11 +179,11 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 	}
 }
 
-func nextAttemptAccount(runner accountRotationRunner, ctx context.Context, authResult auth.Result, validation auth.ModelValidationResult, tried, sharedTried, excludedProviders []string, useShared bool, sessionID string) (*appdb.ProviderAccount, bool, error) {
+func nextAttemptAccount(runner accountRotationRunner, ctx context.Context, authResult auth.Result, validation auth.ModelValidationResult, tried, sharedTried, excludedProviders []string, useShared bool) (*appdb.ProviderAccount, bool, error) {
 	if useShared {
-		return runner.getNextSharedAccount(ctx, authResult.UserID, validation.Model, validation.Provider, sharedTried, excludedProviders, sessionID)
+		return runner.getNextSharedAccount(ctx, authResult.UserID, validation.Model, validation.Provider, sharedTried, excludedProviders)
 	}
-	return runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, excludedProviders, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList}, sessionID)
+	return runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, excludedProviders, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
 }
 
 func appendIfMissing(values []string, value string) []string {

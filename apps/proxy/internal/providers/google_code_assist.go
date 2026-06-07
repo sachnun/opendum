@@ -179,12 +179,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	if messages, ok := body["messages"].([]any); ok && (p.name != "antigravity" || strings.Contains(modelName, "claude")) {
 		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
 	}
-	sessionID := ""
-	if clientSession := stringValue(body["_sessionId"]); clientSession != "" {
-		sessionID = clientSession
-	} else {
-		sessionID = stableSessionID(body)
-	}
+	sessionID := randomUUID()
 	geminiPayload := openAIToGemini(body)
 	if p.name == "antigravity" {
 		p.transformAntigravityPayload(ctx, geminiPayload, modelName, sessionID)
@@ -336,7 +331,6 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 			injectGeminiToolInstruction(payload)
 		}
 	}
-	sortFunctionDeclarations(payload)
 	p.applyAntigravitySystemInstruction(payload, model)
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
 	payload["sessionId"] = sessionID
@@ -645,26 +639,6 @@ func ensureToolConfig(payload map[string]any) {
 		toolConfig["functionCallingConfig"] = calling
 	}
 	calling["mode"] = "VALIDATED"
-}
-
-// sortFunctionDeclarations sorts function declarations within each tool block
-// by name. This ensures a deterministic prefix for Gemini's implicit context
-// caching regardless of the order the client sends tools.
-func sortFunctionDeclarations(payload map[string]any) {
-	tools, _ := payload["tools"].([]any)
-	for _, rawTool := range tools {
-		tool, _ := rawTool.(map[string]any)
-		decls, _ := tool["functionDeclarations"].([]any)
-		if len(decls) <= 1 {
-			continue
-		}
-		sort.SliceStable(decls, func(i, j int) bool {
-			a, _ := decls[i].(map[string]any)
-			b, _ := decls[j].(map[string]any)
-			return stringValue(a["name"]) < stringValue(b["name"])
-		})
-		tool["functionDeclarations"] = decls
-	}
 }
 
 func normalizeClaudeTools(payload map[string]any) {
