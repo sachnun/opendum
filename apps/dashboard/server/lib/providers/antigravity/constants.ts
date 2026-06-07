@@ -19,7 +19,7 @@ const CLIENT_METADATA =
   '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
 const AUTH_USER_AGENT = "google-api-nodejs-client/10.3.0";
 const AUTH_API_CLIENT = "gl-node/22.18.0";
-const USER_AGENT = `antigravity/1.23.2 linux/amd64`;
+const USER_AGENT = `antigravity/1.653.24 linux/amd64`;
 
 // Endpoint fallbacks for account discovery and quota.
 const CODE_ASSIST_ENDPOINT_DAILY =
