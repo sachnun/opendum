@@ -483,7 +483,7 @@ func TestAntigravityGenerationHeadersIncludeCodeAssistMetadata(t *testing.T) {
 	if req.Header.Get("Accept") != "text/event-stream" {
 		t.Fatalf("Accept = %q", req.Header.Get("Accept"))
 	}
-	if !strings.HasPrefix(req.Header.Get("User-Agent"), "antigravity/1.23.2 ") {
+	if !strings.HasPrefix(req.Header.Get("User-Agent"), antigravityUserAgent) {
 		t.Fatalf("User-Agent = %q", req.Header.Get("User-Agent"))
 	}
 	if req.Header.Get("X-Goog-Api-Client") != "google-cloud-sdk vscode_cloudshelleditor/0.1" {
@@ -503,7 +503,7 @@ func TestAntigravityDiscoveryUsesAntigravityProfile(t *testing.T) {
 
 	provider.setGoogleHeaders(req, "token", false)
 
-	if !strings.HasPrefix(req.Header.Get("User-Agent"), "antigravity/1.23.2 ") {
+	if !strings.HasPrefix(req.Header.Get("User-Agent"), antigravityUserAgent) {
 		t.Fatalf("User-Agent = %q", req.Header.Get("User-Agent"))
 	}
 	if req.Header.Get("X-Goog-Api-Client") != "google-cloud-sdk vscode_cloudshelleditor/0.1" {
@@ -525,7 +525,7 @@ func TestAntigravityFetchAccountInfoUsesStandardDiscoveryMetadata(t *testing.T) 
 			if req.URL.Path != "/v1internal:loadCodeAssist" {
 				t.Fatalf("load path = %q", req.URL.Path)
 			}
-			if !strings.HasPrefix(req.Header.Get("User-Agent"), "antigravity/1.23.2 ") {
+			if !strings.HasPrefix(req.Header.Get("User-Agent"), antigravityUserAgent) {
 				t.Fatalf("discovery User-Agent = %q", req.Header.Get("User-Agent"))
 			}
 			if err := json.NewDecoder(req.Body).Decode(&loadPayload); err != nil {
