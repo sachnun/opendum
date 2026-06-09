@@ -19,7 +19,7 @@
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {
-    "edgeone": "^1.5.2",
+    "edgeone": "^1.5.9",
     "typescript": "^6.0.3"
   },
   "overrides": {
