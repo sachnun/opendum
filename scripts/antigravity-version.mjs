@@ -28,7 +28,7 @@ const DASHBOARD_CONSTANTS_PATH = resolve(
 );
 
 const PROXY_USER_AGENT_REGEX =
-  /((?:userAgent:\s*)"antigravity\/)(\d+\.\d+\.\d+)(\s+"\s*\+\s*platform)/;
+  /((?:const\s+antigravityUserAgent\s*=\s*"antigravity\/))(\d+\.\d+\.\d+)(\s+")/;
 const DASHBOARD_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
@@ -86,7 +86,8 @@ function updateVersion(newVersion) {
 async function main() {
   const currentVersion = getCurrentVersion();
   if (!currentVersion) {
-    throw new Error("Could not find Antigravity User-Agent version in Go proxy provider");
+    console.warn("Antigravity: could not find User-Agent version in Go proxy provider, skipping.");
+    return;
   }
 
   console.log(`Antigravity: current proxy User-Agent version is ${currentVersion}`);
