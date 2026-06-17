@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "providerConfig": {
+    "opencode": {
+      "upstream": "north-mini-code-free"
+    }
+  }
+}

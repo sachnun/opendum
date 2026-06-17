@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nex-agi/nex-n2-pro:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "nex-agi/nex-n2-pro:free"
+    }
+  }
+}

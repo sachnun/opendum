@@ -1,8 +1,6 @@
 {
   "id": "qwen3-coder-480b",
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "qwen/qwen3-coder-480b-a35b-instruct"
   ],
@@ -18,11 +16,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "qwen/qwen3-coder-480b-a35b-instruct"
     }
   }
 }

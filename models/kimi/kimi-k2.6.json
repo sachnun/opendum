@@ -1,7 +1,6 @@
 {
   "providers": [
-    "workers_ai",
-    "openrouter"
+    "workers_ai"
   ],
   "family": "Kimi",
   "meta": {
@@ -19,9 +18,6 @@
     }
   },
   "providerConfig": {
-    "openrouter": {
-      "upstream": "moonshotai/kimi-k2.6:free"
-    },
     "workers_ai": {
       "upstream": "@cf/moonshotai/kimi-k2.6"
     }

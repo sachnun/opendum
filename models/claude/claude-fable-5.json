@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "copilot"
+  ],
+  "family": "Claude",
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    }
+  }
+}

@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "openrouter"
-  ],
+  "providers": [],
   "family": "Z.AI",
   "meta": {
     "reasoning": true,
@@ -14,11 +12,6 @@
       "output": [
         "text"
       ]
-    }
-  },
-  "providerConfig": {
-    "openrouter": {
-      "upstream": "z-ai/glm-4.5-air:free"
     }
   }
 }

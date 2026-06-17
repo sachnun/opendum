@@ -1,20 +1,24 @@
 {
   "providers": [
-    "codex"
+    "workers_ai"
   ],
-  "family": "OpenAI",
+  "family": "Z.AI",
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
+    "vision": false,
     "modalities": {
       "input": [
-        "text",
-        "image"
+        "text"
       ],
       "output": [
         "text"
       ]
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-5.2"
     }
   }
 }

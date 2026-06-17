@@ -1,8 +1,8 @@
 {
   "providers": [
-    "codex"
+    "workers_ai"
   ],
-  "family": "OpenAI",
+  "family": "Kimi",
   "meta": {
     "reasoning": true,
     "toolCall": true,
@@ -15,6 +15,11 @@
       "output": [
         "text"
       ]
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/moonshotai/kimi-k2.7-code"
     }
   }
 }
