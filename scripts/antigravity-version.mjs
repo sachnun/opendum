@@ -95,7 +95,7 @@ async function main() {
   let latestVersion;
   for (const source of VERSION_SOURCES) {
     try {
-      const html = await fetchText(source, { label: source, timeout: FETCH_TIMEOUT_MS, headers: { Accept: "text/html", "User-Agent": "opendum-version-check/1.0" } });
+      const html = await fetchText(source, { label: source, timeout: FETCH_TIMEOUT_MS, headers: { Accept: "text/html" } });
       latestVersion = parseLatestVersion(html);
       if (latestVersion) {
         console.log(`Antigravity: latest version from ${source} is ${latestVersion}`);

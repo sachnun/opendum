@@ -21,7 +21,7 @@ import {
 import { sleep, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 
 const PROVIDER_NAME = "workers_ai";
-const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
+const WORKERS_AI_MODELS_API_URL = "https://unroxy.koyeb.app/api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
 const FETCH_CONCURRENCY = 8;
 
 const MODEL_KEY_OVERRIDES = {
@@ -249,7 +249,7 @@ function applyMetadata(modelsDir, metadata) {
 }
 
 async function fetchWorkersAIModelFiles() {
-  const files = await fetchJson(WORKERS_AI_MODELS_API_URL, { headers: { "User-Agent": "opendum-model-refresh" } });
+  const files = await fetchJson(WORKERS_AI_MODELS_API_URL);
   if (!Array.isArray(files)) {
     throw new Error("Unexpected Cloudflare Workers AI model file list payload");
   }
@@ -264,7 +264,7 @@ async function fetchWorkersAIModels() {
 
   return mapWithConcurrency(files, FETCH_CONCURRENCY, async (file) => ({
     slug: file.name.replace(/\.json$/, ""),
-    model: await fetchJson(file.download_url, { headers: { "User-Agent": "opendum-model-refresh" } }),
+    model: await fetchJson(file.download_url),
   }));
 }
 

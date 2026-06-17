@@ -91,7 +91,6 @@ async function fetchOfficialModels() {
       const response = await fetch(KIRO_DOCS_URL, {
         headers: {
           Accept: "text/html",
-          "User-Agent": "OpendumKiroSync/1.0",
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
