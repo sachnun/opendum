@@ -2,20 +2,12 @@
   "providers": [
     "workers_ai"
   ],
-  "ignored": true,
   "family": "IBM",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,
-    "vision": false,
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": false
   },
   "providerConfig": {
     "workers_ai": {

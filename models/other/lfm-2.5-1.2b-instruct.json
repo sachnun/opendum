@@ -7,15 +7,7 @@
   "meta": {
     "reasoning": false,
     "toolCall": false,
-    "vision": false,
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": false
   },
   "providerConfig": {
     "openrouter": {

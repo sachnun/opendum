@@ -9,10 +9,6 @@ export interface ModelMeta {
   reasoning?: boolean;
   toolCall?: boolean;
   vision?: boolean;
-  modalities?: {
-    input: string[];
-    output: string[];
-  };
 }
 
 export interface ModelInfo {

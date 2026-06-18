@@ -2,20 +2,12 @@
   "providers": [
     "openrouter"
   ],
-  "ignored": true,
   "family": "Cognitive Computations",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": false,
-    "vision": false,
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": false
   },
   "providerConfig": {
     "openrouter": {

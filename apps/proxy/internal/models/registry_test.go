@@ -16,8 +16,6 @@ func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
 		"empty-meta":            {Meta: &Meta{}},
 		"explicit-vision-false": {Meta: &Meta{Vision: &visionFalse}},
 		"explicit-vision-true":  {Meta: &Meta{Vision: &visionTrue}},
-		"image-input":           {Meta: &Meta{Modalities: &Modalities{Input: []string{"text", "image"}}}},
-		"text-input":            {Meta: &Meta{Modalities: &Modalities{Input: []string{"text"}}}},
 		"explicit-reasoning-off": {Meta: &Meta{
 			Reasoning: &reasoningFalse,
 		}},
@@ -35,8 +33,6 @@ func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
 		{name: "vision empty meta", got: registry.IsVisionModel("empty-meta"), want: true},
 		{name: "vision explicit false", got: registry.IsVisionModel("explicit-vision-false"), want: false},
 		{name: "vision explicit true", got: registry.IsVisionModel("explicit-vision-true"), want: true},
-		{name: "vision image input", got: registry.IsVisionModel("image-input"), want: true},
-		{name: "vision text input", got: registry.IsVisionModel("text-input"), want: false},
 		{name: "vision unknown", got: registry.IsVisionModel("unknown"), want: false},
 		{name: "reasoning no meta", got: registry.IsReasoningModel("no-meta"), want: true},
 		{name: "reasoning empty meta", got: registry.IsReasoningModel("empty-meta"), want: true},

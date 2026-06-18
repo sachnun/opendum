@@ -7,17 +7,7 @@
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image",
-        "pdf"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "copilot": {

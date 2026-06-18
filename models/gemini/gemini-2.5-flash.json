@@ -9,19 +9,7 @@
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image",
-        "audio",
-        "video",
-        "pdf"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "antigravity": {

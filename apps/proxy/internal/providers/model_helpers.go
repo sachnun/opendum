@@ -86,21 +86,3 @@ func normalizeAntigravityTieredModel(model string) string {
 	}
 	return model
 }
-
-func isImageGenerationModel(registry *models.Registry, model string) bool {
-	if registry != nil {
-		if info, ok := registry.ModelInfo(model); ok && info.Meta != nil && info.Meta.Modalities != nil {
-			return containsString(info.Meta.Modalities.Output, "image")
-		}
-	}
-	return false
-}
-
-func containsString(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
-}

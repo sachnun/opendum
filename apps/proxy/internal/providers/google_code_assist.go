@@ -187,7 +187,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		p.applyThinkingConfig(geminiPayload, modelName, stringValue(body["reasoning_effort"]), numberFromAny(body["thinking_budget"]))
 	}
 	toolSchemas := buildToolSchemaMap(geminiPayload["tools"])
-	if p.name == "antigravity" && !isImageGenerationModel(p.registry, modelName) && !providerConfigBool(p.registry, modelName, p.name, "strict_tool_schema") {
+	if p.name == "antigravity" && !providerConfigBool(p.registry, modelName, p.name, "strict_tool_schema") {
 		sanitizeToolSchemaKeys(toolSchemas)
 	}
 	requestPayload := p.wrapCodeAssistPayload(projectID, modelName, geminiPayload)
@@ -242,11 +242,6 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 		break
 	}
 	resp := lastResp
-	if p.name == "antigravity" && resp != nil && resp.StatusCode == http.StatusNotFound && isImageGenerationModel(p.registry, modelName) {
-		data := readLimit(resp.Body, 1<<20)
-		_ = resp.Body.Close()
-		return nil, fmt.Errorf("model %q returned 404 (NOT_FOUND) from all Code Assist endpoints. This image generation model requires a paid Google account (Google AI Pro/Ultra or Gemini Code Assist subscription). Free-tier accounts do not have access to image generation models. Original error: %s", modelName, data)
-	}
 	if lastErr != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, lastErr
 	}
@@ -314,22 +309,14 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	}
 	p.normalizeCachedContent(payload)
 	delete(payload, "model")
-	if isImageGenerationModel(p.registry, model) {
-		delete(payload, "tools")
-		delete(payload, "toolConfig")
-		if generation, ok := payload["generationConfig"].(map[string]any); ok {
-			delete(generation, "thinkingConfig")
-		}
+	ensureToolConfig(payload)
+	p.normalizeThinkingConfig(payload, model)
+	if providerConfigBool(p.registry, model, p.name, "strict_tool_schema") {
+		normalizeClaudeTools(payload)
 	} else {
-		ensureToolConfig(payload)
-		p.normalizeThinkingConfig(payload, model)
-		if providerConfigBool(p.registry, model, p.name, "strict_tool_schema") {
-			normalizeClaudeTools(payload)
-		} else {
-			sanitizeGeminiToolNames(payload)
-			augmentToolDescriptions(payload)
-			injectGeminiToolInstruction(payload)
-		}
+		sanitizeGeminiToolNames(payload)
+		augmentToolDescriptions(payload)
+		injectGeminiToolInstruction(payload)
 	}
 	p.applyAntigravitySystemInstruction(payload, model)
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
@@ -523,11 +510,6 @@ func (p googleCodeAssistProvider) normalizeBodyForModel(body map[string]any, mod
 	if providerConfigBool(p.registry, model, p.name, "top_p_min_095") {
 		if topP, ok := numberAsFloat(out["top_p"]); ok && topP < 0.95 {
 			delete(out, "top_p")
-		}
-	}
-	if isImageGenerationModel(p.registry, model) {
-		for _, key := range []string{"reasoning", "reasoning_effort", "thinking_budget", "include_thoughts", "presence_penalty", "frequency_penalty", "tools", "tool_choice", "_includeReasoning"} {
-			delete(out, key)
 		}
 	}
 	return out
@@ -1381,9 +1363,6 @@ func codeAssistMetadata() map[string]any {
 }
 
 func (p googleCodeAssistProvider) applyThinkingConfig(payload map[string]any, model, effort string, budget int) {
-	if isImageGenerationModel(p.registry, model) {
-		return
-	}
 	config := map[string]any{}
 	if isGemini3ModelName(model) {
 		level := ""
@@ -1936,9 +1915,6 @@ func defaultThinkingBudget(effort string) int {
 const antigravitySystemInstruction = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**"
 
 func (p googleCodeAssistProvider) applyAntigravitySystemInstruction(payload map[string]any, model string) {
-	if isImageGenerationModel(p.registry, model) {
-		return
-	}
 	needsInjection := false
 	if p.registry != nil {
 		needsInjection = providerConfigBool(p.registry, model, p.name, "system_instruction")

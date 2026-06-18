@@ -18,7 +18,6 @@ const META_PROPERTY_ORDER = [
   "reasoning",
   "toolCall",
   "vision",
-  "modalities",
 ];
 
 const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "authless", "minTier", "allowedTiers", "aliases"];
@@ -72,7 +71,6 @@ function orderValue(value, key) {
   if (!isPlainObject(value)) return value;
 
   if (key === "meta") return orderObject(value, META_PROPERTY_ORDER);
-  if (key === "modalities") return orderObject(value, ["input", "output"]);
   if (key === "providerConfig") return orderProviderMap(value, PROVIDER_CONFIG_PROPERTY_ORDER);
   return orderObject(value);
 }

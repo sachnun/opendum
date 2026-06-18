@@ -14,15 +14,9 @@ import (
 const suggestionThreshold = 0.7
 
 type Meta struct {
-	Reasoning  *bool       `json:"reasoning"`
-	ToolCall   *bool       `json:"toolCall"`
-	Vision     *bool       `json:"vision"`
-	Modalities *Modalities `json:"modalities"`
-}
-
-type Modalities struct {
-	Input  []string `json:"input"`
-	Output []string `json:"output"`
+	Reasoning *bool `json:"reasoning"`
+	ToolCall  *bool `json:"toolCall"`
+	Vision    *bool `json:"vision"`
 }
 
 type ProviderAccessRule struct {
@@ -31,12 +25,12 @@ type ProviderAccessRule struct {
 }
 
 type ProviderModelConfig struct {
-	Upstream      string
-	MinTier       string
-	AllowedTiers  []string
-	Authless      bool
-	Aliases       []string
-	Custom        map[string]any
+	Upstream     string
+	MinTier      string
+	AllowedTiers []string
+	Authless     bool
+	Aliases      []string
+	Custom       map[string]any
 }
 
 type Info struct {
@@ -521,20 +515,7 @@ func (r *Registry) IsToolCallModel(model string) bool {
 }
 
 func (r *Registry) IsVisionModel(model string) bool {
-	info, ok := r.ModelInfo(model)
-	if !ok {
-		return false
-	}
-	if info.Meta == nil {
-		return true
-	}
-	if info.Meta.Vision != nil {
-		return *info.Meta.Vision
-	}
-	if info.Meta.Modalities == nil {
-		return true
-	}
-	return contains(info.Meta.Modalities.Input, "image")
+	return r.defaultEnabledBoolCapability(model, func(meta *Meta) *bool { return meta.Vision })
 }
 
 func (r *Registry) defaultEnabledBoolCapability(model string, getCapability func(*Meta) *bool) bool {

@@ -6,16 +6,6 @@
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": false,
-    "modalities": {
-      "input": [
-        "text",
-        "image",
-        "video"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": false
   }
 }

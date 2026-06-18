@@ -4,6 +4,11 @@
     "nvidia_nim"
   ],
   "family": "DeepSeek",
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "deepseek-ai/deepseek-v4-flash"

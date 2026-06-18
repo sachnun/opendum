@@ -6,14 +6,5 @@
   ],
   "family": "Qwen",
   "ignored": true,
-  "meta": {
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    }
-  }
+  "meta": {}
 }

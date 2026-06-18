@@ -6,15 +6,7 @@
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": false,
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": false
   },
   "providerConfig": {
     "nvidia_nim": {

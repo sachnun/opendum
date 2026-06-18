@@ -11,16 +11,7 @@
   "meta": {
     "reasoning": false,
     "toolCall": true,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "nvidia_nim": {

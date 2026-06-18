@@ -4,15 +4,6 @@
   "meta": {
     "reasoning": true,
     "toolCall": false,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   }
 }

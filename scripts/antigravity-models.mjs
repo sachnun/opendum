@@ -39,21 +39,6 @@ const QUOTA_TS_PATH = resolve(
   "apps/dashboard/server/lib/providers/antigravity/quota.ts"
 );
 
-const GEMINI_TEXT_MODALITIES = {
-  input: ["text", "image", "video", "audio", "pdf"],
-  output: ["text"],
-};
-
-const CLAUDE_MODALITIES = {
-  input: ["text", "image", "pdf"],
-  output: ["text"],
-};
-
-const TEXT_ONLY_MODALITIES = {
-  input: ["text"],
-  output: ["text"],
-};
-
 const GEMINI_LEVEL_THINKING = {
   high: "high",
   low: "low",
@@ -464,9 +449,6 @@ function inferMetadata(modelKey) {
       reasoning: !isGeminiImageModel(modelKey),
       toolCall: !isGeminiImageModel(modelKey),
       vision: true,
-      modalities: isGeminiImageModel(modelKey)
-        ? { input: ["text", "image", "pdf"], output: modelKey.includes("flash-image") ? ["text", "image"] : ["text"] }
-        : GEMINI_TEXT_MODALITIES,
     };
   }
   if (modelKey.startsWith("claude-")) {
@@ -474,7 +456,6 @@ function inferMetadata(modelKey) {
       reasoning: true,
       toolCall: true,
       vision: true,
-      modalities: CLAUDE_MODALITIES,
     };
   }
   if (modelKey.startsWith("gpt-oss-")) {
@@ -482,7 +463,6 @@ function inferMetadata(modelKey) {
       reasoning: true,
       toolCall: true,
       vision: false,
-      modalities: TEXT_ONLY_MODALITIES,
     };
   }
   return null;

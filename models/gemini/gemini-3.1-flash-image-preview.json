@@ -12,18 +12,7 @@
   "meta": {
     "reasoning": true,
     "toolCall": false,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image",
-        "pdf"
-      ],
-      "output": [
-        "text",
-        "image"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "antigravity": {

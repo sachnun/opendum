@@ -596,7 +596,7 @@ function getPanelModels(panel: PanelState): ModelOption[] {
 function hasVisionMetadata(model: ModelOption | undefined): boolean {
   if (!model?.meta) return false;
   if (typeof model.meta.vision === "boolean") return model.meta.vision;
-  return Boolean(model.meta.modalities?.input?.includes("image"));
+  return true;
 }
 
 function shouldShowVisionWarning(model: ModelOption | undefined): boolean {

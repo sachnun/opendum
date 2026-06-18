@@ -14,19 +14,7 @@
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image",
-        "video",
-        "audio",
-        "pdf"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "antigravity": {

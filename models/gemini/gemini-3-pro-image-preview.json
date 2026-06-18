@@ -10,16 +10,7 @@
   "meta": {
     "reasoning": false,
     "toolCall": false,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "antigravity": {

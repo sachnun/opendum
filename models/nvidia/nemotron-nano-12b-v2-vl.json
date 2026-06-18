@@ -3,21 +3,12 @@
     "nvidia_nim",
     "openrouter"
   ],
-  "ignored": true,
   "family": "NVIDIA",
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "nvidia_nim": {

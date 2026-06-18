@@ -1,19 +1,10 @@
 {
   "providers": [],
-  "ignored": true,
   "family": "Mistral",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   }
 }

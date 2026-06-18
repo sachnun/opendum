@@ -6,22 +6,12 @@
     "claude-sonnet-4.5-1m",
     "claude-sonnet-4-5-1m"
   ],
-  "ignored": true,
   "family": "Anthropic",
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
-    "modalities": {
-      "input": [
-        "text",
-        "image",
-        "pdf"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": true
   },
   "providerConfig": {
     "kiro": {

@@ -109,19 +109,11 @@ function deriveFamily(modelKey) {
 }
 
 function buildMeta(model) {
-  const vision = isTrue(getProperty(model, "vision"));
-
-  const meta = {
+  return {
     reasoning: isTrue(getProperty(model, "reasoning")),
     toolCall: isTrue(getProperty(model, "function_calling")),
-    vision,
-    modalities: {
-      input: vision ? ["text", "image"] : ["text"],
-      output: ["text"],
-    },
+    vision: isTrue(getProperty(model, "vision")),
   };
-
-  return meta;
 }
 
 function buildReverseMap(modelsDir) {
@@ -191,23 +183,6 @@ function mergeMissingMeta(target, source) {
 
   for (const [key, value] of Object.entries(source)) {
     if (value === undefined) continue;
-
-    if (key === "modalities") {
-      if (!target.modalities) {
-        target.modalities = value;
-        changed = true;
-      } else {
-        if (!target.modalities.input && value.input) {
-          target.modalities.input = value.input;
-          changed = true;
-        }
-        if (!target.modalities.output && value.output) {
-          target.modalities.output = value.output;
-          changed = true;
-        }
-      }
-      continue;
-    }
 
     if (target[key] === undefined) {
       target[key] = value;

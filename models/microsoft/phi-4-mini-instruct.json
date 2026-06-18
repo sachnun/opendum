@@ -2,24 +2,16 @@
   "providers": [
     "nvidia_nim"
   ],
-  "ignored": true,
   "aliases": [
     "microsoft-phi-4-mini-instruct",
     "microsoft/phi-4-mini-instruct"
   ],
   "family": "Microsoft",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": false,
-    "vision": false,
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    }
+    "vision": false
   },
   "providerConfig": {
     "nvidia_nim": {
