@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getDashboardQuery, requireMaintenerContext } from "../../../../utils/api";
 import { db } from "../../../../lib/db";
-import { providerAccount, usageLog, user } from "../../../../lib/db/schema";
+import { providerAccount, proxyApiKey, user } from "../../../../lib/db/schema";
 import { getAccountIndicator } from "../../../../services/account-stats";
 import { PROVIDER_ACCOUNT_KEYS } from "../../../../services/account-providers";
 
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   const limit = input?.limit ?? DEFAULT_LIMIT;
 
   const conditions = [ne(user.id, context.actor.id)];
-  const lastUsedAt = sql<Date | null>`max(${usageLog.createdAt})`;
+  const lastUsedAt = sql<Date | null>`max(${proxyApiKey.lastUsedAt})`;
 
   if (query.length > 0) {
     if (query.length < 2) return { users: [], hasMore: false, nextOffset: offset };
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
   const rows = await db
     .select({ id: user.id, name: user.name, email: user.email, image: user.image, lastUsedAt })
     .from(user)
-    .leftJoin(usageLog, eq(usageLog.userId, user.id))
+    .leftJoin(proxyApiKey, eq(proxyApiKey.userId, user.id))
     .where(and(...conditions))
     .groupBy(user.id)
     .orderBy(sql`${lastUsedAt} desc nulls last`, asc(user.name), asc(user.email), asc(user.id))
