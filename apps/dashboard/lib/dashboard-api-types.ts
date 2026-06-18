@@ -43,6 +43,7 @@ export type MaintenerAuditUser = DashboardUserIdentity;
 
 export type MaintenerAuditSearchUser = DashboardUserIdentity & {
   hasProviderIssue: boolean;
+  lastUsedAt: string | Date | null;
 };
 
 export interface MaintenerAuditUserListResult {

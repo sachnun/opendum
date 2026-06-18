@@ -26,6 +26,23 @@ function userInitial(user: MaintenerAuditSearchUser) {
   return (user.name?.[0] || user.email?.[0] || "U").toUpperCase();
 }
 
+function formatRelativeTime(value: string | Date) {
+  const date = new Date(value);
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60_000);
+
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString();
+}
+
 function canLoadQuery(value: string) {
   return value.length === 0 || value.length >= 2;
 }
@@ -208,7 +225,8 @@ async function selectUser(user: MaintenerAuditSearchUser) {
               <span class="block truncate text-sm font-medium">{{ user.name || user.email || 'Unnamed user' }}</span>
               <span class="block truncate text-xs text-muted-foreground">{{ user.email }}</span>
             </span>
-            <UiIcon v-if="selectingUserId === user.id" name="i-lucide-loader-circle" class="size-4 animate-spin text-muted-foreground" />
+            <UiIcon v-if="selectingUserId === user.id" name="i-lucide-loader-circle" class="size-4 shrink-0 animate-spin text-muted-foreground" />
+            <span v-else-if="user.lastUsedAt" class="shrink-0 text-xs tabular-nums text-muted-foreground">{{ formatRelativeTime(user.lastUsedAt) }}</span>
           </button>
           <p v-if="isLoadingMore" class="px-3 py-3 text-center text-sm text-muted-foreground">Loading more...</p>
         </template>

@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const rows = await db
-    .select({ id: user.id, name: user.name, email: user.email, image: user.image })
+    .select({ id: user.id, name: user.name, email: user.email, image: user.image, lastUsedAt })
     .from(user)
     .leftJoin(usageLog, eq(usageLog.userId, user.id))
     .where(and(...conditions))
