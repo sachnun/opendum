@@ -89,9 +89,9 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
   {
     key: "workers_ai",
     slug: "workers-ai",
-    label: "Workers AI",
+    label: "Cloudflare",
     category: "api_key",
-    emptyMessage: "No Workers AI accounts connected yet.",
+    emptyMessage: "No Cloudflare accounts connected yet.",
     showTier: false,
   },
   {

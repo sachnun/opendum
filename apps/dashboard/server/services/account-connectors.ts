@@ -101,17 +101,17 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
   try {
     const response = await fetchInternalProvider(getWorkersAiValidationUrl(normalizedAccountId), { method: "GET", headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" }, signal: controller.signal });
-    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to validate Workers AI credentials through the proxy. Please try again." };
+    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to validate Cloudflare credentials through the proxy. Please try again." };
     if (!response.ok) {
       const responseText = await response.text().catch(() => "");
-      if (isLikelyCloudflareChallenge(response, responseText)) return { success: false, error: formatProviderHttpError("Workers AI", response, responseText, { endpointLabel: "credentials validation endpoint" }) };
-      if (response.status === 401 || response.status === 403) return { success: false, error: "Workers AI API token is invalid." };
-      return { success: false, error: `Unable to validate Workers AI credentials (HTTP ${response.status}). Please try again.` };
+      if (isLikelyCloudflareChallenge(response, responseText)) return { success: false, error: formatProviderHttpError("Cloudflare", response, responseText, { endpointLabel: "credentials validation endpoint" }) };
+      if (response.status === 401 || response.status === 403) return { success: false, error: "Cloudflare API token is invalid." };
+      return { success: false, error: `Unable to validate Cloudflare credentials (HTTP ${response.status}). Please try again.` };
     }
   } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Workers AI credentials. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
-    if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Workers AI validation timed out. Please try again." };
-    return { success: false, error: "Unable to validate Workers AI credentials. Please check your network and try again." };
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Cloudflare credentials. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
+    if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Cloudflare validation timed out. Please try again." };
+    return { success: false, error: "Unable to validate Cloudflare credentials. Please check your network and try again." };
   } finally {
     clearTimeout(timeout);
   }
@@ -125,7 +125,7 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
   }
 
   const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "workers_ai")));
-  await db.insert(providerAccount).values({ userId, provider: "workers_ai", name: normalizedAccountName || `Workers AI ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiToken), refreshToken: encrypt(normalizedApiToken), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, accountId: normalizedAccountId, isActive: true });
+  await db.insert(providerAccount).values({ userId, provider: "workers_ai", name: normalizedAccountName || `Cloudflare ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiToken), refreshToken: encrypt(normalizedApiToken), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, accountId: normalizedAccountId, isActive: true });
   return { success: true, data: { email: identifier, isUpdate: false } };
 }
 

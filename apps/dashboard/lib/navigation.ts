@@ -51,7 +51,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
       { name: "Openrouter", href: getProviderAccountPath("openrouter") },
-      { name: "Workers AI", href: getProviderAccountPath("workers_ai") },
+      { name: "Cloudflare", href: getProviderAccountPath("workers_ai") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],
   },

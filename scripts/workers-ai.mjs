@@ -254,9 +254,9 @@ async function main() {
   const metadataUpdates = applyMetadata(modelsDir, metadata);
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0 && metadataUpdates === 0) {
-    console.log(`Workers AI models are already up to date (${modelMap.size} models).`);
+    console.log(`Cloudflare models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`Workers AI: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, metadata ${metadataUpdates}).`);
+    console.log(`Cloudflare: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, metadata ${metadataUpdates}).`);
     if (result.added.length > 0) {
       console.log(`  Added: ${result.added.join(", ")}`);
     }

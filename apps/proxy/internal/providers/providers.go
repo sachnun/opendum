@@ -59,18 +59,18 @@ type Registry struct {
 
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
 	return &Registry{providers: map[string]Provider{
-		"opencode":     opencodeProvider{registry: registry},
-		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
-		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
-		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
-		"workers_ai":   workersAIProvider{registry: registry},
-		"qwen_code":    qwenCodeProvider{registry: registry},
-		"kiro":         kiroProvider{registry: registry},
-		"codex":        codexProvider{registry: registry, redis: redis, db: db},
-		"copilot":      copilotProvider{registry: registry, redis: redis},
-		"gemini_cli":   geminiCLIProvider{registry: registry, db: db, redis: redis},
-		"antigravity":  antigravityProvider{registry: registry, db: db, redis: redis},
-		"qoder":        openAICompatibleProvider{name: "qoder", baseURL: "https://openapi.qoder.sh/api/v1", supportedParams: supportedQoder, registry: registry, trimPrefix: "qoder/"},
+		"opencode":    opencodeProvider{registry: registry},
+		"openrouter":  openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
+		"nvidia_nim":  openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
+		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
+		"workers_ai":  workersAIProvider{registry: registry},
+		"qwen_code":   qwenCodeProvider{registry: registry},
+		"kiro":        kiroProvider{registry: registry},
+		"codex":       codexProvider{registry: registry, redis: redis, db: db},
+		"copilot":     copilotProvider{registry: registry, redis: redis},
+		"gemini_cli":  geminiCLIProvider{registry: registry, db: db, redis: redis},
+		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
+		"qoder":       openAICompatibleProvider{name: "qoder", baseURL: "https://openapi.qoder.sh/api/v1", supportedParams: supportedQoder, registry: registry, trimPrefix: "qoder/"},
 	}}
 }
 
@@ -286,7 +286,7 @@ type workersAIProvider struct {
 
 func (p workersAIProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	if account.AccountID == nil || strings.TrimSpace(*account.AccountID) == "" {
-		return nil, fmt.Errorf("missing Cloudflare Account ID on Workers AI account")
+		return nil, fmt.Errorf("missing Cloudflare Account ID on Cloudflare account")
 	}
 	payload := map[string]any{}
 	for key, value := range body {
