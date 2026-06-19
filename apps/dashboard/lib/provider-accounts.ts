@@ -8,7 +8,8 @@ export type ProviderAccountKey =
   | "openrouter"
   | "qoder"
   | "qwen_code"
-  | "workers_ai";
+  | "workers_ai"
+  | "zenmux";
 
 export type ProviderAccountCategory = "oauth" | "api_key";
 
@@ -100,6 +101,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "Qoder",
     category: "api_key",
     emptyMessage: "No Qoder connections yet.",
+    showTier: false,
+  },
+  {
+    key: "zenmux",
+    slug: "zenmux",
+    label: "ZenMux",
+    category: "api_key",
+    emptyMessage: "No ZenMux connections yet.",
     showTier: false,
   },
 ];

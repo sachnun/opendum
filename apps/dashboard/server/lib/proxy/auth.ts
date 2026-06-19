@@ -21,6 +21,7 @@ const DASHBOARD_PROVIDER_ACCOUNT_KEYS = [
   "nvidia_nim",
   "openrouter",
   "workers_ai",
+  "zenmux",
 ] as const;
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";

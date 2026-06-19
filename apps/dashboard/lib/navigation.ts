@@ -28,6 +28,7 @@ export interface ProviderAccountCounts {
   openrouter: number;
   qwen_code: number;
   workers_ai: number;
+  zenmux: number;
 }
 
 export type ProviderAccountIndicator = "normal" | "warning" | "error";
@@ -51,6 +52,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
       { name: "Openrouter", href: getProviderAccountPath("openrouter") },
+      { name: "ZenMux", href: getProviderAccountPath("zenmux") },
       { name: "Cloudflare", href: getProviderAccountPath("workers_ai") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],

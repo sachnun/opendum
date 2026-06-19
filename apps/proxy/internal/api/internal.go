@@ -44,8 +44,8 @@ var internalRelayAllowedHosts = map[string]struct{}{
 	"prod.us-east-1.auth.desktop.kiro.dev":      {},
 	"q.us-east-1.amazonaws.com":                 {},
 	"www.googleapis.com":                        {},
+	"zenmux.ai":                                 {},
 }
-
 
 func (s *Server) internalRefreshRoute(w http.ResponseWriter, r *http.Request) {
 	rawBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, internalRelayMaxBodyBytes))

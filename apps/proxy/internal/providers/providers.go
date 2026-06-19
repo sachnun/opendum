@@ -71,6 +71,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"gemini_cli":  geminiCLIProvider{registry: registry, db: db, redis: redis},
 		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
 		"qoder":       openAICompatibleProvider{name: "qoder", baseURL: "https://openapi.qoder.sh/api/v1", supportedParams: supportedQoder, registry: registry, trimPrefix: "qoder/"},
+		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
 	}}
 }
 
@@ -506,6 +507,8 @@ func set(values ...string) map[string]struct{} {
 }
 
 var supportedQoder = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+
+var supportedZenmux = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
 var supportedOpenRouter = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 

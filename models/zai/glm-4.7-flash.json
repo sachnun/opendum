@@ -1,6 +1,7 @@
 {
   "providers": [
-    "workers_ai"
+    "workers_ai",
+    "zenmux"
   ],
   "family": "Z.AI",
   "meta": {
@@ -11,6 +12,9 @@
   "providerConfig": {
     "workers_ai": {
       "upstream": "@cf/zai-org/glm-4.7-flash"
+    },
+    "zenmux": {
+      "upstream": "z-ai/glm-4.7-flash-free"
     }
   }
 }

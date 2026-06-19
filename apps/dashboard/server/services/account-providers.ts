@@ -9,6 +9,7 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "openrouter",
   "qoder",
   "workers_ai",
+  "zenmux",
 ] as const;
 
 export type ProviderAccountKey = (typeof PROVIDER_ACCOUNT_KEYS)[number];

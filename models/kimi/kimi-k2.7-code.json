@@ -1,6 +1,7 @@
 {
   "providers": [
-    "workers_ai"
+    "workers_ai",
+    "zenmux"
   ],
   "family": "Kimi",
   "meta": {
@@ -11,6 +12,9 @@
   "providerConfig": {
     "workers_ai": {
       "upstream": "@cf/moonshotai/kimi-k2.7-code"
+    },
+    "zenmux": {
+      "upstream": "moonshotai/kimi-k2.7-code-free"
     }
   }
 }
