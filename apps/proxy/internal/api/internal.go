@@ -39,6 +39,7 @@ var internalRelayAllowedHosts = map[string]struct{}{
 	"github.com":                                {},
 	"integrate.api.nvidia.com":                  {},
 	"oauth2.googleapis.com":                     {},
+	"openapi.qoder.sh":                          {},
 	"openrouter.ai":                             {},
 	"prod.us-east-1.auth.desktop.kiro.dev":      {},
 	"q.us-east-1.amazonaws.com":                 {},

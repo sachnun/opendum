@@ -75,6 +75,43 @@ func TestInternalRouteForwardsAllowedURL(t *testing.T) {
 	}
 }
 
+func TestInternalRouteForwardsQoderValidationRequest(t *testing.T) {
+	previousClient := internalRelayClient
+	defer func() { internalRelayClient = previousClient }()
+
+	var capturedMethod string
+	var capturedURL string
+	var capturedAuth string
+	internalRelayClient = &http.Client{Transport: internalRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		capturedMethod = req.Method
+		capturedURL = req.URL.String()
+		capturedAuth = req.Header.Get("Authorization")
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"object":"list","data":[]}`))}, nil
+	})}
+
+	recorder := httptest.NewRecorder()
+	body := `{"url":"https://openapi.qoder.sh/api/v1/models","method":"GET","headers":{"Authorization":"Bearer qod_pat_test","Accept":"application/json"}}`
+	req := signedInternalRefreshRequest([]byte(body))
+
+	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if recorder.Header().Get("X-Opendum-Internal-Relay-Error") == "1" {
+		t.Fatalf("relay error header set: %s", recorder.Body.String())
+	}
+	if capturedMethod != http.MethodGet {
+		t.Fatalf("method = %q, want %q", capturedMethod, http.MethodGet)
+	}
+	if capturedURL != "https://openapi.qoder.sh/api/v1/models" {
+		t.Fatalf("url = %q", capturedURL)
+	}
+	if capturedAuth != "Bearer qod_pat_test" {
+		t.Fatalf("authorization = %q", capturedAuth)
+	}
+}
+
 func TestInternalRouteRejectsBlockedHost(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	body := []byte(`{"url":"https://example.com/models","method":"GET"}`)
