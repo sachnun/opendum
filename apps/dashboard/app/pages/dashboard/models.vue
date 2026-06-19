@@ -346,7 +346,7 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
                   </UiTooltip>
                   <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
                     <UiTooltip v-if="model.isEnabled" text="Playground">
-                      <NuxtLink :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
+                      <NuxtLink :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
                         <UiIcon name="i-lucide-flask-conical" class="size-3" />
                       </NuxtLink>
                     </UiTooltip>

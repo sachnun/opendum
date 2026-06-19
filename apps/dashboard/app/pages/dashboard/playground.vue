@@ -257,11 +257,21 @@ watch(options, (value) => {
   applyQuerySettings(route.query);
   const modelId = normalizeQueryParam(route.query.model);
   const accountId = normalizeQueryParam(route.query.accountId);
+  const compareAuto = isAutoCompareQuery(route.query.compare);
 
-  if (modelId && modelsById.value.has(modelId)) {
-    panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
-    initializedFromRoute.value = true;
-    return;
+  if (modelId) {
+    const model = modelsById.value.get(modelId);
+    if (compareAuto && model) {
+      panels.value = buildAutoComparePanelsForModel(model);
+      initializedFromRoute.value = true;
+      return;
+    }
+
+    if (model) {
+      panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
+      initializedFromRoute.value = true;
+      return;
+    }
   }
 
   if (accountId) {
@@ -286,11 +296,21 @@ watch(() => route.query, (query) => {
   applyQuerySettings(query);
   const modelId = normalizeQueryParam(query.model);
   const accountId = normalizeQueryParam(query.accountId);
+  const compareAuto = isAutoCompareQuery(query.compare);
 
-  if (modelId && modelsById.value.has(modelId)) {
-    panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
-    responses.value = {};
-    return;
+  if (modelId) {
+    const model = modelsById.value.get(modelId);
+    if (compareAuto && model) {
+      panels.value = buildAutoComparePanelsForModel(model);
+      responses.value = {};
+      return;
+    }
+
+    if (model) {
+      panels.value = [{ id: generateId(), modelId, provider: null, accountId: getValidRouteAccountId(accountId, modelId) }];
+      responses.value = {};
+      return;
+    }
   }
 
   if (accountId) {
@@ -489,6 +509,18 @@ function buildProviderPresets(modelOptions: ModelOption[], accounts: ProviderAcc
   });
 }
 
+function buildAutoComparePanelsForModel(model: ModelOption): PanelState[] {
+  const supportedProviders = model.providers.filter((provider) => providerSupportsModel(provider, model));
+  return [
+    { id: generateId(), modelId: model.id, provider: null, accountId: null },
+    ...supportedProviders.map((provider) => ({ id: generateId(), modelId: model.id, provider, accountId: null })),
+  ];
+}
+
+function isAutoCompareQuery(value: unknown): boolean {
+  return normalizeQueryParam(value)?.trim().toLowerCase() === "auto";
+}
+
 function getAccountLabel(account: ProviderAccountOption): string {
   const name = account.name.trim();
   const email = account.email?.trim();
@@ -516,7 +548,7 @@ function getProviderPresetAccountLabel(accounts: ProviderAccountOption[]): strin
 }
 
 function getProviderScopedRouteLabel(provider: string): string {
-  return `${getProviderLabel(provider)} (load balancer)`;
+  return `Auto (${getProviderLabel(provider)})`;
 }
 
 function getPendingModelProviders(panel: PanelState): string[] {
