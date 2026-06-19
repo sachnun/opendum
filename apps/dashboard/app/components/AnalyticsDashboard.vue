@@ -37,9 +37,9 @@ const period = ref<Period>("30d");
 const selectedApiKeyId = ref(props.apiKeyId || "all");
 const customRange = ref<CalendarDateRange | null>(null);
 const draftCustomRange = ref<CalendarDateRange | null>(null);
-const draftCustomRangeModel = computed<any>({
+const draftCustomRangeModel = computed<CalendarDateRange | null>({
   get: () => draftCustomRange.value,
-  set: (v: any) => { draftCustomRange.value = v; },
+  set: (v: CalendarDateRange | null) => { draftCustomRange.value = v; },
 });
 const isCustomRangeActive = ref(false);
 const isFilterOpen = ref(false);

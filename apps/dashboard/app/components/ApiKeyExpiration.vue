@@ -32,15 +32,15 @@ watch(open, (value) => {
 
 const isExpired = computed(() => expiresAt.value != null && expiresAt.value < new Date());
 const displayText = computed(() => (expiresAt.value ? format(expiresAt.value, "MMM d, yyyy HH:mm") : "No expiry"));
-const draftDateModel = computed<any>({
+const draftDateModel = computed<DateValue | undefined>({
   get: () => draftDate.value,
-  set: (v: any) => { draftDate.value = v; },
+  set: (v: DateValue | undefined) => { draftDate.value = v; },
 });
-const draftTimeModel = computed<any>({
+const draftTimeModel = computed<Time>({
   get: () => draftTime.value,
-  set: (v: any) => { draftTime.value = v; },
+  set: (v: Time) => { draftTime.value = v; },
 });
-const draftExpiresAt = computed(() => toLocalDateTime(draftDate.value as any, draftTime.value as any));
+const draftExpiresAt = computed(() => toLocalDateTime(draftDate.value, draftTime.value));
 const isDraftInPast = computed(() => {
   if (!draftExpiresAt.value) return false;
   return draftExpiresAt.value <= new Date();
