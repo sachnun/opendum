@@ -38,6 +38,7 @@ const EXCLUDED_IDS = new Set([
   "pro",
   "flash",
   "flash-lite",
+  "none", // deprecated placeholder for PREVIEW_GEMINI_FLASH_LITE_MODEL
 ]);
 
 const PAID_GEMINI_CLI_TIERS = [
