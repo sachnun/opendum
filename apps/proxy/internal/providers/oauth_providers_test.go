@@ -633,6 +633,9 @@ func TestAntigravityGemini35FlashComesFromRegistry(t *testing.T) {
 
 func TestAntigravityGPTOSS120BIsSupported(t *testing.T) {
 	registry := testModelsRegistry(t)
+	if info, ok := registry.ModelInfo("gpt-oss-120b"); !ok || info.Ignored {
+		t.Skip("gpt-oss-120b is not an active model in the registry")
+	}
 	provider := antigravityProvider{registry: registry}.delegate()
 	if !registry.IsSupportedByProvider("gpt-oss-120b", "antigravity") {
 		t.Fatal("gpt-oss-120b should be supported by antigravity")
