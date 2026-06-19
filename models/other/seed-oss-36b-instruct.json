@@ -4,6 +4,7 @@
     "siliconflow"
   ],
   "family": "ByteDance",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,

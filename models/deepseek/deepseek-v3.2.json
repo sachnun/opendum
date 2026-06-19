@@ -4,6 +4,7 @@
     "siliconflow"
   ],
   "family": "DeepSeek",
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,

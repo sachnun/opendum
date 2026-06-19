@@ -9,6 +9,7 @@
     "openai-gpt-oss-20b"
   ],
   "family": "OpenAI",
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,

@@ -3,6 +3,7 @@
     "siliconflow"
   ],
   "family": "Z.AI",
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,

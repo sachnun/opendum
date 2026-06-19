@@ -3,6 +3,7 @@
     "siliconflow"
   ],
   "family": "DeepSeek",
+  "ignored": true,
   "providerConfig": {
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V3"

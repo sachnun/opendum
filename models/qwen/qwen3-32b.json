@@ -3,6 +3,7 @@
     "siliconflow"
   ],
   "family": "Qwen",
+  "ignored": true,
   "providerConfig": {
     "siliconflow": {
       "upstream": "Qwen/Qwen3-32B"

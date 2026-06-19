@@ -5,6 +5,7 @@
     "siliconflow"
   ],
   "family": "OpenAI",
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
