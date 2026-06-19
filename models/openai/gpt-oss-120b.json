@@ -1,7 +1,8 @@
 {
   "providers": [
     "antigravity",
-    "workers_ai"
+    "workers_ai",
+    "siliconflow"
   ],
   "family": "OpenAI",
   "meta": {
@@ -12,6 +13,9 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "gpt-oss-120b-medium"
+    },
+    "siliconflow": {
+      "upstream": "openai/gpt-oss-120b"
     },
     "workers_ai": {
       "upstream": "@cf/openai/gpt-oss-120b"

@@ -1,5 +1,7 @@
 {
-  "providers": [],
+  "providers": [
+    "siliconflow"
+  ],
   "aliases": [
     "qwen-qwen2.5-7b-instruct",
     "qwen/qwen2.5-7b-instruct"
@@ -10,5 +12,10 @@
     "reasoning": false,
     "toolCall": true,
     "vision": false
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "Qwen/Qwen2.5-7B-Instruct"
+    }
   }
 }

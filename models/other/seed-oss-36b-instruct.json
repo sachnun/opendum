@@ -1,6 +1,7 @@
 {
   "providers": [
-    "nvidia_nim"
+    "nvidia_nim",
+    "siliconflow"
   ],
   "family": "ByteDance",
   "meta": {
@@ -11,6 +12,9 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "bytedance/seed-oss-36b-instruct"
+    },
+    "siliconflow": {
+      "upstream": "ByteDance-Seed/Seed-OSS-36B-Instruct"
     }
   }
 }

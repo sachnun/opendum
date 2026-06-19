@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "family": "Z.AI",
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "zai-org/GLM-5V-Turbo"
+    }
+  }
+}

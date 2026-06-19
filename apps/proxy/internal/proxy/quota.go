@@ -157,6 +157,9 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 	if account.Provider == "openrouter" {
 		return s.fetchOpenRouterQuota(ctx, account, forceRefresh), nil
 	}
+	if account.Provider == "siliconflow" {
+		return s.fetchSiliconFlowQuota(ctx, account, forceRefresh), nil
+	}
 	providerImpl, ok := s.providerRegistry.Get(account.Provider)
 	if !ok {
 		return accountQuotaInfo{}, fmt.Errorf("provider %s is not supported for quota", account.Provider)

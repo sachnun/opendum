@@ -152,7 +152,7 @@ export interface ProviderDetailDeltaData {
 
 export type ProviderDetailResponse = ProviderDetailData | ProviderDetailDeltaData;
 
-export type QuotaProviderKey = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter";
+export type QuotaProviderKey = "antigravity" | "copilot" | "codex" | "gemini_cli" | "kiro" | "openrouter" | "siliconflow";
 
 export interface QuotaGroupDisplay {
   name: string;

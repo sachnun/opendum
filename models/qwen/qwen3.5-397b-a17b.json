@@ -1,11 +1,15 @@
 {
   "providers": [
-    "nvidia_nim"
+    "nvidia_nim",
+    "siliconflow"
   ],
   "family": "Qwen",
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "qwen/qwen3.5-397b-a17b"
+    },
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3.5-397B-A17B"
     }
   }
 }

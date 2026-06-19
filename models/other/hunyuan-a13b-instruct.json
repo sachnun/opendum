@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "tencent/Hunyuan-A13B-Instruct"
+    }
+  }
+}

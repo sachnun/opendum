@@ -1,7 +1,8 @@
 {
   "providers": [
     "workers_ai",
-    "zenmux"
+    "zenmux",
+    "siliconflow"
   ],
   "family": "Kimi",
   "meta": {
@@ -10,6 +11,9 @@
     "vision": true
   },
   "providerConfig": {
+    "siliconflow": {
+      "upstream": "moonshotai/Kimi-K2.7-Code"
+    },
     "workers_ai": {
       "upstream": "@cf/moonshotai/kimi-k2.7-code"
     },

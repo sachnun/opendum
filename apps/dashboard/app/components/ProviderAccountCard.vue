@@ -41,7 +41,7 @@ type DurationPoint = { time: string; avgDuration: number | null };
 
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
-const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
+const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter", "siliconflow"]);
 const DEFAULT_MAX_QUOTA_SKELETON_ROWS = 3;
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;

@@ -1,6 +1,7 @@
 {
   "providers": [
-    "nvidia_nim"
+    "nvidia_nim",
+    "siliconflow"
   ],
   "family": "DeepSeek",
   "meta": {
@@ -11,6 +12,9 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "deepseek-ai/deepseek-v4-pro"
+    },
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V4-Pro"
     }
   }
 }

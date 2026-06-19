@@ -1,4 +1,11 @@
 {
-  "providers": [],
-  "family": "MiniMax"
+  "providers": [
+    "siliconflow"
+  ],
+  "family": "MiniMax",
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "MiniMaxAI/MiniMax-M3"
+    }
+  }
 }

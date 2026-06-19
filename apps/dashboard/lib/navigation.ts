@@ -27,6 +27,7 @@ export interface ProviderAccountCounts {
   nvidia_nim: number;
   openrouter: number;
   qwen_code: number;
+  siliconflow: number;
   workers_ai: number;
   zenmux: number;
 }
@@ -53,6 +54,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
       { name: "Openrouter", href: getProviderAccountPath("openrouter") },
       { name: "ZenMux", href: getProviderAccountPath("zenmux") },
+      { name: "SiliconFlow", href: getProviderAccountPath("siliconflow") },
       { name: "Cloudflare", href: getProviderAccountPath("workers_ai") },
       { name: "Qwen Code", href: getProviderAccountPath("qwen_code") },
     ],

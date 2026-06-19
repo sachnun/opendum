@@ -1,9 +1,16 @@
 {
-  "providers": [],
+  "providers": [
+    "siliconflow"
+  ],
   "family": "Qwen",
   "meta": {
     "reasoning": false,
     "toolCall": true,
     "vision": true
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3-VL-30B-A3B-Thinking"
+    }
   }
 }

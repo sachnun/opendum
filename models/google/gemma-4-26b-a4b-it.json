@@ -1,7 +1,8 @@
 {
   "providers": [
     "openrouter",
-    "workers_ai"
+    "workers_ai",
+    "siliconflow"
   ],
   "family": "Google",
   "meta": {
@@ -12,6 +13,9 @@
   "providerConfig": {
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free"
+    },
+    "siliconflow": {
+      "upstream": "google/gemma-4-26B-A4B-it"
     },
     "workers_ai": {
       "upstream": "@cf/google/gemma-4-26b-a4b-it"

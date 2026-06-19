@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "family": "Qwen",
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "Qwen/Qwen2.5-72B-Instruct"
+    }
+  }
+}

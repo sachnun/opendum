@@ -8,6 +8,7 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "nvidia_nim",
   "openrouter",
   "qoder",
+  "siliconflow",
   "workers_ai",
   "zenmux",
 ] as const;

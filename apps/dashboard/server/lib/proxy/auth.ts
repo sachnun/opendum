@@ -20,6 +20,7 @@ const DASHBOARD_PROVIDER_ACCOUNT_KEYS = [
   "qwen_code",
   "nvidia_nim",
   "openrouter",
+  "siliconflow",
   "workers_ai",
   "zenmux",
 ] as const;

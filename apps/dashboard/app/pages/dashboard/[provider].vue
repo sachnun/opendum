@@ -27,7 +27,7 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
   accounts: number;
 };
 
-const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter"]);
+const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter", "siliconflow"]);
 const ACCOUNT_STATS_BATCH_SIZE = 24;
 const ERROR_HISTORY_BATCH_SIZE = 20;
 const ACCOUNT_STATS_POLL_MS = 30_000;

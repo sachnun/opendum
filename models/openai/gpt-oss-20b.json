@@ -2,7 +2,8 @@
   "providers": [
     "openrouter",
     "workers_ai",
-    "nvidia_nim"
+    "nvidia_nim",
+    "siliconflow"
   ],
   "aliases": [
     "openai-gpt-oss-20b"
@@ -19,6 +20,9 @@
     },
     "openrouter": {
       "upstream": "openai/gpt-oss-20b:free"
+    },
+    "siliconflow": {
+      "upstream": "openai/gpt-oss-20b"
     },
     "workers_ai": {
       "upstream": "@cf/openai/gpt-oss-20b"

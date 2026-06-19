@@ -1,6 +1,7 @@
 {
   "providers": [
-    "workers_ai"
+    "workers_ai",
+    "siliconflow"
   ],
   "family": "Kimi",
   "meta": {
@@ -9,6 +10,9 @@
     "vision": false
   },
   "providerConfig": {
+    "siliconflow": {
+      "upstream": "moonshotai/Kimi-K2.5"
+    },
     "workers_ai": {
       "upstream": "@cf/moonshotai/kimi-k2.5"
     }

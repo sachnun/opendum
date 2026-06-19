@@ -1,9 +1,16 @@
 {
-  "providers": [],
+  "providers": [
+    "siliconflow"
+  ],
   "family": "DeepSeek",
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": false
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V3.1"
+    }
   }
 }

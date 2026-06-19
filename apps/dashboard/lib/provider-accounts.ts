@@ -8,6 +8,7 @@ export type ProviderAccountKey =
   | "openrouter"
   | "qoder"
   | "qwen_code"
+  | "siliconflow"
   | "workers_ai"
   | "zenmux";
 
@@ -109,6 +110,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "ZenMux",
     category: "api_key",
     emptyMessage: "No ZenMux connections yet.",
+    showTier: false,
+  },
+  {
+    key: "siliconflow",
+    slug: "siliconflow",
+    label: "SiliconFlow",
+    category: "api_key",
+    emptyMessage: "No SiliconFlow connections yet.",
     showTier: false,
   },
 ];

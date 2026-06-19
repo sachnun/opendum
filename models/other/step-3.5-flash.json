@@ -1,6 +1,7 @@
 {
   "providers": [
-    "nvidia_nim"
+    "nvidia_nim",
+    "siliconflow"
   ],
   "family": "StepFun",
   "meta": {
@@ -11,6 +12,9 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "stepfun-ai/step-3.5-flash"
+    },
+    "siliconflow": {
+      "upstream": "stepfun-ai/Step-3.5-Flash"
     }
   }
 }
