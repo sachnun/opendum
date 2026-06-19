@@ -348,9 +348,9 @@ watch(isAnyLoading, (loading) => {
 });
 
 onMounted(() => {
+  providerPresetExpanded.value = true;
   if (window.matchMedia("(min-width: 640px)").matches) {
     familyPresetExpanded.value = true;
-    providerPresetExpanded.value = true;
   }
 });
 
