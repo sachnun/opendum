@@ -9,7 +9,6 @@ import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUr
 import { initiateCopilotDeviceCodeFlow, pollCopilotDeviceCodeAuthorization } from "../lib/providers/copilot";
 import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
-import { initiateDeviceCodeFlow, pollDeviceCodeAuthorization } from "../lib/providers/qwen-code";
 import type { OAuthResult } from "../lib/providers/types";
 import type { ActionResult } from "../utils/api";
 
@@ -18,8 +17,8 @@ const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth
 export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]) });
 export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
 const copilotAuthMethodSchema = z.enum(["opencode", "official"]).optional();
-export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), method: copilotAuthMethodSchema });
-export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: copilotAuthMethodSchema });
+export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["copilot", "codex"]), method: copilotAuthMethodSchema });
+export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: copilotAuthMethodSchema });
 export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
 
 type OAuthProviderKey = z.infer<typeof getAuthUrlInputSchema>["provider"];
@@ -93,12 +92,6 @@ const DEVICE_PROVIDERS = {
     emailPrefix: "copilot",
     initiate: (input: z.infer<typeof initiateDeviceAuthInputSchema>) => initiateCopilotDeviceCodeFlow(input.method),
     poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCopilotDeviceCodeAuthorization(input.deviceCode, input.method),
-  },
-  qwen_code: {
-    label: "Qwen Code",
-    emailPrefix: "qwen",
-    initiate: initiateDeviceCodeFlow,
-    poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollDeviceCodeAuthorization(input.deviceCode, input.codeVerifier ?? ""),
   },
   codex: {
     label: "Codex",

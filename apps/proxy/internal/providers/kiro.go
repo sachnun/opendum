@@ -1664,7 +1664,7 @@ func jsonResponse(status int, payload any) *http.Response {
 }
 
 func sseResponse(reader io.Reader, closer io.Closer) *http.Response {
-	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}, "Cache-Control": []string{"no-cache"}, "Connection": []string{"keep-alive"}}, Body: &qwenThinkTagReadCloser{reader: io.NopCloser(reader), closer: closer}}
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}, "Cache-Control": []string{"no-cache"}, "Connection": []string{"keep-alive"}}, Body: &sseReadCloser{reader: io.NopCloser(reader), closer: closer}}
 }
 
 func lastModelSegment(model string) string {

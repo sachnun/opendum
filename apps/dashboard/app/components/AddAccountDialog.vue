@@ -56,7 +56,6 @@ const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account
 
 const providerConfigs: Record<Provider, ProviderConfig> = {
   antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", methods: [browserOAuthMethod] },
-  qwen_code: { name: "Qwen Code", description: "Access Qwen Coder models", methods: [deviceCodeMethod] },
   copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [copilotOpencodeMethod, copilotOfficialMethod] },
   codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
@@ -83,7 +82,7 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "qwen_code", "copilot", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
+const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "copilot", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -97,7 +96,7 @@ const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
 const selectedMethod = ref<MethodKey | null>(null);
-const deviceCodeInfo = ref<{ provider: "qwen_code" | "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: CopilotAuthMethod } | null>(null);
+const deviceCodeInfo = ref<{ provider: "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: CopilotAuthMethod } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const copiedCallbackUrl = ref(false);
@@ -180,11 +179,11 @@ watch([open, step, provider, selectedMethod], async () => {
 
     if (selectedFlowType === "device_code") {
       const method = selectedProvider === "copilot" ? selectedCopilotAuthMethod.value : undefined;
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "qwen_code" | "copilot" | "codex", method });
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "copilot" | "codex", method });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
-        provider: selectedProvider as "qwen_code" | "copilot" | "codex",
+        provider: selectedProvider as "copilot" | "codex",
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,

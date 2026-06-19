@@ -6,7 +6,7 @@ func TestRefreshableProviderNames(t *testing.T) {
 	registry := NewRegistry(nil, nil, nil)
 	names := registry.RefreshableProviderNames()
 
-	want := []string{"antigravity", "codex", "copilot", "kiro", "qwen_code"}
+	want := []string{"antigravity", "codex", "copilot", "kiro"}
 	if len(names) != len(want) {
 		t.Fatalf("names = %#v, want %#v", names, want)
 	}
@@ -26,20 +26,13 @@ func TestRefreshableProviderNames(t *testing.T) {
 	}
 }
 
-func TestRefreshBufferFor(t *testing.T) {
+func TestRefreshBufferDefaultsToOAuthBuffer(t *testing.T) {
 	registry := NewRegistry(nil, nil, nil)
-	qwen, ok := registry.Get("qwen_code")
-	if !ok {
-		t.Fatal("qwen_code provider missing")
-	}
 	openrouter, ok := registry.Get("openrouter")
 	if !ok {
 		t.Fatal("openrouter provider missing")
 	}
 
-	if got := RefreshBufferFor(qwen); got != oauthRefreshBuffer {
-		t.Fatalf("qwen buffer = %s, want %s", got, oauthRefreshBuffer)
-	}
 	if got := RefreshBufferFor(openrouter); got != oauthRefreshBuffer {
 		t.Fatalf("default buffer = %s, want %s", got, oauthRefreshBuffer)
 	}

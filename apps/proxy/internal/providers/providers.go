@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -18,8 +17,6 @@ import (
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 )
 
-const qwenCodeTokenEndpoint = "https://chat.qwen.ai/api/v1/oauth2/token"
-const qwenCodeClientID = "f0304373b74a44d2b584a3fb70ca9e56"
 const opencodeChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
 const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
@@ -64,7 +61,6 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"nvidia_nim":  openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
 		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
 		"workers_ai":  workersAIProvider{registry: registry},
-		"qwen_code":   qwenCodeProvider{registry: registry},
 		"kiro":        kiroProvider{registry: registry},
 		"codex":       codexProvider{registry: registry, redis: redis, db: db},
 		"copilot":     copilotProvider{registry: registry, redis: redis},
@@ -305,102 +301,6 @@ func (p workersAIProvider) MakeRequest(ctx context.Context, client *http.Client,
 	return postJSON(ctx, client, url, credentials, payload, stream)
 }
 
-type qwenCodeProvider struct {
-	registry *models.Registry
-}
-
-func (p qwenCodeProvider) RefreshBuffer() time.Duration { return 3 * time.Hour }
-
-func (p qwenCodeProvider) RefreshCredentials(ctx context.Context, client *http.Client, refreshToken string, _ appdb.ProviderAccount) (RefreshedCredentials, error) {
-	form := url.Values{}
-	form.Set("grant_type", "refresh_token")
-	form.Set("refresh_token", strings.TrimSpace(refreshToken))
-	form.Set("client_id", qwenCodeClientID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, qwenCodeTokenEndpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		return RefreshedCredentials{}, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return RefreshedCredentials{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body := readLimit(resp.Body, 1<<20)
-		return RefreshedCredentials{}, fmt.Errorf("qwen_code token refresh failed: %d %s", resp.StatusCode, body)
-	}
-
-	var token struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		ExpiresIn    int64  `json:"expires_in"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return RefreshedCredentials{}, err
-	}
-	if strings.TrimSpace(token.AccessToken) == "" {
-		return RefreshedCredentials{}, fmt.Errorf("qwen_code token refresh returned empty access token")
-	}
-	if token.RefreshToken == "" {
-		token.RefreshToken = refreshToken
-	}
-	if token.ExpiresIn <= 0 {
-		token.ExpiresIn = 3600
-	}
-	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)}, nil
-}
-
-func (p qwenCodeProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
-	payload := p.buildPayload(body, stream)
-	resp, err := postJSONWithHeaders(ctx, client, "https://portal.qwen.ai/v1/chat/completions", credentials, payload, stream, map[string]string{
-		"User-Agent":        "google-api-nodejs-client/9.15.1",
-		"X-Goog-Api-Client": "gl-node/22.17.0",
-		"Client-Metadata":   "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI",
-	})
-	if err != nil || !stream || resp == nil || resp.Body == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return resp, err
-	}
-	resp.Body = &qwenThinkTagReadCloser{reader: io.NopCloser(newQwenThinkTagReader(resp.Body)), closer: resp.Body}
-	resp.Header.Set("Content-Type", "text/event-stream")
-	resp.Header.Set("Cache-Control", "no-cache")
-	resp.Header.Set("Connection", "keep-alive")
-	return resp, nil
-}
-
-func (p qwenCodeProvider) buildPayload(body map[string]any, stream bool) map[string]any {
-	payload := map[string]any{}
-	for key, value := range body {
-		if _, ok := supportedQwenCode[key]; ok && value != nil {
-			payload[key] = value
-		}
-	}
-	model, _ := body["model"].(string)
-	if strings.HasPrefix(model, "qwen_code/") {
-		model = strings.TrimPrefix(model, "qwen_code/")
-	}
-	if p.registry != nil {
-		model = p.registry.UpstreamModelName(model, "qwen_code")
-	}
-	payload["model"] = model
-	payload["stream"] = stream
-	if stream {
-		payload["stream_options"] = map[string]any{"include_usage": true}
-	}
-	if tools, ok := payload["tools"].([]any); ok {
-		if len(tools) > 0 {
-			payload["tools"] = cleanQwenTools(tools)
-		} else if stream {
-			payload["tools"] = []any{map[string]any{"type": "function", "function": map[string]any{"name": "do_not_call_me", "description": "Do not call this tool.", "parameters": map[string]any{"type": "object", "properties": map[string]any{}}}}}
-		}
-	}
-	return payload
-}
-
 func postJSON(ctx context.Context, client *http.Client, url, bearer string, payload map[string]any, stream bool) (*http.Response, error) {
 	return postJSONWithHeaders(ctx, client, url, bearer, payload, stream, nil)
 }
@@ -445,42 +345,6 @@ func shouldRefresh(account appdb.ProviderAccount) bool {
 	return time.Now().After(account.ExpiresAt.Add(-oauthRefreshBuffer))
 }
 
-func cleanQwenTools(tools []any) []any {
-	cleaned := make([]any, 0, len(tools))
-	for _, raw := range tools {
-		tool, ok := raw.(map[string]any)
-		if !ok {
-			cleaned = append(cleaned, raw)
-			continue
-		}
-		copyTool := cloneAnyMap(tool)
-		fn, _ := copyTool["function"].(map[string]any)
-		if fn != nil {
-			delete(fn, "strict")
-			if params, ok := fn["parameters"].(map[string]any); ok {
-				cleanQwenSchema(params)
-			}
-		}
-		cleaned = append(cleaned, copyTool)
-	}
-	return cleaned
-}
-
-func cleanQwenSchema(schema map[string]any) {
-	delete(schema, "additionalProperties")
-	delete(schema, "strict")
-	if props, ok := schema["properties"].(map[string]any); ok {
-		for _, raw := range props {
-			if child, ok := raw.(map[string]any); ok {
-				cleanQwenSchema(child)
-			}
-		}
-	}
-	if items, ok := schema["items"].(map[string]any); ok {
-		cleanQwenSchema(items)
-	}
-}
-
 func cloneAnyMap(input map[string]any) map[string]any {
 	out := make(map[string]any, len(input))
 	for key, value := range input {
@@ -496,6 +360,20 @@ func cloneAnyMap(input map[string]any) map[string]any {
 func readLimit(r io.Reader, limit int64) string {
 	data, _ := io.ReadAll(io.LimitReader(r, limit))
 	return string(data)
+}
+
+type sseReadCloser struct {
+	reader io.ReadCloser
+	closer io.Closer
+}
+
+func (r *sseReadCloser) Read(p []byte) (int, error) {
+	return r.reader.Read(p)
+}
+
+func (r *sseReadCloser) Close() error {
+	_ = r.reader.Close()
+	return r.closer.Close()
 }
 
 func set(values ...string) map[string]struct{} {
@@ -519,4 +397,3 @@ var supportedSiliconFlow = set("model", "messages", "temperature", "top_p", "top
 var supportedKilo = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedOpencode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedWorkersAI = set("model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "function_call", "functions", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "chat_template_kwargs", "modalities", "metadata", "prediction", "logit_bias", "logprobs", "top_logprobs", "store", "service_tier", "user", "web_search_options", "n")
-var supportedQwenCode = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")

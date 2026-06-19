@@ -3,7 +3,6 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "codex",
   "copilot",
   "kiro",
-  "qwen_code",
   "nvidia_nim",
   "openrouter",
   "qoder",

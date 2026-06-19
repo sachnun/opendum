@@ -6,7 +6,6 @@ export type ProviderAccountKey =
   | "nvidia_nim"
   | "openrouter"
   | "qoder"
-  | "qwen_code"
   | "siliconflow"
   | "workers_ai"
   | "zenmux";
@@ -54,14 +53,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Kiro connections yet.",
     showTier: true,
-  },
-  {
-    key: "qwen_code",
-    slug: "qwen-code",
-    label: "Qwen Code",
-    category: "oauth",
-    emptyMessage: "No Qwen Code connections yet.",
-    showTier: false,
   },
   {
     key: "nvidia_nim",
