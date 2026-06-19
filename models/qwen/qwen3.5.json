@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "qwen_code"
-  ],
+  "providers": [],
   "family": "Qwen",
   "meta": {
     "reasoning": true,

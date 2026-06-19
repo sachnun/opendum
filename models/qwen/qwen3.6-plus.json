@@ -1,4 +1,11 @@
 {
-  "providers": [],
-  "family": "Qwen"
+  "providers": [
+    "qwen_code"
+  ],
+  "family": "Qwen",
+  "providerConfig": {
+    "qwen_code": {
+      "upstream": "coder-model"
+    }
+  }
 }

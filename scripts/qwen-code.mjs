@@ -3,12 +3,26 @@
 /**
  * Qwen Code model refresh script.
  *
- * Fetches the model list from the QwenLM/qwen-code GitHub repository
- * (QWEN_OAUTH_MODELS in constants.ts) and syncs them into the JSON registry.
+ * Fetches the OAuth model list from the QwenLM/qwen-code GitHub repository
+ * (`QWEN_OAUTH_MODELS` in `packages/core/src/models/constants.ts`) and syncs
+ * them into the JSON registry.
  *
- * Because the OAuth model list is a subset of what the portal.qwen.ai API
- * actually accepts, this script uses an additive strategy: it never removes
- * existing qwen_code models from JSON, only adds newly discovered ones.
+ * The upstream exposes abstract model IDs (e.g. `coder-model`) whose real
+ * identity lives in the human-readable `description` field, which the Qwen
+ * team updates whenever they swap the underlying model. We auto-derive the
+ * canonical JSON key from that description so this script picks up the
+ * latest model without any manual mapping maintenance.
+ *
+ * Source of truth:
+ *   https://raw.githubusercontent.com/QwenLM/qwen-code/main/packages/core/src/models/constants.ts
+ *
+ * Strategy:
+ *   - Additive for models not yet in the registry.
+ *   - Strips `qwen_code` from any existing entry whose key no longer matches
+ *     an upstream model (so the previous alias becomes an empty stub).
+ *   - `description`-based derivation handles known variants: Plus, Flash,
+ *     Max, Pro, Ultra, Lite. If a new variant appears, the script logs a
+ *     warning; update `deriveCanonicalKey()` to extend the regex.
  */
 
 import { dirname, resolve } from "node:path";
@@ -23,17 +37,36 @@ const QWEN_CONSTANTS_URL =
   "https://raw.githubusercontent.com/QwenLM/qwen-code/main/packages/core/src/models/constants.ts";
 
 // ---------------------------------------------------------------------------
-// Known mapping: Qwen OAuth model ID → canonical JSON model key
+// Canonical key derivation
 //
-// The Qwen Code CLI exposes abstract model IDs (e.g. "coder-model") that
-// don't match the standard Qwen model names used in the JSON registry.
-// This map translates them. When a new OAuth model appears that isn't in
-// this map, the script logs a warning so it can be added manually.
+// Qwen Code upstream writes descriptions like:
+//   "Qwen 3.6 Plus — efficient hybrid model ..."    → "qwen3.6-plus"
+//   "Qwen 3.5 — flagship ..."                        → "qwen3.5"
+//   "Qwen 3.7 Max — agentic ..."                     → "qwen3.7-max"
+//
+// We parse the leading "Qwen X.Y [<variant>]" so this script stays in sync
+// whenever Qwen swaps the underlying model of `coder-model`.
 // ---------------------------------------------------------------------------
 
-const OAUTH_MODEL_KEY_MAP = {
-  "coder-model": "qwen3.5",
-};
+const KNOWN_VARIANTS = ["Plus", "Flash", "Max", "Pro", "Ultra", "Lite"];
+
+function deriveCanonicalKey(oauthModel) {
+  const description =
+    typeof oauthModel.description === "string" ? oauthModel.description : "";
+  const variantGroup = KNOWN_VARIANTS.join("|");
+  const match = description.match(
+    new RegExp(`^\\s*Qwen\\s+(\\d+(?:\\.\\d+)?)(?:\\s+(${variantGroup}))?\\b`, "i")
+  );
+  if (!match) return null;
+
+  const version = match[1];
+  const variant = match[2];
+
+  if (variant) {
+    return `qwen${version}-${variant.toLowerCase()}`;
+  }
+  return `qwen${version}`;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -155,20 +188,33 @@ function parseOAuthModels(source) {
 /**
  * Build the modelKey → upstreamName map.
  *
- * Strategy (additive):
- *  1. Start with all existing qwen_code models from JSON (preserves them).
- *  2. Add any new OAuth models found in the source (using OAUTH_MODEL_KEY_MAP).
- *  3. Never remove models – the OAuth list is incomplete by design.
+ * Strategy:
+ *  1. Start from existing `qwen_code` registry entries, but only keep those
+ *     whose `upstream` field still points to an ID offered by Qwen Code
+ *     today. Stale entries (whose upstream no longer matches anything in
+ *     the OAuth list) fall out so the registry reflects the latest upstream.
+ *  2. Derive the canonical JSON key from each OAuth model's `description`
+ *     and add it to the map if not already present.
+ *  3. Models whose description we cannot parse are logged as warnings so the
+ *     regex in `deriveCanonicalKey()` can be extended.
  */
 function buildModelMap(oauthModels, existingKeys) {
-  const map = new Map(existingKeys);
+  const validUpstreamIds = new Set(oauthModels.map((m) => m.id));
+  const map = new Map();
+
+  for (const [key, upstream] of existingKeys) {
+    if (validUpstreamIds.has(upstream)) {
+      map.set(key, upstream);
+    }
+  }
+
   const unmapped = [];
 
   for (const model of oauthModels) {
-    const canonicalKey = OAUTH_MODEL_KEY_MAP[model.id];
+    const canonicalKey = deriveCanonicalKey(model);
 
     if (!canonicalKey) {
-      unmapped.push(model.id);
+      unmapped.push({ id: model.id, description: model.description });
       continue;
     }
 
@@ -180,8 +226,11 @@ function buildModelMap(oauthModels, existingKeys) {
 
   if (unmapped.length > 0) {
     console.warn(
-      `Qwen Code: ${unmapped.length} unmapped OAuth model(s): ${unmapped.join(", ")}. ` +
-        `Add them to OAUTH_MODEL_KEY_MAP in scripts/qwen-code.mjs.`
+      `Qwen Code: ${unmapped.length} OAuth model(s) could not be derived from description:\n` +
+        unmapped
+          .map((m) => `  - ${m.id}: "${m.description ?? ""}"`)
+          .join("\n") +
+        `\nExtend the variant list / regex in deriveCanonicalKey().`
     );
   }
 
@@ -197,7 +246,7 @@ function enrichNewModels(modelsDir, addedKeys, oauthModels) {
   const lookup = new Map();
 
   for (const m of oauthModels) {
-    const canonicalKey = OAUTH_MODEL_KEY_MAP[m.id];
+    const canonicalKey = deriveCanonicalKey(m);
     if (canonicalKey) lookup.set(canonicalKey, m);
   }
 
