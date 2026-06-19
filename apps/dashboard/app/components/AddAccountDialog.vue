@@ -56,7 +56,6 @@ const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account
 
 const providerConfigs: Record<Provider, ProviderConfig> = {
   antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", methods: [browserOAuthMethod] },
-  gemini_cli: { name: "Gemini CLI", description: "Access Gemini 2.5 Pro & 3 models", methods: [browserOAuthMethod] },
   qwen_code: { name: "Qwen Code", description: "Access Qwen Coder models", methods: [deviceCodeMethod] },
   copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [copilotOpencodeMethod, copilotOfficialMethod] },
   codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
@@ -84,7 +83,7 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "gemini_cli", "qwen_code", "copilot", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
+const providerOptions: Provider[] = ["antigravity", "codex", "kiro", "qwen_code", "copilot", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -170,7 +169,7 @@ watch([open, step, provider, selectedMethod], async () => {
 
   try {
     if (selectedFlowType === "oauth_redirect") {
-      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider as "antigravity" | "gemini_cli" | "codex" | "kiro" });
+      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider as "antigravity" | "codex" | "kiro" });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       authUrl.value = result.data.authUrl;
@@ -514,7 +513,7 @@ async function handleExchangeOAuth() {
 
   isLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.exchangeOAuth({ provider: provider.value as "antigravity" | "gemini_cli" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
+    const result = await dashboardApi.accounts.exchangeOAuth({ provider: provider.value as "antigravity" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {

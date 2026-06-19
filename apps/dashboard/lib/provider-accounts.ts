@@ -2,7 +2,6 @@ export type ProviderAccountKey =
   | "antigravity"
   | "codex"
   | "copilot"
-  | "gemini_cli"
   | "kiro"
   | "nvidia_nim"
   | "openrouter"
@@ -46,14 +45,6 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "Copilot",
     category: "oauth",
     emptyMessage: "No Copilot connections yet.",
-    showTier: true,
-  },
-  {
-    key: "gemini_cli",
-    slug: "gemini-cli",
-    label: "Gemini CLI",
-    category: "oauth",
-    emptyMessage: "No Gemini CLI connections yet.",
     showTier: true,
   },
   {

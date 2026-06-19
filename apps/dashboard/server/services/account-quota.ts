@@ -6,7 +6,7 @@ import { providerAccount } from "../lib/db/schema";
 import { fetchInternalQuota, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 
 const MAX_QUOTA_BATCH_ACCOUNTS = 100;
-const quotaProviderSchema = z.enum(["antigravity", "copilot", "codex", "gemini_cli", "kiro", "openrouter", "siliconflow"]);
+const quotaProviderSchema = z.enum(["antigravity", "copilot", "codex", "kiro", "openrouter", "siliconflow"]);
 const quotaInFlight = new Map<string, Promise<AccountQuotaResult>>();
 const accountIdSchema = z.string().trim().min(1);
 

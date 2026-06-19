@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
 	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
@@ -869,37 +867,6 @@ func TestValidateForcedAccountAvailabilityAllowsInactiveForPlayground(t *testing
 	err := validateForcedAccountAvailability(appdb.ProviderAccount{ID: "acct_1", IsActive: false, DisabledUntil: &disabledUntil}, true, param)
 	if err != nil {
 		t.Fatalf("availability error = %+v, want nil", err)
-	}
-}
-
-func TestValidateSelectedAccountModelRejectsGeminiCLIFreeTierForProModel(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := &Service{registry: registry}
-	provider := "gemini_cli"
-	freeTier := "free-tier"
-	validation := auth.ModelValidationResult{Valid: true, Provider: &provider, Model: "gemini-3.1-pro-preview"}
-
-	routeErr := service.validateSelectedAccountModel(appdb.ProviderAccount{ID: "acct_1", Provider: provider, Tier: &freeTier}, validation, "model")
-	if routeErr == nil || routeErr.Code == nil || *routeErr.Code != "provider_account_tier_mismatch" {
-		t.Fatalf("route error = %+v, want provider_account_tier_mismatch", routeErr)
-	}
-}
-
-func TestValidateSelectedAccountModelAllowsGeminiCLIStandardTierForProModel(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := &Service{registry: registry}
-	provider := "gemini_cli"
-	standardTier := "standard-tier"
-	validation := auth.ModelValidationResult{Valid: true, Provider: &provider, Model: "gemini-3.1-pro-preview"}
-
-	if routeErr := service.validateSelectedAccountModel(appdb.ProviderAccount{ID: "acct_1", Provider: provider, Tier: &standardTier}, validation, "model"); routeErr != nil {
-		t.Fatalf("route error = %+v, want nil", routeErr)
 	}
 }
 

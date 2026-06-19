@@ -1,8 +1,7 @@
 {
   "providers": [
     "copilot",
-    "antigravity",
-    "gemini_cli"
+    "antigravity"
   ],
   "aliases": [
     "gemini-3.5-flash-high",

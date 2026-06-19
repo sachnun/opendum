@@ -1,8 +1,7 @@
 {
   "providers": [
     "antigravity",
-    "copilot",
-    "gemini_cli"
+    "copilot"
   ],
   "aliases": [
     "gemini-3-flash",
@@ -38,9 +37,6 @@
         "enterprise"
       ],
       "reasoning_effort": false
-    },
-    "gemini_cli": {
-      "upstream": "gemini-3-flash"
     }
   }
 }

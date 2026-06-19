@@ -176,8 +176,6 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 		return s.fetchCopilotQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "codex":
 		return s.fetchCodexQuota(ctx, requestAccount, credentials, forceRefresh), nil
-	case "gemini_cli":
-		return s.fetchGeminiCLIQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "kiro":
 		return s.fetchKiroQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	default:

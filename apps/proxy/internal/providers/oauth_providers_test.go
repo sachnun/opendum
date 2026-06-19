@@ -448,26 +448,6 @@ func TestWorkersAIProviderConvertsImageURL(t *testing.T) {
 	assertChatImageDataURI(t, payload)
 }
 
-func TestGoogleCodeAssistConvertsImageURLToInlineData(t *testing.T) {
-	projectID := "project_123"
-	var payload map[string]any
-	client := imageCaptureClient(t, &payload)
-	provider := googleCodeAssistProvider{name: "gemini_cli", endpoint: "https://cloudcode-pa.googleapis.com", registry: testModelsRegistry(t)}
-
-	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{ProjectID: &projectID}, imageURLBody("gemini_cli"), false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-	request := payload["request"].(map[string]any)
-	contents := request["contents"].([]any)
-	parts := contents[0].(map[string]any)["parts"].([]any)
-	inlineData := parts[1].(map[string]any)["inlineData"].(map[string]any)
-	if inlineData["mimeType"] != "image/png" || inlineData["data"] == "" {
-		t.Fatalf("inlineData = %#v", inlineData)
-	}
-}
-
 func TestAntigravityGenerationHeadersIncludeCodeAssistMetadata(t *testing.T) {
 	provider := antigravityProvider{}.delegate()
 	req, err := http.NewRequest(http.MethodPost, "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent", nil)

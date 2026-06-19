@@ -1,6 +1,5 @@
 {
   "providers": [
-    "gemini_cli",
     "copilot"
   ],
   "family": "Google",
@@ -18,23 +17,6 @@
         "enterprise"
       ],
       "reasoning_effort": false
-    },
-    "gemini_cli": {
-      "allowedTiers": [
-        "standard-tier",
-        "paid",
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
-      ],
-      "thinking_budgets": {
-        "high": 32768,
-        "low": 8192,
-        "medium": 16384,
-        "xhigh": 32768
-      },
-      "thinking_format": "budget"
     }
   }
 }

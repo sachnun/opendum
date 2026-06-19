@@ -72,19 +72,10 @@ type googleCodeAssistProvider struct {
 	redis            *redis.Client
 }
 
-type geminiCLIProvider struct {
-	registry *models.Registry
-	db       *appdb.DB
-	redis    *redis.Client
-}
 type antigravityProvider struct {
 	registry *models.Registry
 	db       *appdb.DB
 	redis    *redis.Client
-}
-
-func (p geminiCLIProvider) delegate() googleCodeAssistProvider {
-	return googleCodeAssistProvider{name: "gemini_cli", clientID: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.sandbox.googleapis.com", endpoints: []string{"https://daily-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.sandbox.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: 30 * time.Minute, userAgent: "GeminiCLI/0.34.0 (win32; x64)", registry: p.registry, db: p.db, redis: p.redis}
 }
 
 func (p antigravityProvider) delegate() googleCodeAssistProvider {
@@ -92,16 +83,9 @@ func (p antigravityProvider) delegate() googleCodeAssistProvider {
 	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "rising-fact-p41fc", userAgent: antigravityUserAgent + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
 }
 
-func (p geminiCLIProvider) RefreshBuffer() time.Duration   { return p.delegate().RefreshBuffer() }
 func (p antigravityProvider) RefreshBuffer() time.Duration { return p.delegate().RefreshBuffer() }
-func (p geminiCLIProvider) RefreshCredentials(ctx context.Context, client *http.Client, refreshToken string, account appdb.ProviderAccount) (RefreshedCredentials, error) {
-	return p.delegate().RefreshCredentials(ctx, client, refreshToken, account)
-}
 func (p antigravityProvider) RefreshCredentials(ctx context.Context, client *http.Client, refreshToken string, account appdb.ProviderAccount) (RefreshedCredentials, error) {
 	return p.delegate().RefreshCredentials(ctx, client, refreshToken, account)
-}
-func (p geminiCLIProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
-	return p.delegate().MakeRequest(ctx, client, credentials, account, body, stream)
 }
 func (p antigravityProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	return p.delegate().MakeRequest(ctx, client, credentials, account, body, stream)

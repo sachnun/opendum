@@ -8,8 +8,6 @@ import { antigravityProvider } from "../lib/providers/antigravity";
 import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "../lib/providers/antigravity/constants";
 import { initiateCopilotDeviceCodeFlow, pollCopilotDeviceCodeAuthorization } from "../lib/providers/copilot";
 import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
-import { geminiCliProvider } from "../lib/providers/gemini-cli";
-import { CLIENT_ID as geminiCliClientId, REDIRECT_URI as geminiCliRedirectUri, SCOPES as geminiCliScopes } from "../lib/providers/gemini-cli/constants";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
 import { initiateDeviceCodeFlow, pollDeviceCodeAuthorization } from "../lib/providers/qwen-code";
 import type { OAuthResult } from "../lib/providers/types";
@@ -17,8 +15,8 @@ import type { ActionResult } from "../utils/api";
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
-export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "gemini_cli", "codex", "kiro"]) });
-export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "gemini_cli", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
+export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]) });
+export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
 const copilotAuthMethodSchema = z.enum(["opencode", "official"]).optional();
 export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), method: copilotAuthMethodSchema });
 export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["qwen_code", "copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: copilotAuthMethodSchema });
@@ -36,7 +34,6 @@ type OAuthAccountOptions = {
 
 const GOOGLE_OAUTH_CONFIG = {
   antigravity: { clientId: antigravityClientId, redirectUri: antigravityRedirectUri, scopes: antigravityScopes },
-  gemini_cli: { clientId: geminiCliClientId, redirectUri: geminiCliRedirectUri, scopes: geminiCliScopes },
 };
 
 function generateOAuthState(): string {
@@ -44,8 +41,8 @@ function generateOAuthState(): string {
   return Buffer.from(bytes).toString("base64url");
 }
 
-function buildGoogleOAuthUrl(provider: "antigravity" | "gemini_cli"): string {
-  const config = GOOGLE_OAUTH_CONFIG[provider];
+function buildGoogleOAuthUrl(): string {
+  const config = GOOGLE_OAUTH_CONFIG.antigravity;
   const params = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirectUri, response_type: "code", scope: config.scopes.join(" "), access_type: "offline", prompt: "consent" });
   return `${GOOGLE_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
 }
@@ -71,13 +68,8 @@ const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
 }> = {
   antigravity: {
     label: "Antigravity",
-    buildAuthUrl: async () => ({ authUrl: buildGoogleOAuthUrl("antigravity"), state: null, codeVerifier: null }),
+    buildAuthUrl: async () => ({ authUrl: buildGoogleOAuthUrl(), state: null, codeVerifier: null }),
     exchangeCode: (code) => antigravityProvider.exchangeCode(code, antigravityRedirectUri),
-  },
-  gemini_cli: {
-    label: "Gemini CLI",
-    buildAuthUrl: async () => ({ authUrl: buildGoogleOAuthUrl("gemini_cli"), state: null, codeVerifier: null }),
-    exchangeCode: (code) => geminiCliProvider.exchangeCode(code, geminiCliRedirectUri),
   },
   codex: {
     label: "Codex",

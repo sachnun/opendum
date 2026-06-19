@@ -68,7 +68,6 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"kiro":        kiroProvider{registry: registry},
 		"codex":       codexProvider{registry: registry, redis: redis, db: db},
 		"copilot":     copilotProvider{registry: registry, redis: redis},
-		"gemini_cli":  geminiCLIProvider{registry: registry, db: db, redis: redis},
 		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
 		"qoder":       openAICompatibleProvider{name: "qoder", baseURL: "https://openapi.qoder.sh/api/v1", supportedParams: supportedQoder, registry: registry, trimPrefix: "qoder/"},
 		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},

@@ -22,7 +22,6 @@ export interface ProviderAccountCounts {
   antigravity: number;
   codex: number;
   copilot: number;
-  gemini_cli: number;
   kiro: number;
   nvidia_nim: number;
   openrouter: number;
@@ -49,7 +48,6 @@ export const primaryNavigation: NavItem[] = [
       { name: "Antigravity", href: getProviderAccountPath("antigravity") },
       { name: "Codex", href: getProviderAccountPath("codex") },
       { name: "Copilot", href: getProviderAccountPath("copilot") },
-      { name: "Gemini CLI", href: getProviderAccountPath("gemini_cli") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
       { name: "Openrouter", href: getProviderAccountPath("openrouter") },

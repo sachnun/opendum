@@ -2,7 +2,6 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "antigravity",
   "codex",
   "copilot",
-  "gemini_cli",
   "kiro",
   "qwen_code",
   "nvidia_nim",
