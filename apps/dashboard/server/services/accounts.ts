@@ -182,6 +182,7 @@ function accountTierCanAccessModel(accountTier: string | null | undefined, model
 }
 
 function providerModelIsAccessibleByAccounts(model: string, provider: string, accounts: Array<{ tier: string | null }>): boolean {
+  if (accounts.length === 0) return true;
   const accessRule = getProviderAccessRule(model, provider);
   if (!accessRule?.allowedTiers?.length && !accessRule?.minTier) return true;
   return accounts.some((account) => accountTierCanAccessModel(account.tier, model, provider));
