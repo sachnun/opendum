@@ -199,6 +199,50 @@ func TestProviderAliasesUseConfiguredUpstreams(t *testing.T) {
 	}
 }
 
+func TestDeepSeekV4AliasesResolveToCanonical(t *testing.T) {
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const flashCanonical = "deepseek-v4-flash"
+	const proCanonical = "deepseek-v4-pro"
+
+	flashAliases := []string{
+		"deepseek-flash",
+		"deepseek-v4-flash",
+		"deepseek-ai/deepseek-v4-flash",
+		"deepseek-v4-flash-free",
+		"deepseek-ai/DeepSeek-V4-Flash",
+	}
+	for _, alias := range flashAliases {
+		if got := registry.ResolveAlias(alias); got != flashCanonical {
+			t.Fatalf("ResolveAlias(%q) = %q, want %q", alias, got, flashCanonical)
+		}
+		if !registry.IsSupported(alias) {
+			t.Fatalf("IsSupported(%q) = false, want true", alias)
+		}
+		if _, ok := registry.ProviderModelMap("nvidia_nim")[alias]; ok {
+			continue
+		}
+	}
+
+	proAliases := []string{
+		"deepseek-pro",
+		"deepseek-v4-pro",
+		"deepseek-ai/deepseek-v4-pro",
+		"deepseek-ai/DeepSeek-V4-Pro",
+	}
+	for _, alias := range proAliases {
+		if got := registry.ResolveAlias(alias); got != proCanonical {
+			t.Fatalf("ResolveAlias(%q) = %q, want %q", alias, got, proCanonical)
+		}
+		if !registry.IsSupported(alias) {
+			t.Fatalf("IsSupported(%q) = false, want true", alias)
+		}
+	}
+}
+
 func TestNvidiaNemotronOmniAliasUsesCurrentHostedModel(t *testing.T) {
 	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
 	if err != nil {

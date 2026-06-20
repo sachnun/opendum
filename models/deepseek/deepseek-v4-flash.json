@@ -20,5 +20,13 @@
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Flash"
     }
-  }
+  },
+  "aliases": [
+    "deepseek-flash",
+    "deepseek-v4-flash",
+    "deepseek-ai/deepseek-v4-flash",
+    "deepseek-v4-flash-free",
+    "deepseek-ai/DeepSeek-V4-Flash"
+  ],
+  "ignored": false
 }

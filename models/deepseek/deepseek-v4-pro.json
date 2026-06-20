@@ -16,5 +16,12 @@
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Pro"
     }
-  }
+  },
+  "aliases": [
+    "deepseek-pro",
+    "deepseek-v4-pro",
+    "deepseek-ai/deepseek-v4-pro",
+    "deepseek-ai/DeepSeek-V4-Pro"
+  ],
+  "ignored": false
 }
