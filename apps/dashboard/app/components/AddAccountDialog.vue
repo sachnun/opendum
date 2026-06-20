@@ -61,7 +61,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   command_code: { name: "Command Code", description: "Access open-source models via the Go tier CLI API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://commandcode.ai/studio/api-keys", apiKeyPlaceholder: "user_..." },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
-  openrouter: { name: "Openrouter", description: "Access Openrouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
+  openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
   workers_ai: { name: "Cloudflare", description: "Access open-source models on Cloudflare's global network", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
   qoder: { name: "Qoder", description: "Access Qoder models via PAT", methods: [apiKeyMethod], apiKeyPortalUrl: "https://qoder.com/account/integrations", apiKeyPlaceholder: "qod_pat_..." },
   zenmux: { name: "ZenMux", description: "Access ZenMux free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://zenmux.ai/platform/pay-as-you-go", apiKeyPlaceholder: "sk-..." },

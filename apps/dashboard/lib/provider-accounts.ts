@@ -74,9 +74,9 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
   {
     key: "openrouter",
     slug: "openrouter",
-    label: "Openrouter",
+    label: "OpenRouter",
     category: "api_key",
-    emptyMessage: "No Openrouter connections yet.",
+    emptyMessage: "No OpenRouter connections yet.",
     showTier: false,
   },
   {

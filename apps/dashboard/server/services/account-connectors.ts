@@ -26,7 +26,7 @@ type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 
 const API_KEY_PROVIDER_SETTINGS = {
   nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
-  openrouter: { label: "Openrouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
+  openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
   qoder: { label: "Qoder", baseUrl: "https://openapi.qoder.sh/api/v1", modelMap: getProviderModelMap("qoder"), validationPath: "/models", requireSuccessfulStatus: true },
   siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
