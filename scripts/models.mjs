@@ -20,7 +20,7 @@ const refreshScripts = [
   "opencode.mjs",
   "openrouter.mjs",
   "nvidia.mjs",
-  "workers-ai.mjs",
+  "cloudflare.mjs",
   "zenmux.mjs",
   "siliconflow.mjs",
 ];

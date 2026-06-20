@@ -56,7 +56,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
   },
   {
     key: "nvidia_nim",
-    slug: "nvidia-nim",
+    slug: "nvidia",
     label: "Nvidia",
     category: "api_key",
     emptyMessage: "No Nvidia connections yet.",
@@ -72,7 +72,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
   },
   {
     key: "workers_ai",
-    slug: "workers-ai",
+    slug: "cloudflare",
     label: "Cloudflare",
     category: "api_key",
     emptyMessage: "No Cloudflare accounts connected yet.",

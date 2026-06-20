@@ -6,12 +6,12 @@ import { providerAccount } from "../lib/db/schema";
 import { encrypt, hashString } from "../lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { getProviderModelMap } from "../lib/proxy/models";
-import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia-nim/constants";
+import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/constants";
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
 import { API_BASE_URL as siliconflowApiBaseUrl } from "../lib/providers/siliconflow/constants";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/providers/provider-http-errors";
-import { getWorkersAiValidationUrl } from "../lib/providers/workers-ai/constants";
+import { getCloudflareValidationUrl } from "../lib/providers/cloudflare/constants";
 import type { ActionResult } from "../utils/api";
 
 const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
@@ -95,7 +95,7 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   return { success: true, data: { email: identifier, isUpdate: false } };
 }
 
-async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: string, accountName?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+async function connectCloudflare(userId: string, apiToken: string, cfAccountId: string, accountName?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
   const normalizedApiToken = apiToken.trim();
   const normalizedAccountId = cfAccountId.trim();
   if (!normalizedApiToken) return { success: false, error: "API token is required" };
@@ -104,7 +104,7 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
   try {
-    const response = await fetchInternalProvider(getWorkersAiValidationUrl(normalizedAccountId), { method: "GET", headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" }, signal: controller.signal });
+    const response = await fetchInternalProvider(getCloudflareValidationUrl(normalizedAccountId), { method: "GET", headers: { Authorization: `Bearer ${normalizedApiToken}`, Accept: "application/json" }, signal: controller.signal });
     if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to validate Cloudflare credentials through the proxy. Please try again." };
     if (!response.ok) {
       const responseText = await response.text().catch(() => "");
@@ -135,7 +135,7 @@ async function connectWorkersAi(userId: string, apiToken: string, cfAccountId: s
 
 const ACCOUNT_CONNECTORS = {
   ...Object.fromEntries(apiKeyProviderSchema.options.map((provider) => [provider, (userId: string, input: CreateAccountInput) => connectApiKeyProviderAccount(userId, provider, input.token, input.name)])),
-  workers_ai: (userId: string, input: CreateAccountInput) => connectWorkersAi(userId, input.token, input.cfAccountId ?? "", input.name),
+  workers_ai: (userId: string, input: CreateAccountInput) => connectCloudflare(userId, input.token, input.cfAccountId ?? "", input.name),
 } as Record<string, (userId: string, input: CreateAccountInput) => Promise<ActionResult<{ email: string; isUpdate: boolean }>>>;
 
 export async function createAccount(userId: string, input: CreateAccountInput) {
