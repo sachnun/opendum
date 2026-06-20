@@ -41,7 +41,7 @@ type DurationPoint = { time: string; avgDuration: number | null };
 
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
-const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "kiro", "openrouter", "siliconflow"]);
+const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "kiro", "openrouter", "siliconflow", "command_code"]);
 const DEFAULT_MAX_QUOTA_SKELETON_ROWS = 3;
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
@@ -140,6 +140,9 @@ const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
   openrouter: [
     { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
     { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
+  ],
+  command_code: [
+    { labelClass: "w-36", metaClass: "w-12", valueClass: "w-16", barClass: "w-3/4" },
   ],
 };
 
