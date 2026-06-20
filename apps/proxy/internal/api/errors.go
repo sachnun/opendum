@@ -21,13 +21,6 @@ func WriteOpenAIError(w http.ResponseWriter, status int, info ErrorInfo) {
 	writeJSON(w, status, map[string]any{"error": info})
 }
 
-func WriteAnthropicError(w http.ResponseWriter, status int, info ErrorInfo) {
-	if info.Type == "" {
-		info.Type = "invalid_request_error"
-	}
-	writeJSON(w, status, map[string]any{"type": "error", "error": map[string]any{"type": info.Type, "message": info.Message}})
-}
-
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

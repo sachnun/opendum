@@ -113,14 +113,6 @@ const BY_SLUG: Record<string, ProviderAccountDefinition> = Object.fromEntries(
   PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.slug, definition])
 );
 
-export const OAUTH_DEFINITIONS = PROVIDER_ACCOUNT_DEFINITIONS.filter(
-  (definition) => definition.category === "oauth"
-);
-
-export const API_KEY_DEFINITIONS = PROVIDER_ACCOUNT_DEFINITIONS.filter(
-  (definition) => definition.category === "api_key"
-);
-
 export function getProviderLabel(provider: string): string {
   if (provider === "opencode") return "Opencode";
   if (provider === "kilo_code") return "Kilo Code";

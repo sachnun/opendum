@@ -4,10 +4,6 @@ export const AUTHLESS_PROVIDER_KEYS = ["opencode", "mimo_code"] as const;
 
 const AUTHLESS_PROVIDER_SET = new Set<string>(AUTHLESS_PROVIDER_KEYS);
 
-export function isAuthlessProvider(provider: string): boolean {
-  return AUTHLESS_PROVIDER_SET.has(provider);
-}
-
 export function getAuthlessProviderAccounts() {
   const providerModelAuthlessAccounts = Object.entries(getAuthlessProviderModels()).map(([provider, models]) => ({
     id: `authless:${provider}`,
@@ -40,5 +36,5 @@ export function getAuthlessProviderAccounts() {
 }
 
 export function isSyntheticAuthlessAccount(accountId: string): boolean {
-  return isAuthlessProvider(accountId) || accountId.startsWith("authless:");
+  return AUTHLESS_PROVIDER_SET.has(accountId) || accountId.startsWith("authless:");
 }

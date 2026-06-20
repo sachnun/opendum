@@ -10,18 +10,7 @@ import {
   resolveModelAlias,
 } from "./models.js";
 import { AUTHLESS_PROVIDER_KEYS } from "./authless-providers.js";
-
-const DASHBOARD_PROVIDER_ACCOUNT_KEYS = [
-  "antigravity",
-  "codex",
-  "copilot",
-  "kiro",
-  "nvidia_nim",
-  "openrouter",
-  "siliconflow",
-  "workers_ai",
-  "zenmux",
-] as const;
+import { PROVIDER_ACCOUNT_KEYS } from "../../services/account-providers";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";
@@ -133,8 +122,8 @@ export async function getAccountModelAvailability(
   options: { includeInactiveAccounts?: boolean } = {}
 ): Promise<AccountModelAvailability> {
   const accountWhere = options.includeInactiveAccounts
-    ? and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, DASHBOARD_PROVIDER_ACCOUNT_KEYS))
-    : and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, DASHBOARD_PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date())));
+    ? and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS))
+    : and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date())));
 
   const activeAccounts = await db
     .select({

@@ -1,8 +1,3 @@
-import { eq } from "drizzle-orm";
-
-import { db } from "../../db/index.js";
-import { providerAccount, type ProviderAccount } from "../../db/schema.js";
-import { decrypt, encrypt } from "../../encryption.js";
 import { fetchInternalProvider } from "../../proxy/internal-relay.js";
 import type { OAuthResult } from "../types.js";
 import { formatProviderHttpError } from "../provider-http-errors.js";
@@ -12,7 +7,6 @@ import {
   DEVICE_CODE_ENDPOINT,
   DEVICE_CODE_EXPIRY,
   POLLING_INTERVAL,
-  REFRESH_BUFFER_SECONDS,
   SCOPES,
   TOKEN_ENDPOINT,
   type CopilotAuthMethod,
@@ -71,13 +65,6 @@ const POLLING_SAFETY_MARGIN_SECONDS = 3;
 function copilotAuthMethod(method?: string | null): CopilotAuthMethod {
   return method === "official" ? "official" : DEFAULT_AUTH_METHOD;
 }
-
-function isTokenExpired(expiresAt: Date): boolean {
-  const bufferMs = REFRESH_BUFFER_SECONDS * 1000;
-  return Date.now() > expiresAt.getTime() - bufferMs;
-}
-
-type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt">;
 
 async function fetchCopilotIdentity(accessToken: string): Promise<string> {
   try {
@@ -223,79 +210,6 @@ async function buildOAuthResult(githubToken: string, options: CopilotOAuthResult
     ...(tier ? { tier } : {}),
   };
 }
-
-export const copilotProvider = {
-  async refreshToken(refreshToken: string): Promise<OAuthResult> {
-    if (refreshToken.trim() && !refreshToken.startsWith("ghr_")) {
-      return buildOAuthResult(refreshToken);
-    }
-
-    const response = await fetchInternalProvider(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": USER_AGENT,
-      },
-      body: JSON.stringify({
-        client_id: CLIENT_IDS[DEFAULT_AUTH_METHOD],
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-      }),
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        formatProviderHttpError("Copilot", response, errorText, {
-          endpointLabel: "token refresh endpoint",
-        })
-      );
-    }
-
-    const tokenData = (await response.json()) as CopilotTokenResponse;
-    if (!tokenData.access_token) {
-      throw new Error(tokenData.error_description || tokenData.error || "Missing access token");
-    }
-
-    return buildOAuthResult(tokenData.access_token, {
-      sourceRefreshToken: tokenData.refresh_token || refreshToken,
-      expiresInSeconds: tokenData.expires_in,
-    });
-  },
-
-  async getValidCredentials(account: CredentialAccount): Promise<string> {
-    let accessToken = decrypt(account.accessToken);
-    const refreshTokenValue = decrypt(account.refreshToken);
-
-    if (isTokenExpired(account.expiresAt) && refreshTokenValue) {
-      try {
-        const refreshed = await copilotProvider.refreshToken(refreshTokenValue);
-
-        await db
-          .update(providerAccount)
-          .set({
-            accessToken: encrypt(refreshed.accessToken),
-            refreshToken: encrypt(refreshed.refreshToken || refreshTokenValue),
-            expiresAt: refreshed.expiresAt,
-            ...(refreshed.email ? { email: refreshed.email } : {}),
-            ...(refreshed.tier ? { tier: refreshed.tier } : {}),
-          })
-          .where(eq(providerAccount.id, account.id));
-
-        accessToken = refreshed.accessToken;
-      } catch (error) {
-        console.error(`Failed to refresh Copilot token for account ${account.id}:`, error);
-        if (new Date() >= account.expiresAt) {
-          throw error;
-        }
-      }
-    }
-
-    return accessToken;
-  },
-};
 
 export async function initiateCopilotDeviceCodeFlow(method?: string | null): Promise<{
   deviceCode: string;

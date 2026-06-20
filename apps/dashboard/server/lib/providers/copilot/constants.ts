@@ -31,6 +31,3 @@ export const USER_AGENT = "opencode/1.1.65";
 // Polling defaults
 export const POLLING_INTERVAL = 5;
 export const DEVICE_CODE_EXPIRY = 900;
-
-// Refresh buffer for expiring OAuth tokens
-export const REFRESH_BUFFER_SECONDS = 5 * 60;

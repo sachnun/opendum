@@ -39,5 +39,3 @@ export function formatProviderHttpError(
     body ? ` ${body.slice(0, bodyLimit)}` : ""
   }`;
 }
-
-export const formatQuotaHttpError = formatProviderHttpError;

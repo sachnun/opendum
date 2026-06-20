@@ -1,4 +1,3 @@
-export { copilotProvider } from "./client.js";
 export {
   initiateCopilotDeviceCodeFlow,
   pollCopilotDeviceCodeAuthorization,

@@ -336,17 +336,6 @@ func (r *Registry) IsAuthlessProviderModel(model, provider string) bool {
 	return ok && cfg.Authless
 }
 
-func (r *Registry) AuthlessProvidersForModel(model string) []string {
-	canonical := r.ResolveAlias(model)
-	providers := []string{}
-	for _, provider := range r.ProvidersForModel(canonical) {
-		if r.IsAuthlessProviderModel(canonical, provider) {
-			providers = append(providers, provider)
-		}
-	}
-	return providers
-}
-
 func (r *Registry) AuthlessProviderModels() map[string][]string {
 	result := map[string][]string{}
 	for model, info := range r.effective {

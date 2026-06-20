@@ -137,11 +137,6 @@ export function getProviderAccessRule(
   return null;
 }
 
-export function isAuthlessProviderModel(model: string, provider: string): boolean {
-  const canonical = resolveModelAlias(model);
-  return EFFECTIVE_MODEL_REGISTRY[canonical]?.providerConfig?.[provider]?.authless === true;
-}
-
 export function getAuthlessProviderModels(): Record<string, string[]> {
   const result: Record<string, string[]> = {};
 

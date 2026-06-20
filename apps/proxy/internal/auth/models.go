@@ -219,10 +219,6 @@ func (s *Service) IsModelDisabledForUser(ctx context.Context, userID, model stri
 	return ok, nil
 }
 
-func (s *Service) GetAccountModelAvailability(ctx context.Context, userID string) (AccountModelAvailability, error) {
-	return s.GetAccountModelAvailabilityWithSharing(ctx, userID, false)
-}
-
 func (s *Service) GetAccountModelAvailabilityWithSharing(ctx context.Context, userID string, includeShared bool) (AccountModelAvailability, error) {
 	availability := AccountModelAvailability{
 		ActiveProviders:                    map[string]struct{}{},

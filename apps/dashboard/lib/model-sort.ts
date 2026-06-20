@@ -250,11 +250,3 @@ export function compareModelEntries(left: ModelSortEntry, right: ModelSortEntry)
 export function compareModelIds(left: string, right: string): number {
   return compareModelEntries(left, right);
 }
-
-export function sortModelIds(models: readonly string[]): string[] {
-  return [...models].sort(compareModelIds);
-}
-
-export function sortModelEntries<T extends Exclude<ModelSortEntry, string>>(models: readonly T[]): T[] {
-  return [...models].sort(compareModelEntries);
-}

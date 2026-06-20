@@ -3,11 +3,11 @@ import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
 import { db, type Database } from "../lib/db";
 import { pointTransaction, providerAccount, proxyApiKey, usageLog, userPointBalance } from "../lib/db/schema";
 
-export const INITIAL_POINT_BALANCE = 15;
 export const API_KEY_UPDATE_POINT_COST = 100;
 export const ROAMING_POINT_COST = 2;
 
 type PointDatabase = Pick<Database, "insert" | "select" | "update">;
+const INITIAL_POINT_BALANCE = 15;
 
 async function ensureUserPointBalanceWithClient(client: PointDatabase, userId: string): Promise<number> {
   const [created] = await client
