@@ -8,7 +8,6 @@ import { getProviderLabel } from "../../../lib/provider-accounts";
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const route = useRoute();
-const router = useRouter();
 const dashboardApi = useDashboardApi();
 const { isAuditMode } = useDashboardAudit();
 const dashboardInvalidation = useDashboardDataInvalidation();
@@ -17,7 +16,7 @@ const nuxtApp = useNuxtApp();
 type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
 const MODEL_STATS_BATCH_SIZE = 24;
 const MODEL_STATS_POLL_MS = 30_000;
-const HIGHLIGHT_DURATION_MS = 5000;
+const HIGHLIGHT_DURATION_MS = 2500;
 
 const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardInvalidation.keys.models).data.value !== undefined;
 const shouldRefreshCachedModelsOnMount = import.meta.client && !nuxtApp.isHydrating && cachedModelsBeforePageLoad;
@@ -329,7 +328,9 @@ watch(
 
     setTimeout(() => {
       if (route.path === "/dashboard/models" && decodeModelHash(route.hash) === id) {
-        void router.replace({ path: "/dashboard/models" });
+        if (typeof window !== "undefined") {
+          window.history.replaceState(window.history.state, "", "/dashboard/models");
+        }
       }
     }, 60);
   },

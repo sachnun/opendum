@@ -36,6 +36,7 @@ const PROVIDER_DETAIL_REFRESH_MS = 30_000;
 const DASHBOARD_CACHE_DB_NAME = "opendum-dashboard";
 const ACCOUNT_STATS_STORE_NAME = "account-stats";
 const ACCOUNT_QUOTA_STORE_NAME = "account-quota";
+const HIGHLIGHT_DURATION_MS = 2500;
 
 const { data, error, pending, refresh } = await useAsyncData(
   () => `dashboard-accounts-detail-${selectedProvider.value}`,
@@ -190,7 +191,7 @@ watch(
     highlightTimer = setTimeout(() => {
       highlightedAccountIds.value = new Set();
       highlightTimer = null;
-    }, 5000);
+    }, HIGHLIGHT_DURATION_MS);
   },
   { immediate: true }
 );
@@ -294,7 +295,7 @@ watch(
     highlightTimer = setTimeout(() => {
       highlightedAccountIds.value = new Set();
       highlightTimer = null;
-    }, 5000);
+    }, HIGHLIGHT_DURATION_MS);
 
     await nextTick();
     const accountCard = accountCardRefs.value.find((card) => {
@@ -303,6 +304,14 @@ watch(
     });
     const accountElement = accountCard instanceof Element ? accountCard : accountCard?.$el;
     accountElement?.scrollIntoView({ block: "center", behavior: "smooth" });
+
+    setTimeout(() => {
+      if (route.path === `/dashboard/${selectedProvider.value}` && decodeAccountHash(route.hash) === accountId) {
+        if (typeof window !== "undefined") {
+          window.history.replaceState(window.history.state, "", route.path);
+        }
+      }
+    }, 60);
   },
   { immediate: true }
 );
