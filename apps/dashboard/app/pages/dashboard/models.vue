@@ -216,7 +216,7 @@ function getFamilyAnchorId(family: string) {
   if (family === "Mistral") return "mistral-models";
   if (family === "Qwen") return "qwen-models";
   if (family === "DeepSeek") return "deepseek-models";
-  if (family === "Kimi") return "kimi-models";
+  if (family === "Moonshot") return "moonshot-models";
   if (family === "MiniMax") return "minimax-models";
   if (family === "Xiaomi") return "xiaomi-models";
   if (family === "xAI") return "xai-models";

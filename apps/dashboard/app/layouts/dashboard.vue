@@ -316,7 +316,15 @@ function visibleSubItems(item: NavItem) {
   }
 
   if (item.href === "/dashboard/models") {
-    return item.children.filter((subItem) => subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) > 0 : true);
+    return item.children
+      .filter((subItem) => subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) > 0 : true)
+      .sort((a, b) => {
+        const countA = a.anchorId ? (modelFamilyCounts.value[a.anchorId] ?? 0) : 0;
+        const countB = b.anchorId ? (modelFamilyCounts.value[b.anchorId] ?? 0) : 0;
+        const isSingleA = countA === 1;
+        const isSingleB = countB === 1;
+        return (isSingleA ? 1 : 0) - (isSingleB ? 1 : 0);
+      });
   }
 
   return item.children;

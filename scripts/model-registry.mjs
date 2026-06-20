@@ -137,7 +137,7 @@ const FAMILY_RULES = [
   { test: /^qwen|^qwq-/, folder: "qwen", family: "Qwen" },
   { test: /^deepseek-?/, folder: "deepseek", family: "DeepSeek" },
   { test: /^kilo-auto-?/, folder: "kilo-code", family: "Kilo Code" },
-  { test: /^kimi-?/, folder: "kimi", family: "Kimi" },
+  { test: /^kimi-?/, folder: "moonshot", family: "Moonshot" },
   { test: /^minimax-?/, folder: "minimax", family: "MiniMax" },
   { test: /^glm-?/, folder: "zai", family: "Z.AI" },
   { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, folder: "mistral", family: "Mistral" },

@@ -97,7 +97,7 @@ function toModelKey(model, slug, reverseMap) {
 }
 
 function deriveFamily(modelKey) {
-  if (/^kimi-/i.test(modelKey)) return "Kimi";
+  if (/^kimi-/i.test(modelKey)) return "Moonshot";
   if (/^glm-/i.test(modelKey)) return "Z.AI";
   if (/^gpt-|^o\d/i.test(modelKey)) return "OpenAI";
   if (/^gemma/i.test(modelKey)) return "Gemini";

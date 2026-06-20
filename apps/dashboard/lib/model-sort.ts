@@ -13,7 +13,7 @@ const INFERRED_FAMILY_RULES: Array<{ test: RegExp; family: string }> = [
   { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, family: "Mistral" },
   { test: /^qwen|^qwq-/, family: "Qwen" },
   { test: /^deepseek-/, family: "DeepSeek" },
-  { test: /^kimi-/, family: "Kimi" },
+  { test: /^kimi-/, family: "Moonshot" },
   { test: /^minimax-/, family: "MiniMax" },
   { test: /^mimo-/, family: "Xiaomi" },
   { test: /^glm-/, family: "Z.AI" },
@@ -94,7 +94,7 @@ function extractVersion(modelId: string, family: ModelFamily): number[] {
   if (family === "Google") return parseVersionParts(normalized.match(/^gemini-(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
   if (family === "Qwen") return parseVersionParts(normalized.match(/^qwen(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
   if (family === "DeepSeek") return parseVersionParts(normalized.match(/^deepseek-[a-z-]*?v?(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
-  if (family === "Kimi") return parseVersionParts(normalized.match(/^kimi-k(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
+  if (family === "Moonshot") return parseVersionParts(normalized.match(/^kimi-k(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
   if (family === "Z.AI") return parseVersionParts(normalized.match(/^glm-?(\d+(?:\.\d+)*)(?=$|[-_.])/)?.[1]);
 
   return Array.from(normalized.matchAll(/\d+(?:\.\d+)*/g)).flatMap((match) => parseVersionParts(match[0]));

@@ -1,10 +1,9 @@
 {
   "providers": [
     "workers_ai",
-    "zenmux",
     "siliconflow"
   ],
-  "family": "Kimi",
+  "family": "Moonshot",
   "meta": {
     "reasoning": true,
     "toolCall": true,
@@ -12,13 +11,10 @@
   },
   "providerConfig": {
     "siliconflow": {
-      "upstream": "moonshotai/Kimi-K2.7-Code"
+      "upstream": "moonshotai/Kimi-K2.6"
     },
     "workers_ai": {
-      "upstream": "@cf/moonshotai/kimi-k2.7-code"
-    },
-    "zenmux": {
-      "upstream": "moonshotai/kimi-k2.7-code-free"
+      "upstream": "@cf/moonshotai/kimi-k2.6"
     }
   }
 }

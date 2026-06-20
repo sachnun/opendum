@@ -3,7 +3,7 @@
     "workers_ai",
     "siliconflow"
   ],
-  "family": "Kimi",
+  "family": "Moonshot",
   "meta": {
     "reasoning": true,
     "toolCall": true,
