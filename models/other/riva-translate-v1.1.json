@@ -1,4 +1,5 @@
 {
+  "id": "riva-translate-v1.1",
   "providers": [
     "nvidia_nim"
   ],
@@ -13,7 +14,9 @@
     "type": "instruct"
   },
   "aliases": [
+    "riva-translate",
     "riva-translate-4b-instruct-v1.1",
+    "nvidia-riva-translate-v1.1",
     "nvidia/riva-translate-4b-instruct-v1.1",
     "riva-translate-instruct"
   ]

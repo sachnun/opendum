@@ -1,4 +1,5 @@
 {
+  "id": "mixtral-8x7b-v0.1",
   "providers": [
     "nvidia_nim"
   ],
@@ -16,7 +17,9 @@
     }
   },
   "aliases": [
+    "mixtral-8x7b",
     "mixtral-8x7b-instruct-v0.1",
+    "mistralai-mixtral-8x7b-v0.1",
     "mistralai/mixtral-8x7b-instruct-v0.1",
     "mixtral-8x7b-instruct"
   ]

@@ -59,25 +59,29 @@ const cases = [
   ["gpt-5.1-codex", "gpt-5.1-codex"],
   ["llama-4-maverick-17b-128e-instruct", "llama-4-maverick"],
   ["qwen3-coder-next", "qwen3-coder-next"],
-  ["nemotron-nano-9b-v2", "nemotron-nano"],
   ["magistral-small-2506", "magistral-small"],
 
-  // Dates and versions — stripped
+  // Dates — stripped; release versions — preserved
   ["mistral-large-3-675b-instruct-2512", "mistral-large-3"],
   ["mistral-small-4-119b-2603", "mistral-small-4"],
   ["mistral-small-3.1-24b-instruct-2503", "mistral-small-3.1"],
   ["ministral-14b-instruct-2512", "ministral"],
   ["kimi-k2-instruct-0905", "kimi-k2"],
-  ["llama-3.1-nemotron-ultra-253b-v1", "llama-3.1-nemotron-ultra"],
-  ["llama-3.3-nemotron-super-49b-v1.5", "llama-3.3-nemotron-super"],
-  ["llama-3.1-nemotron-nano-8b-v1", "llama-3.1-nemotron-nano"],
-  ["llama-3.1-nemotron-nano-vl-8b-v1", "llama-3.1-nemotron-nano-vl"],
-  ["codestral-22b-instruct-v0.1", "codestral"],
-  ["mamba-codestral-7b-v0.1", "mamba-codestral"],
-  ["mixtral-8x22b-instruct-v0.1", "mixtral-8x22b"],
-  ["mistral-7b-instruct-v0.3", "mistral"],
-  ["riva-translate-4b-instruct-v1.1", "riva-translate"],
+  ["llama-3.1-nemotron-ultra-253b-v1", "llama-3.1-nemotron-ultra-v1"],
+  ["llama-3.3-nemotron-super-49b-v1.5", "llama-3.3-nemotron-super-v1.5"],
+  ["llama-3.1-nemotron-nano-8b-v1", "llama-3.1-nemotron-nano-v1"],
+  ["llama-3.1-nemotron-nano-vl-8b-v1", "llama-3.1-nemotron-nano-vl-v1"],
+  ["codestral-22b-instruct-v0.1", "codestral-v0.1"],
+  ["mamba-codestral-7b-v0.1", "mamba-codestral-v0.1"],
+  ["mixtral-8x22b-instruct-v0.1", "mixtral-8x22b-v0.1"],
+  ["mistral-7b-instruct-v0.3", "mistral-v0.3"],
+  ["riva-translate-4b-instruct-v1.1", "riva-translate-v1.1"],
   ["devstral-2-123b-instruct-2512", "devstral-2"],
+  ["nemotron-nano-9b-v2", "nemotron-nano-v2"],
+
+  // Release versions preserved when used as family identifier
+  ["mimo-v2.5", "mimo-v2.5"],
+  ["qwen3-coder-v3", "qwen3-coder-v3"],
 
   // Modality/coder/vl/vision/omni identifiers preserved when in mid-position
   ["nemotron-nano-vl", "nemotron-nano-vl"],

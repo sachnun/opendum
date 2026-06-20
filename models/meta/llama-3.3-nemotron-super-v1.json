@@ -1,14 +1,17 @@
 {
+  "id": "llama-3.3-nemotron-super-v1",
   "providers": [
     "nvidia_nim"
   ],
   "aliases": [
-    "llama-3.3-nemotron-super-49b-v1.5",
-    "nvidia-llama-3.3-nemotron-super-49b-v1.5",
-    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "llama-3.3-nemotron-super",
     "llama-3.3-nemotron-super-49b-v1",
+    "llama-3.3-nemotron-super-49b-v1.5",
+    "nvidia-llama-3.3-nemotron-super-v1",
     "nvidia-llama-3.3-nemotron-super-49b-v1",
-    "nvidia/llama-3.3-nemotron-super-49b-v1"
+    "nvidia-llama-3.3-nemotron-super-49b-v1.5",
+    "nvidia/llama-3.3-nemotron-super-49b-v1",
+    "nvidia/llama-3.3-nemotron-super-49b-v1.5"
   ],
   "family": "Meta",
   "ignored": true,

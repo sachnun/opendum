@@ -1,7 +1,10 @@
 {
+  "id": "mamba-codestral-v0.1",
   "providers": [],
   "aliases": [
+    "mamba-codestral",
     "mamba-codestral-7b-v0.1",
+    "mistralai-mamba-codestral-v0.1",
     "mistralai-mamba-codestral-7b-v0.1",
     "mistralai/mamba-codestral-7b-v0.1"
   ],

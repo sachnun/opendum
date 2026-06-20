@@ -1,4 +1,5 @@
 {
+  "id": "mistral-v0.3",
   "providers": [
     "nvidia_nim"
   ],
@@ -16,9 +17,11 @@
     }
   },
   "aliases": [
+    "mistral",
     "mistral-7b-instruct-v0.2",
-    "mistralai/mistral-7b-instruct-v0.3",
     "mistral-7b-instruct-v0.3",
+    "mistralai/mistral-7b-instruct-v0.3",
+    "mistralai-mistral-v0.3",
     "mistral-instruct"
   ]
 }

@@ -12,9 +12,9 @@
 //   2. Drop standalone size tokens (`-Xb`/`-Xm`/`-Xt`).
 //   3. Drop standalone quantization tokens anywhere (`-fp<N>`, `-int<N>`,
 //      `-awq`, `-gptq`, `-gguf`, `-q<N>[_<letter>]`).
-//   4. Drop trailing version tokens (`v0.1`, `v1.5`, `v2`). Date tokens
-//      (`2512`, `2603`, `0905`, `202601`) follow when no behavior
-//      descriptor follows them.
+//   4. Drop trailing date tokens (`2512`, `2603`, `0905`, `202601`) when
+//      no behavior descriptor follows them. Release versions (`v0.1`,
+//      `v1.5`, `v2`, `v2.5`) are preserved as family identifiers.
 //   5. Drop trailing behavior-descriptor tokens whose meaning is recorded
 //      in `meta`: `instruct`, `it`, `chat`, `base`, `reasoning`,
 //      `thinking`, `completion`, `preview`, `beta`, `alpha`,
@@ -36,6 +36,7 @@
 //   "claude-opus-4-6-thinking"               -> "claude-opus-4-6"
 //   "nemotron-nano-vl"                       -> "nemotron-nano-vl"     (`vl` sub-family)
 //   "llama-4-maverick-17b-128e-instruct"     -> "llama-4-maverick"
+//   "mimo-v2.5"                              -> "mimo-v2.5"            (release version preserved)
 
 const ACTIVE_PARAMS_SUFFIX = /^a[0-9]+(?:\.[0-9]+)?[kmbt]$/i;
 const EXPERT_COUNT_SUFFIX = /^[0-9]+e$/i;
@@ -86,7 +87,8 @@ function isPairableMoESuffix(token) {
 /**
  * Strip every token that matches a parameter-info or pure-behavior
  * descriptor pattern. Identifier/tier tokens (`coder`, `vl`, `nano`,
- * `ultra`, ...) stay in the basename as family names.
+ * `ultra`, release-version tokens like `v2.5`, ...) stay in the
+ * basename as family names.
  */
 export function stripParamInfoKey(modelKey) {
   if (typeof modelKey !== "string" || modelKey.length === 0) return modelKey;
@@ -101,7 +103,6 @@ export function stripParamInfoKey(modelKey) {
       SIZE_BM.test(t) ||
       SIZE_T.test(t) ||
       QUANTIZATION.test(t) ||
-      VERSION.test(t) ||
       isDateToken(t) ||
       isBehaviorDescriptor(t)
     ) {
