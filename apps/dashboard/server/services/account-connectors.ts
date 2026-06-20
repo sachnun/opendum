@@ -37,6 +37,46 @@ const API_KEY_PROVIDER_SETTINGS = {
 // endpoint, which takes a custom CLI envelope (not an OpenAI body).
 const COMMAND_CODE_CLI_VERSION = "0.38.7";
 
+// Canonical Tier IDs stored on providerAccount.tier. These mirror the
+// labels rendered by the Go proxy fetcher in quota_commandcode.go so the
+// account record stays in sync with the live /alpha/billing/subscriptions
+// response. Paid plans surface a non-null planId string ("individual-go",
+// "individual-pro"); free / un-subscribed accounts surface planId: null and
+// are stamped "free" so downstream model-access rules see them explicitly
+// rather than guessing from empty credits.
+function commandCodeCanonicalTier(planId: string | null | undefined): string | undefined {
+  if (planId == null) return "free";
+  const cleaned = planId.toLowerCase().trim();
+  if (!cleaned) return "free";
+  switch (cleaned) {
+    case "individual-go":
+      return "go";
+    default:
+      return undefined;
+  }
+}
+
+async function fetchCommandCodePlanTier(apiKey: string): Promise<string | undefined> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
+  try {
+    const response = await fetchInternalProvider(commandCodeApiBaseUrl + "/alpha/billing/subscriptions", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return undefined;
+    if (!response.ok) return undefined;
+    const payload = (await response.json().catch(() => null)) as { data?: { planId?: string | null } } | null;
+    const rawPlanId = (payload?.data?.planId ?? null) as string | null;
+    return commandCodeCanonicalTier(rawPlanId);
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function buildCommandCodeValidationEnvelope(model: string) {
   return {
     config: { workingDir: "/", date: new Date().toISOString().slice(0, 10), environment: "linux-x64", structure: [], isGitRepo: false, currentBranch: "", mainBranch: "", gitStatus: "", recentCommits: [] },
@@ -118,9 +158,13 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   const { label } = API_KEY_PROVIDER_SETTINGS[provider];
   const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
-  // Command Code's Go tier ($1/mo CLI plan) gates its open-source model set;
-  // stamp the account tier so model-access rules resolve correctly.
-  const tier = provider === "command_code" ? "go" : undefined;
+  // Command Code stamps the actual plan tier so downstream model-access
+  // rules (open-source-only on the Go tier, premium allowed on Pro/Max)
+  // resolve correctly. We resolve the tier from the live
+  // /alpha/billing/subscriptions endpoint; unknown planIds are left
+  // undefined so model-access rules receive an empty tier and decide for
+  // themselves rather than getting a misleading "go" stamp.
+  const tier = provider === "command_code" ? await fetchCommandCodePlanTier(normalizedApiKey) : undefined;
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(tier ? { tier } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));

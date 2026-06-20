@@ -178,6 +178,8 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 		return s.fetchCodexQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "kiro":
 		return s.fetchKiroQuota(ctx, requestAccount, credentials, forceRefresh), nil
+	case "command_code":
+		return s.fetchCommandCodeQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	default:
 		return accountQuotaInfo{}, fmt.Errorf("provider %s is not supported for quota", account.Provider)
 	}
