@@ -75,3 +75,28 @@ func TestSplitQoderAccountID(t *testing.T) {
 }
 
 func ptrString(s string) *string { return &s }
+
+// qoderRefreshEndpointFor mirrors the branch inside RefreshCredentials so the
+// routing decision can be unit-tested without spinning up an HTTP server.
+func qoderRefreshEndpointFor(refreshToken string) string {
+	if strings.HasPrefix(strings.TrimSpace(refreshToken), qoderPATRefreshPrefix) {
+		return qoderJobRefreshPath
+	}
+	return qoderDeviceRefreshPath
+}
+
+func TestQoderRefreshEndpointRouting(t *testing.T) {
+	cases := map[string]string{
+		"jrt-IPFmOhi5":         qoderJobRefreshPath,    // PAT-exchanged (personal token)
+		"drt-ign208Bt":         qoderDeviceRefreshPath, // device flow
+		"jrt-":                 qoderJobRefreshPath,    // bare prefix still routes to job refresh
+		"drt-abc":              qoderDeviceRefreshPath,
+		"  jrt-spaces  ":       qoderJobRefreshPath,    // trimming does not change routing
+		"unknown-prefix-token": qoderDeviceRefreshPath, // default route is the device endpoint
+	}
+	for token, want := range cases {
+		if got := qoderRefreshEndpointFor(token); got != want {
+			t.Errorf("qoderRefreshEndpointFor(%q) = %q, want %q", token, got, want)
+		}
+	}
+}

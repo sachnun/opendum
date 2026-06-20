@@ -34,19 +34,27 @@ const (
 	qoderInferencePath     = "/algo/api/v2/service/pro/sse/agent_chat_generation"
 	qoderInferenceQuery    = "?FetchKeys=llm_model_result&AgentId=agent_common&Encode=1"
 	qoderDeviceRefreshPath = "/api/v1/deviceToken/refresh"
+	qoderJobRefreshPath    = "/api/v1/jobToken/refresh"
 	qoderUserInfoPath      = "/api/v1/userinfo"
 
-	qoderIDEVersion    = "1.0.0"
-	qoderClientType    = "5"
-	qoderMachineType   = "5"
-	qoderMachineOS     = "x86_64_windows"
-	qoderDataPolicy    = "disagree"
-	qoderLoginVersion  = "v2"
-	qoderDefaultModel  = "qmodel_latest"
-	qoderRefreshBuffer = 5 * time.Minute
-	qoderSessionType   = "qodercli"
-	qoderAgentID       = "agent_common"
-	qoderTaskID        = "common"
+	// Refresh-token prefixes identify the originating login method. Device
+	// flow tokens carry the "drt-" prefix and refresh against the device
+	// endpoint; PAT-exchanged tokens carry "jrt-" and refresh against the
+	// jobToken endpoint. Routing the refresh off the prefix (instead of a
+	// separate account column) keeps the persisted shape identical for both
+	// auth methods.
+	qoderPATRefreshPrefix = "jrt-"
+	qoderIDEVersion       = "1.0.0"
+	qoderClientType       = "5"
+	qoderMachineType      = "5"
+	qoderMachineOS        = "x86_64_windows"
+	qoderDataPolicy       = "disagree"
+	qoderLoginVersion     = "v2"
+	qoderDefaultModel     = "qmodel_latest"
+	qoderRefreshBuffer    = 5 * time.Minute
+	qoderSessionType      = "qodercli"
+	qoderAgentID          = "agent_common"
+	qoderTaskID           = "common"
 )
 
 // qoderStdAlphabet mirrors the standard base64 alphabet; qoderCustomAlphabet
@@ -68,8 +76,17 @@ type qoderProvider struct {
 func (p qoderProvider) RefreshBuffer() time.Duration { return qoderRefreshBuffer }
 
 func (p qoderProvider) RefreshCredentials(ctx context.Context, client *http.Client, refreshToken string, _ appdb.ProviderAccount) (RefreshedCredentials, error) {
-	body, _ := json.Marshal(map[string]string{"refresh_token": strings.TrimSpace(refreshToken)})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, qoderOpenAPIBase+qoderDeviceRefreshPath, bytes.NewReader(body))
+	// Route the refresh off the refresh-token prefix. Device flow returns a
+	// "drt-" token and talks to deviceToken/refresh; PAT-exchanged sessions
+	// return a "jrt-" token and talk to jobToken/refresh. The two endpoints
+	// also return differently named session-token fields.
+	refreshToken = strings.TrimSpace(refreshToken)
+	path := qoderDeviceRefreshPath
+	if strings.HasPrefix(refreshToken, qoderPATRefreshPrefix) {
+		path = qoderJobRefreshPath
+	}
+	body, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, qoderOpenAPIBase+path, bytes.NewReader(body))
 	if err != nil {
 		return RefreshedCredentials{}, err
 	}
