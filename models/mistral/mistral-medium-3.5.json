@@ -3,7 +3,6 @@
   "providers": [
     "nvidia_nim"
   ],
-  "family": "Mistral",
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/mistral-medium-3.5-128b"

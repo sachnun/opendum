@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "workers_ai",
+    "zenmux",
+    "siliconflow"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "zai-org/GLM-5.2"
+    },
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-5.2"
+    },
+    "zenmux": {
+      "upstream": "z-ai/glm-5.2-free"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "copilot"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    }
+  }
+}

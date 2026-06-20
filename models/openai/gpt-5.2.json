@@ -2,7 +2,6 @@
   "providers": [
     "codex"
   ],
-  "family": "OpenAI",
   "meta": {
     "reasoning": true,
     "toolCall": true,

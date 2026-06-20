@@ -1,0 +1,16 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/ibm-granite/granite-4.0-h-micro"
+    }
+  }
+}

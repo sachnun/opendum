@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "liquid/lfm-2.5-1.2b-instruct:free"
+    }
+  },
+  "aliases": [
+    "lfm-2.5-1.2b-instruct",
+    "liquid/lfm-2.5-1.2b-instruct:free",
+    "lfm-2.5-1.2b-thinking",
+    "liquid/lfm-2.5-1.2b-thinking:free",
+    "lfm-2.5-instruct",
+    "lfm-2.5-thinking"
+  ]
+}

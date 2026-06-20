@@ -1,6 +1,5 @@
 {
   "providers": [],
-  "family": "OpenAI",
   "meta": {
     "reasoning": true,
     "toolCall": true,

@@ -1,0 +1,12 @@
+{
+  "providers": [
+    "kilo_code"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "openrouter/free",
+      "authless": true
+    }
+  }
+}

@@ -5,7 +5,6 @@
     "microsoft-phi-3.5-vision-instruct",
     "microsoft/phi-3.5-vision-instruct"
   ],
-  "family": "Microsoft",
   "ignored": true,
   "meta": {
     "reasoning": false,

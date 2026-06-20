@@ -7,7 +7,6 @@
     "google-codegemma-7b",
     "google/codegemma-7b"
   ],
-  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

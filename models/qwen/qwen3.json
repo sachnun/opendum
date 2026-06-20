@@ -3,7 +3,6 @@
     "siliconflow",
     "workers_ai"
   ],
-  "family": "Qwen",
   "ignored": false,
   "providerConfig": {
     "siliconflow": {

@@ -2,7 +2,6 @@
   "providers": [
     "siliconflow"
   ],
-  "family": "Qwen",
   "meta": {
     "reasoning": true,
     "toolCall": false,

@@ -4,7 +4,6 @@
     "zenmux",
     "siliconflow"
   ],
-  "family": "Moonshot",
   "meta": {
     "reasoning": true,
     "toolCall": true,

@@ -8,7 +8,6 @@
     "deepseek-ai/deepseek-coder-6.7b-instruct",
     "deepseek-coder-instruct"
   ],
-  "family": "DeepSeek",
   "ignored": true,
   "meta": {
     "reasoning": false,

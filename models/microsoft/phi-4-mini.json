@@ -7,7 +7,6 @@
     "microsoft-phi-4-mini-instruct",
     "microsoft/phi-4-mini-instruct"
   ],
-  "family": "Microsoft",
   "ignored": true,
   "meta": {
     "reasoning": false,

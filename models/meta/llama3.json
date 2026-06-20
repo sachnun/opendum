@@ -9,7 +9,6 @@
     "meta/llama3-8b-instruct",
     "llama3-instruct"
   ],
-  "family": "Meta",
   "ignored": true,
   "meta": {
     "reasoning": false,

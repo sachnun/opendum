@@ -1,6 +1,5 @@
 {
   "providers": [],
-  "family": "OpenAI",
   "ignored": true,
   "meta": {
     "reasoning": true,

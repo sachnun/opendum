@@ -8,7 +8,6 @@
     "qwen-qwen2.5-coder-7b-instruct",
     "qwen/qwen2.5-coder-7b-instruct"
   ],
-  "family": "Qwen",
   "meta": {
     "reasoning": false,
     "toolCall": false,

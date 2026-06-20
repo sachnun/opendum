@@ -1,6 +1,5 @@
 {
   "providers": [],
-  "family": "Moonshot",
   "meta": {
     "reasoning": false,
     "toolCall": true,

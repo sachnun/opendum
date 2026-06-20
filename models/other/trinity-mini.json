@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "family": "Trinity",
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false
-  }
-}

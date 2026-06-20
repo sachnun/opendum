@@ -16,7 +16,6 @@
     "@cf/meta/llama-3.1-8b-instruct-fast",
     "llama-3.1-instruct"
   ],
-  "family": "Meta",
   "meta": {
     "reasoning": false,
     "toolCall": true,

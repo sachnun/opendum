@@ -12,7 +12,6 @@
     "google-gemma-2-2b-it",
     "gemma-2-it"
   ],
-  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

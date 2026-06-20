@@ -5,7 +5,6 @@
     "siliconflow",
     "workers_ai"
   ],
-  "family": "Google",
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it"

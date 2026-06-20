@@ -2,7 +2,6 @@
   "providers": [
     "siliconflow"
   ],
-  "family": "Qwen",
   "ignored": true,
   "providerConfig": {
     "siliconflow": {

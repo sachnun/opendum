@@ -8,7 +8,6 @@
     "deepseek-ai/deepseek-v3.1-terminus",
     "deepseek-ai/DeepSeek-V3.1-Terminus"
   ],
-  "family": "DeepSeek",
   "ignored": true,
   "meta": {
     "reasoning": true,

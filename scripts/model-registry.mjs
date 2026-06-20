@@ -8,7 +8,6 @@ const MODEL_PROPERTY_ORDER = [
   "providers",
   "aliases",
   "description",
-  "family",
   "ignored",
   "meta",
   "providerConfig",
@@ -81,6 +80,9 @@ function orderValue(value, key) {
 }
 
 function normalizeModelData(data) {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    delete data.family;
+  }
   return orderObject(data, MODEL_PROPERTY_ORDER);
 }
 
@@ -127,11 +129,10 @@ export function buildModelIndex(modelsDir) {
 }
 
 const FAMILY_RULES = [
-  { test: /^claude-/, folder: "claude", family: "Claude" },
+  { test: /^claude-/, folder: "anthropic", family: "Anthropic" },
   { test: /^gpt($|-)|^chatgpt-|^o($|-)|^o\d/, folder: "openai", family: "OpenAI" },
-  { test: /^gemini-?/, folder: "gemini", family: "Gemini" },
+  { test: /^gemini-?|^gemma|^diffusiongemma/, folder: "google", family: "Google" },
   { test: /^grok-?/, folder: "xai", family: "xAI" },
-  { test: /^gemma/, folder: "google", family: "Gemini" },
   { test: /^llama|^codellama/, folder: "meta", family: "Meta" },
   { test: /^phi-?/, folder: "microsoft", family: "Microsoft" },
   { test: /^qwen|^qwq-/, folder: "qwen", family: "Qwen" },
@@ -139,12 +140,28 @@ const FAMILY_RULES = [
   { test: /^kilo-auto-?/, folder: "kilo-code", family: "Kilo Code" },
   { test: /^kimi-?/, folder: "moonshot", family: "Moonshot" },
   { test: /^minimax-?/, folder: "minimax", family: "MiniMax" },
-  { test: /^glm-?/, folder: "zai", family: "Z.AI" },
+  { test: /^glm-?/, folder: "z-ai", family: "Z.AI" },
   { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, folder: "mistral", family: "Mistral" },
   { test: /^nemotron-|^nim-?/, folder: "nvidia", family: "NVIDIA" },
   { test: /^openrouter-?/, folder: "openrouter", family: "Openrouter" },
-  { test: /^mimo-?/, folder: "other", family: "Xiaomi" },
+  { test: /^mimo-?/, folder: "xiaomi", family: "Xiaomi" },
+  { test: /^hunyuan|^hy3/, folder: "hunyuan", family: "Hunyuan" },
+  { test: /^ling-|^ring-|^ling/, folder: "inclusion-ai", family: "InclusionAI" },
+  { test: /^mai-code/, folder: "microsoft", family: "Microsoft" },
+  { test: /^nex-n|^nex-n2/, folder: "nex-agi", family: "Nex AGI" },
+  { test: /^north-/, folder: "cohere", family: "Cohere" },
 ];
+
+// Reverse map: folder slug -> human family name.
+// Used by the registry loader to populate `family` when the JSON omits it.
+const FAMILY_BY_FOLDER = Object.fromEntries(
+  FAMILY_RULES.map((rule) => [rule.folder, rule.family])
+);
+
+export function inferFamilyFromFolder(folderName) {
+  if (!folderName) return null;
+  return FAMILY_BY_FOLDER[folderName] ?? null;
+}
 
 function inferModelFolder(modelKey) {
   for (const rule of FAMILY_RULES) {
@@ -280,16 +297,18 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
         updated.push(modelKey);
       }
     } else {
-      const folder = inferModelFolder(modelKey) || "other";
-      const folderPath = join(modelsDir, folder);
-      if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+      const folder = inferModelFolder(modelKey);
+      const filePath = folder
+        ? join(modelsDir, folder, `${modelKey}${MODEL_FILE_EXTENSION}`)
+        : join(modelsDir, `${modelKey}${MODEL_FILE_EXTENSION}`);
+      if (folder) {
+        const folderPath = join(modelsDir, folder);
+        if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+      }
 
       const data = {
         providers: [providerName],
       };
-
-      const family = inferModelFamily(modelKey) || inferModelFamily(upstreamName);
-      if (family) data.family = family;
 
       const providerConfig = { ...extraProviderConfig(modelKey) };
       if (upstreamName !== modelKey) {
@@ -301,7 +320,6 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
         };
       }
 
-      const filePath = join(folderPath, `${modelKey}${MODEL_FILE_EXTENSION}`);
       writeModelJson(filePath, data);
       added.push(modelKey);
     }

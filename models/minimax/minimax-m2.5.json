@@ -3,7 +3,6 @@
     "kiro",
     "siliconflow"
   ],
-  "family": "MiniMax",
   "meta": {
     "reasoning": true,
     "toolCall": true,

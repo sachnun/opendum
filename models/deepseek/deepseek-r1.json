@@ -2,7 +2,6 @@
   "providers": [
     "siliconflow"
   ],
-  "family": "DeepSeek",
   "ignored": true,
   "providerConfig": {
     "siliconflow": {

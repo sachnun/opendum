@@ -1,0 +1,18 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "databricks/dbrx-instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "dbrx-instruct",
+    "databricks/dbrx-instruct"
+  ]
+}

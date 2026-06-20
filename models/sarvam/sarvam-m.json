@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "sarvamai/sarvam-m"
+    }
+  }
+}

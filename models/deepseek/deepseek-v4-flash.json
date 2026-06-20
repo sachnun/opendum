@@ -4,7 +4,6 @@
     "nvidia_nim",
     "siliconflow"
   ],
-  "family": "DeepSeek",
   "meta": {
     "reasoning": true,
     "toolCall": true,

@@ -11,7 +11,6 @@
     "mistralai/codestral-22b-instruct-v0.1",
     "codestral-instruct"
   ],
-  "family": "Mistral",
   "ignored": true,
   "meta": {
     "reasoning": false,

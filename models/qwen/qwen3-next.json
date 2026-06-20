@@ -13,7 +13,6 @@
     "qwen3-next-instruct",
     "qwen3-next-thinking"
   ],
-  "family": "Qwen",
   "meta": {
     "reasoning": true,
     "toolCall": true,

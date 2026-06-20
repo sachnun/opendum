@@ -205,10 +205,6 @@ function applyMetadata(modelsDir, metadata) {
     if (!entry) continue;
 
     let changed = false;
-    if (!entry.data.family && info.family) {
-      entry.data.family = info.family;
-      changed = true;
-    }
 
     if (!entry.data.meta) {
       entry.data.meta = info.meta;

@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "aisingapore/sea-lion-7b-instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "sea-lion-7b-instruct",
+    "aisingapore/sea-lion-7b-instruct",
+    "sea-lion-instruct"
+  ]
+}

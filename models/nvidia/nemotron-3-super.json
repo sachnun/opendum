@@ -6,7 +6,6 @@
     "openrouter",
     "workers_ai"
   ],
-  "family": "NVIDIA",
   "meta": {
     "reasoning": true,
     "toolCall": true,

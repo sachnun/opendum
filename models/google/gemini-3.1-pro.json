@@ -1,0 +1,44 @@
+{
+  "providers": [
+    "antigravity",
+    "copilot"
+  ],
+  "aliases": [
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-pro-high",
+    "gemini-3.1-pro-low",
+    "gemini-3.1-pro-medium"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "status": "preview"
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-3.1-pro-high",
+      "inject_thought_signature": true,
+      "scrub_model_artifacts": true,
+      "signature_family": "gemini-pro",
+      "system_instruction": true,
+      "thinking_budgets": {
+        "high": 32768,
+        "low": 8192,
+        "medium": 16384,
+        "xhigh": 32768
+      },
+      "thinking_format": "budget"
+    },
+    "copilot": {
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ],
+      "reasoning_effort": false
+    }
+  },
+  "ignored": false
+}

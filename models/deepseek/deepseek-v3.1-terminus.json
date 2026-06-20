@@ -6,7 +6,6 @@
     "deepseek-ai-deepseek-v3.1-terminus",
     "deepseek-ai/deepseek-v3.1-terminus"
   ],
-  "family": "DeepSeek",
   "ignored": true,
   "meta": {
     "reasoning": true,

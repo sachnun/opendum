@@ -144,12 +144,9 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
 
     // attachment / vision (input_modalities includes "image")
     const inputModalities = Array.isArray(meta.input_modalities)
-      ? meta.input_modalities
+      ? meta.inputModalities
       : [];
     data.meta.vision = inputModalities.includes("image");
-
-    // family
-    data.family = "OpenAI";
 
     writeModelJson(entry.path, data);
   }

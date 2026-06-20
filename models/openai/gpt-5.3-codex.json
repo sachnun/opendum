@@ -3,7 +3,6 @@
     "codex",
     "copilot"
   ],
-  "family": "OpenAI",
   "meta": {
     "reasoning": true,
     "toolCall": true,

@@ -7,7 +7,6 @@
     "microsoft-phi-3-vision-128k-instruct",
     "microsoft/phi-3-vision-128k-instruct"
   ],
-  "family": "Microsoft",
   "ignored": true,
   "meta": {
     "reasoning": false,

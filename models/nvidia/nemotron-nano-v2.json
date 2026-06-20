@@ -12,7 +12,6 @@
     "nvidia/nvidia-nemotron-nano-9b-v2",
     "nvidia/nemotron-nano-9b-v2:free"
   ],
-  "family": "NVIDIA",
   "ignored": true,
   "meta": {
     "reasoning": true,

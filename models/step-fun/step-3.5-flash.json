@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "siliconflow"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "stepfun-ai/step-3.5-flash"
+    },
+    "siliconflow": {
+      "upstream": "stepfun-ai/Step-3.5-Flash"
+    }
+  }
+}

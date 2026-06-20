@@ -3,7 +3,6 @@
   "providers": [
     "workers_ai"
   ],
-  "family": "Mistral",
   "meta": {
     "reasoning": false,
     "toolCall": true,

@@ -2,7 +2,6 @@
   "providers": [
     "copilot"
   ],
-  "family": "OpenAI",
   "meta": {
     "reasoning": true,
     "toolCall": true,

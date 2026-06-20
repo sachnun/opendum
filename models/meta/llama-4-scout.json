@@ -10,7 +10,6 @@
     "@cf/meta/llama-4-scout-17b-16e-instruct",
     "llama-4-scout-16e-instruct"
   ],
-  "family": "Meta",
   "meta": {
     "reasoning": false,
     "toolCall": true,

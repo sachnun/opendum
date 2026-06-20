@@ -2,7 +2,6 @@
   "providers": [
     "workers_ai"
   ],
-  "family": "DeepSeek",
   "meta": {
     "reasoning": true,
     "toolCall": false,

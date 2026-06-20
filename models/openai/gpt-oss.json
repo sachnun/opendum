@@ -6,7 +6,6 @@
     "siliconflow",
     "workers_ai"
   ],
-  "family": "OpenAI",
   "ignored": true,
   "meta": {
     "reasoning": true,

@@ -6,7 +6,6 @@
     "qwen/qwen2-7b-instruct",
     "qwen2-instruct"
   ],
-  "family": "Qwen",
   "ignored": true,
   "providerConfig": {},
   "meta": {

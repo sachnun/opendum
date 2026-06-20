@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "z-ai/glm-5.1"
+    },
+    "siliconflow": {
+      "upstream": "zai-org/GLM-5.1"
+    }
+  }
+}

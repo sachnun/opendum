@@ -2,7 +2,6 @@
   "providers": [
     "copilot"
   ],
-  "family": "OpenAI",
   "providerConfig": {
     "copilot": {
       "allowedTiers": [

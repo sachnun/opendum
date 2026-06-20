@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "bielik-11b-v2.3-instruct",
+    "bielik-11b-v2.6-instruct",
+    "bielik-instruct"
+  ]
+}

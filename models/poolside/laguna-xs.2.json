@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "poolside/laguna-xs.2:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "poolside/laguna-xs.2:free"
+    }
+  }
+}

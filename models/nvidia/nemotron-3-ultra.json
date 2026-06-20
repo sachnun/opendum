@@ -5,7 +5,6 @@
     "opencode",
     "openrouter"
   ],
-  "family": "NVIDIA",
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",

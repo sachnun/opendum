@@ -8,7 +8,6 @@
     "nvidia/nemotron-4-340b-instruct",
     "nemotron-4-instruct"
   ],
-  "family": "NVIDIA",
   "ignored": true,
   "meta": {
     "reasoning": false,

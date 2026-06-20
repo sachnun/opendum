@@ -5,7 +5,6 @@
     "microsoft-phi-3-medium-4k-instruct",
     "microsoft/phi-3-medium-4k-instruct"
   ],
-  "family": "Microsoft",
   "ignored": true,
   "meta": {
     "reasoning": false,

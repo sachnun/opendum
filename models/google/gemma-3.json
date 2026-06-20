@@ -2,7 +2,6 @@
   "providers": [
     "nvidia_nim"
   ],
-  "family": "Google",
   "meta": {
     "reasoning": true,
     "toolCall": true,

@@ -1,0 +1,17 @@
+{
+  "id": "mimo-v2.5",
+  "providers": [
+    "opencode"
+  ],
+  "aliases": [
+    "mimo",
+    "mimo-v2.5-free"
+  ],
+  "ignored": false,
+  "meta": {},
+  "providerConfig": {
+    "opencode": {
+      "upstream": "mimo-v2.5-free"
+    }
+  }
+}

@@ -7,7 +7,6 @@
     "microsoft-phi-3.5-moe-instruct",
     "microsoft/phi-3.5-moe-instruct"
   ],
-  "family": "Microsoft",
   "ignored": true,
   "meta": {
     "reasoning": false,

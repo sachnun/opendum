@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "zenmux"
+  ],
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "z-ai/glm-4.6v-flash-free"
+    }
+  }
+}

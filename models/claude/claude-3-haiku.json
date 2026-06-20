@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "family": "Anthropic",
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": true
-  }
-}

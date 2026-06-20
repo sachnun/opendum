@@ -1,0 +1,16 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/ising-calibration-1-35b-a3b"
+    }
+  },
+  "meta": {},
+  "ignored": false,
+  "aliases": [
+    "ising-calibration-1-35b-a3b",
+    "nvidia/ising-calibration-1-35b-a3b"
+  ]
+}

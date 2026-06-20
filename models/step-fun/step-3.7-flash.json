@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "kilo_code",
+    "zenmux"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "stepfun/step-3.7-flash:free",
+      "authless": true
+    },
+    "zenmux": {
+      "upstream": "stepfun/step-3.7-flash-free"
+    }
+  }
+}

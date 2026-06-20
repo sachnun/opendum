@@ -7,7 +7,6 @@
     "mistralai-mistral-large-2-instruct",
     "mistralai/mistral-large-2-instruct"
   ],
-  "family": "Mistral",
   "ignored": true,
   "meta": {
     "reasoning": false,

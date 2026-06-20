@@ -1,0 +1,21 @@
+{
+  "providers": [
+    "copilot"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "copilot": {
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ],
+      "reasoning_effort": false
+    }
+  }
+}

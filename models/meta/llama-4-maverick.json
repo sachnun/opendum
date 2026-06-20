@@ -9,7 +9,6 @@
     "meta/llama-4-maverick-17b-128e-instruct",
     "llama-4-maverick-128e-instruct"
   ],
-  "family": "Meta",
   "meta": {
     "reasoning": false,
     "toolCall": true,

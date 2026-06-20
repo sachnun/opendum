@@ -2,7 +2,6 @@
   "providers": [
     "nvidia_nim"
   ],
-  "family": "Mistral",
   "meta": {
     "reasoning": false,
     "toolCall": true,

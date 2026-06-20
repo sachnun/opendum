@@ -1,0 +1,36 @@
+{
+  "providers": [
+    "copilot",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-haiku-4.5",
+    "claude-haiku4.5"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "copilot": {
+      "upstream": "claude-haiku-4.5",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ],
+      "reasoning_effort": false
+    },
+    "kiro": {
+      "upstream": "claude-haiku-4.5",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    }
+  }
+}

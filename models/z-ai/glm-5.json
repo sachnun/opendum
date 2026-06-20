@@ -1,0 +1,16 @@
+{
+  "providers": [
+    "kiro",
+    "siliconflow"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "zai-org/GLM-5"
+    }
+  }
+}

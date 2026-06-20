@@ -1,6 +1,5 @@
 {
   "providers": [],
-  "family": "Mistral",
   "providerConfig": {},
   "meta": {
     "type": "instruct"

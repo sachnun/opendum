@@ -7,7 +7,6 @@
     "google-gemma-3n-e2b-it",
     "google/gemma-3n-e2b-it"
   ],
-  "family": "Google",
   "ignored": true,
   "meta": {
     "reasoning": false,

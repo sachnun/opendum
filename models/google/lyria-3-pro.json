@@ -1,0 +1,11 @@
+{
+  "providers": [],
+  "providerConfig": {},
+  "meta": {
+    "status": "preview"
+  },
+  "ignored": false,
+  "aliases": [
+    "lyria-3-pro-preview"
+  ]
+}

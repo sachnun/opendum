@@ -12,7 +12,6 @@
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "llama-3.3-instruct"
   ],
-  "family": "Meta",
   "meta": {
     "reasoning": false,
     "toolCall": true,

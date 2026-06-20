@@ -3,7 +3,6 @@
     "nvidia_nim",
     "openrouter"
   ],
-  "family": "Meta",
   "ignored": true,
   "meta": {
     "reasoning": false,

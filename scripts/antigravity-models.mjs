@@ -420,11 +420,6 @@ function enrichModelMetadata(result, documentedModelKeys) {
       changed = true;
     }
 
-    if (!data.family && familyForModel(entry.id || entry.fileId)) {
-      data.family = familyForModel(entry.id || entry.fileId);
-      changed = true;
-    }
-
     const desiredAliases = MODEL_ALIASES_BY_KEY.get(modelKey) || [];
     if (desiredAliases.length > 0) {
       const aliases = new Set(data.aliases || []);

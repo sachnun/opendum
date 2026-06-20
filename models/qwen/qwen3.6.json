@@ -2,7 +2,6 @@
   "providers": [
     "siliconflow"
   ],
-  "family": "Qwen",
   "providerConfig": {
     "siliconflow": {
       "upstream": "Qwen/Qwen3.6-35B-A3B"

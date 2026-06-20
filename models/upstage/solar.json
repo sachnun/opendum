@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "upstage/solar-10.7b-instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "solar-10.7b-instruct",
+    "upstage/solar-10.7b-instruct",
+    "solar-instruct"
+  ]
+}

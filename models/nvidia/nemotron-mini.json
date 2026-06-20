@@ -2,7 +2,6 @@
   "providers": [
     "nvidia_nim"
   ],
-  "family": "NVIDIA",
   "ignored": true,
   "providerConfig": {
     "nvidia_nim": {
