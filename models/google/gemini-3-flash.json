@@ -1,43 +1,14 @@
 {
-  "providers": [
-    "antigravity",
-    "copilot"
-  ],
+  "providers": [],
   "aliases": [
+    "gemini-3-flash",
     "gemini-3-flash-preview",
     "gemini-3-flash-preview-latest"
   ],
+  "ignored": false,
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
-    "status": "preview"
-  },
-  "providerConfig": {
-    "antigravity": {
-      "upstream": "gemini-3-flash",
-      "inject_thought_signature": true,
-      "scrub_model_artifacts": true,
-      "signature_family": "gemini-flash",
-      "system_instruction": true,
-      "thinking_format": "level",
-      "thinking_levels": {
-        "high": "high",
-        "low": "low",
-        "medium": "medium",
-        "none": "minimal",
-        "xhigh": "high"
-      }
-    },
-    "copilot": {
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
-      ],
-      "reasoning_effort": false
-    }
-  },
-  "ignored": false
+    "vision": true
+  }
 }

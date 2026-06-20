@@ -1,7 +1,13 @@
 {
   "id": "mixtral-8x7b-v0.1",
-  "providers": [
-    "nvidia_nim"
+  "providers": [],
+  "aliases": [
+    "mistralai-mixtral-8x7b-instruct-v0.1",
+    "mistralai-mixtral-8x7b-v0.1",
+    "mistralai/mixtral-8x7b-instruct-v0.1",
+    "mixtral-8x7b",
+    "mixtral-8x7b-instruct",
+    "mixtral-8x7b-instruct-v0.1"
   ],
   "ignored": true,
   "meta": {
@@ -9,17 +15,5 @@
     "toolCall": false,
     "vision": false,
     "type": "instruct"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/mixtral-8x7b-instruct-v0.1"
-    }
-  },
-  "aliases": [
-    "mixtral-8x7b",
-    "mixtral-8x7b-instruct-v0.1",
-    "mistralai-mixtral-8x7b-v0.1",
-    "mistralai/mixtral-8x7b-instruct-v0.1",
-    "mixtral-8x7b-instruct"
-  ]
+  }
 }

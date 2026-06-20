@@ -2,32 +2,36 @@
   "providers": [
     "siliconflow"
   ],
+  "aliases": [
+    "Qwen-Qwen3-VL-30B-A3B-Thinking",
+    "Qwen-Qwen3-VL-32B-Instruct",
+    "Qwen-Qwen3-VL-32B-Thinking",
+    "Qwen-Qwen3-VL-8B-Instruct",
+    "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "Qwen/Qwen3-VL-30B-A3B-Thinking",
+    "Qwen/Qwen3-VL-32B-Instruct",
+    "Qwen/Qwen3-VL-32B-Thinking",
+    "Qwen/Qwen3-VL-8B-Instruct",
+    "qwen3-vl-235b-a22b-thinking",
+    "qwen3-vl-30b-a3b-instruct",
+    "qwen3-vl-30b-a3b-thinking",
+    "qwen3-vl-32b-instruct",
+    "qwen3-vl-32b-thinking",
+    "qwen3-vl-8b-instruct",
+    "qwen3-vl-instruct",
+    "qwen3-vl-thinking"
+  ],
+  "ignored": false,
   "meta": {
     "reasoning": true,
     "toolCall": false,
     "vision": true,
-    "variant": "vl",
-    "type": "instruct"
+    "type": "instruct",
+    "variant": "vl"
   },
   "providerConfig": {
     "siliconflow": {
       "upstream": "Qwen/Qwen3-VL-30B-A3B-Instruct"
     }
-  },
-  "ignored": false,
-  "aliases": [
-    "qwen3-vl-235b-a22b-thinking",
-    "qwen3-vl-32b-instruct",
-    "Qwen/Qwen3-VL-32B-Instruct",
-    "qwen3-vl-32b-thinking",
-    "Qwen/Qwen3-VL-32B-Thinking",
-    "Qwen/Qwen3-VL-30B-A3B-Instruct",
-    "qwen3-vl-30b-a3b-instruct",
-    "qwen3-vl-30b-a3b-thinking",
-    "Qwen/Qwen3-VL-30B-A3B-Thinking",
-    "qwen3-vl-8b-instruct",
-    "Qwen/Qwen3-VL-8B-Instruct",
-    "qwen3-vl-instruct",
-    "qwen3-vl-thinking"
-  ]
+  }
 }

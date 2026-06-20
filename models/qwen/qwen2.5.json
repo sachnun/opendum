@@ -2,22 +2,23 @@
   "providers": [
     "siliconflow"
   ],
+  "aliases": [
+    "Qwen-Qwen2.5-7B-Instruct",
+    "Qwen/Qwen2.5-72B-Instruct",
+    "Qwen/Qwen2.5-7B-Instruct",
+    "qwen-qwen2.5-7b-instruct",
+    "qwen/qwen2.5-7b-instruct",
+    "qwen2.5-72b-instruct",
+    "qwen2.5-7b-instruct",
+    "qwen2.5-instruct"
+  ],
   "ignored": true,
+  "meta": {
+    "type": "instruct"
+  },
   "providerConfig": {
     "siliconflow": {
       "upstream": "Qwen/Qwen2.5-72B-Instruct"
     }
-  },
-  "meta": {
-    "type": "instruct"
-  },
-  "aliases": [
-    "qwen2.5-72b-instruct",
-    "Qwen/Qwen2.5-72B-Instruct",
-    "qwen2.5-7b-instruct",
-    "qwen-qwen2.5-7b-instruct",
-    "qwen/qwen2.5-7b-instruct",
-    "Qwen/Qwen2.5-7B-Instruct",
-    "qwen2.5-instruct"
-  ]
+  }
 }

@@ -1,21 +1,13 @@
 {
-  "providers": [
-    "antigravity"
-  ],
+  "providers": [],
   "aliases": [
+    "gemini-3-pro-image",
     "gemini-3-pro-image-preview"
   ],
   "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": false,
-    "vision": true,
-    "status": "preview"
-  },
-  "providerConfig": {
-    "antigravity": {
-      "upstream": "gemini-3-pro-image",
-      "signature_family": "gemini-pro"
-    }
+    "vision": true
   }
 }

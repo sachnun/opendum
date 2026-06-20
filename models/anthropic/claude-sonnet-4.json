@@ -4,7 +4,12 @@
   ],
   "aliases": [
     "claude-sonnet-4-0",
+    "claude-sonnet-4-6",
     "claude-sonnet-4.0",
+    "claude-sonnet-4.5",
+    "claude-sonnet-4.5-1m",
+    "claude-sonnet-4.6",
+    "claude-sonnet-4.6-1m",
     "claude-sonnet4.0"
   ],
   "ignored": true,

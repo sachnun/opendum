@@ -1,7 +1,14 @@
 {
   "id": "mistral-v0.3",
-  "providers": [
-    "nvidia_nim"
+  "providers": [],
+  "aliases": [
+    "mistral",
+    "mistral-7b-instruct-v0.2",
+    "mistral-7b-instruct-v0.3",
+    "mistral-instruct",
+    "mistralai-mistral-7b-instruct-v0.3",
+    "mistralai-mistral-v0.3",
+    "mistralai/mistral-7b-instruct-v0.3"
   ],
   "ignored": true,
   "meta": {
@@ -9,18 +16,5 @@
     "toolCall": true,
     "vision": false,
     "type": "instruct"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/mistral-7b-instruct-v0.3"
-    }
-  },
-  "aliases": [
-    "mistral",
-    "mistral-7b-instruct-v0.2",
-    "mistral-7b-instruct-v0.3",
-    "mistralai/mistral-7b-instruct-v0.3",
-    "mistralai-mistral-v0.3",
-    "mistral-instruct"
-  ]
+  }
 }

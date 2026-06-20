@@ -1,15 +1,17 @@
 {
   "providers": [],
+  "aliases": [
+    "mistral-small-24b-instruct",
+    "mistral-small-instruct",
+    "mistralai-mistral-small-4-119b-2603",
+    "mistralai/mistral-small-4-119b-2603"
+  ],
+  "ignored": false,
   "meta": {
     "reasoning": false,
     "toolCall": true,
     "vision": false,
     "type": "instruct"
   },
-  "providerConfig": {},
-  "ignored": false,
-  "aliases": [
-    "mistral-small-24b-instruct",
-    "mistral-small-instruct"
-  ]
+  "providerConfig": {}
 }

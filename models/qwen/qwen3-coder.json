@@ -4,27 +4,28 @@
     "siliconflow"
   ],
   "aliases": [
-    "qwen3-coder-480b-a35b-instruct",
-    "qwen/qwen3-coder-480b-a35b-instruct",
-    "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    "qwen3-coder-30b-a3b-instruct",
+    "Qwen-Qwen3-Coder-480B-A35B-Instruct",
     "Qwen/Qwen3-Coder-30B-A3B-Instruct",
-    "qwen/qwen3-coder:free"
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+    "qwen/qwen3-coder-480b-a35b-instruct",
+    "qwen/qwen3-coder:free",
+    "qwen3-coder-30b-a3b-instruct",
+    "qwen3-coder-480b-a35b-instruct"
   ],
   "ignored": false,
   "meta": {
     "reasoning": false,
     "toolCall": true,
     "vision": false,
-    "code": true,
-    "type": "instruct"
+    "type": "instruct",
+    "code": true
   },
   "providerConfig": {
-    "siliconflow": {
-      "upstream": "Qwen/Qwen3-Coder-480B-A35B-Instruct"
-    },
     "openrouter": {
       "upstream": "qwen/qwen3-coder:free"
+    },
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3-Coder-30B-A3B-Instruct"
     }
   }
 }

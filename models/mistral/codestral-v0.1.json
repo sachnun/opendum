@@ -1,8 +1,6 @@
 {
   "id": "codestral-v0.1",
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "codestral",
     "codestral-22b-instruct-v0.1",
@@ -17,10 +15,5 @@
     "toolCall": true,
     "vision": false,
     "type": "instruct"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/codestral-22b-instruct-v0.1"
-    }
   }
 }

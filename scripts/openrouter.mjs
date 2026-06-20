@@ -26,7 +26,7 @@ function toModelKey(modelId) {
 
   const cleaned = stripParamInfoKey(modelKey);
   if (modelKey !== "openrouter-free" && cleaned.endsWith("-free")) {
-    return cleaned.slice(0, "-free".length);
+    return cleaned.slice(0, -"-free".length);
   }
 
   return cleaned;

@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "siliconflow"
-  ],
+  "providers": [],
   "aliases": [
     "deepseek-ai-deepseek-v3.1-terminus",
     "deepseek-ai/deepseek-v3.1-terminus"
@@ -11,10 +9,5 @@
     "reasoning": true,
     "toolCall": true,
     "vision": false
-  },
-  "providerConfig": {
-    "siliconflow": {
-      "upstream": "deepseek-ai/DeepSeek-V3.1-Terminus"
-    }
   }
 }

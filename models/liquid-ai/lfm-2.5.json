@@ -2,6 +2,15 @@
   "providers": [
     "openrouter"
   ],
+  "aliases": [
+    "lfm-2.5-1.2b-instruct",
+    "lfm-2.5-1.2b-thinking",
+    "lfm-2.5-instruct",
+    "lfm-2.5-thinking",
+    "liquid-lfm-2.5-1.2b-thinking:free",
+    "liquid/lfm-2.5-1.2b-instruct:free",
+    "liquid/lfm-2.5-1.2b-thinking:free"
+  ],
   "ignored": true,
   "meta": {
     "reasoning": true,
@@ -13,13 +22,5 @@
     "openrouter": {
       "upstream": "liquid/lfm-2.5-1.2b-instruct:free"
     }
-  },
-  "aliases": [
-    "lfm-2.5-1.2b-instruct",
-    "liquid/lfm-2.5-1.2b-instruct:free",
-    "lfm-2.5-1.2b-thinking",
-    "liquid/lfm-2.5-1.2b-thinking:free",
-    "lfm-2.5-instruct",
-    "lfm-2.5-thinking"
-  ]
+  }
 }

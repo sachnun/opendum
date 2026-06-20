@@ -1,16 +1,17 @@
 {
   "id": "nemotron-nano-v2",
   "providers": [
-    "nvidia_nim",
     "openrouter"
   ],
   "aliases": [
     "nemotron-nano",
     "nemotron-nano-9b-v2",
-    "nvidia-nemotron-nano-v2",
     "nvidia-nemotron-nano-9b-v2",
-    "nvidia/nvidia-nemotron-nano-9b-v2",
-    "nvidia/nemotron-nano-9b-v2:free"
+    "nvidia-nemotron-nano-9b-v2:free",
+    "nvidia-nemotron-nano-v2",
+    "nvidia-nvidia-nemotron-nano-9b-v2",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/nvidia-nemotron-nano-9b-v2"
   ],
   "ignored": true,
   "meta": {
@@ -19,9 +20,6 @@
     "vision": false
   },
   "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nvidia/nvidia-nemotron-nano-9b-v2"
-    },
     "openrouter": {
       "upstream": "nvidia/nemotron-nano-9b-v2:free"
     }

@@ -33,8 +33,8 @@ const EXCLUDED_MODEL_KEY_TOKENS = [
   "safety",
   "vila",
 ];
-
-const IGNORED_MODEL_KEYS = new Set(["gpt-oss-120b", "mistral-large"]);
+// Models can opt out by setting `"ignored": true` in their JSON file. There
+// is no longer a hard-coded ignore list here.
 
 function toModelKey(modelId) {
   const normalizedModelId = modelId.replace(/^library\//, "");
@@ -194,9 +194,6 @@ function buildModelMap(modelIds, existingKeys, llmModelKeys) {
     }
 
     const baseModelKey = toModelKey(upstreamModel);
-    if (IGNORED_MODEL_KEYS.has(baseModelKey)) {
-      continue;
-    }
 
     let modelKey = baseModelKey;
     let suffix = 2;

@@ -1,10 +1,22 @@
 {
   "providers": [
-    "antigravity",
     "nvidia_nim",
     "openrouter",
     "siliconflow",
     "workers_ai"
+  ],
+  "aliases": [
+    "@cf/openai/gpt-oss-120b",
+    "@cf/openai/gpt-oss-20b",
+    "gpt-oss-120b",
+    "gpt-oss-120b-medium",
+    "gpt-oss-20b",
+    "openai-gpt-oss-120b",
+    "openai-gpt-oss-20b",
+    "openai-gpt-oss-20b:free",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-20b:free"
   ],
   "ignored": true,
   "meta": {
@@ -13,31 +25,17 @@
     "vision": false
   },
   "providerConfig": {
-    "antigravity": {
-      "upstream": "gpt-oss-120b-medium"
+    "nvidia_nim": {
+      "upstream": "openai/gpt-oss-20b"
+    },
+    "openrouter": {
+      "upstream": "openai/gpt-oss-120b:free"
     },
     "siliconflow": {
       "upstream": "openai/gpt-oss-120b"
     },
     "workers_ai": {
-      "upstream": "@cf/openai/gpt-oss-120b"
-    },
-    "nvidia_nim": {
-      "upstream": "openai/gpt-oss-20b"
-    },
-    "openrouter": {
-      "upstream": "openai/gpt-oss-20b:free"
+      "upstream": "@cf/openai/gpt-oss-20b"
     }
-  },
-  "aliases": [
-    "gpt-oss-120b",
-    "gpt-oss-120b-medium",
-    "openai/gpt-oss-120b",
-    "@cf/openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "openai/gpt-oss-20b:free",
-    "gpt-oss-20b",
-    "openai-gpt-oss-20b",
-    "@cf/openai/gpt-oss-20b"
-  ]
+  }
 }

@@ -1,29 +1,22 @@
 {
-  "providers": [
-    "kiro",
-    "siliconflow"
+  "providers": [],
+  "aliases": [
+    "deepseek-3.2",
+    "deepseek-ai-DeepSeek-V3",
+    "deepseek-ai-DeepSeek-V3.1",
+    "deepseek-ai-DeepSeek-V3.2",
+    "deepseek-ai-DeepSeek-V3.2-Exp",
+    "deepseek-ai/DeepSeek-V3",
+    "deepseek-ai/DeepSeek-V3.1",
+    "deepseek-ai/DeepSeek-V3.2",
+    "deepseek-ai/DeepSeek-V3.2-Exp",
+    "deepseek-exp",
+    "deepseek-v3",
+    "deepseek-v3.1",
+    "deepseek-v3.2",
+    "deepseek-v3.2-exp"
   ],
   "ignored": true,
-  "providerConfig": {
-    "siliconflow": {
-      "upstream": "deepseek-ai/DeepSeek-V3"
-    },
-    "kiro": {
-      "upstream": "deepseek-3.2"
-    }
-  },
-  "aliases": [
-    "deepseek-v3.1",
-    "deepseek-ai/DeepSeek-V3.1",
-    "deepseek-v3.2-exp",
-    "deepseek-ai/DeepSeek-V3.2-Exp",
-    "deepseek-v3.2",
-    "deepseek-3.2",
-    "deepseek-ai/DeepSeek-V3.2",
-    "deepseek-v3",
-    "deepseek-ai/DeepSeek-V3",
-    "deepseek-exp"
-  ],
   "meta": {
     "status": "experimental"
   }

@@ -1,8 +1,6 @@
 {
   "providers": [
-    "antigravity",
-    "copilot",
-    "kiro"
+    "antigravity"
   ],
   "aliases": [
     "claude-sonnet-4-6-1m",
@@ -17,37 +15,15 @@
     "vision": true
   },
   "providerConfig": {
-    "kiro": {
-      "upstream": "claude-sonnet-4.6-1m",
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "power",
-        "standalone"
-      ]
-    },
     "antigravity": {
-      "anthropic_beta": true,
-      "anthropic_beta_thinking": true,
+      "upstream": "claude-sonnet-4-6",
       "convert_external_images": true,
       "force_stream_non_stream": true,
       "sanitize_tool_blocks": true,
       "signature_family": "claude",
       "strict_thought_signatures": true,
       "strict_tool_schema": true,
-      "system_instruction": true,
-      "thinking_model": true,
       "top_p_min_095": true
-    },
-    "copilot": {
-      "upstream": "claude-sonnet-4.6",
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
-      ],
-      "reasoning_effort": false
     }
   }
 }

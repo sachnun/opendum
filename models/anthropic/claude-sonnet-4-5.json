@@ -1,8 +1,5 @@
 {
-  "providers": [
-    "copilot",
-    "kiro"
-  ],
+  "providers": [],
   "aliases": [
     "claude-sonnet-4-5-1m",
     "claude-sonnet-4.5-1m",
@@ -14,20 +11,5 @@
     "reasoning": true,
     "toolCall": true,
     "vision": true
-  },
-  "providerConfig": {
-    "kiro": {
-      "upstream": "claude-sonnet-4.5-1m"
-    },
-    "copilot": {
-      "upstream": "claude-sonnet-4.5",
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
-      ],
-      "reasoning_effort": false
-    }
   }
 }

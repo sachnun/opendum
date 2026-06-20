@@ -77,14 +77,9 @@ const MODEL_ALIASES_BY_KEY = new Map([
   ["gemini-3.5-flash", GEMINI_35_FLASH_LEVELS.map((level) => `gemini-3.5-flash-${level}`)],
 ]);
 
-// Models proven to exist in the Antigravity backend but not shown in the public
-// reasoning-model docs. Kept separate so documented model changes still sync.
-const PRESERVED_EXTRAS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-3.1-flash-image-preview",
-  "gemini-3-pro-image-preview",
-];
+// Models can opt in/out by editing their JSON file directly. There is no
+// longer a hard-coded preserved list here; a model's registry state is
+// driven by the `providers` array on disk and the antigravity docs.
 
 const MANAGED_PROVIDER_CONFIG_KEYS = [
   "anthropic_beta",
@@ -254,20 +249,33 @@ function upstreamRank(upstream) {
   return 0;
 }
 
+// Preserve any existing model file that already has the antigravity
+// provider configured even when the model is not in the public docs.
+// This keeps JSON the source of truth: edit providerConfig to a file
+// to retain an antigravity binding across refresh runs.
 function mergePreservedExtras(modelMap) {
   const index = buildModelIndex(modelsDir);
   const extras = [];
 
-  for (const key of PRESERVED_EXTRAS) {
+  for (const [key, entry] of Object.entries(index)) {
+    const providers = entry.data.providers || [];
+    if (!providers.includes(PROVIDER_NAME)) continue;
     if (modelMap.has(key)) continue;
 
-    const existing = findModelEntry(index, key);
-    const upstream = existing
-      ? getExistingProviderUpstream(existing, PROVIDER_NAME)
-      : inferUpstream(key);
-
+    const upstream = getExistingProviderUpstream(entry, PROVIDER_NAME) || key;
     modelMap.set(key, upstream);
     extras.push({ key, upstream });
+  }
+
+  for (const [, entry] of Object.entries(index)) {
+    const id = entry.id;
+    if (!id || id === entry.fileId || modelMap.has(id)) continue;
+    const providers = entry.data.providers || [];
+    if (!providers.includes(PROVIDER_NAME)) continue;
+
+    const upstream = getExistingProviderUpstream(entry, PROVIDER_NAME) || id;
+    modelMap.set(id, upstream);
+    extras.push({ key: id, upstream });
   }
 
   return extras;
@@ -647,7 +655,7 @@ async function main() {
 
   console.log(
     `[antigravity] Found ${discovered.length} documented reasoning models ` +
-      `and preserved ${extras.length} backend extras.`
+      `and preserved ${extras.length} JSON-configured extras.`
   );
 
   if (verbose || dryRun) {

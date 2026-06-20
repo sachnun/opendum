@@ -1,22 +1,14 @@
 {
-  "providers": [
-    "antigravity"
-  ],
+  "providers": [],
   "aliases": [
-    "gemini-3.1-flash-image-preview",
-    "gemini-3-flash-image"
+    "gemini-3-flash-image",
+    "gemini-3.1-flash-image",
+    "gemini-3.1-flash-image-preview"
   ],
   "ignored": true,
   "meta": {
-    "reasoning": true,
+    "reasoning": false,
     "toolCall": false,
-    "vision": true,
-    "status": "preview"
-  },
-  "providerConfig": {
-    "antigravity": {
-      "upstream": "gemini-3.1-flash-image",
-      "signature_family": "gemini-flash"
-    }
+    "vision": true
   }
 }

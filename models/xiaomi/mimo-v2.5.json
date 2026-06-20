@@ -6,7 +6,9 @@
   ],
   "aliases": [
     "mimo",
-    "mimo-v2.5-free"
+    "mimo-v2.5-free",
+    "xiaomi-mimo-v2.5",
+    "xiaomi/mimo-v2.5"
   ],
   "ignored": false,
   "meta": {},

@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
+import { aliasesFromUpstream } from "./lib/clean-key.mjs";
+
 const MODEL_FILE_EXTENSION = ".json";
 
 const MODEL_PROPERTY_ORDER = [
@@ -189,12 +191,64 @@ function inferModelFamily(modelKey) {
  */
 export function syncProviderModels(modelsDir, providerName, modelMap, options = {}) {
   const index = buildModelIndex(modelsDir);
+  const modelUpstreams = new Set(modelMap.values());
   const added = [];
   const removed = [];
   const updated = [];
 
   function extraProviderConfig(modelKey) {
     return options.providerConfigByModel?.get(modelKey) ?? {};
+  }
+
+  function findParentForCollision(modelKey, upstreamName) {
+    const entries = Object.values(index);
+    if (index[modelKey]) return null;
+
+    const suffixMatch = modelKey.match(/^(.+?)(?:-(\d+)|-v(\d+(?:\.\d+)*))$/);
+    if (suffixMatch) {
+      const [, base, numericSuffix, versionSuffix] = suffixMatch;
+      const isMeaningfulSuffix =
+        (numericSuffix && Number.parseInt(numericSuffix, 10) >= 2) || versionSuffix;
+      if (isMeaningfulSuffix) {
+        const parent =
+          index[base] ||
+          entries.find((entry) => entry.id === base) ||
+          entries.find((entry) => entry.fileId !== modelKey && (entry.data.aliases || []).includes(base));
+        if (parent) return { baseKey: base, entry: parent };
+      }
+    }
+    const covered =
+      entries.find(
+        (entry) =>
+          entry.fileId !== modelKey &&
+          (entry.data.aliases || []).includes(upstreamName),
+      ) ||
+      entries.find(
+        (entry) =>
+          entry.fileId !== modelKey &&
+          getProviderUpstream(entry.data, providerName, entry.fileId) === upstreamName,
+      );
+    if (covered) return { baseKey: covered.fileId, entry: covered };
+    return null;
+  }
+  for (const [modelKey, upstreamName] of [...modelMap.entries()]) {
+    const parent = findParentForCollision(modelKey, upstreamName);
+    if (!parent) continue;
+
+    const existingAliases = new Set(parent.entry.data.aliases || []);
+    let changed = false;
+    for (const alias of aliasesFromUpstream([upstreamName])) {
+      if (!existingAliases.has(alias)) {
+        existingAliases.add(alias);
+        changed = true;
+      }
+    }
+    if (changed) {
+      parent.entry.data.aliases = [...existingAliases].sort();
+      writeModelJson(parent.entry.path, parent.entry.data);
+      updated.push(parent.baseKey);
+    }
+    modelMap.delete(modelKey);
   }
 
   function applyManagedProviderConfig(providerConfig, modelKey) {
@@ -221,7 +275,11 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
   }
 
   function entryMatchesProviderMap(entry) {
-    return modelMap.has(entry.fileId) || modelMap.has(entry.id);
+    if (modelMap.has(entry.fileId) || modelMap.has(entry.id)) return true;
+    const upstream = getProviderUpstream(entry.data, providerName, entry.id);
+    if (upstream && modelUpstreams.has(upstream)) return true;
+    const aliases = entry.data.aliases || [];
+    return aliases.some((alias) => modelMap.has(alias) || modelUpstreams.has(alias));
   }
 
   function findExistingEntry(modelKey, upstreamName) {
@@ -280,9 +338,6 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
         if (upstreamName !== existing.id && nextProviderConfig.upstream !== upstreamName) {
           nextProviderConfig.upstream = upstreamName;
           changed = true;
-        } else if (upstreamName === existing.id && nextProviderConfig.upstream !== undefined) {
-          delete nextProviderConfig.upstream;
-          changed = true;
         }
         if (Object.keys(nextProviderConfig).length === 0) {
           delete existing.data.providerConfig[providerName];
@@ -304,6 +359,54 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
       if (folder) {
         const folderPath = join(modelsDir, folder);
         if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+      }
+
+      // If a file with the same canonical name already exists (e.g. as a
+      // legacy/ignored catch-all), merge providers/providerConfig into the
+      // existing file instead of overwriting it. The existing meta/aliases/
+      // ignored flags are preserved.
+      if (existsSync(filePath)) {
+        const existing = readModelJson(readFileSync(filePath, "utf-8"));
+        const existingProviders = existing.providers || [];
+        let touched = false;
+
+        if (!existingProviders.includes(providerName)) {
+          existing.providers = orderProviders([...existingProviders, providerName]);
+          touched = true;
+        }
+
+        const extra = extraProviderConfig(modelKey);
+        const wantsProviderConfig = Object.keys(extra).length > 0
+          || upstreamName !== (existing.id || modelKey)
+          || (existing.providerConfig && existing.providerConfig[providerName]);
+
+        if (wantsProviderConfig) {
+          if (!existing.providerConfig) existing.providerConfig = {};
+          if (!existing.providerConfig[providerName]) existing.providerConfig[providerName] = {};
+          const nextProviderConfig = existing.providerConfig[providerName];
+          for (const [key, value] of Object.entries(extra)) {
+            if (JSON.stringify(nextProviderConfig[key]) !== JSON.stringify(value)) {
+              nextProviderConfig[key] = value;
+              touched = true;
+            }
+          }
+          if (upstreamName !== modelKey && nextProviderConfig.upstream !== upstreamName) {
+            nextProviderConfig.upstream = upstreamName;
+            touched = true;
+          }
+          if (Object.keys(nextProviderConfig).length === 0) {
+            delete existing.providerConfig[providerName];
+          }
+          if (Object.keys(existing.providerConfig).length === 0) {
+            delete existing.providerConfig;
+          }
+        }
+
+        if (touched) {
+          writeModelJson(filePath, existing);
+          updated.push(modelKey);
+        }
+        continue;
       }
 
       const data = {
