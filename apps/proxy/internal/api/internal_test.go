@@ -112,18 +112,6 @@ func TestInternalRouteForwardsQoderValidationRequest(t *testing.T) {
 	}
 }
 
-func TestInternalRouteRejectsBlockedHost(t *testing.T) {
-	recorder := httptest.NewRecorder()
-	body := []byte(`{"url":"https://example.com/models","method":"GET"}`)
-	req := signedInternalRefreshRequest(body)
-
-	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
-	}
-}
-
 func TestInternalRouteRejectsHTTPURL(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	body := []byte(`{"url":"http://openrouter.ai/api/v1/models","method":"GET"}`)

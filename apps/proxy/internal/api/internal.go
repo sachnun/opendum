@@ -23,30 +23,6 @@ type internalRelayRequest struct {
 	Body    json.RawMessage   `json:"body,omitempty"`
 }
 
-var internalRelayAllowedHosts = map[string]struct{}{
-	"api.cloudflare.com":    {},
-	"api.github.com":        {},
-	"api.githubcopilot.com": {},
-	"api.kilo.ai":           {},
-	"api.siliconflow.com":   {},
-	"auth.openai.com":       {},
-	"autopush-cloudcode-pa.sandbox.googleapis.com": {},
-	"chatgpt.com":                               {},
-	"cloudcode-pa.googleapis.com":               {},
-	"cloudresourcemanager.googleapis.com":       {},
-	"daily-cloudcode-pa.googleapis.com":         {},
-	"daily-cloudcode-pa.sandbox.googleapis.com": {},
-	"github.com":                                {},
-	"integrate.api.nvidia.com":                  {},
-	"oauth2.googleapis.com":                     {},
-	"openapi.qoder.sh":                          {},
-	"openrouter.ai":                             {},
-	"prod.us-east-1.auth.desktop.kiro.dev":      {},
-	"q.us-east-1.amazonaws.com":                 {},
-	"www.googleapis.com":                        {},
-	"zenmux.ai":                                 {},
-}
-
 func (s *Server) internalRefreshRoute(w http.ResponseWriter, r *http.Request) {
 	rawBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, internalRelayMaxBodyBytes))
 	if err != nil {
@@ -123,9 +99,6 @@ func resolveInternalRelayTarget(input internalRelayRequest) (string, string, err
 	}
 	if target.Scheme != "https" || target.Hostname() == "" || target.User != nil {
 		return "", "", errors.New("url must be an https provider URL")
-	}
-	if _, ok := internalRelayAllowedHosts[strings.ToLower(target.Hostname())]; !ok {
-		return "", "", errors.New("url host is not allowed")
 	}
 	return method, target.String(), nil
 }
