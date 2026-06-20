@@ -1,5 +1,7 @@
 {
-  "providers": [],
+  "providers": [
+    "kiro"
+  ],
   "aliases": [
     "claude-sonnet-4-5-1m",
     "claude-sonnet-4.5-1m",
@@ -11,5 +13,10 @@
     "reasoning": true,
     "toolCall": true,
     "vision": true
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "claude-sonnet-4.5-1m"
+    }
   }
 }

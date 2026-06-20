@@ -1,6 +1,7 @@
 {
   "providers": [
-    "antigravity"
+    "antigravity",
+    "kiro"
   ],
   "aliases": [
     "claude-sonnet-4-6-1m",
@@ -24,6 +25,15 @@
       "strict_thought_signatures": true,
       "strict_tool_schema": true,
       "top_p_min_095": true
+    },
+    "kiro": {
+      "upstream": "claude-sonnet-4.6-1m",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }
