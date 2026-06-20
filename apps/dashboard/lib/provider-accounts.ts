@@ -1,6 +1,7 @@
 export type ProviderAccountKey =
   | "antigravity"
   | "codex"
+  | "command_code"
   | "copilot"
   | "kiro"
   | "nvidia_nim"
@@ -36,6 +37,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     label: "Codex",
     category: "oauth",
     emptyMessage: "No Codex connections yet.",
+    showTier: true,
+  },
+  {
+    key: "command_code",
+    slug: "command-code",
+    label: "Command Code",
+    category: "api_key",
+    emptyMessage: "No Command Code connections yet.",
     showTier: true,
   },
   {

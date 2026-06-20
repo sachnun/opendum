@@ -1,8 +1,15 @@
 {
   "providers": [
-    "siliconflow"
+    "siliconflow",
+    "command_code"
   ],
   "providerConfig": {
+    "command_code": {
+      "upstream": "MiniMaxAI/MiniMax-M3",
+      "allowedTiers": [
+        "go"
+      ]
+    },
     "siliconflow": {
       "upstream": "MiniMaxAI/MiniMax-M3"
     }

@@ -10,6 +10,7 @@ import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/consta
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
 import { API_BASE_URL as siliconflowApiBaseUrl } from "../lib/providers/siliconflow/constants";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
+import { API_BASE_URL as commandCodeApiBaseUrl, GENERATE_PATH as commandCodeGeneratePath } from "../lib/providers/commandcode/constants";
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/providers/provider-http-errors";
 import { getCloudflareValidationUrl } from "../lib/providers/cloudflare/constants";
 import type { ActionResult } from "../utils/api";
@@ -18,7 +19,7 @@ const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "qoder", "siliconflow", "zenmux"]);
+const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "qoder", "siliconflow", "zenmux", "command_code"]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional() });
 type ApiKeyProvider = z.infer<typeof apiKeyProviderSchema>;
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
@@ -29,25 +30,53 @@ const API_KEY_PROVIDER_SETTINGS = {
   qoder: { label: "Qoder", baseUrl: "https://openapi.qoder.sh/api/v1", modelMap: getProviderModelMap("qoder"), validationPath: "/models", requireSuccessfulStatus: true },
   siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
-} satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
+  command_code: { label: "Command Code", baseUrl: commandCodeApiBaseUrl, modelMap: getProviderModelMap("command_code"), validationPath: commandCodeGeneratePath, requireSuccessfulStatus: false },
+} satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions" | "/alpha/generate"; requireSuccessfulStatus: boolean }>;
+
+// Command Code's Go tier uses the reverse-engineered CLI /alpha/generate
+// endpoint, which takes a custom CLI envelope (not an OpenAI body).
+const COMMAND_CODE_CLI_VERSION = "0.38.7";
+
+function buildCommandCodeValidationEnvelope(model: string) {
+  return {
+    config: { workingDir: "/", date: new Date().toISOString().slice(0, 10), environment: "linux-x64", structure: [], isGitRepo: false, currentBranch: "", mainBranch: "", gitStatus: "", recentCommits: [] },
+    memory: "",
+    taste: "",
+    skills: null,
+    permissionMode: "standard",
+    params: { model, messages: [{ role: "user", content: "ping" }], stream: true, max_tokens: 1 },
+  };
+}
 
 function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {
   const { baseUrl, modelMap, validationPath } = API_KEY_PROVIDER_SETTINGS[provider];
   const validationModel = Object.values(modelMap)[0];
-  const isChatValidation = validationPath === "/chat/completions";
+  const isCommandCode = provider === "command_code";
+  const isPost = validationPath === "/chat/completions" || isCommandCode;
+  const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" };
+  let body: Record<string, unknown> | undefined;
+  if (isCommandCode) {
+    headers["x-command-code-version"] = COMMAND_CODE_CLI_VERSION;
+    headers["x-cli-environment"] = "production";
+    headers["x-project-slug"] = "command-code";
+    headers["Accept"] = "text/event-stream";
+    body = buildCommandCodeValidationEnvelope(validationModel as string);
+  } else if (validationPath === "/chat/completions") {
+    body = { model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false };
+  }
   return {
     validationModel,
     url: `${baseUrl}${validationPath}`,
-    method: isChatValidation ? "POST" as const : "GET" as const,
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
-    body: isChatValidation ? { model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false } : undefined,
+    method: (isPost ? "POST" : "GET") as "POST" | "GET",
+    headers,
+    body,
   };
 }
 
 async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string): Promise<ActionResult<void>> {
   const { label, validationPath, requireSuccessfulStatus } = API_KEY_PROVIDER_SETTINGS[provider];
   const { validationModel, url, method, headers, body } = buildValidationRequest(provider, apiKey);
-  if (validationPath === "/chat/completions" && !validationModel) return { success: false, error: `${label} API key validation model is not configured.` };
+  if ((validationPath === "/chat/completions" || provider === "command_code") && !validationModel) return { success: false, error: `${label} API key validation model is not configured.` };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
@@ -64,6 +93,11 @@ async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string):
       const normalizedBody = responseText.toLowerCase();
       if (normalizedBody.includes("authenticate") || normalizedBody.includes("unauthorized") || normalizedBody.includes("invalid api key") || normalizedBody.includes("user not found")) return { success: false, error: `${label} API key is invalid.` };
       return { success: false, error: `Unable to validate ${label} API key right now (HTTP ${response.status}). Please try again.` };
+    }
+    // Command Code validates against a streaming endpoint; release the SSE
+    // body once auth is confirmed so the request does not leak a connection.
+    if (provider === "command_code" && response.body) {
+      try { await response.body.cancel(); } catch { /* noop */ }
     }
     return { success: true, data: undefined };
   } catch (error) {
@@ -84,14 +118,17 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   const { label } = API_KEY_PROVIDER_SETTINGS[provider];
   const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
+  // Command Code's Go tier ($1/mo CLI plan) gates its open-source model set;
+  // stamp the account tier so model-access rules resolve correctly.
+  const tier = provider === "command_code" ? "go" : undefined;
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(tier ? { tier } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
   const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
-  await db.insert(providerAccount).values({ userId, provider, name: normalizedAccountName || `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, isActive: true });
+  await db.insert(providerAccount).values({ userId, provider, name: normalizedAccountName || `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, isActive: true, ...(tier ? { tier } : {}) });
   return { success: true, data: { email: identifier, isUpdate: false } };
 }
 

@@ -1,26 +1,33 @@
 {
   "providers": [
     "nvidia_nim",
-    "siliconflow"
+    "siliconflow",
+    "command_code"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "deepseek-ai/deepseek-v4-pro"
-    },
-    "siliconflow": {
-      "upstream": "deepseek-ai/DeepSeek-V4-Pro"
-    }
-  },
   "aliases": [
     "deepseek-pro",
     "deepseek-v4-pro",
     "deepseek-ai/deepseek-v4-pro",
     "deepseek-ai/DeepSeek-V4-Pro"
   ],
-  "ignored": false
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "command_code": {
+      "upstream": "deepseek/deepseek-v4-pro",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "nvidia_nim": {
+      "upstream": "deepseek-ai/deepseek-v4-pro"
+    },
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V4-Pro"
+    }
+  }
 }

@@ -1,9 +1,16 @@
 {
   "providers": [
     "kilo_code",
-    "zenmux"
+    "zenmux",
+    "command_code"
   ],
   "providerConfig": {
+    "command_code": {
+      "upstream": "stepfun/Step-3.7-Flash",
+      "allowedTiers": [
+        "go"
+      ]
+    },
     "kilo_code": {
       "upstream": "stepfun/step-3.7-flash:free",
       "authless": true

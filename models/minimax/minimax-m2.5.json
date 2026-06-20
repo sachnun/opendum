@@ -1,17 +1,24 @@
 {
   "providers": [
     "kiro",
-    "siliconflow"
+    "siliconflow",
+    "command_code"
   ],
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": false
   },
   "providerConfig": {
+    "command_code": {
+      "upstream": "MiniMaxAI/MiniMax-M2.5",
+      "allowedTiers": [
+        "go"
+      ]
+    },
     "siliconflow": {
       "upstream": "MiniMaxAI/MiniMax-M2.5"
     }
-  },
-  "ignored": true
+  }
 }

@@ -1,9 +1,16 @@
 {
   "providers": [
     "nvidia_nim",
-    "siliconflow"
+    "siliconflow",
+    "command_code"
   ],
   "providerConfig": {
+    "command_code": {
+      "upstream": "zai-org/GLM-5.1",
+      "allowedTiers": [
+        "go"
+      ]
+    },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.1"
     },

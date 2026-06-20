@@ -1,11 +1,20 @@
 {
-  "providers": [],
-  "providerConfig": {},
+  "providers": [
+    "command_code"
+  ],
+  "aliases": [
+    "qwen3.6-plus-preview"
+  ],
+  "ignored": false,
   "meta": {
     "status": "preview"
   },
-  "ignored": false,
-  "aliases": [
-    "qwen3.6-plus-preview"
-  ]
+  "providerConfig": {
+    "command_code": {
+      "upstream": "Qwen/Qwen3.6-Plus",
+      "allowedTiers": [
+        "go"
+      ]
+    }
+  }
 }

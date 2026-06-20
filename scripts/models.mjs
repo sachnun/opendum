@@ -14,6 +14,7 @@ const refreshScripts = [
   "antigravity-version.mjs",
   "antigravity-models.mjs",
   "codex.mjs",
+  "command-code.mjs",
   "copilot.mjs",
   "kilo-code.mjs",
   "kiro.mjs",
@@ -26,7 +27,7 @@ const refreshScripts = [
 ];
 
 // Providers whose models are refreshed by the scripts above
-const REFRESHED_PROVIDERS = ["antigravity", "codex", "copilot", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
+const REFRESHED_PROVIDERS = ["antigravity", "codex", "command_code", "copilot", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

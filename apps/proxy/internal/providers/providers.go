@@ -56,19 +56,20 @@ type Registry struct {
 
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
 	return &Registry{providers: map[string]Provider{
-		"opencode":    opencodeProvider{registry: registry},
-		"openrouter":  openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
-		"nvidia_nim":  openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
-		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
-		"workers_ai":  workersAIProvider{registry: registry},
-		"kiro":        kiroProvider{registry: registry},
-		"codex":       codexProvider{registry: registry, redis: redis, db: db},
-		"copilot":     copilotProvider{registry: registry, redis: redis},
-		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
-		"qoder":       openAICompatibleProvider{name: "qoder", baseURL: "https://openapi.qoder.sh/api/v1", supportedParams: supportedQoder, registry: registry, trimPrefix: "qoder/"},
-		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
-		"siliconflow": openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
-		"mimo_code":   mimoCodeProvider{registry: registry},
+		"opencode":     opencodeProvider{registry: registry},
+		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
+		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
+		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
+		"workers_ai":   workersAIProvider{registry: registry},
+		"kiro":         kiroProvider{registry: registry},
+		"codex":        codexProvider{registry: registry, redis: redis, db: db},
+		"copilot":      copilotProvider{registry: registry, redis: redis},
+		"antigravity":  antigravityProvider{registry: registry, db: db, redis: redis},
+		"qoder":        openAICompatibleProvider{name: "qoder", baseURL: "https://openapi.qoder.sh/api/v1", supportedParams: supportedQoder, registry: registry, trimPrefix: "qoder/"},
+		"zenmux":       openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
+		"siliconflow":  openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
+		"mimo_code":    mimoCodeProvider{registry: registry},
+		"command_code": commandCodeProvider{registry: registry},
 	}}
 }
 

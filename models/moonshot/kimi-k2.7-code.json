@@ -2,7 +2,8 @@
   "providers": [
     "workers_ai",
     "zenmux",
-    "siliconflow"
+    "siliconflow",
+    "command_code"
   ],
   "meta": {
     "reasoning": true,
@@ -10,6 +11,12 @@
     "vision": true
   },
   "providerConfig": {
+    "command_code": {
+      "upstream": "moonshotai/Kimi-K2.7-Code",
+      "allowedTiers": [
+        "go"
+      ]
+    },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.7-Code"
     },

@@ -1,16 +1,10 @@
 {
   "providers": [
-    "qoder",
     "command_code"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
   "providerConfig": {
     "command_code": {
-      "upstream": "Qwen/Qwen3.7-Max",
+      "upstream": "xiaomi/mimo-v2.5-pro",
       "allowedTiers": [
         "go"
       ]
