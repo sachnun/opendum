@@ -125,6 +125,9 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 
 	account, providerResp, requestStartMS, upstreamFirstResponseMS, rotationFailures, roaming, errInfo := s.executeWithAccountRotation(ctx, r, cfg, parsed, authResult, validation, forced, startMS)
 	if errInfo != nil {
+		if errInfo.AccountID != "" {
+			w.Header().Set("X-Provider-Account-Id", errInfo.AccountID)
+		}
 		s.writeRouteError(w, cfg, errInfo.Status, errInfo.Message, errInfo.Type, errInfo.Param, errInfo.Code, errInfo.RetryAfter, errInfo.RetryAfterMS)
 		return
 	}

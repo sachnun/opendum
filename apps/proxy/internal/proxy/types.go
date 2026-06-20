@@ -41,6 +41,7 @@ type routeError struct {
 	Code         *string
 	RetryAfter   *string
 	RetryAfterMS *int64
+	AccountID    string
 }
 
 type accountRotationFailure struct {

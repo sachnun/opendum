@@ -127,7 +127,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			detailed := buildAccountErrorMessage(message, accountErrorContext{Model: validation.Model, Provider: attempt.account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
 			failedAt := runner.markAccountFailed(ctx, attempt.account.ID, validation.Model, status, detailed)
 			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: attempt.account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: status, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: attempt.account.Provider})
-			lastFailure = &routeError{Status: status, Message: message, Type: "api_error"}
+			lastFailure = &routeError{Status: status, Message: message, Type: "api_error", AccountID: attempt.account.ID}
 			if attempt.roaming != nil {
 				runner.refundRoamingPoint(context.Background(), attempt.roaming)
 			}
@@ -158,7 +158,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			}
 			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: attempt.account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: attempt.account.Provider})
 			message, typ := sanitizedProxyError(resp.StatusCode, bodyText)
-			lastFailure = &routeError{Status: resp.StatusCode, Message: message, Type: typ}
+			lastFailure = &routeError{Status: resp.StatusCode, Message: message, Type: typ, AccountID: attempt.account.ID}
 			if attempt.roaming != nil {
 				runner.refundRoamingPoint(context.Background(), attempt.roaming)
 			}

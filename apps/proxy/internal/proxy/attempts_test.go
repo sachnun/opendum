@@ -394,6 +394,77 @@ func TestExecuteAccountRotationDoesNotFallbackOnBadRequestWithForcedProvider(t *
 	}
 }
 
+func TestExecuteAccountRotationRecordsLastAttemptedAccountOnError(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "p1-a1", Provider: "provider_1"},
+			{ID: "p1-a2", Provider: "provider_1"},
+			{ID: "p2-a1", Provider: "provider_2"},
+		},
+		statusByProvider: map[string]int{"provider_1": http.StatusTooManyRequests, "provider_2": http.StatusTooManyRequests},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil || routeErr.Status != http.StatusTooManyRequests {
+		t.Fatalf("routeErr = %+v, want 429", routeErr)
+	}
+	if routeErr.AccountID != "p2-a1" {
+		t.Fatalf("routeErr.AccountID = %q, want p2-a1 (last attempted)", routeErr.AccountID)
+	}
+}
+
+func TestExecuteAccountRotationOmitsAccountIDWhenNoAccountAttempted(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil {
+		t.Fatalf("routeErr = nil, want no-accounts error")
+	}
+	if routeErr.AccountID != "" {
+		t.Fatalf("routeErr.AccountID = %q, want empty when no account attempted", routeErr.AccountID)
+	}
+}
+
 func TestExecuteAccountRotationRefundsFailedSharedAttempt(t *testing.T) {
 	runner := &testRotationRunner{
 		accounts:       []appdb.ProviderAccount{{ID: "own-a1", UserID: "user_1", Provider: "provider_1"}},
