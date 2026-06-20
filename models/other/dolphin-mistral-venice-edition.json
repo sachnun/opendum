@@ -1,0 +1,21 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "family": "Cognitive Computations",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+    }
+  },
+  "aliases": [
+    "dolphin-mistral-24b-venice-edition",
+    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+  ]
+}

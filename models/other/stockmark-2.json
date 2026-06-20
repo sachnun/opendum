@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Stockmark",
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "stockmark/stockmark-2-100b-instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "stockmark-2-100b-instruct",
+    "stockmark/stockmark-2-100b-instruct",
+    "stockmark-2-instruct"
+  ]
+}

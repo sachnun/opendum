@@ -1,0 +1,26 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "openrouter"
+  ],
+  "family": "NVIDIA",
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-nano-12b-v2-vl"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-nano-12b-v2-vl:free"
+    }
+  },
+  "aliases": [
+    "nemotron-nano-12b-v2-vl",
+    "nvidia/nemotron-nano-12b-v2-vl",
+    "nvidia/nemotron-nano-12b-v2-vl:free"
+  ]
+}

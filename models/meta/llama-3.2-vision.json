@@ -1,0 +1,29 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "llama-3.2-90b-vision-instruct",
+    "meta-llama-3.2-90b-vision-instruct",
+    "meta/llama-3.2-90b-vision-instruct",
+    "llama-3.2-11b-vision-instruct",
+    "meta-llama-3.2-11b-vision-instruct",
+    "meta/llama-3.2-11b-vision-instruct",
+    "llama-3.2-vision-instruct"
+  ],
+  "family": "Meta",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "variant": "vision",
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "meta/llama-3.2-90b-vision-instruct"
+    }
+  },
+  "ignored": true,
+  "description": "Superseded \u2014 Llama 3.2 Vision (Sep 2024) replaced by Llama 3.3 vision-line and Llama 4 Maverick."
+}

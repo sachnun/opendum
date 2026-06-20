@@ -4,13 +4,15 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
 import { sleep, fetchText, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
 
 function toModelKey(modelId) {
-  if (modelId.endsWith("-free")) return modelId.slice(0, -"-free".length);
-  return modelId;
+  const cleaned = stripParamInfoKey(modelId);
+  if (cleaned.endsWith("-free")) return cleaned.slice(0, -"-free".length);
+  return cleaned;
 }
 
 function parseMarkdownTables(markdown) {

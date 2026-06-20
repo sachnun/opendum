@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "ignored": true,
+  "description": "Deprecated — Mistral 7B v0.1/v0.2/v0.3 retired March 30, 2025 (mistral.ai legal). Superseded by Mistral-Large-3, Mistral-Medium-3.5, Mistral-Small-3.1/4.",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-7b-instruct-v0.3"
+    }
+  },
+  "aliases": [
+    "mistral-7b-instruct-v0.2",
+    "mistralai/mistral-7b-instruct-v0.3",
+    "mistral-7b-instruct-v0.3",
+    "mistral-instruct"
+  ]
+}

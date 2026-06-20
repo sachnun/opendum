@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "mistral-large-2-instruct",
+    "mistralai-mistral-large-2-instruct",
+    "mistralai/mistral-large-2-instruct"
+  ],
+  "family": "Mistral",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-large-2-instruct"
+    }
+  }
+}

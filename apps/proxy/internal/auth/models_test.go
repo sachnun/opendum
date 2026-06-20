@@ -74,7 +74,7 @@ func TestValidateModelSuggestionsExcludeAliases(t *testing.T) {
 	if result.Valid {
 		t.Fatal("ValidateModel returned valid result")
 	}
-	if !strings.Contains(result.Error, "Did you mean:") || !strings.Contains(result.Error, "mistral-large-3-675b") {
+	if !strings.Contains(result.Error, "Did you mean:") || !strings.Contains(result.Error, "mistral-large-3") {
 		t.Fatalf("error = %q", result.Error)
 	}
 	suggestions := strings.TrimPrefix(result.Error[strings.Index(result.Error, "Did you mean: "):], "Did you mean: ")

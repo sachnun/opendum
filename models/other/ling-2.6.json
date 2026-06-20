@@ -1,0 +1,10 @@
+{
+  "providers": [],
+  "family": "InclusionAI",
+  "providerConfig": {},
+  "aliases": [
+    "ling-2.6-1t"
+  ],
+  "ignored": false,
+  "meta": {}
+}

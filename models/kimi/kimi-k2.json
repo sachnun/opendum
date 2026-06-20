@@ -1,0 +1,17 @@
+{
+  "providers": [],
+  "family": "Kimi",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {},
+  "aliases": [
+    "kimi-k2-0905",
+    "kimi-k2-instruct-0905",
+    "kimi-k2-instruct"
+  ],
+  "ignored": false
+}

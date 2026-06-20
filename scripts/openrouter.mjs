@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
@@ -23,11 +24,12 @@ function toModelKey(modelId) {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 
-  if (modelKey !== "openrouter-free" && modelKey.endsWith("-free")) {
-    return modelKey.slice(0, -"-free".length);
+  const cleaned = stripParamInfoKey(modelKey);
+  if (modelKey !== "openrouter-free" && cleaned.endsWith("-free")) {
+    return cleaned.slice(0, "-free".length);
   }
 
-  return modelKey;
+  return cleaned;
 }
 
 function isFreeChatModel(model) {

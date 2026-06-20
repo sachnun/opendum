@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
 import { fetchJson } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "zenmux";
 const ZENMUX_MODELS_URL = "https://zenmux.ai/api/v1/models";
@@ -17,7 +18,8 @@ function toModelKey(modelId) {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 
-  return modelKey.endsWith("-free") ? modelKey.slice(0, -"-free".length) : modelKey;
+  const cleaned = stripParamInfoKey(modelKey);
+  return cleaned.endsWith("-free") ? cleaned.slice(0, -"-free".length) : cleaned;
 }
 
 function isZeroPriced(model) {

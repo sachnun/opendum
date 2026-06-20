@@ -13,5 +13,7 @@
     "siliconflow": {
       "upstream": "MiniMaxAI/MiniMax-M2.5"
     }
-  }
+  },
+  "ignored": true,
+  "description": "Superseded \u2014 Minimax-M2.5 replaced by Minimax-M2.7 and Minimax-M3."
 }

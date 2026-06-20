@@ -18,6 +18,11 @@ const META_PROPERTY_ORDER = [
   "reasoning",
   "toolCall",
   "vision",
+  "type",
+  "code",
+  "tier",
+  "variant",
+  "status",
 ];
 
 const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "authless", "minTier", "allowedTiers", "aliases"];

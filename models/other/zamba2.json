@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Zyphra",
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "zyphra/zamba2-7b-instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "zamba2-7b-instruct",
+    "zyphra/zamba2-7b-instruct",
+    "zamba2-instruct"
+  ]
+}

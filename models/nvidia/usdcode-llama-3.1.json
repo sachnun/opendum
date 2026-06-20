@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "NVIDIA",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "usdcode-llama-3.1-70b-instruct",
+    "usdcode-llama-3.1-instruct"
+  ]
+}

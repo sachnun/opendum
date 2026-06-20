@@ -1,0 +1,10 @@
+{
+  "providers": [],
+  "family": "Baidu",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {},
+  "aliases": [
+    "qianfan-ocr-fast"
+  ]
+}

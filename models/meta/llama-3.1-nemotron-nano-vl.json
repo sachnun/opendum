@@ -1,0 +1,24 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "llama-3.1-nemotron-nano-vl-8b-v1",
+    "nvidia-llama-3.1-nemotron-nano-vl-8b-v1",
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+  ],
+  "family": "Meta",
+  "meta": {
+    "reasoning": true,
+    "toolCall": false,
+    "vision": true,
+    "variant": "vl"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+    }
+  },
+  "ignored": true,
+  "description": "Old Llama-3.1 generation \u2014 replaced by Llama-4 Maverick/Scout for vision-language tasks."
+}

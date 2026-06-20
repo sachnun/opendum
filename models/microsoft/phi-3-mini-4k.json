@@ -1,0 +1,15 @@
+{
+  "providers": [],
+  "family": "Microsoft",
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {},
+  "ignored": false,
+  "aliases": [
+    "phi-3-mini-4k-instruct"
+  ]
+}

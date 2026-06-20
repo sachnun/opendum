@@ -1,0 +1,10 @@
+{
+  "providers": [],
+  "family": "Meta",
+  "providerConfig": {},
+  "meta": {},
+  "ignored": false,
+  "aliases": [
+    "llama-guard-4-12b"
+  ]
+}

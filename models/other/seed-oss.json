@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "siliconflow"
+  ],
+  "family": "ByteDance",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "bytedance/seed-oss-36b-instruct"
+    },
+    "siliconflow": {
+      "upstream": "ByteDance-Seed/Seed-OSS-36B-Instruct"
+    }
+  },
+  "aliases": [
+    "seed-oss-36b-instruct",
+    "bytedance/seed-oss-36b-instruct",
+    "ByteDance-Seed/Seed-OSS-36B-Instruct",
+    "seed-oss-instruct"
+  ]
+}

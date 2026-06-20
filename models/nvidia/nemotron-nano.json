@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "openrouter"
+  ],
+  "aliases": [
+    "nemotron-nano-9b-v2",
+    "nvidia-nvidia-nemotron-nano-9b-v2",
+    "nvidia-nemotron-nano-9b-v2",
+    "nvidia/nvidia-nemotron-nano-9b-v2",
+    "nvidia/nemotron-nano-9b-v2:free"
+  ],
+  "family": "NVIDIA",
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/nvidia-nemotron-nano-9b-v2"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-nano-9b-v2:free"
+    }
+  }
+}

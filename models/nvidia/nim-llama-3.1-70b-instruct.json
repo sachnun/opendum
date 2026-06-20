@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "meta/llama-3.1-70b-instruct"
-  ],
-  "family": "NVIDIA",
-  "ignored": true,
-  "meta": {}
-}

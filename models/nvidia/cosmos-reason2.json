@@ -1,0 +1,17 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "NVIDIA",
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/cosmos-reason2-8b"
+    }
+  },
+  "meta": {},
+  "aliases": [
+    "cosmos-reason2-8b",
+    "nvidia/cosmos-reason2-8b"
+  ]
+}

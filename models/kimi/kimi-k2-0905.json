@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "family": "Kimi",
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false
-  }
-}

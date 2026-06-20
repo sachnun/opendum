@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "deepseek-coder-6.7b-instruct",
+    "deepseek-ai-deepseek-coder-6.7b-instruct",
+    "deepseek-ai/deepseek-coder-6.7b-instruct",
+    "deepseek-coder-instruct"
+  ],
+  "family": "DeepSeek",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "code": true,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "deepseek-ai/deepseek-coder-6.7b-instruct"
+    }
+  }
+}

@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "family": "Microsoft",
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false
-  }
-}

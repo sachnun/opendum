@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "TII",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "falcon3-7b-instruct",
+    "falcon3-instruct"
+  ]
+}

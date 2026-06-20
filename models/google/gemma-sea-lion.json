@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "family": "Google",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/aisingapore/gemma-sea-lion-v4-27b-it"
+    }
+  },
+  "aliases": [
+    "gemma-sea-lion-v4-27b-it",
+    "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
+    "gemma-sea-lion-it"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "providers": [],
+  "family": "Mistral",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {},
+  "ignored": false,
+  "aliases": [
+    "mistral-small-24b-instruct",
+    "mistral-small-instruct"
+  ]
+}

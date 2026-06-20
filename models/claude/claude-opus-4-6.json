@@ -1,20 +1,33 @@
 {
   "providers": [
-    "kiro",
     "antigravity",
-    "copilot"
+    "copilot",
+    "kiro"
   ],
   "aliases": [
+    "claude-opus-4-6-1m",
+    "claude-opus-4.6-1m",
+    "claude-opus-4-6-thinking",
     "claude-opus-4.6",
     "claude-opus4.6"
   ],
   "family": "Anthropic",
+  "ignored": false,
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": true
   },
   "providerConfig": {
+    "kiro": {
+      "upstream": "claude-opus-4.6-1m",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    },
     "antigravity": {
       "upstream": "claude-opus-4-6-thinking",
       "anthropic_beta": true,
@@ -36,15 +49,6 @@
         "enterprise"
       ],
       "reasoning_effort": false
-    },
-    "kiro": {
-      "upstream": "claude-opus-4.6",
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "power",
-        "standalone"
-      ]
     }
   }
 }

@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "family": "Hunyuan",
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "tencent/Hy3-preview"
+    }
+  },
+  "meta": {
+    "status": "preview"
+  },
+  "ignored": false,
+  "aliases": [
+    "hy3-preview",
+    "tencent/Hy3-preview"
+  ]
+}

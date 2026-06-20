@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "phi-4-mini-instruct",
+    "microsoft-phi-4-mini-instruct",
+    "microsoft/phi-4-mini-instruct"
+  ],
+  "family": "Microsoft",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "microsoft/phi-4-mini-instruct"
+    }
+  }
+}

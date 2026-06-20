@@ -94,11 +94,11 @@ func TestNvidiaMistralLargeAliasUsesCurrentHostedModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := registry.ResolveAlias("mistralai/mistral-large"); got != "mistral-large-3-675b" {
-		t.Fatalf("ResolveAlias(mistralai/mistral-large) = %q, want mistral-large-3-675b", got)
+	if got := registry.ResolveAlias("mistralai/mistral-large"); got != "mistral-large-3" {
+		t.Fatalf("ResolveAlias(mistralai/mistral-large) = %q, want mistral-large-3", got)
 	}
-	if got := registry.ResolveAlias("mistral-large-3-675b-instruct-2512"); got != "mistral-large-3-675b" {
-		t.Fatalf("ResolveAlias(mistral-large-3-675b-instruct-2512) = %q, want mistral-large-3-675b", got)
+	if got := registry.ResolveAlias("mistral-large-3-675b-instruct-2512"); got != "mistral-large-3" {
+		t.Fatalf("ResolveAlias(mistral-large-3-675b-instruct-2512) = %q, want mistral-large-3", got)
 	}
 	if got := registry.UpstreamModelName("mistralai/mistral-large", "nvidia_nim"); got != "mistralai/mistral-large-3-675b-instruct-2512" {
 		t.Fatalf("NVIDIA upstream = %q, want mistralai/mistral-large-3-675b-instruct-2512", got)
@@ -114,15 +114,15 @@ func TestNvidiaNemotronNanoVLDisablesToolCalling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	model := "nemotron-nano-vl"
+	model := "llama-3.1-nemotron-nano-vl"
 	if got := registry.ResolveAlias("llama-3.1-nemotron-nano-vl-8b-v1"); got != model {
 		t.Fatalf("ResolveAlias(llama-3.1-nemotron-nano-vl-8b-v1) = %q, want %q", got, model)
 	}
 	if !registry.IsVisionModel(model) {
-		t.Fatal("Nemotron Nano VL should remain vision-capable")
+		t.Fatal("Llama-3.1 Nemotron Nano VL should remain vision-capable")
 	}
 	if registry.IsToolCallModel(model) {
-		t.Fatal("Nemotron Nano VL should not send OpenAI tool parameters to NVIDIA NIM")
+		t.Fatal("Llama-3.1 Nemotron Nano VL should not send OpenAI tool parameters to NVIDIA NIM")
 	}
 }
 
@@ -161,7 +161,7 @@ func TestNvidiaNemotronOmniAliasUsesCurrentHostedModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	model := "nemotron-3-nano"
+	model := "nemotron-3-nano-omni"
 	for _, alias := range []string{"nemotron-3-nano-omni-30b-a3b-reasoning", "nemotron-omni", "nano-omni"} {
 		if got := registry.ResolveAlias(alias); got != model {
 			t.Fatalf("ResolveAlias(%q) = %q, want %q", alias, got, model)

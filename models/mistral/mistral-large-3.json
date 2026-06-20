@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "mistral-large-3-675b-instruct-2512",
+    "mistralai/mistral-large-3-675b-instruct-2512",
+    "mistral-large",
+    "mistralai/mistral-large",
+    "mistral-large-3-instruct"
+  ],
+  "family": "Mistral",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-large-3-675b-instruct-2512"
+    }
+  },
+  "ignored": false
+}

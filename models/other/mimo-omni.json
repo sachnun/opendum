@@ -1,0 +1,9 @@
+{
+  "providers": [],
+  "family": "Xiaomi",
+  "providerConfig": {},
+  "aliases": [
+    "mimo-v2-omni"
+  ],
+  "ignored": false
+}

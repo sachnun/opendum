@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Abacus.AI",
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "abacusai/dracarys-llama-3.1-70b-instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "dracarys-llama-3.1-70b-instruct",
+    "abacusai/dracarys-llama-3.1-70b-instruct",
+    "dracarys-llama-3.1-instruct"
+  ]
+}

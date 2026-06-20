@@ -21,6 +21,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
 import { fetchText, sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -166,7 +167,7 @@ function modelIDFromDisplayName(displayName) {
     id = id.replace(/\.(?=\d)/g, "-");
   }
 
-  return id;
+  return stripParamInfoKey(id);
 }
 
 function canonicalizeDiscoveredModel(displayName) {

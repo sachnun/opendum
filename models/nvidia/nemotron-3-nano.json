@@ -1,0 +1,26 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "openrouter"
+  ],
+  "family": "NVIDIA",
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3-nano-30b-a3b"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-nano-30b-a3b:free"
+    }
+  },
+  "aliases": [
+    "nemotron-3-nano-30b-a3b",
+    "nvidia/nemotron-3-nano-30b-a3b",
+    "nvidia/nemotron-3-nano-30b-a3b:free"
+  ]
+}

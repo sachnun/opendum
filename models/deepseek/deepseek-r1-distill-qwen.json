@@ -1,0 +1,22 @@
+{
+  "providers": [
+    "workers_ai"
+  ],
+  "family": "DeepSeek",
+  "meta": {
+    "reasoning": true,
+    "toolCall": false,
+    "vision": false
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+    }
+  },
+  "ignored": true,
+  "aliases": [
+    "deepseek-r1-distill-qwen-32b",
+    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+  ],
+  "description": "Superseded \u2014 DeepSeek R1 distill line replaced by DeepSeek V4-Pro/Flash (April 2026). V4 covers the reasoning use cases previously served by R1."
+}

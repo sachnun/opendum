@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "phi-3.5-moe-instruct",
+    "microsoft-phi-3.5-moe-instruct",
+    "microsoft/phi-3.5-moe-instruct"
+  ],
+  "family": "Microsoft",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "microsoft/phi-3.5-moe-instruct"
+    }
+  }
+}

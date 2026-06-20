@@ -1,0 +1,36 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "workers_ai"
+  ],
+  "aliases": [
+    "llama-3.1-405b-instruct",
+    "meta-llama-3.1-405b-instruct",
+    "meta/llama-3.1-405b-instruct",
+    "meta/llama-3.1-70b-instruct",
+    "llama-3.1-70b-instruct",
+    "@cf/meta/llama-3.1-8b-instruct-fp8",
+    "llama-3.1-8b-instruct-fp8",
+    "llama-3.1-8b-instruct",
+    "meta/llama-3.1-8b-instruct",
+    "@cf/meta/llama-3.1-8b-instruct-fast",
+    "llama-3.1-instruct"
+  ],
+  "family": "Meta",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "meta/llama-3.1-70b-instruct"
+    },
+    "workers_ai": {
+      "upstream": "@cf/meta/llama-3.1-8b-instruct-fp8"
+    }
+  },
+  "ignored": true,
+  "description": "Superseded \u2014 Llama 3.1 (Jul 2024) replaced by Llama 3.3 (Dec 2024) and Llama 4 Maverick/Scout."
+}

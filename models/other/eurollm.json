@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "EuroLLM",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "eurollm-9b-instruct",
+    "eurollm-instruct"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "Google",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "gemma-2-9b-cpt-sahabatai-instruct",
+    "gemma-2-cpt-sahabatai-instruct"
+  ]
+}

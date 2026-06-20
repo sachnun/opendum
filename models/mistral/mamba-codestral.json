@@ -1,0 +1,16 @@
+{
+  "providers": [],
+  "aliases": [
+    "mamba-codestral-7b-v0.1",
+    "mistralai-mamba-codestral-7b-v0.1",
+    "mistralai/mamba-codestral-7b-v0.1"
+  ],
+  "family": "Mistral",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false
+  },
+  "providerConfig": {}
+}

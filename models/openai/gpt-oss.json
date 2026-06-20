@@ -1,0 +1,44 @@
+{
+  "providers": [
+    "antigravity",
+    "nvidia_nim",
+    "openrouter",
+    "siliconflow",
+    "workers_ai"
+  ],
+  "family": "OpenAI",
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gpt-oss-120b-medium"
+    },
+    "siliconflow": {
+      "upstream": "openai/gpt-oss-120b"
+    },
+    "workers_ai": {
+      "upstream": "@cf/openai/gpt-oss-120b"
+    },
+    "nvidia_nim": {
+      "upstream": "openai/gpt-oss-20b"
+    },
+    "openrouter": {
+      "upstream": "openai/gpt-oss-20b:free"
+    }
+  },
+  "aliases": [
+    "gpt-oss-120b",
+    "gpt-oss-120b-medium",
+    "openai/gpt-oss-120b",
+    "@cf/openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-20b:free",
+    "gpt-oss-20b",
+    "openai-gpt-oss-20b",
+    "@cf/openai/gpt-oss-20b"
+  ]
+}

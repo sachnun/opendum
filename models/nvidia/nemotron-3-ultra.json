@@ -1,11 +1,32 @@
 {
   "providers": [
-    "opencode"
+    "kilo_code",
+    "nvidia_nim",
+    "opencode",
+    "openrouter"
   ],
   "family": "NVIDIA",
   "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "authless": true
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free"
+    },
     "opencode": {
       "upstream": "nemotron-3-ultra-free"
     }
-  }
+  },
+  "meta": {},
+  "ignored": false,
+  "aliases": [
+    "nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3-ultra-550b-a55b",
+    "nemotron-3-ultra-free"
+  ]
 }

@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "Meta",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "llama-3-taiwan-70b-instruct",
+    "llama-3-taiwan-instruct"
+  ]
+}

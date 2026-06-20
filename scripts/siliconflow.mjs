@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
 import { fetchText, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "siliconflow";
 const MODELS_PAGE_URL = "https://www.siliconflow.com/models";
@@ -31,11 +32,13 @@ function toModelKey(modelId) {
   const slashIndex = modelId.indexOf("/");
   const baseModelId = slashIndex === -1 ? modelId : modelId.slice(slashIndex + 1);
 
-  return baseModelId
-    .toLowerCase()
-    .replace(/[:/]/g, "-")
-    .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .replace(/-{2,}/g, "-");
+  return stripParamInfoKey(
+    baseModelId
+      .toLowerCase()
+      .replace(/[:/]/g, "-")
+      .replace(/[^a-zA-Z0-9._-]/g, "-")
+      .replace(/-{2,}/g, "-")
+  );
 }
 
 function isChatModelId(modelId) {

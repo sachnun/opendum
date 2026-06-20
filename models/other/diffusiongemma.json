@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/diffusiongemma-26b-a4b-it"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "ignored": false,
+  "aliases": [
+    "diffusiongemma-26b-a4b-it",
+    "google/diffusiongemma-26b-a4b-it",
+    "diffusiongemma-it"
+  ]
+}

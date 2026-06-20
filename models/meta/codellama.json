@@ -1,0 +1,16 @@
+{
+  "providers": [],
+  "aliases": [
+    "codellama-70b",
+    "meta-codellama-70b",
+    "meta/codellama-70b"
+  ],
+  "family": "Meta",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false
+  },
+  "providerConfig": {}
+}

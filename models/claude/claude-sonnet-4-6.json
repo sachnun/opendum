@@ -1,20 +1,32 @@
 {
   "providers": [
-    "kiro",
     "antigravity",
-    "copilot"
+    "copilot",
+    "kiro"
   ],
   "aliases": [
+    "claude-sonnet-4-6-1m",
+    "claude-sonnet-4.6-1m",
     "claude-sonnet-4.6",
     "claude-sonnet4.6"
   ],
   "family": "Anthropic",
+  "ignored": false,
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": true
   },
   "providerConfig": {
+    "kiro": {
+      "upstream": "claude-sonnet-4.6-1m",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    },
     "antigravity": {
       "anthropic_beta": true,
       "anthropic_beta_thinking": true,
@@ -37,15 +49,6 @@
         "enterprise"
       ],
       "reasoning_effort": false
-    },
-    "kiro": {
-      "upstream": "claude-sonnet-4.6",
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "power",
-        "standalone"
-      ]
     }
   }
 }

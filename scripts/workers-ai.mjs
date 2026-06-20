@@ -19,6 +19,7 @@ import {
   writeModelJson,
 } from "./model-registry.mjs";
 import { sleep, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://unroxy.koyeb.app/api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
@@ -74,12 +75,14 @@ function supportsMessagesInput(value, depth = 0) {
 }
 
 function normalizeModelKey(value) {
-  return value
-    .replace(/^@[^/]+\//, "")
-    .replace(/[:/]/g, "-")
-    .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return stripParamInfoKey(
+    value
+      .replace(/^@[^/]+\//, "")
+      .replace(/[:/]/g, "-")
+      .replace(/[^a-zA-Z0-9._-]/g, "-")
+      .replace(/-{2,}/g, "-")
+      .replace(/^-+|-+$/g, "")
+  );
 }
 
 function toModelKey(model, slug, reverseMap) {

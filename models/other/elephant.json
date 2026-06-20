@@ -1,0 +1,12 @@
+{
+  "providers": [],
+  "family": "Openrouter",
+  "providerConfig": {},
+  "meta": {
+    "status": "alpha"
+  },
+  "ignored": false,
+  "aliases": [
+    "elephant-alpha"
+  ]
+}

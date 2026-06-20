@@ -1,0 +1,12 @@
+{
+  "providers": [],
+  "family": "Qwen",
+  "providerConfig": {},
+  "meta": {
+    "status": "preview"
+  },
+  "ignored": false,
+  "aliases": [
+    "qwen3.6-plus-preview"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "providers": [],
+  "aliases": [
+    "qwen2.5-coder-32b",
+    "qwen-qwen2.5-coder-32b-instruct",
+    "qwen/qwen2.5-coder-32b-instruct",
+    "qwen2.5-coder-7b",
+    "qwen-qwen2.5-coder-7b-instruct",
+    "qwen/qwen2.5-coder-7b-instruct"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "code": true
+  },
+  "providerConfig": {},
+  "ignored": false
+}

@@ -8,6 +8,8 @@
     "claude-sonnet4.0"
   ],
   "family": "Anthropic",
+  "ignored": true,
+  "description": "Deprecated — unversioned Claude Sonnet 4 retires June 15, 2026 (aiforanything.io). Use claude-sonnet-4-5/4-6 instead.",
   "meta": {
     "reasoning": true,
     "toolCall": true,

@@ -1,0 +1,24 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "phi-3-vision-128k-instruct",
+    "microsoft-phi-3-vision-128k-instruct",
+    "microsoft/phi-3-vision-128k-instruct"
+  ],
+  "family": "Microsoft",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "variant": "vision",
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "microsoft/phi-3-vision-128k-instruct"
+    }
+  }
+}

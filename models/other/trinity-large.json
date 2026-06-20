@@ -1,0 +1,16 @@
+{
+  "providers": [],
+  "family": "Trinity",
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "status": "preview"
+  },
+  "providerConfig": {},
+  "aliases": [
+    "trinity-large-preview",
+    "trinity-large-thinking"
+  ]
+}

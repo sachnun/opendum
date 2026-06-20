@@ -24,6 +24,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels } from "./model-registry.mjs";
 import { sleep, fetchText, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -217,6 +218,7 @@ function toCanonical(displayName) {
   if (key.startsWith("claude-")) {
     key = key.replace(/(\d+)\.(\d+)/g, "$1-$2");
   }
+  key = stripParamInfoKey(key);
 
   return { key, upstream };
 }

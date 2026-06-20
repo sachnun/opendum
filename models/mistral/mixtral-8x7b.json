@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mixtral-8x7b-instruct-v0.1"
+    }
+  },
+  "aliases": [
+    "mixtral-8x7b-instruct-v0.1",
+    "mistralai/mixtral-8x7b-instruct-v0.1",
+    "mixtral-8x7b-instruct"
+  ]
+}

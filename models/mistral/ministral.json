@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Mistral",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/ministral-14b-instruct-2512"
+    }
+  },
+  "ignored": false,
+  "aliases": [
+    "ministral-14b-instruct-2512",
+    "mistralai/ministral-14b-instruct-2512",
+    "ministral-instruct"
+  ]
+}

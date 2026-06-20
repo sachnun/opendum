@@ -1,0 +1,27 @@
+{
+  "id": "mistral-small-3.1",
+  "providers": [
+    "workers_ai"
+  ],
+  "family": "Mistral",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/mistralai/mistral-small-3.1-24b-instruct"
+    }
+  },
+  "ignored": false,
+  "aliases": [
+    "mistral-small-3.1-24b-instruct-2503",
+    "mistralai-mistral-small-3.1-24b-instruct-2503",
+    "mistralai/mistral-small-3.1-24b-instruct-2503",
+    "mistral-small-3.1-24b-instruct",
+    "@cf/mistralai/mistral-small-3.1-24b-instruct",
+    "mistral-small-3.1-instruct"
+  ]
+}

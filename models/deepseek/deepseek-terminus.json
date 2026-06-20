@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "aliases": [
+    "deepseek-v3.1-terminus",
+    "deepseek-ai-deepseek-v3.1-terminus",
+    "deepseek-ai/deepseek-v3.1-terminus",
+    "deepseek-ai/DeepSeek-V3.1-Terminus"
+  ],
+  "family": "DeepSeek",
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V3.1-Terminus"
+    }
+  }
+}

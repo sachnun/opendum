@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "family": "Mistral",
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": true
-  }
-}

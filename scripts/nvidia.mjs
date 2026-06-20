@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, getProviderUpstream } from "./model-registry.mjs";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "nvidia_nim";
 const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
@@ -47,10 +48,12 @@ function toModelKey(modelId) {
     ? normalizedModelId
     : normalizedModelId.slice(slashIndex + 1);
 
-  return baseModelId
+  const normalized = baseModelId
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
+
+  return stripParamInfoKey(normalized);
 }
 
 function normalizeModelIdForMatch(modelId) {

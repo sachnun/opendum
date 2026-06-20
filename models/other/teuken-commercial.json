@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "OpenGPT-X",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "teuken-7b-instruct-commercial-v0.4",
+    "teuken-instruct-commercial"
+  ]
+}

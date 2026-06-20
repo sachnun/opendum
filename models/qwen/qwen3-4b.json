@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "family": "Qwen",
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  }
-}

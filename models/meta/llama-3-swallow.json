@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "Meta",
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "llama-3-swallow-70b-instruct-v0.1",
+    "llama-3-swallow-instruct"
+  ]
+}

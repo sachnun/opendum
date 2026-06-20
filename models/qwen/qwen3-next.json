@@ -1,0 +1,32 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "openrouter"
+  ],
+  "aliases": [
+    "qwen3-next-80b-a3b-instruct",
+    "qwen-qwen3-next-80b-a3b-instruct",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "qwen3-next-80b-a3b-thinking",
+    "qwen/qwen3-next-80b-a3b-thinking",
+    "qwen3-next-instruct",
+    "qwen3-next-thinking"
+  ],
+  "family": "Qwen",
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "qwen/qwen3-next-80b-a3b-instruct"
+    },
+    "openrouter": {
+      "upstream": "qwen/qwen3-next-80b-a3b-instruct:free"
+    }
+  },
+  "ignored": false
+}

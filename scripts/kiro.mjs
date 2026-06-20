@@ -20,6 +20,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -325,6 +326,8 @@ function toCanonical(kiroModelId) {
   if (key.startsWith("deepseek-") && /^deepseek-\d/.test(key)) {
     key = key.replace(/^deepseek-/, "deepseek-v");
   }
+
+  key = stripParamInfoKey(key);
 
   return { key, upstream: kiroModelId };
 }

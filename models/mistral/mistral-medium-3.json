@@ -1,0 +1,15 @@
+{
+  "providers": [],
+  "family": "Mistral",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "type": "instruct"
+  },
+  "providerConfig": {},
+  "ignored": false,
+  "aliases": [
+    "mistral-medium-3-instruct"
+  ]
+}

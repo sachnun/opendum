@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 
@@ -17,7 +18,7 @@ function toModelKey(modelId) {
 
   // kilo-auto/* models: replace / with -
   if (modelId.startsWith("kilo-auto/")) {
-    return modelId.replace("/", "-");
+    return stripParamInfoKey(modelId.replace("/", "-"));
   }
 
   // Strip provider prefix (e.g. "minimax/minimax-m2.5:free" → "minimax-m2.5:free")
@@ -32,7 +33,7 @@ function toModelKey(modelId) {
     .replace(/[^a-zA-Z0-9._-]/g, "-")
     .replace(/-{2,}/g, "-");
 
-  return modelKey;
+  return stripParamInfoKey(modelKey);
 }
 
 function isEligibleModel(model) {

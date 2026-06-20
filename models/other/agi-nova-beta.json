@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "family": "AGI Nova",
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  }
-}

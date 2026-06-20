@@ -1,8 +1,0 @@
-{
-  "id": "qwen3-next-thinking",
-  "providers": [],
-  "aliases": [
-    "qwen/qwen3-next-80b-a3b-thinking"
-  ],
-  "family": "Qwen"
-}

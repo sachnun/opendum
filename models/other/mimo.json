@@ -1,0 +1,17 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "family": "Xiaomi",
+  "providerConfig": {
+    "opencode": {
+      "upstream": "mimo-v2.5-free"
+    }
+  },
+  "aliases": [
+    "mimo-v2.5",
+    "mimo-v2.5-free"
+  ],
+  "ignored": false,
+  "meta": {}
+}

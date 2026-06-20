@@ -1,0 +1,37 @@
+{
+  "id": "nemotron-3-super",
+  "providers": [
+    "kilo_code",
+    "nvidia_nim",
+    "openrouter",
+    "workers_ai"
+  ],
+  "family": "NVIDIA",
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
+      "authless": true
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3-super-120b-a12b"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-super-120b-a12b:free"
+    },
+    "workers_ai": {
+      "upstream": "@cf/nvidia/nemotron-3-120b-a12b"
+    }
+  },
+  "ignored": false,
+  "aliases": [
+    "nemotron-3-super-120b-a12b",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3-super-120b-a12b",
+    "@cf/nvidia/nemotron-3-120b-a12b"
+  ]
+}

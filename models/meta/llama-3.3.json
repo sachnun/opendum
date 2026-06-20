@@ -1,0 +1,34 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "openrouter",
+    "workers_ai"
+  ],
+  "aliases": [
+    "llama-3.3-70b-instruct",
+    "meta-llama-3.3-70b-instruct",
+    "meta/llama-3.3-70b-instruct",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "llama-3.3-instruct"
+  ],
+  "family": "Meta",
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "meta/llama-3.3-70b-instruct"
+    },
+    "openrouter": {
+      "upstream": "meta-llama/llama-3.3-70b-instruct:free"
+    },
+    "workers_ai": {
+      "upstream": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    }
+  },
+  "ignored": false
+}

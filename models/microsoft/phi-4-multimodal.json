@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "family": "Microsoft",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "variant": "multimodal",
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "microsoft/phi-4-multimodal-instruct"
+    }
+  },
+  "aliases": [
+    "phi-4-multimodal-instruct",
+    "microsoft/phi-4-multimodal-instruct"
+  ]
+}

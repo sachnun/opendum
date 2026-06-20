@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "kilo_code"
+  ],
+  "family": "Openrouter",
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "openrouter/owl-alpha",
+      "authless": true
+    }
+  },
+  "meta": {
+    "status": "alpha"
+  },
+  "ignored": false,
+  "aliases": [
+    "owl-alpha",
+    "openrouter/owl-alpha"
+  ]
+}

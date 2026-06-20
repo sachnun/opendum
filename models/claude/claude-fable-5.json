@@ -3,6 +3,8 @@
     "copilot"
   ],
   "family": "Claude",
+  "ignored": true,
+  "description": "Temporarily unavailable — US export-control directive June 12, 2026; access expected to return for US-based users around July 1, 2026 (morphllm.com).",
   "providerConfig": {
     "copilot": {
       "allowedTiers": [

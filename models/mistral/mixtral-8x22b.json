@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "family": "Mistral",
+  "ignored": true,
+  "providerConfig": {},
+  "aliases": [
+    "mixtral-8x22b-instruct-v0.1",
+    "mixtral-8x22b-instruct"
+  ],
+  "meta": {
+    "type": "instruct"
+  }
+}

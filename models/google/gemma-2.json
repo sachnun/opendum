@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "gemma-2-27b-it",
+    "google-gemma-2-27b-it",
+    "google/gemma-2-27b-it",
+    "gemma-2-9b-it",
+    "google/gemma-2-2b-it",
+    "gemma-2-2b-it",
+    "google-gemma-2-2b-it",
+    "gemma-2-it"
+  ],
+  "family": "Google",
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/gemma-2-2b-it"
+    }
+  }
+}
