@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "openrouter",
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "qwen/qwen3-next-80b-a3b-instruct:free"
+    },
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3-30B-A3B-Instruct-2507"
+    }
+  }
+}

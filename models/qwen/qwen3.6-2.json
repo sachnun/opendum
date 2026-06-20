@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3.6-35B-A3B"
+    }
+  }
+}

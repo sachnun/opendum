@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "openai/gpt-oss-120b:free"
+    }
+  }
+}

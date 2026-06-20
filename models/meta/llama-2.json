@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "meta-llama/llama-3.3-70b-instruct:free"
+    }
+  }
+}

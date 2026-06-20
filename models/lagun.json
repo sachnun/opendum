@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "poolside/laguna-m.1:free"
+    }
+  }
+}

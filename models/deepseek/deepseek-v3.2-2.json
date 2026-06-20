@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V3.2-Exp"
+    }
+  }
+}

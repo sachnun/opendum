@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+    }
+  }
+}

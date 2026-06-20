@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "nvidia_nim",
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "openai/gpt-oss-120b"
+    },
+    "siliconflow": {
+      "upstream": "openai/gpt-oss-20b"
+    }
+  }
+}

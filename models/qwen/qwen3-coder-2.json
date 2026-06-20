@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+    }
+  }
+}

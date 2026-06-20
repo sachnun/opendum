@@ -1,6 +1,7 @@
 {
   "providers": [
-    "nvidia_nim"
+    "nvidia_nim",
+    "openrouter"
   ],
   "aliases": [
     "gemma-2-27b-it",
@@ -22,6 +23,9 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "google/gemma-2-2b-it"
+    },
+    "openrouter": {
+      "upstream": "google/gemma-4-31b-it:free"
     }
   }
 }

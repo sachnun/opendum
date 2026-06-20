@@ -1,8 +1,7 @@
 {
   "providers": [
     "kilo_code",
-    "nvidia_nim",
-    "openrouter"
+    "nvidia_nim"
   ],
   "aliases": [
     "nemotron-3-nano-omni-30b-a3b-reasoning",
@@ -13,6 +12,11 @@
     "nano-omni",
     "nemotron-3-nano-omni-reasoning"
   ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "variant": "omni"
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
@@ -20,14 +24,6 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
-    },
-    "openrouter": {
-      "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
     }
-  },
-  "meta": {
-    "variant": "omni",
-    "reasoning": true
-  },
-  "ignored": false
+  }
 }

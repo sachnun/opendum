@@ -1,16 +1,12 @@
 {
   "providers": [
     "kilo_code",
-    "openrouter",
     "siliconflow"
   ],
   "providerConfig": {
     "kilo_code": {
       "upstream": "nex-agi/nex-n2-pro:free",
       "authless": true
-    },
-    "openrouter": {
-      "upstream": "nex-agi/nex-n2-pro:free"
     },
     "siliconflow": {
       "upstream": "nex-agi/Nex-N2-Pro"

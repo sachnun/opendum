@@ -16,6 +16,7 @@
     "@cf/meta/llama-3.1-8b-instruct-fast",
     "llama-3.1-instruct"
   ],
+  "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": true,
@@ -27,8 +28,7 @@
       "upstream": "meta/llama-3.1-70b-instruct"
     },
     "workers_ai": {
-      "upstream": "@cf/meta/llama-3.1-8b-instruct-fp8"
+      "upstream": "@cf/meta/llama-3.1-8b-instruct-fast"
     }
-  },
-  "ignored": true
+  }
 }

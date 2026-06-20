@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3-VL-30B-A3B-Thinking"
+    }
+  }
+}

@@ -1,20 +1,9 @@
 {
   "providers": [
     "siliconflow",
-    "workers_ai"
+    "workers_ai",
+    "openrouter"
   ],
-  "ignored": false,
-  "providerConfig": {
-    "siliconflow": {
-      "upstream": "Qwen/Qwen3-32B"
-    },
-    "workers_ai": {
-      "upstream": "@cf/qwen/qwen3-30b-a3b-fp8"
-    }
-  },
-  "meta": {
-    "type": "instruct"
-  },
   "aliases": [
     "qwen3-32b",
     "Qwen/Qwen3-32B",
@@ -28,5 +17,23 @@
     "Qwen/Qwen3-8B",
     "qwen3-4b",
     "qwen3-instruct"
-  ]
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "qwen/qwen3-coder:free"
+    },
+    "siliconflow": {
+      "upstream": "Qwen/Qwen3-14B"
+    },
+    "workers_ai": {
+      "upstream": "@cf/qwen/qwen3-30b-a3b-fp8"
+    }
+  }
 }

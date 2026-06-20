@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "liquid/lfm-2.5-1.2b-thinking:free"
+    }
+  }
+}

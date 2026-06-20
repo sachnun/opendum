@@ -1,8 +1,7 @@
 {
   "providers": [
     "opencode",
-    "kilo_code",
-    "openrouter"
+    "kilo_code"
   ],
   "providerConfig": {
     "kilo_code": {
@@ -11,9 +10,6 @@
     },
     "opencode": {
       "upstream": "north-mini-code-free"
-    },
-    "openrouter": {
-      "upstream": "cohere/north-mini-code:free"
     }
   }
 }

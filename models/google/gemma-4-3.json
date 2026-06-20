@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "google/gemma-4-31B-it"
+    }
+  }
+}

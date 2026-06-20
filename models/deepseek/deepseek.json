@@ -3,15 +3,6 @@
     "kiro",
     "siliconflow"
   ],
-  "ignored": true,
-  "providerConfig": {
-    "siliconflow": {
-      "upstream": "deepseek-ai/DeepSeek-V3"
-    },
-    "kiro": {
-      "upstream": "deepseek-3.2"
-    }
-  },
   "aliases": [
     "deepseek-v3.1",
     "deepseek-ai/DeepSeek-V3.1",
@@ -24,7 +15,16 @@
     "deepseek-ai/DeepSeek-V3",
     "deepseek-exp"
   ],
+  "ignored": true,
   "meta": {
     "status": "experimental"
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "deepseek-3.2"
+    },
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V3.2"
+    }
   }
 }

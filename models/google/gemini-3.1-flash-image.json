@@ -15,7 +15,8 @@
   },
   "providerConfig": {
     "antigravity": {
-      "upstream": "gemini-3.1-flash-image",
+      "inject_thought_signature": true,
+      "scrub_model_artifacts": true,
       "signature_family": "gemini-flash"
     }
   }

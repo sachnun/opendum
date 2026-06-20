@@ -9,11 +9,11 @@
     "gemini-3.1-pro-low",
     "gemini-3.1-pro-medium"
   ],
+  "ignored": false,
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true,
-    "status": "preview"
+    "vision": true
   },
   "providerConfig": {
     "antigravity": {
@@ -31,14 +31,13 @@
       "thinking_format": "budget"
     },
     "copilot": {
+      "upstream": "gemini-3.1-pro-preview",
       "allowedTiers": [
         "pro",
         "pro+",
         "business",
         "enterprise"
-      ],
-      "reasoning_effort": false
+      ]
     }
-  },
-  "ignored": false
+  }
 }

@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-nano-30b-a3b:free"
+    }
+  }
+}
