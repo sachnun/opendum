@@ -7,14 +7,15 @@
     "gemini-3-flash-preview",
     "gemini-3-flash-preview-latest"
   ],
-  "ignored": false,
   "meta": {
     "reasoning": true,
     "toolCall": true,
-    "vision": true
+    "vision": true,
+    "status": "preview"
   },
   "providerConfig": {
     "antigravity": {
+      "upstream": "gemini-3-flash",
       "inject_thought_signature": true,
       "scrub_model_artifacts": true,
       "signature_family": "gemini-flash",
@@ -29,13 +30,14 @@
       }
     },
     "copilot": {
-      "upstream": "gemini-3-flash-preview",
       "allowedTiers": [
         "pro",
         "pro+",
         "business",
         "enterprise"
-      ]
+      ],
+      "reasoning_effort": false
     }
-  }
+  },
+  "ignored": false
 }

@@ -1,6 +1,7 @@
 {
   "providers": [
     "nvidia_nim",
+    "openrouter",
     "workers_ai"
   ],
   "aliases": [
@@ -11,7 +12,6 @@
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "llama-3.3-instruct"
   ],
-  "ignored": false,
   "meta": {
     "reasoning": false,
     "toolCall": true,
@@ -22,8 +22,12 @@
     "nvidia_nim": {
       "upstream": "meta/llama-3.3-70b-instruct"
     },
+    "openrouter": {
+      "upstream": "meta-llama/llama-3.3-70b-instruct:free"
+    },
     "workers_ai": {
       "upstream": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
     }
-  }
+  },
+  "ignored": false
 }

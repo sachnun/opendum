@@ -1,9 +1,28 @@
 {
   "providers": [
     "nvidia_nim",
+    "openrouter",
     "siliconflow",
     "workers_ai"
   ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/gemma-4-31b-it"
+    },
+    "openrouter": {
+      "upstream": "google/gemma-4-31b-it:free"
+    },
+    "siliconflow": {
+      "upstream": "google/gemma-4-31B-it"
+    },
+    "workers_ai": {
+      "upstream": "@cf/google/gemma-4-26b-a4b-it"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "ignored": false,
   "aliases": [
     "gemma-4-31b-it",
     "google/gemma-4-31b-it",
@@ -16,23 +35,5 @@
     "gemma-4-12b-it",
     "google/gemma-4-12B-it",
     "gemma-4-it"
-  ],
-  "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true,
-    "type": "instruct"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "google/gemma-4-31b-it"
-    },
-    "siliconflow": {
-      "upstream": "google/gemma-4-12B-it"
-    },
-    "workers_ai": {
-      "upstream": "@cf/google/gemma-4-26b-a4b-it"
-    }
-  }
+  ]
 }

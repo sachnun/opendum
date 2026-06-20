@@ -1,15 +1,7 @@
 {
   "providers": [
-    "nvidia_nim"
-  ],
-  "aliases": [
-    "llama-3.2-3b-instruct",
-    "meta/llama-3.2-3b-instruct",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "llama-3.2-1b-instruct",
-    "meta-llama-3.2-1b-instruct",
-    "meta/llama-3.2-1b-instruct",
-    "llama-3.2-instruct"
+    "nvidia_nim",
+    "openrouter"
   ],
   "ignored": true,
   "meta": {
@@ -21,6 +13,18 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "meta/llama-3.2-3b-instruct"
+    },
+    "openrouter": {
+      "upstream": "meta-llama/llama-3.2-3b-instruct:free"
     }
-  }
+  },
+  "aliases": [
+    "llama-3.2-3b-instruct",
+    "meta/llama-3.2-3b-instruct",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "llama-3.2-1b-instruct",
+    "meta-llama-3.2-1b-instruct",
+    "meta/llama-3.2-1b-instruct",
+    "llama-3.2-instruct"
+  ]
 }

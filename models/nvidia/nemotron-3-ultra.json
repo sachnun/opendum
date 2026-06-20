@@ -3,6 +3,7 @@
     "opencode",
     "kilo_code",
     "nvidia_nim",
+    "openrouter",
     "command_code"
   ],
   "aliases": [
@@ -29,6 +30,9 @@
     },
     "opencode": {
       "upstream": "nemotron-3-ultra-free"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free"
     }
   }
 }

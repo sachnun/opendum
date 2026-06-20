@@ -1,7 +1,8 @@
 {
   "id": "nemotron-nano-v2",
   "providers": [
-    "nvidia_nim"
+    "nvidia_nim",
+    "openrouter"
   ],
   "aliases": [
     "nemotron-nano",
@@ -20,6 +21,9 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "nvidia/nvidia-nemotron-nano-9b-v2"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-nano-9b-v2:free"
     }
   }
 }

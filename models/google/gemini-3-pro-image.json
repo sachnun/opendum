@@ -14,8 +14,7 @@
   },
   "providerConfig": {
     "antigravity": {
-      "inject_thought_signature": true,
-      "scrub_model_artifacts": true,
+      "upstream": "gemini-3-pro-image",
       "signature_family": "gemini-pro"
     }
   }
