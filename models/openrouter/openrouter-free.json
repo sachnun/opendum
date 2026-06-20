@@ -2,7 +2,6 @@
   "providers": [
     "openrouter"
   ],
-  "description": "Openrouter router that automatically selects a compatible free model.",
   "family": "Openrouter",
   "meta": {
     "reasoning": true,

@@ -9,7 +9,6 @@
   ],
   "family": "Meta",
   "ignored": true,
-  "description": "Old Llama-3.1 generation — replaced by Llama-4 Maverick/Scout for vision-language tasks.",
   "meta": {
     "reasoning": true,
     "toolCall": false,

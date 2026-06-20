@@ -31,6 +31,5 @@
       "upstream": "@cf/meta/llama-3.1-8b-instruct-fp8"
     }
   },
-  "ignored": true,
-  "description": "Superseded \u2014 Llama 3.1 (Jul 2024) replaced by Llama 3.3 (Dec 2024) and Llama 4 Maverick/Scout."
+  "ignored": true
 }

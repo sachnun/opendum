@@ -8,6 +8,5 @@
     "toolCall": true,
     "vision": false
   },
-  "ignored": true,
-  "description": "Superseded \u2014 Minimax-M2.1 replaced by Minimax-M2.5/2.7/M3 (April 2026)."
+  "ignored": true
 }
