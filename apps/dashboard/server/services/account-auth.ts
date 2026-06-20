@@ -9,6 +9,7 @@ import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUr
 import { initiateCopilotDeviceCodeFlow, pollCopilotDeviceCodeAuthorization } from "../lib/providers/copilot";
 import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
+import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from "../lib/providers/qoder";
 import type { OAuthResult } from "../lib/providers/types";
 import type { ActionResult } from "../utils/api";
 
@@ -17,8 +18,8 @@ const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth
 export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]) });
 export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
 const copilotAuthMethodSchema = z.enum(["opencode", "official"]).optional();
-export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["copilot", "codex"]), method: copilotAuthMethodSchema });
-export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["copilot", "codex"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: copilotAuthMethodSchema });
+export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["copilot", "codex", "qoder"]), method: copilotAuthMethodSchema });
+export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["copilot", "codex", "qoder"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: copilotAuthMethodSchema, machineId: z.string().optional() });
 export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
 
 type OAuthProviderKey = z.infer<typeof getAuthUrlInputSchema>["provider"];
@@ -98,6 +99,39 @@ const DEVICE_PROVIDERS = {
     emailPrefix: "codex",
     initiate: initiateCodexDeviceCodeFlow,
     poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
+  },
+  qoder: {
+    label: "Qoder",
+    emailPrefix: "qoder",
+    initiate: async () => {
+      const result = await initiateQoderDeviceCodeFlow();
+      return {
+        // Qoder has no short user_code; consent happens entirely in the
+        // browser at the authorize URL. The nonce drives the poll and is
+        // carried through the existing deviceCode field.
+        deviceCode: result.nonce,
+        userCode: result.userCode,
+        verificationUrl: result.authUrl,
+        verificationUrlComplete: result.authUrl,
+        // The verifier is carried through the shared codeVerifier field so
+        // the dashboard device-code flow needs no qoder-specific UI state.
+        codeVerifier: result.codeVerifier,
+        machineId: result.machineId,
+        expiresIn: result.expiresIn,
+        interval: result.interval,
+      };
+    },
+    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
+      const result = await pollQoderDeviceCodeAuthorization(input.codeVerifier ?? "", input.deviceCode);
+      if ("pending" in result || "error" in result) return result;
+      // Persist both the Qoder user_id (returned by the device poll) and the
+      // machine_id (generated at initiation) on the account record, packed
+      // into accountId as "<user_id>|<machine_id>". The proxy unpacks these
+      // to build COSY-signed inference requests.
+      const userId = result.accountId || "";
+      const machineId = input.machineId || "";
+      return { ...result, accountId: machineId ? `${userId}|${machineId}` : userId };
+    },
   },
 } satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: (input: z.infer<typeof initiateDeviceAuthInputSchema>) => Promise<unknown>; poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => Promise<unknown> }>;
 

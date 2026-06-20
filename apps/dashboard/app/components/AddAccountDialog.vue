@@ -63,7 +63,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
   openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
   workers_ai: { name: "Cloudflare", description: "Access open-source models on Cloudflare's global network", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
-  qoder: { name: "Qoder", description: "Access Qoder models via PAT", methods: [apiKeyMethod], apiKeyPortalUrl: "https://qoder.com/account/integrations", apiKeyPlaceholder: "qod_pat_..." },
+  qoder: { name: "Qoder", description: "Access Qoder models via browser login", methods: [deviceCodeMethod] },
   zenmux: { name: "ZenMux", description: "Access ZenMux free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://zenmux.ai/platform/pay-as-you-go", apiKeyPlaceholder: "sk-..." },
   siliconflow: { name: "SiliconFlow", description: "Access DeepSeek, Qwen, GLM & more via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://cloud.siliconflow.com/account/ak", apiKeyPlaceholder: "sk-..." },
 };
@@ -97,7 +97,7 @@ const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
 const selectedMethod = ref<MethodKey | null>(null);
-const deviceCodeInfo = ref<{ provider: "copilot" | "codex"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: CopilotAuthMethod } | null>(null);
+const deviceCodeInfo = ref<{ provider: "copilot" | "codex" | "qoder"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: CopilotAuthMethod; machineId?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const copiedCallbackUrl = ref(false);
@@ -180,16 +180,17 @@ watch([open, step, provider, selectedMethod], async () => {
 
     if (selectedFlowType === "device_code") {
       const method = selectedProvider === "copilot" ? selectedCopilotAuthMethod.value : undefined;
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "copilot" | "codex", method });
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "copilot" | "codex" | "qoder", method });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
-        provider: selectedProvider as "copilot" | "codex",
+        provider: selectedProvider as "copilot" | "codex" | "qoder",
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
         codeVerifier: "codeVerifier" in result.data && typeof result.data.codeVerifier === "string" ? result.data.codeVerifier : undefined,
         method,
+        machineId: "machineId" in result.data && typeof result.data.machineId === "string" ? result.data.machineId : undefined,
       };
       return;
     }
@@ -419,6 +420,7 @@ function startDevicePolling(popup: Window | null) {
         userCode: deviceCodeInfo.value.userCode,
         codeVerifier: deviceCodeInfo.value.codeVerifier,
         method: deviceCodeInfo.value.method,
+        machineId: deviceCodeInfo.value.machineId,
       });
 
       if (!result.success) throw new Error(result.error);

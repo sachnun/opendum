@@ -65,7 +65,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"codex":        codexProvider{registry: registry, redis: redis, db: db},
 		"copilot":      copilotProvider{registry: registry, redis: redis},
 		"antigravity":  antigravityProvider{registry: registry, db: db, redis: redis},
-		"qoder":        openAICompatibleProvider{name: "qoder", baseURL: "https://openapi.qoder.sh/api/v1", supportedParams: supportedQoder, registry: registry, trimPrefix: "qoder/"},
+		"qoder":        qoderProvider{registry: registry},
 		"zenmux":       openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
 		"siliconflow":  openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
 		"mimo_code":    mimoCodeProvider{registry: registry},

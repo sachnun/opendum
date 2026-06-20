@@ -91,7 +91,7 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     key: "qoder",
     slug: "qoder",
     label: "Qoder",
-    category: "api_key",
+    category: "oauth",
     emptyMessage: "No Qoder connections yet.",
     showTier: false,
   },

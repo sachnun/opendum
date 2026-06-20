@@ -6,7 +6,7 @@ func TestRefreshableProviderNames(t *testing.T) {
 	registry := NewRegistry(nil, nil, nil)
 	names := registry.RefreshableProviderNames()
 
-	want := []string{"antigravity", "codex", "copilot", "kiro"}
+	want := []string{"antigravity", "codex", "copilot", "kiro", "qoder"}
 	if len(names) != len(want) {
 		t.Fatalf("names = %#v, want %#v", names, want)
 	}
