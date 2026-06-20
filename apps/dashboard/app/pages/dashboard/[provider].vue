@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
-import { BY_KEY, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
+import { BY_KEY, getProviderAccountPath, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import { warmDashboardIndexedDbStore } from "../../utils/dashboardIndexedDb";
 
 definePageMeta({
@@ -306,7 +306,7 @@ watch(
     accountElement?.scrollIntoView({ block: "center", behavior: "smooth" });
 
     setTimeout(() => {
-      if (route.path === `/dashboard/${selectedProvider.value}` && decodeAccountHash(route.hash) === accountId) {
+      if (route.path === getProviderAccountPath(selectedProvider.value) && decodeAccountHash(route.hash) === accountId) {
         if (typeof window !== "undefined") {
           window.history.replaceState(window.history.state, "", route.path);
         }

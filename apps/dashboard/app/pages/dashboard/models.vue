@@ -288,19 +288,22 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
 
 function decodeModelHash(hash: string): string | null {
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
-  if (!raw) return null;
+  const id = raw.startsWith("model-") ? raw.slice("model-".length) : raw;
+  if (!id) return null;
 
   try {
-    return decodeURIComponent(raw);
+    return decodeURIComponent(id);
   } catch {
-    return raw;
+    return id;
   }
 }
 
 watch(
   () => route.hash,
-  async (raw) => {
+  (raw) => {
     if (!import.meta.client) return;
+    const hashRaw = raw.startsWith("#") ? raw.slice(1) : raw;
+    if (!hashRaw.startsWith("model-")) return;
     const id = decodeModelHash(raw);
     if (!id) return;
     if (highlightedModelId.value === id) return;
@@ -312,27 +315,9 @@ watch(
       highlightTimer = null;
     }, HIGHLIGHT_DURATION_MS);
 
-    await nextTick();
-    let attempts = 0;
-    while (!models.value.some((model) => model.id === id) && attempts++ < 40) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    if (route.path === "/dashboard/models" && typeof window !== "undefined") {
+      window.history.replaceState(window.history.state, "", "/dashboard/models");
     }
-    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-
-    const card = modelCardRefs.value.find((entry) => {
-      const root = entry instanceof Element ? entry : entry.$el;
-      return root?.getAttribute("data-model-id") === id;
-    });
-    const target = card instanceof Element ? card : card?.$el;
-    target?.scrollIntoView({ block: "center", behavior: "smooth" });
-
-    setTimeout(() => {
-      if (route.path === "/dashboard/models" && decodeModelHash(route.hash) === id) {
-        if (typeof window !== "undefined") {
-          window.history.replaceState(window.history.state, "", "/dashboard/models");
-        }
-      }
-    }, 60);
   },
   { immediate: true }
 );
@@ -383,10 +368,11 @@ watch(
           <div class="dashboard-card-grid">
             <UiCard
               v-for="model in section.models"
+              :id="`model-${model.id}`"
               :key="model.id"
               ref="modelCardRefs"
               :data-model-id="model.id"
-              class="flex h-full flex-col bg-transparent transition-[border-color,box-shadow] duration-[1800ms] ease-out"
+              class="flex h-full flex-col scroll-mt-20 bg-transparent transition-[border-color,box-shadow] duration-[1800ms] ease-out"
               :class="[
                 model.isEnabled === false ? 'opacity-65 ' : '',
                 highlightedModelId === model.id

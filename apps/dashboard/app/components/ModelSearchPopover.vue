@@ -118,7 +118,7 @@ async function selectModel(model: ModelListItem) {
   closeSuggestions();
   await navigateTo({
     path: "/dashboard/models",
-    hash: `#${encodeURIComponent(model.id)}`,
+    hash: `#model-${encodeURIComponent(model.id)}`,
   });
 }
 </script>
