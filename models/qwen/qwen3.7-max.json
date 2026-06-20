@@ -1,7 +1,7 @@
 {
   "providers": [
-    "qoder",
-    "command_code"
+    "command_code",
+    "qoder"
   ],
   "meta": {
     "reasoning": true,
@@ -14,6 +14,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "qoder": {
+      "upstream": "qmodel_latest"
     }
   }
 }

@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "qoder"
+  ],
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "qoder": {
+      "upstream": "lite"
+    }
+  }
+}
