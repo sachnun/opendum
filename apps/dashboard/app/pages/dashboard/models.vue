@@ -7,6 +7,8 @@ import { getProviderLabel } from "../../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
+const route = useRoute();
+const router = useRouter();
 const dashboardApi = useDashboardApi();
 const { isAuditMode } = useDashboardAudit();
 const dashboardInvalidation = useDashboardDataInvalidation();
@@ -15,6 +17,7 @@ const nuxtApp = useNuxtApp();
 type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
 const MODEL_STATS_BATCH_SIZE = 24;
 const MODEL_STATS_POLL_MS = 30_000;
+const HIGHLIGHT_DURATION_MS = 5000;
 
 const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardInvalidation.keys.models).data.value !== undefined;
 const shouldRefreshCachedModelsOnMount = import.meta.client && !nuxtApp.isHydrating && cachedModelsBeforePageLoad;
@@ -38,6 +41,9 @@ const activeProviders = ref<string[]>([]);
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
+const modelCardRefs = ref<Array<Element | { $el?: Element }>>([]);
+const highlightedModelId = ref<string | null>(null);
+let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 const queuedModelStatsIds = new Set<string>();
 const forceQueuedModelStatsIds = new Set<string>();
 const loadingModelStatsIds = new Set<string>();
@@ -100,6 +106,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopModelStatsPolling();
   if (modelStatsQueueTimer) clearTimeout(modelStatsQueueTimer);
+  if (highlightTimer) {
+    clearTimeout(highlightTimer);
+    highlightTimer = null;
+  }
 });
 
 async function refreshModels() {
@@ -276,6 +286,55 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
     pendingModelId.value = null;
   }
 }
+
+function decodeModelHash(hash: string): string | null {
+  const raw = hash.startsWith("#") ? hash.slice(1) : hash;
+  if (!raw) return null;
+
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+watch(
+  () => route.hash,
+  async (raw) => {
+    if (!import.meta.client) return;
+    const id = decodeModelHash(raw);
+    if (!id) return;
+    if (highlightedModelId.value === id) return;
+
+    highlightedModelId.value = id;
+    if (highlightTimer) clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      highlightedModelId.value = null;
+      highlightTimer = null;
+    }, HIGHLIGHT_DURATION_MS);
+
+    await nextTick();
+    let attempts = 0;
+    while (!models.value.some((model) => model.id === id) && attempts++ < 40) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+
+    const card = modelCardRefs.value.find((entry) => {
+      const root = entry instanceof Element ? entry : entry.$el;
+      return root?.getAttribute("data-model-id") === id;
+    });
+    const target = card instanceof Element ? card : card?.$el;
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+
+    setTimeout(() => {
+      if (route.path === "/dashboard/models" && decodeModelHash(route.hash) === id) {
+        void router.replace({ path: "/dashboard/models" });
+      }
+    }, 60);
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -324,8 +383,15 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
             <UiCard
               v-for="model in section.models"
               :key="model.id"
-              class="flex h-full flex-col bg-transparent transition-colors"
-              :class="model.isEnabled === false ? 'opacity-65' : ''"
+              ref="modelCardRefs"
+              :data-model-id="model.id"
+              class="flex h-full flex-col bg-transparent transition-[border-color,box-shadow] duration-[1800ms] ease-out"
+              :class="[
+                model.isEnabled === false ? 'opacity-65 ' : '',
+                highlightedModelId === model.id
+                  ? 'border-primary shadow-[0_0_0_3px_var(--primary)]'
+                  : 'border-border shadow-none',
+              ]"
             >
               <UiCardHeader class="pb-1">
                 <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">

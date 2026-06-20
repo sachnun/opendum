@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { getProviderLabel } from "../../lib/provider-accounts";
-import type { ModelListItem as DashboardModelListItem, ModelSearchItem } from "../../lib/dashboard-api-types";
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
+import type { ModelSearchItem } from "../../lib/dashboard-api-types";
 
 type ModelListItem = ModelSearchItem;
 
@@ -16,36 +15,19 @@ const searchInput = ref<HTMLInputElement | null>(null);
 const suggestionsOpen = ref(false);
 const activeSuggestionIndex = ref(-1);
 const search = ref("");
-const detailModel = ref<ModelListItem | null>(null);
-const copiedModelId = ref<string | null>(null);
-const suppressFocusUntil = ref(0);
-const suggestionListId = "model-search-suggestions";
 const placeholderModelIndex = ref(0);
 let placeholderTimer: number | null = null;
 
-const detailOpen = computed({
-  get: () => detailModel.value !== null,
-  set: (value: boolean) => {
-    if (!value) detailModel.value = null;
-  },
-});
+const suggestionListId = "model-search-suggestions";
 
 const { data } = await useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
   default: () => [] as ModelListItem[],
-});
-const sharedFullModels = useNuxtData<DashboardModelListItem[]>("dashboard-models");
-const { data: fullModelData, execute: loadFullModels } = useAsyncData("dashboard-models", () => dashboardApi.models.list(), {
-  immediate: false,
 });
 
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 const placeholderModels = computed(() => models.value.filter((model) => model.isEnabled !== false).map((model) => model.id).slice(0, 24));
 const activePlaceholderModel = computed(() => placeholderModels.value[placeholderModelIndex.value] ?? null);
 const showAnimatedPlaceholder = computed(() => search.value.length === 0 && activePlaceholderModel.value !== null);
-const fullModels = computed(() => fullModelData.value ?? sharedFullModels.data.value ?? []);
-const fullModelById = computed(() => new Map(fullModels.value.map((model) => [model.id, model])));
-const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
-const detailModelStats = computed<ModelStats | undefined>(() => detailModel.value ? fullModelById.value.get(detailModel.value.id)?.stats : undefined);
 const filteredModels = computed(() => {
   const term = search.value.trim().toLowerCase();
 
@@ -77,7 +59,6 @@ watch(() => route.fullPath, () => {
   suggestionsOpen.value = false;
   activeSuggestionIndex.value = -1;
   search.value = "";
-  detailModel.value = null;
 });
 
 onMounted(() => {
@@ -93,8 +74,6 @@ onBeforeUnmount(() => {
 });
 
 function openSuggestions() {
-  if (Date.now() < suppressFocusUntil.value) return;
-
   emit("focusChange", true);
   suggestionsOpen.value = true;
   if (filteredModels.value.length > 0 && activeSuggestionIndex.value === -1) {
@@ -134,31 +113,13 @@ function clearSearch() {
   openSuggestions();
 }
 
-function selectModel(model: ModelListItem) {
+async function selectModel(model: ModelListItem) {
   searchInput.value?.blur();
-  detailModel.value = model;
   closeSuggestions();
-  if (!fullModelById.value.get(model.id)?.stats) void loadFullModels();
-}
-
-async function copyModelId(modelId: string) {
-  await navigator.clipboard.writeText(modelId);
-  copiedModelId.value = modelId;
-  window.setTimeout(() => {
-    if (copiedModelId.value === modelId) copiedModelId.value = null;
-  }, 2000);
-}
-
-function closeDetail() {
-  suppressFocusUntil.value = Date.now() + 300;
-  detailModel.value = null;
-  closeSuggestions();
-  search.value = "";
-  searchInput.value?.blur();
-
-  if (document.activeElement instanceof HTMLElement && root.value?.contains(document.activeElement)) {
-    document.activeElement.blur();
-  }
+  await navigateTo({
+    path: "/dashboard/models",
+    hash: `#${encodeURIComponent(model.id)}`,
+  });
 }
 </script>
 
@@ -252,50 +213,5 @@ function closeDetail() {
         </button>
       </div>
     </div>
-
-    <UiDialog v-model:open="detailOpen" prevent-close-auto-focus :ui="{ content: 'gap-0 sm:max-w-md' }">
-      <template #content>
-        <div v-if="detailModel" class="space-y-3" :class="detailModel.isEnabled === false ? 'opacity-70' : ''">
-          <div class="flex items-start justify-between gap-2">
-            <UiTooltip text="Copy ID" class="max-w-96 break-all font-mono">
-              <button
-                type="button"
-                :aria-label="`Copy model ID ${detailModel.id}`"
-                class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                @click="copyModelId(detailModel.id)"
-              >
-                <span class="flex size-3 shrink-0 items-center justify-center">
-                  <UiIcon :name="copiedModelId === detailModel.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
-                </span>
-                <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
-                  {{ detailModel.id }}
-                </span>
-              </button>
-            </UiTooltip>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-1.5">
-            <UiBadge v-for="provider in detailModel.providers" :key="provider" variant="outline" class="text-[10px] font-normal">
-              {{ getProviderLabel(provider) }}
-            </UiBadge>
-            <UiTooltip v-if="detailModel.isEnabled" text="Playground">
-              <NuxtLink
-                :to="`/dashboard/playground?model=${encodeURIComponent(detailModel.id)}`"
-                class="inline-flex h-5 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] hover:bg-accent/50"
-                aria-label="Try in Playground"
-                @click="closeDetail"
-              >
-                <UiIcon name="i-lucide-flask-conical" class="size-3" />
-              </NuxtLink>
-            </UiTooltip>
-          </div>
-
-          <div class="space-y-3 pt-1">
-            <ModelFeatureBadges :meta="detailModel.meta" />
-            <ModelStatsPanel :stats="detailModelStats ?? emptyModelStats" :label="detailModel.id" compact :animate-deltas="false" />
-          </div>
-        </div>
-      </template>
-    </UiDialog>
   </div>
 </template>
