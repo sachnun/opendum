@@ -63,7 +63,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
   openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
   workers_ai: { name: "Cloudflare", description: "Access open-source models on Cloudflare's global network", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
-  qoder: { name: "Qoder", description: "Access Qoder models via browser login", methods: [deviceCodeMethod] },
+  qoder: { name: "Qoder", description: "Access Qoder models via browser login or PAT", methods: [deviceCodeMethod, apiKeyMethod], apiKeyPortalUrl: "https://qoder.com/account/integrations", apiKeyPlaceholder: "pt-..." },
   zenmux: { name: "ZenMux", description: "Access ZenMux free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://zenmux.ai/platform/pay-as-you-go", apiKeyPlaceholder: "sk-..." },
   siliconflow: { name: "SiliconFlow", description: "Access DeepSeek, Qwen, GLM & more via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://cloud.siliconflow.com/account/ak", apiKeyPlaceholder: "sk-..." },
 };
