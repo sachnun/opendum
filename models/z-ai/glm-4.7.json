@@ -2,6 +2,7 @@
   "providers": [
     "siliconflow"
   ],
+  "ignored": true,
   "providerConfig": {
     "siliconflow": {
       "upstream": "zai-org/GLM-4.7"
