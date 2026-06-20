@@ -2068,7 +2068,7 @@ function formatToolArguments(value: string): string {
                 </div>
               </div>
               <div class="mt-1 flex items-center justify-between gap-2">
-                <span class="shrink-0 whitespace-nowrap text-muted-foreground">Provider account</span>
+                <span class="shrink-0 whitespace-nowrap text-muted-foreground">Account</span>
                 <UiTooltip v-if="getPanelProviderAccountHref(panel)" text="Open account">
                   <NuxtLink
                     :to="getPanelProviderAccountHref(panel)!"
