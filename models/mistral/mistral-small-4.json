@@ -1,10 +1,17 @@
 {
   "id": "mistral-small-4",
-  "providers": [],
+  "providers": [
+    "nvidia_nim"
+  ],
   "aliases": [
     "mistral-small-4-119b-2603",
     "mistralai/mistral-small-4-119b-2603"
   ],
   "ignored": false,
-  "meta": {}
+  "meta": {},
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-small-4-119b-2603"
+    }
+  }
 }

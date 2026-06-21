@@ -1,6 +1,7 @@
 {
   "providers": [
-    "kiro"
+    "kiro",
+    "copilot"
   ],
   "aliases": [
     "claude-sonnet-4-5-1m",
@@ -15,6 +16,15 @@
     "vision": true
   },
   "providerConfig": {
+    "copilot": {
+      "upstream": "claude-sonnet-4.5",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "business",
+        "enterprise"
+      ]
+    },
     "kiro": {
       "upstream": "claude-sonnet-4.5-1m"
     }
