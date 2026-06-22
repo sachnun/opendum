@@ -185,6 +185,9 @@ func (p mimoCodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	}
 	payload["model"] = model
 	payload["stream"] = stream
+	if messages, ok := payload["messages"].([]any); ok {
+		payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
+	}
 	injectMimoCodeSystemMarker(payload)
 
 	headers := map[string]string{
