@@ -560,7 +560,7 @@ type testRotationRunner struct {
 	insufficientPoints    bool
 }
 
-func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude, excludeProviders []string, _ auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
+func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude, excludeProviders []string, _ auth.AccountAccess, _ string) (*appdb.ProviderAccount, bool, error) {
 	excluded := map[string]struct{}{}
 	for _, id := range exclude {
 		excluded[id] = struct{}{}

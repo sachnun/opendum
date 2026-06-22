@@ -18,6 +18,7 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 	"github.com/opendum/opendum/apps/proxy/internal/providers"
+	"github.com/opendum/opendum/apps/proxy/internal/sessionaffinity"
 )
 
 const (
@@ -33,6 +34,7 @@ type Service struct {
 	auth             *auth.Service
 	registry         *models.Registry
 	providerRegistry *providers.Registry
+	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
 }
@@ -44,6 +46,7 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		auth:             authSvc,
 		registry:         registry,
 		providerRegistry: providers.NewRegistry(registry, db, redisClient),
+		affinity:         sessionaffinity.New(redisClient, []string{"zenmux"}),
 		secret:           secret,
 		client:           &http.Client{Timeout: 0},
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+	"github.com/opendum/opendum/apps/proxy/internal/sessionaffinity"
 )
 
 const (
@@ -151,7 +152,7 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 	return enabled, nil
 }
 
-func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, accountAccess auth.AccountAccess) (*appdb.ProviderAccount, bool, error) {
+func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, accountAccess auth.AccountAccess, sessionID string) (*appdb.ProviderAccount, bool, error) {
 	eligible, err := s.getEligibleAccounts(ctx, userID, model, provider, exclude, excludeProviders, accountAccess)
 	if err != nil {
 		return nil, false, err
@@ -160,7 +161,20 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 		return nil, false, nil
 	}
 	prioritized := prioritizeAccounts(eligible, provider == nil, s.registry.ProvidersForModel(model))
-	return s.pickHealthyAccount(ctx, prioritized, model)
+	if stickyID := s.affinity.Lookup(ctx, userID, sessionID); stickyID != "" {
+		prioritized = sessionaffinity.Prefer(prioritized, func(a appdb.ProviderAccount) bool { return a.ID == stickyID })
+	}
+	selected, has, err := s.pickHealthyAccount(ctx, prioritized, model)
+	if err != nil {
+		return nil, false, err
+	}
+	if !has {
+		return nil, false, nil
+	}
+	if selected != nil && s.affinity.Enabled(selected.Provider) && sessionID != "" {
+		s.affinity.Store(ctx, userID, sessionID, selected.ID)
+	}
+	return selected, has, nil
 }
 
 func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string) (*appdb.ProviderAccount, bool, error) {

@@ -12,7 +12,7 @@ import (
 )
 
 type accountRotationRunner interface {
-	getNextAvailableAccount(context.Context, string, string, *string, []string, []string, auth.AccountAccess) (*appdb.ProviderAccount, bool, error)
+	getNextAvailableAccount(context.Context, string, string, *string, []string, []string, auth.AccountAccess, string) (*appdb.ProviderAccount, bool, error)
 	getNextSharedAccount(context.Context, string, string, *string, []string, []string) (*appdb.ProviderAccount, bool, error)
 	reserveRoamingPoint(context.Context, string) (*pointReservation, bool, error)
 	refundRoamingPoint(context.Context, *pointReservation)
@@ -50,11 +50,12 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 	var lastFailure *routeError
 	var delayedFinalFailure *delayedAccountFailure
 	accountConfigured := false
+	sessID := sessionID(r)
 
 	for {
 		attempt := accountAttempt{account: forced}
 		if attempt.account == nil {
-			selected, configured, err := nextAttemptAccount(runner, ctx, authResult, validation, tried, sharedTried, excludedProviders, useShared)
+			selected, configured, err := nextAttemptAccount(runner, ctx, authResult, validation, tried, sharedTried, excludedProviders, useShared, sessID)
 			if err != nil {
 				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
@@ -102,7 +103,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 		if forced != nil {
 			go runner.bumpAccountRequestCount(context.Background(), attempt.account.ID, time.Now())
 		}
-		payload := cfg.Build(parsed, validation.Model, parsed.Stream, sessionID(r))
+		payload := cfg.Build(parsed, validation.Model, parsed.Stream, sessID)
 		if !runner.isVisionModel(validation.Model) {
 			stripImageContent(payload)
 		}
@@ -179,11 +180,11 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 	}
 }
 
-func nextAttemptAccount(runner accountRotationRunner, ctx context.Context, authResult auth.Result, validation auth.ModelValidationResult, tried, sharedTried, excludedProviders []string, useShared bool) (*appdb.ProviderAccount, bool, error) {
+func nextAttemptAccount(runner accountRotationRunner, ctx context.Context, authResult auth.Result, validation auth.ModelValidationResult, tried, sharedTried, excludedProviders []string, useShared bool, sessionID string) (*appdb.ProviderAccount, bool, error) {
 	if useShared {
 		return runner.getNextSharedAccount(ctx, authResult.UserID, validation.Model, validation.Provider, sharedTried, excludedProviders)
 	}
-	return runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, excludedProviders, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList})
+	return runner.getNextAvailableAccount(ctx, authResult.UserID, validation.Model, validation.Provider, tried, excludedProviders, auth.AccountAccess{Mode: authResult.AccountAccessMode, Accounts: authResult.AccountAccessList}, sessionID)
 }
 
 func appendIfMissing(values []string, value string) []string {

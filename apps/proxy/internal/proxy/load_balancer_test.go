@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+	"github.com/opendum/opendum/apps/proxy/internal/sessionaffinity"
 )
 
 func TestEffectiveUnhealthyCountDecaysAfterIdleIntervals(t *testing.T) {
@@ -182,5 +183,50 @@ func TestPrioritizeAccountsUsesProviderSpecificPaidTiers(t *testing.T) {
 	want := []string{"standard-antigravity", "team-antigravity"}
 	if !reflect.DeepEqual(ids, want) {
 		t.Fatalf("prioritized ids = %#v, want %#v", ids, want)
+	}
+}
+
+func TestSessionAffinityPrefersStickyAccount(t *testing.T) {
+	free := "free"
+	accounts := []appdb.ProviderAccount{
+		{ID: "zm-1", Provider: "zenmux", Tier: &free},
+		{ID: "zm-2", Provider: "zenmux", Tier: &free},
+		{ID: "zm-3", Provider: "zenmux", Tier: &free},
+	}
+	prioritized := prioritizeAccounts(accounts, false, nil)
+	if prioritized[0].ID != "zm-1" {
+		t.Fatalf("baseline first = %q, want zm-1", prioritized[0].ID)
+	}
+	sticky := "zm-3"
+	reordered := sessionaffinity.Prefer(prioritized, func(a appdb.ProviderAccount) bool { return a.ID == sticky })
+	if reordered[0].ID != sticky {
+		t.Fatalf("after Prefer first = %q, want %q", reordered[0].ID, sticky)
+	}
+	if len(reordered) != len(accounts) {
+		t.Fatalf("reordered len = %d, want %d", len(reordered), len(accounts))
+	}
+	seen := map[string]int{}
+	for i, a := range reordered {
+		seen[a.ID] = i
+	}
+	if len(seen) != len(accounts) {
+		t.Fatalf("reordered contains duplicates: %v", reordered)
+	}
+	if reordered[1].ID != "zm-1" || reordered[2].ID != "zm-2" {
+		t.Fatalf("remaining order = %v, want [zm-1 zm-2] after sticky", reordered[1:])
+	}
+}
+
+func TestSessionAffinityPreferNoOpWhenStickyExcluded(t *testing.T) {
+	free := "free"
+	accounts := []appdb.ProviderAccount{
+		{ID: "zm-1", Provider: "zenmux", Tier: &free},
+		{ID: "zm-2", Provider: "zenmux", Tier: &free},
+	}
+	prioritized := prioritizeAccounts(accounts, false, nil)
+	sticky := "zm-cooling-down"
+	reordered := sessionaffinity.Prefer(prioritized, func(a appdb.ProviderAccount) bool { return a.ID == sticky })
+	if reordered[0].ID != "zm-1" || reordered[1].ID != "zm-2" {
+		t.Fatalf("no-match Prefer = %v, want unchanged [zm-1 zm-2]", reordered)
 	}
 }
