@@ -628,7 +628,7 @@ onBeforeUnmount(() => {
     v-model:open="dialogOpen"
     :prevent-outside-close="shouldPreventOutsideClose"
     :prevent-escape-close="isPolling"
-    :ui="{ content: 'max-h-[calc(100dvh-1rem)] p-4 sm:max-w-md sm:p-6' }"
+    :ui="{ content: 'max-h-[calc(100dvh-1rem)] p-4 sm:max-w-lg sm:p-6' }"
   >
     <template #content>
       <div class="space-y-1.5 pr-6">
