@@ -63,7 +63,6 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"workers_ai":   workersAIProvider{registry: registry},
 		"kiro":         kiroProvider{registry: registry},
 		"codex":        codexProvider{registry: registry, redis: redis, db: db},
-		"copilot":      copilotProvider{registry: registry, redis: redis},
 		"antigravity":  antigravityProvider{registry: registry, db: db, redis: redis},
 		"qoder":        qoderProvider{registry: registry},
 		"zenmux":       openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},

@@ -22,7 +22,6 @@ export interface ProviderAccountCounts {
   antigravity: number;
   codex: number;
   command_code: number;
-  copilot: number;
   kiro: number;
   nvidia_nim: number;
   openrouter: number;
@@ -48,7 +47,6 @@ export const primaryNavigation: NavItem[] = [
       { name: "Antigravity", href: getProviderAccountPath("antigravity") },
       { name: "Codex", href: getProviderAccountPath("codex") },
       { name: "Command Code", href: getProviderAccountPath("command_code") },
-      { name: "Copilot", href: getProviderAccountPath("copilot") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
       { name: "OpenRouter", href: getProviderAccountPath("openrouter") },

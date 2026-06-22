@@ -50,7 +50,6 @@
     "scripts/antigravity-version.mjs",
     "scripts/cloudflare.mjs",
     "scripts/codex.mjs",
-    "scripts/copilot.mjs",
     "scripts/kiro.mjs",
     "scripts/opencode.mjs",
     "scripts/openrouter.mjs",
@@ -62,10 +61,7 @@
     "apps/dashboard/lib/model-families.ts",
     "apps/dashboard/lib/provider-accounts.ts",
     "apps/dashboard/server/lib/proxy/loader.ts",
-    "apps/dashboard/server/lib/providers/antigravity/quota.ts",
-    "apps/dashboard/server/lib/providers/copilot/index.ts",
-    "apps/dashboard/server/lib/providers/copilot/client.ts",
-    "apps/dashboard/server/lib/providers/copilot/constants.ts"
+    "apps/dashboard/server/lib/providers/antigravity/quota.ts"
   ],
   "ignoreBinaries": ["go"],
   "ignoreDependencies": ["vue-tsc"]

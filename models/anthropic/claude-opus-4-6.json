@@ -1,7 +1,6 @@
 {
   "providers": [
     "antigravity",
-    "copilot",
     "kiro"
   ],
   "aliases": [
@@ -40,14 +39,6 @@
       "system_instruction": true,
       "thinking_model": true,
       "top_p_min_095": true
-    },
-    "copilot": {
-      "upstream": "claude-opus-4.6",
-      "allowedTiers": [
-        "business",
-        "enterprise"
-      ],
-      "reasoning_effort": false
     }
   }
 }

@@ -1,8 +1,7 @@
 {
   "providers": [
     "antigravity",
-    "kiro",
-    "copilot"
+    "kiro"
   ],
   "aliases": [
     "claude-sonnet-4-6-1m",
@@ -30,15 +29,6 @@
       "system_instruction": true,
       "thinking_model": true,
       "top_p_min_095": true
-    },
-    "copilot": {
-      "upstream": "claude-sonnet-4.6",
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
-      ]
     },
     "kiro": {
       "upstream": "claude-sonnet-4.6-1m",

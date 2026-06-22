@@ -32,7 +32,6 @@ import type {
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 type RateLimitRule = { target: string; targetType: "model" | "family"; perMinute: number | null; perHour: number | null; perDay: number | null };
-type CopilotAuthMethod = "opencode" | "official";
 
 type DashboardFetch = ReturnType<typeof useRequestFetch>;
 type DashboardFetchOptions = Parameters<DashboardFetch>[1];
@@ -81,8 +80,8 @@ export function useDashboardApi() {
       getAuthUrl: (body: { provider: "antigravity" | "codex" | "kiro" }) => post<ActionResult<{ authUrl: string; state: string | null; codeVerifier: string | null }>>(dashboardFetch, "/api/dashboard/accounts/oauth/url", body),
       exchangeOAuth: (body: { provider: "antigravity" | "codex" | "kiro"; callbackUrl: string; state?: string | null; codeVerifier?: string | null }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/oauth/exchange", body),
       connectCodexSession: (body: { sessionJson: string }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/codex-session", body),
-      initiateDeviceAuth: (body: { provider: "copilot" | "codex" | "qoder"; method?: CopilotAuthMethod }) => post<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string; machineId?: string; expiresIn?: number; interval?: number }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/initiate", body),
-      pollDeviceAuth: (body: { provider: "copilot" | "codex" | "qoder"; deviceCode: string; userCode?: string; codeVerifier?: string; method?: CopilotAuthMethod; machineId?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/poll", body),
+      initiateDeviceAuth: (body: { provider: "codex" | "qoder"; method?: string }) => post<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string; machineId?: string; expiresIn?: number; interval?: number }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/initiate", body),
+      pollDeviceAuth: (body: { provider: "codex" | "qoder"; deviceCode: string; userCode?: string; codeVerifier?: string; method?: string; machineId?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/poll", body),
       quota: (body: AccountQuotaRequest, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaInfo>>(dashboardFetch, "/api/dashboard/accounts/quota", body, options),
       quotas: (body: AccountQuotaBatchRequest, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaBatchResult>>(dashboardFetch, "/api/dashboard/accounts/quotas", body, options),
     },

@@ -4,13 +4,11 @@ import { cn } from "../../lib/utils";
 
 type Provider = ProviderAccountKey;
 type FlowType = "oauth_redirect" | "device_code" | "chatgpt_session" | "api_key" | "api_key_with_account_id";
-type CopilotAuthMethod = "opencode" | "official";
-type MethodKey = FlowType | "copilot_device_code_opencode" | "copilot_device_code_official";
+type MethodKey = FlowType;
 
 interface ProviderMethod {
   key: MethodKey;
   flow?: FlowType;
-  copilotAuthMethod?: CopilotAuthMethod;
   name: string;
   tag?: string;
   description: string;
@@ -49,14 +47,11 @@ const dashboardInvalidation = useDashboardDataInvalidation();
 
 const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." };
 const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code", description: "Enter a short device code." };
-const copilotOpencodeMethod: ProviderMethod = { key: "copilot_device_code_opencode", flow: "device_code", copilotAuthMethod: "opencode", name: "Device Code", tag: "Opencode", description: "Use the Opencode OAuth app." };
-const copilotOfficialMethod: ProviderMethod = { key: "copilot_device_code_official", flow: "device_code", copilotAuthMethod: "official", name: "Device Code", description: "Use the GitHub Copilot OAuth app." };
 const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key", description: "Create or copy an API key from the provider portal." };
 const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token", description: "Requires the matching account ID." };
 
 const providerConfigs: Record<Provider, ProviderConfig> = {
   antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", methods: [browserOAuthMethod] },
-  copilot: { name: "Copilot", description: "Access GitHub Copilot chat models", methods: [copilotOpencodeMethod, copilotOfficialMethod] },
   codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
   command_code: { name: "Command Code", description: "Access open-source models via the Go tier CLI API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://commandcode.ai/studio/api-keys", apiKeyPlaceholder: "user_..." },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
@@ -83,7 +78,7 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "codex", "command_code", "kiro", "copilot", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
+const providerOptions: Provider[] = ["antigravity", "codex", "command_code", "kiro", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -97,7 +92,7 @@ const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
 const selectedMethod = ref<MethodKey | null>(null);
-const deviceCodeInfo = ref<{ provider: "copilot" | "codex" | "qoder"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: CopilotAuthMethod; machineId?: string } | null>(null);
+const deviceCodeInfo = ref<{ provider: "codex" | "qoder"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: string; machineId?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const copiedCallbackUrl = ref(false);
@@ -119,10 +114,6 @@ const activeFlowType = computed<FlowType | null>(() => {
   const method = selectedConfig.value.methods.find((item) => item.key === selectedMethod.value && !item.disabled);
   if (!method) return null;
   return method.flow ?? (method.key as FlowType);
-});
-const selectedCopilotAuthMethod = computed<CopilotAuthMethod | undefined>(() => {
-  if (provider.value !== "copilot" || !selectedConfig.value || !selectedMethod.value) return undefined;
-  return selectedConfig.value.methods.find((item) => item.key === selectedMethod.value)?.copilotAuthMethod;
 });
 const authStep = computed(() => 3);
 const finishStep = computed(() => 4);
@@ -179,17 +170,15 @@ watch([open, step, provider, selectedMethod], async () => {
     }
 
     if (selectedFlowType === "device_code") {
-      const method = selectedProvider === "copilot" ? selectedCopilotAuthMethod.value : undefined;
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "copilot" | "codex" | "qoder", method });
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "codex" | "qoder" });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
-        provider: selectedProvider as "copilot" | "codex" | "qoder",
+        provider: selectedProvider as "codex" | "qoder",
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
         codeVerifier: "codeVerifier" in result.data && typeof result.data.codeVerifier === "string" ? result.data.codeVerifier : undefined,
-        method,
         machineId: "machineId" in result.data && typeof result.data.machineId === "string" ? result.data.machineId : undefined,
       };
       return;

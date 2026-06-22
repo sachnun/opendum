@@ -1,22 +1,10 @@
 {
   "providers": [
-    "codex",
-    "copilot"
+    "codex"
   ],
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": true
-  },
-  "providerConfig": {
-    "copilot": {
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
-      ],
-      "responses_api": true
-    }
   }
 }

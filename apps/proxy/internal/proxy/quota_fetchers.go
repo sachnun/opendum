@@ -15,8 +15,6 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
-const copilotDefaultMonthlyLimit = 300.0
-
 var antigravityQuotaMaxRequests = map[string]map[string]float64{
 	"standard-tier": {"claude-opus-4-6": 150, "claude-sonnet-4-6": 150, "gemini-3.1-pro-preview": 320, "gemini-3.5-flash": 400, "gpt-oss-120b": 100},
 	"free-tier":     {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150, "gemini-3.5-flash": 500, "gpt-oss-120b": 100},
@@ -244,126 +242,6 @@ func parseResetISO(value any) *string {
 	case map[string]any:
 		if seconds, ok := parseQuotaNumber(typed["seconds"]); ok {
 			iso := time.UnixMilli(int64(seconds * 1000)).UTC().Format(time.RFC3339Nano)
-			return &iso
-		}
-	}
-	return nil
-}
-
-func (s *Service) fetchCopilotQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
-	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "copilot:user", http.MethodGet, "https://api.github.com/copilot_internal/user", map[string]string{"Authorization": "Bearer " + accessToken, "Accept": "application/json", "User-Agent": "GitHubCopilotChat/0.26.7", "Editor-Version": "vscode/1.96.2", "Editor-Plugin-Version": "copilot-chat/0.26.7"}, nil)
-	if err != nil {
-		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
-	}
-	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return errorQuotaInfo(account, fmt.Sprintf("Copilot internal quota endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(result.Raw, &payload); err != nil {
-		return errorQuotaInfo(account, "Copilot quota response was not valid JSON", time.Now().UnixMilli())
-	}
-	plan := strings.ToLower(strings.ReplaceAll(parseQuotaString(payload["copilot_plan"]), "_", "-"))
-	if detected := normalizeCopilotTier(payload); detected != "" {
-		plan = detected
-	}
-	entitlement, remaining := copilotEntitlement(payload, plan)
-	used := math.Max(0, entitlement-remaining)
-	fraction := 1.0
-	if entitlement > 0 {
-		fraction = clampFraction(remaining / entitlement)
-	}
-	resetISO := copilotResetISO(payload)
-	label := fmt.Sprintf("%s/%s used", formatFloat(used), formatFloat(entitlement))
-	group := quotaGroupDisplay{Name: "premium_requests", DisplayName: "Premium requests", Models: []string{}, RemainingFraction: fraction, RemainingRequests: displayNumber(remaining), MaxRequests: displayNumber(entitlement), UsedRequests: displayNumber(used), PercentUsed: int(math.Round(clampFraction(used/entitlement) * 100)), IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "medium", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO), RemainingLabel: &label}
-	s.putQuotaJSONCache(ctx, result)
-	return baseQuotaInfo(account, "success", []quotaGroupDisplay{group}, time.Now().UnixMilli(), "")
-}
-
-func copilotEntitlement(payload map[string]any, plan string) (float64, float64) {
-	planLimits := map[string]float64{"free": 50, "student": 300, "pro": 300, "pro+": 1500, "business": 300, "enterprise": 1000}
-	entitlement := planLimits[plan]
-	remaining := entitlement
-	snapshots := payload["quota_snapshots"]
-	for _, raw := range parseSnapshotValues(snapshots) {
-		record := parseQuotaRecord(raw)
-		if record == nil {
-			continue
-		}
-		if record["quota_id"] != nil && parseQuotaString(record["quota_id"]) != "premium_interactions" {
-			continue
-		}
-		if value, ok := parseQuotaNumber(record["entitlement"]); ok && value > 0 {
-			entitlement = value
-		}
-		if value, ok := parseQuotaNumber(record["quota_remaining"]); ok {
-			remaining = value
-		} else if value, ok := parseQuotaNumber(record["remaining"]); ok {
-			remaining = value
-		}
-		break
-	}
-	if entitlement <= 0 {
-		entitlement = copilotDefaultMonthlyLimit
-		remaining = entitlement
-	}
-	return entitlement, math.Max(0, remaining)
-}
-
-func normalizeCopilotTier(payload map[string]any) string {
-	for _, raw := range []string{parseQuotaString(payload["access_type_sku"]), parseQuotaString(payload["copilot_plan"])} {
-		value := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(raw), "_", "-"))
-		if value == "" {
-			continue
-		}
-		if strings.Contains(value, "education") || strings.Contains(value, "student") {
-			return "student"
-		}
-		if strings.Contains(value, "free") {
-			return "free"
-		}
-		if strings.Contains(value, "enterprise") {
-			return "enterprise"
-		}
-		if strings.Contains(value, "business") {
-			return "business"
-		}
-		if value == "pro-plus" || value == "proplus" || value == "pro+" {
-			return "pro+"
-		}
-		if value == "pro" || strings.Contains(value, "-pro-") {
-			return "pro"
-		}
-	}
-
-	return ""
-}
-
-func parseSnapshotValues(value any) []any {
-	if array := parseQuotaArray(value); array != nil {
-		return array
-	}
-	if record := parseQuotaRecord(value); record != nil {
-		out := []any{}
-		for _, item := range record {
-			out = append(out, item)
-		}
-		return out
-	}
-	return nil
-}
-
-func copilotResetISO(payload map[string]any) *string {
-	for _, key := range []string{"quota_reset_date_utc", "quota_reset_date"} {
-		value := parseQuotaString(payload[key])
-		if value == "" {
-			continue
-		}
-		if parsed, err := time.Parse("2006-01-02", value); err == nil {
-			iso := parsed.UTC().Format(time.RFC3339Nano)
-			return &iso
-		}
-		if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
-			iso := parsed.UTC().Format(time.RFC3339Nano)
 			return &iso
 		}
 	}

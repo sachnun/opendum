@@ -138,7 +138,7 @@ func (s *Service) fetchCommandCodeQuota(ctx context.Context, account appdb.Provi
 
 	// Step 1 — confirm the API key resolves to a real identity. Using the
 	// pre-decrypted credentials string keeps consistency with the other
-	// switch-case fetchers (codex, kiro, copilot) that also receive a
+	// switch-case fetchers (codex, kiro) that also receive a
 	// plaintext token via credentialsForAccount.
 	whoamiResult, err := s.getQuotaJSON(ctx, account, forceRefresh, "commandcode:whoami", http.MethodGet, base+"/alpha/whoami", headersForCaller, nil)
 	if err != nil {

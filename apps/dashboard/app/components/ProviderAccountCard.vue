@@ -41,7 +41,7 @@ type DurationPoint = { time: string; avgDuration: number | null };
 
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
-const QUOTA_PROVIDERS = new Set<string>(["antigravity", "copilot", "codex", "kiro", "openrouter", "siliconflow", "command_code"]);
+const QUOTA_PROVIDERS = new Set<string>(["antigravity", "codex", "kiro", "openrouter", "siliconflow", "command_code"]);
 const DEFAULT_MAX_QUOTA_SKELETON_ROWS = 3;
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
@@ -120,9 +120,6 @@ const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
   antigravity: [
     { labelClass: "w-14", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
     { labelClass: "w-24", metaClass: "w-12", valueClass: "w-8", barClass: "w-4/5" },
-  ],
-  copilot: [
-    { labelClass: "w-36", metaClass: "w-12", valueClass: "w-16", barClass: "w-3/4" },
   ],
   codex: [
     { labelClass: "w-32", metaClass: "w-10", valueClass: "w-8", barClass: "w-4/5" },
@@ -540,7 +537,7 @@ const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value,
 const showTierBadge = computed(() => props.showTier && tierBadgeLabel.value !== "");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
 const quotaSkeletonRows = computed(() => {
-  const rows = QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? QUOTA_SKELETON_ROWS.copilot;
+  const rows = QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? [];
   const limit = props.quotaSkeletonLimit ?? DEFAULT_MAX_QUOTA_SKELETON_ROWS;
   return limit > 0 ? rows.slice(0, limit) : rows;
 });

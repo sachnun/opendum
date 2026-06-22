@@ -1,6 +1,5 @@
 {
   "providers": [
-    "copilot",
     "antigravity"
   ],
   "aliases": [
@@ -29,14 +28,6 @@
         "none": "minimal",
         "xhigh": "high"
       }
-    },
-    "copilot": {
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "business",
-        "enterprise"
-      ]
     }
   }
 }

@@ -11,7 +11,6 @@ func TestProviderDisplayName(t *testing.T) {
 		want     string
 	}{
 		{"antigravity", "Antigravity"},
-		{"copilot", "Copilot"},
 		{"codex", "Codex"},
 		{"command_code", "Command Code"},
 		{"kiro", "Kiro"},

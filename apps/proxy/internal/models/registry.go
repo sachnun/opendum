@@ -524,12 +524,7 @@ func (r *Registry) defaultEnabledBoolCapability(model string, getCapability func
 
 func NormalizeProviderAlias(provider string) string {
 	normalized := strings.ToLower(strings.TrimSpace(provider))
-	switch normalized {
-	case "github-copilot", "github_copilot", "github-copilot-enterprise", "github_copilot_enterprise":
-		return "copilot"
-	default:
-		return normalized
-	}
+	return normalized
 }
 
 func legacyNvidiaAlias(upstream string) string {

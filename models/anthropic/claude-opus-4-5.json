@@ -1,6 +1,5 @@
 {
   "providers": [
-    "copilot",
     "kiro"
   ],
   "aliases": [
@@ -13,14 +12,6 @@
     "vision": true
   },
   "providerConfig": {
-    "copilot": {
-      "upstream": "claude-opus-4.5",
-      "allowedTiers": [
-        "business",
-        "enterprise"
-      ],
-      "reasoning_effort": false
-    },
     "kiro": {
       "upstream": "claude-opus-4.5",
       "allowedTiers": [

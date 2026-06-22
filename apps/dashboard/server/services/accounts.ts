@@ -163,7 +163,7 @@ function normalizeTierForModelAccess(tier: string | null | undefined): string | 
   if (!tier) return null;
   const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
   if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
-  if (normalized === "free-tier" || normalized === "free-limited-copilot") return "free";
+  if (normalized === "free-tier") return "free";
   if (normalized === "education" || normalized === "educational" || normalized === "edu" || normalized === "free-educational-quota") return "student";
   return normalized || null;
 }

@@ -467,7 +467,7 @@ func normalizeTierAlias(tier string) string {
 	if normalized == "pro-plus" || normalized == "proplus" {
 		return "pro+"
 	}
-	if normalized == "free-tier" || normalized == "free-limited-copilot" {
+	if normalized == "free-tier" {
 		return "free"
 	}
 	if normalized == "education" || normalized == "educational" || normalized == "edu" || normalized == "free-educational-quota" {

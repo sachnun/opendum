@@ -1,15 +1,5 @@
 {
   "providers": [
-    "codex",
-    "copilot"
-  ],
-  "providerConfig": {
-    "copilot": {
-      "allowedTiers": [
-        "pro+",
-        "business",
-        "enterprise"
-      ]
-    }
-  }
+    "codex"
+  ]
 }
