@@ -18,6 +18,44 @@ const (
 	accountErrorMessageLimit      = 30
 )
 
+var providerDisplayNames = map[string]string{
+	"antigravity":  "Antigravity",
+	"copilot":      "Copilot",
+	"codex":        "Codex",
+	"command_code": "Command Code",
+	"kiro":         "Kiro",
+	"nvidia_nim":   "Nvidia",
+	"openrouter":   "OpenRouter",
+	"workers_ai":   "Cloudflare",
+	"qoder":        "Qoder",
+	"zenmux":       "ZenMux",
+	"siliconflow":  "SiliconFlow",
+	"opencode":     "Opencode",
+	"kilo_code":    "Kilo Code",
+	"mimo_code":    "MiMo Code",
+}
+
+func providerDisplayName(provider string) string {
+	if name, ok := providerDisplayNames[provider]; ok {
+		return name
+	}
+	if provider == "" {
+		return ""
+	}
+	return provider
+}
+
+func prefixWithProvider(provider, message string) string {
+	if message == "" {
+		return message
+	}
+	name := providerDisplayName(provider)
+	if name == "" {
+		return message
+	}
+	return "[" + name + "] " + message
+}
+
 func (s *Service) writeRouteError(w http.ResponseWriter, cfg endpointAdapter, status int, message, typ string, param, code *string, retryAfter *string, retryAfterMS *int64) {
 	if typ == "" {
 		typ = "invalid_request_error"
