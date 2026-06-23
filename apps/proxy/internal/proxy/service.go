@@ -47,7 +47,7 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		registry:         registry,
 		providerRegistry: providers.NewRegistry(registry, db, redisClient),
 		affinity: sessionaffinity.New(redisClient, []string{
-			"zenmux", "codex", "antigravity", "siliconflow", "openrouter",
+			"zenmux", "codex", "siliconflow", "openrouter",
 		}),
 		secret: secret,
 		client: &http.Client{Timeout: 0},
