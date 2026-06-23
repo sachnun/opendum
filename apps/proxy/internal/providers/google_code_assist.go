@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"runtime"
 	"sort"
@@ -33,8 +32,6 @@ const antigravityAuthUserAgent = "google-api-nodejs-client/10.3.0"
 const antigravityAuthAPIClient = "gl-node/22.18.0"
 const antigravityAuthClientMetadata = `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`
 const antigravityUserAgent = "antigravity/1.653.24 "
-const antigravityClientVersion = "1.653.24"
-const antigravityClientName = "antigravity"
 const geminiToolSchemaSystemInstruction = `<CRITICAL_TOOL_USAGE_INSTRUCTIONS>
 You are operating in a CUSTOM ENVIRONMENT where tool definitions COMPLETELY DIFFER from your training data.
 VIOLATION OF THESE RULES WILL CAUSE IMMEDIATE SYSTEM FAILURE.
@@ -70,8 +67,6 @@ type googleCodeAssistProvider struct {
 	userAgent        string
 	apiClient        string
 	clientMetadata   string
-	machineID        string
-	sessionID        string
 	registry         *models.Registry
 	db               *appdb.DB
 	redis            *redis.Client
@@ -85,14 +80,7 @@ type antigravityProvider struct {
 
 func (p antigravityProvider) delegate() googleCodeAssistProvider {
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	hostname, _ := os.Hostname()
-	if hostname == "" {
-		hostname = "unknown"
-	}
-	machineSeed := sha256.Sum256([]byte(hostname + "|" + runtime.GOOS + "|" + runtime.GOARCH))
-	machineID := hex.EncodeToString(machineSeed[:])[:32]
-	instanceSessionID := randomUUID()
-	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "rising-fact-p41fc", userAgent: antigravityUserAgent + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, machineID: machineID, sessionID: instanceSessionID, registry: p.registry, db: p.db, redis: p.redis}
+	return googleCodeAssistProvider{name: "antigravity", clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com", clientSecret: "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", endpoint: "https://daily-cloudcode-pa.googleapis.com", endpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"}, loadEndpoints: []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}, onboardEndpoints: []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}, refreshBuffer: time.Hour, defaultProject: "rising-fact-p41fc", userAgent: antigravityUserAgent + platform, apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1", clientMetadata: `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`, registry: p.registry, db: p.db, redis: p.redis}
 }
 
 func (p antigravityProvider) RefreshBuffer() time.Duration { return p.delegate().RefreshBuffer() }
@@ -175,14 +163,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	if messages, ok := body["messages"].([]any); ok && (p.name != "antigravity" || strings.Contains(modelName, "claude")) {
 		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
 	}
-	sessionID := stringValue(body["_sessionId"])
-	if sessionID == "" && account.Email != nil {
-		seed := sha256.Sum256([]byte(*account.Email + "|" + modelName))
-		sessionID = hex.EncodeToString(seed[:])[:32]
-	}
-	if sessionID == "" {
-		sessionID = randomUUID()
-	}
+	sessionID := randomUUID()
 	geminiPayload := openAIToGemini(body)
 	if p.name == "antigravity" {
 		p.transformAntigravityPayload(ctx, geminiPayload, modelName, sessionID)
@@ -216,9 +197,6 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 			return nil, err
 		}
 		p.setGoogleGenerationHeaders(req, accessToken, actualStream)
-		if projectID != "" && p.name == "antigravity" {
-			req.Header.Set("x-goog-user-project", projectID)
-		}
 		if p.name == "antigravity" && p.shouldSetAnthropicBeta(modelName) {
 			req.Header.Set("anthropic-beta", antigravityClaudeBetaHeader)
 		}
@@ -344,6 +322,7 @@ func (p googleCodeAssistProvider) normalizeCachedContent(payload map[string]any)
 		payload["cachedContent"] = value
 	}
 	delete(payload, "cached_content")
+	delete(payload, "cachedContent")
 }
 
 func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any, model string) {
@@ -1345,20 +1324,7 @@ func (p googleCodeAssistProvider) setGoogleHeaders(req *http.Request, accessToke
 }
 
 func (p googleCodeAssistProvider) setGoogleGenerationHeaders(req *http.Request, accessToken string, stream bool) {
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", map[bool]string{true: "text/event-stream", false: "application/json"}[stream])
-	if p.userAgent != "" {
-		req.Header.Set("User-Agent", p.userAgent)
-	}
-	req.Header.Set("x-client-name", antigravityClientName)
-	req.Header.Set("x-client-version", antigravityClientVersion)
-	if p.machineID != "" {
-		req.Header.Set("x-machine-id", p.machineID)
-	}
-	if p.sessionID != "" {
-		req.Header.Set("x-vscode-sessionid", p.sessionID)
-	}
+	p.setGoogleHeadersWithMetadata(req, accessToken, stream, true)
 }
 
 func (p googleCodeAssistProvider) setGoogleHeadersWithMetadata(req *http.Request, accessToken string, stream bool, includeClientMetadata bool) {
