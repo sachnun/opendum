@@ -200,11 +200,17 @@ func TestAntigravityGenerationHeadersIncludeCodeAssistMetadata(t *testing.T) {
 	if !strings.HasPrefix(req.Header.Get("User-Agent"), antigravityUserAgent) {
 		t.Fatalf("User-Agent = %q", req.Header.Get("User-Agent"))
 	}
-	if req.Header.Get("X-Goog-Api-Client") != "google-cloud-sdk vscode_cloudshelleditor/0.1" {
-		t.Fatalf("X-Goog-Api-Client = %q", req.Header.Get("X-Goog-Api-Client"))
+	if req.Header.Get("x-client-name") != "antigravity" {
+		t.Fatalf("x-client-name = %q", req.Header.Get("x-client-name"))
 	}
-	if req.Header.Get("Client-Metadata") != `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}` {
-		t.Fatalf("Client-Metadata = %q", req.Header.Get("Client-Metadata"))
+	if req.Header.Get("x-client-version") != "1.653.24" {
+		t.Fatalf("x-client-version = %q", req.Header.Get("x-client-version"))
+	}
+	if req.Header.Get("x-machine-id") == "" {
+		t.Fatalf("x-machine-id missing")
+	}
+	if req.Header.Get("x-vscode-sessionid") == "" {
+		t.Fatalf("x-vscode-sessionid missing")
 	}
 }
 
@@ -546,7 +552,7 @@ func TestAntigravityOpenAIToGeminiToolHistoryParity(t *testing.T) {
 	}
 }
 
-func TestAntigravityTransformRemovesCachedContentAndSetsClaudeThinking(t *testing.T) {
+func TestAntigravityTransformPreservesCachedContentAndSetsClaudeThinking(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()
 	payload := openAIToGemini(map[string]any{
@@ -556,8 +562,8 @@ func TestAntigravityTransformRemovesCachedContentAndSetsClaudeThinking(t *testin
 		"thinking_budget": 2048,
 	})
 	provider.transformAntigravityPayload(t.Context(), payload, "claude-opus-4-6-thinking", "sess")
-	if _, ok := payload["cachedContent"]; ok {
-		t.Fatalf("cachedContent leaked: %#v", payload["cachedContent"])
+	if payload["cachedContent"] != "cached/123" {
+		t.Fatalf("cachedContent should be preserved: %#v", payload["cachedContent"])
 	}
 	if _, ok := payload["cached_content"]; ok {
 		t.Fatalf("cached_content leaked: %#v", payload["cached_content"])
