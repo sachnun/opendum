@@ -1,7 +1,6 @@
 {
   "providers": [
     "workers_ai",
-    "zenmux",
     "siliconflow",
     "command_code"
   ],
@@ -22,9 +21,6 @@
     },
     "workers_ai": {
       "upstream": "@cf/zai-org/glm-5.2"
-    },
-    "zenmux": {
-      "upstream": "z-ai/glm-5.2-free"
     }
   }
 }
