@@ -1,0 +1,13 @@
+{
+  "providers": [
+    "command_code"
+  ],
+  "providerConfig": {
+    "command_code": {
+      "upstream": "zai-org/GLM-5.2-Fast",
+      "allowedTiers": [
+        "go"
+      ]
+    }
+  }
+}
