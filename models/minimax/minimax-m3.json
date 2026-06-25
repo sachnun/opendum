@@ -1,7 +1,8 @@
 {
   "providers": [
     "siliconflow",
-    "command_code"
+    "command_code",
+    "zenmux"
   ],
   "providerConfig": {
     "command_code": {
@@ -12,6 +13,9 @@
     },
     "siliconflow": {
       "upstream": "MiniMaxAI/MiniMax-M3"
+    },
+    "zenmux": {
+      "upstream": "minimax/minimax-m3"
     }
   }
 }

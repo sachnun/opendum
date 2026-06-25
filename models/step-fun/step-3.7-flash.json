@@ -4,6 +4,10 @@
     "zenmux",
     "command_code"
   ],
+  "aliases": [
+    "stepfun-step-3.7-flash-free",
+    "stepfun/step-3.7-flash-free"
+  ],
   "providerConfig": {
     "command_code": {
       "upstream": "stepfun/Step-3.7-Flash",
@@ -16,7 +20,7 @@
       "authless": true
     },
     "zenmux": {
-      "upstream": "stepfun/step-3.7-flash-free"
+      "upstream": "stepfun/step-3.7-flash"
     }
   }
 }

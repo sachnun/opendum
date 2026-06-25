@@ -1,6 +1,7 @@
 {
   "providers": [
-    "antigravity"
+    "antigravity",
+    "zenmux"
   ],
   "aliases": [
     "gemini-3.1-pro-preview",
@@ -28,6 +29,9 @@
         "xhigh": 32768
       },
       "thinking_format": "budget"
+    },
+    "zenmux": {
+      "upstream": "google/gemini-3.1-pro-preview"
     }
   }
 }

@@ -1,9 +1,15 @@
 {
-  "providers": [],
-  "providerConfig": {},
+  "providers": [
+    "zenmux"
+  ],
   "aliases": [
     "ling-2.6-1t"
   ],
   "ignored": false,
-  "meta": {}
+  "meta": {},
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "inclusionai/ling-2.6-1t"
+    }
+  }
 }

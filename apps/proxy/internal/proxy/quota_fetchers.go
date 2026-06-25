@@ -529,6 +529,90 @@ func firstNonNil(values ...any) any {
 	}
 	return nil
 }
+func (s *Service) fetchZenmuxQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) accountQuotaInfo {
+	platformKey := account.AccountID
+	if platformKey == nil || strings.TrimSpace(*platformKey) == "" {
+		return expiredQuotaInfo(account, "Platform key is required for ZenMux quota.")
+	}
+
+	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "zenmux:subscription", http.MethodGet,
+		"https://zenmux.ai/api/v1/management/subscription/detail",
+		map[string]string{"Authorization": "Bearer " + strings.TrimSpace(*platformKey), "Accept": "application/json"}, nil)
+	if err != nil {
+		return errorQuotaInfo(account, fmt.Sprintf("ZenMux quota request failed: %s", err), time.Now().UnixMilli())
+	}
+	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
+		return errorQuotaInfo(account, fmt.Sprintf("ZenMux subscription endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(result.Raw, &payload); err != nil {
+		return errorQuotaInfo(account, "ZenMux subscription response was not valid JSON", time.Now().UnixMilli())
+	}
+	data := parseQuotaRecord(payload["data"])
+	if data == nil {
+		return errorQuotaInfo(account, "ZenMux subscription response did not include data", time.Now().UnixMilli())
+	}
+
+	s.putQuotaJSONCache(ctx, result)
+	return baseQuotaInfo(account, "success", zenmuxGroups(data), time.Now().UnixMilli(), "")
+}
+
+func zenmuxGroups(data map[string]any) []quotaGroupDisplay {
+	groups := []quotaGroupDisplay{}
+	windows := []struct {
+		key     string
+		display string
+	}{
+		{"quota_5_hour", "5-Hour Window"},
+		{"quota_7_day", "7-Day Window"},
+	}
+
+	for _, w := range windows {
+		win := parseQuotaRecord(data[w.key])
+		if win == nil {
+			continue
+		}
+		maxVal, hasMax := parseQuotaNumber(win["max_flows"])
+		usedVal, hasUsed := parseQuotaNumber(win["used_flows"])
+		remainingVal, hasRemaining := parseQuotaNumber(win["remaining_flows"])
+		if !hasMax || !hasUsed || !hasRemaining || maxVal <= 0 {
+			continue
+		}
+		fraction := clampFraction(remainingVal / maxVal)
+		resetRaw := parseQuotaString(win["resets_at"])
+		var resetISO *string
+		if resetRaw != "" {
+			if parsed, err := time.Parse(time.RFC3339Nano, resetRaw); err == nil {
+				iso := parsed.UTC().Format(time.RFC3339Nano)
+				resetISO = &iso
+			}
+		}
+		remainingLabel := fmt.Sprintf("%s / %s flows", formatFloat(remainingVal), formatFloat(maxVal))
+		groups = append(groups, quotaGroupDisplay{
+			Name:              w.key,
+			DisplayName:       w.display,
+			Models:            []string{},
+			RemainingFraction: fraction,
+			RemainingRequests: displayNumber(remainingVal),
+			MaxRequests:       displayNumber(maxVal),
+			UsedRequests:      displayNumber(usedVal),
+			PercentUsed:       int(math.Round(clampFraction((maxVal-remainingVal)/maxVal) * 100)),
+			IsExhausted:       fraction <= 0,
+			IsEstimated:       false,
+			Confidence:        "high",
+			ResetTimeIso:      resetISO,
+			ResetInHuman:      formatTimeUntilResetISO(resetISO),
+			RemainingLabel:    &remainingLabel,
+		})
+	}
+	if len(groups) == 0 {
+		label := "active"
+		return []quotaGroupDisplay{{Name: "account-status", DisplayName: "Account status", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
+	}
+	return groups
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if strings.TrimSpace(value) != "" {

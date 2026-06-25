@@ -106,12 +106,13 @@ type openAICompatibleProvider struct {
 	trimPrefix      string
 }
 
-func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
+func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	model := p.normalizeModel(stringValue(body["model"]))
 	modelName := p.resolveModel(model)
+	extraHeaders := p.extraRequestHeaders(account)
 	if p.requiresResponsesAPI(model) {
 		payload := p.buildResponsesPayload(body, modelName, stream)
-		resp, err := p.post(ctx, client, p.baseURL+"/responses", credentials, payload, stream, model)
+		resp, err := p.post(ctx, client, p.baseURL+"/responses", credentials, payload, stream, model, extraHeaders)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
 		}
@@ -131,7 +132,7 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	}
 
 	payload := p.buildPayload(body, modelName, stream)
-	resp, err := p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model)
+	resp, err := p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model, extraHeaders)
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
@@ -150,9 +151,19 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	return resp, err
 }
 
-func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, model string) (*http.Response, error) {
+func (p openAICompatibleProvider) extraRequestHeaders(account appdb.ProviderAccount) map[string]string {
+	if p.name == "zenmux" {
+		return map[string]string{"x-zenmux-apikey-source": "subscription"}
+	}
+	return nil
+}
+
+func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, model string, extraHeaders map[string]string) (*http.Response, error) {
 	if strings.TrimSpace(credentials) == "" && p.registry != nil && p.registry.IsAuthlessProviderModel(model, p.name) {
 		return postJSONWithoutAuth(ctx, client, url, payload, stream)
+	}
+	if len(extraHeaders) > 0 {
+		return postJSONWithHeaders(ctx, client, url, credentials, payload, stream, extraHeaders)
 	}
 	return postJSON(ctx, client, url, credentials, payload, stream)
 }

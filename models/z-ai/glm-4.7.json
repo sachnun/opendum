@@ -1,11 +1,15 @@
 {
   "providers": [
-    "siliconflow"
+    "siliconflow",
+    "zenmux"
   ],
   "ignored": true,
   "providerConfig": {
     "siliconflow": {
       "upstream": "zai-org/GLM-4.7"
+    },
+    "zenmux": {
+      "upstream": "z-ai/glm-4.7"
     }
   }
 }

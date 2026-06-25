@@ -20,7 +20,7 @@ const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
 const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "siliconflow", "zenmux", "command_code"]);
-export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional() });
+export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional(), platformKey: z.string().optional() });
 type ApiKeyProvider = z.infer<typeof apiKeyProviderSchema>;
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 
@@ -148,7 +148,7 @@ async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string):
   }
 }
 
-async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProvider, apiKey: string, accountName?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProvider, apiKey: string, accountName?: string, platformKey?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
   const normalizedApiKey = apiKey.trim();
   if (!normalizedApiKey) return { success: false, error: "API key is required" };
   const validationResult = await validateProviderApiKey(provider, normalizedApiKey);
@@ -157,6 +157,7 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   const { label } = API_KEY_PROVIDER_SETTINGS[provider];
   const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
+  const normalizedPlatformKey = platformKey?.trim() || null;
   // Command Code stamps the actual plan tier so downstream model-access
   // rules (open-source-only on the Go tier, premium allowed on Pro/Max)
   // resolve correctly. We resolve the tier from the live
@@ -166,12 +167,12 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   const tier = provider === "command_code" ? await fetchCommandCodePlanTier(normalizedApiKey) : undefined;
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(tier ? { tier } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(tier ? { tier } : {}), ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
   const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
-  await db.insert(providerAccount).values({ userId, provider, name: normalizedAccountName || `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, isActive: true, ...(tier ? { tier } : {}) });
+  await db.insert(providerAccount).values({ userId, provider, name: normalizedAccountName || `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, ...(tier ? { tier } : {}) });
   return { success: true, data: { email: identifier, isUpdate: false } };
 }
 
@@ -303,7 +304,7 @@ async function connectCloudflare(userId: string, apiToken: string, cfAccountId: 
 }
 
 const ACCOUNT_CONNECTORS = {
-  ...Object.fromEntries(apiKeyProviderSchema.options.map((provider) => [provider, (userId: string, input: CreateAccountInput) => connectApiKeyProviderAccount(userId, provider, input.token, input.name)])),
+  ...Object.fromEntries(apiKeyProviderSchema.options.map((provider) => [provider, (userId: string, input: CreateAccountInput) => connectApiKeyProviderAccount(userId, provider, input.token, input.name, input.platformKey)])),
   qoder: (userId: string, input: CreateAccountInput) => connectQoderPATAccount(userId, input.token, input.name),
   workers_ai: (userId: string, input: CreateAccountInput) => connectCloudflare(userId, input.token, input.cfAccountId ?? "", input.name),
 } as Record<string, (userId: string, input: CreateAccountInput) => Promise<ActionResult<{ email: string; isUpdate: boolean }>>>;

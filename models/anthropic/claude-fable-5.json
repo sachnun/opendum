@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "zenmux"
+  ],
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "anthropic/claude-fable-5"
+    }
+  }
+}

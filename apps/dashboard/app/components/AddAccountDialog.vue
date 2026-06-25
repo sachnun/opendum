@@ -87,6 +87,7 @@ const provider = ref<Provider | null>(props.initialProvider);
 const callbackUrl = ref("");
 const chatgptSessionJson = ref("");
 const apiKey = ref("");
+const platformKey = ref("");
 const cfAccountId = ref("");
 const authUrl = ref("");
 const oauthState = ref<string | null>(null);
@@ -200,6 +201,7 @@ function resetForm() {
   callbackUrl.value = "";
   chatgptSessionJson.value = "";
   apiKey.value = "";
+  platformKey.value = "";
   cfAccountId.value = "";
   authUrl.value = "";
   oauthState.value = null;
@@ -448,6 +450,10 @@ async function handleConnectApiKey() {
     errorMessage.value = activeFlowType.value === "api_key_with_account_id" ? "Please enter an API token" : "Please enter an API key";
     return;
   }
+  if (provider.value === "zenmux" && !platformKey.value.trim()) {
+    errorMessage.value = "Please enter a Platform Key. Get it from ZenMux → Management → API Keys.";
+    return;
+  }
 
   if (activeFlowType.value === "api_key_with_account_id" && !cfAccountId.value.trim()) {
     errorMessage.value = `Please enter the ${selectedConfig.value.accountIdLabel}`;
@@ -456,7 +462,7 @@ async function handleConnectApiKey() {
 
   isLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.create({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined });
+    const result = await dashboardApi.accounts.create({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined, platformKey: platformKey.value.trim() || undefined });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {
@@ -928,6 +934,31 @@ onBeforeUnmount(() => {
                 </button>
               </UiTooltip>
             </div>
+          </div>
+
+          <div v-if="provider === 'zenmux'" class="space-y-2">
+            <label for="provider-platform-key" class="text-sm font-medium">
+              Platform Key <span aria-hidden="true" class="text-destructive">*</span>
+            </label>
+            <p class="text-xs text-muted-foreground">
+              For quota usage tracking.
+              <a href="https://zenmux.ai/platform/management" target="_blank" class="underline">Get from ZenMux → Management → API Keys</a>
+            </p>
+            <input
+              id="provider-platform-key"
+              v-model="platformKey"
+              type="text"
+              name="provider-platform-key"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
+              spellcheck="false"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              placeholder="sk-mg-v1-..."
+              :disabled="isLoading"
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            >
           </div>
 
           <div v-if="activeFlowType === 'api_key_with_account_id'" class="space-y-2">

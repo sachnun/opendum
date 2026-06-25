@@ -3,7 +3,8 @@
     "opencode",
     "nvidia_nim",
     "siliconflow",
-    "command_code"
+    "command_code",
+    "zenmux"
   ],
   "aliases": [
     "deepseek-flash",
@@ -33,6 +34,9 @@
     },
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Flash"
+    },
+    "zenmux": {
+      "upstream": "deepseek/deepseek-v4-flash"
     }
   }
 }

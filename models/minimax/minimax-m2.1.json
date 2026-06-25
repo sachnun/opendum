@@ -1,11 +1,17 @@
 {
   "providers": [
-    "kiro"
+    "kiro",
+    "zenmux"
   ],
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": false
   },
-  "ignored": true
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "minimax/minimax-m2.1"
+    }
+  }
 }

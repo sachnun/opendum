@@ -2,7 +2,8 @@
   "providers": [
     "nvidia_nim",
     "siliconflow",
-    "command_code"
+    "command_code",
+    "zenmux"
   ],
   "meta": {
     "reasoning": true,
@@ -21,6 +22,9 @@
     },
     "siliconflow": {
       "upstream": "stepfun-ai/Step-3.5-Flash"
+    },
+    "zenmux": {
+      "upstream": "stepfun/step-3.5-flash"
     }
   }
 }

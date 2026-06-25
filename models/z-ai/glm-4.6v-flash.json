@@ -2,9 +2,13 @@
   "providers": [
     "zenmux"
   ],
+  "aliases": [
+    "z-ai-glm-4.6v-flash-free",
+    "z-ai/glm-4.6v-flash-free"
+  ],
   "providerConfig": {
     "zenmux": {
-      "upstream": "z-ai/glm-4.6v-flash-free"
+      "upstream": "z-ai/glm-4.6v-flash"
     }
   }
 }
