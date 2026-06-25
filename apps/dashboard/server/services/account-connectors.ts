@@ -36,23 +36,14 @@ const API_KEY_PROVIDER_SETTINGS = {
 // endpoint, which takes a custom CLI envelope (not an OpenAI body).
 const COMMAND_CODE_CLI_VERSION = "0.38.7";
 
-// Canonical Tier IDs stored on providerAccount.tier. These mirror the
-// labels rendered by the Go proxy fetcher in quota_commandcode.go so the
-// account record stays in sync with the live /alpha/billing/subscriptions
-// response. Paid plans surface a non-null planId string ("individual-go",
-// "individual-pro"); free / un-subscribed accounts surface planId: null and
-// are stamped "free" so downstream model-access rules see them explicitly
-// rather than guessing from empty credits.
+// Only the Go tier ($1/mo CLI plan) is accepted. Users on any other tier
+// (free, pro, max, etc.) are rejected during account creation.
 function commandCodeCanonicalTier(planId: string | null | undefined): string | undefined {
-  if (planId == null) return "free";
+  if (planId == null) return undefined;
   const cleaned = planId.toLowerCase().trim();
-  if (!cleaned) return "free";
-  switch (cleaned) {
-    case "individual-go":
-      return "go";
-    default:
-      return undefined;
-  }
+  if (!cleaned) return undefined;
+  if (cleaned === "individual-go") return "go";
+  return undefined;
 }
 
 async function fetchCommandCodePlanTier(apiKey: string): Promise<string | undefined> {
@@ -165,6 +156,7 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   // undefined so model-access rules receive an empty tier and decide for
   // themselves rather than getting a misleading "go" stamp.
   const tier = provider === "command_code" ? await fetchCommandCodePlanTier(normalizedApiKey) : undefined;
+  if (provider === "command_code" && tier !== "go") return { success: false, error: "Only the Go tier ($1/mo) is supported for Command Code accounts. Your account appears to be on a different plan." };
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(tier ? { tier } : {}), ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
