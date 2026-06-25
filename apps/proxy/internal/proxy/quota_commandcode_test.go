@@ -14,8 +14,8 @@ func TestCommandCodeTierFromPlanID(t *testing.T) {
 		{"individual-max-20x", "max-20x", 300, true},
 		{"team-pro", "team-pro", 40, true},
 		{"  INDIVIDUAL-GO ", "go", 10, true},
-		{"", "free", 0, true},
-		{"   ", "free", 0, true},
+		{"", "", 0, false},
+		{"   ", "", 0, false},
 		{"individual-future", "individual-future", 0, false},
 	}
 	for _, c := range cases {

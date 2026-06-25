@@ -36,10 +36,7 @@ var commandCodePlanAllowance = map[string]struct {
 func commandCodeTierFromPlanID(planID string) (label string, allowance float64, known bool) {
 	cleaned := strings.ToLower(strings.TrimSpace(planID))
 	if cleaned == "" {
-		// Un-subscribed / free accounts surface planId as JSON null in
-		// /alpha/billing/subscriptions; label them "free" with no allowance
-		// so the card renders an unknown-state progress bar.
-		return "free", 0, true
+		return "", 0, false
 	}
 	entry, ok := commandCodePlanAllowance[cleaned]
 	if !ok {
@@ -78,6 +75,12 @@ type commandCodeSubscriptionResponse struct {
 	} `json:"error"`
 }
 
+type commandCodeWindowLimit struct {
+	Used    float64 `json:"used"`
+	Cap     float64 `json:"cap"`
+	ResetAt string  `json:"resetAt"`
+}
+
 type commandCodeCreditsResponse struct {
 	Credits *struct {
 		BelowThreshold   bool    `json:"belowThreshold"`
@@ -86,6 +89,12 @@ type commandCodeCreditsResponse struct {
 		PurchasedCredits float64 `json:"purchasedCredits"`
 		FreeCredits      float64 `json:"freeCredits"`
 	} `json:"credits"`
+	WindowLimits *struct {
+		Limited  bool                    `json:"limited"`
+		Exceeded *string                 `json:"exceeded"`
+		FiveHour *commandCodeWindowLimit `json:"fiveHour"`
+		Weekly   *commandCodeWindowLimit `json:"weekly"`
+	} `json:"windowLimits"`
 	Error *struct {
 		Message string `json:"message"`
 	} `json:"error"`
@@ -277,5 +286,36 @@ func (s *Service) fetchCommandCodeQuota(ctx context.Context, account appdb.Provi
 		RemainingLabel:    &remainingLabel,
 	}
 
-	return baseQuotaInfo(account, "success", []quotaGroupDisplay{group}, time.Now().UnixMilli(), "")
+	groups := []quotaGroupDisplay{group}
+
+	if credits.WindowLimits != nil {
+		if wh := credits.WindowLimits.FiveHour; wh != nil && wh.Cap > 0 {
+			groups = append(groups, buildWindowLimitGroup("five-hour", "5-Hour Window", wh))
+		}
+		if wh := credits.WindowLimits.Weekly; wh != nil && wh.Cap > 0 {
+			groups = append(groups, buildWindowLimitGroup("weekly", "7-Day Window", wh))
+		}
+	}
+
+	return baseQuotaInfo(account, "success", groups, time.Now().UnixMilli(), "")
+}
+
+func buildWindowLimitGroup(name, display string, w *commandCodeWindowLimit) quotaGroupDisplay {
+	remaining := math.Max(0, w.Cap-w.Used)
+	fraction := clampFraction(remaining / w.Cap)
+	resetISO := stringPtr(w.ResetAt)
+	remainingLabel := fmt.Sprintf("%s / %s requests", formatFloat(remaining), formatFloat(w.Cap))
+	return quotaGroupDisplay{
+		Name:              name,
+		DisplayName:       display,
+		RemainingFraction: fraction,
+		RemainingRequests: displayNumber(remaining),
+		MaxRequests:       displayNumber(w.Cap),
+		UsedRequests:      displayNumber(w.Used),
+		ResetTimeIso:      resetISO,
+		ResetInHuman:      formatTimeUntilResetISO(resetISO),
+		PercentUsed:       int(math.Round(clampFraction(w.Used/w.Cap) * 100)),
+		IsExhausted:       fraction <= 0,
+		RemainingLabel:    &remainingLabel,
+	}
 }
