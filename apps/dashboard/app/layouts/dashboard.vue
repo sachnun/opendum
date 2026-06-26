@@ -71,6 +71,7 @@ const supportNavigation = computed<NavItem[]>(() => [
     children: [
       { name: "Email", href: "/dashboard/tools/email", disabled: true, tag: "soon" },
       { name: "OTP", href: "/dashboard/tools/otp", disabled: true, tag: "soon" },
+      { name: "Card", href: "/dashboard/tools/card", disabled: true, tag: "soon" },
     ],
   },
   { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
