@@ -19,13 +19,13 @@
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {
-    "edgeone": "^1.5.9",
+    "edgeone": "^1.6.9",
     "typescript": "^6.0.3"
   },
   "overrides": {
-    "postcss": "^8.5.10",
-    "typescript-eslint": "^8.59.3",
-    "@typescript-eslint/eslint-plugin": "^8.59.3",
-    "@typescript-eslint/parser": "^8.59.3"
+    "postcss": "^8.5.16",
+    "typescript-eslint": "^8.62.1",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1"
   }
 }
