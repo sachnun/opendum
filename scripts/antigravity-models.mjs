@@ -111,14 +111,23 @@ function parseReasoningModelNames(markdown) {
   }
 
   const models = [];
+  let pastHeader = false;
   for (const line of section[1].split(/\r?\n/)) {
-    const match = line.match(/^\s*[*-]\s+(.+?)\s*$/);
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("|") || /^\|[\s:-]+\|/.test(trimmed)) continue;
+
+    if (!pastHeader) {
+      const firstCol = trimmed.match(/^\|\s+(.+?)\s+\|/);
+      if (firstCol && /model/i.test(firstCol[1].trim())) continue;
+      pastHeader = true;
+    }
+
+    const match = trimmed.match(/^\|\s+(.+?)\s+\|/);
     if (!match) continue;
 
     const name = stripMarkdown(match[1]).trim();
     if (!name) continue;
 
-    // Stop before the Additional Models prose if the section structure changes.
     if (/^nano banana/i.test(name)) continue;
     models.push(name);
   }

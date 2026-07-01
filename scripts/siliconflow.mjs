@@ -8,7 +8,7 @@ import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "siliconflow";
 const MODELS_PAGE_URL = "https://www.siliconflow.com/models";
-const SEARCH_INDEX_FALLBACK_PATTERN = /framer-search-index[^>]*content="([^"]+)"/;
+const SEARCH_INDEX_PATTERN = /<meta\s+name="framer-search-index(?:-fallback)?"\s+content="([^"]+)"/g;
 
 // Minimum number of chat models expected; guards against silent parsing breakage.
 const MIN_EXPECTED_MODELS = 20;
@@ -48,18 +48,6 @@ function isChatModelId(modelId) {
 
 function isCanonicalModelId(value) {
   return typeof value === "string" && /^[\w.-]+\/[\w.-]+$/.test(value.trim());
-}
-
-async function resolveSearchIndexUrl() {
-  const html = await fetchText(MODELS_PAGE_URL, {
-    label: "SiliconFlow models page",
-    headers: { Accept: "text/html" },
-  });
-  const match = html.match(SEARCH_INDEX_FALLBACK_PATTERN);
-  if (!match || !match[1]) {
-    throw new Error("Unable to locate framer-search-index URL on SiliconFlow models page");
-  }
-  return match[1];
 }
 
 function extractModelIds(searchIndex) {
@@ -108,16 +96,48 @@ function buildModelMap(modelIds) {
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
+async function resolveSearchIndexUrls() {
+  const html = await fetchText(MODELS_PAGE_URL, {
+    label: "SiliconFlow models page",
+    headers: { Accept: "text/html" },
+  });
+  const urls = [];
+  const seen = new Set();
+  for (const match of html.matchAll(SEARCH_INDEX_PATTERN)) {
+    if (match[1] && !seen.has(match[1])) {
+      seen.add(match[1]);
+      urls.push(match[1]);
+    }
+  }
+  if (urls.length === 0) {
+    throw new Error("Unable to locate framer-search-index URL on SiliconFlow models page");
+  }
+  return urls;
+}
+
 async function fetchSiliconFlowChatModelIds() {
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
     try {
-      const searchIndexUrl = await resolveSearchIndexUrl();
-      const searchIndex = await fetchJson(searchIndexUrl, {
-        label: "SiliconFlow search index",
-        timeout: FETCH_TIMEOUT_MS,
-      });
+      const searchIndexUrls = await resolveSearchIndexUrls();
+      let searchIndex = null;
+      let fetchError = null;
+
+      for (const url of searchIndexUrls) {
+        try {
+          searchIndex = await fetchJson(url, {
+            label: "SiliconFlow search index",
+            timeout: FETCH_TIMEOUT_MS,
+          });
+          break;
+        } catch (error) {
+          fetchError = error;
+        }
+      }
+
+      if (!searchIndex) throw fetchError || new Error("All SiliconFlow search index URLs failed");
+
       const ids = extractModelIds(searchIndex);
       const chatIds = ids.filter(isChatModelId);
       if (chatIds.length < MIN_EXPECTED_MODELS) {
