@@ -2,7 +2,8 @@
   "providers": [
     "workers_ai",
     "siliconflow",
-    "command_code"
+    "command_code",
+    "nvidia_nim"
   ],
   "meta": {
     "reasoning": true,
@@ -15,6 +16,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "nvidia_nim": {
+      "upstream": "moonshotai/kimi-k2.6"
     },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.6"

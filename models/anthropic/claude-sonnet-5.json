@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "kiro",
+    "zenmux"
+  ],
+  "providerConfig": {
+    "kiro": {
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    },
+    "zenmux": {
+      "upstream": "anthropic/claude-sonnet-5"
+    }
+  }
+}

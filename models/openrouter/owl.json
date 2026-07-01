@@ -1,19 +1,11 @@
 {
-  "providers": [
-    "kilo_code"
-  ],
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "openrouter/owl-alpha",
-      "authless": true
-    }
-  },
-  "meta": {
-    "status": "alpha"
-  },
-  "ignored": false,
+  "providers": [],
   "aliases": [
     "owl-alpha",
     "openrouter/owl-alpha"
-  ]
+  ],
+  "ignored": false,
+  "meta": {
+    "status": "alpha"
+  }
 }
