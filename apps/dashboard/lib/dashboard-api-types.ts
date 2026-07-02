@@ -240,7 +240,7 @@ export type ModelSearchItem = Omit<ModelListItem, "name" | "family" | "stats">;
 export interface PlaygroundOptions {
   proxyBaseUrl?: string;
   hasAnyProviderAccount: boolean;
-  models: Array<{ id: string; name: string; family: string; providers: string[]; meta?: ModelMeta }>;
+  models: Array<{ id: string; name: string; family: string; providers: string[]; meta?: ModelMeta; topPDeprecatedProviders?: string[] }>;
   providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; isActive: boolean; disabledUntil: string | Date | null; disabledModels: string[]; supportedModels?: string[] | null }>;
 }
 

@@ -231,6 +231,17 @@ const maxPanels = computed(() => Math.max(filteredModels.value.length, providerP
 const canAddPanel = computed(() => panels.value.length < maxPanels.value);
 const hasSelectedModel = computed(() => panels.value.some((panel) => panel.modelId));
 const isAnyLoading = computed(() => Object.values(responses.value).some((response) => response.isLoading));
+const isTopPDeprecated = computed(() =>
+  panels.value.some((panel) => {
+    if (!panel.modelId) return false;
+    const model = modelsById.value.get(panel.modelId);
+    if (!model?.topPDeprecatedProviders) return false;
+    const provider = panel.accountId
+      ? providerAccountsById.value.get(panel.accountId)?.provider
+      : panel.provider;
+    return Boolean(provider && model.topPDeprecatedProviders.includes(provider));
+  }),
+);
 const additionalParametersError = computed(() => parseAdditionalParameters(additionalParametersInput.value).error);
 const canRunPlayground = computed(() => Boolean(selectedScenario.value && hasSelectedModel.value && canUsePlayground.value && !additionalParametersError.value));
 const playgroundSetupMessage = computed(() => {
@@ -1675,8 +1686,9 @@ function formatToolArguments(value: string): string {
             </label>
             <label class="grid gap-2 text-sm font-medium">
               <span class="flex items-center justify-between"><span>Top P</span><span class="w-12 text-right text-sm text-muted-foreground">{{ settings.topP.toFixed(2) }}</span></span>
-              <input v-model.number="settings.topP" type="range" min="0" max="1" step="0.05" :disabled="isAnyLoading" class="w-full accent-primary">
-              <span class="text-xs font-normal text-muted-foreground">Nucleus sampling threshold (1.0 = consider all tokens)</span>
+              <input v-model.number="settings.topP" type="range" min="0" max="1" step="0.05" :disabled="isAnyLoading || isTopPDeprecated" class="w-full accent-primary">
+              <span v-if="isTopPDeprecated" class="text-xs font-normal text-amber-600 dark:text-amber-400">This model's provider no longer accepts top_p; using default value (1.0)</span>
+              <span v-else class="text-xs font-normal text-muted-foreground">Nucleus sampling threshold (1.0 = consider all tokens)</span>
             </label>
             <label class="grid gap-2 text-sm font-medium">
               Max Tokens

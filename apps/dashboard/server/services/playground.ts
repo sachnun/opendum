@@ -63,13 +63,21 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
 
     const models = getAllModels()
       .filter((model) => !disabledModelSet.has(model) && isModelUsableByAccounts(model, availability))
-      .map((model) => ({
-        id: model,
-        name: model,
-        family: getModelFamily(model),
-        providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
-        meta: MODEL_REGISTRY[model]?.meta,
-      }))
+      .map((model) => {
+        const providerConfigs = MODEL_REGISTRY[model]?.providerConfig ?? {};
+        const topPDeprecatedProviders = Object.entries(providerConfigs)
+          .filter(([, cfg]) => (cfg as Record<string, unknown>).top_p_deprecated === true)
+          .map(([provider]) => provider);
+
+        return {
+          id: model,
+          name: model,
+          family: getModelFamily(model),
+          providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
+          meta: MODEL_REGISTRY[model]?.meta,
+          topPDeprecatedProviders: topPDeprecatedProviders.length > 0 ? topPDeprecatedProviders : undefined,
+        };
+      })
       .sort(compareModelEntries);
 
     return {
