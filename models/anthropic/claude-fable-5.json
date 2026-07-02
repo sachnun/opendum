@@ -4,7 +4,8 @@
   ],
   "providerConfig": {
     "zenmux": {
-      "upstream": "anthropic/claude-fable-5"
+      "upstream": "anthropic/claude-fable-5",
+      "top_p_deprecated": true
     }
   }
 }

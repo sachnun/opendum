@@ -131,7 +131,7 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 		return jsonResponse(http.StatusOK, responsesJSONToChatCompletion(data, modelName)), nil
 	}
 
-	payload := p.buildPayload(body, modelName, stream)
+	payload := p.buildPayload(body, model, modelName, stream)
 	resp, err := p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model, extraHeaders)
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
@@ -168,12 +168,15 @@ func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client,
 	return postJSON(ctx, client, url, credentials, payload, stream)
 }
 
-func (p openAICompatibleProvider) buildPayload(body map[string]any, modelName string, stream bool) map[string]any {
+func (p openAICompatibleProvider) buildPayload(body map[string]any, model string, modelName string, stream bool) map[string]any {
 	payload := map[string]any{}
 	for key, value := range body {
 		if _, ok := p.supportedParams[key]; ok && value != nil {
 			payload[key] = value
 		}
+	}
+	if providerConfigBool(p.registry, model, p.name, "top_p_deprecated") {
+		delete(payload, "top_p")
 	}
 	payload["model"] = modelName
 	payload["stream"] = stream
