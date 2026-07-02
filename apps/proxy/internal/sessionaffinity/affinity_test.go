@@ -83,28 +83,13 @@ func TestEnabledNilSafe(t *testing.T) {
 	}
 }
 
-func TestWithTLOverridesDefault(t *testing.T) {
-	a := New(nil, []string{"zenmux"}, WithTTL(5*time.Minute))
-	if a.ttl != 5*time.Minute {
-		t.Fatalf("ttl = %v, want 5m", a.ttl)
-	}
-}
-
-func TestWithTLIgnoresNonPositive(t *testing.T) {
-	a := New(nil, []string{"zenmux"}, WithTTL(0))
-	if a.ttl != defaultTTL {
-		t.Fatalf("ttl = %v, want default %v", a.ttl, defaultTTL)
-	}
-}
-
-func TestLookupStoreForgetNilSafe(t *testing.T) {
+func TestLookupStoreNilSafe(t *testing.T) {
 	var a *Affinity
 	ctx := context.Background()
 	if id := a.Lookup(ctx, "u", "s"); id != "" {
 		t.Fatalf("nil Lookup = %q, want empty", id)
 	}
 	a.Store(ctx, "u", "s", "acct_1")
-	a.Forget(ctx, "u", "s")
 }
 
 func TestLookupStoreNoOpWithoutRedis(t *testing.T) {
@@ -114,7 +99,6 @@ func TestLookupStoreNoOpWithoutRedis(t *testing.T) {
 		t.Fatalf("Lookup without redis = %q, want empty", id)
 	}
 	a.Store(ctx, "u", "s", "acct_1")
-	a.Forget(ctx, "u", "s")
 }
 
 func TestLookupStoreIgnoreEmptyIdentifiers(t *testing.T) {
@@ -149,17 +133,12 @@ func TestRedisRoundtripSkippedWithoutRedis(t *testing.T) {
 		t.Skipf("redis unavailable: %v", err)
 	}
 	ctx := context.Background()
-	a := New(client, []string{"zenmux"}, WithTTL(time.Minute))
-	a.Forget(ctx, "u_rt", "s_rt")
+	a := New(client, []string{"zenmux"})
 	if id := a.Lookup(ctx, "u_rt", "s_rt"); id != "" {
 		t.Fatalf("Lookup before Store = %q, want empty", id)
 	}
 	a.Store(ctx, "u_rt", "s_rt", "acct_rt")
 	if id := a.Lookup(ctx, "u_rt", "s_rt"); id != "acct_rt" {
 		t.Fatalf("Lookup after Store = %q, want acct_rt", id)
-	}
-	a.Forget(ctx, "u_rt", "s_rt")
-	if id := a.Lookup(ctx, "u_rt", "s_rt"); id != "" {
-		t.Fatalf("Lookup after Forget = %q, want empty", id)
 	}
 }

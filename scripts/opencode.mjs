@@ -3,7 +3,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
-import { sleep, fetchText, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchText, fetchJson } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";

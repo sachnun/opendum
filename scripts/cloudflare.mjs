@@ -18,7 +18,7 @@ import {
   syncProviderModels,
   writeModelJson,
 } from "./model-registry.mjs";
-import { sleep, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "workers_ai";

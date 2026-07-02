@@ -154,32 +154,12 @@ const FAMILY_RULES = [
   { test: /^north-/, folder: "cohere", family: "Cohere" },
 ];
 
-// Reverse map: folder slug -> human family name.
-// Used by the registry loader to populate `family` when the JSON omits it.
-const FAMILY_BY_FOLDER = Object.fromEntries(
-  FAMILY_RULES.map((rule) => [rule.folder, rule.family])
-);
-
-export function inferFamilyFromFolder(folderName) {
-  if (!folderName) return null;
-  return FAMILY_BY_FOLDER[folderName] ?? null;
-}
-
 function inferModelFolder(modelKey) {
   for (const rule of FAMILY_RULES) {
     if (rule.test.test(modelKey.toLowerCase())) return rule.folder;
   }
   return null;
 }
-
-function inferModelFamily(modelKey) {
-  if (!modelKey || typeof modelKey !== "string") return null;
-  for (const rule of FAMILY_RULES) {
-    if (rule.test.test(modelKey.toLowerCase())) return rule.family;
-  }
-  return null;
-}
-
 /**
  * Sync a provider's model map into the JSON registry.
  *

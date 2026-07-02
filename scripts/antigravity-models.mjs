@@ -20,7 +20,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { fetchText, sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchText } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 // ---------------------------------------------------------------------------
@@ -307,17 +307,8 @@ function getExistingProviderUpstream(entry, provider) {
   }
   return entry.id || entry.fileId;
 }
-
-function inferUpstream(modelKey) {
-  if (/^gemini-.*-image-preview$/.test(modelKey)) {
-    return modelKey.replace(/-preview$/, "");
-  }
-  if (modelKey === "gemini-3-flash-preview") {
-    return "gemini-3-flash";
-  }
-  return modelKey;
-}
-
+// ---------------------------------------------------------------------------
+// Sync JSON files
 // ---------------------------------------------------------------------------
 // Provider config and metadata
 // ---------------------------------------------------------------------------
@@ -480,14 +471,6 @@ function inferMetadata(modelKey) {
   }
   return null;
 }
-
-function familyForModel(modelKey) {
-  if (modelKey.startsWith("gemini-")) return "Google";
-  if (modelKey.startsWith("claude-")) return "Anthropic";
-  if (modelKey.startsWith("gpt-oss-")) return "OpenAI";
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // Sync JSON files
 // ---------------------------------------------------------------------------

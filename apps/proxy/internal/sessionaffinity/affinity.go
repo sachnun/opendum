@@ -14,23 +14,13 @@ const (
 	keyPrefix  = "opendum:session-affinity"
 )
 
-type Option func(*Affinity)
-
-func WithTTL(d time.Duration) Option {
-	return func(a *Affinity) {
-		if d > 0 {
-			a.ttl = d
-		}
-	}
-}
-
 type Affinity struct {
 	redis     *redis.Client
 	ttl       time.Duration
 	providers map[string]struct{}
 }
 
-func New(client *redis.Client, providers []string, opts ...Option) *Affinity {
+func New(client *redis.Client, providers []string) *Affinity {
 	a := &Affinity{
 		redis:     client,
 		ttl:       defaultTTL,
@@ -39,11 +29,6 @@ func New(client *redis.Client, providers []string, opts ...Option) *Affinity {
 	for _, p := range providers {
 		if p = strings.TrimSpace(p); p != "" {
 			a.providers[p] = struct{}{}
-		}
-	}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(a)
 		}
 	}
 	return a
@@ -73,13 +58,6 @@ func (a *Affinity) Store(ctx context.Context, userID, sessionID, accountID strin
 		return
 	}
 	_ = a.redis.Set(ctx, affinityKey(userID, sessionID), accountID, a.ttl).Err()
-}
-
-func (a *Affinity) Forget(ctx context.Context, userID, sessionID string) {
-	if a == nil || a.redis == nil || !validPair(userID, sessionID) {
-		return
-	}
-	_ = a.redis.Del(ctx, affinityKey(userID, sessionID)).Err()
 }
 
 func Prefer[T any](items []T, isSticky func(T) bool) []T {

@@ -16,7 +16,7 @@ function warnInvalidMaintainers() {
   hasWarnedInvalidMaintainers = true;
 }
 
-export function getMaintenerEmails(): Set<string> {
+function getMaintenerEmails(): Set<string> {
   const rawValue = process.env.MAINTENERS?.trim();
 
   if (!rawValue) {
@@ -49,6 +49,6 @@ export function getDashboardRoleForEmail(email: string | null | undefined): Dash
   return getMaintenerEmails().has(normalizeEmail(email)) ? MAINTENER_ROLE : USER_ROLE;
 }
 
-export function isMaintenerEmail(email: string | null | undefined): boolean {
+function isMaintenerEmail(email: string | null | undefined): boolean {
   return getDashboardRoleForEmail(email) === MAINTENER_ROLE;
 }

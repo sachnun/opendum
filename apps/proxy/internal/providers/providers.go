@@ -355,11 +355,6 @@ func postJSONWithHeadersAuth(ctx context.Context, client *http.Client, url, bear
 	}
 	return resp, err
 }
-
-func shouldRefresh(account appdb.ProviderAccount) bool {
-	return time.Now().After(account.ExpiresAt.Add(-oauthRefreshBuffer))
-}
-
 func cloneAnyMap(input map[string]any) map[string]any {
 	out := make(map[string]any, len(input))
 	for key, value := range input {

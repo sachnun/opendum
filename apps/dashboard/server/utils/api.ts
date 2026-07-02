@@ -117,7 +117,7 @@ export async function requireReadableUserId(event: H3Event): Promise<string> {
   return (await requireReadableDashboardContext(event)).userId;
 }
 
-export async function requireWritableDashboardContext(event: H3Event): Promise<DashboardRequestContext> {
+async function requireWritableDashboardContext(event: H3Event): Promise<DashboardRequestContext> {
   const context = await requireDashboardContext(event);
   if (context.isAuditMode) {
     throw createError({ statusCode: 403, statusMessage: "Audit mode is read-only" });
@@ -128,10 +128,6 @@ export async function requireWritableDashboardContext(event: H3Event): Promise<D
 
 export async function requireWritableUserId(event: H3Event): Promise<string> {
   return (await requireWritableDashboardContext(event)).userId;
-}
-
-export async function requireUserId(event: H3Event): Promise<string> {
-  return requireWritableUserId(event);
 }
 
 function badRequestFromZod(error: ZodError): never {

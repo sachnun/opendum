@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { sleep, fetchText, MAX_FETCH_ATTEMPTS } from "./lib/shared.mjs";
+import { fetchText } from "./lib/shared.mjs";
 
 const VERSION_SOURCES = [
   "https://releasebot.io/updates/google/antigravity",

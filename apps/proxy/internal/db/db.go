@@ -96,7 +96,6 @@ type ProxyAPIKey struct {
 	UserID            string     `bun:"userId"`
 	KeyHash           string     `bun:"keyHash"`
 	KeyPreview        string     `bun:"keyPreview"`
-	EncryptedKey      *string    `bun:"encryptedKey"`
 	Name              *string    `bun:"name"`
 	ModelAccessMode   string     `bun:"modelAccessMode"`
 	ModelAccessList   []string   `bun:"modelAccessList,array"`

@@ -49,9 +49,6 @@ const MODELS_WITH_1M_VARIANT = new Set([
   "claude-sonnet-4.5",
 ]);
 
-// Kiro modelId -> canonical JSON model key (only when they differ)
-const MODEL_KEY_OVERRIDES = {};
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -308,13 +305,6 @@ function expandVariants(kiroId) {
  * @returns {{ key: string, upstream: string }}
  */
 function toCanonical(kiroModelId) {
-  if (MODEL_KEY_OVERRIDES[kiroModelId]) {
-    return {
-      key: MODEL_KEY_OVERRIDES[kiroModelId],
-      upstream: kiroModelId,
-    };
-  }
-
   let key = kiroModelId;
 
   // Claude: "claude-sonnet-4.5" → "claude-sonnet-4-5"

@@ -265,9 +265,6 @@ func formatTimeUntilResetISO(resetISO *string) *string {
 }
 
 func stringPtr(value string) *string { return &value }
-
-func intPtrValue(value int64) *int64 { return &value }
-
 func (s *Service) getQuotaJSON(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool, cacheName, method, target string, headers map[string]string, body any) (quotaJSONResult, error) {
 	encodedBody, err := encodeQuotaBody(body)
 	if err != nil {
