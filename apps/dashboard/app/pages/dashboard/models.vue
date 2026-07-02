@@ -372,13 +372,7 @@ watch(
               :key="model.id"
               ref="modelCardRefs"
               :data-model-id="model.id"
-              class="flex h-full flex-col scroll-mt-20 bg-transparent transition-[border-color,box-shadow] duration-[1800ms] ease-out"
-              :class="[
-                model.isEnabled === false ? 'opacity-65 ' : '',
-                highlightedModelId === model.id
-                  ? 'border-primary shadow-[0_0_0_3px_var(--primary)]'
-                  : 'border-border shadow-none',
-              ]"
+              :class="`flex h-full flex-col scroll-mt-20 bg-transparent transition-[border-color,box-shadow] duration-[1800ms] ease-out${model.isEnabled === false ? ' opacity-65' : ''}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
             >
               <UiCardHeader class="pb-1">
                 <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">

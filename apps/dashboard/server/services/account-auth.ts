@@ -95,7 +95,7 @@ const DEVICE_PROVIDERS = {
   qoder: {
     label: "Qoder",
     emailPrefix: "qoder",
-    initiate: async () => {
+    initiate: async (_input?: z.infer<typeof initiateDeviceAuthInputSchema>) => {
       const result = await initiateQoderDeviceCodeFlow();
       return {
         // Qoder has no short user_code; consent happens entirely in the

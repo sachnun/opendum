@@ -169,7 +169,7 @@ export default defineNuxtConfig({
     esbuild: {
       legalComments: "none",
     },
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss() as any],
   },
   typescript: {
     strict: true,

@@ -32,15 +32,7 @@ watch(open, (value) => {
 
 const isExpired = computed(() => expiresAt.value != null && expiresAt.value < new Date());
 const displayText = computed(() => (expiresAt.value ? format(expiresAt.value, "MMM d, yyyy HH:mm") : "No expiry"));
-const draftDateModel = computed<DateValue | undefined>({
-  get: () => draftDate.value,
-  set: (v: DateValue | undefined) => { draftDate.value = v; },
-});
-const draftTimeModel = computed<Time>({
-  get: () => draftTime.value,
-  set: (v: Time) => { draftTime.value = v; },
-});
-const draftExpiresAt = computed(() => toLocalDateTime(draftDate.value, draftTime.value));
+const draftExpiresAt = computed(() => toLocalDateTime(draftDate.value as DateValue | undefined, draftTime.value as Time));
 const isDraftInPast = computed(() => {
   if (!draftExpiresAt.value) return false;
   return draftExpiresAt.value <= new Date();
@@ -134,13 +126,13 @@ async function saveExpiration(value: Date | null) {
       <div class="space-y-3 p-3">
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration date</p>
-          <UiCalendar v-model="draftDateModel" :is-date-disabled="isPastDate" class="border-0 p-0" />
+          <UiCalendar v-model="(draftDate as any)" :is-date-disabled="isPastDate" class="border-0 p-0" />
         </div>
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration time</p>
           <TimeFieldRoot
             v-slot="{ segments }"
-            v-model="draftTimeModel"
+            v-model="(draftTime as any)"
             granularity="minute"
             :hour-cycle="24"
             class="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm outline-none focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"

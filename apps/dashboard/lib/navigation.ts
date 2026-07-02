@@ -25,6 +25,7 @@ export interface ProviderAccountCounts {
   kiro: number;
   nvidia_nim: number;
   openrouter: number;
+  qoder: number;
   siliconflow: number;
   workers_ai: number;
   zenmux: number;
