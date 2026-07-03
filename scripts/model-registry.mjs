@@ -154,6 +154,15 @@ const FAMILY_RULES = [
   { test: /^north-/, folder: "cohere", family: "Cohere" },
 ];
 
+const FAMILY_BY_FOLDER = Object.fromEntries(
+  FAMILY_RULES.map((rule) => [rule.folder, rule.family])
+);
+
+export function inferFamilyFromFolder(folderName) {
+  if (!folderName) return null;
+  return FAMILY_BY_FOLDER[folderName] ?? null;
+}
+
 function inferModelFolder(modelKey) {
   for (const rule of FAMILY_RULES) {
     if (rule.test.test(modelKey.toLowerCase())) return rule.folder;
