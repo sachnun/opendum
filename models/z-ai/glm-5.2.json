@@ -2,7 +2,8 @@
   "providers": [
     "workers_ai",
     "siliconflow",
-    "command_code"
+    "command_code",
+    "nvidia_nim"
   ],
   "meta": {
     "reasoning": true,
@@ -15,6 +16,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "nvidia_nim": {
+      "upstream": "z-ai/glm-5.2"
     },
     "siliconflow": {
       "upstream": "zai-org/GLM-5.2"
