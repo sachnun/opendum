@@ -18,8 +18,8 @@ const dashboardApi = useDashboardApi();
 const open = ref(false);
 const isSaving = ref(false);
 const expiresAt = ref<Date | null>(props.initialExpiresAt ? new Date(props.initialExpiresAt) : null);
-const draftDate = ref<DateValue | undefined>(toCalendarDate(expiresAt.value) as DateValue | undefined);
-const draftTime = ref<Time>(toTimeValue(expiresAt.value) as Time);
+const draftDate = ref<any>(toCalendarDate(expiresAt.value) as DateValue | undefined);
+const draftTime = ref<any>(toTimeValue(expiresAt.value) as Time);
 const errorMessage = ref("");
 
 watch(open, (value) => {
@@ -126,13 +126,13 @@ async function saveExpiration(value: Date | null) {
       <div class="space-y-3 p-3">
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration date</p>
-          <UiCalendar v-model="(draftDate as any)" :is-date-disabled="isPastDate" class="border-0 p-0" />
+          <UiCalendar v-model="draftDate" :is-date-disabled="isPastDate" class="border-0 p-0" />
         </div>
         <div class="space-y-1.5">
           <p class="text-xs font-medium text-muted-foreground">Expiration time</p>
           <TimeFieldRoot
             v-slot="{ segments }"
-            v-model="(draftTime as any)"
+            v-model="draftTime"
             granularity="minute"
             :hour-cycle="24"
             class="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm outline-none focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
