@@ -1,18 +1,27 @@
 {
   "providers": [
-    "siliconflow"
+    "siliconflow",
+    "kilo_code",
+    "openrouter"
   ],
-  "providerConfig": {
-    "siliconflow": {
-      "upstream": "tencent/Hy3-preview"
-    }
-  },
-  "meta": {
-    "status": "preview"
-  },
-  "ignored": false,
   "aliases": [
     "hy3-preview",
     "tencent/Hy3-preview"
-  ]
+  ],
+  "ignored": false,
+  "meta": {
+    "status": "preview"
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "tencent/hy3:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "tencent/hy3:free"
+    },
+    "siliconflow": {
+      "upstream": "tencent/Hy3-preview"
+    }
+  }
 }
