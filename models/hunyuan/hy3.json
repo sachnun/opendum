@@ -2,7 +2,8 @@
   "providers": [
     "siliconflow",
     "kilo_code",
-    "openrouter"
+    "openrouter",
+    "command_code"
   ],
   "aliases": [
     "hy3-preview",
@@ -13,6 +14,12 @@
     "status": "preview"
   },
   "providerConfig": {
+    "command_code": {
+      "upstream": "tencent/Hy3",
+      "allowedTiers": [
+        "go"
+      ]
+    },
     "kilo_code": {
       "upstream": "tencent/hy3:free",
       "authless": true

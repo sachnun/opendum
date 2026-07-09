@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "zenmux"
+  ],
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "kuaishou/kat-coder-air-v2.5"
+    }
+  }
+}

@@ -1,7 +1,6 @@
 {
   "providers": [
-    "kiro",
-    "zenmux"
+    "kiro"
   ],
   "providerConfig": {
     "kiro": {
@@ -11,10 +10,6 @@
         "power",
         "standalone"
       ]
-    },
-    "zenmux": {
-      "upstream": "anthropic/claude-sonnet-5",
-      "top_p_deprecated": true
     }
   }
 }
