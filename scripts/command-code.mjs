@@ -12,8 +12,8 @@ const PRICING_DOCS_URL = "https://commandcode.ai/docs/resources/pricing-limits";
 
 // Command Code's "Go" tier ($1/mo plan) is restricted to open-source models.
 // The live /provider/v1/models endpoint lists every model but carries no
-// tier field, so the open-source set is resolved from the official pricing
-// docs ("Open Source Models" table) and intersected with the API by name.
+// tier field, so the open-source set is resolved from the RSC payload in
+// the pricing docs and intersected with the API by name.
 const GO_TIER = "go";
 
 // Minimum number of Go-tier models expected; guards against silent parsing breakage.
@@ -33,23 +33,57 @@ function toModelKey(modelId) {
 }
 
 function extractOpenSourceModelNames(html) {
-  const start = html.indexOf("Open Source Models");
-  if (start === -1) {
-    throw new Error("Unable to locate 'Open Source Models' section in Command Code pricing docs");
-  }
-  const end = html.indexOf("Premium Models", start);
-  const section = end === -1 ? html.slice(start) : html.slice(start, end);
+  const prefix = 'self.__next_f.push([1,"';
+  let searchFrom = 0;
 
-  const rows = section.match(/<tr>([\s\S]*?)<\/tr>/g) || [];
-  const names = new Set();
-  for (const row of rows) {
-    const cells = row.match(/<td>([\s\S]*?)<\/td>/g) || [];
-    if (cells.length === 0) continue;
-    // First cell holds the model display name; strip nested tags.
-    const name = cells[0].replace(/<[^>]+>/g, "").trim();
-    if (name) names.add(name);
+  while (true) {
+    const startIdx = html.indexOf(prefix, searchFrom);
+    if (startIdx === -1) break;
+
+    const contentStart = startIdx + prefix.length;
+    let i = contentStart;
+    let payload = "";
+    while (i < html.length) {
+      if (html[i] === "\\" && i + 1 < html.length) {
+        payload += html[i] + html[i + 1];
+        i += 2;
+      } else if (html.startsWith('"])', i)) {
+        break;
+      } else {
+        payload += html[i];
+        i++;
+      }
+    }
+
+    if (payload.includes("opensource") && payload.includes("models")) {
+      const unescaped = payload.replace(/\\"/g, '"');
+      const bracketIdx = unescaped.indexOf("[");
+      if (bracketIdx === -1) continue;
+
+      const jsonStr = unescaped.slice(bracketIdx);
+      // Trim trailing non-JSON content (e.g. trailing \n from RSC payload)
+      const cleanJson = jsonStr.replace(/[^}\]]*$/, "");
+      try {
+        const data = JSON.parse(cleanJson);
+        const modelObj = data[3];
+        if (!modelObj || !modelObj.models) continue;
+
+        const names = new Set();
+        for (const m of modelObj.models) {
+          if (m.category === "opensource" && m.name) {
+            names.add(m.name);
+          }
+        }
+        return names;
+      } catch {
+        continue;
+      }
+    }
+
+    searchFrom = contentStart + payload.length;
   }
-  return names;
+
+  throw new Error("Unable to locate open-source model data in Command Code pricing docs");
 }
 
 async function fetchGoTierModels() {
