@@ -29,7 +29,7 @@
       "upstream": "openai/gpt-oss-20b"
     },
     "openrouter": {
-      "upstream": "openai/gpt-oss-120b:free"
+      "upstream": "openai/gpt-oss-20b:free"
     },
     "siliconflow": {
       "upstream": "openai/gpt-oss-120b"

@@ -1,6 +1,5 @@
 {
   "providers": [
-    "zenmux",
     "kiro"
   ],
   "providerConfig": {
@@ -11,9 +10,6 @@
         "power",
         "standalone"
       ]
-    },
-    "zenmux": {
-      "upstream": "openai/gpt-5.6-luna"
     }
   }
 }
