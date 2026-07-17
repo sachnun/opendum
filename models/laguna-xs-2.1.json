@@ -5,7 +5,8 @@
   ],
   "providerConfig": {
     "kilo_code": {
-      "upstream": "poolside/laguna-xs-2.1:free"
+      "upstream": "poolside/laguna-xs-2.1:free",
+      "authless": true
     },
     "openrouter": {
       "upstream": "poolside/laguna-xs-2.1:free"
