@@ -5,7 +5,8 @@
   ],
   "providerConfig": {
     "kilo_code": {
-      "upstream": "kwaipilot/kat-coder-pro-v2.5:free"
+      "upstream": "kwaipilot/kat-coder-pro-v2.5:free",
+      "authless": true
     },
     "zenmux": {
       "upstream": "kuaishou/kat-coder-pro-v2.5"
