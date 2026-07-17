@@ -1,0 +1,13 @@
+{
+  "providers": [
+    "command_code"
+  ],
+  "providerConfig": {
+    "command_code": {
+      "upstream": "moonshotai/Kimi-K3",
+      "allowedTiers": [
+        "go"
+      ]
+    }
+  }
+}
