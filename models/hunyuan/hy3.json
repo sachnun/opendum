@@ -6,6 +6,7 @@
   ],
   "aliases": [
     "hy3-preview",
+    "tencent-Hy3-preview",
     "tencent/Hy3-preview"
   ],
   "ignored": false,
@@ -21,7 +22,7 @@
       "upstream": "tencent/hy3:free"
     },
     "siliconflow": {
-      "upstream": "tencent/Hy3-preview"
+      "upstream": "tencent/Hy3"
     }
   }
 }

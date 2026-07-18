@@ -1,6 +1,7 @@
 {
   "providers": [
-    "command_code"
+    "command_code",
+    "siliconflow"
   ],
   "providerConfig": {
     "command_code": {
@@ -8,6 +9,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "siliconflow": {
+      "upstream": "moonshotai/Kimi-K3"
     }
   }
 }
