@@ -1,6 +1,5 @@
 {
   "providers": [
-    "openrouter",
     "siliconflow"
   ],
   "aliases": [
@@ -21,9 +20,6 @@
     "code": true
   },
   "providerConfig": {
-    "openrouter": {
-      "upstream": "qwen/qwen3-coder:free"
-    },
     "siliconflow": {
       "upstream": "Qwen/Qwen3-Coder-30B-A3B-Instruct"
     }

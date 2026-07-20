@@ -1,20 +1,13 @@
 {
-  "providers": [
-    "openrouter"
+  "providers": [],
+  "aliases": [
+    "hermes-3-llama-3.1-405b",
+    "nousresearch/hermes-3-llama-3.1-405b:free"
   ],
   "ignored": true,
   "meta": {
     "reasoning": false,
     "toolCall": false,
     "vision": false
-  },
-  "providerConfig": {
-    "openrouter": {
-      "upstream": "nousresearch/hermes-3-llama-3.1-405b:free"
-    }
-  },
-  "aliases": [
-    "hermes-3-llama-3.1-405b",
-    "nousresearch/hermes-3-llama-3.1-405b:free"
-  ]
+  }
 }
