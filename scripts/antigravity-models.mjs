@@ -8,8 +8,7 @@
  * from display names instead of a fixed model table so new Gemini/Claude/GPT-OSS
  * versions can flow through without updating a hardcoded list.
  *
- * Source: https://antigravity.google/assets/docs/agent/models.md
- * Rendered at: https://antigravity.google/docs/models
+ * Source: https://antigravity.google/docs/models
  *
  * Usage:
  *   node scripts/antigravity-models.mjs
@@ -27,8 +26,7 @@ import { stripParamInfoKey } from "./lib/clean-key.mjs";
 // Configuration
 // ---------------------------------------------------------------------------
 
-const ANTIGRAVITY_MODELS_URL =
-  "https://antigravity.google/assets/docs/antigravity-2-0/models.md";
+const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -63,10 +61,13 @@ const GEMINI_PRO_BUDGETS = {
 };
 
 const GEMINI_35_FLASH_LEVELS = ["minimal", "low", "medium", "high"];
+const GEMINI_36_FLASH_LEVELS = ["low", "medium", "high"];
+const GEMINI_31_PRO_LEVELS = ["low", "medium", "high"];
 
 // Official docs expose user-facing labels, but cloudcode-pa v1internal can use
 // backend IDs that are not derivable from the display name alone.
 const DOCUMENTED_BACKEND_OVERRIDES = new Map([
+  ["Gemini 3.6 Flash", { key: "gemini-3.6-flash", upstream: "gemini-3.6-flash-medium" }],
   ["Gemini 3.5 Flash", { key: "gemini-3.5-flash", upstream: "gemini-3.5-flash-medium" }],
   ["Claude Sonnet 4.6 (thinking)", { key: "claude-sonnet-4-6", upstream: "claude-sonnet-4-6" }],
   ["Claude Opus 4.6 (thinking)", { key: "claude-opus-4-6", upstream: "claude-opus-4-6-thinking" }],
@@ -74,7 +75,9 @@ const DOCUMENTED_BACKEND_OVERRIDES = new Map([
 ]);
 
 const MODEL_ALIASES_BY_KEY = new Map([
+  ["gemini-3.6-flash", GEMINI_36_FLASH_LEVELS.map((level) => `gemini-3.6-flash-${level}`)],
   ["gemini-3.5-flash", GEMINI_35_FLASH_LEVELS.map((level) => `gemini-3.5-flash-${level}`)],
+  ["gemini-3.1-pro", GEMINI_31_PRO_LEVELS.map((level) => `gemini-3.1-pro-${level}`)],
 ]);
 
 // Models can opt in/out by editing their JSON file directly. There is no
@@ -103,6 +106,33 @@ const MANAGED_PROVIDER_CONFIG_KEYS = [
 // ---------------------------------------------------------------------------
 // Antigravity docs parsing
 // ---------------------------------------------------------------------------
+
+function htmlToReasoningModelMarkdown(html) {
+  const sectionMatch = html.match(
+    /<h2[^>]*id=["']reasoning-model["'][^>]*>[\s\S]*?<\/h2>\s*([\s\S]*?)(?:<h2[^>]*>|$)/i
+  );
+  if (!sectionMatch) {
+    return "";
+  }
+
+  const tableMatch = sectionMatch[1].match(/<table[^>]*>([\s\S]*?)<\/table>/i);
+  if (!tableMatch) {
+    return "";
+  }
+
+  const rows = [];
+  const trMatches = tableMatch[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
+  for (const tr of trMatches) {
+    const cells = [...tr[1].matchAll(/<(th|td)[^>]*>([\s\S]*?)<\/\1>/gi)]
+      .map((m) => m[2].replace(/<[^>]+>/g, "").trim())
+      .filter(Boolean);
+    if (cells.length > 0) {
+      rows.push(`| ${cells.join(" | ")} |`);
+    }
+  }
+
+  return `## Reasoning Model\n\n${rows.join("\n")}\n`;
+}
 
 function parseReasoningModelNames(markdown) {
   const section = markdown.match(/## Reasoning Model\s+([\s\S]*?)(?:\n## |$)/);
@@ -499,7 +529,23 @@ function syncJson(modelMap, providerConfigByModel, dryRun) {
     const wouldUpdate = [];
     for (const [key, upstream] of modelMap.entries()) {
       const existing = findModelEntry(index, key);
-      if (!existing || !(existing.data.providers || []).includes(PROVIDER_NAME)) {
+      if (!existing) {
+        // Don't propose adding antigravity to an existing model that is
+        // ignored (e.g. an alias-only entry).
+        const ignored = Object.values(index).find(
+          (entry) =>
+            entry.data.ignored &&
+            (entry.fileId === key ||
+              entry.id === key ||
+              (entry.data.aliases || []).includes(key))
+        );
+        if (!ignored) {
+          wouldAdd.push(key);
+        }
+        continue;
+      }
+
+      if (!(existing.data.providers || []).includes(PROVIDER_NAME)) {
         wouldAdd.push(key);
         continue;
       }
@@ -535,6 +581,7 @@ function syncJson(modelMap, providerConfigByModel, dryRun) {
     providerConfigByModel,
     managedProviderConfigKeys: MANAGED_PROVIDER_CONFIG_KEYS,
   });
+  return { ...result, modelMap };
 }
 
 // ---------------------------------------------------------------------------
@@ -634,7 +681,7 @@ async function main() {
     throw error;
   }
 
-  const displayNames = parseReasoningModelNames(markdown);
+  const displayNames = parseReasoningModelNames(htmlToReasoningModelMarkdown(markdown));
   const { modelMap, discovered } = buildDiscoveredModelMap(displayNames);
   const documentedModelKeys = new Set(modelMap.keys());
   const extras = mergePreservedExtras(modelMap);
