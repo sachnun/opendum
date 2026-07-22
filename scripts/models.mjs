@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -34,7 +34,7 @@ const REFRESHED_PROVIDERS = ["antigravity", "codex", "command_code", "kilo_code"
 function runScript(scriptName) {
   const scriptPath = resolve(scriptDir, scriptName);
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [scriptPath], {
+    const child = spawn("bun", ["run", scriptPath], {
       stdio: "inherit",
     });
 

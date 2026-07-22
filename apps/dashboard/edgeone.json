@@ -1,7 +1,6 @@
 {
   "name": "opendum",
   "installCommand": "true",
-  "buildCommand": "npm run build",
-  "outputDirectory": ".edgeone/assets",
-  "nodeVersion": "22.11.0"
+  "buildCommand": "bun run build",
+  "outputDirectory": ".edgeone/assets"
 }

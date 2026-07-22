@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 /**
  * Antigravity model discovery script.
@@ -11,8 +11,8 @@
  * Source: https://antigravity.google/docs/models
  *
  * Usage:
- *   node scripts/antigravity-models.mjs
- *   node scripts/antigravity-models.mjs --dry-run
+ *   bun scripts/antigravity-models.mjs
+ *   bun scripts/antigravity-models.mjs --dry-run
  */
 
 import { readFileSync, writeFileSync } from "node:fs";

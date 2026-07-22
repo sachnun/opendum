@@ -2,21 +2,20 @@
   "name": "opendum",
   "version": "0.2.0",
   "private": true,
-  "packageManager": "npm@11.14.1",
   "workspaces": [
     "apps/*"
   ],
   "scripts": {
-    "dev:dashboard": "npm run dev --workspace @opendum/dashboard",
+    "dev:dashboard": "bun run --cwd apps/dashboard dev",
     "dev:proxy": "TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy",
-    "dev": "(npm run dev:dashboard & npm run dev:proxy)",
-    "build:dashboard": "npm run build --workspace @opendum/dashboard",
+    "dev": "(bun run dev:dashboard & bun run dev:proxy)",
+    "build:dashboard": "bun run --cwd apps/dashboard build",
     "build:proxy": "go -C apps/proxy build ./...",
-    "build": "npm run build:dashboard && npm run build:proxy",
-    "db:push": "npm run db:push --workspace @opendum/dashboard",
-    "db:studio": "npm run db:studio --workspace @opendum/dashboard",
-    "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./...",
-    "models:refresh": "node scripts/models.mjs"
+    "build": "bun run build:dashboard && bun run build:proxy",
+    "db:push": "bun run --cwd apps/dashboard db:push",
+    "db:studio": "bun run --cwd apps/dashboard db:studio",
+    "lint": "bun run --cwd apps/dashboard lint && go -C apps/proxy test ./...",
+    "models:refresh": "bun scripts/models.mjs"
   },
   "devDependencies": {
     "edgeone": "^1.6.13",
