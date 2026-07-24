@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "opencode",
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "inclusionai/ling-3.0-flash:free",
+      "authless": true
+    },
+    "opencode": {
+      "upstream": "ling-3.0-flash-free"
+    },
+    "openrouter": {
+      "upstream": "inclusionai/ling-3.0-flash:free"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "providers": [
+    "command_code"
+  ],
+  "providerConfig": {
+    "command_code": {
+      "upstream": "tencent/hy3-paid",
+      "allowedTiers": [
+        "go"
+      ]
+    }
+  }
+}

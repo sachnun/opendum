@@ -1,10 +1,3 @@
 {
-  "providers": [
-    "zenmux"
-  ],
-  "providerConfig": {
-    "zenmux": {
-      "upstream": "deepseek/deepseek-reasoner"
-    }
-  }
+  "providers": []
 }

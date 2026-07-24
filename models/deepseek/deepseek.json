@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "zenmux"
-  ],
+  "providers": [],
   "aliases": [
     "deepseek-3.2",
     "deepseek-ai-DeepSeek-V3",
@@ -21,10 +19,5 @@
   "ignored": true,
   "meta": {
     "status": "experimental"
-  },
-  "providerConfig": {
-    "zenmux": {
-      "upstream": "deepseek/deepseek-chat"
-    }
   }
 }
