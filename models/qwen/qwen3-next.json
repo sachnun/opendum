@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "qwen3-next-80b-a3b-instruct",
     "qwen-qwen3-next-80b-a3b-instruct",
@@ -18,10 +16,5 @@
     "toolCall": true,
     "vision": false,
     "type": "instruct"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "qwen/qwen3-next-80b-a3b-instruct"
-    }
   }
 }

@@ -1,6 +1,5 @@
 {
   "providers": [
-    "nvidia_nim",
     "command_code"
   ],
   "meta": {
@@ -14,9 +13,6 @@
       "allowedTiers": [
         "go"
       ]
-    },
-    "nvidia_nim": {
-      "upstream": "minimaxai/minimax-m2.7"
     }
   }
 }

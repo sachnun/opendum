@@ -1,6 +1,5 @@
 {
   "providers": [
-    "nvidia_nim",
     "siliconflow",
     "command_code",
     "zenmux"
@@ -16,9 +15,6 @@
       "allowedTiers": [
         "go"
       ]
-    },
-    "nvidia_nim": {
-      "upstream": "stepfun-ai/step-3.5-flash"
     },
     "siliconflow": {
       "upstream": "stepfun-ai/Step-3.5-Flash"

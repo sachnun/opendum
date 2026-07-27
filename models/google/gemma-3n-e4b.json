@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "gemma-3n-e4b-it",
     "google-gemma-3n-e4b-it",
@@ -13,10 +11,5 @@
     "toolCall": true,
     "vision": true,
     "type": "instruct"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "google/gemma-3n-e4b-it"
-    }
   }
 }
