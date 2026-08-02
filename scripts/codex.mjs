@@ -43,8 +43,9 @@ async function fetchCodexModels() {
 function filterModels(models) {
   return models.filter((m) => {
     if (!m.slug || typeof m.slug !== "string") return false;
-    if (m.visibility && m.visibility !== "list") return false;
     if (m.supported_in_api === false) return false;
+    // Visibility "hide" models (e.g. gpt-5.4 during staged rollout) are still
+    // valid ChatGPT-compatible Codex models once whitelisted below.
     if (!CHATGPT_COMPATIBLE_CODEX_MODELS.has(m.slug)) return false;
     return true;
   });
@@ -61,11 +62,13 @@ function buildModelMap(models) {
     map.set(model.slug, model.slug);
   }
 
-  // GPT-5.5 is documented as rolling out to Codex ahead of the public models
-  // feed. Keep it in the local registry so ChatGPT-backed Codex accounts can
-  // use it during the rollout window.
-  if (!map.has("gpt-5.5")) {
-    map.set("gpt-5.5", "gpt-5.5");
+  // Some models roll out to Codex ahead of the public models feed (or get
+  // dropped from it). Keep every documented ChatGPT-compatible model in the
+  // local registry so ChatGPT-backed Codex accounts can still use them.
+  for (const slug of CHATGPT_COMPATIBLE_CODEX_MODELS) {
+    if (!map.has(slug)) {
+      map.set(slug, slug);
+    }
   }
 
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
