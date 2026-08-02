@@ -7,8 +7,16 @@
     "./db": "./src/db/index.ts",
     "./registry": "./src/registry/plugin.ts"
   },
+  "scripts": {
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.3.0",
     "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "drizzle-kit": "^0.31.10"
   }
 }

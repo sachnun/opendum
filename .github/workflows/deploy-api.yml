@@ -7,7 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-api.yml
       - apps/api/**
-      - apps/shared/**
+      - packages/shared/**
       - models/**
       - package.json
       - package-lock.json

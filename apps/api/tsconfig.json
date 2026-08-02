@@ -3,8 +3,8 @@
   "compilerOptions": {
     "moduleResolution": "bundler",
     "paths": {
-      "@opendum/shared/db": ["../shared/src/db/index.ts"],
-      "@opendum/shared/registry": ["../shared/src/registry/plugin.ts"]
+      "@opendum/shared/db": ["../../packages/shared/src/db/index.ts"],
+      "@opendum/shared/registry": ["../../packages/shared/src/registry/plugin.ts"]
     }
   },
   "include": ["src"]

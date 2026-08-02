@@ -3,7 +3,7 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json ./
-COPY apps/shared/package.json apps/shared/package.json
+COPY packages/shared/package.json packages/shared/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY apps/proxy/package.json apps/proxy/package.json
 COPY apps/web/package.json apps/web/package.json
