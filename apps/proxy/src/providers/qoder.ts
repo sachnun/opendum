@@ -228,7 +228,7 @@ function qoderTruncate(value: string, limit: number): string {
   return runes.slice(0, limit).join("");
 }
 
-function buildQoderAuthHeaders(body: Buffer, requestURL: string, uid: string, machineID: string, authToken: string): Record<string, string> {
+export function buildQoderAuthHeaders(body: Buffer, requestURL: string, uid: string, machineID: string, authToken: string): Record<string, string> {
   const aesKey = randomQoderAESKey();
   const infoB64 = qoderAESEncryptCBC(JSON.stringify({ uid, security_oauth_token: authToken, name: "", aid: "", email: "" }), aesKey);
   const cosyKey = qoderRSAEncrypt(aesKey);
@@ -269,7 +269,7 @@ function buildQoderAuthHeaders(body: Buffer, requestURL: string, uid: string, ma
   };
 }
 
-function qoderSigPath(requestURL: string): string {
+export function qoderSigPath(requestURL: string): string {
   let path = requestURL;
   const schemeIdx = requestURL.indexOf("://");
   if (schemeIdx >= 0) {

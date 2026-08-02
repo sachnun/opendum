@@ -16,10 +16,20 @@ import { openAIErrorBody, validateInternalSignature } from "./errors.js";
 import { InternalRelay } from "./internal.js";
 import { streamFromAsyncIterable } from "./providers/http.js";
 
-export function createApp(options: { db?: ProxyDB | null; redis?: ReturnType<typeof openRedis> | null; secret?: string; modelsDir?: string; registry?: Registry } = {}) {
-  const cfg = loadConfig();
-  const db = options.db ?? openDb(cfg.databaseUrl);
-  const redis = options.redis ?? openRedis(cfg.redisUrl);
+export interface CreateAppOptions {
+  db?: ProxyDB | null;
+  redis?: ReturnType<typeof openRedis> | null;
+  secret?: string;
+  modelsDir?: string;
+  registry?: Registry;
+  config?: ReturnType<typeof loadConfig>;
+  tokenRefreshIntervalSeconds?: number;
+}
+
+export function createApp(options: CreateAppOptions = {}) {
+  const cfg = options.config ?? loadConfig();
+  const db = options.db !== undefined ? options.db : openDb(cfg.databaseUrl);
+  const redis = options.redis !== undefined ? options.redis : openRedis(cfg.redisUrl);
   const secret = options.secret ?? cfg.betterAuthSecret;
   const registry = options.registry ?? Registry.load(options.modelsDir ?? cfg.modelsDir);
 

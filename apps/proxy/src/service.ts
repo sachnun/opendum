@@ -239,6 +239,11 @@ export class ProxyService {
 
     if (parsed.stream) {
       const writer = new ControllerStreamWriter();
+      // Pre-set stream headers: handlers may override, but headers must be
+      // known before the response body generator starts executing.
+      writer.header("content-type", "text/event-stream");
+      writer.header("cache-control", "no-cache");
+      writer.header("connection", "keep-alive");
       responseCtx.writer = writer;
       let handlerErr: Error | null = null;
       const svc: ProxyService = this;
