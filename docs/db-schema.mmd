@@ -16,6 +16,8 @@ erDiagram
         timestamp expiresAt
         text ipAddress
         text userAgent
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     account {
@@ -25,7 +27,13 @@ erDiagram
         text providerId
         text accessToken
         text refreshToken
+        timestamp accessTokenExpiresAt
+        timestamp refreshTokenExpiresAt
+        text scope
+        text idToken
         text password
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     verification {
@@ -33,30 +41,36 @@ erDiagram
         text identifier
         text value
         timestamp expiresAt
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     user_point_balance {
         text userId PK, FK
         integer balance "default 15"
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     user_sharing_setting {
         text userId PK, FK
         boolean enabled
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     disabled_model {
         text id PK
         text userId FK
-        text model
-        unique (userId, model)
+        text model "unique userId + model"
+        timestamp createdAt
     }
 
     pinned_provider {
         text id PK
         text userId FK
-        text providerKey
-        unique (userId, providerKey)
+        text providerKey "unique userId + providerKey"
+        timestamp createdAt
     }
 
     provider_account {
@@ -64,36 +78,49 @@ erDiagram
         text userId FK
         text provider
         text name
-        text accessToken PK2
-        text refreshToken PK2
+        text accessToken "encrypted AES-256"
+        text refreshToken "encrypted AES-256"
         timestamp expiresAt
         text apiKey
         text projectId
         text tier
-        text email
+        text accountId
+        text email "unique userId + provider + email"
+        boolean isActive
+        timestamp disabledUntil
+        timestamp lastUsedAt
         integer requestCount
         integer errorCount
         integer consecutiveErrors
-        integer successCount
+        timestamp lastErrorAt
+        integer lastErrorCode
+        timestamp lastRecoveredByRotationAt
         text status
-        timestamp disabledUntil
-        unique (userId, provider, email)
+        timestamp statusChangedAt
+        integer successCount
+        timestamp lastSuccessAt
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     provider_account_model_health {
         text id PK
         text providerAccountId FK
-        text model
+        text model "unique accountId + model"
         integer consecutiveErrors
         text status
-        unique (providerAccountId, model)
+        timestamp statusChangedAt
+        timestamp lastErrorAt
+        integer lastErrorCode
+        timestamp lastSuccessAt
+        timestamp createdUpdated
     }
 
     provider_account_disabled_model {
         text id PK
         text providerAccountId FK
-        text model
-        unique (providerAccountId, model)
+        text model "unique accountId + model"
+        timestamp createdAt
     }
 
     proxy_api_key {
@@ -102,21 +129,27 @@ erDiagram
         text keyHash UK
         text keyPreview
         text encryptedKey
-        text modelAccessMode
-        text accountAccessMode
+        text name
+        text modelAccessMode "all or list"
+        text accountAccessMode "all or list"
         boolean roamingEnabled
         boolean isActive
         timestamp expiresAt
+        timestamp lastUsedAt
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     proxy_api_key_rate_limit {
         text id PK
         text apiKeyId FK
         text target
+        text targetType "default model"
         integer perMinute
         integer perHour
         integer perDay
-        unique (apiKeyId, target, targetType)
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     usage_log {
@@ -129,6 +162,7 @@ erDiagram
         integer outputTokens
         integer statusCode
         integer duration
+        timestamp createdAt
     }
 
     point_transaction {
@@ -137,26 +171,27 @@ erDiagram
         integer amount
         text type
         integer balanceAfter
-        text idempotencyKey UK
+        text idempotencyKey UK "anti double-charge"
         text usageLogId FK
+        timestamp createdAt
     }
 
     user ||--o{ session : "sessions"
     user ||--o{ account : "accounts"
-    user ||--o| user_point_balance : "balance 1:1"
-    user ||--o| user_sharing_setting : "settings 1:1"
-    user ||--o{ disabled_model : "disabled models"
-    user ||--o{ pinned_provider : "pinned providers"
+    user ||--o| user_point_balance : "points balance 11"
+    user ||--o| user_sharing_setting : "settings 11"
+    user ||--o{ disabled_model : "model disabled"
+    user ||--o{ pinned_provider : "providers pinned"
     user ||--o{ provider_account : "owns"
     user ||--o{ proxy_api_key : "owns"
     user ||--o{ usage_log : "usage"
     user ||--o{ point_transaction : "points"
 
     provider_account ||--o{ provider_account_model_health : "health per model"
-    provider_account ||--o{ provider_account_disabled_model : "disabled models"
-    provider_account ||--o{ usage_log : "served requests"
+    provider_account ||--o{ provider_account_disabled_model : "models disabled"
+    provider_account ||--o{ usage_log : "served"
 
     proxy_api_key ||--o{ proxy_api_key_rate_limit : "rate limits"
     proxy_api_key ||--o{ usage_log : "key used"
 
-    usage_log ||--o{ point_transaction : "billed to"
+    usage_log ||--o{ point_transaction : "billed via"
