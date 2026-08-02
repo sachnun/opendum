@@ -115,7 +115,7 @@ export async function getApiKeyOptions(userId: string) {
     };
   } catch (error) {
     console.error("Failed to load API key options:", error);
-    throw new Error("Failed to load API key options");
+    throw new Error("Failed to load API key options", { cause: error });
   }
 }
 
@@ -174,7 +174,7 @@ export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {
     }));
   } catch (error) {
     console.error("Failed to list API keys:", error);
-    throw new Error("Failed to list API keys");
+    throw new Error("Failed to list API keys", { cause: error });
   }
 }
 

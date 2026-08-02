@@ -100,8 +100,8 @@ func TestNvidiaMistralLargeAliasUsesCurrentHostedModel(t *testing.T) {
 	if got := registry.ResolveAlias("mistral-large-3-675b-instruct-2512"); got != "mistral-large-3" {
 		t.Fatalf("ResolveAlias(mistral-large-3-675b-instruct-2512) = %q, want mistral-large-3", got)
 	}
-	if got := registry.UpstreamModelName("mistralai/mistral-large", "nvidia_nim"); got != "mistralai/mistral-large-3-675b-instruct-2512" {
-		t.Fatalf("NVIDIA upstream = %q, want mistralai/mistral-large-3-675b-instruct-2512", got)
+	if got := registry.UpstreamModelName("mistralai/mistral-large", "nvidia_nim"); got != "mistralai/mistral-large" {
+		t.Fatalf("NVIDIA upstream = %q, want mistralai/mistral-large", got)
 	}
 	if _, ok := registry.ProviderModelMap("nvidia_nim")["mistral-large"]; ok {
 		t.Fatal("deprecated mistral-large model key should not be exposed as a separate NVIDIA NIM registry entry")

@@ -48,7 +48,3 @@ export function getDashboardRoleForEmail(email: string | null | undefined): Dash
 
   return getMaintenerEmails().has(normalizeEmail(email)) ? MAINTENER_ROLE : USER_ROLE;
 }
-
-function isMaintenerEmail(email: string | null | undefined): boolean {
-  return getDashboardRoleForEmail(email) === MAINTENER_ROLE;
-}

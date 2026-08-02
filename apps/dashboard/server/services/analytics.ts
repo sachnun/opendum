@@ -262,6 +262,6 @@ export async function getUsageRows(userId: string, input?: z.infer<typeof analyt
       .limit(100);
   } catch (error) {
     console.error("Failed to fetch usage rows:", error);
-    throw new Error("Failed to fetch usage rows");
+    throw new Error("Failed to fetch usage rows", { cause: error });
   }
 }

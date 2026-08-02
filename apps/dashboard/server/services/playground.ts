@@ -95,6 +95,6 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
     };
   } catch (error) {
     console.error("Failed to load playground options:", error);
-    throw new Error("Failed to load playground options");
+    throw new Error("Failed to load playground options", { cause: error });
   }
 }

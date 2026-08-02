@@ -522,7 +522,7 @@ export async function listAccounts(userId: string) {
     return accounts.map((account) => ({ ...withEffectiveActive(account, now), unhealthyCount: account.consecutiveErrors }));
   } catch (error) {
     console.error("Failed to list accounts:", error);
-    throw new Error("Failed to list accounts");
+    throw new Error("Failed to list accounts", { cause: error });
   }
 }
 
@@ -533,7 +533,7 @@ export async function listAccountsByProvider(userId: string, input: z.infer<type
     return accounts.map((account) => ({ ...withEffectiveActive(account, now), unhealthyCount: account.consecutiveErrors }));
   } catch (error) {
     console.error("Failed to list provider accounts:", error);
-    throw new Error("Failed to list provider accounts");
+    throw new Error("Failed to list provider accounts", { cause: error });
   }
 }
 
@@ -594,7 +594,7 @@ export async function getAccountOverview(userId: string, options: AccountOvervie
     return { summaries, pinnedProviders, cursor };
   } catch (error) {
     console.error("Failed to load account summaries:", error);
-    throw new Error("Failed to load account summaries");
+    throw new Error("Failed to load account summaries", { cause: error });
   }
 }
 
@@ -632,7 +632,7 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
     };
   } catch (error) {
     console.error("Failed to ping account summaries:", error);
-    throw new Error("Failed to ping account summaries");
+    throw new Error("Failed to ping account summaries", { cause: error });
   }
 }
 
@@ -768,7 +768,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     return { ...detail, cursor };
   } catch (error) {
     console.error("Failed to load provider account detail:", error);
-    throw new Error("Failed to load provider account detail");
+    throw new Error("Failed to load provider account detail", { cause: error });
   }
 }
 
@@ -785,7 +785,7 @@ export async function getAccountStats(userId: string, input: z.infer<typeof acco
     return buildStatsDelta(await buildAccountStats(userId, ownedAccountIds), input.cursors);
   } catch (error) {
     console.error("Failed to load account stats:", error);
-    throw new Error("Failed to load account stats");
+    throw new Error("Failed to load account stats", { cause: error });
   }
 }
 

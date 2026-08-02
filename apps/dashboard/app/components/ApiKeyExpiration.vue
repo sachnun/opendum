@@ -18,8 +18,8 @@ const dashboardApi = useDashboardApi();
 const open = ref(false);
 const isSaving = ref(false);
 const expiresAt = ref<Date | null>(props.initialExpiresAt ? new Date(props.initialExpiresAt) : null);
-const draftDate = ref<any>(toCalendarDate(expiresAt.value) as DateValue | undefined);
-const draftTime = ref<any>(toTimeValue(expiresAt.value) as Time);
+const draftDate = ref<DateValue | undefined>(toCalendarDate(expiresAt.value));
+const draftTime = ref<Time>(toTimeValue(expiresAt.value));
 const errorMessage = ref("");
 
 watch(open, (value) => {

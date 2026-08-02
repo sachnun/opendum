@@ -1,3 +1,4 @@
+import type { Plugin } from "vite";
 import { readdirSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -169,7 +170,7 @@ export default defineNuxtConfig({
     esbuild: {
       legalComments: "none",
     },
-    plugins: [tailwindcss() as any],
+    plugins: [tailwindcss() as unknown as Plugin],
   },
   typescript: {
     strict: true,

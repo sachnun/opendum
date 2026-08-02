@@ -55,7 +55,7 @@ export async function listModels(userId: string, options: { includeStats?: boole
     return result;
   } catch (error) {
     console.error("Failed to list models:", error);
-    throw new Error("Failed to list models");
+    throw new Error("Failed to list models", { cause: error });
   }
 }
 
@@ -71,7 +71,7 @@ export async function searchModels(userId: string) {
     }));
   } catch (error) {
     console.error("Failed to search models:", error);
-    throw new Error("Failed to search models");
+    throw new Error("Failed to search models", { cause: error });
   }
 }
 
@@ -98,7 +98,7 @@ export async function getModelStats(userId: string, input: z.infer<typeof modelS
     };
   } catch (error) {
     console.error("Failed to load model stats:", error);
-    throw new Error("Failed to load model stats");
+    throw new Error("Failed to load model stats", { cause: error });
   }
 }
 
@@ -112,7 +112,7 @@ export async function getModelFamilyCounts(userId: string) {
     }, {});
   } catch (error) {
     console.error("Failed to count model families:", error);
-    throw new Error("Failed to count model families");
+    throw new Error("Failed to count model families", { cause: error });
   }
 }
 

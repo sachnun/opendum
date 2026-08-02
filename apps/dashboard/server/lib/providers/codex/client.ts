@@ -243,7 +243,7 @@ function parseChatGPTSessionPayload(sessionJson: string): ChatGPTSessionPayload 
     return record as ChatGPTSessionPayload;
   } catch (error) {
     if (error instanceof SyntaxError) {
-      throw new Error("Invalid ChatGPT session JSON. Copy the full response from https://chatgpt.com/api/auth/session.");
+      throw new Error("Invalid ChatGPT session JSON. Copy the full response from https://chatgpt.com/api/auth/session.", { cause: error });
     }
     throw error;
   }
