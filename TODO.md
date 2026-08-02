@@ -57,7 +57,7 @@
 - [x] `routes/`: chat.ts, messages.ts, responses.ts (from `routes_*.go`)
 - [x] `service.ts` wiring (from `service.go`)
 - [x] `index.ts` + `internal.ts` + `errors.ts`: chi routes → Hono, HMAC signature (from `api/server.go`, `internal.go`, `errors.go`)
-- [x] Port 18 Go test files → vitest (attempts, load_balancer, quota, token_refresher, routes_messages, providers, auth, registry, sessionaffinity, internal)
+- [x] Port 18 Go test files → vitest (attempts, load_balancer, quota, token_refresher, routes_messages, providers, auth, registry, sessionaffinity, internal) — 158 tests green
 - [x] Parity: same input → same JSON vs Go (load balancer, quota, points, streaming paths)
 - [x] Golden tests: assert identical JSON bodies, status codes, error messages, SSE chunk sequence vs Phase 0 snapshots
 
