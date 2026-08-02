@@ -9,7 +9,7 @@ on:
       - apps/dashboard/**
       - models/**
       - package.json
-      - bun.lock
+      - package-lock.json
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -40,14 +40,18 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: bun install
+        run: npm ci
 
       - name: Deploy dashboard to EdgeOne Pages
         working-directory: apps/dashboard
-        run: bun run deploy -- -t "$EDGEONE_API_TOKEN" -e production
+        run: npm run deploy -- -t "$EDGEONE_API_TOKEN" -e production
         env:
           EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}

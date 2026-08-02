@@ -12,17 +12,21 @@ jobs:
   refresh-models:
     name: Refresh Provider Models
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Refresh provider models
-        run: bun run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
+        run: npm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
 
       - name: Build commit message
         id: commit_msg

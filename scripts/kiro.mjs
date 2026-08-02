@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 /**
  * Kiro model discovery script.
@@ -12,8 +12,8 @@
  * model IDs that the Kiro API may not accept for all accounts/regions.
  *
  * Usage:
- *   bun scripts/kiro.mjs
- *   bun scripts/kiro.mjs --dry-run
+ *   node scripts/kiro.mjs
+ *   node scripts/kiro.mjs --dry-run
  */
 
 import { dirname, resolve } from "node:path";

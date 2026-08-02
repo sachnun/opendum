@@ -2,20 +2,21 @@
   "name": "opendum",
   "version": "0.2.0",
   "private": true,
+  "packageManager": "npm@11.14.1",
   "workspaces": [
     "apps/*"
   ],
   "scripts": {
-    "dev:dashboard": "bun run --cwd apps/dashboard dev",
+    "dev:dashboard": "npm run dev --workspace @opendum/dashboard",
     "dev:proxy": "TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy",
-    "dev": "(bun run dev:dashboard & bun run dev:proxy)",
-    "build:dashboard": "bun run --cwd apps/dashboard build",
+    "dev": "(npm run dev:dashboard & npm run dev:proxy)",
+    "build:dashboard": "npm run build --workspace @opendum/dashboard",
     "build:proxy": "go -C apps/proxy build ./...",
-    "build": "bun run build:dashboard && bun run build:proxy",
-    "db:push": "bun run --cwd apps/dashboard db:push",
-    "db:studio": "bun run --cwd apps/dashboard db:studio",
-    "lint": "bun run --cwd apps/dashboard lint && go -C apps/proxy test ./...",
-    "models:refresh": "bun scripts/models.mjs"
+    "build": "npm run build:dashboard && npm run build:proxy",
+    "db:push": "npm run db:push --workspace @opendum/dashboard",
+    "db:studio": "npm run db:studio --workspace @opendum/dashboard",
+    "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./...",
+    "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {
     "edgeone": "^1.6.13",
@@ -26,5 +27,16 @@
     "typescript-eslint": "^8.62.1",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.62.1"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.5": true,
+    "esbuild@0.27.7": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.19.12": true,
+    "esbuild@0.28.1": true,
+    "unrs-resolver@1.12.2": true,
+    "@parcel/watcher@2.5.6": true,
+    "vue-demi@0.14.10": true
   }
 }

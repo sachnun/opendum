@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 /**
  * Sync Cloudflare Workers AI model availability into JSON registry.
