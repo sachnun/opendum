@@ -1,0 +1,162 @@
+erDiagram
+    user {
+        text id PK
+        text name
+        text email UK
+        boolean emailVerified
+        text image
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    session {
+        text id PK
+        text userId FK
+        text token UK
+        timestamp expiresAt
+        text ipAddress
+        text userAgent
+    }
+
+    account {
+        text id PK
+        text userId FK
+        text accountId
+        text providerId
+        text accessToken
+        text refreshToken
+        text password
+    }
+
+    verification {
+        text id PK
+        text identifier
+        text value
+        timestamp expiresAt
+    }
+
+    user_point_balance {
+        text userId PK, FK
+        integer balance "default 15"
+    }
+
+    user_sharing_setting {
+        text userId PK, FK
+        boolean enabled
+    }
+
+    disabled_model {
+        text id PK
+        text userId FK
+        text model
+        unique (userId, model)
+    }
+
+    pinned_provider {
+        text id PK
+        text userId FK
+        text providerKey
+        unique (userId, providerKey)
+    }
+
+    provider_account {
+        text id PK
+        text userId FK
+        text provider
+        text name
+        text accessToken PK2
+        text refreshToken PK2
+        timestamp expiresAt
+        text apiKey
+        text projectId
+        text tier
+        text email
+        integer requestCount
+        integer errorCount
+        integer consecutiveErrors
+        integer successCount
+        text status
+        timestamp disabledUntil
+        unique (userId, provider, email)
+    }
+
+    provider_account_model_health {
+        text id PK
+        text providerAccountId FK
+        text model
+        integer consecutiveErrors
+        text status
+        unique (providerAccountId, model)
+    }
+
+    provider_account_disabled_model {
+        text id PK
+        text providerAccountId FK
+        text model
+        unique (providerAccountId, model)
+    }
+
+    proxy_api_key {
+        text id PK
+        text userId FK
+        text keyHash UK
+        text keyPreview
+        text encryptedKey
+        text modelAccessMode
+        text accountAccessMode
+        boolean roamingEnabled
+        boolean isActive
+        timestamp expiresAt
+    }
+
+    proxy_api_key_rate_limit {
+        text id PK
+        text apiKeyId FK
+        text target
+        integer perMinute
+        integer perHour
+        integer perDay
+        unique (apiKeyId, target, targetType)
+    }
+
+    usage_log {
+        text id PK
+        text userId FK
+        text providerAccountId FK
+        text proxyApiKeyId FK
+        text model
+        integer inputTokens
+        integer outputTokens
+        integer statusCode
+        integer duration
+    }
+
+    point_transaction {
+        text id PK
+        text userId FK
+        integer amount
+        text type
+        integer balanceAfter
+        text idempotencyKey UK
+        text usageLogId FK
+    }
+
+    user ||--o{ session : "sessions"
+    user ||--o{ account : "accounts"
+    user ||--o| user_point_balance : "balance 1:1"
+    user ||--o| user_sharing_setting : "settings 1:1"
+    user ||--o{ disabled_model : "disabled models"
+    user ||--o{ pinned_provider : "pinned providers"
+    user ||--o{ provider_account : "owns"
+    user ||--o{ proxy_api_key : "owns"
+    user ||--o{ usage_log : "usage"
+    user ||--o{ point_transaction : "points"
+
+    provider_account ||--o{ provider_account_model_health : "health per model"
+    provider_account ||--o{ provider_account_disabled_model : "disabled models"
+    provider_account ||--o{ usage_log : "served requests"
+
+    proxy_api_key ||--o{ proxy_api_key_rate_limit : "rate limits"
+    proxy_api_key ||--o{ usage_log : "key used"
+
+    usage_log ||--o{ point_transaction : "billed to"
