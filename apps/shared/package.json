@@ -1,0 +1,14 @@
+{
+  "name": "@opendum/shared",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    "./db": "./src/db/index.ts",
+    "./registry": "./src/registry/plugin.ts"
+  },
+  "dependencies": {
+    "@paralleldrive/cuid2": "^3.3.0",
+    "drizzle-orm": "^0.45.2"
+  }
+}

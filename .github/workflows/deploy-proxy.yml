@@ -7,16 +7,15 @@ on:
     paths:
       - .github/workflows/deploy-proxy.yml
       - apps/proxy/**
+      - apps/shared/**
       - models/**
-  workflow_run:
-    workflows:
-      - Refresh Provider Models
-    types:
-      - completed
+      - package.json
+      - package-lock.json
   workflow_dispatch:
 
 permissions:
   contents: read
+  deployments: write
 
 concurrency:
   group: railway-proxy-${{ github.ref }}
@@ -24,68 +23,32 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     name: Proxy Railway
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment:
-      name: proxy
-    env:
-      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
-      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
-      RAILWAY_PROXY_SERVICE_ID: ${{ vars.RAILWAY_PROXY_SERVICE_ID }}
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      DEPLOY_DIR: .railway-deploy/proxy
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          ref: main
+          node-version: 22
+          cache: npm
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run proxy tests
+        run: npm run test:proxy
+
+      - name: Build proxy
+        run: npm run build:proxy
+
+      - name: Deploy to Railway
+        uses: bervProject/railway-deploy@v2.0.0
         with:
-          go-version-file: apps/proxy/go.mod
-          cache-dependency-path: apps/proxy/go.sum
-
-      - name: Test proxy
-        run: go -C apps/proxy test ./...
-
-      - name: Prepare Railway bundle
-        run: |
-          rm -rf "$DEPLOY_DIR"
-          mkdir -p "$DEPLOY_DIR/bin"
-          cp -R models "$DEPLOY_DIR/models"
-          cp apps/proxy/Dockerfile "$DEPLOY_DIR/Dockerfile"
-          cp apps/proxy/railway.json "$DEPLOY_DIR/railway.json"
-
-      - name: Build proxy binary
-        run: go -C apps/proxy build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o "../../$DEPLOY_DIR/bin/proxy" ./cmd/proxy
-        env:
-          CGO_ENABLED: 0
-          GOOS: linux
-          GOARCH: amd64
-
-      - name: Validate Railway configuration
-        run: |
-          test -n "$RAILWAY_PROJECT_ID"
-          test -n "$RAILWAY_ENVIRONMENT"
-          test -n "$RAILWAY_PROXY_SERVICE_ID"
-          test -n "$RAILWAY_TOKEN"
-          test -x "$DEPLOY_DIR/bin/proxy"
-          test -d "$DEPLOY_DIR/models"
-          test -f "$DEPLOY_DIR/Dockerfile"
-          test -f "$DEPLOY_DIR/railway.json"
-
-      - name: Install Railway CLI
-        run: bash <(curl -fsSL railway.com/install.sh) --yes
-
-      - name: Deploy proxy to Railway
-        run: >-
-          "$HOME/.railway/bin/railway" up .railway-deploy/proxy
-          --path-as-root
-          --ci
-          --project "$RAILWAY_PROJECT_ID"
-          --environment "$RAILWAY_ENVIRONMENT"
-          --service "$RAILWAY_PROXY_SERVICE_ID"
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          railway_service_name: opendum-proxy
+          service_directory: apps/proxy

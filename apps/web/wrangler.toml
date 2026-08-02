@@ -1,0 +1,13 @@
+name = "opendum-web"
+main = "dist/index.html"
+compatibility_date = "2025-07-15"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[assets.routing]
+single_page_application = true
+
+[observability]
+enabled = true

@@ -1,0 +1,51 @@
+name: Deploy API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-api.yml
+      - apps/api/**
+      - apps/shared/**
+      - models/**
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: railway-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: API Railway
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build api
+        run: npm run build:api
+
+      - name: Deploy to Railway
+        uses: bervProject/railway-deploy@v2.0.0
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          railway_service_name: opendum-api
+          service_directory: apps/api

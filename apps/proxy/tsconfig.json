@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "paths": {
+      "@opendum/shared/db": ["../shared/src/db/index.ts"],
+      "@opendum/shared/registry": ["../shared/src/registry/plugin.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}
