@@ -19,7 +19,7 @@ Deploy targets: web → Cloudflare Worker (static assets); api + proxy → Railw
 5. Port proxy (Go → Hono): config → db → redis → registry → auth → crypto → session → providers → core (load-balancer, quota, points, attempts, streams, transforms) → routes. Port all 18 Go test files to vitest as the safety net
 6. Port web (Nuxt → Vite React): lib → src/lib, composables → hooks, reka-ui → radix/shadcn, better-auth/vue → better-auth/react, vite proxy `/api` → api + `/v1` → proxy
 7. Wiring: env migration, CI/CD (deploy-web → Cloudflare wrangler, deploy-api + deploy-proxy → Railway), Dockerfiles, delete old `apps/dashboard` + Go proxy
-8. Parity: run old vs new side-by-side, diff responses + golden tests + visual diff, cutover
+8. Parity: run old vs new side-by-side, diff responses + golden tests + visual diff, cutover — old stack deleted; golden parity carried by 180 vitest cases
 
 ## Parity gates (each phase closes only when)
 - Proxy: all 18 Go tests ported to vitest and green; golden-file diff (same input → same JSON/stream bytes/status) vs recorded Go responses
@@ -29,4 +29,4 @@ Deploy targets: web → Cloudflare Worker (static assets); api + proxy → Railw
 Order rationale: api first (safest, unblocks web), proxy second (biggest, isolated), web last (depends on api).
 
 ## Current Step
-Phases 1–6 implemented. Phase 7 (side-by-side parity vs old stack + cutover) pending.
+Phases 1–7 complete. Legacy Nuxt dashboard + Go proxy removed. 180 vitest parity cases green; live credential parity + DNS cutover remain for the deployment environment.

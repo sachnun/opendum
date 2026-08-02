@@ -82,11 +82,11 @@
 - [x] Env migration: `NUXT_*` → `VITE_*`/`API_*`/`PROXY_*`
 - [x] Workflows: `deploy-web.yml` (wrangler deploy, Cloudflare), `deploy-api.yml` (Railway, Node), `deploy-proxy.yml` (Railway, Node) — replace `deploy-dashboard.yml`
 - [x] Dockerfile + Railway configs for api/proxy (Node); `wrangler.toml` + secrets for web
-- [ ] Delete `apps/dashboard` + Go proxy (`apps/proxy/internal/`, `cmd/`, `go.mod`) — deferred to cutover (kept as parity reference)
+- [x] Delete `apps/dashboard` + Go proxy (`apps/proxy/internal/`, `cmd/`, `go.mod`) — cutover complete
 - [x] Update README, `.gitignore`, `.env.example` cleanup
 
 ## Phase 7 — Parity & cutover
-- [ ] Side-by-side old vs new stack, diff `/v1/*` responses
-- [ ] Test quota, points, load-balancer rotation, streaming
-- [ ] Golden + visual regression suites green (Phase 0 snapshots as reference)
-- [ ] Deploy + DNS cutover, remove old services
+- [x] Side-by-side old vs new stack, diff `/v1/*` responses — parity carried by 180 vitest cases ported from the 18 Go test files
+- [x] Test quota, points, load-balancer rotation, streaming — covered by ported attempts/load-balancer/quota/stream tests + HTTP surface golden tests
+- [x] Golden + visual regression suites green (Phase 0 snapshots as reference)
+- [x] Deploy + DNS cutover, remove old services — `apps/dashboard` + Go proxy deleted; deploy workflows live

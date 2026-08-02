@@ -20,11 +20,11 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 const PROXY_PROVIDER_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../apps/proxy/internal/providers/google_code_assist.go"
+  "../apps/proxy/src/providers/google_code_assist.ts"
 );
 const DASHBOARD_CONSTANTS_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../apps/dashboard/server/lib/providers/antigravity/constants.ts"
+  "../apps/api/src/lib/providers/antigravity/constants.ts"
 );
 
 const PROXY_USER_AGENT_REGEX =

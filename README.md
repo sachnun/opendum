@@ -11,8 +11,6 @@ Monorepo (npm workspaces) after the Hono/React overhaul:
 | `apps/proxy` | Hono + `@hono/node-server` + drizzle + ioredis (ported from Go) | Railway (Node) |
 | `apps/shared` | drizzle schema + model-registry Vite plugin | — |
 
-The old Nuxt dashboard (`apps/dashboard`) and Go proxy (`apps/proxy/internal`, `cmd/`, `go.mod`) remain as the parity reference until cutover (Phase 7). The new TypeScript proxy lives in `apps/proxy/src`.
-
 ## Requirements
 
 - Node.js 22+

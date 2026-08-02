@@ -35,7 +35,7 @@ const modelsDir = resolve(rootDir, "models");
 
 const QUOTA_TS_PATH = resolve(
   rootDir,
-  "apps/dashboard/server/lib/providers/antigravity/quota.ts"
+  "apps/api/src/lib/providers/antigravity/quota.ts"
 );
 
 const GEMINI_LEVEL_THINKING = {
