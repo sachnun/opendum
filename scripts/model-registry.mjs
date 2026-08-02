@@ -102,13 +102,15 @@ export function writeModelJson(filePath, data) {
   writeFileSync(filePath, `${content}\n`);
 }
 
+// readdirSync order is filesystem-dependent; sort so the index (and every
+// "first match wins" collision resolution built on it) is deterministic.
 function collectModelFiles(modelsDir) {
   const files = [];
-  for (const entry of readdirSync(modelsDir)) {
+  for (const entry of readdirSync(modelsDir).sort()) {
     const fullPath = join(modelsDir, entry);
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {
-      for (const file of readdirSync(fullPath)) {
+      for (const file of readdirSync(fullPath).sort()) {
         if (file.endsWith(MODEL_FILE_EXTENSION)) {
           files.push(join(fullPath, file));
         }
@@ -175,15 +177,20 @@ function inferModelFolder(modelKey) {
  * @param {string} modelsDir Path to models/ directory
  * @param {string} providerName e.g. "nvidia_nim"
  * @param {Map<string,string>} modelMap modelKey -> upstreamName
- * @param {{ providerConfigByModel?: Map<string, Record<string, unknown>>, managedProviderConfigKeys?: string[] }} [options]
- * @returns {{ added: string[], removed: string[], updated: string[] }}
+ * @param {{ providerConfigByModel?: Map<string, Record<string, unknown>>, managedProviderConfigKeys?: string[], dryRun?: boolean }} [options]
+ * @returns {{ added: string[], removed: string[], updated: string[] }} Sorted arrays.
  */
 export function syncProviderModels(modelsDir, providerName, modelMap, options = {}) {
+  const dryRun = options.dryRun === true;
   const index = buildModelIndex(modelsDir);
   const modelUpstreams = new Set(modelMap.values());
   const added = [];
   const removed = [];
   const updated = [];
+
+  function maybeWrite(filePath, data) {
+    if (!dryRun) writeModelJson(filePath, data);
+  }
 
   function extraProviderConfig(modelKey) {
     return options.providerConfigByModel?.get(modelKey) ?? {};
@@ -234,7 +241,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
     }
     if (changed) {
       parent.entry.data.aliases = [...existingAliases].sort();
-      writeModelJson(parent.entry.path, parent.entry.data);
+      maybeWrite(parent.entry.path, parent.entry.data);
       updated.push(parent.baseKey);
     }
     modelMap.delete(modelKey);
@@ -295,7 +302,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
       }
     }
 
-    writeModelJson(entry.path, entry.data);
+    maybeWrite(entry.path, entry.data);
     removed.push(modelId);
   }
 
@@ -337,7 +344,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
       }
 
       if (changed) {
-        writeModelJson(existing.path, existing.data);
+        maybeWrite(existing.path, existing.data);
         updated.push(modelKey);
       }
     } else {
@@ -345,7 +352,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
       const filePath = folder
         ? join(modelsDir, folder, `${modelKey}${MODEL_FILE_EXTENSION}`)
         : join(modelsDir, `${modelKey}${MODEL_FILE_EXTENSION}`);
-      if (folder) {
+      if (folder && !dryRun) {
         const folderPath = join(modelsDir, folder);
         if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
       }
@@ -392,7 +399,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
         }
 
         if (touched) {
-          writeModelJson(filePath, existing);
+          maybeWrite(filePath, existing);
           updated.push(modelKey);
         }
         continue;
@@ -412,12 +419,13 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
         };
       }
 
-      writeModelJson(filePath, data);
+      maybeWrite(filePath, data);
       added.push(modelKey);
     }
   }
 
-  return { added, removed, updated };
+  const sortKeys = (keys) => [...keys].sort((a, b) => a.localeCompare(b));
+  return { added: sortKeys(added), removed: sortKeys(removed), updated: sortKeys(updated) };
 }
 
 export function getProviderUpstream(data, providerName, modelId) {

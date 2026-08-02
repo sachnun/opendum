@@ -16,10 +16,9 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { fetchText } from "./lib/shared.mjs";
+import { fetchText, parseFlags, resolveModelsDir, logSyncResult } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 // ---------------------------------------------------------------------------
@@ -29,9 +28,8 @@ import { stripParamInfoKey } from "./lib/clean-key.mjs";
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "models");
+const modelsDir = resolveModelsDir(import.meta.url);
+const rootDir = resolve(modelsDir, "..");
 
 const QUOTA_TS_PATH = resolve(
   rootDir,
@@ -506,82 +504,31 @@ function inferMetadata(modelKey) {
 // ---------------------------------------------------------------------------
 
 function syncJson(modelMap, providerConfigByModel, dryRun) {
-  if (dryRun) {
-    console.log("[antigravity] Dry run - no JSON files modified.");
-
-    const index = buildModelIndex(modelsDir);
-    const wouldRemove = [];
-    const wouldKeep = [];
-
-    for (const [modelId, entry] of Object.entries(index)) {
-      const publicId = entry.id || modelId;
-      const providers = entry.data.providers || [];
-      if (!providers.includes(PROVIDER_NAME)) continue;
-
-      if (modelMap.has(modelId) || modelMap.has(publicId)) {
-        wouldKeep.push(publicId);
-      } else {
-        wouldRemove.push(publicId);
-      }
-    }
-
-    const wouldAdd = [];
-    const wouldUpdate = [];
-    for (const [key, upstream] of modelMap.entries()) {
-      const existing = findModelEntry(index, key);
-      if (!existing) {
-        // Don't propose adding antigravity to an existing model that is
-        // ignored (e.g. an alias-only entry).
-        const ignored = Object.values(index).find(
-          (entry) =>
-            entry.data.ignored &&
-            (entry.fileId === key ||
-              entry.id === key ||
-              (entry.data.aliases || []).includes(key))
-        );
-        if (!ignored) {
-          wouldAdd.push(key);
-        }
-        continue;
-      }
-
-      if (!(existing.data.providers || []).includes(PROVIDER_NAME)) {
-        wouldAdd.push(key);
-        continue;
-      }
-
-      const cfg = existing.data.providerConfig?.[PROVIDER_NAME] || {};
-      const extraConfig = providerConfigByModel.get(key) || {};
-      const existingUpstream = getExistingProviderUpstream(existing, PROVIDER_NAME);
-      if (
-        existingUpstream !== upstream ||
-        MANAGED_PROVIDER_CONFIG_KEYS.some((managedKey) => JSON.stringify(cfg[managedKey]) !== JSON.stringify(extraConfig[managedKey]))
-      ) {
-        wouldUpdate.push(key);
-      }
-    }
-
-    if (wouldRemove.length > 0) {
-      console.log(`  Would REMOVE antigravity from: ${wouldRemove.join(", ")}`);
-    }
-    if (wouldAdd.length > 0) {
-      console.log(`  Would ADD antigravity to: ${wouldAdd.join(", ")}`);
-    }
-    if (wouldUpdate.length > 0) {
-      console.log(`  Would UPDATE antigravity config for: ${wouldUpdate.join(", ")}`);
-    }
-    if (wouldKeep.length > 0) {
-      console.log(`  Would KEEP: ${wouldKeep.join(", ")}`);
-    }
-
-    return { added: wouldAdd, removed: wouldRemove, updated: wouldUpdate };
+  // "Would KEEP" list: models with the antigravity provider that stay in the
+  // map. Computed before sync because syncProviderModels may mutate modelMap
+  // (collision merging deletes collided keys).
+  const index = buildModelIndex(modelsDir);
+  const kept = [];
+  for (const [modelId, entry] of Object.entries(index)) {
+    if (!(entry.data.providers || []).includes(PROVIDER_NAME)) continue;
+    const publicId = entry.id || modelId;
+    if (modelMap.has(modelId) || modelMap.has(publicId)) kept.push(publicId);
   }
 
-  return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: MANAGED_PROVIDER_CONFIG_KEYS,
+    dryRun,
   });
-  return { ...result, modelMap };
+
+  if (dryRun) {
+    console.log("[antigravity] Dry run - no JSON files modified.");
+    if (kept.length > 0) {
+      console.log(`  Would KEEP: ${kept.join(", ")}`);
+    }
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -665,8 +612,7 @@ function escapeRegex(str) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const dryRun = process.argv.includes("--dry-run");
-  const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
+  const { dryRun, verbose } = parseFlags();
 
   console.log("[antigravity] Fetching official Antigravity model docs ...");
   let markdown;
@@ -718,23 +664,7 @@ async function main() {
     enrichModelMetadata(result, documentedModelKeys);
   }
 
-  if (
-    result.added.length === 0 &&
-    result.removed.length === 0 &&
-    result.updated.length === 0
-  ) {
-    console.log(
-      `[antigravity] JSON models are already up to date (${modelMap.size} models).`
-    );
-  } else {
-    console.log(
-      `[antigravity] Synced ${modelMap.size} models ` +
-        `(added: ${result.added.length}, removed: ${result.removed.length}, updated: ${result.updated.length}).`
-    );
-    if (result.added.length > 0) console.log(`  Added: ${result.added.join(", ")}`);
-    if (result.removed.length > 0) console.log(`  Removed: ${result.removed.join(", ")}`);
-    if (result.updated.length > 0) console.log(`  Updated: ${result.updated.join(", ")}`);
-  }
+  logSyncResult({ label: "[antigravity]", count: modelMap.size, result, would: dryRun });
 
   console.log();
   updateQuotaTs(modelMap, dryRun);

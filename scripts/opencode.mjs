@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
-import { fetchText, fetchJson } from "./lib/shared.mjs";
+import { fetchText, fetchJson, parseFlags, resolveModelsDir, logSyncResult } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
@@ -134,18 +132,14 @@ function buildModelMap(modelIds) {
 }
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const modelIds = await fetchOpencodeFreeModelIds();
   const modelMap = buildModelMap(modelIds);
-  const result = syncProviderModels(modelsDir, "opencode", modelMap);
+  const result = syncProviderModels(modelsDir, "opencode", modelMap, { dryRun });
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
-    console.log(`Opencode free models are already up to date (${modelMap.size} models).`);
-  } else {
-    console.log(`Opencode: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
-  }
+  logSyncResult({ label: "[opencode] free", count: modelMap.size, result, would: dryRun });
 }
 
 main().catch((error) => {

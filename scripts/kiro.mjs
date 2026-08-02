@@ -16,10 +16,8 @@
  *   node scripts/kiro.mjs --dry-run
  */
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchText, parseFlags, resolveModelsDir, logSyncResult } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 // ---------------------------------------------------------------------------
@@ -82,39 +80,8 @@ function stripHtml(html) {
  * @returns {Promise<Array<{name: string, contextWindow: string, region: string}>>}
  */
 async function fetchOfficialModels() {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(KIRO_DOCS_URL, {
-        headers: {
-          Accept: "text/html",
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch Kiro docs: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const html = await response.text();
-      return parseModelsFromHtml(html);
-    } catch (error) {
-      lastError = error;
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        console.warn(
-          `[kiro] Attempt ${attempt} failed: ${error.message}. Retrying...`
-        );
-        await sleep(attempt * 1_000);
-      }
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Kiro models page");
+  const html = await fetchText(KIRO_DOCS_URL, { label: "Kiro docs models page" });
+  return parseModelsFromHtml(html);
 }
 
 /**
@@ -327,9 +294,7 @@ function toCanonical(kiroModelId) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const dryRun = process.argv.includes("--dry-run");
-  const verbose =
-    process.argv.includes("--verbose") || process.argv.includes("-v");
+  const { dryRun, verbose } = parseFlags();
 
   // 1. Fetch models from official Kiro docs
   console.log(`[kiro] Fetching models from ${KIRO_DOCS_URL} ...`);
@@ -423,41 +388,18 @@ async function main() {
 
   if (dryRun) {
     console.log("[kiro] Dry run - no JSON files modified.");
-    return;
   }
 
   // 6. Sync into JSON files
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["allowedTiers"],
+    dryRun,
   });
 
-  if (
-    result.added.length === 0 &&
-    result.removed.length === 0 &&
-    result.updated.length === 0
-  ) {
-    console.log(
-      `[kiro] Models are already up to date (${modelMap.size} models).`
-    );
-  } else {
-    console.log(
-      `[kiro] Synced ${modelMap.size} models ` +
-        `(added: ${result.added.length}, removed: ${result.removed.length}, updated: ${result.updated.length}).`
-    );
-    if (result.added.length > 0) {
-      console.log(`  Added: ${result.added.join(", ")}`);
-    }
-    if (result.removed.length > 0) {
-      console.log(`  Removed: ${result.removed.join(", ")}`);
-    }
-    if (result.updated.length > 0) {
-      console.log(`  Updated: ${result.updated.join(", ")}`);
-    }
-  }
+  logSyncResult({ label: "[kiro]", count: modelMap.size, result, would: dryRun });
 }
 
 main().catch((error) => {

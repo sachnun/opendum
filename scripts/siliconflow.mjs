@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
-import { fetchText, fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchText, fetchJson, parseFlags, resolveModelsDir, logSyncResult, uniqueModelKey } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "siliconflow";
@@ -81,15 +79,7 @@ function buildModelMap(modelIds) {
       continue;
     }
 
-    const baseModelKey = toModelKey(modelId);
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
+    const modelKey = uniqueModelKey(map, toModelKey(modelId), modelId);
     map.set(modelKey, modelId);
   }
 
@@ -116,58 +106,41 @@ async function resolveSearchIndexUrls() {
 }
 
 async function fetchSiliconFlowChatModelIds() {
+  const searchIndexUrls = await resolveSearchIndexUrls();
+
+  let searchIndex = null;
   let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
+  for (const url of searchIndexUrls) {
     try {
-      const searchIndexUrls = await resolveSearchIndexUrls();
-      let searchIndex = null;
-      let fetchError = null;
-
-      for (const url of searchIndexUrls) {
-        try {
-          searchIndex = await fetchJson(url, {
-            label: "SiliconFlow search index",
-            timeout: FETCH_TIMEOUT_MS,
-          });
-          break;
-        } catch (error) {
-          fetchError = error;
-        }
-      }
-
-      if (!searchIndex) throw fetchError || new Error("All SiliconFlow search index URLs failed");
-
-      const ids = extractModelIds(searchIndex);
-      const chatIds = ids.filter(isChatModelId);
-      if (chatIds.length < MIN_EXPECTED_MODELS) {
-        throw new Error(`SiliconFlow search index returned only ${chatIds.length} chat models (expected >= ${MIN_EXPECTED_MODELS})`);
-      }
-      return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+      searchIndex = await fetchJson(url, { label: "SiliconFlow search index" });
+      break;
     } catch (error) {
       lastError = error;
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch SiliconFlow model list");
+  if (!searchIndex) {
+    throw lastError ?? new Error("All SiliconFlow search index URLs failed");
+  }
+
+  const ids = extractModelIds(searchIndex);
+  const chatIds = ids.filter(isChatModelId);
+  if (chatIds.length < MIN_EXPECTED_MODELS) {
+    throw new Error(`SiliconFlow search index returned only ${chatIds.length} chat models (expected >= ${MIN_EXPECTED_MODELS})`);
+  }
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const modelIds = await fetchSiliconFlowChatModelIds();
   const modelMap = buildModelMap(modelIds);
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, { dryRun });
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
-    console.log(`SiliconFlow models are already up to date (${modelMap.size} models).`);
-  } else {
-    console.log(`SiliconFlow: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
-  }
+  logSyncResult({ label: "[siliconflow]", count: modelMap.size, result, would: dryRun });
 }
 
 main().catch((error) => {

@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchJson, parseFlags, resolveModelsDir, logSyncResult, uniqueModelKey } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -81,15 +79,7 @@ function buildModelMap(modelIds) {
     if (IGNORED_MODEL_KEYS.has(baseModelKey)) {
       continue;
     }
-
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
+    const modelKey = uniqueModelKey(map, baseModelKey, modelId);
     map.set(modelKey, modelId);
   }
 
@@ -97,62 +87,29 @@ function buildModelMap(modelIds) {
 }
 
 async function fetchOpenRouterFreeModelIds() {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(OPENROUTER_MODELS_URL, {
-        headers: {
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models (${response.status} ${response.statusText})`
-        );
-      }
-
-      const payload = await response.json();
-      if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected OpenRouter /v1/models payload format");
-      }
-
-      const ids = payload.data
-        .filter((item) => isFreeChatModel(item))
-        .map((item) => item.id.trim())
-        .filter((id) => id.length > 0);
-
-      return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
+  const payload = await fetchJson(OPENROUTER_MODELS_URL, { label: "OpenRouter /v1/models" });
+  if (!payload || !Array.isArray(payload.data)) {
+    throw new Error("Unexpected OpenRouter /v1/models payload format");
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch OpenRouter free model list");
+  const ids = payload.data
+    .filter((item) => isFreeChatModel(item))
+    .map((item) => item.id.trim())
+    .filter((id) => id.length > 0);
+
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const modelIds = await fetchOpenRouterFreeModelIds();
   const modelMap = buildModelMap(modelIds);
 
-  const result = syncProviderModels(modelsDir, "openrouter", modelMap);
+  const result = syncProviderModels(modelsDir, "openrouter", modelMap, { dryRun });
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
-    console.log(`OpenRouter free models are already up to date (${modelMap.size} models).`);
-  } else {
-    console.log(`OpenRouter: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
-  }
+  logSyncResult({ label: "[openrouter] free", count: modelMap.size, result, would: dryRun });
 }
 
 main().catch((error) => {

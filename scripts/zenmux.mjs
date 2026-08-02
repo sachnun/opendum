@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
-import { fetchJson } from "./lib/shared.mjs";
+import { fetchJson, parseFlags, resolveModelsDir, logSyncResult, uniqueModelKey } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "zenmux";
@@ -27,15 +25,7 @@ function buildModelMap(modelIds) {
   const map = new Map();
 
   for (const modelId of modelIds) {
-    const baseModelKey = toModelKey(modelId);
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
+    const modelKey = uniqueModelKey(map, toModelKey(modelId), modelId);
     map.set(modelKey, modelId);
   }
 
@@ -83,23 +73,15 @@ async function fetchZenmuxFreePlanModelIds() {
 }
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const modelIds = await fetchZenmuxFreePlanModelIds();
   const modelMap = buildModelMap(modelIds);
 
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
-    providerConfigByModel: new Map(
-      modelIds.map((id) => [toModelKey(id), {}]),
-    ),
-  });
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, { dryRun });
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
-    console.log(`ZenMux free plan models are already up to date (${modelMap.size} models).`);
-  } else {
-    console.log(`ZenMux: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
-  }
+  logSyncResult({ label: "[zenmux] free plan", count: modelMap.size, result, would: dryRun });
 }
 
 main().catch((error) => {

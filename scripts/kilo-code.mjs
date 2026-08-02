@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchJson, parseFlags, resolveModelsDir, logSyncResult, uniqueModelKey } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
@@ -50,15 +48,7 @@ function buildModelMap(models) {
 
   for (const model of models) {
     const modelId = model.id.trim();
-    const baseModelKey = toModelKey(modelId);
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
+    const modelKey = uniqueModelKey(map, toModelKey(modelId), modelId);
     map.set(modelKey, modelId);
   }
 
@@ -66,56 +56,30 @@ function buildModelMap(models) {
 }
 
 async function fetchKiloCodeModels() {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(KILO_CODE_MODELS_URL, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models (${response.status} ${response.statusText})`
-        );
-      }
-
-      const payload = await response.json();
-      if (!payload || !Array.isArray(payload.data)) {
-        throw new Error("Unexpected Kilo Gateway /models payload format");
-      }
-
-      return payload.data.filter((item) => isEligibleModel(item));
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
+  const payload = await fetchJson(KILO_CODE_MODELS_URL, { label: "Kilo Code gateway models" });
+  if (!payload || !Array.isArray(payload.data)) {
+    throw new Error("Unexpected Kilo Gateway /models payload format");
   }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Kilo Code model list");
+  return payload.data.filter((item) => isEligibleModel(item));
 }
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const models = await fetchKiloCodeModels();
   const modelMap = buildModelMap(models);
 
-  const result = syncProviderModels(modelsDir, "kilo_code", modelMap);
-  const metadataUpdates = applyAuthlessMetadata(modelsDir, modelMap);
+  const result = syncProviderModels(modelsDir, "kilo_code", modelMap, { dryRun });
+  const metadataUpdates = dryRun ? 0 : applyAuthlessMetadata(modelsDir, modelMap);
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0 && metadataUpdates === 0) {
-    console.log(`Kilo Code models are already up to date (${modelMap.size} models).`);
-  } else {
-    console.log(`Kilo Code: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, metadata ${metadataUpdates}).`);
-  }
+  logSyncResult({
+    label: "[kilo-code] free",
+    count: modelMap.size,
+    result,
+    would: dryRun,
+    extra: `metadata ${metadataUpdates}`,
+  });
 }
 
 function applyAuthlessMetadata(modelsDir, modelMap) {

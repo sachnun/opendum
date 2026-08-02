@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "./model-registry.mjs";
-import { fetchJson, fetchText } from "./lib/shared.mjs";
+import { fetchJson, fetchText, parseFlags, resolveModelsDir, logSyncResult, uniqueModelKey } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "command_code";
@@ -118,15 +116,7 @@ function buildModelMap(models) {
   const providerConfigByModel = new Map();
 
   for (const { id } of models) {
-    const baseModelKey = toModelKey(id);
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== id) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
+    const modelKey = uniqueModelKey(map, toModelKey(id), id);
     map.set(modelKey, id);
     providerConfigByModel.set(modelKey, { allowedTiers: [GO_TIER] });
   }
@@ -138,8 +128,8 @@ function buildModelMap(models) {
 }
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const models = await fetchGoTierModels();
   const { modelMap, providerConfigByModel } = buildModelMap(models);
@@ -147,13 +137,10 @@ async function main() {
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: ["allowedTiers"],
+    dryRun,
   });
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
-    console.log(`Command Code Go-tier models are already up to date (${modelMap.size} models).`);
-  } else {
-    console.log(`Command Code: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
-  }
+  logSyncResult({ label: "[command-code] Go-tier", count: modelMap.size, result, would: dryRun });
 }
 
 main().catch((error) => {

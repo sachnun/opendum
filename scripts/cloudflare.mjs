@@ -10,15 +10,13 @@
  * the docs model metadata that powers developers.cloudflare.com.
  */
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   buildModelIndex,
   getProviderUpstream,
   syncProviderModels,
   writeModelJson,
 } from "./model-registry.mjs";
-import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchJson, parseFlags, resolveModelsDir, logSyncResult } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "workers_ai";
@@ -243,29 +241,22 @@ async function fetchWorkersAIModels() {
 }
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
   const reverseMap = buildReverseMap(modelsDir);
 
   const models = await fetchWorkersAIModels();
   const { modelMap, metadata } = buildModelMap(models, modelsDir, reverseMap);
-  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
-  const metadataUpdates = applyMetadata(modelsDir, metadata);
+  const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, { dryRun });
+  const metadataUpdates = dryRun ? 0 : applyMetadata(modelsDir, metadata);
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0 && metadataUpdates === 0) {
-    console.log(`Cloudflare models are already up to date (${modelMap.size} models).`);
-  } else {
-    console.log(`Cloudflare: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, metadata ${metadataUpdates}).`);
-    if (result.added.length > 0) {
-      console.log(`  Added: ${result.added.join(", ")}`);
-    }
-    if (result.removed.length > 0) {
-      console.log(`  Removed: ${result.removed.join(", ")}`);
-    }
-    if (result.updated.length > 0) {
-      console.log(`  Updated: ${result.updated.join(", ")}`);
-    }
-  }
+  logSyncResult({
+    label: "[cloudflare]",
+    count: modelMap.size,
+    result,
+    would: dryRun,
+    extra: `metadata ${metadataUpdates}`,
+  });
 }
 
 main().catch((error) => {

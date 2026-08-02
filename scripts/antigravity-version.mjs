@@ -4,13 +4,13 @@
  * Antigravity version refresh script.
  *
  * Fetches the latest version from the Antigravity changelog and updates the
- * User-Agent used by the Go proxy and dashboard Antigravity providers.
+ * User-Agent used by the proxy and API Antigravity providers.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { fetchText } from "./lib/shared.mjs";
+import { fetchText, parseFlags } from "./lib/shared.mjs";
 
 const VERSION_SOURCES = [
   "https://releasebot.io/updates/google/antigravity",
@@ -18,14 +18,9 @@ const VERSION_SOURCES = [
 ];
 const FETCH_TIMEOUT_MS = 15_000;
 
-const PROXY_PROVIDER_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../apps/proxy/src/providers/google_code_assist.ts"
-);
-const DASHBOARD_CONSTANTS_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../apps/api/src/lib/providers/antigravity/constants.ts"
-);
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const PROXY_PROVIDER_PATH = resolve(scriptDir, "../apps/proxy/src/providers/google_code_assist.ts");
+const API_CONSTANTS_PATH = resolve(scriptDir, "../apps/api/src/lib/providers/antigravity/constants.ts");
 
 const PROXY_USER_AGENT_REGEX =
   /((?:const\s+antigravityUserAgent\s*=\s*"antigravity\/))(\d+\.\d+\.\d+)(\s+")/;
@@ -75,7 +70,7 @@ function getCurrentVersion() {
 function updateVersion(newVersion) {
   for (const [filePath, regex] of [
     [PROXY_PROVIDER_PATH, PROXY_USER_AGENT_REGEX],
-    [DASHBOARD_CONSTANTS_PATH, DASHBOARD_USER_AGENT_REGEX],
+    [API_CONSTANTS_PATH, DASHBOARD_USER_AGENT_REGEX],
   ]) {
     const source = readFileSync(filePath, "utf-8");
     const updated = source.replace(regex, `$1${newVersion}$3`);
@@ -84,9 +79,11 @@ function updateVersion(newVersion) {
 }
 
 async function main() {
+  const { dryRun } = parseFlags();
+
   const currentVersion = getCurrentVersion();
   if (!currentVersion) {
-    console.warn("Antigravity: could not find User-Agent version in Go proxy provider, skipping.");
+    console.warn("Antigravity: could not find User-Agent version in proxy provider, skipping.");
     return;
   }
 
@@ -113,8 +110,12 @@ async function main() {
   }
 
   if (compareSemver(latestVersion, currentVersion) > 0) {
-    updateVersion(latestVersion);
-    console.log(`Antigravity: updated User-Agent version ${currentVersion} -> ${latestVersion}`);
+    if (dryRun) {
+      console.log(`Antigravity: would update User-Agent version ${currentVersion} -> ${latestVersion} (dry run)`);
+    } else {
+      updateVersion(latestVersion);
+      console.log(`Antigravity: updated User-Agent version ${currentVersion} -> ${latestVersion}`);
+    }
   } else {
     console.log("Antigravity: User-Agent version is already up to date.");
   }

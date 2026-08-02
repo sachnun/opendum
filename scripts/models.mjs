@@ -1,5 +1,16 @@
 #!/usr/bin/env node
 
+/**
+ * Orchestrator for all provider model refresh scripts.
+ *
+ * Usage:
+ *   node scripts/models.mjs                 # refresh all providers (CI)
+ *   node scripts/models.mjs --dry-run       # no file modifications
+ *   node scripts/models.mjs --summary PATH  # write PR summary markdown
+ *
+ * Flags are forwarded to every child script, so --dry-run makes the whole
+ * pipeline read-only.
+ */
 import { writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
@@ -31,10 +42,10 @@ const REFRESHED_PROVIDERS = ["antigravity", "codex", "command_code", "kilo_code"
 // Run a child script
 // ---------------------------------------------------------------------------
 
-function runScript(scriptName) {
+function runScript(scriptName, args = []) {
   const scriptPath = resolve(scriptDir, scriptName);
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [scriptPath], {
+    const child = spawn(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
     });
 
@@ -96,6 +107,12 @@ function generateSummary(before, after) {
     }
   }
 
+  // Sort by provider, then model, so identical runs produce identical diffs.
+  const byProviderThenModel = (a, b) =>
+    a.provider.localeCompare(b.provider) || a.model.localeCompare(b.model);
+  added.sort(byProviderThenModel);
+  removed.sort(byProviderThenModel);
+
   const sections = [];
 
   if (added.length) {
@@ -120,13 +137,20 @@ function generateSummary(before, after) {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  const dryRun = process.argv.includes("--dry-run");
+  const childArgs = dryRun ? ["--dry-run"] : [];
+
+  if (dryRun) {
+    console.log("[models] Dry run - provider scripts will not modify any files.");
+  }
+
   const before = snapshotProviderModels();
 
   const failures = [];
 
   for (const scriptName of refreshScripts) {
     try {
-      await runScript(scriptName);
+      await runScript(scriptName, childArgs);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       console.error(reason);

@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { syncProviderModels, buildModelIndex, writeModelJson } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { fetchJson, parseFlags, resolveModelsDir, logSyncResult } from "./lib/shared.mjs";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
@@ -28,39 +26,11 @@ const CHATGPT_COMPATIBLE_CODEX_MODELS = new Set([
  * Returns the parsed array of model entries.
  */
 async function fetchCodexModels() {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(CODEX_MODELS_URL, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models (${response.status} ${response.statusText})`
-        );
-      }
-
-      const payload = await response.json();
-      if (!payload || !Array.isArray(payload.models)) {
-        throw new Error("Unexpected Codex models.json payload format");
-      }
-
-      return payload.models;
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < MAX_FETCH_ATTEMPTS) {
-        await sleep(attempt * 1_000);
-      }
-    }
+  const payload = await fetchJson(CODEX_MODELS_URL, { label: "Codex models.json" });
+  if (!payload || !Array.isArray(payload.models)) {
+    throw new Error("Unexpected Codex models.json payload format");
   }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Failed to fetch Codex CLI model list");
+  return payload.models;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,8 +127,8 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const { dryRun } = parseFlags();
+  const modelsDir = resolveModelsDir(import.meta.url);
 
   const allModels = await fetchCodexModels();
   const filtered = filterModels(allModels);
@@ -177,26 +147,14 @@ async function main() {
     );
   }
 
-  const result = syncProviderModels(modelsDir, "codex", modelMap);
+  const result = syncProviderModels(modelsDir, "codex", modelMap, { dryRun });
 
   // Enrich newly created JSON files with metadata from models.json
-  if (result.added.length > 0) {
+  if (!dryRun && result.added.length > 0) {
     enrichNewModels(modelsDir, result.added, metadataLookup);
   }
 
-  if (
-    result.added.length === 0 &&
-    result.removed.length === 0 &&
-    result.updated.length === 0
-  ) {
-    console.log(
-      `Codex CLI models are already up to date (${modelMap.size} models).`
-    );
-  } else {
-    console.log(
-      `Codex ChatGPT-compatible models: ${modelMap.size} models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`
-    );
-  }
+  logSyncResult({ label: "[codex]", count: modelMap.size, result, would: dryRun });
 }
 
 main().catch((error) => {
