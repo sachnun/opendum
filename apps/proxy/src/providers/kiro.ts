@@ -1342,7 +1342,7 @@ function kiroNumberAsFloat(value: unknown): number {
   return 0;
 }
 
-function kiroAPIURLForAccount(account: ProviderAccountLike): string {
+export function kiroAPIURLForAccount(account: ProviderAccountLike): string {
   let region = kiroDefaultRegion;
   if (account.accountId !== null) {
     const extracted = kiroRegionFromARN(account.accountId);

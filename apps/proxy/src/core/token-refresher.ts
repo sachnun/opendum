@@ -304,11 +304,11 @@ export class TokenRefresher {
   }
 }
 
-function accountNeedsCredentialRefresh(account: ProviderAccountLike, providerImpl: Provider): boolean {
-  return Date.now() > account.expiresAt.getTime() - refreshBufferFor(providerImpl);
+export function accountNeedsCredentialRefresh(account: ProviderAccountLike, providerImpl: Provider, now = new Date()): boolean {
+  return now.getTime() > account.expiresAt.getTime() - refreshBufferFor(providerImpl);
 }
 
-function tokenRefreshLockKey(accountID: string): string {
+export function tokenRefreshLockKey(accountID: string): string {
   return tokenRefreshLockPrefix + accountID;
 }
 

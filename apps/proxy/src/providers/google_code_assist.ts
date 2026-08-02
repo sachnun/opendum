@@ -850,26 +850,30 @@ export class GoogleCodeAssistProvider implements Provider {
   }
 }
 
+export function antigravityDelegateConfig(registry: Registry | null, db: ProxyDB | null, redis: Redis | null): ConstructorParameters<typeof GoogleCodeAssistProvider>[0] {
+  return {
+    name: "antigravity",
+    clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
+    clientSecret: "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",
+    endpoint: "https://daily-cloudcode-pa.googleapis.com",
+    endpoints: ["https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"],
+    loadEndpoints: ["https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"],
+    onboardEndpoints: ["https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"],
+    refreshBufferMs: 3600 * 1000,
+    defaultProject: "rising-fact-p41fc",
+    userAgent: antigravityUserAgent + "linux/x64",
+    apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1",
+    clientMetadata: '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',
+    registry,
+    db,
+    redis,
+  };
+}
+
 export class AntigravityProvider implements Provider {
   private delegate: GoogleCodeAssistProvider;
   constructor(registry: Registry | null, db: ProxyDB | null, redis: Redis | null) {
-    this.delegate = new GoogleCodeAssistProvider({
-      name: "antigravity",
-      clientID: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
-      clientSecret: "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",
-      endpoint: "https://daily-cloudcode-pa.googleapis.com",
-      endpoints: ["https://daily-cloudcode-pa.googleapis.com", "https://autopush-cloudcode-pa.sandbox.googleapis.com", "https://cloudcode-pa.googleapis.com"],
-      loadEndpoints: ["https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"],
-      onboardEndpoints: ["https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"],
-      refreshBufferMs: 3600 * 1000,
-      defaultProject: "rising-fact-p41fc",
-      userAgent: antigravityUserAgent + "linux/x64",
-      apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1",
-      clientMetadata: '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',
-      registry,
-      db,
-      redis,
-    });
+    this.delegate = new GoogleCodeAssistProvider(antigravityDelegateConfig(registry, db, redis));
   }
 
   refreshBuffer(): number {
@@ -999,7 +1003,7 @@ function augmentToolDescriptions(payload: Record<string, unknown>): void {
   }
 }
 
-function injectGeminiToolInstruction(payload: Record<string, unknown>): void {
+export function injectGeminiToolInstruction(payload: Record<string, unknown>): void {
   if (!hasFunctionTools(payload)) return;
   const existing = payload["systemInstruction"];
   if (typeof existing === "string") {
@@ -1169,7 +1173,7 @@ function scrubConversationArtifacts(content: Record<string, unknown>): void {
   }
 }
 
-function scrubToolTranscriptArtifacts(text: string): string {
+export function scrubToolTranscriptArtifacts(text: string): string {
   const lines = text.split("\n");
   const output: string[] = [];
   let inFence = false;
@@ -2078,7 +2082,7 @@ function unwrapGeminiResponse(data: unknown): Record<string, unknown> {
   return obj;
 }
 
-function geminiToOpenAICompletion(response: Record<string, unknown>, model: string, schemas: ToolSchemaMap): Record<string, unknown> {
+export function geminiToOpenAICompletion(response: Record<string, unknown>, model: string, schemas: ToolSchemaMap): Record<string, unknown> {
   let content = "";
   let reasoning = "";
   const toolCalls: unknown[] = [];

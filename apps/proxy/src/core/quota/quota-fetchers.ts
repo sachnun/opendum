@@ -311,7 +311,7 @@ function codexWindowGroups(primaryName: string, primary: Record<string, unknown>
   return groups;
 }
 
-function codexWindowGroup(name: string, record: Record<string, unknown>, tier: string, apiNames: boolean): [QuotaGroupDisplay, boolean] {
+export function codexWindowGroup(name: string, record: Record<string, unknown>, tier: string, apiNames: boolean): [QuotaGroupDisplay, boolean] {
   const [used, ok] = parseQuotaNumber(record["used_percent"]);
   if (!ok) return [null as unknown as QuotaGroupDisplay, false];
   let [windowMinutes] = parseQuotaNumber(record["window_minutes"]);

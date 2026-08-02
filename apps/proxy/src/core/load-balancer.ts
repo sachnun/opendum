@@ -504,9 +504,9 @@ export function effectiveUnhealthyCount(row: ProviderAccountModelHealth, now: Da
 }
 
 export function latestHealthRequestAt(row: ProviderAccountModelHealth): Date | null {
-  let latest: Date | null = row.unhealthyCountUpdatedAt;
-  if (row.lastErrorAt !== null && (latest === null || row.lastErrorAt.getTime() > latest.getTime())) latest = row.lastErrorAt;
-  if (row.lastSuccessAt !== null && (latest === null || row.lastSuccessAt.getTime() > latest.getTime())) latest = row.lastSuccessAt;
+  let latest: Date | null = row.unhealthyCountUpdatedAt ?? null;
+  if (row.lastErrorAt != null && (latest === null || row.lastErrorAt.getTime() > latest.getTime())) latest = row.lastErrorAt;
+  if (row.lastSuccessAt != null && (latest === null || row.lastSuccessAt.getTime() > latest.getTime())) latest = row.lastSuccessAt;
   if (latest === null && row.updatedAt) latest = row.updatedAt;
   if (latest === null && row.createdAt) latest = row.createdAt;
   return latest;

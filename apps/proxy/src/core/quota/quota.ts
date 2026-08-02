@@ -154,18 +154,18 @@ export async function putQuotaJSONCache(redis: Redis | null, result: QuotaJSONRe
   }
 }
 
-function quotaRawCacheTTL(): number {
+export function quotaRawCacheTTL(): number {
   const spread = quotaRawCacheMaxTTL - quotaRawCacheMinTTL;
   if (spread <= 0) return quotaRawCacheMinTTL;
   return quotaRawCacheMinTTL + Math.floor(Math.random() * (spread + 1));
 }
 
-function quotaRawCacheKey(account: ProviderAccount, cacheName: string, method: string, target: string, encodedBody: string | null): string {
+export function quotaRawCacheKey(account: ProviderAccount, cacheName: string, method: string, target: string, encodedBody: string | null): string {
   const hash = createHash("sha256").update([account.provider, account.id, cacheName, method.toUpperCase(), target, encodedBody ?? ""].join("\n")).digest("hex");
   return `${quotaRawCachePrefix}:${account.provider}:${account.id}:${hash}`;
 }
 
-function quotaCacheHeaders(headers: Record<string, string>): Record<string, string[]> {
+export function quotaCacheHeaders(headers: Record<string, string>): Record<string, string[]> {
   const allowed = [
     "x-codex-primary-used-percent",
     "x-codex-primary-window-minutes",

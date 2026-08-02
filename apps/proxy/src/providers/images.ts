@@ -1,3 +1,5 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import type { HttpClient, RequestContext } from "./types.js";
 import { readAllText, stringValue } from "./http.js";
 
@@ -103,18 +105,73 @@ export function isExternalURL(value: string): boolean {
   return (value.startsWith("http://") || value.startsWith("https://")) && !value.startsWith("data:");
 }
 
-function isSafeExternalURL(value: string): boolean {
+function isPrivateIP(address: string): boolean {
+  const parts = address.split(".").map(Number);
+  if (parts.length === 4 && parts.every((p) => Number.isInteger(p) && p >= 0 && p <= 255)) {
+    if (parts[0] === 10) return true;
+    if (parts[0] === 127) return true;
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    if (parts[0] === 192 && parts[1] === 168) return true;
+  }
+  return false;
+}
+
+/** Rejects loopback, private, link-local, multicast and unspecified addresses (SSRF guard). */
+export async function isSafeExternalURL(value: string): Promise<boolean> {
+  let parsed: URL;
   try {
-    const parsed = new URL(value);
-    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.hostname === "") return false;
-    return true;
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.hostname === "") return false;
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
+  const literal = isIP(hostname);
+  if (literal !== 0) {
+    if (literal === 4) return !isPrivateIP(hostname);
+    return false; // IPv6 literals are not allowed (matches Go behavior)
+  }
+  try {
+    const addresses = await lookup(hostname, { all: true });
+    for (const entry of addresses) {
+      if (entry.family === 4) {
+        if (isPrivateIP(entry.address)) return false;
+      } else {
+        return false;
+      }
+    }
+    return addresses.length > 0;
   } catch {
     return false;
   }
 }
 
+async function readAllBytes(body: ReadableStream<Uint8Array> | null): Promise<Uint8Array> {
+  if (!body) return new Uint8Array();
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+      total += value.length;
+      if (total > maxImageFetchBytes) break;
+    }
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.length;
+  }
+  return out;
+}
+
 async function fetchAsDataURI(client: HttpClient, ctx: RequestContext, imageURL: string): Promise<string> {
-  if (!isSafeExternalURL(imageURL)) return "";
+  if (!(await isSafeExternalURL(imageURL))) return "";
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), imageFetchTimeoutMs);
   try {
@@ -122,11 +179,11 @@ async function fetchAsDataURI(client: HttpClient, ctx: RequestContext, imageURL:
     if (resp.status < 200 || resp.status >= 300) return "";
     const contentType = (resp.headers["content-type"] ?? "").split(";")[0]!.toLowerCase().trim();
     if (contentType !== "" && !contentType.startsWith("image/") && contentType !== "application/pdf") return "";
-    const text = await readAllText(resp.body);
-    if (text.length > maxImageFetchBytes) return "";
+    const bytes = await readAllBytes(resp.body);
+    if (bytes.length > maxImageFetchBytes) return "";
     const finalContentType = resp.headers["content-type"] ?? "";
     const mime = finalContentType !== "" ? finalContentType : "image/png";
-    return "data:" + mime + ";base64," + Buffer.from(text, "utf8").toString("base64");
+    return "data:" + mime + ";base64," + Buffer.from(bytes).toString("base64");
   } catch {
     return "";
   } finally {

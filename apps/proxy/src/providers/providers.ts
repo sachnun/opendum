@@ -218,7 +218,7 @@ export class WorkersAIProvider implements Provider {
     payload["model"] = this.registry.upstreamModelName(model, "workers_ai");
     payload["stream"] = stream;
     if (Array.isArray(payload["messages"])) {
-      payload["messages"] = convertImageURLsToBase64(client, ctx, payload["messages"] as unknown[]);
+      payload["messages"] = await convertImageURLsToBase64(client, ctx, payload["messages"] as unknown[]);
     }
     const url = "https://api.cloudflare.com/client/v4/accounts/" + account.accountId.trim() + "/ai/v1/chat/completions";
     return postJSON(client, ctx, url, credentials, payload, stream);
