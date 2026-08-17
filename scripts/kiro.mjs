@@ -141,10 +141,20 @@ function parseModelsFromHtml(html) {
     );
   }
 
-  // Find the comparison table (contains "Context window" in header)
+  // Find the comparison table by its header cells: it must have both a
+  // "Model" column and a context column ("Context window" or "Context").
   let comparisonTable = null;
   for (const table of tables) {
-    if (table.includes("Context window")) {
+    const candidateRows = parseTableRows(table);
+    if (candidateRows.length === 0) continue;
+
+    const candidateHeader = candidateRows[0].map((h) => h.toLowerCase());
+    const hasModel = candidateHeader.some(
+      (h) => h === "model" || h.includes("model")
+    );
+    const hasContext = candidateHeader.some((h) => h.includes("context"));
+
+    if (hasModel && hasContext) {
       comparisonTable = table;
       break;
     }
