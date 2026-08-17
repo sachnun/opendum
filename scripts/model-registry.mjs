@@ -113,6 +113,8 @@ function collectModelFiles(modelsDir) {
           files.push(join(fullPath, file));
         }
       }
+    } else if (entry.endsWith(MODEL_FILE_EXTENSION)) {
+      files.push(fullPath);
     }
   }
   return files;

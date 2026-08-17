@@ -5,7 +5,8 @@
   ],
   "providerConfig": {
     "kilo_code": {
-      "upstream": "dots-studio/dots-3-note-preview:free"
+      "upstream": "dots-studio/dots-3-note-preview:free",
+      "authless": true
     },
     "openrouter": {
       "upstream": "dots-studio/dots-3-note-preview:free"
