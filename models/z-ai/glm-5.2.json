@@ -3,7 +3,9 @@
     "workers_ai",
     "siliconflow",
     "command_code",
-    "nvidia_nim"
+    "nvidia_nim",
+    "kilo_code",
+    "openrouter"
   ],
   "meta": {
     "reasoning": true,
@@ -17,8 +19,15 @@
         "go"
       ]
     },
+    "kilo_code": {
+      "upstream": "z-ai/glm-5.2:free",
+      "authless": true
+    },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.2"
+    },
+    "openrouter": {
+      "upstream": "z-ai/glm-5.2:free"
     },
     "siliconflow": {
       "upstream": "zai-org/GLM-5.2"

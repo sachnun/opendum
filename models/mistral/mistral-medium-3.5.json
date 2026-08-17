@@ -1,17 +1,10 @@
 {
   "id": "mistral-medium-3.5",
-  "providers": [
-    "nvidia_nim"
-  ],
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/mistral-medium-3.5-128b"
-    }
-  },
-  "meta": {},
-  "ignored": false,
+  "providers": [],
   "aliases": [
     "mistral-medium-3.5-128b",
     "mistralai/mistral-medium-3.5-128b"
-  ]
+  ],
+  "ignored": false,
+  "meta": {}
 }

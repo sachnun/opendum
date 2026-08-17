@@ -1,16 +1,18 @@
 {
   "providers": [
     "opencode",
-    "nvidia_nim",
     "siliconflow",
-    "zenmux"
+    "zenmux",
+    "command_code"
   ],
   "aliases": [
+    "@cf-deepseek-ai-deepseek-v4-flash-0731",
+    "@cf/deepseek-ai/deepseek-v4-flash-0731",
+    "deepseek-ai/DeepSeek-V4-Flash",
+    "deepseek-ai/deepseek-v4-flash",
     "deepseek-flash",
     "deepseek-v4-flash",
-    "deepseek-ai/deepseek-v4-flash",
-    "deepseek-v4-flash-free",
-    "deepseek-ai/DeepSeek-V4-Flash"
+    "deepseek-v4-flash-free"
   ],
   "ignored": false,
   "meta": {
@@ -19,8 +21,11 @@
     "vision": false
   },
   "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "deepseek-ai/deepseek-v4-flash"
+    "command_code": {
+      "upstream": "deepseek/deepseek-v4-flash",
+      "allowedTiers": [
+        "go"
+      ]
     },
     "opencode": {
       "upstream": "deepseek-v4-flash-free"

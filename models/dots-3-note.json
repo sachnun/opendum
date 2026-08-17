@@ -5,11 +5,10 @@
   ],
   "providerConfig": {
     "kilo_code": {
-      "upstream": "cohere/north-mini-code:free",
-      "authless": true
+      "upstream": "dots-studio/dots-3-note-preview:free"
     },
     "openrouter": {
-      "upstream": "cohere/north-mini-code:free"
+      "upstream": "dots-studio/dots-3-note-preview:free"
     }
   }
 }
