@@ -1,8 +1,14 @@
 {
   "providers": [
-    "kiro"
+    "kiro",
+    "command_code"
   ],
   "providerConfig": {
+    "command_code": {
+      "allowedTiers": [
+        "go"
+      ]
+    },
     "kiro": {
       "allowedTiers": [
         "pro",

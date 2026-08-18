@@ -1,8 +1,5 @@
 {
-  "providers": [
-    "kilo_code",
-    "openrouter"
-  ],
+  "providers": [],
   "aliases": [
     "lfm-2.5-1.2b-instruct",
     "lfm-2.5-1.2b-thinking",
@@ -18,14 +15,5 @@
     "toolCall": false,
     "vision": false,
     "type": "instruct"
-  },
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "liquid/lfm-2.5-2.6b:free",
-      "authless": true
-    },
-    "openrouter": {
-      "upstream": "liquid/lfm-2.5-2.6b:free"
-    }
   }
 }
