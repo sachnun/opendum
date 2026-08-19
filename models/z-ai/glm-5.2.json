@@ -4,7 +4,6 @@
     "siliconflow",
     "command_code",
     "nvidia_nim",
-    "kilo_code",
     "openrouter"
   ],
   "meta": {
@@ -18,10 +17,6 @@
       "allowedTiers": [
         "go"
       ]
-    },
-    "kilo_code": {
-      "upstream": "z-ai/glm-5.2:free",
-      "authless": true
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.2"
