@@ -1,6 +1,5 @@
 {
   "providers": [
-    "opencode",
     "siliconflow",
     "zenmux",
     "command_code"
@@ -26,9 +25,6 @@
       "allowedTiers": [
         "go"
       ]
-    },
-    "opencode": {
-      "upstream": "deepseek-v4-flash-free"
     },
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Flash"

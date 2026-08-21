@@ -1,5 +1,6 @@
 {
   "providers": [
+    "opencode",
     "command_code"
   ],
   "providerConfig": {
@@ -8,6 +9,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "opencode": {
+      "upstream": "muse-spark-1.2-contributor-free"
     }
   }
 }
