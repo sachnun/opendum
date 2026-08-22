@@ -1,6 +1,8 @@
 {
   "providers": [
-    "command_code"
+    "command_code",
+    "kilo_code",
+    "openrouter"
   ],
   "providerConfig": {
     "command_code": {
@@ -8,6 +10,13 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "kilo_code": {
+      "upstream": "thinkingmachines/inkling:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "thinkingmachines/inkling:free"
     }
   }
 }

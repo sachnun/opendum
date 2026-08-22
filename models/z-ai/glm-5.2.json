@@ -3,7 +3,6 @@
     "workers_ai",
     "siliconflow",
     "command_code",
-    "nvidia_nim",
     "openrouter"
   ],
   "meta": {
@@ -17,9 +16,6 @@
       "allowedTiers": [
         "go"
       ]
-    },
-    "nvidia_nim": {
-      "upstream": "z-ai/glm-5.2"
     },
     "openrouter": {
       "upstream": "z-ai/glm-5.2:free"

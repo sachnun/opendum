@@ -1,7 +1,6 @@
 {
   "providers": [
     "nvidia_nim",
-    "openrouter",
     "siliconflow",
     "workers_ai"
   ],
@@ -27,9 +26,6 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "openai/gpt-oss-20b"
-    },
-    "openrouter": {
-      "upstream": "openai/gpt-oss-20b:free"
     },
     "siliconflow": {
       "upstream": "openai/gpt-oss-120b"
