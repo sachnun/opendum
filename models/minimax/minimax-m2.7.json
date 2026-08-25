@@ -1,6 +1,8 @@
 {
   "providers": [
-    "command_code"
+    "command_code",
+    "kilo_code",
+    "openrouter"
   ],
   "meta": {
     "reasoning": true,
@@ -13,6 +15,13 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "kilo_code": {
+      "upstream": "minimax/minimax-m2.7:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "minimax/minimax-m2.7:free"
     }
   }
 }
