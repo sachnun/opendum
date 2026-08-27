@@ -1,6 +1,5 @@
 {
   "providers": [
-    "nvidia_nim",
     "workers_ai"
   ],
   "aliases": [
@@ -19,9 +18,6 @@
     "type": "instruct"
   },
   "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "meta/llama-3.3-70b-instruct"
-    },
     "workers_ai": {
       "upstream": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
     }

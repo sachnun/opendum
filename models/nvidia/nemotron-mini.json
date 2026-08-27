@@ -1,19 +1,12 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
-  "ignored": true,
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nvidia/nemotron-mini-4b-instruct"
-    }
-  },
-  "meta": {
-    "type": "instruct"
-  },
+  "providers": [],
   "aliases": [
     "nemotron-mini-4b-instruct",
     "nvidia/nemotron-mini-4b-instruct",
     "nemotron-mini-instruct"
-  ]
+  ],
+  "ignored": true,
+  "meta": {
+    "type": "instruct"
+  }
 }

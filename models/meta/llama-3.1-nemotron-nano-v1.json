@@ -1,8 +1,6 @@
 {
   "id": "llama-3.1-nemotron-nano-v1",
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "llama-3.1-nemotron-nano",
     "llama-3.1-nemotron-nano-8b-v1",
@@ -11,10 +9,5 @@
     "nvidia/llama-3.1-nemotron-nano-8b-v1"
   ],
   "ignored": true,
-  "meta": {},
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nvidia/llama-3.1-nemotron-nano-8b-v1"
-    }
-  }
+  "meta": {}
 }

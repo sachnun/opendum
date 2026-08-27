@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "llama-3.2-3b-instruct",
     "meta/llama-3.2-3b-instruct",
@@ -17,10 +15,5 @@
     "toolCall": true,
     "vision": false,
     "type": "instruct"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "meta/llama-3.2-3b-instruct"
-    }
   }
 }

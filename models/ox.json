@@ -1,11 +1,3 @@
 {
-  "providers": [
-    "kilo_code"
-  ],
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "stealth/ox-alpha",
-      "authless": true
-    }
-  }
+  "providers": []
 }

@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "nemotron-nano-12b-v2-vl",
     "nvidia-nemotron-nano-12b-v2-vl",
@@ -14,10 +12,5 @@
     "toolCall": true,
     "vision": true,
     "variant": "vl"
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nvidia/nemotron-nano-12b-v2-vl"
-    }
   }
 }

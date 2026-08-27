@@ -1,8 +1,6 @@
 {
   "id": "llama-3.3-nemotron-super-v1",
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "llama-3.3-nemotron-super",
     "llama-3.3-nemotron-super-49b-v1",
@@ -18,10 +16,5 @@
     "reasoning": false,
     "toolCall": false,
     "vision": false
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nvidia/llama-3.3-nemotron-super-49b-v1"
-    }
   }
 }
