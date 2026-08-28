@@ -1,7 +1,8 @@
 {
   "providers": [
     "command_code",
-    "siliconflow"
+    "siliconflow",
+    "nvidia_nim"
   ],
   "providerConfig": {
     "command_code": {
@@ -9,6 +10,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "nvidia_nim": {
+      "upstream": "moonshotai/kimi-k3"
     },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K3"
