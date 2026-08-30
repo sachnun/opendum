@@ -1,6 +1,5 @@
 {
   "providers": [
-    "opencode",
     "siliconflow",
     "kilo_code"
   ],
@@ -17,9 +16,6 @@
     "kilo_code": {
       "upstream": "tencent/hy3:free",
       "authless": true
-    },
-    "opencode": {
-      "upstream": "hy3-free"
     },
     "siliconflow": {
       "upstream": "tencent/Hy3"
