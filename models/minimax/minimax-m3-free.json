@@ -1,13 +1,3 @@
 {
-  "providers": [
-    "command_code"
-  ],
-  "providerConfig": {
-    "command_code": {
-      "upstream": "minimax/minimax-m3-free",
-      "allowedTiers": [
-        "go"
-      ]
-    }
-  }
+  "providers": []
 }

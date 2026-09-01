@@ -1,7 +1,6 @@
 {
   "providers": [
-    "siliconflow",
-    "kilo_code"
+    "siliconflow"
   ],
   "aliases": [
     "hy3-preview",
@@ -13,10 +12,6 @@
     "status": "preview"
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "tencent/hy3:free",
-      "authless": true
-    },
     "siliconflow": {
       "upstream": "tencent/Hy3"
     }
