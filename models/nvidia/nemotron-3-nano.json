@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
+  "providers": [],
   "aliases": [
     "nemotron-3-nano-30b-a3b",
     "nvidia/nemotron-3-nano-30b-a3b",
@@ -12,10 +10,5 @@
     "reasoning": true,
     "toolCall": true,
     "vision": false
-  },
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "nvidia/nemotron-3-nano-30b-a3b"
-    }
   }
 }
