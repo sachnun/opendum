@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {},
+  "aliases": [
+    "gpt-oss-120b-medium"
+  ]
+}

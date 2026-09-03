@@ -1,0 +1,16 @@
+{
+  "providers": [],
+  "aliases": [
+    "deepseek-ai-DeepSeek-V3.1-Terminus",
+    "deepseek-ai-deepseek-v3.1-terminus",
+    "deepseek-ai/DeepSeek-V3.1-Terminus",
+    "deepseek-ai/deepseek-v3.1-terminus",
+    "deepseek-v3.1-terminus"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "mixtral-8x7b-v0.1",
+  "providers": [],
+  "aliases": [
+    "mistralai-mixtral-8x7b-instruct-v0.1",
+    "mistralai-mixtral-8x7b-v0.1",
+    "mistralai/mixtral-8x7b-instruct-v0.1",
+    "mixtral-8x7b",
+    "mixtral-8x7b-instruct",
+    "mixtral-8x7b-instruct-v0.1"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  }
+}

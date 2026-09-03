@@ -1,0 +1,27 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-3.1-flash-lite",
+      "inject_thought_signature": true,
+      "scrub_model_artifacts": true,
+      "signature_family": "gemini-flash",
+      "system_instruction": true,
+      "thinking_format": "level",
+      "thinking_levels": {
+        "high": "high",
+        "low": "low",
+        "medium": "medium",
+        "none": "minimal",
+        "xhigh": "high"
+      }
+    }
+  }
+}

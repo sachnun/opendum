@@ -18,7 +18,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 var supportedCodex = set("model", "instructions", "store", "input", "stream", "tools", "tool_choice", "parallel_tool_calls", "reasoning", "include", "previous_response_id", "prompt_cache_key", "client_metadata", "service_tier")
 
 type codexProvider struct {
-	registry *models.Registry
+	registry *registry.Registry
 	redis    *redis.Client
 	db       *appdb.DB
 }

@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "aliases": [
+    "seed-oss-36b-instruct",
+    "bytedance/seed-oss-36b-instruct",
+    "ByteDance-Seed/Seed-OSS-36B-Instruct",
+    "seed-oss-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "ByteDance-Seed/Seed-OSS-36B-Instruct"
+    }
+  }
+}

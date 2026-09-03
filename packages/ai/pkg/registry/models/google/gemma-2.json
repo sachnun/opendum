@@ -1,0 +1,20 @@
+{
+  "providers": [],
+  "aliases": [
+    "gemma-2-27b-it",
+    "google-gemma-2-27b-it",
+    "google/gemma-2-27b-it",
+    "gemma-2-9b-it",
+    "google/gemma-2-2b-it",
+    "gemma-2-2b-it",
+    "google-gemma-2-2b-it",
+    "gemma-2-it"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  }
+}

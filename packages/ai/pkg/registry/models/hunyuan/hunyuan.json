@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "tencent/Hunyuan-A13B-Instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "hunyuan-a13b-instruct",
+    "tencent/Hunyuan-A13B-Instruct",
+    "hunyuan-instruct"
+  ]
+}

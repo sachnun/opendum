@@ -1,0 +1,12 @@
+{
+  "providers": [],
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "marin-8b-instruct",
+    "marin-instruct"
+  ]
+}

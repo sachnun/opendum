@@ -1,0 +1,13 @@
+{
+  "id": "llama-3.1-nemotron-nano-v1",
+  "providers": [],
+  "aliases": [
+    "llama-3.1-nemotron-nano",
+    "llama-3.1-nemotron-nano-8b-v1",
+    "nvidia-llama-3.1-nemotron-nano-v1",
+    "nvidia-llama-3.1-nemotron-nano-8b-v1",
+    "nvidia/llama-3.1-nemotron-nano-8b-v1"
+  ],
+  "ignored": true,
+  "meta": {}
+}

@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "openrouter"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "openrouter": {
+      "upstream": "openrouter/free"
+    }
+  }
+}

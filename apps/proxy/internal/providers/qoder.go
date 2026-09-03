@@ -21,7 +21,7 @@ import (
 	"time"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 // Qoder separates identity (openapi.qoder.sh, bearer device token) from
@@ -70,7 +70,7 @@ var qoderCustomAlphabet = []byte("_doRTgHZBKcGVjlvpC,@aFSx#DPuNJme&i*MzLOEn)sUrt
 var qoderRSAPublicKey = mustParseQoderRSAPublicKey()
 
 type qoderProvider struct {
-	registry *models.Registry
+	registry *registry.Registry
 }
 
 func (p qoderProvider) RefreshBuffer() time.Duration { return qoderRefreshBuffer }

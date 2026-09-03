@@ -1,0 +1,23 @@
+{
+  "providers": [],
+  "aliases": [
+    "deepseek-3.2",
+    "deepseek-ai-DeepSeek-V3",
+    "deepseek-ai-DeepSeek-V3.1",
+    "deepseek-ai-DeepSeek-V3.2",
+    "deepseek-ai-DeepSeek-V3.2-Exp",
+    "deepseek-ai/DeepSeek-V3",
+    "deepseek-ai/DeepSeek-V3.1",
+    "deepseek-ai/DeepSeek-V3.2",
+    "deepseek-ai/DeepSeek-V3.2-Exp",
+    "deepseek-exp",
+    "deepseek-v3",
+    "deepseek-v3.1",
+    "deepseek-v3.2",
+    "deepseek-v3.2-exp"
+  ],
+  "ignored": true,
+  "meta": {
+    "status": "experimental"
+  }
+}

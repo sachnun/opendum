@@ -10,7 +10,10 @@ require (
 	github.com/uptrace/bun v1.2.18
 	github.com/uptrace/bun/dialect/pgdialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
+	github.com/opendum/opendum/packages/ai v0.0.0
 )
+
+replace github.com/opendum/opendum/packages/ai => ../../packages/ai
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

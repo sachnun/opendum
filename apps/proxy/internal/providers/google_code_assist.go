@@ -22,7 +22,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 const googleOAuthTokenEndpoint = "https://oauth2.googleapis.com/token"
@@ -68,13 +68,13 @@ type googleCodeAssistProvider struct {
 	userAgent        string
 	apiClient        string
 	clientMetadata   string
-	registry         *models.Registry
+	registry         *registry.Registry
 	db               *appdb.DB
 	redis            *redis.Client
 }
 
 type antigravityProvider struct {
-	registry *models.Registry
+	registry *registry.Registry
 	db       *appdb.DB
 	redis    *redis.Client
 }

@@ -1,0 +1,19 @@
+{
+  "id": "codestral-v0.1",
+  "providers": [],
+  "aliases": [
+    "codestral",
+    "codestral-22b-instruct-v0.1",
+    "mistralai-codestral-v0.1",
+    "mistralai-codestral-22b-instruct-v0.1",
+    "mistralai/codestral-22b-instruct-v0.1",
+    "codestral-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  }
+}

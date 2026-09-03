@@ -15,8 +15,8 @@
     "build": "npm run build:dashboard && npm run build:proxy",
     "db:push": "npm run db:push --workspace @opendum/dashboard",
     "db:studio": "npm run db:studio --workspace @opendum/dashboard",
-    "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./...",
-    "models:refresh": "node scripts/models.mjs"
+    "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./... && go -C packages/ai test ./...",
+    "models:refresh": "go run ./packages/ai/cmd/opendum refresh"
   },
   "devDependencies": {
     "edgeone": "^1.6.13",

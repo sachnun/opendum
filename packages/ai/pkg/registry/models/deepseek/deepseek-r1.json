@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-R1"
+    }
+  }
+}

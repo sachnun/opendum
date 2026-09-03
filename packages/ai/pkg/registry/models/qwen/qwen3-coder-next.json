@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "kiro"
+  ],
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false
+  }
+}

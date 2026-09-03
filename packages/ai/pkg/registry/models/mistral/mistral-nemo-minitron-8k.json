@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/mistral-nemo-minitron-8b-8k-instruct"
+    }
+  },
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "mistral-nemo-minitron-8b-8k-instruct",
+    "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+    "mistral-nemo-minitron-8k-instruct"
+  ]
+}

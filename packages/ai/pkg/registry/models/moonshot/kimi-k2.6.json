@@ -1,0 +1,30 @@
+{
+  "providers": [
+    "workers_ai",
+    "siliconflow",
+    "command_code",
+    "nvidia_nim"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "command_code": {
+      "upstream": "moonshotai/Kimi-K2.6",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "nvidia_nim": {
+      "upstream": "moonshotai/kimi-k2.6"
+    },
+    "siliconflow": {
+      "upstream": "moonshotai/Kimi-K2.6"
+    },
+    "workers_ai": {
+      "upstream": "@cf/moonshotai/kimi-k2.6"
+    }
+  }
+}

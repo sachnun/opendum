@@ -1,0 +1,22 @@
+{
+  "providers": [
+    "command_code",
+    "qoder"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "command_code": {
+      "upstream": "Qwen/Qwen3.7-Max",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "qoder": {
+      "upstream": "qmodel_latest"
+    }
+  }
+}

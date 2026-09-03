@@ -1,0 +1,31 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "aliases": [
+    "lfm-2.5-1.2b-instruct",
+    "lfm-2.5-1.2b-thinking",
+    "lfm-2.5-instruct",
+    "lfm-2.5-thinking",
+    "liquid-lfm-2.5-1.2b-thinking:free",
+    "liquid/lfm-2.5-1.2b-instruct:free",
+    "liquid/lfm-2.5-1.2b-thinking:free"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "liquid/lfm-2.5-2.6b:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "liquid/lfm-2.5-2.6b:free"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "aliases": [
+    "hy3-preview",
+    "tencent-Hy3-preview",
+    "tencent/Hy3-preview"
+  ],
+  "ignored": false,
+  "meta": {
+    "status": "preview"
+  },
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "tencent/Hy3"
+    }
+  }
+}

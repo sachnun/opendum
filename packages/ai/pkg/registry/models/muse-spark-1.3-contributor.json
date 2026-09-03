@@ -1,0 +1,21 @@
+{
+  "providers": [
+    "opencode",
+    "command_code",
+    "zenmux"
+  ],
+  "providerConfig": {
+    "command_code": {
+      "upstream": "meta/muse-spark-1.3-contributor",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "opencode": {
+      "upstream": "muse-spark-1.3-contributor-free"
+    },
+    "zenmux": {
+      "upstream": "meta/muse-spark-1.3-contributor"
+    }
+  }
+}

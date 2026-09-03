@@ -1,0 +1,20 @@
+{
+  "id": "nemotron-nano-v2",
+  "providers": [],
+  "aliases": [
+    "nemotron-nano",
+    "nemotron-nano-9b-v2",
+    "nvidia-nemotron-nano-9b-v2",
+    "nvidia-nemotron-nano-9b-v2:free",
+    "nvidia-nemotron-nano-v2",
+    "nvidia-nvidia-nemotron-nano-9b-v2",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/nvidia-nemotron-nano-9b-v2"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  }
+}

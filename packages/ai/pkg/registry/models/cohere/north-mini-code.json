@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "cohere/north-mini-code:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "cohere/north-mini-code:free"
+    }
+  }
+}

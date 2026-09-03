@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "workers_ai",
+    "zenmux"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-4.7-flash"
+    },
+    "zenmux": {
+      "upstream": "z-ai/glm-4.7-flash-free"
+    }
+  }
+}

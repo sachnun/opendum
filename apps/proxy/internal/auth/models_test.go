@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 func TestValidateModelRejectsCodexChatGPTIncompatibleModel(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := registry.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestValidateModelRejectsCodexChatGPTIncompatibleModel(t *testing.T) {
 }
 
 func TestValidateModelAcceptsCodexChatGPTCompatibleModel(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := registry.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestValidateModelAcceptsCodexChatGPTCompatibleModel(t *testing.T) {
 }
 
 func TestValidateModelSuggestsSimilarModels(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := registry.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestValidateModelSuggestsSimilarModels(t *testing.T) {
 }
 
 func TestValidateModelSuggestionsExcludeAliases(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := registry.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestValidateModelSuggestionsExcludeAliases(t *testing.T) {
 }
 
 func TestValidateModelSuggestsFromTokenTypos(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := registry.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestValidateModelSuggestsFromTokenTypos(t *testing.T) {
 }
 
 func TestValidateModelForUserHidesAPIKeyModelAccessDenials(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := registry.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestValidateModelForUserHidesAPIKeyModelAccessDenials(t *testing.T) {
 }
 
 func TestValidateModelForUserDoesNotSuggestWhenNoUsableCandidates(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := registry.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}

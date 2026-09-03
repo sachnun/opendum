@@ -9,7 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 func (s *Service) ValidateModel(modelParam string) ModelValidationResult {
@@ -187,7 +187,7 @@ func ParseModelParam(modelParam string) (*string, string) {
 	if index < 0 {
 		return nil, modelParam
 	}
-	provider := models.NormalizeProviderAlias(modelParam[:index])
+	provider := registry.NormalizeProviderAlias(modelParam[:index])
 	model := modelParam[index+1:]
 	return &provider, model
 }

@@ -1,0 +1,26 @@
+{
+  "providers": [
+    "command_code",
+    "workers_ai",
+    "zenmux"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "command_code": {
+      "upstream": "z-ai/glm-5.3-flash",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-5.3-flash"
+    },
+    "zenmux": {
+      "upstream": "z-ai/glm-5.3-flash"
+    }
+  }
+}

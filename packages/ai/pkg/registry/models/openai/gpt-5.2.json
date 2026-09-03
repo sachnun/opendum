@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "codex"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  }
+}

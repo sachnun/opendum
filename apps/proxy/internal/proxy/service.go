@@ -16,7 +16,7 @@ import (
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 	"github.com/opendum/opendum/apps/proxy/internal/providers"
 	"github.com/opendum/opendum/apps/proxy/internal/sessionaffinity"
 )
@@ -32,14 +32,14 @@ type Service struct {
 	db               *appdb.DB
 	redis            *redis.Client
 	auth             *auth.Service
-	registry         *models.Registry
+	registry         *registry.Registry
 	providerRegistry *providers.Registry
 	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
 }
 
-func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string) *Service {
+func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *registry.Registry, secret string) *Service {
 	return &Service{
 		db:               db,
 		redis:            redisClient,
@@ -194,7 +194,7 @@ func (s *Service) modelAccountSelector(modelParam string) (string, string, bool)
 }
 
 func (s *Service) isKnownModelProviderPrefix(prefix string) bool {
-	provider := models.NormalizeProviderAlias(prefix)
+	provider := registry.NormalizeProviderAlias(prefix)
 	if provider == "" {
 		return false
 	}

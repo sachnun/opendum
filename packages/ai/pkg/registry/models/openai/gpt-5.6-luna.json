@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "zenmux",
+    "kiro",
+    "command_code"
+  ],
+  "providerConfig": {
+    "command_code": {
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "kiro": {
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    },
+    "zenmux": {
+      "upstream": "openai/gpt-5.6-luna"
+    }
+  }
+}

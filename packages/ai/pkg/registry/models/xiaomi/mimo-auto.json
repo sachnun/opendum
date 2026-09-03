@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "mimo_code"
+  ],
+  "providerConfig": {
+    "mimo_code": {
+      "authless": true
+    }
+  }
+}
