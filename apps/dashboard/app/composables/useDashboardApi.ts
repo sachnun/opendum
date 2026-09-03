@@ -27,6 +27,12 @@ import type {
   ProviderDetailData,
   ProviderDetailResponse,
   ProviderAccountUpdateData,
+  CustomProviderListItem,
+  CustomProviderCreateResult,
+  CustomProviderSyncResult,
+  CustomProviderConnectResult,
+  CustomProviderModelMeta,
+  CustomProviderModelFlags,
 } from "../../lib/dashboard-api-types";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
@@ -84,6 +90,16 @@ export function useDashboardApi() {
       pollDeviceAuth: (body: { provider: "codex" | "qoder" | "cline"; deviceCode: string; userCode?: string; codeVerifier?: string; method?: string; machineId?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/poll", body),
       quota: (body: AccountQuotaRequest, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaInfo>>(dashboardFetch, "/api/dashboard/accounts/quota", body, options),
       quotas: (body: AccountQuotaBatchRequest, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaBatchResult>>(dashboardFetch, "/api/dashboard/accounts/quotas", body, options),
+    },
+    customProviders: {
+      list: () => dashboardFetch<CustomProviderListItem[]>("/api/dashboard/custom-providers"),
+      create: (body: { slug: string; name: string; baseUrl: string; extraHeaders?: Record<string, string> }) => post<ActionResult<CustomProviderCreateResult>>(dashboardFetch, "/api/dashboard/custom-providers", body),
+      update: (body: { slug: string; name?: string; baseUrl?: string; extraHeaders?: Record<string, string>; enabled?: boolean }) => post<ActionResult>(dashboardFetch, "/api/dashboard/custom-providers/update", body),
+      remove: (body: { slug: string }) => post<ActionResult>(dashboardFetch, "/api/dashboard/custom-providers/delete", body),
+      connect: (body: { slug: string; token: string; name?: string }) => post<ActionResult<CustomProviderConnectResult>>(dashboardFetch, "/api/dashboard/custom-providers/connect", body),
+      syncModels: (body: { slug: string }) => post<ActionResult<CustomProviderSyncResult>>(dashboardFetch, "/api/dashboard/custom-providers/sync-models", body),
+      addModels: (body: { slug: string; models: Array<{ modelId: string; upstream?: string; authless?: boolean; minTier?: string; allowedTiers?: string[]; meta?: CustomProviderModelMeta; customFlags?: CustomProviderModelFlags }> }) => post<ActionResult<{ added: number }>>(dashboardFetch, "/api/dashboard/custom-providers/models", body),
+      deleteModel: (body: { slug: string; modelId: string }) => post<ActionResult>(dashboardFetch, "/api/dashboard/custom-providers/models/delete", body),
     },
     analytics: {
       data: (body?: { filter?: AnalyticsFilter; apiKeyId?: string; includeSeries?: boolean }) => post<AnalyticsData>(dashboardFetch, "/api/dashboard/analytics/data", body),

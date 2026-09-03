@@ -158,6 +158,25 @@ func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {
 		enabled = append(enabled, item)
 	}
 
+	if userID != "" {
+		customModels, err := s.auth.ListUserCustomModels(ctx, userID)
+		if err != nil {
+			WriteOpenAIError(w, http.StatusInternalServerError, ErrorInfo{Message: "Internal server error.", Type: "api_error"})
+			return
+		}
+		for _, item := range customModels {
+			id, _ := item["id"].(string)
+			slug := id
+			if index := strings.Index(slug, "/"); index > 0 {
+				slug = slug[:index]
+			}
+			if availability.AccountCountByProvider[slug] == 0 {
+				continue
+			}
+			enabled = append(enabled, item)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "data": enabled})
 }

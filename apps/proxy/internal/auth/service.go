@@ -12,6 +12,7 @@ import (
 	"github.com/opendum/opendum/apps/proxy/internal/cryptojs"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
 const (
@@ -29,13 +30,14 @@ const (
 )
 
 type Service struct {
-	db       *appdb.DB
-	redis    *redis.Client
-	registry *models.Registry
+	db              *appdb.DB
+	redis           *redis.Client
+	registry        *models.Registry
+	customProviders providers.CustomProviderReader
 }
 
 func NewService(db *appdb.DB, redisClient *redis.Client, registry *models.Registry) *Service {
-	return &Service{db: db, redis: redisClient, registry: registry}
+	return &Service{db: db, redis: redisClient, registry: registry, customProviders: providers.NewCustomStore(db)}
 }
 
 func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result, error) {

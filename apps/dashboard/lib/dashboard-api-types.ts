@@ -270,3 +270,57 @@ export interface AnalyticsData {
 }
 
 export type AnalyticsSeriesData = Pick<AnalyticsData, "requestsOverTime" | "tokenUsage" | "successRate" | "durationOverTime" | "granularity">;
+
+export interface CustomProviderModelMeta {
+  reasoning?: boolean;
+  toolCall?: boolean;
+  vision?: boolean;
+}
+
+export interface CustomProviderModelFlags {
+  responses_api?: boolean;
+  top_p_deprecated?: boolean;
+  convert_external_images?: boolean;
+}
+
+export interface CustomProviderModelRow {
+  id: string;
+  providerId: string;
+  modelId: string;
+  upstream: string | null;
+  authless: boolean;
+  minTier: string | null;
+  allowedTiers: string[] | null;
+  meta: CustomProviderModelMeta | null;
+  customFlags: CustomProviderModelFlags | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomProviderListItem {
+  id: string;
+  userId: string;
+  slug: string;
+  name: string;
+  baseUrl: string;
+  extraHeaders: Record<string, string> | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  accountCount: number;
+  models: CustomProviderModelRow[];
+}
+
+export interface CustomProviderCreateResult {
+  id: string;
+  slug: string;
+}
+
+export interface CustomProviderSyncResult {
+  added: number;
+  discovered: number;
+}
+
+export interface CustomProviderConnectResult {
+  isUpdate: boolean;
+}

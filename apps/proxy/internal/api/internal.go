@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -100,7 +102,27 @@ func resolveInternalRelayTarget(input internalRelayRequest) (string, string, err
 	if target.Scheme != "https" || target.Hostname() == "" || target.User != nil {
 		return "", "", errors.New("url must be an https provider URL")
 	}
+	if isPrivateRelayTarget(target) && !relayPrivateHostsAllowed() {
+		return "", "", errors.New("url must not target a private network address")
+	}
 	return method, target.String(), nil
+}
+
+func isPrivateRelayTarget(target *url.URL) bool {
+	host := strings.ToLower(target.Hostname())
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".internal") {
+		return true
+	}
+	addr, err := netip.ParseAddr(strings.Trim(host, "[]"))
+	if err != nil {
+		return false
+	}
+	return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsUnspecified() || addr.IsMulticast()
+}
+
+func relayPrivateHostsAllowed() bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv("OPENDUM_ALLOW_PRIVATE_RELAY")))
+	return value == "1" || value == "true" || value == "yes"
 }
 
 func validateInternalRelayMethod(method string) error {

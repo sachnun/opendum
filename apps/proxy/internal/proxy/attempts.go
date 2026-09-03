@@ -107,10 +107,18 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			go runner.bumpAccountRequestCount(context.Background(), attempt.account.ID, time.Now())
 		}
 		payload := cfg.Build(parsed, validation.Model, parsed.Stream, sessID)
-		if !runner.isVisionModel(validation.Model) {
+		if validation.Vision == nil {
+			if !runner.isVisionModel(validation.Model) {
+				stripImageContent(payload)
+			}
+		} else if !*validation.Vision {
 			stripImageContent(payload)
 		}
-		if !runner.isToolCallModel(validation.Model) {
+		if validation.ToolCall == nil {
+			if !runner.isToolCallModel(validation.Model) {
+				stripToolCallParameters(payload)
+			}
+		} else if !*validation.ToolCall {
 			stripToolCallParameters(payload)
 		}
 		requestStart := time.Now().UnixMilli()

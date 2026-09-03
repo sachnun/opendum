@@ -54,8 +54,8 @@ type Registry struct {
 	providers map[string]Provider
 }
 
-func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
-	return &Registry{providers: map[string]Provider{
+func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client, customs ...CustomProviderConfig) *Registry {
+	r := &Registry{providers: map[string]Provider{
 		"opencode":     opencodeProvider{registry: registry},
 		"cline":        clineProvider{registry: registry},
 		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
@@ -71,6 +71,17 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"mimo_code":    mimoCodeProvider{registry: registry},
 		"command_code": commandCodeProvider{registry: registry},
 	}}
+	for _, custom := range customs {
+		name := strings.TrimSpace(custom.Name)
+		if name == "" {
+			continue
+		}
+		if _, exists := r.providers[name]; exists {
+			continue
+		}
+		r.providers[name] = custom.provider(registry)
+	}
+	return r
 }
 
 func (r *Registry) Get(name string) (Provider, bool) {
@@ -105,6 +116,10 @@ type openAICompatibleProvider struct {
 	supportedParams map[string]struct{}
 	registry        *models.Registry
 	trimPrefix      string
+	extraHeaders    map[string]string
+	upstreamName    func(model string) string
+	modelFlags      func(model string) map[string]any
+	isAuthless      func(model string) bool
 }
 
 func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
@@ -113,6 +128,11 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	extraHeaders := p.extraRequestHeaders(account)
 	if p.requiresResponsesAPI(model) {
 		payload := p.buildResponsesPayload(body, modelName, stream)
+		if p.convertImages(model) {
+			if input, ok := payload["input"].([]any); ok {
+				payload["input"] = convertResponsesInputImageURLsToBase64(ctx, client, input)
+			}
+		}
 		resp, err := p.post(ctx, client, p.baseURL+"/responses", credentials, payload, stream, model, extraHeaders)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
@@ -133,6 +153,11 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	}
 
 	payload := p.buildPayload(body, model, modelName, stream)
+	if p.convertImages(model) {
+		if messages, ok := payload["messages"].([]any); ok {
+			payload["messages"] = convertImageURLsToBase64(ctx, client, messages)
+		}
+	}
 	resp, err := p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model, extraHeaders)
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
@@ -153,14 +178,21 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 }
 
 func (p openAICompatibleProvider) extraRequestHeaders(account appdb.ProviderAccount) map[string]string {
+	headers := map[string]string{}
 	if p.name == "zenmux" {
-		return map[string]string{"x-zenmux-apikey-source": "subscription"}
+		headers["x-zenmux-apikey-source"] = "subscription"
 	}
-	return nil
+	for key, value := range p.extraHeaders {
+		headers[key] = value
+	}
+	if len(headers) == 0 {
+		return nil
+	}
+	return headers
 }
 
 func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, model string, extraHeaders map[string]string) (*http.Response, error) {
-	if strings.TrimSpace(credentials) == "" && p.registry != nil && p.registry.IsAuthlessProviderModel(model, p.name) {
+	if strings.TrimSpace(credentials) == "" && p.authlessModel(model) {
 		return postJSONWithoutAuth(ctx, client, url, payload, stream)
 	}
 	if len(extraHeaders) > 0 {
@@ -176,7 +208,7 @@ func (p openAICompatibleProvider) buildPayload(body map[string]any, model string
 			payload[key] = value
 		}
 	}
-	if providerConfigBool(p.registry, model, p.name, "top_p_deprecated") {
+	if p.flagBool(model, "top_p_deprecated") {
 		delete(payload, "top_p")
 	}
 	payload["model"] = modelName
@@ -236,6 +268,9 @@ func (p openAICompatibleProvider) normalizeModel(model string) string {
 }
 
 func (p openAICompatibleProvider) resolveModel(model string) string {
+	if p.upstreamName != nil {
+		return p.upstreamName(model)
+	}
 	if p.registry != nil {
 		return p.registry.UpstreamModelName(model, p.name)
 	}
@@ -243,7 +278,26 @@ func (p openAICompatibleProvider) resolveModel(model string) string {
 }
 
 func (p openAICompatibleProvider) requiresResponsesAPI(model string) bool {
-	return providerConfigBool(p.registry, model, p.name, "responses_api")
+	return p.flagBool(model, "responses_api")
+}
+
+func (p openAICompatibleProvider) flagBool(model, key string) bool {
+	if p.modelFlags != nil {
+		value, _ := p.modelFlags(model)[key].(bool)
+		return value
+	}
+	return providerConfigBool(p.registry, model, p.name, key)
+}
+
+func (p openAICompatibleProvider) convertImages(model string) bool {
+	return p.flagBool(model, "convert_external_images")
+}
+
+func (p openAICompatibleProvider) authlessModel(model string) bool {
+	if p.isAuthless != nil {
+		return p.isAuthless(model)
+	}
+	return p.registry != nil && p.registry.IsAuthlessProviderModel(model, p.name)
 }
 
 type opencodeProvider struct {

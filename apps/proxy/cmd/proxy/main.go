@@ -16,6 +16,7 @@ import (
 	"github.com/opendum/opendum/apps/proxy/internal/config"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 	"github.com/opendum/opendum/apps/proxy/internal/proxy"
 	"github.com/opendum/opendum/apps/proxy/internal/redisclient"
 )
@@ -48,7 +49,12 @@ func main() {
 	}
 
 	authSvc := auth.NewService(database, redisClient, registry)
-	proxySvc := proxy.NewService(database, redisClient, authSvc, registry, cfg.BetterAuthSecret)
+	customProviders, err := providers.LoadCustomProviderConfigs()
+	if err != nil {
+		slog.Error("failed to load custom providers", "error", err)
+		os.Exit(1)
+	}
+	proxySvc := proxy.NewService(database, redisClient, authSvc, registry, cfg.BetterAuthSecret, customProviders...)
 	refreshCtx, stopTokenRefresher := context.WithCancel(context.Background())
 	defer stopTokenRefresher()
 	if cfg.TokenRefreshInterval > 0 {

@@ -34,18 +34,20 @@ type Service struct {
 	auth             *auth.Service
 	registry         *models.Registry
 	providerRegistry *providers.Registry
+	customStore      providers.CustomProviderReader
 	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
 }
 
-func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string) *Service {
+func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string, customs ...providers.CustomProviderConfig) *Service {
 	return &Service{
 		db:               db,
 		redis:            redisClient,
 		auth:             authSvc,
 		registry:         registry,
-		providerRegistry: providers.NewRegistry(registry, db, redisClient),
+		providerRegistry: providers.NewRegistry(registry, db, redisClient, customs...),
+		customStore:      providers.NewCustomStore(db),
 		affinity: sessionaffinity.New(redisClient, []string{
 			"zenmux", "codex", "siliconflow", "openrouter", "antigravity",
 		}),
@@ -91,7 +93,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		s.writeRouteError(w, cfg, routeErr.Status, routeErr.Message, routeErr.Type, routeErr.Param, routeErr.Code, routeErr.RetryAfter, routeErr.RetryAfterMS)
 		return
 	}
-	parsed = s.applyModelAccountSelector(parsed)
+	parsed = s.applyModelAccountSelector(parsed, ctx, authResult.UserID)
 	r = r.WithContext(context.WithValue(ctx, requestBodyContextKey{}, body))
 	ctx = r.Context()
 
@@ -170,8 +172,8 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	}
 }
 
-func (s *Service) applyModelAccountSelector(parsed parsedEndpointRequest) parsedEndpointRequest {
-	accountID, model, ok := s.modelAccountSelector(parsed.ModelParam)
+func (s *Service) applyModelAccountSelector(parsed parsedEndpointRequest, ctx context.Context, userID string) parsedEndpointRequest {
+	accountID, model, ok := s.modelAccountSelector(ctx, parsed.ModelParam, userID)
 	if !ok {
 		return parsed
 	}
@@ -180,7 +182,7 @@ func (s *Service) applyModelAccountSelector(parsed parsedEndpointRequest) parsed
 	return parsed
 }
 
-func (s *Service) modelAccountSelector(modelParam string) (string, string, bool) {
+func (s *Service) modelAccountSelector(ctx context.Context, modelParam, userID string) (string, string, bool) {
 	index := strings.Index(modelParam, "/")
 	if index < 0 {
 		return "", "", false
@@ -189,6 +191,12 @@ func (s *Service) modelAccountSelector(modelParam string) (string, string, bool)
 	model := strings.TrimSpace(modelParam[index+1:])
 	if prefix == "" || model == "" || s.isKnownModelProviderPrefix(prefix) {
 		return "", "", false
+	}
+	if s.customStore != nil {
+		custom, err := s.customStore.GetProvider(ctx, userID, prefix)
+		if err == nil && custom != nil {
+			return "", "", false
+		}
 	}
 	return prefix, model, true
 }
@@ -271,6 +279,9 @@ func playgroundSignature(secret, userID, timestamp, method, path string) string 
 func (s *Service) makeProviderRequest(ctx context.Context, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {
 	providerImpl, ok := s.providerRegistry.Get(account.Provider)
 	if !ok {
+		providerImpl = s.customProviderForAccount(ctx, account)
+	}
+	if providerImpl == nil {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
 	}
 	if isAuthlessProvider(providerImpl) || isSyntheticProviderAccountID(account.ID) {
@@ -286,4 +297,19 @@ func (s *Service) makeProviderRequest(ctx context.Context, account appdb.Provide
 func isAuthlessProvider(provider providers.Provider) bool {
 	authless, ok := provider.(providers.AuthlessProvider)
 	return ok && authless.Authless()
+}
+
+func (s *Service) customProviderForAccount(ctx context.Context, account appdb.ProviderAccount) providers.Provider {
+	if s.customStore == nil {
+		return nil
+	}
+	custom, err := s.customStore.GetProvider(ctx, account.UserID, account.Provider)
+	if err != nil || custom == nil {
+		return nil
+	}
+	rows, err := s.customStore.ListModels(ctx, custom.ID)
+	if err != nil {
+		return nil
+	}
+	return providers.CompileCustomProvider(custom, rows)
 }
