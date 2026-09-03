@@ -1,0 +1,20 @@
+{
+  "id": "mistral-v0.3",
+  "providers": [],
+  "aliases": [
+    "mistral",
+    "mistral-7b-instruct-v0.2",
+    "mistral-7b-instruct-v0.3",
+    "mistral-instruct",
+    "mistralai-mistral-7b-instruct-v0.3",
+    "mistralai-mistral-v0.3",
+    "mistralai/mistral-7b-instruct-v0.3"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  }
+}

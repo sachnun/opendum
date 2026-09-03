@@ -1,0 +1,19 @@
+{
+  "providers": [],
+  "aliases": [
+    "llama-3.2-3b-instruct",
+    "meta/llama-3.2-3b-instruct",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "llama-3.2-1b-instruct",
+    "meta-llama-3.2-1b-instruct",
+    "meta/llama-3.2-1b-instruct",
+    "llama-3.2-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  }
+}

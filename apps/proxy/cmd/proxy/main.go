@@ -15,7 +15,7 @@ import (
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	"github.com/opendum/opendum/apps/proxy/internal/config"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 	"github.com/opendum/opendum/apps/proxy/internal/proxy"
 	"github.com/opendum/opendum/apps/proxy/internal/redisclient"
 )
@@ -41,7 +41,7 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	registry, err := models.Load(cfg.ModelsDir)
+	registry, err := registry.Load(cfg.ModelsDir)
 	if err != nil {
 		slog.Error("failed to load model registry", "error", err, "dir", cfg.ModelsDir)
 		os.Exit(1)

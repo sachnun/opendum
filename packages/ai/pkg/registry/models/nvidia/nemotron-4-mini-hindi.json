@@ -1,0 +1,12 @@
+{
+  "providers": [],
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "aliases": [
+    "nemotron-4-mini-hindi-4b-instruct",
+    "nemotron-4-mini-hindi-instruct"
+  ]
+}

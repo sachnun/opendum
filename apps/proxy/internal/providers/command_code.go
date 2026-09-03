@@ -8,7 +8,7 @@ import (
 	"time"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 )
 
 type commandCodeProvider struct {
-	registry *models.Registry
+	registry *registry.Registry
 }
 
 func (p commandCodeProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {

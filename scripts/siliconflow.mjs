@@ -156,7 +156,7 @@ async function fetchSiliconFlowChatModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/ai/models");
 
   const modelIds = await fetchSiliconFlowChatModelIds();
   const modelMap = buildModelMap(modelIds);

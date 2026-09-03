@@ -1,0 +1,26 @@
+{
+  "id": "mimo-v2.5",
+  "providers": [
+    "opencode",
+    "command_code"
+  ],
+  "aliases": [
+    "mimo",
+    "mimo-v2.5-free",
+    "xiaomi-mimo-v2.5",
+    "xiaomi/mimo-v2.5"
+  ],
+  "ignored": false,
+  "meta": {},
+  "providerConfig": {
+    "command_code": {
+      "upstream": "xiaomi/mimo-v2.5",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "opencode": {
+      "upstream": "mimo-v2.5-free"
+    }
+  }
+}

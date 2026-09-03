@@ -1,0 +1,32 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "aliases": [
+    "gemini-3.6-flash-high",
+    "gemini-3.6-flash-low",
+    "gemini-3.6-flash-medium"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-3.6-flash-medium",
+      "inject_thought_signature": true,
+      "scrub_model_artifacts": true,
+      "signature_family": "gemini-flash",
+      "system_instruction": true,
+      "thinking_format": "level",
+      "thinking_levels": {
+        "high": "high",
+        "low": "low",
+        "medium": "medium",
+        "none": "minimal",
+        "xhigh": "high"
+      }
+    }
+  }
+}

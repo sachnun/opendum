@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	models "github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 func TestCodexBuildPayloadConvertsChatToResponses(t *testing.T) {
@@ -878,7 +878,7 @@ func jsonTestResponse(status int, body string) *http.Response {
 
 func testModelsRegistry(t *testing.T) *models.Registry {
 	t.Helper()
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "packages", "ai", "models"))
 	if err != nil {
 		t.Fatal(err)
 	}

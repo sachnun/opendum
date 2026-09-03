@@ -1,0 +1,17 @@
+{
+  "providers": [],
+  "aliases": [
+    "phi-3.5-vision-instruct",
+    "microsoft-phi-3.5-vision-instruct",
+    "microsoft/phi-3.5-vision-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "variant": "vision",
+    "type": "instruct"
+  },
+  "providerConfig": {}
+}

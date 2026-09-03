@@ -1,0 +1,25 @@
+{
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "claude-opus-4.7",
+    "claude-opus4.7"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "claude-opus-4.7",
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    }
+  }
+}

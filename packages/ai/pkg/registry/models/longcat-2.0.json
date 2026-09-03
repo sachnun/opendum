@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "zenmux",
+    "siliconflow"
+  ],
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "meituan-longcat/LongCat-2.0"
+    },
+    "zenmux": {
+      "upstream": "meituan/longcat-2.0"
+    }
+  }
+}

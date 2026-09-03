@@ -141,7 +141,7 @@ async function fetchOpenRouterFreeModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/ai/models");
 
   const modelIds = await fetchOpenRouterFreeModelIds();
   const modelMap = buildModelMap(modelIds);

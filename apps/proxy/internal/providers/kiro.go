@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 const (
@@ -36,7 +36,7 @@ var kiroThinkingTags = []struct {
 }
 
 type kiroProvider struct {
-	registry *models.Registry
+	registry *registry.Registry
 }
 
 func (p kiroProvider) RefreshBuffer() time.Duration { return 5 * time.Minute }

@@ -1,0 +1,30 @@
+{
+  "providers": [
+    "siliconflow",
+    "command_code",
+    "zenmux",
+    "kilo_code",
+    "openrouter"
+  ],
+  "providerConfig": {
+    "command_code": {
+      "upstream": "MiniMaxAI/MiniMax-M3",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "kilo_code": {
+      "upstream": "minimax/minimax-m3:free",
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "minimax/minimax-m3:free"
+    },
+    "siliconflow": {
+      "upstream": "MiniMaxAI/MiniMax-M3"
+    },
+    "zenmux": {
+      "upstream": "minimax/minimax-m3"
+    }
+  }
+}

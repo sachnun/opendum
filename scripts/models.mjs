@@ -8,7 +8,7 @@ import { buildModelIndex } from "./model-registry.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "models");
+const modelsDir = resolve(rootDir, "packages/ai/models");
 
 const refreshScripts = [
   "antigravity-version.mjs",

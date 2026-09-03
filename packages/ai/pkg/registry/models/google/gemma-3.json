@@ -1,0 +1,28 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "gemma-3-27b-it",
+    "gemma-3-12b-it",
+    "google/gemma-3-12b-it",
+    "gemma-3-4b-it",
+    "google/gemma-3-4b-it",
+    "gemma-3-1b-it",
+    "google-gemma-3-1b-it",
+    "google/gemma-3-1b-it",
+    "gemma-3-it"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/gemma-3-12b-it"
+    }
+  }
+}

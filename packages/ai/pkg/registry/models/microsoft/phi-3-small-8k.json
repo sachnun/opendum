@@ -1,0 +1,16 @@
+{
+  "providers": [],
+  "aliases": [
+    "phi-3-small-8k-instruct",
+    "microsoft-phi-3-small-8k-instruct",
+    "microsoft/phi-3-small-8k-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {}
+}

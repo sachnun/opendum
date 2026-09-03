@@ -1,0 +1,25 @@
+{
+  "id": "riva-translate-v1.1",
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "nvidia-riva-translate-4b-instruct-v1.1",
+    "nvidia-riva-translate-4b-instruct-v2",
+    "nvidia-riva-translate-v1.1",
+    "nvidia/riva-translate-4b-instruct-v1.1",
+    "nvidia/riva-translate-4b-instruct-v2",
+    "riva-translate",
+    "riva-translate-4b-instruct-v1.1",
+    "riva-translate-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "type": "instruct"
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/riva-translate-4b-instruct-v1.1"
+    }
+  }
+}

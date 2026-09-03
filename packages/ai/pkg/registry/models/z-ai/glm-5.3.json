@@ -1,0 +1,22 @@
+{
+  "providers": [
+    "command_code",
+    "workers_ai"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "command_code": {
+      "upstream": "zai-org/GLM-5.3",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-5.3"
+    }
+  }
+}

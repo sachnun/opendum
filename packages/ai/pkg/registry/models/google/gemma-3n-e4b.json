@@ -1,0 +1,15 @@
+{
+  "providers": [],
+  "aliases": [
+    "gemma-3n-e4b-it",
+    "google-gemma-3n-e4b-it",
+    "google/gemma-3n-e4b-it"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "type": "instruct"
+  }
+}

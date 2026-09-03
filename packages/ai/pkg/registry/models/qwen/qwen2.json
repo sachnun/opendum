@@ -1,0 +1,14 @@
+{
+  "providers": [],
+  "aliases": [
+    "qwen2-7b-instruct",
+    "qwen-qwen2-7b-instruct",
+    "qwen/qwen2-7b-instruct",
+    "qwen2-instruct"
+  ],
+  "ignored": true,
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  }
+}

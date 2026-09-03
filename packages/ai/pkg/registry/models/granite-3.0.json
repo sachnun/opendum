@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "ibm/granite-3.0-3b-a800m-instruct"
+    }
+  }
+}

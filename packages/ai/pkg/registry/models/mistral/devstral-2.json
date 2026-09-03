@@ -1,0 +1,12 @@
+{
+  "providers": [],
+  "providerConfig": {},
+  "meta": {
+    "type": "instruct"
+  },
+  "ignored": false,
+  "aliases": [
+    "devstral-2-123b-instruct-2512",
+    "devstral-2-instruct"
+  ]
+}

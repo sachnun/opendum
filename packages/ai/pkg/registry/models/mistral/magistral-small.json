@@ -1,0 +1,13 @@
+{
+  "providers": [],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {},
+  "aliases": [
+    "magistral-small-2506"
+  ],
+  "ignored": false
+}

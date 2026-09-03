@@ -103,7 +103,7 @@ async function fetchKiloCodeModels() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/ai/models");
 
   const models = await fetchKiloCodeModels();
   const modelMap = buildModelMap(models);

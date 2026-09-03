@@ -1,0 +1,38 @@
+{
+  "providers": [
+    "siliconflow",
+    "zenmux",
+    "command_code"
+  ],
+  "aliases": [
+    "@cf-deepseek-ai-deepseek-v4-flash-0731",
+    "@cf/deepseek-ai/deepseek-v4-flash-0731",
+    "deepseek-ai-deepseek-v4-flash-0731",
+    "deepseek-ai/DeepSeek-V4-Flash",
+    "deepseek-ai/deepseek-v4-flash",
+    "deepseek-ai/deepseek-v4-flash-0731",
+    "deepseek-flash",
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-free"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "command_code": {
+      "upstream": "deepseek/deepseek-v4-flash",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V4-Flash"
+    },
+    "zenmux": {
+      "upstream": "deepseek/deepseek-v4-flash"
+    }
+  }
+}

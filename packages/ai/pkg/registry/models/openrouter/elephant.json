@@ -1,0 +1,11 @@
+{
+  "providers": [],
+  "providerConfig": {},
+  "meta": {
+    "status": "alpha"
+  },
+  "ignored": false,
+  "aliases": [
+    "elephant-alpha"
+  ]
+}

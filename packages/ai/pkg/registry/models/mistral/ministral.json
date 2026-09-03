@@ -1,0 +1,15 @@
+{
+  "providers": [],
+  "aliases": [
+    "ministral-14b-instruct-2512",
+    "mistralai/ministral-14b-instruct-2512",
+    "ministral-instruct"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  }
+}

@@ -3,10 +3,10 @@ package providers
 import (
 	"strings"
 
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
-func providerConfigBool(registry *models.Registry, model, provider, key string) bool {
+func providerConfigBool(registry *registry.Registry, model, provider, key string) bool {
 	value, ok := providerConfigValue(registry, model, provider, key)
 	if !ok {
 		return false
@@ -15,7 +15,7 @@ func providerConfigBool(registry *models.Registry, model, provider, key string) 
 	return boolValue
 }
 
-func providerConfigString(registry *models.Registry, model, provider, key string) string {
+func providerConfigString(registry *registry.Registry, model, provider, key string) string {
 	value, ok := providerConfigValue(registry, model, provider, key)
 	if !ok {
 		return ""
@@ -24,7 +24,7 @@ func providerConfigString(registry *models.Registry, model, provider, key string
 	return strings.TrimSpace(text)
 }
 
-func providerConfigStringMap(registry *models.Registry, model, provider, key string) map[string]string {
+func providerConfigStringMap(registry *registry.Registry, model, provider, key string) map[string]string {
 	value, ok := providerConfigValue(registry, model, provider, key)
 	if !ok {
 		return nil
@@ -42,7 +42,7 @@ func providerConfigStringMap(registry *models.Registry, model, provider, key str
 	return out
 }
 
-func providerConfigIntMap(registry *models.Registry, model, provider, key string) map[string]int {
+func providerConfigIntMap(registry *registry.Registry, model, provider, key string) map[string]int {
 	value, ok := providerConfigValue(registry, model, provider, key)
 	if !ok {
 		return nil
@@ -60,7 +60,7 @@ func providerConfigIntMap(registry *models.Registry, model, provider, key string
 	return out
 }
 
-func providerConfigValue(registry *models.Registry, model, provider, key string) (any, bool) {
+func providerConfigValue(registry *registry.Registry, model, provider, key string) (any, bool) {
 	if registry == nil {
 		return nil, false
 	}

@@ -11,7 +11,7 @@ import (
 
 	"github.com/opendum/opendum/apps/proxy/internal/cryptojs"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 const (
@@ -31,10 +31,10 @@ const (
 type Service struct {
 	db       *appdb.DB
 	redis    *redis.Client
-	registry *models.Registry
+	registry *registry.Registry
 }
 
-func NewService(db *appdb.DB, redisClient *redis.Client, registry *models.Registry) *Service {
+func NewService(db *appdb.DB, redisClient *redis.Client, registry *registry.Registry) *Service {
 	return &Service{db: db, redis: redisClient, registry: registry}
 }
 

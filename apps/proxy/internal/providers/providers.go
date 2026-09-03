@@ -14,7 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 const opencodeChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
@@ -54,7 +54,7 @@ type Registry struct {
 	providers map[string]Provider
 }
 
-func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
+func NewRegistry(registry *registry.Registry, db *appdb.DB, redis *redis.Client) *Registry {
 	return &Registry{providers: map[string]Provider{
 		"opencode":     opencodeProvider{registry: registry},
 		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
@@ -102,7 +102,7 @@ type openAICompatibleProvider struct {
 	name            string
 	baseURL         string
 	supportedParams map[string]struct{}
-	registry        *models.Registry
+	registry        *registry.Registry
 	trimPrefix      string
 }
 
@@ -246,7 +246,7 @@ func (p openAICompatibleProvider) requiresResponsesAPI(model string) bool {
 }
 
 type opencodeProvider struct {
-	registry *models.Registry
+	registry *registry.Registry
 }
 
 func (p opencodeProvider) Authless() bool { return true }
@@ -293,7 +293,7 @@ func opencodeHeaders(body map[string]any) map[string]string {
 }
 
 type workersAIProvider struct {
-	registry *models.Registry
+	registry *registry.Registry
 }
 
 func (p workersAIProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {

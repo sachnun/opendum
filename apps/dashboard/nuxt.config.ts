@@ -36,7 +36,7 @@ function collectFamilyByFileId(modelsDir: string): Record<string, string | null>
 }
 
 function buildModelRegistryModule(): string {
-  const modelsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../models");
+  const modelsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/ai/models");
   const modelFiles = collectModelFiles(modelsDir);
   const familyByFileId = collectFamilyByFileId(modelsDir);
   const imports = modelFiles.map((filePath, index) => `import model${index} from ${JSON.stringify(filePath)};`);

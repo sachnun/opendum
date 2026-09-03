@@ -1,0 +1,20 @@
+{
+  "providers": [
+    "command_code"
+  ],
+  "aliases": [
+    "qwen3.6-plus-preview"
+  ],
+  "ignored": false,
+  "meta": {
+    "status": "preview"
+  },
+  "providerConfig": {
+    "command_code": {
+      "upstream": "Qwen/Qwen3.6-Plus",
+      "allowedTiers": [
+        "go"
+      ]
+    }
+  }
+}

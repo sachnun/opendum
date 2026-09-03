@@ -1,0 +1,24 @@
+{
+  "providers": [
+    "kiro",
+    "siliconflow"
+  ],
+  "aliases": [
+    "deepseek-ai-DeepSeek-V3.2-Exp",
+    "deepseek-ai/DeepSeek-V3.2-Exp"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "status": "stable"
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "deepseek-3.2"
+    },
+    "siliconflow": {
+      "upstream": "deepseek-ai/DeepSeek-V3.2"
+    }
+  }
+}

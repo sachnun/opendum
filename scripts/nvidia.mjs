@@ -297,7 +297,7 @@ async function fetchNvidiaModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/ai/models");
 
   // Build existing model map from JSON files to preserve existing keys
   const index = buildModelIndex(modelsDir);

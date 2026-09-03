@@ -135,7 +135,7 @@ function buildModelMap(modelIds) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/ai/models");
 
   const modelIds = await fetchOpencodeFreeModelIds();
   const modelMap = buildModelMap(modelIds);

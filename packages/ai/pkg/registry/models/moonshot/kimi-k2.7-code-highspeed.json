@@ -1,0 +1,13 @@
+{
+  "providers": [
+    "command_code"
+  ],
+  "providerConfig": {
+    "command_code": {
+      "upstream": "moonshotai/Kimi-K2.7-Code-Highspeed",
+      "allowedTiers": [
+        "go"
+      ]
+    }
+  }
+}

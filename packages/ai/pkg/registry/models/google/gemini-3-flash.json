@@ -1,0 +1,14 @@
+{
+  "providers": [],
+  "aliases": [
+    "gemini-3-flash",
+    "gemini-3-flash-preview",
+    "gemini-3-flash-preview-latest"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  }
+}

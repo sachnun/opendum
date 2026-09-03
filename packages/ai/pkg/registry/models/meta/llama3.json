@@ -1,0 +1,20 @@
+{
+  "providers": [],
+  "aliases": [
+    "llama3-70b-instruct",
+    "meta-llama3-70b-instruct",
+    "meta/llama3-70b-instruct",
+    "llama3-8b-instruct",
+    "meta-llama3-8b-instruct",
+    "meta/llama3-8b-instruct",
+    "llama3-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "providerConfig": {}
+}

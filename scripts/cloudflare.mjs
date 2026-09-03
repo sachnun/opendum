@@ -244,7 +244,7 @@ async function fetchWorkersAIModels() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/ai/models");
   const reverseMap = buildReverseMap(modelsDir);
 
   const models = await fetchWorkersAIModels();

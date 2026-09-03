@@ -438,7 +438,7 @@ async function main() {
 
   // 6. Sync into JSON files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../packages/ai/models");
 
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,

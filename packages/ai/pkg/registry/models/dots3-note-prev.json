@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "zenmux"
+  ],
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "dots-studio/dots3-note-prev"
+    }
+  }
+}

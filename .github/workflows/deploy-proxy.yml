@@ -7,7 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-proxy.yml
       - apps/proxy/**
-      - models/**
+      - packages/ai/**
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -56,7 +56,7 @@ jobs:
         run: |
           rm -rf "$DEPLOY_DIR"
           mkdir -p "$DEPLOY_DIR/bin"
-          cp -R models "$DEPLOY_DIR/models"
+          cp -R packages/ai/models "$DEPLOY_DIR/models"
           cp apps/proxy/Dockerfile "$DEPLOY_DIR/Dockerfile"
           cp apps/proxy/railway.json "$DEPLOY_DIR/railway.json"
 

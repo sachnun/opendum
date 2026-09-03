@@ -1,0 +1,37 @@
+{
+  "providers": [
+    "antigravity",
+    "command_code",
+    "zenmux"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "providerConfig": {
+    "antigravity": {
+      "inject_thought_signature": true,
+      "scrub_model_artifacts": true,
+      "signature_family": "gemini-flash",
+      "system_instruction": true,
+      "thinking_format": "level",
+      "thinking_levels": {
+        "high": "high",
+        "low": "low",
+        "medium": "medium",
+        "none": "minimal",
+        "xhigh": "high"
+      }
+    },
+    "command_code": {
+      "upstream": "google/gemini-3.8-flash",
+      "allowedTiers": [
+        "go"
+      ]
+    },
+    "zenmux": {
+      "upstream": "google/gemini-3.8-flash"
+    }
+  }
+}

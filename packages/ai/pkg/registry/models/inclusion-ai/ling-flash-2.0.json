@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "siliconflow"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "siliconflow": {
+      "upstream": "inclusionAI/Ling-flash-2.0"
+    }
+  }
+}

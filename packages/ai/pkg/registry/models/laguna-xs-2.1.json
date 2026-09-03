@@ -1,0 +1,19 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter",
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "poolside/laguna-xs-2.1:free",
+      "authless": true
+    },
+    "nvidia_nim": {
+      "upstream": "poolside/laguna-xs-2.1"
+    },
+    "openrouter": {
+      "upstream": "poolside/laguna-xs-2.1:free"
+    }
+  }
+}

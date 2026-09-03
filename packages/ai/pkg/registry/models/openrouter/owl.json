@@ -1,0 +1,11 @@
+{
+  "providers": [],
+  "aliases": [
+    "owl-alpha",
+    "openrouter/owl-alpha"
+  ],
+  "ignored": false,
+  "meta": {
+    "status": "alpha"
+  }
+}

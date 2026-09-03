@@ -1,0 +1,15 @@
+{
+  "providers": [],
+  "aliases": [
+    "qwq-32b",
+    "qwen-qwq-32b",
+    "qwen/qwq-32b"
+  ],
+  "ignored": true,
+  "meta": {
+    "reasoning": false,
+    "toolCall": false,
+    "vision": false
+  },
+  "providerConfig": {}
+}

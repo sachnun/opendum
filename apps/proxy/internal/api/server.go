@@ -14,18 +14,18 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
-	"github.com/opendum/opendum/apps/proxy/internal/models"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 	"github.com/opendum/opendum/apps/proxy/internal/proxy"
 )
 
 type Server struct {
-	registry *models.Registry
+	registry *registry.Registry
 	auth     *auth.Service
 	proxy    *proxy.Service
 	secret   string
 }
 
-func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy.Service, secret string) http.Handler {
+func NewServer(registry *registry.Registry, authSvc *auth.Service, proxySvc *proxy.Service, secret string) http.Handler {
 	s := &Server{registry: registry, auth: authSvc, proxy: proxySvc, secret: secret}
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{

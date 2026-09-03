@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "opencode",
+    "kilo_code",
+    "openrouter",
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3.5-lightning:free",
+      "authless": true
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    "opencode": {
+      "upstream": "nemotron-3.5-lightning-free"
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3.5-lightning:free"
+    }
+  }
+}

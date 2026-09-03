@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  }
+}

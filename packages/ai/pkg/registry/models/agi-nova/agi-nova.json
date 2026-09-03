@@ -1,0 +1,14 @@
+{
+  "providers": [],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true,
+    "status": "beta"
+  },
+  "providerConfig": {},
+  "ignored": false,
+  "aliases": [
+    "agi-nova-beta"
+  ]
+}

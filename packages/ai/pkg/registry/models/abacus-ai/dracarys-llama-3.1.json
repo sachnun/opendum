@@ -1,0 +1,12 @@
+{
+  "providers": [],
+  "aliases": [
+    "dracarys-llama-3.1-70b-instruct",
+    "abacusai/dracarys-llama-3.1-70b-instruct",
+    "dracarys-llama-3.1-instruct"
+  ],
+  "ignored": true,
+  "meta": {
+    "type": "instruct"
+  }
+}
