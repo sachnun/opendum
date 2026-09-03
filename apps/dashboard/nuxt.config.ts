@@ -3,7 +3,35 @@ import { readdirSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
-import { inferFamilyFromFolder } from "../../scripts/model-registry.mjs";
+const FAMILY_BY_FOLDER: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  xai: "xAI",
+  meta: "Meta",
+  microsoft: "Microsoft",
+  qwen: "Qwen",
+  deepseek: "DeepSeek",
+  "kilo-code": "Kilo Code",
+  moonshot: "Moonshot",
+  minimax: "MiniMax",
+  "z-ai": "Z.AI",
+  mistral: "Mistral",
+  nvidia: "NVIDIA",
+  openrouter: "OpenRouter",
+  xiaomi: "Xiaomi",
+  hunyuan: "Hunyuan",
+  "inclusion-ai": "InclusionAI",
+  "nex-agi": "Nex AGI",
+  cohere: "Cohere",
+  "step-fun": "StepFun",
+  baichuan: "Baichuan",
+};
+
+function inferFamilyFromFolder(folderName: string): string | null {
+  if (!folderName) return null;
+  return FAMILY_BY_FOLDER[folderName] ?? null;
+}
 
 const redisXxhashStub = "\0redis-xxhash-stub";
 const modelRegistryVirtualModule = "virtual:opendum-model-registry";

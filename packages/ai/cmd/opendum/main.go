@@ -72,6 +72,10 @@ func runRefresh(args []string) {
 	manager := sync.NewSyncManager(modelsDir)
 	manager.Register(providers.NewOpenRouterFetcher())
 	manager.Register(providers.NewZenMuxFetcher())
+	manager.Register(providers.NewCodexFetcher())
+	manager.Register(providers.NewKiloCodeFetcher())
+	manager.Register(providers.NewCloudflareFetcher())
+	manager.Register(providers.NewNvidiaFetcher())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
