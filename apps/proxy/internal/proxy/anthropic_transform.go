@@ -255,7 +255,15 @@ func transformOpenAIToAnthropic(openAI map[string]any, model string) map[string]
 		content = append(content, map[string]any{"type": "text", "text": ""})
 	}
 	inputTokens, outputTokens := usageFromJSON(openAI)
-	return map[string]any{"id": "msg_" + defaultStringValue(openAI["id"], time.Now().Format("20060102150405")), "type": "message", "role": "assistant", "content": content, "model": model, "stop_reason": stopReason, "stop_sequence": nil, "usage": map[string]any{"input_tokens": inputTokens, "output_tokens": outputTokens}}
+	usage := map[string]any{"input_tokens": inputTokens, "output_tokens": outputTokens}
+	if rawUsage, ok := openAI["usage"].(map[string]any); ok {
+		if details, ok := rawUsage["prompt_tokens_details"].(map[string]any); ok {
+			if cached := numberAsInt(details["cached_tokens"]); cached > 0 {
+				usage["cache_read_input_tokens"] = cached
+			}
+		}
+	}
+	return map[string]any{"id": "msg_" + defaultStringValue(openAI["id"], time.Now().Format("20060102150405")), "type": "message", "role": "assistant", "content": content, "model": model, "stop_reason": stopReason, "stop_sequence": nil, "usage": usage}
 }
 
 func appendOpenAIMessageContent(content []any, message map[string]any) []any {

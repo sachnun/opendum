@@ -74,6 +74,7 @@ type anthropicStreamTracker struct {
 	openToolBlocks    map[int]bool
 	inputTokens       int
 	outputTokens      int
+	cachedTokens      int
 	finishReason      string
 	generatedToolUses int
 }
@@ -106,6 +107,11 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 			t.outputTokens = output
 		} else if output := numberAsInt(usage["output_tokens"]); output > 0 {
 			t.outputTokens = output
+		}
+		if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
+			if cached := numberAsInt(details["cached_tokens"]); cached > 0 {
+				t.cachedTokens = cached
+			}
 		}
 	}
 	choices, _ := parsed["choices"].([]any)
@@ -300,7 +306,11 @@ func (t *anthropicStreamTracker) Finish() {
 	if stopReason == "" {
 		stopReason = "end_turn"
 	}
-	writeAnthropicEvent(t.writer, t.flusher, "message_delta", map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": stopReason, "stop_sequence": nil}, "usage": map[string]any{"input_tokens": t.inputTokens, "output_tokens": t.outputTokens}})
+	deltaUsage := map[string]any{"input_tokens": t.inputTokens, "output_tokens": t.outputTokens}
+	if t.cachedTokens > 0 {
+		deltaUsage["cache_read_input_tokens"] = t.cachedTokens
+	}
+	writeAnthropicEvent(t.writer, t.flusher, "message_delta", map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": stopReason, "stop_sequence": nil}, "usage": deltaUsage})
 	writeAnthropicEvent(t.writer, t.flusher, "message_stop", map[string]any{"type": "message_stop"})
 }
 

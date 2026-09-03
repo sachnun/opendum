@@ -6,6 +6,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -163,7 +164,15 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	if messages, ok := body["messages"].([]any); ok && (p.name != "antigravity" || strings.Contains(modelName, "claude")) {
 		body["messages"] = convertImageURLsToBase64(ctx, client, messages)
 	}
-	sessionID := randomUUID()
+	sessionID := ""
+	if clientSession := stringValue(body["_sessionId"]); clientSession != "" {
+		sessionID = toNumericSessionID(clientSession)
+	} else {
+		sessionID = toNumericSessionID(stableSessionID(body))
+	}
+	if sessionID == "" {
+		sessionID = toNumericSessionID(randomUUID())
+	}
 	geminiPayload := openAIToGemini(body)
 	if p.name == "antigravity" {
 		p.transformAntigravityPayload(ctx, geminiPayload, modelName, sessionID)
@@ -302,9 +311,30 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 		augmentToolDescriptions(payload)
 		injectGeminiToolInstruction(payload)
 	}
+	sortFunctionDeclarations(payload)
 	p.applyAntigravitySystemInstruction(payload, model)
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
 	payload["sessionId"] = sessionID
+}
+
+// sortFunctionDeclarations sorts function declarations within each tool block
+// by name. This ensures a deterministic prefix for Gemini's implicit context
+// caching regardless of the order the client sends tools.
+func sortFunctionDeclarations(payload map[string]any) {
+	tools, _ := payload["tools"].([]any)
+	for _, rawTool := range tools {
+		tool, _ := rawTool.(map[string]any)
+		decls, _ := tool["functionDeclarations"].([]any)
+		if len(decls) <= 1 {
+			continue
+		}
+		sort.SliceStable(decls, func(i, j int) bool {
+			a, _ := decls[i].(map[string]any)
+			b, _ := decls[j].(map[string]any)
+			return stringValue(a["name"]) < stringValue(b["name"])
+		})
+		tool["functionDeclarations"] = decls
+	}
 }
 
 func (p googleCodeAssistProvider) normalizeCachedContent(payload map[string]any) {
@@ -534,6 +564,19 @@ func mapSlice(value any) []map[string]any {
 		}
 	}
 	return out
+}
+
+func toNumericSessionID(sessionID string) string {
+	v := strings.TrimSpace(sessionID)
+	if v == "" {
+		return ""
+	}
+	if matched, _ := regexp.MatchString(`^-?\d+$`, v); matched {
+		return v
+	}
+	h := sha256.Sum256([]byte(v))
+	n := binary.BigEndian.Uint64(h[:8]) & 0x7fffffffffffffff
+	return fmt.Sprintf("-%d", n)
 }
 
 func stableSessionID(body map[string]any) string {
@@ -2663,7 +2706,22 @@ func geminiUsage(response map[string]any) map[string]any {
 	if !ok {
 		return nil
 	}
-	return map[string]any{"prompt_tokens": numberFromAny(rawUsage["promptTokenCount"]), "completion_tokens": numberFromAny(rawUsage["candidatesTokenCount"]), "total_tokens": numberFromAny(rawUsage["totalTokenCount"])}
+	usage := map[string]any{
+		"prompt_tokens":     numberFromAny(rawUsage["promptTokenCount"]),
+		"completion_tokens": numberFromAny(rawUsage["candidatesTokenCount"]),
+		"total_tokens":      numberFromAny(rawUsage["totalTokenCount"]),
+	}
+	if cachedTokens := numberFromAny(rawUsage["cachedContentTokenCount"]); cachedTokens > 0 {
+		usage["prompt_tokens_details"] = map[string]any{
+			"cached_tokens": cachedTokens,
+		}
+	}
+	if thoughtsTokens := numberFromAny(rawUsage["thoughtsTokenCount"]); thoughtsTokens > 0 {
+		usage["completion_tokens_details"] = map[string]any{
+			"reasoning_tokens": thoughtsTokens,
+		}
+	}
+	return usage
 }
 
 func geminiFinishReason(response map[string]any, hasToolCalls bool) (string, bool) {
