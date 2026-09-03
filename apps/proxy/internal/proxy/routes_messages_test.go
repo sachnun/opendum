@@ -1,8 +1,10 @@
 package proxy
 
 import (
+	"encoding/json"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -84,3 +86,122 @@ func TestParseMessagesDefaultsStreamFalseAndValidatesModel(t *testing.T) {
 		t.Fatalf("routeErr = %+v", routeErr)
 	}
 }
+
+func TestTransformOpenAIToAnthropicPreservesCachedTokens(t *testing.T) {
+	openAI := map[string]any{
+		"id":    "chatcmpl_test",
+		"model": "claude-sonnet",
+		"choices": []any{
+			map[string]any{
+				"index": 0,
+				"message": map[string]any{
+					"role":    "assistant",
+					"content": "Hello world",
+				},
+				"finish_reason": "stop",
+			},
+		},
+		"usage": map[string]any{
+			"prompt_tokens":     1200,
+			"completion_tokens": 150,
+			"total_tokens":      1350,
+			"prompt_tokens_details": map[string]any{
+				"cached_tokens": 1000,
+			},
+		},
+	}
+
+	anthropic := transformOpenAIToAnthropic(openAI, "claude-sonnet")
+	usage, ok := anthropic["usage"].(map[string]any)
+	if !ok {
+		t.Fatalf("anthropic usage missing: %#v", anthropic["usage"])
+	}
+	if usage["input_tokens"] != 1200 || usage["output_tokens"] != 150 {
+		t.Fatalf("usage tokens mismatch: %#v", usage)
+	}
+	if usage["cache_read_input_tokens"] != 1000 {
+		t.Fatalf("cache_read_input_tokens = %v, want 1000", usage["cache_read_input_tokens"])
+	}
+}
+
+func TestAnthropicStreamTrackerPreservesCachedTokens(t *testing.T) {
+	recorder := &fakeResponseWriter{}
+	tracker := &anthropicStreamTracker{
+		writer:  recorder,
+		flusher: fakeFlusher{},
+	}
+
+	tracker.Process("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"}}]}\n\n")
+	tracker.Process("data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":800,\"completion_tokens\":40,\"prompt_tokens_details\":{\"cached_tokens\":650}}}\n\n")
+	tracker.Finish()
+
+	var deltaUsage map[string]any
+	for _, event := range recorder.events {
+		if event.name == "message_delta" {
+			if u, ok := event.data["usage"].(map[string]any); ok {
+				deltaUsage = u
+			}
+		}
+	}
+
+	if deltaUsage == nil {
+		t.Fatal("message_delta usage event not found")
+	}
+	if numberAsInt(deltaUsage["input_tokens"]) != 800 || numberAsInt(deltaUsage["output_tokens"]) != 40 {
+		t.Fatalf("deltaUsage tokens mismatch: input=%v, output=%v", deltaUsage["input_tokens"], deltaUsage["output_tokens"])
+	}
+	if numberAsInt(deltaUsage["cache_read_input_tokens"]) != 650 {
+		t.Fatalf("cache_read_input_tokens = %v, want 650: %#v", deltaUsage["cache_read_input_tokens"], deltaUsage)
+	}
+}
+
+type fakeEvent struct {
+	name string
+	data map[string]any
+}
+
+type fakeResponseWriter struct {
+	headers http.Header
+	status  int
+	events  []fakeEvent
+}
+
+func (f *fakeResponseWriter) Header() http.Header {
+	if f.headers == nil {
+		f.headers = make(http.Header)
+	}
+	return f.headers
+}
+
+func (f *fakeResponseWriter) Write(b []byte) (int, error) {
+	text := string(b)
+	for _, part := range strings.Split(text, "\n\n") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		lines := strings.Split(part, "\n")
+		var eventName string
+		var data map[string]any
+		for _, line := range lines {
+			if strings.HasPrefix(line, "event: ") {
+				eventName = strings.TrimPrefix(line, "event: ")
+			} else if strings.HasPrefix(line, "data: ") {
+				_ = json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &data)
+			}
+		}
+		if eventName != "" && data != nil {
+			f.events = append(f.events, fakeEvent{name: eventName, data: data})
+		}
+	}
+	return len(b), nil
+}
+
+func (f *fakeResponseWriter) WriteHeader(statusCode int) {
+	f.status = statusCode
+}
+
+type fakeFlusher struct{}
+
+func (fakeFlusher) Flush() {}
+

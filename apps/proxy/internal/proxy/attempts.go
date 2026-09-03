@@ -2,7 +2,10 @@ package proxy
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -261,9 +264,63 @@ func normalizeAccountTierAlias(tier string) string {
 	return normalized
 }
 
+var claudeCodeSessionRe = regexp.MustCompile(`_session_([a-f0-9-]+)$`)
+
 func sessionID(r *http.Request) string {
-	if value := r.Header.Get("session_id"); value != "" {
-		return value
+	if r == nil {
+		return ""
 	}
-	return r.Header.Get("x-session-id")
+	// 1. Check explicit client headers
+	for _, h := range []string{
+		"x-claude-code-session-id",
+		"session_id",
+		"x-session-id",
+		"session-id",
+		"x-session-affinity",
+		"x-client-request-id",
+	} {
+		if v := strings.TrimSpace(r.Header.Get(h)); v != "" {
+			return v
+		}
+	}
+
+	// 2. Check body from context if available
+	if ctx := r.Context(); ctx != nil {
+		if body, ok := ctx.Value(requestBodyContextKey{}).(map[string]any); ok && body != nil {
+			for _, k := range []string{"prompt_cache_key", "session_id", "sessionId", "conversation_id"} {
+				if v, ok := body[k].(string); ok && strings.TrimSpace(v) != "" {
+					return strings.TrimSpace(v)
+				}
+			}
+
+			if meta, ok := body["metadata"].(map[string]any); ok {
+				if uID, ok := meta["user_id"].(string); ok && strings.TrimSpace(uID) != "" {
+					if m := claudeCodeSessionRe.FindStringSubmatch(uID); len(m) > 1 {
+						return "claude:" + m[1]
+					}
+					return strings.TrimSpace(uID)
+				}
+			}
+
+			// Content hash fallback if messages exist
+			if messages, ok := body["messages"].([]any); ok && len(messages) > 0 {
+				for _, m := range messages {
+					if msg, ok := m.(map[string]any); ok {
+						if role, ok := msg["role"].(string); ok && role == "user" {
+							if content, ok := msg["content"].(string); ok && len(strings.TrimSpace(content)) > 20 {
+								trimmed := strings.TrimSpace(content)
+								if len(trimmed) > 100 {
+									trimmed = trimmed[:100]
+								}
+								h := sha256.Sum256([]byte(trimmed))
+								return "prompt:" + hex.EncodeToString(h[:8])
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return ""
 }

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	defaultTTL = 30 * time.Minute
+	defaultTTL = 2 * time.Hour
 	keyPrefix  = "opendum:session-affinity"
 )
 
