@@ -1,5 +1,6 @@
 {
   "providers": [
+    "cline",
     "siliconflow",
     "zenmux",
     "command_code"
@@ -22,6 +23,9 @@
     "vision": false
   },
   "providerConfig": {
+    "cline": {
+      "upstream": "deepseek/deepseek-v4-flash"
+    },
     "command_code": {
       "upstream": "deepseek/deepseek-v4-flash",
       "allowedTiers": [

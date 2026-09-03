@@ -1,9 +1,13 @@
 {
   "providers": [
     "zenmux",
-    "siliconflow"
+    "siliconflow",
+    "cline"
   ],
   "providerConfig": {
+    "cline": {
+      "upstream": "cline-free/longcat-2.0"
+    },
     "siliconflow": {
       "upstream": "meituan-longcat/LongCat-2.0"
     },

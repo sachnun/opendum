@@ -13,6 +13,7 @@ const modelsDir = resolve(rootDir, "models");
 const refreshScripts = [
   "antigravity-version.mjs",
   "antigravity-models.mjs",
+  "cline.mjs",
   "codex.mjs",
   "command-code.mjs",
   "kilo-code.mjs",
@@ -25,7 +26,7 @@ const refreshScripts = [
   "siliconflow.mjs",
 ];
 
-const REFRESHED_PROVIDERS = ["antigravity", "codex", "command_code", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
+const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "command_code", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
 
 // ---------------------------------------------------------------------------
 // Run a child script
