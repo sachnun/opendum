@@ -4,7 +4,8 @@
     "command_code",
     "zenmux",
     "kilo_code",
-    "openrouter"
+    "openrouter",
+    "perch"
   ],
   "providerConfig": {
     "command_code": {
@@ -19,6 +20,9 @@
     },
     "openrouter": {
       "upstream": "minimax/minimax-m3:free"
+    },
+    "perch": {
+      "upstream": "minimax-m3-free"
     },
     "siliconflow": {
       "upstream": "MiniMaxAI/MiniMax-M3"

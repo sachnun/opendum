@@ -55,6 +55,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
   command_code: { name: "Command Code", description: "Access open-source models via the Go tier ($1/mo) CLI API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://commandcode.ai/studio/api-keys", apiKeyPlaceholder: "user_..." },
   kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
+  perch: { name: "Perch", description: "Access free GLM, Qwen, Kimi & more via Perch browser login", methods: [browserOAuthMethod] },
   nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
   openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
   workers_ai: { name: "Cloudflare", description: "Access open-source models on Cloudflare's global network", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
@@ -78,7 +79,7 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "codex", "command_code", "kiro", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
+const providerOptions: Provider[] = ["antigravity", "codex", "command_code", "kiro", "perch", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -161,7 +162,7 @@ watch([open, step, provider, selectedMethod], async () => {
 
   try {
     if (selectedFlowType === "oauth_redirect") {
-      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider as "antigravity" | "codex" | "kiro" });
+      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider as "antigravity" | "codex" | "kiro" | "perch" });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       authUrl.value = result.data.authUrl;
@@ -305,6 +306,7 @@ function selectLoginMethod(method: MethodKey) {
 function callbackPlaceholder(providerKey: Provider | null) {
   if (providerKey === "kiro") return "http://localhost:49153/oauth/callback?code=...";
   if (providerKey === "codex") return "http://localhost:1455/auth/callback?code=...";
+  if (providerKey === "perch") return "http://127.0.0.1:47321/callback?code=...";
   return "http://localhost:1/oauth2callback?code=...";
 }
 
@@ -510,7 +512,7 @@ async function handleExchangeOAuth() {
 
   isLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.exchangeOAuth({ provider: provider.value as "antigravity" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
+    const result = await dashboardApi.accounts.exchangeOAuth({ provider: provider.value as "antigravity" | "codex" | "kiro" | "perch", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {

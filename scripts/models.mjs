@@ -19,13 +19,14 @@ const refreshScripts = [
   "kiro.mjs",
   "opencode.mjs",
   "openrouter.mjs",
+  "perch.mjs",
   "nvidia.mjs",
   "cloudflare.mjs",
   "zenmux.mjs",
   "siliconflow.mjs",
 ];
 
-const REFRESHED_PROVIDERS = ["antigravity", "codex", "command_code", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
+const REFRESHED_PROVIDERS = ["antigravity", "codex", "command_code", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "siliconflow", "workers_ai", "zenmux"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

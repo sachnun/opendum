@@ -172,6 +172,8 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 	switch account.Provider {
 	case "antigravity":
 		return s.fetchAntigravityQuota(ctx, requestAccount, credentials, forceRefresh), nil
+	case "perch":
+		return s.fetchPerchQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "codex":
 		return s.fetchCodexQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "kiro":

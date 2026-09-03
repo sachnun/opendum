@@ -5,6 +5,7 @@ export type ProviderAccountKey =
   | "kiro"
   | "nvidia_nim"
   | "openrouter"
+  | "perch"
   | "qoder"
   | "siliconflow"
   | "workers_ai"
@@ -53,6 +54,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Kiro connections yet.",
     showTier: true,
+  },
+  {
+    key: "perch",
+    slug: "perch",
+    label: "Perch",
+    category: "oauth",
+    emptyMessage: "No Perch connections yet.",
+    showTier: false,
   },
   {
     key: "nvidia_nim",

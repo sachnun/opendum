@@ -1,8 +1,9 @@
 {
   "providers": [
-    "workers_ai",
+    "command_code",
+    "perch",
     "siliconflow",
-    "command_code"
+    "workers_ai"
   ],
   "meta": {
     "reasoning": true,
@@ -15,6 +16,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "perch": {
+      "upstream": "kimi-2.5"
     },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.5"

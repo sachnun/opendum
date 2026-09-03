@@ -1,8 +1,9 @@
 {
   "providers": [
+    "command_code",
     "kiro",
-    "siliconflow",
-    "command_code"
+    "perch",
+    "siliconflow"
   ],
   "meta": {
     "reasoning": true,
@@ -15,6 +16,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "perch": {
+      "upstream": "glm-5"
     },
     "siliconflow": {
       "upstream": "zai-org/GLM-5"

@@ -25,6 +25,7 @@ export interface ProviderAccountCounts {
   kiro: number;
   nvidia_nim: number;
   openrouter: number;
+  perch: number;
   qoder: number;
   siliconflow: number;
   workers_ai: number;
@@ -49,6 +50,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "Codex", href: getProviderAccountPath("codex") },
       { name: "Command Code", href: getProviderAccountPath("command_code") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },
+      { name: "Perch", href: getProviderAccountPath("perch") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
       { name: "OpenRouter", href: getProviderAccountPath("openrouter") },
       { name: "ZenMux", href: getProviderAccountPath("zenmux") },

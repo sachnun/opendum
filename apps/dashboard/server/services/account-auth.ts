@@ -9,13 +9,14 @@ import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUr
 import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
 import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from "../lib/providers/qoder";
+import { exchangePerchOAuthCode, initiatePerchOAuth } from "../lib/providers/perch";
 import type { OAuthResult } from "../lib/providers/types";
 import type { ActionResult } from "../utils/api";
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
-export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]) });
-export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
+export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro", "perch"]) });
+export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro", "perch"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
 export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["codex", "qoder"]), method: z.string().optional() });
 export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["codex", "qoder"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: z.string().optional(), machineId: z.string().optional() });
 export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
@@ -82,6 +83,15 @@ const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
     requiresCodeVerifier: true,
     buildAuthUrl: () => buildKiroOAuthUrl(generateOAuthState()),
     exchangeCode: (code, codeVerifier) => kiroProvider.exchangeCode(code, kiroBrowserRedirectUri, codeVerifier ?? undefined),
+  },
+  perch: {
+    label: "Perch",
+    requiresCodeVerifier: true,
+    buildAuthUrl: async () => {
+      const result = await initiatePerchOAuth();
+      return { authUrl: result.authUrl, state: null, codeVerifier: result.codeVerifier };
+    },
+    exchangeCode: (code, codeVerifier) => exchangePerchOAuthCode(code, codeVerifier ?? ""),
   },
 };
 

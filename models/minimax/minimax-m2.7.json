@@ -2,7 +2,8 @@
   "providers": [
     "command_code",
     "kilo_code",
-    "openrouter"
+    "openrouter",
+    "perch"
   ],
   "meta": {
     "reasoning": true,
@@ -22,6 +23,9 @@
     },
     "openrouter": {
       "upstream": "minimax/minimax-m2.7:free"
+    },
+    "perch": {
+      "upstream": "minimax-m2.7-free"
     }
   }
 }

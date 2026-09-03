@@ -20,6 +20,7 @@ const (
 
 var providerDisplayNames = map[string]string{
 	"antigravity":  "Antigravity",
+	"perch":        "Perch",
 	"codex":        "Codex",
 	"command_code": "Command Code",
 	"kiro":         "Kiro",

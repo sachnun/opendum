@@ -5,6 +5,7 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "kiro",
   "nvidia_nim",
   "openrouter",
+  "perch",
   "qoder",
   "siliconflow",
   "workers_ai",
