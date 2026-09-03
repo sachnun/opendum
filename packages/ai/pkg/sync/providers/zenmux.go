@@ -2,48 +2,33 @@ package providers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/opendum/opendum/packages/ai/pkg/sync"
+	"github.com/opendum/opendum/packages/ai/pkg/sync/httpfetch"
 )
 
-type ZenMuxFetcher struct {
-	Client *http.Client
+const (
+	zenMuxPlansURL  = "https://zenmux.ai/api/subscription/public/get_all_plans"
+	zenMuxModelsURL = "https://zenmux.ai/api/v1/models"
+)
+
+func zenMuxToModelKey(modelID string) string {
+	base := modelID
+	if idx := strings.Index(modelID, "/"); idx != -1 {
+		base = modelID[idx+1:]
+	}
+	cleaned := stripKey(sanitizeKey(base))
+	return trimFreeSuffix(cleaned)
 }
 
-func NewZenMuxFetcher() *ZenMuxFetcher {
-	return &ZenMuxFetcher{
-		Client: &http.Client{Timeout: 30 * time.Second},
-	}
-}
-
-func (f *ZenMuxFetcher) Name() string {
-	return "zenmux"
-}
-
-func (f *ZenMuxFetcher) Fetch(ctx context.Context) (map[string]string, error) {
-	// 1. Get plans
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://zenmux.ai/api/subscription/public/get_all_plans", nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := f.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var plansResp struct {
+func SyncZenMux(ctx context.Context, modelsDir string) (sync.ProviderResult, error) {
+	client := &http.Client{Timeout: 20 * time.Second}
+	var plans struct {
 		Data []struct {
 			Desc   string `json:"desc"`
 			Models []struct {
@@ -52,65 +37,74 @@ func (f *ZenMuxFetcher) Fetch(ctx context.Context) (map[string]string, error) {
 			} `json:"models"`
 		} `json:"data"`
 	}
-
-	if err := json.Unmarshal(body, &plansResp); err != nil {
-		return nil, err
+	if err := httpfetch.FetchJSON(ctx, client, zenMuxPlansURL, &plans, &httpfetch.Options{Label: "ZenMux subscription plans"}); err != nil {
+		return sync.ProviderResult{Provider: "zenmux"}, err
 	}
-
-	planSlugs := map[string]struct{}{}
-	for _, p := range plansResp.Data {
-		if strings.Contains(p.Desc, "5 Flows/5h") {
-			for _, m := range p.Models {
-				if m.ProviderSlug == "*" {
-					planSlugs[m.ModelSlug] = struct{}{}
-				}
+	planSlugs := map[string]bool{}
+	for _, p := range plans.Data {
+		if !strings.Contains(p.Desc, "5 Flows/5h") {
+			continue
+		}
+		for _, m := range p.Models {
+			if m.ProviderSlug == "*" {
+				planSlugs[m.ModelSlug] = true
 			}
 		}
 	}
-
 	if len(planSlugs) == 0 {
-		return nil, fmt.Errorf("no free models found in zenmux plans")
+		return sync.ProviderResult{Provider: "zenmux"}, fmt.Errorf("No models found in ZenMux Free Plan")
 	}
-
-	// 2. Fetch active models
-	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://zenmux.ai/api/v1/models", nil)
-	if err != nil {
-		return nil, err
-	}
-	resp2, err := f.Client.Do(req2)
-	if err != nil {
-		return nil, err
-	}
-	defer resp2.Body.Close()
-
-	body2, err := io.ReadAll(resp2.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var modelsResp struct {
+	var all struct {
 		Data []struct {
 			ID               string   `json:"id"`
 			OutputModalities []string `json:"output_modalities"`
 		} `json:"data"`
 	}
-
-	if err := json.Unmarshal(body2, &modelsResp); err != nil {
-		return nil, err
+	if err := httpfetch.FetchJSON(ctx, client, zenMuxModelsURL, &all, &httpfetch.Options{Label: "ZenMux /v1/models"}); err != nil {
+		return sync.ProviderResult{Provider: "zenmux"}, err
 	}
-
-	result := map[string]string{}
-	for _, m := range modelsResp.Data {
-		if _, ok := planSlugs[m.ID]; !ok {
+	ids := []string{}
+	seen := map[string]bool{}
+	for _, m := range all.Data {
+		if !planSlugs[m.ID] {
 			continue
 		}
-		modelID := strings.TrimSpace(m.ID)
-		if modelID == "" {
+		mods := m.OutputModalities
+		if len(mods) > 0 && !containsStr(mods, "text") {
 			continue
 		}
-		key := sync.CleanKeyToModelKey(modelID)
-		result[key] = modelID
+		id := strings.TrimSpace(m.ID)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
 	}
+	sort.Strings(ids)
+	modelMap := buildSuffixedMap(ids, zenMuxToModelKey)
+	extra := map[string]map[string]any{}
+	for id := range idsSet(ids) {
+		_ = id
+	}
+	for k := range modelMap {
+		extra[k] = map[string]any{}
+	}
+	res, err := sync.SyncProviderRegistry(modelsDir, "zenmux", modelMap, extra, nil)
+	if err != nil {
+		return res, err
+	}
+	if len(res.Added) == 0 && len(res.Removed) == 0 && len(res.Updated) == 0 {
+		fmt.Printf("ZenMux free plan models are already up to date (%d models).\n", len(modelMap))
+	} else {
+		fmt.Printf("ZenMux: %d models (added %d, removed %d, updated %d).\n", len(modelMap), len(res.Added), len(res.Removed), len(res.Updated))
+	}
+	return res, nil
+}
 
-	return result, nil
+func idsSet(ids []string) map[string]bool {
+	m := map[string]bool{}
+	for _, id := range ids {
+		m[id] = true
+	}
+	return m
 }

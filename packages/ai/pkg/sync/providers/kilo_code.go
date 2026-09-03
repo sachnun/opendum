@@ -2,95 +2,100 @@ package providers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/opendum/opendum/packages/ai/pkg/sync"
-	"github.com/opendum/opendum/packages/ai/pkg/sync/cleankey"
+	gosync "github.com/opendum/opendum/packages/ai/pkg/sync"
+	"github.com/opendum/opendum/packages/ai/pkg/sync/httpfetch"
 )
 
 const kiloCodeModelsURL = "https://api.kilo.ai/api/gateway/models"
 
-type KiloCodeFetcher struct {
-	Client *http.Client
+var kiloCodeKeyOverrides = map[string]string{
+	"x-ai/grok-code-fast-1:optimized:free": "grok-code-fast-1",
 }
 
-func NewKiloCodeFetcher() *KiloCodeFetcher {
-	return &KiloCodeFetcher{
-		Client: &http.Client{Timeout: 30 * time.Second},
+func kiloCodeToModelKey(modelID string) string {
+	if v, ok := kiloCodeKeyOverrides[modelID]; ok {
+		return v
 	}
+	if strings.HasPrefix(modelID, "kilo-auto/") {
+		return stripKey(strings.ReplaceAll(modelID, "/", "-"))
+	}
+	without := modelID
+	if idx := strings.Index(modelID, "/"); idx != -1 {
+		without = modelID[idx+1:]
+	}
+	key := sanitizeKey(strings.TrimSuffix(without, ":free"))
+	return stripKey(key)
 }
 
-func (f *KiloCodeFetcher) Name() string {
-	return "kilo_code"
-}
-
-func (f *KiloCodeFetcher) Fetch(ctx context.Context) (map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, kiloCodeModelsURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := f.Client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("kilo code api returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
+func SyncKiloCode(ctx context.Context, modelsDir string) (gosync.ProviderResult, error) {
+	client := &http.Client{Timeout: 20 * time.Second}
 	var payload struct {
 		Data []struct {
 			ID     string `json:"id"`
 			IsFree bool   `json:"isFree"`
 		} `json:"data"`
 	}
-
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf("unmarshal kilo code models: %w", err)
+	if err := httpfetch.FetchJSON(ctx, client, kiloCodeModelsURL, &payload, &httpfetch.Options{Label: "Kilo Gateway /models"}); err != nil {
+		return gosync.ProviderResult{Provider: "kilo_code"}, err
 	}
-
-	result := map[string]string{}
+	ids := []string{}
 	for _, m := range payload.Data {
 		if !m.IsFree {
 			continue
 		}
-		modelID := strings.TrimSpace(m.ID)
-		if modelID == "" {
-			continue
+		if id := strings.TrimSpace(m.ID); id != "" {
+			ids = append(ids, id)
 		}
-
-		if modelID == "x-ai/grok-code-fast-1:optimized:free" {
-			result["grok-code-fast-1"] = modelID
-			continue
-		}
-
-		if strings.HasPrefix(modelID, "kilo-auto/") {
-			key := cleankey.StripParamInfoKey(strings.ReplaceAll(modelID, "/", "-"))
-			result[key] = modelID
-			continue
-		}
-
-		clean := modelID
-		if idx := strings.Index(clean, "/"); idx != -1 {
-			clean = clean[idx+1:]
-		}
-		clean = strings.TrimSuffix(clean, ":free")
-		key := sync.CleanKeyToModelKey(clean)
-		result[key] = modelID
 	}
-
-	return result, nil
+	modelMap := buildSuffixedMap(ids, kiloCodeToModelKey)
+	res, err := gosync.SyncProviderRegistry(modelsDir, "kilo_code", modelMap, nil, nil)
+	if err != nil {
+		return res, err
+	}
+	metaUpdates := 0
+	idx, err := gosync.BuildDiskIndex(modelsDir)
+	if err == nil {
+		seen := map[*gosync.DiskModelEntry]bool{}
+		for _, entry := range idx {
+			if seen[entry] {
+				continue
+			}
+			seen[entry] = true
+			has := false
+			for _, p := range gosync.GetStringSlice(entry.Data["providers"]) {
+				if p == "kilo_code" {
+					has = true
+					break
+				}
+			}
+			if !has {
+				continue
+			}
+			pcfg, ok := entry.Data["providerConfig"].(map[string]any)
+			if !ok {
+				continue
+			}
+			kilo, ok := pcfg["kilo_code"].(map[string]any)
+			if !ok {
+				continue
+			}
+			if kilo["authless"] != true {
+				kilo["authless"] = true
+				if err := gosync.WriteModelJSON(entry.Path, entry.Data); err == nil {
+					metaUpdates++
+				}
+			}
+		}
+	}
+	if len(res.Added) == 0 && len(res.Removed) == 0 && len(res.Updated) == 0 && metaUpdates == 0 {
+		fmt.Printf("Kilo Code models are already up to date (%d models).\n", len(modelMap))
+	} else {
+		fmt.Printf("Kilo Code: %d free models (added %d, removed %d, updated %d, metadata %d).\n", len(modelMap), len(res.Added), len(res.Removed), len(res.Updated), metaUpdates)
+	}
+	return res, nil
 }
