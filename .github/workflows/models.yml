@@ -20,13 +20,14 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Go
+        uses: actions/setup-go@v6
         with:
-          node-version: 20
+          go-version-file: packages/ai/go.mod
+          cache-dependency-path: packages/ai/go.sum
 
       - name: Refresh provider models
-        run: npm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
+        run: go run ./packages/ai/cmd/opendum refresh --summary "$RUNNER_TEMP/summary.md"
 
       - name: Build commit message
         id: commit_msg
