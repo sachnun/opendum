@@ -78,7 +78,7 @@ export const primaryNavigation: NavItem[] = [
   },
   {
     name: "Custom Providers",
-    href: "/dashboard/custom-providers",
+    href: "/dashboard/custom",
     icon: "i-lucide-plug",
   },
 ];
