@@ -11,13 +11,11 @@ interface ProviderMethod {
   flow?: FlowType;
   name: string;
   tag?: string;
-  description: string;
   disabled?: boolean;
 }
 
 interface ProviderConfig {
   name: string;
-  description: string;
   methods: ProviderMethod[];
   apiKeyPortalUrl?: string;
   apiKeyPlaceholder?: string;
@@ -45,23 +43,24 @@ const emit = defineEmits<{
 const dashboardApi = useDashboardApi();
 const dashboardInvalidation = useDashboardDataInvalidation();
 
-const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth", description: "Login in your browser." };
-const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code", description: "Enter a short device code." };
-const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key", description: "Create or copy an API key from the provider portal." };
-const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token", description: "Requires the matching account ID." };
+const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth" };
+const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code" };
+const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key" };
+const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token" };
 
 const providerConfigs: Record<Provider, ProviderConfig> = {
-  antigravity: { name: "Antigravity", description: "Access Gemini & Claude via Google OAuth", methods: [browserOAuthMethod] },
-  codex: { name: "Codex", description: "Access GPT-5 Codex models", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", description: "Use an active web session.", disabled: true }] },
-  command_code: { name: "Command Code", description: "Access open-source models via the Go tier ($1/mo) CLI API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://commandcode.ai/studio/api-keys", apiKeyPlaceholder: "user_..." },
-  kiro: { name: "Kiro", description: "Access Claude via Kiro OAuth", methods: [browserOAuthMethod] },
-  perch: { name: "Perch", description: "Access free GLM, Qwen, Kimi & more via Perch browser login", methods: [browserOAuthMethod] },
-  nvidia_nim: { name: "Nvidia", description: "Access NIM models with direct API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
-  openrouter: { name: "OpenRouter", description: "Access OpenRouter free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
-  workers_ai: { name: "Cloudflare", description: "Access open-source models on Cloudflare's global network", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
-  qoder: { name: "Qoder", description: "Access Qoder models via browser login or PAT", methods: [deviceCodeMethod, apiKeyMethod], apiKeyPortalUrl: "https://qoder.com/account/integrations", apiKeyPlaceholder: "pt-..." },
-  zenmux: { name: "ZenMux", description: "Access ZenMux free models via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://zenmux.ai/platform/pay-as-you-go", apiKeyPlaceholder: "sk-..." },
-  siliconflow: { name: "SiliconFlow", description: "Access DeepSeek, Qwen, GLM & more via API key", methods: [apiKeyMethod], apiKeyPortalUrl: "https://cloud.siliconflow.com/account/ak", apiKeyPlaceholder: "sk-..." },
+  antigravity: { name: "Antigravity", methods: [browserOAuthMethod] },
+  cline: { name: "Cline", methods: [deviceCodeMethod] },
+  codex: { name: "Codex", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", disabled: true }] },
+  command_code: { name: "Command Code", methods: [apiKeyMethod], apiKeyPortalUrl: "https://commandcode.ai/studio/api-keys", apiKeyPlaceholder: "user_..." },
+  kiro: { name: "Kiro", methods: [browserOAuthMethod] },
+  perch: { name: "Perch", methods: [browserOAuthMethod] },
+  nvidia_nim: { name: "Nvidia", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
+  openrouter: { name: "OpenRouter", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
+  workers_ai: { name: "Cloudflare", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
+  qoder: { name: "Qoder", methods: [deviceCodeMethod, apiKeyMethod], apiKeyPortalUrl: "https://qoder.com/account/integrations", apiKeyPlaceholder: "pt-..." },
+  zenmux: { name: "ZenMux", methods: [apiKeyMethod], apiKeyPortalUrl: "https://zenmux.ai/platform/pay-as-you-go", apiKeyPlaceholder: "sk-..." },
+  siliconflow: { name: "SiliconFlow", methods: [apiKeyMethod], apiKeyPortalUrl: "https://cloud.siliconflow.com/account/ak", apiKeyPlaceholder: "sk-..." },
 };
 
 const chatgptSessionPlaceholder = `{
@@ -79,7 +78,7 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "codex", "command_code", "kiro", "perch", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
+const providerOptions: Provider[] = ["antigravity", "cline", "codex", "command_code", "kiro", "perch", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -94,7 +93,7 @@ const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
 const selectedMethod = ref<MethodKey | null>(null);
-const deviceCodeInfo = ref<{ provider: "codex" | "qoder"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: string; machineId?: string } | null>(null);
+const deviceCodeInfo = ref<{ provider: "codex" | "qoder" | "cline"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: string; machineId?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const copiedCallbackUrl = ref(false);
@@ -172,11 +171,11 @@ watch([open, step, provider, selectedMethod], async () => {
     }
 
     if (selectedFlowType === "device_code") {
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "codex" | "qoder" });
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "codex" | "qoder" | "cline" });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
-        provider: selectedProvider as "codex" | "qoder",
+        provider: selectedProvider as "codex" | "qoder" | "cline",
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
@@ -688,13 +687,10 @@ onBeforeUnmount(() => {
               )"
               @click="selectLoginMethod(method.key)"
             >
-              <span class="space-y-1">
-                <span class="flex items-center gap-2 text-sm font-medium">
-                  {{ method.name }}
-                  <span v-if="method.tag" class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{{ method.tag }}</span>
-                  <span v-if="method.disabled" class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Unavailable</span>
-                </span>
-                <span class="block text-xs text-muted-foreground">{{ method.description }}</span>
+              <span class="flex items-center gap-2 text-sm font-medium">
+                {{ method.name }}
+                <span v-if="method.tag" class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{{ method.tag }}</span>
+                <span v-if="method.disabled" class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Unavailable</span>
               </span>
             </button>
           </div>

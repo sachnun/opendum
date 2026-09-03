@@ -1,5 +1,6 @@
 {
   "providers": [
+    "cline",
     "command_code",
     "workers_ai",
     "zenmux"
@@ -10,6 +11,9 @@
     "vision": true
   },
   "providerConfig": {
+    "cline": {
+      "upstream": "z-ai/glm-5.3-flash"
+    },
     "command_code": {
       "upstream": "z-ai/glm-5.3-flash",
       "allowedTiers": [

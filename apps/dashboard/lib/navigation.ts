@@ -20,6 +20,7 @@ export interface NavSubItem {
 
 export interface ProviderAccountCounts {
   antigravity: number;
+  cline: number;
   codex: number;
   command_code: number;
   kiro: number;
@@ -47,6 +48,7 @@ export const primaryNavigation: NavItem[] = [
     icon: "i-lucide-user",
     children: [
       { name: "Antigravity", href: getProviderAccountPath("antigravity") },
+      { name: "Cline", href: getProviderAccountPath("cline") },
       { name: "Codex", href: getProviderAccountPath("codex") },
       { name: "Command Code", href: getProviderAccountPath("command_code") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },

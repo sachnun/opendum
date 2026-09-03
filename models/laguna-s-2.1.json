@@ -1,9 +1,13 @@
 {
   "providers": [
     "kilo_code",
-    "openrouter"
+    "openrouter",
+    "cline"
   ],
   "providerConfig": {
+    "cline": {
+      "upstream": "poolside/laguna-s-2.1:free"
+    },
     "kilo_code": {
       "upstream": "poolside/laguna-s-2.1:free",
       "authless": true

@@ -58,6 +58,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 	return &Registry{providers: map[string]Provider{
 		"opencode":     opencodeProvider{registry: registry},
 		"perch":        perchProvider{registry: registry},
+		"cline":        clineProvider{registry: registry},
 		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
 		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
 		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},

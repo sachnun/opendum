@@ -1,5 +1,6 @@
 export type ProviderAccountKey =
   | "antigravity"
+  | "cline"
   | "codex"
   | "command_code"
   | "kiro"
@@ -30,6 +31,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Antigravity connections yet.",
     showTier: true,
+  },
+  {
+    key: "cline",
+    slug: "cline",
+    label: "Cline",
+    category: "oauth",
+    emptyMessage: "No Cline connections yet.",
+    showTier: false,
   },
   {
     key: "codex",
