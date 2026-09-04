@@ -1,11 +1,15 @@
 {
   "providers": [
     "siliconflow",
-    "nvidia_nim"
+    "nvidia_nim",
+    "qoder"
   ],
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k3"
+    },
+    "qoder": {
+      "upstream": "kmodel_latest"
     },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K3"

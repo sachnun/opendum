@@ -1,8 +1,12 @@
 {
   "providers": [
-    "zenmux"
+    "zenmux",
+    "qoder"
   ],
   "providerConfig": {
+    "qoder": {
+      "upstream": "qmodel"
+    },
     "zenmux": {
       "upstream": "qwen/qwen3.7-plus"
     }

@@ -1,7 +1,8 @@
 {
   "providers": [
     "siliconflow",
-    "zenmux"
+    "zenmux",
+    "qoder"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-pro-0813",
@@ -20,6 +21,9 @@
     "vision": false
   },
   "providerConfig": {
+    "qoder": {
+      "upstream": "dmodel"
+    },
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Pro"
     },

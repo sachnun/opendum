@@ -224,7 +224,6 @@ const BY_SLUG: Record<string, ProviderAccountDefinition> = Object.fromEntries(
 export function getProviderLabel(provider: string): string {
   if (provider === "opencode") return "Opencode";
   if (provider === "kilo_code") return "Kilo Code";
-  if (provider === "mimo_code") return "MiMo Code";
 
   if (provider in BY_KEY) {
     return BY_KEY[provider as ProviderAccountKey].label;

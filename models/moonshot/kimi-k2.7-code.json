@@ -1,7 +1,8 @@
 {
   "providers": [
     "siliconflow",
-    "zenmux"
+    "zenmux",
+    "qoder"
   ],
   "meta": {
     "reasoning": true,
@@ -9,6 +10,9 @@
     "vision": true
   },
   "providerConfig": {
+    "qoder": {
+      "upstream": "kmodel"
+    },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.7-Code"
     },

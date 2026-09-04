@@ -4,7 +4,8 @@
     "zenmux",
     "kilo_code",
     "openrouter",
-    "perch"
+    "perch",
+    "qoder"
   ],
   "providerConfig": {
     "kilo_code": {
@@ -16,6 +17,9 @@
     },
     "perch": {
       "upstream": "minimax-m3-free"
+    },
+    "qoder": {
+      "upstream": "mmodel"
     },
     "siliconflow": {
       "upstream": "MiniMaxAI/MiniMax-M3"
