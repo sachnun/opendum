@@ -172,6 +172,9 @@ func TestExecuteAccountRotationDelaysAntigravityResourceExhaustedFailureOnRecove
 	if len(runner.failedAccountIDs) != 0 {
 		t.Fatalf("failed accounts = %#v, want none", runner.failedAccountIDs)
 	}
+	if got := strings.Join(runner.loggedAccountErrors, ","); got != "ag-a1:429" {
+		t.Fatalf("logged account errors = %q, want ag-a1:429", got)
+	}
 }
 
 func TestExecuteAccountRotationRecordsLastAntigravityResourceExhaustedFailure(t *testing.T) {
@@ -208,6 +211,9 @@ func TestExecuteAccountRotationRecordsLastAntigravityResourceExhaustedFailure(t 
 	}
 	if len(runner.failedAccountIDs) != 1 || runner.failedAccountIDs[0] != "ag-a2" {
 		t.Fatalf("failed accounts = %#v, want only ag-a2", runner.failedAccountIDs)
+	}
+	if got := strings.Join(runner.loggedAccountErrors, ","); got != "ag-a1:429,ag-a2:429" {
+		t.Fatalf("logged account errors = %q, want ag-a1:429,ag-a2:429", got)
 	}
 }
 
@@ -307,6 +313,93 @@ func TestExecuteAccountRotationFallsBackAcrossProvidersOnBadRequest(t *testing.T
 	}
 	if len(failures) != 0 {
 		t.Fatalf("recoverable failures = %#v, want none", failures)
+	}
+}
+
+func TestExecuteAccountRotationLogsBadRequestWithoutFailingAccount(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "p1-a1", Provider: "provider_1"},
+			{ID: "p2-a1", Provider: "provider_2"},
+		},
+		statusByProvider: map[string]int{"provider_1": http.StatusBadRequest},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	account, _, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr != nil {
+		t.Fatalf("executeAccountRotation routeErr = %+v", routeErr)
+	}
+	if account == nil || account.ID != "p2-a1" {
+		t.Fatalf("selected account = %#v, want p2-a1", account)
+	}
+	if got := strings.Join(runner.loggedAccountErrors, ","); got != "p1-a1:400" {
+		t.Fatalf("logged account errors = %q, want p1-a1:400", got)
+	}
+	if len(runner.failedAccountIDs) != 0 {
+		t.Fatalf("failed accounts = %#v, want none for client 400", runner.failedAccountIDs)
+	}
+}
+
+func TestExecuteAccountRotationLogsRequestTimeoutWithoutFailingAccount(t *testing.T) {
+	runner := &testRotationRunner{
+		accounts: []appdb.ProviderAccount{
+			{ID: "p1-a1", Provider: "provider_1"},
+			{ID: "p1-a2", Provider: "provider_1"},
+			{ID: "p2-a1", Provider: "provider_2"},
+		},
+		statusByProvider: map[string]int{"provider_1": http.StatusRequestTimeout},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	account, _, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "unit-model"},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr != nil {
+		t.Fatalf("executeAccountRotation routeErr = %+v", routeErr)
+	}
+	if account == nil || account.ID != "p2-a1" {
+		t.Fatalf("selected account = %#v, want p2-a1", account)
+	}
+	if got := strings.Join(runner.loggedAccountErrors, ","); got != "p1-a1:408,p1-a2:408" {
+		t.Fatalf("logged account errors = %q, want p1-a1:408,p1-a2:408", got)
+	}
+	if len(runner.failedAccountIDs) != 0 {
+		t.Fatalf("failed accounts = %#v, want none for 408", runner.failedAccountIDs)
 	}
 }
 
@@ -555,6 +648,7 @@ type testRotationRunner struct {
 	usageLimitedModel     string
 	usageLimitedUntil     time.Time
 	failedAccountIDs      []string
+	loggedAccountErrors   []string
 	reserved              []pointReservation
 	refunded              []string
 	insufficientPoints    bool
@@ -644,6 +738,10 @@ func (r *testRotationRunner) makeProviderRequest(_ context.Context, account appd
 func (r *testRotationRunner) markAccountFailed(_ context.Context, accountID string, _ string, _ int, _ string) time.Time {
 	r.failedAccountIDs = append(r.failedAccountIDs, accountID)
 	return time.Now()
+}
+
+func (r *testRotationRunner) logAccountError(_ context.Context, accountID string, _ string, _ string, statusCode int, _ string) {
+	r.loggedAccountErrors = append(r.loggedAccountErrors, accountID+":"+strconv.Itoa(statusCode))
 }
 
 func (r *testRotationRunner) markAccountUsageLimited(_ context.Context, accountID, model string, disabledUntil, _ time.Time) {

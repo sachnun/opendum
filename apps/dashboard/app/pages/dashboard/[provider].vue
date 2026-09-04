@@ -536,6 +536,7 @@ function startAccountStatsPolling() {
   accountStatsPollTimer = setInterval(() => {
     if (document.hidden) return;
     queueAccountStatsLoad(accounts.value.map((account) => account.id), { force: true });
+    queueErrorHistoryLoad(accounts.value.map((account) => account.id), { force: true });
   }, ACCOUNT_STATS_POLL_MS);
 }
 

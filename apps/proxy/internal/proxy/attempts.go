@@ -22,6 +22,7 @@ type accountRotationRunner interface {
 	bumpAccountRequestCount(context.Context, string, time.Time)
 	makeProviderRequest(context.Context, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error)
 	markAccountFailed(context.Context, string, string, int, string) time.Time
+	logAccountError(context.Context, string, string, string, int, string)
 	markAccountUsageLimited(context.Context, string, string, time.Time, time.Time)
 	logUsage(context.Context, usageParams)
 	isVisionModel(string) bool
@@ -149,16 +150,19 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			delayedFinalFailure = nil
 			badRequestFromProvider := resp.StatusCode == http.StatusBadRequest
 			fallbackAcrossProviders := badRequestFromProvider && forced == nil && validation.Provider == nil
+			detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: attempt.account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
 			if resp.StatusCode != http.StatusRequestTimeout && !badRequestFromProvider {
-				detailed := buildAccountErrorMessage(bodyText, accountErrorContext{Model: validation.Model, Provider: attempt.account.Provider, Endpoint: endpointPath(cfg.Endpoint), Messages: parsed.MessagesForError, Parameters: parsed.ParamsForError})
 				if forced == nil && isAntigravityResourceExhausted(attempt.account.Provider, resp.StatusCode, bodyText) {
 					delayedFinalFailure = &delayedAccountFailure{account: *attempt.account, statusCode: resp.StatusCode, message: detailed}
+					runner.logAccountError(ctx, attempt.account.ID, attempt.account.UserID, validation.Model, resp.StatusCode, detailed)
 				} else {
 					failedAt = runner.markAccountFailed(ctx, attempt.account.ID, validation.Model, resp.StatusCode, detailed)
 					if disabledUntil, ok := codexUsageLimitDisabledUntil(attempt.account.Provider, resp.StatusCode, bodyText, failedAt); ok {
 						runner.markAccountUsageLimited(ctx, attempt.account.ID, validation.Model, disabledUntil, failedAt)
 					}
 				}
+			} else {
+				runner.logAccountError(ctx, attempt.account.ID, attempt.account.UserID, validation.Model, resp.StatusCode, detailed)
 			}
 			runner.logUsage(ctx, usageParams{UserID: authResult.UserID, ProviderAccountID: attempt.account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: resp.StatusCode, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: attempt.account.Provider})
 			message, typ := sanitizedProxyError(resp.StatusCode, bodyText)
