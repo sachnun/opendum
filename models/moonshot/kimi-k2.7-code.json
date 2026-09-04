@@ -1,6 +1,5 @@
 {
   "providers": [
-    "workers_ai",
     "siliconflow",
     "command_code",
     "zenmux"
@@ -19,9 +18,6 @@
     },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.7-Code"
-    },
-    "workers_ai": {
-      "upstream": "@cf/moonshotai/kimi-k2.7-code"
     },
     "zenmux": {
       "upstream": "moonshotai/kimi-k2.7-code"

@@ -1,6 +1,5 @@
 {
   "providers": [
-    "workers_ai",
     "siliconflow",
     "command_code",
     "openrouter"
@@ -22,9 +21,6 @@
     },
     "siliconflow": {
       "upstream": "zai-org/GLM-5.2"
-    },
-    "workers_ai": {
-      "upstream": "@cf/zai-org/glm-5.2"
     }
   }
 }

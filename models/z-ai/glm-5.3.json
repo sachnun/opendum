@@ -1,7 +1,6 @@
 {
   "providers": [
-    "command_code",
-    "workers_ai"
+    "command_code"
   ],
   "meta": {
     "reasoning": true,
@@ -14,9 +13,6 @@
       "allowedTiers": [
         "go"
       ]
-    },
-    "workers_ai": {
-      "upstream": "@cf/zai-org/glm-5.3"
     }
   }
 }

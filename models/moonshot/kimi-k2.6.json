@@ -1,6 +1,5 @@
 {
   "providers": [
-    "workers_ai",
     "siliconflow",
     "command_code",
     "nvidia_nim"
@@ -22,9 +21,6 @@
     },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.6"
-    },
-    "workers_ai": {
-      "upstream": "@cf/moonshotai/kimi-k2.6"
     }
   }
 }
