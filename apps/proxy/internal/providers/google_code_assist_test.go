@@ -60,6 +60,47 @@ func TestOpenAIToGeminiDropsEmptyAssistantTextContent(t *testing.T) {
 	}
 }
 
+func TestGeminiUsageMapsCachedContentTokens(t *testing.T) {
+	usage := geminiUsage(map[string]any{
+		"usageMetadata": map[string]any{
+			"promptTokenCount":        1000,
+			"candidatesTokenCount":    200,
+			"totalTokenCount":         1200,
+			"cachedContentTokenCount": 400,
+			"thoughtsTokenCount":      50,
+		},
+	})
+	if usage == nil {
+		t.Fatal("geminiUsage returned nil")
+	}
+	if usage["prompt_tokens"] != 1000 || usage["completion_tokens"] != 200 || usage["total_tokens"] != 1200 {
+		t.Fatalf("unexpected token counts: %v", usage)
+	}
+	details, ok := usage["prompt_tokens_details"].(map[string]any)
+	if !ok {
+		t.Fatalf("prompt_tokens_details missing: %v", usage)
+	}
+	if details["cached_tokens"] != 400 {
+		t.Fatalf("cached_tokens = %v, want 400", details["cached_tokens"])
+	}
+}
+
+func TestGeminiUsageOmitsCacheDetailsWithoutCacheHit(t *testing.T) {
+	cases := []map[string]any{
+		{"promptTokenCount": 500, "candidatesTokenCount": 20, "totalTokenCount": 520},
+		{"promptTokenCount": 500, "candidatesTokenCount": 20, "totalTokenCount": 520, "cachedContentTokenCount": 0},
+	}
+	for _, raw := range cases {
+		usage := geminiUsage(map[string]any{"usageMetadata": raw})
+		if usage == nil {
+			t.Fatal("geminiUsage returned nil")
+		}
+		if _, ok := usage["prompt_tokens_details"]; ok {
+			t.Fatalf("prompt_tokens_details present without cache hit: %v", usage)
+		}
+	}
+}
+
 func jsonify(value any) string {
 	data, _ := json.Marshal(value)
 	return string(data)
