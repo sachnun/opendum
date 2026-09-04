@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -461,5 +463,77 @@ func TestPerchMakeRequestRejectsUnsupportedModel(t *testing.T) {
 	}
 	if errorBody["code"] != "unsupported_perch_model" {
 		t.Fatalf("error code = %#v", errorBody["code"])
+	}
+}
+
+func TestPerchMakeRequestSendsTurnTicket(t *testing.T) {
+	var ticketSeen, uaSeen, runSeen string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/perch-terminal/turn-ticket", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"ticket":"tick_123","ticketId":"tid_1","runId":"run_1"}`))
+	})
+	mux.HandleFunc("/api/perch-terminal/model-call", func(w http.ResponseWriter, r *http.Request) {
+		ticketSeen = r.Header.Get("x-perch-turn-ticket")
+		uaSeen = r.Header.Get("User-Agent")
+		var payload map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		runSeen, _ = payload["runId"].(string)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(perchSSE(
+			map[string]any{"type": "answer_delta", "text": "hi"},
+			map[string]any{"type": "done", "ok": true, "text": "hi", "usage": map[string]any{"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}},
+		)))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	previousBase := perchAppBaseURL
+	perchAppBaseURL = server.URL
+	defer func() { perchAppBaseURL = previousBase }()
+
+	resp, err := (perchProvider{}).MakeRequest(context.Background(), server.Client(), "supabase_jwt", appdb.ProviderAccount{}, map[string]any{"model": "glm-5", "messages": []any{map[string]any{"role": "user", "content": "hi"}}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d body %s", resp.StatusCode, raw)
+	}
+	if ticketSeen != "tick_123" {
+		t.Fatalf("turn ticket header = %q, want tick_123", ticketSeen)
+	}
+	if uaSeen != "perchai-cli/2.4.98" {
+		t.Fatalf("user agent = %q", uaSeen)
+	}
+	if runSeen != "run_1" {
+		t.Fatalf("runId = %q, want run_1", runSeen)
+	}
+	var completion map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
+		t.Fatal(err)
+	}
+	choices, _ := completion["choices"].([]any)
+	message, _ := choices[0].(map[string]any)["message"].(map[string]any)
+	if message["content"] != "hi" {
+		t.Fatalf("content = %#v", message["content"])
+	}
+}
+
+func TestPerchMakeRequestSurfacesTicketFailure(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/perch-terminal/turn-ticket", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"ok":false,"error":"turn rate limit reached","errorCode":"turn_rate_limited"}`))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	previousBase := perchAppBaseURL
+	perchAppBaseURL = server.URL
+	defer func() { perchAppBaseURL = previousBase }()
+
+	_, err := (perchProvider{}).MakeRequest(context.Background(), server.Client(), "supabase_jwt", appdb.ProviderAccount{}, map[string]any{"model": "glm-5", "messages": []any{}}, false)
+	if err == nil || !strings.Contains(err.Error(), "429") {
+		t.Fatalf("err = %v, want turn ticket 429 failure", err)
 	}
 }
