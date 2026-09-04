@@ -42,7 +42,11 @@ type accountAttempt struct {
 }
 
 func (s *Service) executeWithAccountRotation(ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *pointReservation, *routeError) {
-	return executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
+	account, resp, requestStartMS, upstreamFirstResponseMS, rotationFailures, roaming, routeErr := executeAccountRotation(s, ctx, r, cfg, parsed, authResult, validation, forced, startMS)
+	if routeErr == nil && account != nil && forced != nil {
+		s.rememberAffinityAccount(ctx, authResult.UserID, sessionID(r), *account)
+	}
+	return account, resp, requestStartMS, upstreamFirstResponseMS, rotationFailures, roaming, routeErr
 }
 
 func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r *http.Request, cfg endpointAdapter, parsed parsedEndpointRequest, authResult auth.Result, validation auth.ModelValidationResult, forced *appdb.ProviderAccount, startMS int64) (*appdb.ProviderAccount, *http.Response, int64, int64, []accountRotationFailure, *pointReservation, *routeError) {
