@@ -984,7 +984,22 @@ func (p googleCodeAssistProvider) normalizeAntigravityContents(ctx context.Conte
 	}
 	if strictToolSchema || providerConfigBool(p.registry, model, p.name, "sanitize_tool_blocks") {
 		payload["contents"] = sanitizeToolBlocks(contents)
+		return
 	}
+	kept := []any{}
+	for _, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		if content == nil {
+			continue
+		}
+		if len(anySlice(content["parts"])) == 0 {
+			// Google rejects contents whose parts were all filtered out (e.g.
+			// assistant turns that carried only an empty text part).
+			continue
+		}
+		kept = append(kept, rawContent)
+	}
+	payload["contents"] = kept
 }
 
 var toolArtifactMarker = regexp.MustCompile(`(?i)^\s*(Tool:\s*\w+|(?:thought|think)\s*:)`)
@@ -1577,6 +1592,7 @@ func openAIToGemini(body map[string]any) map[string]any {
 	completedToolCallIDs := completedToolCallIDs(messages)
 	toolUseIDs := toolUseIDs(messages)
 	validToolResultIDs := validToolResultIDs(messages)
+	toolCallFunctionNames := toolCallFunctionNames(messages)
 	for _, raw := range messages {
 		msg, _ := raw.(map[string]any)
 		role := stringValue(msg["role"])
@@ -1591,7 +1607,17 @@ func openAIToGemini(body map[string]any) map[string]any {
 			if toolCallID == "" || !validToolResultIDs[toolCallID] || !toolUseIDs[toolCallID] {
 				continue
 			}
-			parts = []any{map[string]any{"functionResponse": map[string]any{"name": defaultStringValue(msg["name"], "unknown"), "id": toolCallID, "response": map[string]any{"result": msg["content"]}}}}
+			functionName := stringValue(msg["name"])
+			if functionName == "" {
+				// OpenAI tool messages carry only tool_call_id + content; the
+				// upstream requires functionResponse.name to match the original
+				// functionCall.name for that id, so resolve it from history.
+				functionName = toolCallFunctionNames[toolCallID]
+			}
+			if functionName == "" {
+				functionName = "unknown"
+			}
+			parts = []any{map[string]any{"functionResponse": map[string]any{"name": functionName, "id": toolCallID, "response": map[string]any{"result": msg["content"]}}}}
 		}
 		geminiRole := "user"
 		if role == "assistant" {
@@ -1704,6 +1730,28 @@ func toolUseIDs(messages []any) map[string]bool {
 		}
 	}
 	return ids
+}
+
+func toolCallFunctionNames(messages []any) map[string]string {
+	names := map[string]string{}
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		if stringValue(msg["role"]) != "assistant" {
+			continue
+		}
+		for _, rawCall := range anySlice(msg["tool_calls"]) {
+			call, _ := rawCall.(map[string]any)
+			id := stringValue(call["id"])
+			if id == "" {
+				continue
+			}
+			fn, _ := call["function"].(map[string]any)
+			if name := stringValue(fn["name"]); name != "" {
+				names[id] = name
+			}
+		}
+	}
+	return names
 }
 
 func validToolResultIDs(messages []any) map[string]bool {
@@ -1994,6 +2042,9 @@ func openAIContentToGeminiParts(content any) []any {
 		return nil
 	}
 	if text, ok := content.(string); ok {
+		if text == "" {
+			return nil
+		}
 		return []any{map[string]any{"text": text}}
 	}
 	items, _ := content.([]any)
