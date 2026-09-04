@@ -1,6 +1,5 @@
 {
   "providers": [
-    "command_code",
     "kiro",
     "perch",
     "siliconflow"
@@ -11,12 +10,6 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "zai-org/GLM-5",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "perch": {
       "upstream": "glm-5"
     },

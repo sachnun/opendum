@@ -1,6 +1,8 @@
 import type { ModelStats } from "./model-stats";
-import type { ProviderAccountKey } from "./provider-accounts";
+import type { ProviderAccountKey, QuotaProviderKey } from "./provider-accounts";
 import type { ModelMeta } from "./model-capabilities";
+
+export type { QuotaProviderKey };
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -151,8 +153,6 @@ export interface ProviderDetailDeltaData {
 }
 
 export type ProviderDetailResponse = ProviderDetailData | ProviderDetailDeltaData;
-
-export type QuotaProviderKey = "antigravity" | "codex" | "kiro" | "openrouter" | "siliconflow" | "command_code" | "zenmux" | "perch";
 
 export interface QuotaGroupDisplay {
   name: string;

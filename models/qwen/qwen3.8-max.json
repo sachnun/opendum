@@ -1,17 +1,7 @@
 {
-  "providers": [
-    "command_code"
-  ],
+  "providers": [],
   "aliases": [
     "Qwen-Qwen3.8-Max",
     "Qwen/Qwen3.8-Max"
-  ],
-  "providerConfig": {
-    "command_code": {
-      "upstream": "Qwen/Qwen3.8-Max-0902",
-      "allowedTiers": [
-        "go"
-      ]
-    }
-  }
+  ]
 }

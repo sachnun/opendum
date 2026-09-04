@@ -10,18 +10,18 @@ import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/consta
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
 import { API_BASE_URL as siliconflowApiBaseUrl } from "../lib/providers/siliconflow/constants";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
-import { API_BASE_URL as commandCodeApiBaseUrl, GENERATE_PATH as commandCodeGeneratePath } from "../lib/providers/commandcode/constants";
+import { API_BASE_URL as harborApiBaseUrl } from "../lib/providers/harbor/constants";
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/providers/provider-http-errors";
 import { getCloudflareValidationUrl } from "../lib/providers/cloudflare/constants";
+import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "../../lib/provider-accounts";
 import type { ActionResult } from "../utils/api";
 
 const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "siliconflow", "zenmux", "command_code"]);
+const apiKeyProviderSchema = z.enum([...API_KEY_PROVIDER_KEYS]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional(), platformKey: z.string().optional() });
-type ApiKeyProvider = z.infer<typeof apiKeyProviderSchema>;
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 
 const API_KEY_PROVIDER_SETTINGS = {
@@ -29,69 +29,16 @@ const API_KEY_PROVIDER_SETTINGS = {
   openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
   siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
-  command_code: { label: "Command Code", baseUrl: commandCodeApiBaseUrl, modelMap: getProviderModelMap("command_code"), validationPath: commandCodeGeneratePath, requireSuccessfulStatus: false },
-} satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions" | "/alpha/generate"; requireSuccessfulStatus: boolean }>;
+  harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
+} satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
 
-// Command Code's Go tier uses the reverse-engineered CLI /alpha/generate
-// endpoint, which takes a custom CLI envelope (not an OpenAI body).
-const COMMAND_CODE_CLI_VERSION = "0.38.7";
-
-// Only the Go tier ($1/mo CLI plan) is accepted. Users on any other tier
-// (free, pro, max, etc.) are rejected during account creation.
-function commandCodeCanonicalTier(planId: string | null | undefined): string | undefined {
-  if (planId == null) return undefined;
-  const cleaned = planId.toLowerCase().trim();
-  if (!cleaned) return undefined;
-  if (cleaned === "individual-go") return "go";
-  return undefined;
-}
-
-async function fetchCommandCodePlanTier(apiKey: string): Promise<string | undefined> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
-  try {
-    const response = await fetchInternalProvider(commandCodeApiBaseUrl + "/alpha/billing/subscriptions", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
-      signal: controller.signal,
-    });
-    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return undefined;
-    if (!response.ok) return undefined;
-    const payload = (await response.json().catch(() => null)) as { data?: { planId?: string | null } } | null;
-    const rawPlanId = (payload?.data?.planId ?? null) as string | null;
-    return commandCodeCanonicalTier(rawPlanId);
-  } catch {
-    return undefined;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function buildCommandCodeValidationEnvelope(model: string) {
-  return {
-    config: { workingDir: "/", date: new Date().toISOString().slice(0, 10), environment: "linux-x64", structure: [], isGitRepo: false, currentBranch: "", mainBranch: "", gitStatus: "", recentCommits: [] },
-    memory: "",
-    taste: "",
-    skills: null,
-    permissionMode: "standard",
-    params: { model, messages: [{ role: "user", content: "ping" }], stream: true, max_tokens: 1 },
-  };
-}
-
-function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {
+function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
   const { baseUrl, modelMap, validationPath } = API_KEY_PROVIDER_SETTINGS[provider];
   const validationModel = Object.values(modelMap)[0];
-  const isCommandCode = provider === "command_code";
-  const isPost = validationPath === "/chat/completions" || isCommandCode;
+  const isPost = validationPath === "/chat/completions";
   const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" };
   let body: Record<string, unknown> | undefined;
-  if (isCommandCode) {
-    headers["x-command-code-version"] = COMMAND_CODE_CLI_VERSION;
-    headers["x-cli-environment"] = "production";
-    headers["x-project-slug"] = "command-code";
-    headers["Accept"] = "text/event-stream";
-    body = buildCommandCodeValidationEnvelope(validationModel as string);
-  } else if (validationPath === "/chat/completions") {
+  if (validationPath === "/chat/completions") {
     body = { model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false };
   }
   return {
@@ -103,10 +50,10 @@ function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {
   };
 }
 
-async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string): Promise<ActionResult<void>> {
+async function validateProviderApiKey(provider: ApiKeyProviderKey, apiKey: string): Promise<ActionResult<void>> {
   const { label, validationPath, requireSuccessfulStatus } = API_KEY_PROVIDER_SETTINGS[provider];
   const { validationModel, url, method, headers, body } = buildValidationRequest(provider, apiKey);
-  if ((validationPath === "/chat/completions" || provider === "command_code") && !validationModel) return { success: false, error: `${label} API key validation model is not configured.` };
+  if (validationPath === "/chat/completions" && !validationModel) return { success: false, error: `${label} API key validation model is not configured.` };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
@@ -124,11 +71,6 @@ async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string):
       if (normalizedBody.includes("authenticate") || normalizedBody.includes("unauthorized") || normalizedBody.includes("invalid api key") || normalizedBody.includes("user not found")) return { success: false, error: `${label} API key is invalid.` };
       return { success: false, error: `Unable to validate ${label} API key right now (HTTP ${response.status}). Please try again.` };
     }
-    // Command Code validates against a streaming endpoint; release the SSE
-    // body once auth is confirmed so the request does not leak a connection.
-    if (provider === "command_code" && response.body) {
-      try { await response.body.cancel(); } catch { /* noop */ }
-    }
     return { success: true, data: undefined };
   } catch (error) {
     if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate external provider API keys. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
@@ -139,7 +81,7 @@ async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string):
   }
 }
 
-async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProvider, apiKey: string, accountName?: string, platformKey?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProviderKey, apiKey: string, accountName?: string, platformKey?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
   const normalizedApiKey = apiKey.trim();
   if (!normalizedApiKey) return { success: false, error: "API key is required" };
   const validationResult = await validateProviderApiKey(provider, normalizedApiKey);
@@ -149,22 +91,14 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   const identifier = `${provider}-${hashString(normalizedApiKey).slice(0, 16)}`;
   const normalizedAccountName = accountName?.trim();
   const normalizedPlatformKey = platformKey?.trim() || null;
-  // Command Code stamps the actual plan tier so downstream model-access
-  // rules (open-source-only on the Go tier, premium allowed on Pro/Max)
-  // resolve correctly. We resolve the tier from the live
-  // /alpha/billing/subscriptions endpoint; unknown planIds are left
-  // undefined so model-access rules receive an empty tier and decide for
-  // themselves rather than getting a misleading "go" stamp.
-  const tier = provider === "command_code" ? await fetchCommandCodePlanTier(normalizedApiKey) : undefined;
-  if (provider === "command_code" && tier !== "go") return { success: false, error: "Only the Go tier ($1/mo) is supported for Command Code accounts. Your account appears to be on a different plan." };
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(tier ? { tier } : {}), ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
   const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
-  await db.insert(providerAccount).values({ userId, provider, name: normalizedAccountName || `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, ...(tier ? { tier } : {}) });
+  await db.insert(providerAccount).values({ userId, provider, name: normalizedAccountName || `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, email: identifier, ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true });
   return { success: true, data: { email: identifier, isUpdate: false } };
 }
 

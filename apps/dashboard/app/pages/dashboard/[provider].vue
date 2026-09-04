@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
-import { BY_KEY, getProviderAccountPath, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
+import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import { warmDashboardIndexedDbStore } from "../../utils/dashboardIndexedDb";
 
 definePageMeta({
@@ -27,7 +27,7 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
   accounts: number;
 };
 
-const QUOTA_PROVIDERS = new Set<string>(["antigravity", "codex", "kiro", "openrouter", "siliconflow", "command_code", "zenmux", "perch"]);
+const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
 const ACCOUNT_STATS_BATCH_SIZE = 24;
 const ERROR_HISTORY_BATCH_SIZE = 20;
 const ACCOUNT_STATS_POLL_MS = 30_000;

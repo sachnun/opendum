@@ -1,15 +1,9 @@
 {
   "providers": [
     "zenmux",
-    "kiro",
-    "command_code"
+    "kiro"
   ],
   "providerConfig": {
-    "command_code": {
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "kiro": {
       "allowedTiers": [
         "pro",

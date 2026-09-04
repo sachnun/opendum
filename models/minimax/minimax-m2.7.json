@@ -1,6 +1,5 @@
 {
   "providers": [
-    "command_code",
     "kilo_code",
     "openrouter",
     "perch"
@@ -11,12 +10,6 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "MiniMaxAI/MiniMax-M2.7",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "kilo_code": {
       "upstream": "minimax/minimax-m2.7:free",
       "authless": true

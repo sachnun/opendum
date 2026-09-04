@@ -1,6 +1,5 @@
 {
   "providers": [
-    "command_code",
     "perch",
     "siliconflow",
     "workers_ai"
@@ -11,12 +10,6 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "moonshotai/Kimi-K2.5",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "perch": {
       "upstream": "kimi-2.5"
     },

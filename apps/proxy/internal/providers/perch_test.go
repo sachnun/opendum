@@ -11,6 +11,27 @@ func perchEvent(payload map[string]any) string {
 	return "data: " + string(data)
 }
 
+func parseChatChunks(t *testing.T, sse string) []map[string]any {
+	t.Helper()
+	chunks := []map[string]any{}
+	for _, raw := range strings.Split(strings.TrimSpace(sse), "\n\n") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" || raw == "data: [DONE]" {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(raw, "data:"))
+		if payload == "[DONE]" {
+			continue
+		}
+		var chunk map[string]any
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			t.Fatalf("parse chunk %q: %v", payload, err)
+		}
+		chunks = append(chunks, chunk)
+	}
+	return chunks
+}
+
 func perchSSE(events ...map[string]any) string {
 	lines := make([]string, 0, len(events)+1)
 	for _, event := range events {

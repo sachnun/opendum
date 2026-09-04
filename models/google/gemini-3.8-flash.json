@@ -1,7 +1,6 @@
 {
   "providers": [
     "antigravity",
-    "command_code",
     "zenmux"
   ],
   "meta": {
@@ -23,12 +22,6 @@
         "none": "minimal",
         "xhigh": "high"
       }
-    },
-    "command_code": {
-      "upstream": "google/gemini-3.8-flash",
-      "allowedTiers": [
-        "go"
-      ]
     },
     "zenmux": {
       "upstream": "google/gemini-3.8-flash"

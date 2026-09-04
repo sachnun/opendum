@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
 const (
@@ -18,32 +20,8 @@ const (
 	accountErrorMessageLimit      = 30
 )
 
-var providerDisplayNames = map[string]string{
-	"antigravity":  "Antigravity",
-	"perch":        "Perch",
-	"cline":        "Cline",
-	"codex":        "Codex",
-	"command_code": "Command Code",
-	"kiro":         "Kiro",
-	"nvidia_nim":   "Nvidia",
-	"openrouter":   "OpenRouter",
-	"workers_ai":   "Cloudflare",
-	"qoder":        "Qoder",
-	"zenmux":       "ZenMux",
-	"siliconflow":  "SiliconFlow",
-	"opencode":     "Opencode",
-	"kilo_code":    "Kilo Code",
-	"mimo_code":    "MiMo Code",
-}
-
 func providerDisplayName(provider string) string {
-	if name, ok := providerDisplayNames[provider]; ok {
-		return name
-	}
-	if provider == "" {
-		return ""
-	}
-	return provider
+	return providers.DisplayName(provider)
 }
 
 func prefixWithProvider(provider, message string) string {

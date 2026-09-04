@@ -12,7 +12,6 @@ func TestProviderDisplayName(t *testing.T) {
 	}{
 		{"antigravity", "Antigravity"},
 		{"codex", "Codex"},
-		{"command_code", "Command Code"},
 		{"kiro", "Kiro"},
 		{"nvidia_nim", "Nvidia"},
 		{"openrouter", "OpenRouter"},

@@ -154,11 +154,12 @@ func (s *Service) loadQuotaAccount(ctx context.Context, input quotaRequest) (app
 }
 
 func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) (accountQuotaInfo, error) {
-	if account.Provider == "openrouter" {
-		return s.fetchOpenRouterQuota(ctx, account, forceRefresh), nil
+	fetcher, ok := s.quotaFetcherFor(account.Provider)
+	if !ok {
+		return accountQuotaInfo{}, fmt.Errorf("provider %s is not supported for quota", account.Provider)
 	}
-	if account.Provider == "siliconflow" {
-		return s.fetchSiliconFlowQuota(ctx, account, forceRefresh), nil
+	if _, skipCredentials := quotaProvidersWithoutToken[account.Provider]; skipCredentials {
+		return fetcher(ctx, account, "", forceRefresh), nil
 	}
 	providerImpl, ok := s.providerRegistry.Get(account.Provider)
 	if !ok {
@@ -168,23 +169,7 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 	if err != nil {
 		return expiredQuotaInfo(account, "Token expired - please re-authenticate"), nil
 	}
-
-	switch account.Provider {
-	case "antigravity":
-		return s.fetchAntigravityQuota(ctx, requestAccount, credentials, forceRefresh), nil
-	case "perch":
-		return s.fetchPerchQuota(ctx, requestAccount, credentials, forceRefresh), nil
-	case "codex":
-		return s.fetchCodexQuota(ctx, requestAccount, credentials, forceRefresh), nil
-	case "kiro":
-		return s.fetchKiroQuota(ctx, requestAccount, credentials, forceRefresh), nil
-	case "command_code":
-		return s.fetchCommandCodeQuota(ctx, requestAccount, credentials, forceRefresh), nil
-	case "zenmux":
-		return s.fetchZenmuxQuota(ctx, account, forceRefresh), nil
-	default:
-		return accountQuotaInfo{}, fmt.Errorf("provider %s is not supported for quota", account.Provider)
-	}
+	return fetcher(ctx, requestAccount, credentials, forceRefresh), nil
 }
 
 func quotaFallbackTier(account appdb.ProviderAccount) string {

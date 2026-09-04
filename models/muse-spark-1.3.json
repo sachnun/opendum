@@ -1,15 +1,8 @@
 {
   "providers": [
-    "command_code",
     "zenmux"
   ],
   "providerConfig": {
-    "command_code": {
-      "upstream": "meta/muse-spark-1.3",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "zenmux": {
       "upstream": "meta/muse-spark-1.3"
     }
