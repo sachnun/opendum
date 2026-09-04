@@ -14,7 +14,7 @@
   },
   "providerConfig": {
     "antigravity": {
-      "upstream": "gemini-3.7-flash-medium",
+      "upstream": "gemini-3.7-flash-tiered",
       "inject_thought_signature": true,
       "scrub_model_artifacts": true,
       "signature_family": "gemini-flash",
