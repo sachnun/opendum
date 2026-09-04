@@ -15,7 +15,6 @@ var providerDisplayNames = map[string]string{
 	"siliconflow": "SiliconFlow",
 	"opencode":    "Opencode",
 	"kilo_code":   "Kilo Code",
-	"mimo_code":   "MiMo Code",
 }
 
 func DisplayName(provider string) string {

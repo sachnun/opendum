@@ -21,7 +21,6 @@ func TestProviderDisplayName(t *testing.T) {
 		{"siliconflow", "SiliconFlow"},
 		{"opencode", "Opencode"},
 		{"kilo_code", "Kilo Code"},
-		{"mimo_code", "MiMo Code"},
 		{"", ""},
 		{"unknown_provider", "unknown_provider"},
 	}

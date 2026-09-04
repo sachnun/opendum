@@ -1,6 +1,6 @@
 package auth
 
-var authlessProviderNames = []string{"opencode", "mimo_code"}
+var authlessProviderNames = []string{"opencode"}
 
 func IsAuthlessProvider(provider string) bool {
 	for _, name := range authlessProviderNames {
