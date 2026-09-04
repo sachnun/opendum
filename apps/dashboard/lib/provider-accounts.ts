@@ -1,28 +1,8 @@
-export type ProviderAccountKey =
-  | "antigravity"
-  | "cline"
-  | "codex"
-  | "harbor"
-  | "kiro"
-  | "nvidia_nim"
-  | "openrouter"
-  | "qoder"
-  | "siliconflow"
-  | "workers_ai"
-  | "zenmux";
-
 export type ProviderAccountCategory = "oauth" | "api_key";
 
-export interface ProviderAccountDefinition {
-  key: ProviderAccountKey;
-  slug: string;
-  label: string;
-  category: ProviderAccountCategory;
-  emptyMessage: string;
-  showTier: boolean;
-}
+export type ProviderAuthMethodKey = "oauth_redirect" | "device_code" | "api_key" | "api_key_with_account_id" | "chatgpt_session";
 
-export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
+const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
   {
     key: "antigravity",
     slug: "antigravity",
@@ -30,6 +10,10 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Antigravity connections yet.",
     showTier: true,
+    authMethods: ["oauth_redirect"],
+    supportsQuota: true,
+    displayOrder: 0,
+    navOrder: 0,
   },
   {
     key: "cline",
@@ -38,6 +22,10 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Cline connections yet.",
     showTier: false,
+    authMethods: ["device_code"],
+    supportsQuota: false,
+    displayOrder: 1,
+    navOrder: 1,
   },
   {
     key: "codex",
@@ -46,6 +34,11 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Codex connections yet.",
     showTier: true,
+    authMethods: ["oauth_redirect", "device_code", "chatgpt_session"],
+    supportsQuota: true,
+    callbackPlaceholder: "http://localhost:1455/auth/callback?code=...",
+    displayOrder: 2,
+    navOrder: 2,
   },
   {
     key: "harbor",
@@ -54,6 +47,12 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "api_key",
     emptyMessage: "No Harbor connections yet.",
     showTier: false,
+    authMethods: ["api_key"],
+    supportsQuota: false,
+    apiKeyPortalUrl: "https://tokenharbor.ai/dashboard",
+    apiKeyPlaceholder: "thk_live_...",
+    displayOrder: 3,
+    navOrder: 3,
   },
   {
     key: "kiro",
@@ -62,6 +61,11 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Kiro connections yet.",
     showTier: true,
+    authMethods: ["oauth_redirect"],
+    supportsQuota: true,
+    callbackPlaceholder: "http://localhost:49153/oauth/callback?code=...",
+    displayOrder: 4,
+    navOrder: 4,
   },
   {
     key: "nvidia_nim",
@@ -70,6 +74,12 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "api_key",
     emptyMessage: "No Nvidia connections yet.",
     showTier: false,
+    authMethods: ["api_key"],
+    supportsQuota: false,
+    apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys",
+    apiKeyPlaceholder: "nvapi-...",
+    displayOrder: 6,
+    navOrder: 5,
   },
   {
     key: "openrouter",
@@ -78,6 +88,12 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "api_key",
     emptyMessage: "No OpenRouter connections yet.",
     showTier: false,
+    authMethods: ["api_key"],
+    supportsQuota: true,
+    apiKeyPortalUrl: "https://openrouter.ai/settings/keys",
+    apiKeyPlaceholder: "sk-or-v1-...",
+    displayOrder: 5,
+    navOrder: 6,
   },
   {
     key: "workers_ai",
@@ -86,6 +102,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "api_key",
     emptyMessage: "No Cloudflare accounts connected yet.",
     showTier: false,
+    authMethods: ["api_key_with_account_id"],
+    supportsQuota: false,
+    apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai",
+    apiKeyPlaceholder: "Bearer token...",
+    accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...",
+    accountIdLabel: "Cloudflare Account ID",
+    displayOrder: 7,
+    navOrder: 9,
   },
   {
     key: "qoder",
@@ -94,6 +118,12 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "oauth",
     emptyMessage: "No Qoder connections yet.",
     showTier: false,
+    authMethods: ["device_code", "api_key"],
+    supportsQuota: false,
+    apiKeyPortalUrl: "https://qoder.com/account/integrations",
+    apiKeyPlaceholder: "pt-...",
+    showInNav: false,
+    displayOrder: 8,
   },
   {
     key: "zenmux",
@@ -102,6 +132,12 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "api_key",
     emptyMessage: "No ZenMux connections yet.",
     showTier: false,
+    authMethods: ["api_key"],
+    supportsQuota: true,
+    apiKeyPortalUrl: "https://zenmux.ai/platform/pay-as-you-go",
+    apiKeyPlaceholder: "sk-...",
+    displayOrder: 9,
+    navOrder: 7,
   },
   {
     key: "siliconflow",
@@ -110,16 +146,66 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "api_key",
     emptyMessage: "No SiliconFlow connections yet.",
     showTier: false,
+    authMethods: ["api_key"],
+    supportsQuota: true,
+    apiKeyPortalUrl: "https://cloud.siliconflow.com/account/ak",
+    apiKeyPlaceholder: "sk-...",
+    displayOrder: 10,
+    navOrder: 8,
   },
-];
+] as const satisfies readonly {
+  key: string;
+  slug: string;
+  label: string;
+  category: ProviderAccountCategory;
+  emptyMessage: string;
+  showTier: boolean;
+  authMethods: readonly ProviderAuthMethodKey[];
+  supportsQuota: boolean;
+  displayOrder: number;
+  navOrder?: number;
+  showInNav?: boolean;
+  apiKeyPortalUrl?: string;
+  apiKeyPlaceholder?: string;
+  accountIdLabel?: string;
+  accountIdPlaceholder?: string;
+  callbackPlaceholder?: string;
+}[];
+
+export type ProviderAccountDefinition = (typeof PROVIDER_ACCOUNT_DEFINITIONS_SOURCE)[number] & {
+  showInNav?: boolean;
+  navOrder?: number;
+  displayOrder?: number;
+  apiKeyPortalUrl?: string;
+  apiKeyPlaceholder?: string;
+  accountIdLabel?: string;
+  accountIdPlaceholder?: string;
+  callbackPlaceholder?: string;
+};
+
+export type ProviderAccountKey = (typeof PROVIDER_ACCOUNT_DEFINITIONS_SOURCE)[number]["key"];
+
+export const PROVIDER_ACCOUNT_DEFINITIONS: readonly ProviderAccountDefinition[] = PROVIDER_ACCOUNT_DEFINITIONS_SOURCE;
+
+export const PROVIDER_ACCOUNT_KEYS: readonly ProviderAccountKey[] = PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => definition.key);
+
+export const OAUTH_PROVIDER_KEYS = ["antigravity", "codex", "kiro"] as const;
+export const DEVICE_PROVIDER_KEYS = ["codex", "qoder", "cline"] as const;
+export const API_KEY_PROVIDER_KEYS = ["nvidia_nim", "openrouter", "siliconflow", "zenmux", "harbor"] as const;
+export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "openrouter", "siliconflow", "zenmux"] as const;
+
+export type OAuthProviderKey = (typeof OAUTH_PROVIDER_KEYS)[number];
+export type DeviceProviderKey = (typeof DEVICE_PROVIDER_KEYS)[number];
+export type ApiKeyProviderKey = (typeof API_KEY_PROVIDER_KEYS)[number];
+export type QuotaProviderKey = (typeof QUOTA_PROVIDER_KEYS)[number];
 
 export const BY_KEY: Record<ProviderAccountKey, ProviderAccountDefinition> =
   Object.fromEntries(
-    PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, definition])
+    PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => [definition.key, definition])
   ) as Record<ProviderAccountKey, ProviderAccountDefinition>;
 
 const BY_SLUG: Record<string, ProviderAccountDefinition> = Object.fromEntries(
-  PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.slug, definition])
+  PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => [definition.slug, definition])
 );
 
 export function getProviderLabel(provider: string): string {
@@ -142,7 +228,7 @@ export function buildProviderHrefMap<V>(
   data: Record<ProviderAccountKey, V>
 ): Record<string, V> {
   return Object.fromEntries(
-    PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [
+    PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => [
       getProviderAccountPath(definition.key),
       data[definition.key],
     ])

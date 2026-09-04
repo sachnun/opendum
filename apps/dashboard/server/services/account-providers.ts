@@ -1,18 +1,6 @@
-export const PROVIDER_ACCOUNT_KEYS = [
-  "antigravity",
-  "cline",
-  "codex",
-  "harbor",
-  "kiro",
-  "nvidia_nim",
-  "openrouter",
-  "qoder",
-  "siliconflow",
-  "workers_ai",
-  "zenmux",
-] as const;
+import { PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
 
-export type ProviderAccountKey = (typeof PROVIDER_ACCOUNT_KEYS)[number];
+export { PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey };
 
 const VALID_PROVIDER_KEYS = new Set<string>(PROVIDER_ACCOUNT_KEYS);
 
