@@ -1,5 +1,5 @@
 import { MODEL_FAMILY_NAV_ITEMS } from "./model-families";
-import { getProviderAccountPath } from "./provider-accounts";
+import { getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS, type ProviderAccountKey } from "./provider-accounts";
 
 export interface NavItem {
   name: string;
@@ -18,45 +18,27 @@ export interface NavSubItem {
   tag?: string;
 }
 
-export interface ProviderAccountCounts {
-  antigravity: number;
-  cline: number;
-  codex: number;
-  harbor: number;
-  kiro: number;
-  nvidia_nim: number;
-  openrouter: number;
-  qoder: number;
-  siliconflow: number;
-  workers_ai: number;
-  zenmux: number;
-}
+export type ProviderAccountCounts = Record<ProviderAccountKey, number>;
 
 export type ProviderAccountIndicator = "normal" | "warning" | "error";
 
-export type ProviderAccountIndicators = Record<keyof ProviderAccountCounts, ProviderAccountIndicator>;
+export type ProviderAccountIndicators = Record<ProviderAccountKey, ProviderAccountIndicator>;
 
 export interface ModelFamilyCounts {
   [anchorId: string]: number;
 }
+
+const ACCOUNT_NAV_CHILDREN: NavSubItem[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
+  .filter((definition) => definition.showInNav !== false)
+  .sort((a, b) => (a.navOrder ?? Number.MAX_SAFE_INTEGER) - (b.navOrder ?? Number.MAX_SAFE_INTEGER))
+  .map((definition) => ({ name: definition.label, href: getProviderAccountPath(definition.key) }));
 
 export const primaryNavigation: NavItem[] = [
   {
     name: "Accounts",
     href: "/dashboard",
     icon: "i-lucide-user",
-    children: [
-      { name: "Antigravity", href: getProviderAccountPath("antigravity") },
-      { name: "Cline", href: getProviderAccountPath("cline") },
-      { name: "Codex", href: getProviderAccountPath("codex") },
-      { name: "Harbor", href: getProviderAccountPath("harbor") },
-      { name: "Kiro", href: getProviderAccountPath("kiro") },
-      { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
-      { name: "OpenRouter", href: getProviderAccountPath("openrouter") },
-      { name: "ZenMux", href: getProviderAccountPath("zenmux") },
-      { name: "SiliconFlow", href: getProviderAccountPath("siliconflow") },
-      { name: "Cloudflare", href: getProviderAccountPath("workers_ai") },
-    ],
+    children: ACCOUNT_NAV_CHILDREN,
   },
   {
     name: "API Keys",

@@ -13,15 +13,15 @@ import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/consta
 import { API_BASE_URL as harborApiBaseUrl } from "../lib/providers/harbor/constants";
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/providers/provider-http-errors";
 import { getCloudflareValidationUrl } from "../lib/providers/cloudflare/constants";
+import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "../../lib/provider-accounts";
 import type { ActionResult } from "../utils/api";
 
 const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "siliconflow", "zenmux", "harbor"]);
+const apiKeyProviderSchema = z.enum([...API_KEY_PROVIDER_KEYS]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional(), platformKey: z.string().optional() });
-type ApiKeyProvider = z.infer<typeof apiKeyProviderSchema>;
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 
 const API_KEY_PROVIDER_SETTINGS = {
@@ -30,9 +30,9 @@ const API_KEY_PROVIDER_SETTINGS = {
   siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
-} satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
+} satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
 
-function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {
+function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
   const { baseUrl, modelMap, validationPath } = API_KEY_PROVIDER_SETTINGS[provider];
   const validationModel = Object.values(modelMap)[0];
   const isPost = validationPath === "/chat/completions";
@@ -50,7 +50,7 @@ function buildValidationRequest(provider: ApiKeyProvider, apiKey: string) {
   };
 }
 
-async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string): Promise<ActionResult<void>> {
+async function validateProviderApiKey(provider: ApiKeyProviderKey, apiKey: string): Promise<ActionResult<void>> {
   const { label, validationPath, requireSuccessfulStatus } = API_KEY_PROVIDER_SETTINGS[provider];
   const { validationModel, url, method, headers, body } = buildValidationRequest(provider, apiKey);
   if (validationPath === "/chat/completions" && !validationModel) return { success: false, error: `${label} API key validation model is not configured.` };
@@ -81,7 +81,7 @@ async function validateProviderApiKey(provider: ApiKeyProvider, apiKey: string):
   }
 }
 
-async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProvider, apiKey: string, accountName?: string, platformKey?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
+async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProviderKey, apiKey: string, accountName?: string, platformKey?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
   const normalizedApiKey = apiKey.trim();
   if (!normalizedApiKey) return { success: false, error: "API key is required" };
   const validationResult = await validateProviderApiKey(provider, normalizedApiKey);

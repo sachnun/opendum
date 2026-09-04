@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProviderAccountKey } from "../../lib/provider-accounts";
+import { BY_KEY, DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, PROVIDER_ACCOUNT_DEFINITIONS, type DeviceProviderKey, type OAuthProviderKey, type ProviderAccountKey, type ProviderAuthMethodKey } from "../../lib/provider-accounts";
 import { cn } from "../../lib/utils";
 
 type Provider = ProviderAccountKey;
@@ -43,24 +43,38 @@ const emit = defineEmits<{
 const dashboardApi = useDashboardApi();
 const dashboardInvalidation = useDashboardDataInvalidation();
 
-const browserOAuthMethod: ProviderMethod = { key: "oauth_redirect", name: "Browser OAuth" };
-const deviceCodeMethod: ProviderMethod = { key: "device_code", name: "Device Code" };
-const apiKeyMethod: ProviderMethod = { key: "api_key", name: "API Key" };
-const apiTokenWithAccountIdMethod: ProviderMethod = { key: "api_key_with_account_id", name: "API Token" };
-
-const providerConfigs: Record<Provider, ProviderConfig> = {
-  antigravity: { name: "Antigravity", methods: [browserOAuthMethod] },
-  cline: { name: "Cline", methods: [deviceCodeMethod] },
-  codex: { name: "Codex", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", disabled: true }] },
-  harbor: { name: "Harbor", methods: [apiKeyMethod], apiKeyPortalUrl: "https://tokenharbor.ai/dashboard", apiKeyPlaceholder: "thk_live_..." },
-  kiro: { name: "Kiro", methods: [browserOAuthMethod] },
-  nvidia_nim: { name: "Nvidia", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
-  openrouter: { name: "OpenRouter", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
-  workers_ai: { name: "Cloudflare", methods: [apiTokenWithAccountIdMethod], apiKeyPortalUrl: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai", apiKeyPlaceholder: "Bearer token...", accountIdPlaceholder: "e.g. 1a2b3c4d5e6f...", accountIdLabel: "Cloudflare Account ID" },
-  qoder: { name: "Qoder", methods: [deviceCodeMethod, apiKeyMethod], apiKeyPortalUrl: "https://qoder.com/account/integrations", apiKeyPlaceholder: "pt-..." },
-  zenmux: { name: "ZenMux", methods: [apiKeyMethod], apiKeyPortalUrl: "https://zenmux.ai/platform/pay-as-you-go", apiKeyPlaceholder: "sk-..." },
-  siliconflow: { name: "SiliconFlow", methods: [apiKeyMethod], apiKeyPortalUrl: "https://cloud.siliconflow.com/account/ak", apiKeyPlaceholder: "sk-..." },
+const providerMethodLabels: Record<ProviderAuthMethodKey, { name: string; disabled?: boolean }> = {
+  oauth_redirect: { name: "Browser OAuth" },
+  device_code: { name: "Device Code" },
+  api_key: { name: "API Key" },
+  api_key_with_account_id: { name: "API Token" },
+  chatgpt_session: { name: "ChatGPT Session", disabled: true },
 };
+
+const providerConfigs: Record<Provider, ProviderConfig> = Object.fromEntries(
+  PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [
+    definition.key,
+    {
+      name: definition.label,
+      methods: definition.authMethods.map((methodKey) => {
+        const method = providerMethodLabels[methodKey];
+        return { key: methodKey, name: method.name, disabled: method.disabled };
+      }),
+      ...(definition.apiKeyPortalUrl ? { apiKeyPortalUrl: definition.apiKeyPortalUrl } : {}),
+      ...(definition.apiKeyPlaceholder ? { apiKeyPlaceholder: definition.apiKeyPlaceholder } : {}),
+      ...(definition.accountIdPlaceholder ? { accountIdPlaceholder: definition.accountIdPlaceholder } : {}),
+      ...(definition.accountIdLabel ? { accountIdLabel: definition.accountIdLabel } : {}),
+    },
+  ])
+) as Record<Provider, ProviderConfig>;
+
+function isOAuthProvider(provider: Provider): provider is OAuthProviderKey {
+  return (OAUTH_PROVIDER_KEYS as readonly Provider[]).includes(provider);
+}
+
+function isDeviceProvider(provider: Provider): provider is DeviceProviderKey {
+  return (DEVICE_PROVIDER_KEYS as readonly Provider[]).includes(provider);
+}
 
 const chatgptSessionPlaceholder = `{
   "WARNING_BANNER": "!!!!!!!!!!!!!!!!!!!! DO NOT SHARE ANY PART OF THE INFORMATION YOU SEE HERE. THIS INFORMATION IS SENSITIVE AND CAN GRANT ACCESS TO YOUR ACCOUNT. !!!!!!!!!!!!!!!!!!!!",
@@ -77,7 +91,9 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "cline", "codex", "harbor", "kiro", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
+const providerOptions: Provider[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
+  .sort((a, b) => (a.displayOrder ?? Number.MAX_SAFE_INTEGER) - (b.displayOrder ?? Number.MAX_SAFE_INTEGER))
+  .map((definition) => definition.key);
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -92,7 +108,7 @@ const authUrl = ref("");
 const oauthState = ref<string | null>(null);
 const oauthCodeVerifier = ref<string | null>(null);
 const selectedMethod = ref<MethodKey | null>(null);
-const deviceCodeInfo = ref<{ provider: "codex" | "qoder" | "cline"; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: string; machineId?: string } | null>(null);
+const deviceCodeInfo = ref<{ provider: DeviceProviderKey; deviceCode: string; userCode: string; verificationUrl: string; codeVerifier?: string; method?: string; machineId?: string } | null>(null);
 const copiedLink = ref(false);
 const copiedDeviceCode = ref(false);
 const copiedCallbackUrl = ref(false);
@@ -160,7 +176,8 @@ watch([open, step, provider, selectedMethod], async () => {
 
   try {
     if (selectedFlowType === "oauth_redirect") {
-      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider as "antigravity" | "codex" | "kiro" });
+      if (!isOAuthProvider(selectedProvider)) return;
+      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       authUrl.value = result.data.authUrl;
@@ -170,11 +187,12 @@ watch([open, step, provider, selectedMethod], async () => {
     }
 
     if (selectedFlowType === "device_code") {
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider as "codex" | "qoder" | "cline" });
+      if (!isDeviceProvider(selectedProvider)) return;
+      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
-        provider: selectedProvider as "codex" | "qoder" | "cline",
+        provider: selectedProvider,
         deviceCode: result.data.deviceCode,
         userCode: result.data.userCode,
         verificationUrl: result.data.verificationUrlComplete || result.data.verificationUrl,
@@ -302,8 +320,10 @@ function selectLoginMethod(method: MethodKey) {
 }
 
 function callbackPlaceholder(providerKey: Provider | null) {
-  if (providerKey === "kiro") return "http://localhost:49153/oauth/callback?code=...";
-  if (providerKey === "codex") return "http://localhost:1455/auth/callback?code=...";
+  if (providerKey) {
+    const definition = BY_KEY[providerKey];
+    if (definition.callbackPlaceholder) return definition.callbackPlaceholder;
+  }
   return "http://localhost:1/oauth2callback?code=...";
 }
 
@@ -494,7 +514,9 @@ async function handleConnectCodexSession() {
 
 async function handleExchangeOAuth() {
   if (props.readonly) return;
-  if (!provider.value) return;
+  const selectedProvider = provider.value;
+  if (!selectedProvider) return;
+  if (!isOAuthProvider(selectedProvider)) return;
 
   errorMessage.value = "";
   if (!callbackUrl.value.trim()) {
@@ -509,7 +531,7 @@ async function handleExchangeOAuth() {
 
   isLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.exchangeOAuth({ provider: provider.value as "antigravity" | "codex" | "kiro", callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
+    const result = await dashboardApi.accounts.exchangeOAuth({ provider: selectedProvider, callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {

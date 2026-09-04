@@ -28,6 +28,7 @@ import type {
   ProviderDetailResponse,
   ProviderAccountUpdateData,
 } from "../../lib/dashboard-api-types";
+import type { DeviceProviderKey, OAuthProviderKey } from "../../lib/provider-accounts";
 
 type ApiKeyAccessMode = "all" | "whitelist" | "blacklist";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
@@ -77,11 +78,11 @@ export function useDashboardApi() {
       errorHistory: (query: { accountId: string; limit?: number }) => dashboardFetch<ErrorHistoryResult>("/api/dashboard/accounts/errors", { query }),
       errorHistories: (body: { accountIds: string[]; limit?: number }) => post<ErrorHistoryBatchResult>(dashboardFetch, "/api/dashboard/accounts/errors/batch", body),
       resolveErrors: (body: { accountId: string }) => post<ActionResult>(dashboardFetch, "/api/dashboard/accounts/errors/resolve", body),
-      getAuthUrl: (body: { provider: "antigravity" | "codex" | "kiro" }) => post<ActionResult<{ authUrl: string; state: string | null; codeVerifier: string | null }>>(dashboardFetch, "/api/dashboard/accounts/oauth/url", body),
-      exchangeOAuth: (body: { provider: "antigravity" | "codex" | "kiro"; callbackUrl: string; state?: string | null; codeVerifier?: string | null }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/oauth/exchange", body),
+      getAuthUrl: (body: { provider: OAuthProviderKey }) => post<ActionResult<{ authUrl: string; state: string | null; codeVerifier: string | null }>>(dashboardFetch, "/api/dashboard/accounts/oauth/url", body),
+      exchangeOAuth: (body: { provider: OAuthProviderKey; callbackUrl: string; state?: string | null; codeVerifier?: string | null }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/oauth/exchange", body),
       connectCodexSession: (body: { sessionJson: string }) => post<ActionResult<{ email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/codex-session", body),
-      initiateDeviceAuth: (body: { provider: "codex" | "qoder" | "cline"; method?: string }) => post<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string; machineId?: string; expiresIn?: number; interval?: number }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/initiate", body),
-      pollDeviceAuth: (body: { provider: "codex" | "qoder" | "cline"; deviceCode: string; userCode?: string; codeVerifier?: string; method?: string; machineId?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/poll", body),
+      initiateDeviceAuth: (body: { provider: DeviceProviderKey; method?: string }) => post<ActionResult<{ deviceCode: string; userCode: string; verificationUrl: string; verificationUrlComplete?: string; codeVerifier?: string; machineId?: string; expiresIn?: number; interval?: number }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/initiate", body),
+      pollDeviceAuth: (body: { provider: DeviceProviderKey; deviceCode: string; userCode?: string; codeVerifier?: string; method?: string; machineId?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(dashboardFetch, "/api/dashboard/accounts/device-auth/poll", body),
       quota: (body: AccountQuotaRequest, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaInfo>>(dashboardFetch, "/api/dashboard/accounts/quota", body, options),
       quotas: (body: AccountQuotaBatchRequest, options?: DashboardFetchOptions) => post<ActionResult<AccountQuotaBatchResult>>(dashboardFetch, "/api/dashboard/accounts/quotas", body, options),
     },

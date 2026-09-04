@@ -11,18 +11,17 @@ import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, gener
 import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from "../lib/providers/qoder";
 import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "../lib/providers/cline";
 import type { OAuthResult } from "../lib/providers/types";
+import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "../../lib/provider-accounts";
 import type { ActionResult } from "../utils/api";
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
-export const getAuthUrlInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]) });
-export const exchangeOAuthInputSchema = z.object({ provider: z.enum(["antigravity", "codex", "kiro"]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
-export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum(["codex", "qoder", "cline"]), method: z.string().optional() });
-export const pollDeviceAuthInputSchema = z.object({ provider: z.enum(["codex", "qoder", "cline"]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: z.string().optional(), machineId: z.string().optional() });
+export const getAuthUrlInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]) });
+export const exchangeOAuthInputSchema = z.object({ provider: z.enum([...OAUTH_PROVIDER_KEYS]), callbackUrl: z.string(), state: z.string().nullable().optional(), codeVerifier: z.string().nullable().optional() });
+export const initiateDeviceAuthInputSchema = z.object({ provider: z.enum([...DEVICE_PROVIDER_KEYS]), method: z.string().optional() });
+export const pollDeviceAuthInputSchema = z.object({ provider: z.enum([...DEVICE_PROVIDER_KEYS]), deviceCode: z.string(), userCode: z.string().optional(), codeVerifier: z.string().optional(), method: z.string().optional(), machineId: z.string().optional() });
 export const connectCodexSessionInputSchema = z.object({ sessionJson: z.string().min(1, "Session JSON is required") });
 
-type OAuthProviderKey = z.infer<typeof getAuthUrlInputSchema>["provider"];
-type DeviceProviderKey = z.infer<typeof initiateDeviceAuthInputSchema>["provider"];
 type ProviderAccountKey = OAuthProviderKey | DeviceProviderKey;
 type AuthUrlResult = { authUrl: string; state: string | null; codeVerifier: string | null };
 type OAuthAccountOptions = {

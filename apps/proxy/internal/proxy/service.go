@@ -37,10 +37,11 @@ type Service struct {
 	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
+	quotaFetchers    map[string]quotaFetcher
 }
 
 func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string) *Service {
-	return &Service{
+	service := &Service{
 		db:               db,
 		redis:            redisClient,
 		auth:             authSvc,
@@ -52,6 +53,8 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		secret: secret,
 		client: &http.Client{Timeout: 0},
 	}
+	service.quotaFetcherRegistry()
+	return service
 }
 
 func (s *Service) ChatCompletions(w http.ResponseWriter, r *http.Request) {
