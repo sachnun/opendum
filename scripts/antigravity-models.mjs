@@ -61,12 +61,14 @@ const GEMINI_PRO_BUDGETS = {
 };
 
 const GEMINI_35_FLASH_LEVELS = ["minimal", "low", "medium", "high"];
-const GEMINI_36_FLASH_LEVELS = ["low", "medium", "high"];
+const GEMINI_3X_FLASH_LEVELS = ["low", "medium", "high"];
 const GEMINI_31_PRO_LEVELS = ["low", "medium", "high"];
 
 // Official docs expose user-facing labels, but cloudcode-pa v1internal can use
 // backend IDs that are not derivable from the display name alone.
 const DOCUMENTED_BACKEND_OVERRIDES = new Map([
+  ["Gemini 3.8 Flash", { key: "gemini-3.8-flash", upstream: "gemini-3.8-flash-medium" }],
+  ["Gemini 3.7 Flash", { key: "gemini-3.7-flash", upstream: "gemini-3.7-flash-medium" }],
   ["Gemini 3.6 Flash", { key: "gemini-3.6-flash", upstream: "gemini-3.6-flash-medium" }],
   ["Gemini 3.5 Flash", { key: "gemini-3.5-flash", upstream: "gemini-3.5-flash-medium" }],
   ["Claude Sonnet 4.6 (thinking)", { key: "claude-sonnet-4-6", upstream: "claude-sonnet-4-6" }],
@@ -75,7 +77,9 @@ const DOCUMENTED_BACKEND_OVERRIDES = new Map([
 ]);
 
 const MODEL_ALIASES_BY_KEY = new Map([
-  ["gemini-3.6-flash", GEMINI_36_FLASH_LEVELS.map((level) => `gemini-3.6-flash-${level}`)],
+  ["gemini-3.8-flash", GEMINI_3X_FLASH_LEVELS.map((level) => `gemini-3.8-flash-${level}`)],
+  ["gemini-3.7-flash", GEMINI_3X_FLASH_LEVELS.map((level) => `gemini-3.7-flash-${level}`)],
+  ["gemini-3.6-flash", GEMINI_3X_FLASH_LEVELS.map((level) => `gemini-3.6-flash-${level}`)],
   ["gemini-3.5-flash", GEMINI_35_FLASH_LEVELS.map((level) => `gemini-3.5-flash-${level}`)],
   ["gemini-3.1-pro", GEMINI_31_PRO_LEVELS.map((level) => `gemini-3.1-pro-${level}`)],
 ]);

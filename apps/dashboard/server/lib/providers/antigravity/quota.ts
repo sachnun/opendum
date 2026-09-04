@@ -68,6 +68,8 @@ const USER_TO_API_MODEL_MAP: Record<string, string> = {
   "claude-opus-4-6": "claude-opus-4-6-thinking",
   "gemini-3.5-flash": "gemini-3.5-flash-medium",
   "gemini-3.6-flash": "gemini-3.6-flash-medium",
+  "gemini-3.7-flash": "gemini-3.7-flash-medium",
+  "gemini-3.8-flash": "gemini-3.8-flash-medium",
 };
 
 // API name -> User-facing name (for normalizing API responses)
@@ -93,6 +95,12 @@ const API_TO_USER_MODEL_MAP: Record<string, string> = {
   "gemini-3.6-flash-high": "gemini-3.6-flash",
   "gemini-3.6-flash-low": "gemini-3.6-flash",
   "gemini-3.6-flash-medium": "gemini-3.6-flash",
+  "gemini-3.7-flash-high": "gemini-3.7-flash",
+  "gemini-3.7-flash-low": "gemini-3.7-flash",
+  "gemini-3.7-flash-medium": "gemini-3.7-flash",
+  "gemini-3.8-flash-high": "gemini-3.8-flash",
+  "gemini-3.8-flash-low": "gemini-3.8-flash",
+  "gemini-3.8-flash-medium": "gemini-3.8-flash",
 };
 
 /**
