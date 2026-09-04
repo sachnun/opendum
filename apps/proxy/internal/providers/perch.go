@@ -6,8 +6,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -228,11 +230,22 @@ func sessionIDsForAccount(ctx context.Context, client *http.Client, account appd
 	return &ids
 }
 
-func perchModelOptionID(alias string) string {
-	if option, ok := perchManualOptionIDs[alias]; ok {
-		return option
+func perchModelOptionID(alias string) (string, bool) {
+	option, ok := perchManualOptionIDs[alias]
+	return option, ok
+}
+
+func perchSupportedModels(registry *models.Registry) string {
+	var names []string
+	if registry != nil {
+		names = registry.ModelsForProvider("perch")
+	} else {
+		for alias := range perchManualOptionIDs {
+			names = append(names, alias)
+		}
 	}
-	return perchManualOptionIDs[perchFallbackAlias]
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 func perchRunID() string {
@@ -380,6 +393,15 @@ func perchEffortFromBody(body map[string]any) (level string, reasoningEnabled bo
 func (p perchProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	requestedModel := stringValue(body["model"])
 	upstream := perchModelAlias(p.registry, requestedModel)
+	optionID, ok := perchModelOptionID(upstream)
+	if !ok {
+		return jsonResponse(http.StatusBadRequest, map[string]any{"error": map[string]any{
+			"message": fmt.Sprintf("Model %q is not supported for Perch. Supported models: %s.", requestedModel, perchSupportedModels(p.registry)),
+			"type":    "invalid_request_error",
+			"param":   "model",
+			"code":    "unsupported_perch_model",
+		}}), nil
+	}
 	includeReasoning := isTruthful(body["_includeReasoning"])
 
 	runID := perchRunID()
@@ -421,7 +443,7 @@ func (p perchProvider) MakeRequest(ctx context.Context, client *http.Client, cre
 		"avoidModelIds":       []any{},
 		"attribution":         attribution,
 		"clientSurface":       "cli",
-		"manualModelOptionId": perchModelOptionID(upstream),
+		"manualModelOptionId": optionID,
 		"roostModelChoice":    "standard",
 		"roostReasoning":      reasoningEnabled,
 		"effort":              map[string]any{"level": effortLevel, "orchestration": false},
@@ -455,6 +477,10 @@ func (p perchProvider) MakeRequest(ctx context.Context, client *http.Client, cre
 	completion, err := perchSSEToChatCompletion(resp.Body, requestedModel, includeReasoning)
 	_ = resp.Body.Close()
 	if err != nil {
+		var upstreamErr *perchUpstreamError
+		if errors.As(err, &upstreamErr) {
+			return jsonResponse(perchErrorStatus(upstreamErr), map[string]any{"error": map[string]any{"message": upstreamErr.Message, "type": perchErrorType(upstreamErr)}}), nil
+		}
 		return nil, err
 	}
 	return jsonResponse(http.StatusOK, completion), nil

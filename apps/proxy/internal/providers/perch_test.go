@@ -1,9 +1,14 @@
 package providers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
+
+	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
 func perchEvent(payload map[string]any) string {
@@ -75,12 +80,15 @@ func TestPerchModelOptionIDResolvesPoolAliases(t *testing.T) {
 		"glm-5":           "bedrock-mantle-zai-glm-5",
 		"kimi-2.5":        "bedrock-mantle-moonshotai-kimi-k2-5",
 		"minimax-m3-free": "gmi-minimaxai-minimax-m3",
-		"unknown-model":   perchManualOptionIDs[perchFallbackAlias],
 	}
 	for alias, want := range cases {
-		if got := perchModelOptionID(alias); got != want {
-			t.Fatalf("perchModelOptionID(%q) = %q, want %q", alias, got, want)
+		got, ok := perchModelOptionID(alias)
+		if !ok || got != want {
+			t.Fatalf("perchModelOptionID(%q) = %q, %v; want %q, true", alias, got, ok, want)
 		}
+	}
+	if _, ok := perchModelOptionID("unknown-model"); ok {
+		t.Fatal("unknown alias should not resolve to a pool option")
 	}
 }
 
@@ -347,5 +355,111 @@ func TestPerchEffortFromBodyMapping(t *testing.T) {
 		if level != tc.level || enabled != tc.enabled {
 			t.Fatalf("reasoning_effort %q = (%q, %v), want (%q, %v)", tc.input, level, enabled, tc.level, tc.enabled)
 		}
+	}
+}
+
+func TestPerchSSEToChatCompletionReportsUpstreamFailure(t *testing.T) {
+	cases := []struct {
+		name    string
+		events  []map[string]any
+		message string
+		quota   bool
+		wantErr bool
+	}{
+		{
+			name: "quota error aborts completion",
+			events: []map[string]any{
+				{"type": "answer_delta", "text": "partial"},
+				{"type": "done", "ok": false, "error": "Monthly allowance reached"},
+			},
+			message: "Monthly allowance reached",
+			quota:   true,
+			wantErr: true,
+		},
+		{
+			name: "plain error aborts completion",
+			events: []map[string]any{
+				{"type": "done", "ok": false, "error": "Upstream model overloaded"},
+			},
+			message: "Upstream model overloaded",
+			quota:   false,
+			wantErr: true,
+		},
+		{
+			name: "explicit failure without message",
+			events: []map[string]any{
+				{"type": "done", "ok": false},
+			},
+			message: "Perch request failed",
+			quota:   false,
+			wantErr: true,
+		},
+		{
+			name: "missing ok field is treated as success",
+			events: []map[string]any{
+				{"type": "answer_delta", "text": "hi"},
+				{"type": "done", "usage": map[string]any{"inputTokens": 4, "outputTokens": 1}},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			completion, err := perchSSEToChatCompletion(strings.NewReader(perchSSE(tc.events...)), "glm-5", false)
+			if !tc.wantErr {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				message := completion["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)
+				if message["content"] != "hi" {
+					t.Fatalf("content = %#v", message["content"])
+				}
+				return
+			}
+			var upstreamErr *perchUpstreamError
+			if !errors.As(err, &upstreamErr) {
+				t.Fatalf("err = %v, want *perchUpstreamError", err)
+			}
+			if upstreamErr.Message != tc.message || upstreamErr.Quota != tc.quota {
+				t.Fatalf("upstream error = %#v, want message %q quota %v", upstreamErr, tc.message, tc.quota)
+			}
+		})
+	}
+}
+
+func TestPerchErrorStatusAndTypeMapping(t *testing.T) {
+	quotaErr := &perchUpstreamError{Message: "Monthly allowance reached", Quota: true}
+	if perchErrorStatus(quotaErr) != http.StatusTooManyRequests || perchErrorType(quotaErr) != "rate_limit_error" {
+		t.Fatalf("quota error status/type = %d/%s", perchErrorStatus(quotaErr), perchErrorType(quotaErr))
+	}
+	plainErr := &perchUpstreamError{Message: "Upstream model overloaded", Quota: false}
+	if perchErrorStatus(plainErr) != http.StatusBadGateway || perchErrorType(plainErr) != "api_error" {
+		t.Fatalf("plain error status/type = %d/%s", perchErrorStatus(plainErr), perchErrorType(plainErr))
+	}
+}
+
+func TestPerchMakeRequestRejectsUnsupportedModel(t *testing.T) {
+	resp, err := (perchProvider{}).MakeRequest(context.Background(), nil, "", appdb.ProviderAccount{}, map[string]any{"model": "gpt-4o", "messages": []any{}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	errorBody, ok := payload["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v", payload)
+	}
+	message, _ := errorBody["message"].(string)
+	if !strings.Contains(message, "gpt-4o") || !strings.Contains(message, "not supported for Perch") {
+		t.Fatalf("error message = %q", message)
+	}
+	if errorBody["code"] != "unsupported_perch_model" {
+		t.Fatalf("error code = %#v", errorBody["code"])
 	}
 }

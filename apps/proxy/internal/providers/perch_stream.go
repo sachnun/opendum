@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -229,11 +230,13 @@ func perchSSEToChatCompletion(source io.Reader, model string, includeReasoning b
 				}
 			}
 		case "done":
-			ok, _ := event["ok"].(bool)
-			if !ok {
-				if message := perchErrorMessage(event); message != "" {
-					content.WriteString(message)
+			message := perchErrorMessage(event)
+			ok, hasOK := event["ok"].(bool)
+			if message != "" || (hasOK && !ok) {
+				if message == "" {
+					message = "Perch request failed"
 				}
+				return nil, &perchUpstreamError{Message: message, Quota: perchQuotaError(message)}
 			}
 			usage = perchUsageToChatUsage(event["usage"])
 		}
@@ -323,6 +326,39 @@ func perchErrorMessage(event map[string]any) string {
 		return string(encoded)
 	}
 	return ""
+}
+
+type perchUpstreamError struct {
+	Message string
+	Quota   bool
+}
+
+func (e *perchUpstreamError) Error() string {
+	return e.Message
+}
+
+func perchErrorStatus(err *perchUpstreamError) int {
+	if err.Quota {
+		return http.StatusTooManyRequests
+	}
+	return http.StatusBadGateway
+}
+
+func perchErrorType(err *perchUpstreamError) string {
+	if err.Quota {
+		return "rate_limit_error"
+	}
+	return "api_error"
+}
+
+func perchQuotaError(message string) bool {
+	lower := strings.ToLower(message)
+	for _, marker := range []string{"allowance", "quota", "limit", "usage", "billing", "credit"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func perchUsageToChatUsage(raw any) map[string]any {
