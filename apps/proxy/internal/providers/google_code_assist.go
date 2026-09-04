@@ -2766,9 +2766,17 @@ func geminiUsage(response map[string]any) map[string]any {
 	if !ok {
 		return nil
 	}
+	promptTokens := numberFromAny(rawUsage["promptTokenCount"])
+	thoughtsTokens := numberFromAny(rawUsage["thoughtsTokenCount"])
+	candidatesTokens := numberFromAny(rawUsage["candidatesTokenCount"])
+	if totalTokens := numberFromAny(rawUsage["totalTokenCount"]); candidatesTokens == 0 && totalTokens > 0 {
+		if derived := totalTokens - promptTokens - thoughtsTokens; derived > 0 {
+			candidatesTokens = derived
+		}
+	}
 	usage := map[string]any{
-		"prompt_tokens":     numberFromAny(rawUsage["promptTokenCount"]),
-		"completion_tokens": numberFromAny(rawUsage["candidatesTokenCount"]),
+		"prompt_tokens":     promptTokens,
+		"completion_tokens": candidatesTokens + thoughtsTokens,
 		"total_tokens":      numberFromAny(rawUsage["totalTokenCount"]),
 	}
 	if cachedTokens := numberFromAny(rawUsage["cachedContentTokenCount"]); cachedTokens > 0 {
@@ -2776,7 +2784,7 @@ func geminiUsage(response map[string]any) map[string]any {
 			"cached_tokens": cachedTokens,
 		}
 	}
-	if thoughtsTokens := numberFromAny(rawUsage["thoughtsTokenCount"]); thoughtsTokens > 0 {
+	if thoughtsTokens > 0 {
 		usage["completion_tokens_details"] = map[string]any{
 			"reasoning_tokens": thoughtsTokens,
 		}

@@ -65,7 +65,7 @@ func TestGeminiUsageMapsCachedContentTokens(t *testing.T) {
 		"usageMetadata": map[string]any{
 			"promptTokenCount":        1000,
 			"candidatesTokenCount":    200,
-			"totalTokenCount":         1200,
+			"totalTokenCount":         1250,
 			"cachedContentTokenCount": 400,
 			"thoughtsTokenCount":      50,
 		},
@@ -73,7 +73,7 @@ func TestGeminiUsageMapsCachedContentTokens(t *testing.T) {
 	if usage == nil {
 		t.Fatal("geminiUsage returned nil")
 	}
-	if usage["prompt_tokens"] != 1000 || usage["completion_tokens"] != 200 || usage["total_tokens"] != 1200 {
+	if usage["prompt_tokens"] != 1000 || usage["completion_tokens"] != 250 || usage["total_tokens"] != 1250 {
 		t.Fatalf("unexpected token counts: %v", usage)
 	}
 	details, ok := usage["prompt_tokens_details"].(map[string]any)
@@ -82,6 +82,49 @@ func TestGeminiUsageMapsCachedContentTokens(t *testing.T) {
 	}
 	if details["cached_tokens"] != 400 {
 		t.Fatalf("cached_tokens = %v, want 400", details["cached_tokens"])
+	}
+	completionDetails, ok := usage["completion_tokens_details"].(map[string]any)
+	if !ok {
+		t.Fatalf("completion_tokens_details missing: %v", usage)
+	}
+	if completionDetails["reasoning_tokens"] != 50 {
+		t.Fatalf("reasoning_tokens = %v, want 50", completionDetails["reasoning_tokens"])
+	}
+}
+
+func TestGeminiUsageFoldsThoughtsIntoCompletionTokens(t *testing.T) {
+	usage := geminiUsage(map[string]any{
+		"usageMetadata": map[string]any{
+			"promptTokenCount":     4489,
+			"candidatesTokenCount": 7,
+			"totalTokenCount":      4542,
+			"thoughtsTokenCount":   46,
+		},
+	})
+	if usage == nil {
+		t.Fatal("geminiUsage returned nil")
+	}
+	if usage["completion_tokens"] != 53 {
+		t.Fatalf("completion_tokens = %v, want 53 (candidates 7 + thoughts 46)", usage["completion_tokens"])
+	}
+	if usage["prompt_tokens"] != 4489 || usage["total_tokens"] != 4542 {
+		t.Fatalf("unexpected token counts: %v", usage)
+	}
+}
+
+func TestGeminiUsageDerivesCandidatesFromTotal(t *testing.T) {
+	usage := geminiUsage(map[string]any{
+		"usageMetadata": map[string]any{
+			"promptTokenCount":   100,
+			"totalTokenCount":    300,
+			"thoughtsTokenCount": 50,
+		},
+	})
+	if usage == nil {
+		t.Fatal("geminiUsage returned nil")
+	}
+	if usage["completion_tokens"] != 200 {
+		t.Fatalf("completion_tokens = %v, want 200 (300 - 100 total minus prompt; 150 text + 50 thoughts)", usage["completion_tokens"])
 	}
 }
 
