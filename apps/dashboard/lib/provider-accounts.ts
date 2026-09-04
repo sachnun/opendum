@@ -3,6 +3,7 @@ export type ProviderAccountKey =
   | "cline"
   | "codex"
   | "command_code"
+  | "harbor"
   | "kiro"
   | "nvidia_nim"
   | "openrouter"
@@ -54,6 +55,14 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: ProviderAccountDefinition[] = [
     category: "api_key",
     emptyMessage: "No Command Code connections yet.",
     showTier: true,
+  },
+  {
+    key: "harbor",
+    slug: "harbor",
+    label: "Harbor",
+    category: "api_key",
+    emptyMessage: "No Harbor connections yet.",
+    showTier: false,
   },
   {
     key: "kiro",
