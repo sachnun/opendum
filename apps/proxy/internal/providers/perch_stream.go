@@ -111,6 +111,10 @@ func transformPerchSSEToChat(source io.Reader, writer io.Writer, model string, i
 					nextToolIndex++
 					perchToolDeltaChunk(writer, completionID, model, state.index, true, id, name != "", name, "")
 				}
+				if name := stringValue(call["name"]); name != "" && state.name == "" {
+					state.name = name
+					perchToolDeltaChunk(writer, completionID, model, state.index, false, "", true, name, "")
+				}
 				arguments := perchToolArgumentsDelta(call, sealed)
 				if arguments == "" {
 					continue
@@ -119,10 +123,6 @@ func transformPerchSSEToChat(source io.Reader, writer io.Writer, model string, i
 					continue
 				}
 				state.emittedArgs = true
-				if name := stringValue(call["name"]); name != "" && state.name == "" {
-					state.name = name
-					perchToolDeltaChunk(writer, completionID, model, state.index, false, "", true, name, "")
-				}
 				perchToolDeltaChunk(writer, completionID, model, state.index, false, "", false, "", arguments)
 			}
 		case "done":
@@ -334,7 +334,7 @@ func perchUsageToChatUsage(raw any) map[string]any {
 	output := perchUsageInt(usage, "outputTokens")
 	cacheRead := perchUsageInt(usage, "cacheReadInputTokens")
 	if input == 0 && output == 0 && cacheRead == 0 {
-		return map[string]any{}
+		return nil
 	}
 	promptTokens := input + cacheRead
 	return map[string]any{"prompt_tokens": promptTokens, "completion_tokens": output, "total_tokens": promptTokens + output}

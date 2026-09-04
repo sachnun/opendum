@@ -198,3 +198,133 @@ func TestPerchSSEStreamFailureInjectsErrorMessage(t *testing.T) {
 		t.Fatalf("streamed text = %q", text)
 	}
 }
+
+func perchToolDeltas(chunks []map[string]any) []map[string]any {
+	out := []map[string]any{}
+	for _, chunk := range chunks {
+		choices, _ := chunk["choices"].([]any)
+		if len(choices) == 0 {
+			continue
+		}
+		delta, _ := choices[0].(map[string]any)["delta"].(map[string]any)
+		if delta == nil {
+			continue
+		}
+		calls, _ := delta["tool_calls"].([]any)
+		for _, raw := range calls {
+			if call, ok := raw.(map[string]any); ok {
+				out = append(out, call)
+			}
+		}
+	}
+	return out
+}
+
+func TestPerchSSEStreamEmitsToolCallsAndToolFinish(t *testing.T) {
+	events := []map[string]any{
+		{"type": "tool_call_delta", "toolCalls": []any{map[string]any{"id": "t_1", "name": "search", "rawArgumentsText": `{"q":"`}}},
+		{"type": "tool_call_delta", "toolCalls": []any{map[string]any{"id": "t_1", "rawArgumentsText": `perch"}`}}},
+		{"type": "tool_use_end", "toolCalls": []any{map[string]any{"id": "t_1", "name": "search", "arguments": map[string]any{"q": "perch"}}}},
+		{"type": "done", "ok": true, "usage": map[string]any{"inputTokens": 4, "outputTokens": 2}},
+	}
+	chunks := parseChatChunks(t, perchReadSSE(t, perchSSE(events...), false))
+
+	id := ""
+	name := ""
+	args := ""
+	for _, call := range perchToolDeltas(chunks) {
+		if value, ok := call["id"].(string); ok {
+			id = value
+		}
+		if fn, ok := call["function"].(map[string]any); ok {
+			if value, ok := fn["name"].(string); ok {
+				name = value
+			}
+			if value, ok := fn["arguments"].(string); ok {
+				args += value
+			}
+		}
+	}
+	if id != "t_1" || name != "search" || args != `{"q":"perch"}` {
+		t.Fatalf("tool call = id %q name %q args %q", id, name, args)
+	}
+	last := chunks[len(chunks)-1]
+	choices := last["choices"].([]any)
+	finish := choices[0].(map[string]any)["finish_reason"]
+	if finish != "tool_calls" {
+		t.Fatalf("finish_reason = %#v", finish)
+	}
+}
+
+func TestPerchSSEStreamEmitsToolNameArrivingAtSeal(t *testing.T) {
+	events := []map[string]any{
+		{"type": "tool_call_delta", "toolCalls": []any{map[string]any{"id": "t_1", "rawArgumentsText": `{"q":"x"}`}}},
+		{"type": "tool_use_end", "toolCalls": []any{map[string]any{"id": "t_1", "name": "search", "arguments": map[string]any{"q": "x"}}}},
+		{"type": "done", "ok": true},
+	}
+	chunks := parseChatChunks(t, perchReadSSE(t, perchSSE(events...), false))
+
+	names := []string{}
+	args := ""
+	for _, call := range perchToolDeltas(chunks) {
+		if fn, ok := call["function"].(map[string]any); ok {
+			if value, ok := fn["name"].(string); ok && value != "" {
+				names = append(names, value)
+			}
+			if value, ok := fn["arguments"].(string); ok {
+				args += value
+			}
+		}
+	}
+	if len(names) == 0 || names[0] != "search" {
+		t.Fatalf("tool name never streamed: %#v", perchToolDeltas(chunks))
+	}
+	if args != `{"q":"x"}` {
+		t.Fatalf("tool args = %q", args)
+	}
+}
+
+func TestPerchMessagesDropsImageParts(t *testing.T) {
+	messages := perchMessages(map[string]any{
+		"messages": []any{
+			map[string]any{"role": "user", "content": []any{
+				map[string]any{"type": "text", "text": "describe this"},
+				map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64,AAA"}},
+			}},
+		},
+	})
+	if len(messages) != 1 {
+		t.Fatalf("messages = %#v", messages)
+	}
+	user := messages[0].(map[string]any)
+	if user["role"] != "user" || user["content"] != "describe this" {
+		t.Fatalf("user message = %#v", user)
+	}
+}
+
+func TestPerchEffortFromBodyMapping(t *testing.T) {
+	cases := []struct {
+		input   string
+		level   string
+		enabled bool
+	}{
+		{"", "high", true},
+		{"off", "off", false},
+		{"none", "off", false},
+		{"low", "low", true},
+		{"medium", "medium", true},
+		{"high", "high", true},
+		{"xhigh", "high", true},
+		{"max", "high", true},
+	}
+	for _, tc := range cases {
+		body := map[string]any{}
+		if tc.input != "" {
+			body["reasoning_effort"] = tc.input
+		}
+		level, enabled := perchEffortFromBody(body)
+		if level != tc.level || enabled != tc.enabled {
+			t.Fatalf("reasoning_effort %q = (%q, %v), want (%q, %v)", tc.input, level, enabled, tc.level, tc.enabled)
+		}
+	}
+}
