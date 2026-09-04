@@ -147,6 +147,7 @@ function shouldIncludeModel(model, modelKey, index, existingWorkersAI) {
   if (model.task?.name !== "Text Generation") return false;
   if (!supportsMessagesInput(model.schema?.input)) return false;
   if (isTrue(getProperty(model, "lora"))) return false;
+  if (isTrue(getProperty(model, "require_workers_paid"))) return false;
   if (getProperty(model, "planned_deprecation_date") && !existingWorkersAI) return false;
   if (isExistingIgnoredWithoutWorkersAI(index, modelKey)) return false;
 
