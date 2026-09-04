@@ -62,6 +62,36 @@ type ProviderAccount struct {
 	UpdatedAt                 time.Time  `bun:"updatedAt"`
 }
 
+type CustomProvider struct {
+	bun.BaseModel `bun:"table:custom_provider"`
+
+	ID           string            `bun:"id,pk"`
+	UserID       string            `bun:"userId"`
+	Slug         string            `bun:"slug"`
+	Name         string            `bun:"name"`
+	BaseURL      string            `bun:"baseUrl"`
+	ExtraHeaders map[string]string `bun:"extraHeaders,json"`
+	Enabled      bool              `bun:"enabled"`
+	CreatedAt    time.Time         `bun:"createdAt"`
+	UpdatedAt    time.Time         `bun:"updatedAt"`
+}
+
+type CustomProviderModel struct {
+	bun.BaseModel `bun:"table:custom_provider_model"`
+
+	ID           string         `bun:"id,pk"`
+	ProviderID   string         `bun:"providerId"`
+	ModelID      string         `bun:"modelId"`
+	Upstream     string         `bun:"upstream"`
+	Authless     bool           `bun:"authless"`
+	MinTier      string         `bun:"minTier"`
+	AllowedTiers []string       `bun:"allowedTiers,array"`
+	Meta         map[string]any `bun:"meta,json"`
+	CustomFlags  map[string]any `bun:"customFlags,json"`
+	CreatedAt    time.Time      `bun:"createdAt"`
+	UpdatedAt    time.Time      `bun:"updatedAt"`
+}
+
 type UserPointBalance struct {
 	bun.BaseModel `bun:"table:user_point_balance"`
 

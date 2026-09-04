@@ -60,6 +60,15 @@ func (s *Service) codexChatGPTModels() []string {
 
 func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam string, access ModelAccess) (ModelValidationResult, error) {
 	provider, rawModel := ParseModelParam(modelParam)
+	if provider != nil && s.customProviders != nil {
+		custom, err := s.customModelResult(ctx, userID, *provider, rawModel)
+		if err != nil {
+			return ModelValidationResult{}, err
+		}
+		if custom != nil {
+			return *custom, nil
+		}
+	}
 	mode := normalizeAccessMode(access.Mode)
 	modelSet := map[string]struct{}{}
 	for _, model := range s.normalizeModelList(access.Models) {
@@ -98,6 +107,37 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 	}
 
 	return base, nil
+}
+
+func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel string) (*ModelValidationResult, error) {
+	custom, err := s.customProviders.GetProvider(ctx, userID, slug)
+	if err != nil {
+		return nil, err
+	}
+	if custom == nil {
+		return nil, nil
+	}
+	rows, err := s.customProviders.ListModels(ctx, custom.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if row.ModelID != rawModel {
+			continue
+		}
+		provider := slug
+		result := ModelValidationResult{Valid: true, Provider: &provider, Model: slug + "/" + rawModel}
+		if value, ok := row.Meta["vision"].(bool); ok {
+			result.Vision = &value
+		}
+		if value, ok := row.Meta["toolCall"].(bool); ok {
+			result.ToolCall = &value
+		}
+		return &result, nil
+	}
+	message := "Model \"" + rawModel + "\" is not registered under your custom provider \"" + slug + "\"."
+	provider := slug
+	return &ModelValidationResult{Valid: false, Provider: &provider, Model: rawModel, Error: message, Param: "model", Code: "invalid_model"}, nil
 }
 
 func (s *Service) invalidModelResult(provider *string, model, modelParam string, candidates []string) ModelValidationResult {

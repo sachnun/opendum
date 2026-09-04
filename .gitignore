@@ -50,5 +50,8 @@ Thumbs.db
 # agent instructions
 AGENTS.md
 
+# local plan notes
+PLAN.md
+
 # typescript
 *.tsbuildinfo

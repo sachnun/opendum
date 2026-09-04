@@ -187,6 +187,15 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 	if len(targetProviders) == 0 {
 		return nil, false, nil
 	}
+	if provider != nil && s.customStore != nil {
+		custom, err := s.customStore.GetProvider(ctx, userID, *provider)
+		if err != nil {
+			return nil, false, err
+		}
+		if custom != nil {
+			return nil, false, nil
+		}
+	}
 
 	query := s.db.NewSelect().Model((*appdb.ProviderAccount)(nil)).
 		Column("provider_account.id", "provider_account.userId", "provider_account.provider", "provider_account.tier", "provider_account.status", "provider_account.lastUsedAt", "provider_account.createdAt", "provider_account.accountId", "provider_account.disabledUntil").
