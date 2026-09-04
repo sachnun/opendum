@@ -22,6 +22,9 @@ const (
 	perchAppURL           = "https://app.perchai.app"
 	perchAuthConfigPath   = "/api/perch-terminal/cli-auth/config"
 	perchAccountPath      = "/api/perchai/account"
+	perchTurnTicketPath   = "/api/perch-terminal/turn-ticket"
+	perchTurnTicketHeader = "x-perch-turn-ticket"
+	perchCLIVersion       = "2.4.98"
 	perchModelCallPath    = "/api/perch-terminal/model-call"
 	perchAccessTTL        = time.Hour
 	perchRefreshBuffer    = 5 * time.Minute
@@ -68,7 +71,7 @@ func fetchPerchAuthConfig(ctx context.Context, client *http.Client) (*perchAuthC
 	if cached := perchAuthConfigState.config; cached != nil && time.Since(perchAuthConfigState.fetchedAt) < perchConfigCacheTTL {
 		return cached, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, perchAppURL+perchAuthConfigPath, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, perchAppBaseURL+perchAuthConfigPath, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +200,7 @@ func sessionIDsForAccount(ctx context.Context, client *http.Client, account appd
 	}
 	perchSessionState.mu.Unlock()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, perchAppURL+perchAccountPath, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, perchAppBaseURL+perchAccountPath, nil)
 	if err != nil {
 		return nil
 	}
@@ -252,6 +255,56 @@ func perchRunID() string {
 	buf := make([]byte, 4)
 	_, _ = rand.Read(buf)
 	return fmt.Sprintf("cli-turn-%d-%s", time.Now().UnixMilli(), hex.EncodeToString(buf))
+}
+
+var perchAppBaseURL = perchAppURL
+
+func perchUserAgent() string {
+	return "perchai-cli/" + perchCLIVersion
+}
+
+func perchTurnTicket(ctx context.Context, client *http.Client, accessToken string) (string, string, error) {
+	payload, _ := json.Marshal(map[string]any{"surface": "cli", "profile": "standard"})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, perchAppBaseURL+perchTurnTicketPath, bytes.NewReader(payload))
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+	req.Header.Set("User-Agent", perchUserAgent())
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", "", fmt.Errorf("perch turn ticket failed: %d %s", resp.StatusCode, readLimit(resp.Body, 1<<20))
+	}
+	var result struct {
+		Ok     *bool  `json:"ok"`
+		Ticket string `json:"ticket"`
+		RunID  string `json:"runId"`
+		Error  string `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", fmt.Errorf("perch turn ticket was not valid JSON")
+	}
+	if result.Ok != nil && !*result.Ok {
+		message := strings.TrimSpace(result.Error)
+		if message == "" {
+			message = "Perch turn ticket request failed"
+		}
+		return "", "", fmt.Errorf("%s", message)
+	}
+	if strings.TrimSpace(result.Ticket) == "" || strings.TrimSpace(result.RunID) == "" {
+		message := strings.TrimSpace(result.Error)
+		if message == "" {
+			message = "Perch turn ticket returned incomplete credentials"
+		}
+		return "", "", fmt.Errorf("%s", message)
+	}
+	return strings.TrimSpace(result.Ticket), strings.TrimSpace(result.RunID), nil
 }
 
 func perchMessages(body map[string]any) []any {
@@ -404,7 +457,14 @@ func (p perchProvider) MakeRequest(ctx context.Context, client *http.Client, cre
 	}
 	includeReasoning := isTruthful(body["_includeReasoning"])
 
-	runID := perchRunID()
+	ticket, ticketRunID, err := perchTurnTicket(ctx, client, credentials)
+	if err != nil {
+		return nil, err
+	}
+	runID := strings.TrimSpace(ticketRunID)
+	if runID == "" {
+		runID = perchRunID()
+	}
 	attribution := any(nil)
 	if ids := sessionIDsForAccount(ctx, client, account, credentials); ids != nil && ids.userID != "" && ids.workspaceID != "" {
 		attribution = map[string]any{
@@ -453,12 +513,14 @@ func (p perchProvider) MakeRequest(ctx context.Context, client *http.Client, cre
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, perchAppURL+perchModelCallPath, bytes.NewReader(rawBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, perchAppBaseURL+perchModelCallPath, bytes.NewReader(rawBody))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(credentials))
+	req.Header.Set(perchTurnTicketHeader, ticket)
+	req.Header.Set("User-Agent", perchUserAgent())
 	req.Header.Set("Accept", "text/event-stream")
 
 	resp, err := client.Do(req)
