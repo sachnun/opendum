@@ -457,7 +457,8 @@ func (p googleCodeAssistProvider) resolveAntigravityGemini3ModelVariant(model st
 	if !isGemini3ModelName(model) {
 		return model
 	}
-	if strings.Contains(strings.ToLower(model), "flash") && strings.Contains(strings.ToLower(model), "3.5") {
+	lower := strings.ToLower(model)
+	if strings.HasPrefix(lower, "gemini-3.5-flash") && !strings.Contains(lower, "lite") {
 		base := trimGeminiThinkingLevelSuffix(model)
 		level := geminiThinkingLevelFromModel(model)
 		if bodyLevel := p.requestedGemini3ThinkingLevel(model, body); bodyLevel != "" {

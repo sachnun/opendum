@@ -330,6 +330,17 @@ func TestAntigravityGemini35FlashComesFromRegistry(t *testing.T) {
 	}
 }
 
+func TestAntigravityGemini35FlashLiteNotBound(t *testing.T) {
+	registry := testModelsRegistry(t)
+	if _, ok := registry.ProviderModelConfig("gemini-3.5-flash-lite", "antigravity"); ok {
+		t.Fatal("gemini-3.5-flash-lite must not be bound to antigravity (not an Antigravity Code Assist model)")
+	}
+	provider := antigravityProvider{registry: registry}.delegate()
+	if got := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel("gemini-3.5-flash-lite"), map[string]any{"reasoning_effort": "high"}); got != "gemini-3.5-flash-lite" {
+		t.Fatalf("resolved model = %q, want gemini-3.5-flash-lite", got)
+	}
+}
+
 func TestAntigravityGPTOSS120BIsSupported(t *testing.T) {
 	registry := testModelsRegistry(t)
 	if info, ok := registry.ModelInfo("gpt-oss-120b"); !ok || info.Ignored {
