@@ -19,6 +19,24 @@ func TestProviderDisplayNamesMatchRegistry(t *testing.T) {
 	}
 }
 
+func TestRegistryNames(t *testing.T) {
+	registry := NewRegistry(nil, nil, nil)
+	names := registry.Names()
+	if len(names) != len(registry.providers) {
+		t.Fatalf("names = %d entries, registry = %d entries", len(names), len(registry.providers))
+	}
+	for i := 1; i < len(names); i++ {
+		if names[i-1] >= names[i] {
+			t.Fatalf("names not sorted: %v", names)
+		}
+	}
+	for _, name := range names {
+		if _, ok := registry.Get(name); !ok {
+			t.Fatalf("name %q missing from registry", name)
+		}
+	}
+}
+
 func TestRefreshableProviderNames(t *testing.T) {
 	registry := NewRegistry(nil, nil, nil)
 	names := registry.RefreshableProviderNames()

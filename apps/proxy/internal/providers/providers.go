@@ -78,6 +78,18 @@ func (r *Registry) Get(name string) (Provider, bool) {
 	return provider, ok
 }
 
+func (r *Registry) Names() []string {
+	if r == nil {
+		return nil
+	}
+	names := make([]string, 0, len(r.providers))
+	for name := range r.providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 func (r *Registry) RefreshableProviderNames() []string {
 	if r == nil {
 		return nil
