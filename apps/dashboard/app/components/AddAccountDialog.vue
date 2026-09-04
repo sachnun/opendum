@@ -53,6 +53,7 @@ const providerConfigs: Record<Provider, ProviderConfig> = {
   cline: { name: "Cline", methods: [deviceCodeMethod] },
   codex: { name: "Codex", methods: [browserOAuthMethod, deviceCodeMethod, { key: "chatgpt_session", name: "ChatGPT Session", disabled: true }] },
   command_code: { name: "Command Code", methods: [apiKeyMethod], apiKeyPortalUrl: "https://commandcode.ai/studio/api-keys", apiKeyPlaceholder: "user_..." },
+  harbor: { name: "Harbor", methods: [apiKeyMethod], apiKeyPortalUrl: "https://tokenharbor.ai/dashboard", apiKeyPlaceholder: "thk_live_..." },
   kiro: { name: "Kiro", methods: [browserOAuthMethod] },
   nvidia_nim: { name: "Nvidia", methods: [apiKeyMethod], apiKeyPortalUrl: "https://build.nvidia.com/settings/api-keys", apiKeyPlaceholder: "nvapi-..." },
   openrouter: { name: "OpenRouter", methods: [apiKeyMethod], apiKeyPortalUrl: "https://openrouter.ai/settings/keys", apiKeyPlaceholder: "sk-or-v1-..." },
@@ -77,7 +78,7 @@ const chatgptSessionPlaceholder = `{
   "sessionToken": "eyJ..."
 }`;
 
-const providerOptions: Provider[] = ["antigravity", "cline", "codex", "command_code", "kiro", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
+const providerOptions: Provider[] = ["antigravity", "cline", "codex", "command_code", "harbor", "kiro", "openrouter", "nvidia_nim", "workers_ai", "qoder", "zenmux", "siliconflow"];
 
 const open = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));

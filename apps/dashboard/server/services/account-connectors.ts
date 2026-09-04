@@ -11,6 +11,7 @@ import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openroute
 import { API_BASE_URL as siliconflowApiBaseUrl } from "../lib/providers/siliconflow/constants";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
 import { API_BASE_URL as commandCodeApiBaseUrl, GENERATE_PATH as commandCodeGeneratePath } from "../lib/providers/commandcode/constants";
+import { API_BASE_URL as harborApiBaseUrl } from "../lib/providers/harbor/constants";
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/providers/provider-http-errors";
 import { getCloudflareValidationUrl } from "../lib/providers/cloudflare/constants";
 import type { ActionResult } from "../utils/api";
@@ -19,7 +20,7 @@ const API_KEY_PROVIDER_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 
-const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "siliconflow", "zenmux", "command_code"]);
+const apiKeyProviderSchema = z.enum(["nvidia_nim", "openrouter", "siliconflow", "zenmux", "command_code", "harbor"]);
 export const createAccountInputSchema = z.object({ provider: z.string(), name: z.string().optional(), token: z.string(), cfAccountId: z.string().optional(), platformKey: z.string().optional() });
 type ApiKeyProvider = z.infer<typeof apiKeyProviderSchema>;
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
@@ -30,6 +31,7 @@ const API_KEY_PROVIDER_SETTINGS = {
   siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   command_code: { label: "Command Code", baseUrl: commandCodeApiBaseUrl, modelMap: getProviderModelMap("command_code"), validationPath: commandCodeGeneratePath, requireSuccessfulStatus: false },
+  harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
 } satisfies Record<ApiKeyProvider, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions" | "/alpha/generate"; requireSuccessfulStatus: boolean }>;
 
 // Command Code's Go tier uses the reverse-engineered CLI /alpha/generate

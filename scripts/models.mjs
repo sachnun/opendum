@@ -24,9 +24,10 @@ const refreshScripts = [
   "cloudflare.mjs",
   "zenmux.mjs",
   "siliconflow.mjs",
+  "harbor.mjs",
 ];
 
-const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "command_code", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
+const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "command_code", "harbor", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

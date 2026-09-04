@@ -23,6 +23,7 @@ export interface ProviderAccountCounts {
   cline: number;
   codex: number;
   command_code: number;
+  harbor: number;
   kiro: number;
   nvidia_nim: number;
   openrouter: number;
@@ -50,6 +51,7 @@ export const primaryNavigation: NavItem[] = [
       { name: "Cline", href: getProviderAccountPath("cline") },
       { name: "Codex", href: getProviderAccountPath("codex") },
       { name: "Command Code", href: getProviderAccountPath("command_code") },
+      { name: "Harbor", href: getProviderAccountPath("harbor") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },
       { name: "OpenRouter", href: getProviderAccountPath("openrouter") },

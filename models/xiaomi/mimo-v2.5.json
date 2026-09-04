@@ -2,7 +2,8 @@
   "id": "mimo-v2.5",
   "providers": [
     "opencode",
-    "command_code"
+    "command_code",
+    "harbor"
   ],
   "aliases": [
     "mimo",
@@ -18,6 +19,9 @@
       "allowedTiers": [
         "go"
       ]
+    },
+    "harbor": {
+      "upstream": "mimo-v2.5:free"
     },
     "opencode": {
       "upstream": "mimo-v2.5-free"

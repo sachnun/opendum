@@ -3,6 +3,7 @@ export const PROVIDER_ACCOUNT_KEYS = [
   "cline",
   "codex",
   "command_code",
+  "harbor",
   "kiro",
   "nvidia_nim",
   "openrouter",

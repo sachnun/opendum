@@ -63,6 +63,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
 		"workers_ai":   workersAIProvider{registry: registry},
 		"kiro":         kiroProvider{registry: registry},
+		"harbor":       openAICompatibleProvider{name: "harbor", baseURL: "https://tokenharbor.ai/v1", supportedParams: supportedHarbor, registry: registry, trimPrefix: "harbor/"},
 		"codex":        codexProvider{registry: registry, redis: redis, db: db},
 		"antigravity":  antigravityProvider{registry: registry, db: db, redis: redis},
 		"qoder":        qoderProvider{registry: registry},
@@ -400,6 +401,8 @@ var supportedQoder = set("model", "messages", "temperature", "top_p", "max_token
 var supportedZenmux = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
 var supportedOpenRouter = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+
+var supportedHarbor = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
 var supportedNvidia = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 
