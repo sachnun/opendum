@@ -1,7 +1,6 @@
 {
   "providers": [
     "cline",
-    "workers_ai",
     "zenmux"
   ],
   "meta": {
@@ -12,9 +11,6 @@
   "providerConfig": {
     "cline": {
       "upstream": "z-ai/glm-5.3-flash"
-    },
-    "workers_ai": {
-      "upstream": "@cf/zai-org/glm-5.3-flash"
     },
     "zenmux": {
       "upstream": "z-ai/glm-5.3-flash"

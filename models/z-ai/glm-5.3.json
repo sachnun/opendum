@@ -1,15 +1,8 @@
 {
-  "providers": [
-    "workers_ai"
-  ],
+  "providers": [],
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": false
-  },
-  "providerConfig": {
-    "workers_ai": {
-      "upstream": "@cf/zai-org/glm-5.3"
-    }
   }
 }
