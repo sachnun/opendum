@@ -56,20 +56,21 @@ type Registry struct {
 
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
 	return &Registry{providers: map[string]Provider{
-		"opencode":     opencodeProvider{registry: registry},
-		"cline":        clineProvider{registry: registry},
-		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
-		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
-		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
-		"workers_ai":   workersAIProvider{registry: registry},
-		"kiro":         kiroProvider{registry: registry},
-		"harbor":       openAICompatibleProvider{name: "harbor", baseURL: "https://tokenharbor.ai/v1", supportedParams: supportedHarbor, registry: registry, trimPrefix: "harbor/"},
-		"codex":        codexProvider{registry: registry, redis: redis, db: db},
-		"antigravity":  antigravityProvider{registry: registry, db: db, redis: redis},
-		"qoder":        qoderProvider{registry: registry},
-		"zenmux":       openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
-		"siliconflow":  openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
-		"mimo_code":    mimoCodeProvider{registry: registry},
+		"opencode":    opencodeProvider{registry: registry},
+		"perch":       perchProvider{registry: registry},
+		"cline":       clineProvider{registry: registry},
+		"openrouter":  openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
+		"nvidia_nim":  openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
+		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
+		"workers_ai":  workersAIProvider{registry: registry},
+		"kiro":        kiroProvider{registry: registry},
+		"harbor":      openAICompatibleProvider{name: "harbor", baseURL: "https://tokenharbor.ai/v1", supportedParams: supportedHarbor, registry: registry, trimPrefix: "harbor/"},
+		"codex":       codexProvider{registry: registry, redis: redis, db: db},
+		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
+		"qoder":       qoderProvider{registry: registry},
+		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
+		"siliconflow": openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
+		"mimo_code":   mimoCodeProvider{registry: registry},
 	}}
 }
 
@@ -371,6 +372,11 @@ func cloneAnyMap(input map[string]any) map[string]any {
 func readLimit(r io.Reader, limit int64) string {
 	data, _ := io.ReadAll(io.LimitReader(r, limit))
 	return string(data)
+}
+
+func isTruthful(value any) bool {
+	b, ok := value.(bool)
+	return ok && b
 }
 
 type sseReadCloser struct {

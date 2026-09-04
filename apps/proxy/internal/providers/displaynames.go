@@ -2,6 +2,7 @@ package providers
 
 var providerDisplayNames = map[string]string{
 	"antigravity": "Antigravity",
+	"perch":       "Perch",
 	"cline":       "Cline",
 	"codex":       "Codex",
 	"harbor":      "Harbor",

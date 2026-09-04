@@ -27,6 +27,7 @@ func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
 		"antigravity": s.fetchAntigravityQuota,
 		"codex":       s.fetchCodexQuota,
 		"kiro":        s.fetchKiroQuota,
+		"perch":       s.fetchPerchQuota,
 		"zenmux": func(ctx context.Context, account appdb.ProviderAccount, _ string, forceRefresh bool) accountQuotaInfo {
 			return s.fetchZenmuxQuota(ctx, account, forceRefresh)
 		},

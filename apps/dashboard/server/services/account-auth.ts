@@ -9,6 +9,7 @@ import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUr
 import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
 import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from "../lib/providers/qoder";
+import { exchangePerchOAuthCode, initiatePerchOAuth } from "../lib/providers/perch";
 import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "../lib/providers/cline";
 import type { OAuthResult } from "../lib/providers/types";
 import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "../../lib/provider-accounts";
@@ -82,6 +83,15 @@ const OAUTH_PROVIDERS: Record<OAuthProviderKey, {
     requiresCodeVerifier: true,
     buildAuthUrl: () => buildKiroOAuthUrl(generateOAuthState()),
     exchangeCode: (code, codeVerifier) => kiroProvider.exchangeCode(code, kiroBrowserRedirectUri, codeVerifier ?? undefined),
+  },
+  perch: {
+    label: "Perch",
+    requiresCodeVerifier: true,
+    buildAuthUrl: async () => {
+      const result = await initiatePerchOAuth();
+      return { authUrl: result.authUrl, state: null, codeVerifier: result.codeVerifier };
+    },
+    exchangeCode: (code, codeVerifier) => exchangePerchOAuthCode(code, codeVerifier ?? ""),
   },
 };
 
