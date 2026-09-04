@@ -2,7 +2,6 @@
   "id": "mimo-v2.5",
   "providers": [
     "opencode",
-    "command_code",
     "harbor"
   ],
   "aliases": [
@@ -14,12 +13,6 @@
   "ignored": false,
   "meta": {},
   "providerConfig": {
-    "command_code": {
-      "upstream": "xiaomi/mimo-v2.5",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "harbor": {
       "upstream": "mimo-v2.5:free"
     },

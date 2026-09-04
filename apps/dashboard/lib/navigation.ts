@@ -22,7 +22,6 @@ export interface ProviderAccountCounts {
   antigravity: number;
   cline: number;
   codex: number;
-  command_code: number;
   harbor: number;
   kiro: number;
   nvidia_nim: number;
@@ -50,7 +49,6 @@ export const primaryNavigation: NavItem[] = [
       { name: "Antigravity", href: getProviderAccountPath("antigravity") },
       { name: "Cline", href: getProviderAccountPath("cline") },
       { name: "Codex", href: getProviderAccountPath("codex") },
-      { name: "Command Code", href: getProviderAccountPath("command_code") },
       { name: "Harbor", href: getProviderAccountPath("harbor") },
       { name: "Kiro", href: getProviderAccountPath("kiro") },
       { name: "Nvidia", href: getProviderAccountPath("nvidia_nim") },

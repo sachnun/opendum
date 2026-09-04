@@ -3,7 +3,6 @@
     "cline",
     "siliconflow",
     "zenmux",
-    "command_code",
     "harbor"
   ],
   "aliases": [
@@ -26,12 +25,6 @@
   "providerConfig": {
     "cline": {
       "upstream": "deepseek/deepseek-v4-flash"
-    },
-    "command_code": {
-      "upstream": "deepseek/deepseek-v4-flash",
-      "allowedTiers": [
-        "go"
-      ]
     },
     "harbor": {
       "upstream": "deepseek-v4-flash:free"

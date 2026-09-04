@@ -1,13 +1,3 @@
 {
-  "providers": [
-    "command_code"
-  ],
-  "providerConfig": {
-    "command_code": {
-      "upstream": "meta/muse-spark-1.2",
-      "allowedTiers": [
-        "go"
-      ]
-    }
-  }
+  "providers": []
 }

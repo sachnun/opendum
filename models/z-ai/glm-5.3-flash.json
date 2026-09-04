@@ -1,7 +1,7 @@
 {
   "providers": [
     "cline",
-    "command_code",
+    "workers_ai",
     "zenmux"
   ],
   "meta": {
@@ -13,11 +13,8 @@
     "cline": {
       "upstream": "z-ai/glm-5.3-flash"
     },
-    "command_code": {
-      "upstream": "z-ai/glm-5.3-flash",
-      "allowedTiers": [
-        "go"
-      ]
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-5.3-flash"
     },
     "zenmux": {
       "upstream": "z-ai/glm-5.3-flash"

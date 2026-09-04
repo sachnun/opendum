@@ -22,7 +22,6 @@ var providerDisplayNames = map[string]string{
 	"antigravity":  "Antigravity",
 	"cline":        "Cline",
 	"codex":        "Codex",
-	"command_code": "Command Code",
 	"harbor":       "Harbor",
 	"kiro":         "Kiro",
 	"nvidia_nim":   "Nvidia",

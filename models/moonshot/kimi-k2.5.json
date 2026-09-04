@@ -1,8 +1,7 @@
 {
   "providers": [
     "workers_ai",
-    "siliconflow",
-    "command_code"
+    "siliconflow"
   ],
   "meta": {
     "reasoning": true,
@@ -10,12 +9,6 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "moonshotai/Kimi-K2.5",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.5"
     },

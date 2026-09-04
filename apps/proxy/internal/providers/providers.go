@@ -70,7 +70,6 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"zenmux":       openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
 		"siliconflow":  openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
 		"mimo_code":    mimoCodeProvider{registry: registry},
-		"command_code": commandCodeProvider{registry: registry},
 	}}
 }
 

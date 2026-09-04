@@ -1,7 +1,6 @@
 {
   "providers": [
     "siliconflow",
-    "command_code",
     "nvidia_nim"
   ],
   "meta": {
@@ -10,12 +9,6 @@
     "vision": true
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "moonshotai/Kimi-K2.6",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6"
     },

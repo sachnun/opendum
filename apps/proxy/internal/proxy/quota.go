@@ -176,8 +176,6 @@ func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderA
 		return s.fetchCodexQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "kiro":
 		return s.fetchKiroQuota(ctx, requestAccount, credentials, forceRefresh), nil
-	case "command_code":
-		return s.fetchCommandCodeQuota(ctx, requestAccount, credentials, forceRefresh), nil
 	case "zenmux":
 		return s.fetchZenmuxQuota(ctx, account, forceRefresh), nil
 	default:

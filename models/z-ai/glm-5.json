@@ -1,8 +1,7 @@
 {
   "providers": [
     "kiro",
-    "siliconflow",
-    "command_code"
+    "siliconflow"
   ],
   "meta": {
     "reasoning": true,
@@ -10,12 +9,6 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "zai-org/GLM-5",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "siliconflow": {
       "upstream": "zai-org/GLM-5"
     }

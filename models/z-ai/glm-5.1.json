@@ -1,15 +1,8 @@
 {
   "providers": [
-    "siliconflow",
-    "command_code"
+    "siliconflow"
   ],
   "providerConfig": {
-    "command_code": {
-      "upstream": "zai-org/GLM-5.1",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "siliconflow": {
       "upstream": "zai-org/GLM-5.1"
     }

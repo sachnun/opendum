@@ -1,7 +1,6 @@
 {
   "providers": [
-    "antigravity",
-    "command_code"
+    "antigravity"
   ],
   "meta": {
     "reasoning": true,
@@ -22,12 +21,6 @@
         "none": "minimal",
         "xhigh": "high"
       }
-    },
-    "command_code": {
-      "upstream": "google/gemini-3.7-flash",
-      "allowedTiers": [
-        "go"
-      ]
     }
   }
 }

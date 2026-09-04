@@ -1,7 +1,6 @@
 {
   "providers": [
     "siliconflow",
-    "command_code",
     "openrouter"
   ],
   "meta": {
@@ -10,12 +9,6 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "zai-org/GLM-5.2",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "openrouter": {
       "upstream": "z-ai/glm-5.2:free"
     },
