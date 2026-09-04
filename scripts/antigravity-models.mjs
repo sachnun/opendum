@@ -83,6 +83,12 @@ function leveledFlashModelKey(modelKey) {
   return Number(match[1]) >= 5 ? modelKey : "";
 }
 
+function leveledFlashUpstream(modelKey) {
+  if (!leveledFlashModelKey(modelKey)) return "";
+  const minor = Number(/^gemini-3\.(\d+)-flash$/.exec(modelKey)[1]);
+  return minor >= 7 ? `${modelKey}-tiered` : `${modelKey}-medium`;
+}
+
 function leveledFlashAliases(modelKey) {
   if (!leveledFlashModelKey(modelKey)) return [];
   return GEMINI_3X_FLASH_LEVELS.map((level) => `${modelKey}-${level}`);
@@ -258,7 +264,7 @@ function canonicalizeDiscoveredModel(displayName) {
   }
 
   if (leveledFlashModelKey(entry.key)) {
-    entry.upstream = `${entry.key}-medium`;
+    entry.upstream = leveledFlashUpstream(entry.key);
   }
 
   if (base.startsWith("claude-") && lower.includes("thinking")) {

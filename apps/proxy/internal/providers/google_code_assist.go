@@ -358,7 +358,7 @@ func (p googleCodeAssistProvider) normalizeCachedContent(payload map[string]any)
 func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any, model string) {
 	generation, _ := payload["generationConfig"].(map[string]any)
 	if generation == nil {
-		if providerConfigBool(p.registry, model, p.name, "thinking_model") {
+		if providerConfigBool(p.registry, model, p.name, "thinking_model") || isTieredGemini3Model(model) {
 			generation = map[string]any{}
 			payload["generationConfig"] = generation
 		} else {
@@ -1451,6 +1451,9 @@ func (p googleCodeAssistProvider) normalizeGemini3ThinkingConfig(thinking map[st
 	if level == "" {
 		level = geminiThinkingLevelFromModel(model)
 	}
+	if level == "" && strings.HasSuffix(strings.ToLower(lastModelSegment(model)), "-tiered") {
+		level = "medium"
+	}
 	if level != "" {
 		out["thinkingLevel"] = level
 		if _, ok := out["includeThoughts"]; !ok {
@@ -1478,6 +1481,11 @@ func (p googleCodeAssistProvider) ensureGemini3MaxOutputTokens(generation map[st
 func isGemini3ModelName(model string) bool {
 	model = strings.ToLower(lastModelSegment(model))
 	return strings.HasPrefix(model, "gemini-3")
+}
+
+func isTieredGemini3Model(model string) bool {
+	model = strings.ToLower(lastModelSegment(model))
+	return strings.HasPrefix(model, "gemini-3") && strings.HasSuffix(model, "-tiered")
 }
 
 func geminiThinkingLevelFromModel(model string) string {
