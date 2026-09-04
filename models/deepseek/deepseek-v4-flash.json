@@ -3,7 +3,8 @@
     "cline",
     "siliconflow",
     "zenmux",
-    "harbor"
+    "harbor",
+    "qoder"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-flash-0731",
@@ -28,6 +29,9 @@
     },
     "harbor": {
       "upstream": "deepseek-v4-flash:free"
+    },
+    "qoder": {
+      "upstream": "dfmodel"
     },
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Flash"

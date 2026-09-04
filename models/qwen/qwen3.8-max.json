@@ -1,7 +1,14 @@
 {
-  "providers": [],
+  "providers": [
+    "qoder"
+  ],
   "aliases": [
     "Qwen-Qwen3.8-Max",
     "Qwen/Qwen3.8-Max"
-  ]
+  ],
+  "providerConfig": {
+    "qoder": {
+      "upstream": "qmodel_preview"
+    }
+  }
 }
