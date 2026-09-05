@@ -629,11 +629,29 @@ func hypercreditsBalanceKey(accountID string) string {
 	return hypercreditsBalanceKeyPrefix + ":" + accountID
 }
 
-func (s *Service) storeHypercreditsBalance(ctx context.Context, accountID string, balance float64) {
-	if accountID == "" || balance <= 0 {
+func (s *Service) storeHypercreditsUsage(ctx context.Context, accountID string, remaining *float64, cost float64) {
+	if accountID == "" {
 		return
 	}
-	_ = s.redis.Set(ctx, hypercreditsBalanceKey(accountID), balance, hypercreditsBalanceTTL).Err()
+	key := hypercreditsBalanceKey(accountID)
+
+	// Prefer the exact remaining balance when the provider reports it
+	// (non-stream responses). For streams only the request cost is reported,
+	// so decrement the stored balance instead.
+	if remaining != nil && *remaining > 0 {
+		_ = s.redis.Set(ctx, key, *remaining, hypercreditsBalanceTTL).Err()
+		return
+	}
+	if cost > 0 {
+		current, err := s.redis.Get(ctx, key).Float64()
+		if err == nil && current > 0 {
+			next := current - cost
+			if next < 0 {
+				next = 0
+			}
+			_ = s.redis.Set(ctx, key, next, hypercreditsBalanceTTL).Err()
+		}
+	}
 }
 
 func (s *Service) loadHypercreditsBalance(ctx context.Context, accountID string) (float64, bool) {

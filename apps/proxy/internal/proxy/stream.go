@@ -11,10 +11,11 @@ import (
 )
 
 type openAIStreamUsageTracker struct {
-	scanner      sseScanner
-	inputTokens  int
-	outputTokens int
-	hypercredits *float64
+	scanner              sseScanner
+	inputTokens          int
+	outputTokens         int
+	hypercreditsRemaining *float64
+	hypercreditsCost      float64
 }
 
 func (t *openAIStreamUsageTracker) Process(chunk []byte) {
@@ -46,7 +47,12 @@ func (t *openAIStreamUsageTracker) processEvent(event sseEvent) {
 	}
 	if remaining, ok := usage["remaining"].(map[string]any); ok {
 		if value := numberAsFloat(remaining["hypercredits"]); value > 0 {
-			t.hypercredits = &value
+			t.hypercreditsRemaining = &value
+		}
+	}
+	if cost, ok := usage["cost"].(map[string]any); ok {
+		if value := numberAsFloat(cost["hypercredits"]); value > 0 {
+			t.hypercreditsCost = value
 		}
 	}
 }
@@ -83,8 +89,8 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 	}
 	tracker.Flush()
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
-	if ctx.Provider == "hyper" && tracker.hypercredits != nil {
-		go s.storeHypercreditsBalance(context.Background(), ctx.AccountID, *tracker.hypercredits)
+	if ctx.Provider == "hyper" && (tracker.hypercreditsRemaining != nil || tracker.hypercreditsCost > 0) {
+		go s.storeHypercreditsUsage(context.Background(), ctx.AccountID, tracker.hypercreditsRemaining, tracker.hypercreditsCost)
 	}
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
@@ -100,10 +106,18 @@ func (s *Service) passthroughNonStream(ctx responseContext) error {
 	inputTokens, outputTokens := usageFromJSON(parsed)
 	if ctx.Provider == "hyper" {
 		if usage, ok := parsed["usage"].(map[string]any); ok {
-			if remaining, ok := usage["remaining"].(map[string]any); ok {
-				if value := numberAsFloat(remaining["hypercredits"]); value > 0 {
-					go s.storeHypercreditsBalance(context.Background(), ctx.AccountID, value)
+			var remaining *float64
+			if remainingMap, ok := usage["remaining"].(map[string]any); ok {
+				if value := numberAsFloat(remainingMap["hypercredits"]); value > 0 {
+					remaining = &value
 				}
+			}
+			var cost float64
+			if costMap, ok := usage["cost"].(map[string]any); ok {
+				cost = numberAsFloat(costMap["hypercredits"])
+			}
+			if remaining != nil || cost > 0 {
+				go s.storeHypercreditsUsage(context.Background(), ctx.AccountID, remaining, cost)
 			}
 		}
 	}
