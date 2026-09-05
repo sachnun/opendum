@@ -12,9 +12,11 @@
 //   2. Drop standalone size tokens (`-Xb`/`-Xm`/`-Xt`).
 //   3. Drop standalone quantization tokens anywhere (`-fp<N>`, `-int<N>`,
 //      `-awq`, `-gptq`, `-gguf`, `-q<N>[_<letter>]`).
-//   4. Drop trailing date tokens (`2512`, `2603`, `0905`, `202601`) when
-//      no behavior descriptor follows them. Release versions (`v0.1`,
-//      `v1.5`, `v2`, `v2.5`) are preserved as family identifiers.
+//   4. Drop trailing date tokens when no behavior descriptor follows them.
+//      Both YYMM/YYYYMM spellings (`2512`, `2603`, `0905`, `202601`) and
+//      MMDD/YYMMDD spellings (`0731`, `0813`, `250731`) are recognized.
+//      Release versions (`v0.1`, `v1.5`, `v2`, `v2.5`) are preserved as
+//      family identifiers.
 //   5. Drop trailing behavior-descriptor tokens whose meaning is recorded
 //      in `meta`: `instruct`, `it`, `chat`, `base`, `reasoning`,
 //      `thinking`, `completion`, `preview`, `beta`, `alpha`,
@@ -33,6 +35,9 @@
 //   "qwen3-vl-30b-a3b-instruct"              -> "qwen3-vl"
 //   "qwen3-vl-thinking"                      -> "qwen3-vl"
 //   "mistral-large-3-675b-instruct-2512"     -> "mistral-large-3"
+//   "deepseek-v4-flash-0731"                 -> "deepseek-v4-flash"    (MMDD)
+//   "deepseek-v4-pro-0813"                   -> "deepseek-v4-pro"      (MMDD)
+//   "qwen3-250731"                           -> "qwen3"                (YYMMDD)
 //   "claude-opus-4-6-thinking"               -> "claude-opus-4-6"
 //   "nemotron-nano-vl"                       -> "nemotron-nano-vl"     (`vl` sub-family)
 //   "llama-4-maverick-17b-128e-instruct"     -> "llama-4-maverick"
@@ -70,8 +75,27 @@ export const PARAMETER_INFO_PATTERNS = Object.freeze({
   MODALITY_DESCRIPTOR,
 });
 
-function isDateToken(token) {
+export function isDateToken(token) {
   if (!DATE_CANDIDATE.test(token)) return false;
+
+  if (token.length === 4) {
+    const monthFromTail = Number.parseInt(token.slice(-2), 10);
+    const monthFromHead = Number.parseInt(token.slice(0, 2), 10);
+    const day = Number.parseInt(token.slice(2, 4), 10);
+    const yyMM = monthFromTail >= 1 && monthFromTail <= 12;
+    const mmDD = monthFromHead >= 1 && monthFromHead <= 12 && day >= 1 && day <= 31;
+    return yyMM || mmDD;
+  }
+
+  if (token.length === 6) {
+    const monthFromTail = Number.parseInt(token.slice(-2), 10);
+    const monthFromMiddle = Number.parseInt(token.slice(2, 4), 10);
+    const day = Number.parseInt(token.slice(4, 6), 10);
+    const yyyyMM = monthFromTail >= 1 && monthFromTail <= 12;
+    const yyMMdd = monthFromMiddle >= 1 && monthFromMiddle <= 12 && day >= 1 && day <= 31;
+    return yyyyMM || yyMMdd;
+  }
+
   const month = Number.parseInt(token.slice(-2), 10);
   return month >= 1 && month <= 12;
 }
@@ -89,9 +113,13 @@ function isPairableMoESuffix(token) {
  * descriptor pattern. Identifier/tier tokens (`coder`, `vl`, `nano`,
  * `ultra`, release-version tokens like `v2.5`, ...) stay in the
  * basename as family names.
+ *
+ * Pass `{ keepDates: true }` to preserve trailing date tokens so callers
+ * can build a dated variant key for a canonical base model.
  */
-export function stripParamInfoKey(modelKey) {
+export function stripParamInfoKey(modelKey, options = {}) {
   if (typeof modelKey !== "string" || modelKey.length === 0) return modelKey;
+  const keepDates = options && options.keepDates === true;
 
   const tokens = modelKey.split(/[-_]/);
 
@@ -103,7 +131,7 @@ export function stripParamInfoKey(modelKey) {
       SIZE_BM.test(t) ||
       SIZE_T.test(t) ||
       QUANTIZATION.test(t) ||
-      isDateToken(t) ||
+      (!keepDates && isDateToken(t)) ||
       isBehaviorDescriptor(t)
     ) {
       end -= 1;

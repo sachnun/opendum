@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { aliasesFromUpstream } from "./lib/clean-key.mjs";
+import { aliasesFromUpstream, isDateToken } from "./lib/clean-key.mjs";
 
 const MODEL_FILE_EXTENSION = ".json";
 
@@ -171,6 +171,71 @@ function inferModelFolder(modelKey) {
   }
   return null;
 }
+
+function trailingDateToken(modelId) {
+  const segment = modelId.slice(modelId.lastIndexOf("/") + 1);
+  const tokens = segment.split(/[-_]/);
+  const tail = tokens[tokens.length - 1].split(":")[0];
+  return isDateToken(tail) ? tail : null;
+}
+
+function compareCandidatesNewestFirst(left, right) {
+  if (left.dateToken === null && right.dateToken === null) return 0;
+  if (left.dateToken === null) return -1;
+  if (right.dateToken === null) return 1;
+  return Number.parseInt(right.dateToken, 10) - Number.parseInt(left.dateToken, 10);
+}
+
+/**
+ * Build a modelKey -> upstreamId map from a raw provider model id list.
+ *
+ * Provider feeds often carry both a rolling base id and date-pinned variants
+ * of the same model (e.g. `deepseek/deepseek-v4-flash` next to
+ * `deepseek/deepseek-v4-flash-0731` or `-0813`). All of them normalize to the
+ * same base key via `toModelKey`; this helper makes the newest variant own
+ * the base key (an undated rolling id counts as the newest) and re-keys
+ * older date-pinned variants under `base-<date>` so the registry merge turns
+ * them into aliases instead of separate models.
+ */
+export function buildModelIdMap(modelIds, toModelKey) {
+  const groups = new Map();
+
+  for (const modelId of modelIds) {
+    const key = toModelKey(modelId);
+    if (!key) continue;
+
+    const dateToken = trailingDateToken(modelId);
+    const baseKey =
+      dateToken && key.endsWith(`-${dateToken}`)
+        ? key.slice(0, key.length - dateToken.length - 1)
+        : key;
+
+    if (!groups.has(baseKey)) groups.set(baseKey, []);
+    groups.get(baseKey).push({ modelId, key, dateToken });
+  }
+
+  const map = new Map();
+  for (const [baseKey, candidates] of groups) {
+    candidates.sort(compareCandidatesNewestFirst);
+
+    const [winner, ...losers] = candidates;
+    map.set(baseKey, winner.modelId);
+
+    for (const loser of losers) {
+      const stem = loser.dateToken ? `${baseKey}-${loser.dateToken}` : loser.key;
+      let key = stem;
+      let suffix = 2;
+      while (map.has(key) && map.get(key) !== loser.modelId) {
+        key = `${stem}-${suffix}`;
+        suffix += 1;
+      }
+      map.set(key, loser.modelId);
+    }
+  }
+
+  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
 /**
  * Sync a provider's model map into the JSON registry.
  *
