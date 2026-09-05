@@ -2,7 +2,8 @@
   "providers": [
     "siliconflow",
     "openrouter",
-    "qoder"
+    "qoder",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,

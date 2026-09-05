@@ -2,7 +2,8 @@
   "providers": [
     "kilo_code",
     "openrouter",
-    "perch"
+    "perch",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,

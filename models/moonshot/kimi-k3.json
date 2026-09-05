@@ -2,7 +2,8 @@
   "providers": [
     "siliconflow",
     "nvidia_nim",
-    "qoder"
+    "qoder",
+    "hyper"
   ],
   "providerConfig": {
     "nvidia_nim": {

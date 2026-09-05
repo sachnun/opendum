@@ -2,7 +2,8 @@
   "providers": [
     "nvidia_nim",
     "siliconflow",
-    "workers_ai"
+    "workers_ai",
+    "hyper"
   ],
   "aliases": [
     "@cf/openai/gpt-oss-120b",
@@ -24,6 +25,9 @@
     "vision": false
   },
   "providerConfig": {
+    "hyper": {
+      "upstream": "gpt-oss-120b"
+    },
     "nvidia_nim": {
       "upstream": "openai/gpt-oss-20b"
     },

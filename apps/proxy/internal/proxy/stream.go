@@ -11,9 +11,11 @@ import (
 )
 
 type openAIStreamUsageTracker struct {
-	scanner      sseScanner
-	inputTokens  int
-	outputTokens int
+	scanner              sseScanner
+	inputTokens          int
+	outputTokens         int
+	hypercreditsRemaining *float64
+	hypercreditsCost      float64
 }
 
 func (t *openAIStreamUsageTracker) Process(chunk []byte) {
@@ -42,6 +44,16 @@ func (t *openAIStreamUsageTracker) processEvent(event sseEvent) {
 		t.outputTokens = value
 	} else if value := numberAsInt(usage["output_tokens"]); value > 0 {
 		t.outputTokens = value
+	}
+	if remaining, ok := usage["remaining"].(map[string]any); ok {
+		if value := numberAsFloat(remaining["hypercredits"]); value > 0 {
+			t.hypercreditsRemaining = &value
+		}
+	}
+	if cost, ok := usage["cost"].(map[string]any); ok {
+		if value := numberAsFloat(cost["hypercredits"]); value > 0 {
+			t.hypercreditsCost = value
+		}
 	}
 }
 
@@ -77,6 +89,9 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 	}
 	tracker.Flush()
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	if ctx.Provider == "hyper" && (tracker.hypercreditsRemaining != nil || tracker.hypercreditsCost > 0) {
+		go s.storeHypercreditsUsage(context.Background(), ctx.AccountID, tracker.hypercreditsRemaining, tracker.hypercreditsCost)
+	}
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
 }
@@ -89,6 +104,23 @@ func (s *Service) passthroughNonStream(ctx responseContext) error {
 	var parsed map[string]any
 	_ = json.Unmarshal(body, &parsed)
 	inputTokens, outputTokens := usageFromJSON(parsed)
+	if ctx.Provider == "hyper" {
+		if usage, ok := parsed["usage"].(map[string]any); ok {
+			var remaining *float64
+			if remainingMap, ok := usage["remaining"].(map[string]any); ok {
+				if value := numberAsFloat(remainingMap["hypercredits"]); value > 0 {
+					remaining = &value
+				}
+			}
+			var cost float64
+			if costMap, ok := usage["cost"].(map[string]any); ok {
+				cost = numberAsFloat(costMap["hypercredits"])
+			}
+			if remaining != nil || cost > 0 {
+				go s.storeHypercreditsUsage(context.Background(), ctx.AccountID, remaining, cost)
+			}
+		}
+	}
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.Header().Set("X-Provider-Account-Id", ctx.AccountID)
 	ctx.Writer.WriteHeader(http.StatusOK)
@@ -122,6 +154,19 @@ func numberAsInt(value any) int {
 		return v
 	case int64:
 		return int(v)
+	default:
+		return 0
+	}
+}
+
+func numberAsFloat(value any) float64 {
+	switch v := value.(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
 	default:
 		return 0
 	}

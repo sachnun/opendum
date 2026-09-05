@@ -1,6 +1,7 @@
 {
   "providers": [
-    "siliconflow"
+    "siliconflow",
+    "hyper"
   ],
   "providerConfig": {
     "siliconflow": {

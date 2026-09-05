@@ -3,8 +3,7 @@
     "hyper"
   ],
   "meta": {
-    "reasoning": true,
     "toolCall": true,
-    "vision": false
+    "vision": true
   }
 }

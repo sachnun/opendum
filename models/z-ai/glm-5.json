@@ -2,7 +2,8 @@
   "providers": [
     "kiro",
     "perch",
-    "siliconflow"
+    "siliconflow",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,

@@ -11,6 +11,7 @@ type quotaFetcher func(ctx context.Context, account appdb.ProviderAccount, acces
 var quotaProvidersWithoutToken = map[string]struct{}{
 	"openrouter":  {},
 	"siliconflow": {},
+	"hyper":       {},
 }
 
 func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
@@ -30,6 +31,9 @@ func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
 		"perch":       s.fetchPerchQuota,
 		"zenmux": func(ctx context.Context, account appdb.ProviderAccount, _ string, forceRefresh bool) accountQuotaInfo {
 			return s.fetchZenmuxQuota(ctx, account, forceRefresh)
+		},
+		"hyper": func(ctx context.Context, account appdb.ProviderAccount, _ string, forceRefresh bool) accountQuotaInfo {
+			return s.fetchHyperQuota(ctx, account, forceRefresh)
 		},
 	}
 	return s.quotaFetchers

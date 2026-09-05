@@ -1,7 +1,8 @@
 {
   "providers": [
     "kilo_code",
-    "openrouter"
+    "openrouter",
+    "hyper"
   ],
   "providerConfig": {
     "kilo_code": {

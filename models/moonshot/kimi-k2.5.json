@@ -2,7 +2,8 @@
   "providers": [
     "perch",
     "siliconflow",
-    "workers_ai"
+    "workers_ai",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,

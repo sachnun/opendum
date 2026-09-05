@@ -1,5 +1,7 @@
 {
-  "providers": [],
+  "providers": [
+    "hyper"
+  ],
   "aliases": [
     "qwen3.6-plus-preview"
   ],

@@ -2,7 +2,8 @@
   "providers": [
     "siliconflow",
     "zenmux",
-    "qoder"
+    "qoder",
+    "hyper"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-pro-0813",
@@ -12,7 +13,8 @@
     "deepseek-ai/deepseek-v4-pro",
     "deepseek-ai/deepseek-v4-pro-0813",
     "deepseek-pro",
-    "deepseek-v4-pro"
+    "deepseek-v4-pro",
+    "deepseek-v4-pro-0813"
   ],
   "ignored": false,
   "meta": {

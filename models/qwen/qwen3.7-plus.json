@@ -1,7 +1,8 @@
 {
   "providers": [
     "zenmux",
-    "qoder"
+    "qoder",
+    "hyper"
   ],
   "providerConfig": {
     "qoder": {
