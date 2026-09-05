@@ -1,7 +1,8 @@
 {
   "providers": [
     "siliconflow",
-    "nvidia_nim"
+    "nvidia_nim",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,

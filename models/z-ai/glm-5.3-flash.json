@@ -1,7 +1,8 @@
 {
   "providers": [
     "cline",
-    "zenmux"
+    "zenmux",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,

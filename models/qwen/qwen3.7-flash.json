@@ -1,6 +1,7 @@
 {
   "providers": [
-    "zenmux"
+    "zenmux",
+    "hyper"
   ],
   "providerConfig": {
     "zenmux": {

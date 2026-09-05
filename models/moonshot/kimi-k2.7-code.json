@@ -2,7 +2,8 @@
   "providers": [
     "siliconflow",
     "zenmux",
-    "qoder"
+    "qoder",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,

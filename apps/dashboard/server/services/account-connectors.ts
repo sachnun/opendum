@@ -11,6 +11,7 @@ import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openroute
 import { API_BASE_URL as siliconflowApiBaseUrl } from "../lib/providers/siliconflow/constants";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
 import { API_BASE_URL as harborApiBaseUrl } from "../lib/providers/harbor/constants";
+import { API_BASE_URL as hyperApiBaseUrl } from "../lib/providers/hyper/constants";
 import { formatProviderHttpError, isLikelyCloudflareChallenge } from "../lib/providers/provider-http-errors";
 import { getCloudflareValidationUrl } from "../lib/providers/cloudflare/constants";
 import { API_KEY_PROVIDER_KEYS, type ApiKeyProviderKey } from "../../lib/provider-accounts";
@@ -30,6 +31,7 @@ const API_KEY_PROVIDER_SETTINGS = {
   siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
+  hyper: { label: "Hyper", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
 } satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
 
 function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {

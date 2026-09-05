@@ -4,7 +4,8 @@
     "siliconflow",
     "zenmux",
     "harbor",
-    "qoder"
+    "qoder",
+    "hyper"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-flash-0731",
@@ -15,6 +16,7 @@
     "deepseek-ai/deepseek-v4-flash-0731",
     "deepseek-flash",
     "deepseek-v4-flash",
+    "deepseek-v4-flash-0731",
     "deepseek-v4-flash-free"
   ],
   "ignored": false,

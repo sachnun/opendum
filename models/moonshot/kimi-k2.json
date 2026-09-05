@@ -1,16 +1,22 @@
 {
-  "providers": [],
+  "providers": [
+    "hyper"
+  ],
+  "aliases": [
+    "kimi-k2-0905",
+    "kimi-k2-instruct-0905",
+    "kimi-k2-instruct"
+  ],
+  "ignored": false,
   "meta": {
     "reasoning": false,
     "toolCall": true,
     "vision": false,
     "type": "instruct"
   },
-  "providerConfig": {},
-  "aliases": [
-    "kimi-k2-0905",
-    "kimi-k2-instruct-0905",
-    "kimi-k2-instruct"
-  ],
-  "ignored": false
+  "providerConfig": {
+    "hyper": {
+      "upstream": "kimi-k2-thinking"
+    }
+  }
 }

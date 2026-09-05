@@ -3,7 +3,8 @@
     "nvidia_nim",
     "openrouter",
     "siliconflow",
-    "workers_ai"
+    "workers_ai",
+    "hyper"
   ],
   "aliases": [
     "@cf/google/gemma-4-26b-a4b-it",
@@ -29,6 +30,9 @@
     "type": "instruct"
   },
   "providerConfig": {
+    "hyper": {
+      "upstream": "gemma-4-26b-a4b-it"
+    },
     "nvidia_nim": {
       "upstream": "google/gemma-4-31b-it"
     },

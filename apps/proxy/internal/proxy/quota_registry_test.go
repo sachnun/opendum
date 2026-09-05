@@ -11,7 +11,7 @@ import (
 
 func TestQuotaFetcherRegistryHasExpectedProviders(t *testing.T) {
 	registry := (&Service{}).quotaFetcherRegistry()
-	expected := []string{"antigravity", "codex", "kiro", "openrouter", "perch", "siliconflow", "zenmux"}
+	expected := []string{"antigravity", "codex", "hyper", "kiro", "openrouter", "perch", "siliconflow", "zenmux"}
 	got := make([]string, 0, len(registry))
 	for name := range registry {
 		got = append(got, name)
