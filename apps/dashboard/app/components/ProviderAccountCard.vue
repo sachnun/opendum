@@ -191,6 +191,9 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
+const isDev = import.meta.dev;
+const copiedSession = ref(false);
+const sessionLoading = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);
@@ -961,6 +964,18 @@ async function copyAllErrors() {
   resetFlag(copiedAllErrors);
 }
 
+async function copySession() {
+  sessionLoading.value = true;
+  try {
+    const result = await dashboardApi.accounts.copySession({ id: props.account.id });
+    if (!result.success || !(await copyToClipboard(result.data.session))) return;
+    copiedSession.value = true;
+    resetFlag(copiedSession);
+  } finally {
+    sessionLoading.value = false;
+  }
+}
+
 function getErrorEntryRelativeTime(entry: ErrorPreviewEntry): string {
   if (!entry.createdAt) return "Unknown time";
   const createdAt = new Date(entry.createdAt);
@@ -1209,6 +1224,11 @@ function cancelErrorPreviewPointer() {
               <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
                 <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
+            </UiTooltip>
+            <UiTooltip v-if="isDev" :text="sessionLoading ? 'Fetching session...' : copiedSession ? 'Copied' : 'Copy session'">
+              <UiButton type="button" variant="outline" size="sm" :disabled="readonly || sessionLoading" :aria-label="`Copy session for ${accountTitle}`" @click="copySession">
+                <UiIcon :name="sessionLoading ? 'i-lucide-loader-2' : copiedSession ? 'i-lucide-check' : 'i-lucide-key-round'" :class="sessionLoading ? 'size-3 animate-spin' : 'size-3'" />
+              </UiButton>
             </UiTooltip>
           </div>
           <div class="flex shrink-0 items-center gap-1.5">

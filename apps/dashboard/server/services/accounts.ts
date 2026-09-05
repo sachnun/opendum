@@ -4,6 +4,7 @@ import { getRedisClient } from "../lib/redis";
 import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "../lib/db/schema";
 import { getModelFamily, getModelLookupKeys, getProviderAccessRule, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
+import { decrypt } from "../lib/encryption";
 import { compareModelEntries } from "../../lib/model-sort";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -112,6 +113,7 @@ export const setAccountModelEnabledInputSchema = z.object({ accountId: accountId
 export const errorHistoryInputSchema = z.object({ accountId: accountIdSchema, limit: z.coerce.number().int().min(1).max(200).optional() });
 export const errorHistoryBatchInputSchema = z.object({ accountIds: z.array(accountIdSchema).max(50), limit: z.coerce.number().int().min(1).max(200).optional() });
 export const resolveErrorsInputSchema = z.object({ accountId: accountIdSchema });
+export const accountSessionInputSchema = z.object({ id: accountIdSchema });
 const statsIdsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string().min(1)).max(50));
 const statsCursorsQuerySchema = z.preprocess((value) => (Array.isArray(value) ? value : value == null ? [] : [value]), z.array(z.string()).max(50)).optional();
 
@@ -983,6 +985,23 @@ export async function getAccountErrorHistories(userId: string, input: z.infer<ty
   } catch (error) {
     console.error("Failed to read provider account error histories:", error);
     return { success: true, data: Object.fromEntries(accountIds.map((accountId) => [accountId, { success: true, data: { entries: [] } }])) } as const;
+  }
+}
+
+export async function getAccountSession(userId: string, input: z.infer<typeof accountSessionInputSchema>) {
+  try {
+    const [account] = await db
+      .select({ accessToken: providerAccount.accessToken, refreshToken: providerAccount.refreshToken, apiKey: providerAccount.apiKey, accountId: providerAccount.accountId, provider: providerAccount.provider, email: providerAccount.email })
+      .from(providerAccount)
+      .where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId)))
+      .limit(1);
+    if (!account) return { success: false, error: "Account not found" } as const;
+
+    const session = decrypt(account.accessToken);
+    return { success: true, data: { session } } as const;
+  } catch (error) {
+    console.error("Failed to read account session:", error);
+    return { success: false, error: "Failed to read account session" } as const;
   }
 }
 

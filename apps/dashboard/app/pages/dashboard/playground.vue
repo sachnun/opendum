@@ -187,6 +187,8 @@ const modelSearchByPanel = reactive<Record<string, string>>({});
 const routeSearchByPanel = reactive<Record<string, string>>({});
 const chatMessagesByPanel = reactive<Record<string, ScenarioMessage[]>>({});
 const autoScrollByPanel = reactive<Record<string, boolean>>({});
+const copiedErrorByPanel = reactive<Record<string, boolean>>({});
+const copyErrorTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const initializedFromRoute = ref(false);
 const liveNow = ref(Date.now());
 
@@ -370,6 +372,8 @@ onBeforeUnmount(() => {
   if (liveTimer) clearInterval(liveTimer);
   if (startLongPressTimer) clearTimeout(startLongPressTimer);
   if (accountOverviewInvalidationTimer) clearTimeout(accountOverviewInvalidationTimer);
+  for (const timeout of copyErrorTimeouts.values()) clearTimeout(timeout);
+  copyErrorTimeouts.clear();
 });
 
 function generateId(): string {
@@ -721,6 +725,12 @@ function removePanel(panelId: string) {
   panelScrollElements.delete(panelId);
   Reflect.deleteProperty(autoScrollByPanel, panelId);
   Reflect.deleteProperty(chatMessagesByPanel, panelId);
+  Reflect.deleteProperty(copiedErrorByPanel, panelId);
+  const timeout = copyErrorTimeouts.get(panelId);
+  if (timeout) {
+    clearTimeout(timeout);
+    copyErrorTimeouts.delete(panelId);
+  }
   panels.value = panels.value.filter((panel) => panel.id !== panelId);
   const nextResponses = { ...responses.value };
   Reflect.deleteProperty(nextResponses, panelId);
@@ -1618,6 +1628,24 @@ function formatToolArguments(value: string): string {
     return value;
   }
 }
+
+async function copyPanelError(panelId: string) {
+  const error = responses.value[panelId]?.error;
+  if (!error) return;
+
+  try {
+    await navigator.clipboard.writeText(error);
+    copiedErrorByPanel[panelId] = true;
+    const existingTimeout = copyErrorTimeouts.get(panelId);
+    if (existingTimeout) clearTimeout(existingTimeout);
+    copyErrorTimeouts.set(panelId, setTimeout(() => {
+      copiedErrorByPanel[panelId] = false;
+      copyErrorTimeouts.delete(panelId);
+    }, 1800));
+  } catch {
+    console.error("Failed to copy error");
+  }
+}
 </script>
 
 <template>
@@ -1985,6 +2013,11 @@ function formatToolArguments(value: string): string {
                     <p class="font-medium">Error</p>
                     <p class="break-words text-sm text-destructive/90">{{ responses[panel.id]?.error }}</p>
                   </div>
+                  <UiTooltip :text="copiedErrorByPanel[panel.id] ? 'Copied' : 'Copy error'">
+                    <UiButton type="button" variant="ghost" size="icon-xs" class="absolute right-1.5 top-1.5 h-6 w-6 text-destructive/70 hover:text-destructive" aria-label="Copy error" @click="copyPanelError(panel.id)">
+                      <UiIcon :name="copiedErrorByPanel[panel.id] ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                    </UiButton>
+                  </UiTooltip>
                 </div>
                 <UiButton v-if="panel.modelId" type="button" variant="outline" size="sm" class="w-full gap-1.5" :disabled="responses[panel.id]?.isLoading" @click="retryPanel(panel.id)">
                   <UiIcon name="i-lucide-rotate-cw" class="size-3.5" />
