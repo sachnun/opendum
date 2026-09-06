@@ -81,6 +81,23 @@ const isLoadingAccounts = computed(() => pending.value || (!detailData.value && 
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
 const supportedModelsByAccountId = computed(() => detailData.value?.supportedModelsByAccountId ?? {});
+const freeSupportedModels = computed(() => detailData.value?.freeSupportedModels ?? []);
+const freeSupportedModelIds = computed<Set<string> | null>(() => (detailData.value ? new Set(freeSupportedModels.value) : null));
+const orderedSupportedModels = computed(() => {
+  const freeIds = freeSupportedModelIds.value;
+  if (!freeIds) return supportedModels.value;
+
+  const free: string[] = [];
+  const restricted: string[] = [];
+  for (const model of supportedModels.value) {
+    (freeIds.has(model) ? free : restricted).push(model);
+  }
+  return [...free, ...restricted];
+});
+const hasRestrictedSupportedModels = computed(() => {
+  const freeIds = freeSupportedModelIds.value;
+  return freeIds !== null && supportedModels.value.some((model) => !freeIds.has(model));
+});
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
 const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
@@ -268,6 +285,7 @@ function applyProviderDetailResponse(detail: ProviderDetailResponse): ProviderDe
       ...(detail.accounts ?? []).filter((account) => !current.accounts.some((currentAccount) => currentAccount.id === account.id)),
     ],
     supportedModels: detail.supportedModels ?? current.supportedModels,
+    freeSupportedModels: detail.freeSupportedModels ?? current.freeSupportedModels,
     supportedModelsByAccountId: nextSupportedModelsByAccountId,
     disabledModelsByAccountId: nextDisabledModelsByAccountId,
     modelHealthByAccountId: nextModelHealthByAccountId,
@@ -805,14 +823,17 @@ function decodeAccountHash(hash: string): string | null {
         <div v-if="supportedModels.length" class="space-y-2">
           <div class="flex flex-wrap gap-1.5">
             <UiBadge
-              v-for="model in supportedModels"
+              v-for="model in orderedSupportedModels"
               :key="model"
               variant="secondary"
-              class="text-xs font-normal"
+              :class="['text-xs font-normal', freeSupportedModelIds === null || freeSupportedModelIds.has(model) ? '' : 'opacity-40']"
             >
               {{ model }}
             </UiBadge>
           </div>
+          <p v-if="hasRestrictedSupportedModels" class="text-[11px] text-muted-foreground">
+            Dimmer models require a paid account tier.
+          </p>
         </div>
       </div>
     </section>

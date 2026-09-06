@@ -96,6 +96,7 @@ type ProviderDetailCursor = {
   v: typeof PROVIDER_DETAIL_CURSOR_VERSION;
   accounts: Record<string, string>;
   supportedModels: string;
+  freeSupportedModels: string;
   supportedModelsByAccountId: Record<string, string>;
   disabledModelsByAccountId: Record<string, string>;
   modelHealthByAccountId: Record<string, string>;
@@ -418,11 +419,12 @@ function decodeAccountOverviewCursor(cursor: string | undefined): AccountOvervie
   return { pinned, summaries };
 }
 
-function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; supportedModelsByAccountId: Record<string, string[]>; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: ProviderAccountKey[] }) {
+function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; freeSupportedModels: string[]; supportedModelsByAccountId: Record<string, string[]>; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: ProviderAccountKey[] }) {
   const cursor: ProviderDetailCursor = {
     v: PROVIDER_DETAIL_CURSOR_VERSION,
     accounts: Object.fromEntries(detail.accounts.map((account) => [account.id, hashAccountOverviewValue(account)])),
     supportedModels: hashAccountOverviewValue(detail.supportedModels),
+    freeSupportedModels: hashAccountOverviewValue(detail.freeSupportedModels),
     supportedModelsByAccountId: Object.fromEntries(Object.entries(detail.supportedModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
     disabledModelsByAccountId: Object.fromEntries(Object.entries(detail.disabledModelsByAccountId).map(([accountId, models]) => [accountId, hashAccountOverviewValue(models)])),
     modelHealthByAccountId: Object.fromEntries(Object.entries(detail.modelHealthByAccountId).map(([accountId, health]) => [accountId, hashAccountOverviewValue(health)])),
@@ -438,7 +440,7 @@ function decodeProviderDetailCursor(cursor: string | undefined): ProviderDetailC
   try {
     const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<ProviderDetailCursor>;
     if (parsed.v !== PROVIDER_DETAIL_CURSOR_VERSION || !parsed.accounts || typeof parsed.accounts !== "object") return null;
-    if (typeof parsed.supportedModels !== "string" || !parsed.supportedModelsByAccountId || typeof parsed.supportedModelsByAccountId !== "object") return null;
+    if (typeof parsed.supportedModels !== "string" || typeof parsed.freeSupportedModels !== "string" || !parsed.supportedModelsByAccountId || typeof parsed.supportedModelsByAccountId !== "object") return null;
     if (!parsed.disabledModelsByAccountId || typeof parsed.disabledModelsByAccountId !== "object") return null;
     if (!parsed.modelHealthByAccountId || typeof parsed.modelHealthByAccountId !== "object" || typeof parsed.pinnedProviders !== "string") return null;
 
@@ -654,6 +656,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       getProviderModelsForAccountTier(input.provider, account.tier),
     ]));
     const supportedModels = sortProviderModels(providerModels.filter((model) => providerModelIsAccessibleByAccounts(model, input.provider, accounts)));
+    const freeSupportedModels = getProviderModelsForAccountTier(input.provider, "free");
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
     const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
       accountIds.length > 0
@@ -732,6 +735,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
     const detail = {
       accounts: detailedAccounts,
       supportedModels,
+      freeSupportedModels,
       supportedModelsByAccountId,
       disabledModelsByAccountId,
       modelHealthByAccountId,
@@ -757,6 +761,7 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
         ...(changedAccounts.length > 0 ? { accounts: changedAccounts } : {}),
         ...(deletedAccountIds.length > 0 ? { deletedAccountIds } : {}),
         ...(previousCursor.supportedModels !== hashAccountOverviewValue(detail.supportedModels) ? { supportedModels: detail.supportedModels } : {}),
+        ...(previousCursor.freeSupportedModels !== hashAccountOverviewValue(detail.freeSupportedModels) ? { freeSupportedModels: detail.freeSupportedModels } : {}),
         ...(Object.keys(changedSupportedModels).length > 0 ? { supportedModelsByAccountId: changedSupportedModels } : {}),
         ...(clearedSupportedModelsByAccountId.length > 0 ? { clearedSupportedModelsByAccountId } : {}),
         ...(Object.keys(changedDisabledModels).length > 0 ? { disabledModelsByAccountId: changedDisabledModels } : {}),

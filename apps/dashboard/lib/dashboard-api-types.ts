@@ -130,6 +130,7 @@ export interface AccountStatsData {
 export interface ProviderDetailData {
   accounts: ProviderAccountDetailItem[];
   supportedModels: string[];
+  freeSupportedModels: string[];
   supportedModelsByAccountId: Record<string, string[]>;
   disabledModelsByAccountId: Record<string, string[]>;
   modelHealthByAccountId: Record<string, Record<string, ProviderAccountModelHealthItem>>;
@@ -143,6 +144,7 @@ export interface ProviderDetailDeltaData {
   accounts?: ProviderAccountDetailItem[];
   deletedAccountIds?: string[];
   supportedModels?: string[];
+  freeSupportedModels?: string[];
   supportedModelsByAccountId?: Record<string, string[]>;
   clearedSupportedModelsByAccountId?: string[];
   disabledModelsByAccountId?: Record<string, string[]>;
