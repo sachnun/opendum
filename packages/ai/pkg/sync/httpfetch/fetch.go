@@ -12,10 +12,6 @@ import (
 const MaxFetchAttempts = 3
 const FetchTimeout = 20 * time.Second
 
-func Sleep(ms int) {
-	time.Sleep(time.Duration(ms) * time.Millisecond)
-}
-
 type Options struct {
 	Attempts int
 	Timeout  time.Duration
