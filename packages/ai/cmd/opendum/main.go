@@ -78,23 +78,7 @@ func runRefresh(args []string) {
 	absModels, _ := filepath.Abs(modelsDir)
 	fmt.Printf("Starting model refresh on %s...\n", absModels)
 
-	all := []sync.Provider{
-		sync.FuncProvider("antigravity-version", func(ctx context.Context, dir string) (sync.ProviderResult, error) {
-			err := providers.SyncAntigravityVersion(ctx, dir)
-			return sync.ProviderResult{Provider: "antigravity-version"}, err
-		}),
-		sync.FuncProvider("antigravity", providers.SyncAntigravity),
-		sync.FuncProvider("codex", providers.SyncCodex),
-		sync.FuncProvider("command_code", providers.SyncCommandCode),
-		sync.FuncProvider("kilo_code", providers.SyncKiloCode),
-		sync.FuncProvider("kiro", providers.SyncKiro),
-		sync.FuncProvider("opencode", providers.SyncOpenCode),
-		sync.FuncProvider("openrouter", providers.SyncOpenRouter),
-		sync.FuncProvider("nvidia_nim", providers.SyncNvidia),
-		sync.FuncProvider("workers_ai", providers.SyncCloudflare),
-		sync.FuncProvider("zenmux", providers.SyncZenMux),
-		sync.FuncProvider("siliconflow", providers.SyncSiliconFlow),
-	}
+	all := providers.All()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()

@@ -183,9 +183,13 @@ func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client,
 }
 
 func (p openAICompatibleProvider) buildPayload(body map[string]any, model string, modelName string, stream bool) map[string]any {
+	supported := p.supportedParams
+	if supported == nil {
+		supported = defaultSupportedParams
+	}
 	payload := map[string]any{}
 	for key, value := range body {
-		if _, ok := p.supportedParams[key]; ok && value != nil {
+		if _, ok := supported[key]; ok && value != nil {
 			payload[key] = value
 		}
 	}
@@ -418,6 +422,8 @@ var supportedQoder = set("model", "messages", "temperature", "top_p", "max_token
 var supportedZenmux = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
 var supportedOpenRouter = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+
+var defaultSupportedParams = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
 var supportedHarbor = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
