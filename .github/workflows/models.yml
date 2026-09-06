@@ -40,6 +40,7 @@ jobs:
 
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
+        if: always()
         with:
           branch: main
           commit_message: ${{ steps.commit_msg.outputs.msg }}

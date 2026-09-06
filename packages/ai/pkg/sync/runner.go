@@ -142,19 +142,26 @@ func RunRefresh(ctx context.Context, modelsDir string, providers []Provider, sum
 			failures = append(failures, p.Name())
 		}
 	}
-	if len(failures) > 0 {
-		return fmt.Errorf("refresh failed for: %s", joinStrings(failures, ", "))
-	}
 	after, err := SnapshotProviderModels(modelsDir, names)
 	if err != nil {
 		return err
 	}
 	if summaryPath != "" {
 		summary := GenerateSummary(before, after, names).FormatMarkdown()
+		if len(failures) > 0 {
+			summary += "### Failed providers\n\n"
+			for _, f := range failures {
+				summary += fmt.Sprintf("- `%s`\n", f)
+			}
+			summary += "\n"
+		}
 		if err := os.WriteFile(summaryPath, []byte(summary), 0644); err != nil {
 			return err
 		}
 		fmt.Printf("PR summary written to %s\n", summaryPath)
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("refresh failed for: %s", joinStrings(failures, ", "))
 	}
 	return nil
 }
