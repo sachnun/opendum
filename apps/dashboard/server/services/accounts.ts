@@ -655,7 +655,13 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       account.id,
       getProviderModelsForAccountTier(input.provider, account.tier),
     ]));
-    const supportedModels = sortProviderModels(providerModels.filter((model) => providerModelIsAccessibleByAccounts(model, input.provider, accounts)));
+    const supportedModels = sortProviderModels(
+      providerModels.filter((model) =>
+        input.provider === "codex"
+          ? true
+          : providerModelIsAccessibleByAccounts(model, input.provider, accounts)
+      )
+    );
     const freeSupportedModels = getProviderModelsForAccountTier(input.provider, "free");
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
     const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([

@@ -1,6 +1,7 @@
 {
   "providers": [
-    "kiro"
+    "kiro",
+    "codex"
   ],
   "providerConfig": {
     "kiro": {

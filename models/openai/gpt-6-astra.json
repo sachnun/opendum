@@ -1,8 +1,12 @@
 {
   "providers": [
-    "kiro",
     "codex"
   ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
   "providerConfig": {
     "codex": {
       "allowedTiers": [
@@ -13,14 +17,6 @@
         "enterprise",
         "team",
         "student"
-      ]
-    },
-    "kiro": {
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "power",
-        "standalone"
       ]
     }
   }

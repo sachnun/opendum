@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "codex"
-  ],
+  "providers": [],
   "meta": {
     "reasoning": true,
     "toolCall": true,
