@@ -1,3 +1,8 @@
+// Package client provides a Go client for the public Opendum API.
+//
+// It is the SDK surface for external consumers and is intentionally not
+// wired into the proxy, which routes requests through its own internal
+// provider pipeline instead.
 package client
 
 import (

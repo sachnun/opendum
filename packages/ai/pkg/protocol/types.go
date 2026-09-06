@@ -1,3 +1,5 @@
+// Package protocol defines the vendor-neutral chat protocol shared by the
+// Opendum client SDK and request adapters.
 package protocol
 
 type Role string
