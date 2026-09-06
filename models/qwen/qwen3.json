@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "workers_ai"
   ],
   "aliases": [
@@ -28,9 +27,6 @@
     "type": "instruct"
   },
   "providerConfig": {
-    "siliconflow": {
-      "upstream": "Qwen/Qwen3-14B"
-    },
     "workers_ai": {
       "upstream": "@cf/qwen/qwen3-30b-a3b-fp8"
     }

@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "openrouter",
     "qoder",
     "hyper"
@@ -16,9 +15,6 @@
     },
     "qoder": {
       "upstream": "gm51model"
-    },
-    "siliconflow": {
-      "upstream": "zai-org/GLM-5.2"
     }
   }
 }

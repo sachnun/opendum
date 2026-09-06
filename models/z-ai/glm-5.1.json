@@ -1,11 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "hyper"
-  ],
-  "providerConfig": {
-    "siliconflow": {
-      "upstream": "zai-org/GLM-5.1"
-    }
-  }
+  ]
 }

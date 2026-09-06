@@ -2,7 +2,6 @@
   "providers": [
     "nvidia_nim",
     "openrouter",
-    "siliconflow",
     "workers_ai",
     "hyper"
   ],
@@ -38,9 +37,6 @@
     },
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free"
-    },
-    "siliconflow": {
-      "upstream": "google/gemma-4-12B-it"
     },
     "workers_ai": {
       "upstream": "@cf/google/gemma-4-26b-a4b-it"

@@ -18,7 +18,6 @@ func TestProviderDisplayName(t *testing.T) {
 		{"workers_ai", "Cloudflare"},
 		{"qoder", "Qoder"},
 		{"zenmux", "ZenMux"},
-		{"siliconflow", "SiliconFlow"},
 		{"opencode", "Opencode"},
 		{"kilo_code", "Kilo Code"},
 		{"", ""},
@@ -41,12 +40,6 @@ func TestPrefixWithProvider(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "known provider",
-			provider: "siliconflow",
-			message:  "Sorry, your account balance is insufficient.",
-			want:     "[SiliconFlow] Sorry, your account balance is insufficient.",
-		},
-		{
 			name:     "workers_ai alias",
 			provider: "workers_ai",
 			message:  "rate limit exceeded",
@@ -66,7 +59,7 @@ func TestPrefixWithProvider(t *testing.T) {
 		},
 		{
 			name:     "empty message",
-			provider: "siliconflow",
+			provider: "openrouter",
 			message:  "",
 			want:     "",
 		},

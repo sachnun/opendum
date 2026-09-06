@@ -2,7 +2,6 @@
   "providers": [
     "kiro",
     "perch",
-    "siliconflow",
     "hyper"
   ],
   "meta": {
@@ -13,9 +12,6 @@
   "providerConfig": {
     "perch": {
       "upstream": "glm-5"
-    },
-    "siliconflow": {
-      "upstream": "zai-org/GLM-5"
     }
   }
 }

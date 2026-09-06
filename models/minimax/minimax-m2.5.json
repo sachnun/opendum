@@ -1,17 +1,11 @@
 {
   "providers": [
-    "kiro",
-    "siliconflow"
+    "kiro"
   ],
   "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": false
-  },
-  "providerConfig": {
-    "siliconflow": {
-      "upstream": "MiniMaxAI/MiniMax-M2.5"
-    }
   }
 }

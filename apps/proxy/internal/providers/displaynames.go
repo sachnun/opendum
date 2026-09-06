@@ -13,7 +13,6 @@ var providerDisplayNames = map[string]string{
 	"workers_ai":  "Cloudflare",
 	"qoder":       "Qoder",
 	"zenmux":      "ZenMux",
-	"siliconflow": "SiliconFlow",
 	"opencode":    "Opencode",
 	"kilo_code":   "Kilo Code",
 }

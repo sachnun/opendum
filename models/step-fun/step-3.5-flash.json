@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "zenmux"
   ],
   "meta": {
@@ -9,9 +8,6 @@
     "vision": false
   },
   "providerConfig": {
-    "siliconflow": {
-      "upstream": "stepfun-ai/Step-3.5-Flash"
-    },
     "zenmux": {
       "upstream": "stepfun/step-3.5-flash"
     }

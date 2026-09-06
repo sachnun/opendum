@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "zenmux",
     "qoder",
     "hyper"
@@ -25,9 +24,6 @@
   "providerConfig": {
     "qoder": {
       "upstream": "dmodel"
-    },
-    "siliconflow": {
-      "upstream": "deepseek-ai/DeepSeek-V4-Pro"
     },
     "zenmux": {
       "upstream": "deepseek/deepseek-v4-pro"

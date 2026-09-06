@@ -1,7 +1,6 @@
 {
   "providers": [
     "perch",
-    "siliconflow",
     "workers_ai",
     "hyper"
   ],
@@ -13,9 +12,6 @@
   "providerConfig": {
     "perch": {
       "upstream": "kimi-2.5"
-    },
-    "siliconflow": {
-      "upstream": "moonshotai/Kimi-K2.5"
     },
     "workers_ai": {
       "upstream": "@cf/moonshotai/kimi-k2.5"

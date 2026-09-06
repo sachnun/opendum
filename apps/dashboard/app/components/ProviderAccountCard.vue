@@ -143,9 +143,6 @@ const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
     { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
     { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
   ],
-  siliconflow: [
-    { labelClass: "w-24", metaClass: "w-10", valueClass: "w-16", barClass: "w-4/5" },
-  ],
 };
 
 const props = defineProps<{

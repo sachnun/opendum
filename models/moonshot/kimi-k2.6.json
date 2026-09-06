@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "nvidia_nim",
     "hyper"
   ],
@@ -12,9 +11,6 @@
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6"
-    },
-    "siliconflow": {
-      "upstream": "moonshotai/Kimi-K2.6"
     }
   }
 }

@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "nvidia_nim",
     "qoder",
     "hyper"
@@ -11,9 +10,6 @@
     },
     "qoder": {
       "upstream": "kmodel_latest"
-    },
-    "siliconflow": {
-      "upstream": "moonshotai/Kimi-K3"
     }
   }
 }

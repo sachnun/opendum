@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "zenmux",
     "kilo_code",
     "openrouter",
@@ -21,9 +20,6 @@
     },
     "qoder": {
       "upstream": "mmodel"
-    },
-    "siliconflow": {
-      "upstream": "MiniMaxAI/MiniMax-M3"
     },
     "zenmux": {
       "upstream": "minimax/minimax-m3"

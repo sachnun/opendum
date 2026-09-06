@@ -8,7 +8,6 @@ import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/p
 import { getProviderModelMap } from "../lib/proxy/models";
 import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/constants";
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
-import { API_BASE_URL as siliconflowApiBaseUrl } from "../lib/providers/siliconflow/constants";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
 import { API_BASE_URL as harborApiBaseUrl } from "../lib/providers/harbor/constants";
 import { API_BASE_URL as hyperApiBaseUrl } from "../lib/providers/hyper/constants";
@@ -28,7 +27,6 @@ type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 const API_KEY_PROVIDER_SETTINGS = {
   nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
-  siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
   hyper: { label: "Hyper", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), validationPath: "/chat/completions", requireSuccessfulStatus: false },

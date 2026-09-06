@@ -1,7 +1,6 @@
 {
   "providers": [
     "nvidia_nim",
-    "siliconflow",
     "workers_ai",
     "hyper"
   ],
@@ -30,9 +29,6 @@
     },
     "nvidia_nim": {
       "upstream": "openai/gpt-oss-20b"
-    },
-    "siliconflow": {
-      "upstream": "openai/gpt-oss-120b"
     },
     "workers_ai": {
       "upstream": "@cf/openai/gpt-oss-20b"

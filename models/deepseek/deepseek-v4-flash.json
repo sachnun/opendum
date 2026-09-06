@@ -1,7 +1,6 @@
 {
   "providers": [
     "cline",
-    "siliconflow",
     "zenmux",
     "harbor",
     "qoder",
@@ -34,9 +33,6 @@
     },
     "qoder": {
       "upstream": "dfmodel"
-    },
-    "siliconflow": {
-      "upstream": "deepseek-ai/DeepSeek-V4-Flash"
     },
     "zenmux": {
       "upstream": "deepseek/deepseek-v4-flash"

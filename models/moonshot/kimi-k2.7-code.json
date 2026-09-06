@@ -1,6 +1,5 @@
 {
   "providers": [
-    "siliconflow",
     "zenmux",
     "qoder",
     "hyper"
@@ -13,9 +12,6 @@
   "providerConfig": {
     "qoder": {
       "upstream": "kmodel"
-    },
-    "siliconflow": {
-      "upstream": "moonshotai/Kimi-K2.7-Code"
     },
     "zenmux": {
       "upstream": "moonshotai/kimi-k2.7-code"

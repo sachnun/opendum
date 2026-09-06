@@ -1,7 +1,6 @@
 {
   "providers": [
-    "perch",
-    "siliconflow"
+    "perch"
   ],
   "aliases": [
     "Qwen-Qwen3.6-35B-A3B",
@@ -15,9 +14,6 @@
   "providerConfig": {
     "perch": {
       "upstream": "qwen-3.6"
-    },
-    "siliconflow": {
-      "upstream": "Qwen/Qwen3.6-27B"
     }
   }
 }
