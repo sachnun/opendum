@@ -22,7 +22,7 @@ import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mj
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
 const PROVIDER_NAME = "workers_ai";
-const WORKERS_AI_MODELS_API_URL = "https://unroxy.koyeb.app/api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
+const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
 const FETCH_CONCURRENCY = 8;
 
 const MODEL_KEY_OVERRIDES = {
@@ -147,6 +147,7 @@ function shouldIncludeModel(model, modelKey, index, existingWorkersAI) {
   if (model.task?.name !== "Text Generation") return false;
   if (!supportsMessagesInput(model.schema?.input)) return false;
   if (isTrue(getProperty(model, "lora"))) return false;
+  if (isTrue(getProperty(model, "require_workers_paid"))) return false;
   if (getProperty(model, "planned_deprecation_date") && !existingWorkersAI) return false;
   if (isExistingIgnoredWithoutWorkersAI(index, modelKey)) return false;
 

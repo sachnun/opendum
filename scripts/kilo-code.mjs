@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
+import { buildModelIdMap, buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
@@ -46,23 +46,7 @@ function isEligibleModel(model) {
 }
 
 function buildModelMap(models) {
-  const map = new Map();
-
-  for (const model of models) {
-    const modelId = model.id.trim();
-    const baseModelKey = toModelKey(modelId);
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
-    map.set(modelKey, modelId);
-  }
-
-  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  return buildModelIdMap(models.map((model) => model.id.trim()), toModelKey);
 }
 
 async function fetchKiloCodeModels() {

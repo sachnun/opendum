@@ -161,7 +161,7 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 		return nil, false, nil
 	}
 	prioritized := prioritizeAccounts(eligible, provider == nil, s.registry.ProvidersForModel(model))
-	if stickyID := s.affinity.Lookup(ctx, userID, sessionID); stickyID != "" {
+	if stickyID := s.affinity.Lookup(ctx, userID, sessionID); stickyID != "" && !isSyntheticProviderAccountID(stickyID) {
 		prioritized = sessionaffinity.Prefer(prioritized, func(a appdb.ProviderAccount) bool { return a.ID == stickyID })
 	}
 	selected, has, err := s.pickHealthyAccount(ctx, prioritized, model)
@@ -171,10 +171,20 @@ func (s *Service) getNextAvailableAccount(ctx context.Context, userID, model str
 	if !has {
 		return nil, false, nil
 	}
-	if selected != nil && s.affinity.Enabled(selected.Provider) && sessionID != "" {
-		s.affinity.Store(ctx, userID, sessionID, selected.ID)
+	if selected != nil {
+		s.rememberAffinityAccount(ctx, userID, sessionID, *selected)
 	}
 	return selected, has, nil
+}
+
+func (s *Service) rememberAffinityAccount(ctx context.Context, userID, sessionID string, account appdb.ProviderAccount) {
+	if s == nil || s.affinity == nil || sessionID == "" || isSyntheticProviderAccountID(account.ID) {
+		return
+	}
+	if !s.affinity.Enabled(account.Provider) {
+		return
+	}
+	s.affinity.Store(ctx, userID, sessionID, account.ID)
 }
 
 func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string) (*appdb.ProviderAccount, bool, error) {

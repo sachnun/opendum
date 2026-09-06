@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
-import { BY_KEY, getProviderAccountPath, getProviderFromSlug, type ProviderAccountKey } from "../../../lib/provider-accounts";
+import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../../lib/provider-accounts";
 import { warmDashboardIndexedDbStore } from "../../utils/dashboardIndexedDb";
 
 definePageMeta({
@@ -27,7 +27,7 @@ type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
   accounts: number;
 };
 
-const QUOTA_PROVIDERS = new Set<string>(["antigravity", "codex", "kiro", "openrouter", "siliconflow", "command_code", "zenmux"]);
+const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
 const ACCOUNT_STATS_BATCH_SIZE = 24;
 const ERROR_HISTORY_BATCH_SIZE = 20;
 const ACCOUNT_STATS_POLL_MS = 30_000;
@@ -81,6 +81,19 @@ const isLoadingAccounts = computed(() => pending.value || (!detailData.value && 
 const pinnedProviders = computed(() => new Set(detailData.value?.pinnedProviders ?? []));
 const supportedModels = computed(() => detailData.value?.supportedModels ?? []);
 const supportedModelsByAccountId = computed(() => detailData.value?.supportedModelsByAccountId ?? {});
+const freeSupportedModels = computed(() => detailData.value?.freeSupportedModels ?? []);
+const freeSupportedModelIds = computed<Set<string> | null>(() => (detailData.value ? new Set(freeSupportedModels.value) : null));
+const orderedSupportedModels = computed(() => {
+  const freeIds = freeSupportedModelIds.value;
+  if (!freeIds) return supportedModels.value;
+
+  const free: string[] = [];
+  const restricted: string[] = [];
+  for (const model of supportedModels.value) {
+    (freeIds.has(model) ? free : restricted).push(model);
+  }
+  return [...free, ...restricted];
+});
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
 const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
@@ -268,6 +281,7 @@ function applyProviderDetailResponse(detail: ProviderDetailResponse): ProviderDe
       ...(detail.accounts ?? []).filter((account) => !current.accounts.some((currentAccount) => currentAccount.id === account.id)),
     ],
     supportedModels: detail.supportedModels ?? current.supportedModels,
+    freeSupportedModels: detail.freeSupportedModels ?? current.freeSupportedModels,
     supportedModelsByAccountId: nextSupportedModelsByAccountId,
     disabledModelsByAccountId: nextDisabledModelsByAccountId,
     modelHealthByAccountId: nextModelHealthByAccountId,
@@ -536,6 +550,7 @@ function startAccountStatsPolling() {
   accountStatsPollTimer = setInterval(() => {
     if (document.hidden) return;
     queueAccountStatsLoad(accounts.value.map((account) => account.id), { force: true });
+    queueErrorHistoryLoad(accounts.value.map((account) => account.id), { force: true });
   }, ACCOUNT_STATS_POLL_MS);
 }
 
@@ -804,10 +819,10 @@ function decodeAccountHash(hash: string): string | null {
         <div v-if="supportedModels.length" class="space-y-2">
           <div class="flex flex-wrap gap-1.5">
             <UiBadge
-              v-for="model in supportedModels"
+              v-for="model in orderedSupportedModels"
               :key="model"
               variant="secondary"
-              class="text-xs font-normal"
+              :class="['text-xs font-normal', freeSupportedModelIds === null || freeSupportedModelIds.has(model) ? '' : 'opacity-40']"
             >
               {{ model }}
             </UiBadge>

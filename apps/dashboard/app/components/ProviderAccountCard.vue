@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatDistanceToNowStrict } from "date-fns";
 import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/dashboard-api-types";
+import { QUOTA_PROVIDER_KEYS } from "../../lib/provider-accounts";
 
 type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
@@ -41,7 +42,7 @@ type DurationPoint = { time: string; avgDuration: number | null };
 
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
-const QUOTA_PROVIDERS = new Set<string>(["antigravity", "codex", "kiro", "openrouter", "siliconflow", "command_code"]);
+const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
 const DEFAULT_MAX_QUOTA_SKELETON_ROWS = 3;
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
@@ -138,8 +139,9 @@ const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
     { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
     { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
   ],
-  command_code: [
-    { labelClass: "w-36", metaClass: "w-12", valueClass: "w-16", barClass: "w-3/4" },
+  zenmux: [
+    { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
+    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
   ],
   siliconflow: [
     { labelClass: "w-24", metaClass: "w-10", valueClass: "w-16", barClass: "w-4/5" },
@@ -189,6 +191,9 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
+const isDev = import.meta.dev;
+const copiedSession = ref(false);
+const sessionLoading = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);
@@ -959,6 +964,18 @@ async function copyAllErrors() {
   resetFlag(copiedAllErrors);
 }
 
+async function copySession() {
+  sessionLoading.value = true;
+  try {
+    const result = await dashboardApi.accounts.copySession({ id: props.account.id });
+    if (!result.success || !(await copyToClipboard(result.data.session))) return;
+    copiedSession.value = true;
+    resetFlag(copiedSession);
+  } finally {
+    sessionLoading.value = false;
+  }
+}
+
 function getErrorEntryRelativeTime(entry: ErrorPreviewEntry): string {
   if (!entry.createdAt) return "Unknown time";
   const createdAt = new Date(entry.createdAt);
@@ -1207,6 +1224,11 @@ function cancelErrorPreviewPointer() {
               <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
                 <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
+            </UiTooltip>
+            <UiTooltip v-if="isDev" :text="sessionLoading ? 'Fetching session...' : copiedSession ? 'Copied' : 'Copy session'">
+              <UiButton type="button" variant="outline" size="sm" :disabled="readonly || sessionLoading" :aria-label="`Copy session for ${accountTitle}`" @click="copySession">
+                <UiIcon :name="sessionLoading ? 'i-lucide-loader-2' : copiedSession ? 'i-lucide-check' : 'i-lucide-key-round'" :class="sessionLoading ? 'size-3 animate-spin' : 'size-3'" />
+              </UiButton>
             </UiTooltip>
           </div>
           <div class="flex shrink-0 items-center gap-1.5">

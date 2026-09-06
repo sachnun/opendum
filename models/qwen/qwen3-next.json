@@ -1,5 +1,7 @@
 {
-  "providers": [],
+  "providers": [
+    "hyper"
+  ],
   "aliases": [
     "qwen3-next-80b-a3b-instruct",
     "qwen-qwen3-next-80b-a3b-instruct",
@@ -16,5 +18,10 @@
     "toolCall": true,
     "vision": false,
     "type": "instruct"
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "qwen3-next-80b-a3b-instruct"
+    }
   }
 }

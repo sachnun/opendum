@@ -1,13 +1,10 @@
 {
   "providers": [
-    "command_code"
+    "hyper"
   ],
   "providerConfig": {
-    "command_code": {
-      "upstream": "Qwen/Qwen3.8-27B",
-      "allowedTiers": [
-        "go"
-      ]
+    "hyper": {
+      "upstream": "qwen3.8-2.4t-a95b"
     }
   }
 }

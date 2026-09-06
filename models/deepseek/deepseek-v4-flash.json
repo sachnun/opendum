@@ -3,7 +3,9 @@
     "cline",
     "siliconflow",
     "zenmux",
-    "command_code"
+    "harbor",
+    "qoder",
+    "hyper"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-flash-0731",
@@ -14,6 +16,7 @@
     "deepseek-ai/deepseek-v4-flash-0731",
     "deepseek-flash",
     "deepseek-v4-flash",
+    "deepseek-v4-flash-0731",
     "deepseek-v4-flash-free"
   ],
   "ignored": false,
@@ -26,11 +29,11 @@
     "cline": {
       "upstream": "deepseek/deepseek-v4-flash"
     },
-    "command_code": {
-      "upstream": "deepseek/deepseek-v4-flash",
-      "allowedTiers": [
-        "go"
-      ]
+    "harbor": {
+      "upstream": "deepseek-v4-flash:free"
+    },
+    "qoder": {
+      "upstream": "dfmodel"
     },
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Flash"

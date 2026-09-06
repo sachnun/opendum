@@ -330,6 +330,40 @@ func TestAntigravityGemini35FlashComesFromRegistry(t *testing.T) {
 	}
 }
 
+func TestAntigravityGemini35FlashLiteNotBound(t *testing.T) {
+	registry := testModelsRegistry(t)
+	if _, ok := registry.ProviderModelConfig("gemini-3.5-flash-lite", "antigravity"); ok {
+		t.Fatal("gemini-3.5-flash-lite must not be bound to antigravity (not an Antigravity Code Assist model)")
+	}
+	provider := antigravityProvider{registry: registry}.delegate()
+	if got := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel("gemini-3.5-flash-lite"), map[string]any{"reasoning_effort": "high"}); got != "gemini-3.5-flash-lite" {
+		t.Fatalf("resolved model = %q, want gemini-3.5-flash-lite", got)
+	}
+}
+
+func TestAntigravityGemini38FlashUsesTieredUpstream(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	for _, model := range []string{"gemini-3.7-flash", "gemini-3.8-flash"} {
+		resolved := provider.resolveModel(model)
+		want := model + "-tiered"
+		if resolved != want {
+			t.Fatalf("resolveModel(%s) = %q, want %s", model, resolved, want)
+		}
+		if got := provider.resolveAntigravityGemini3ModelVariant(resolved, map[string]any{}); got != want {
+			t.Fatalf("variant(%s) = %q, want %s", model, got, want)
+		}
+	}
+
+	payload := openAIToGemini(map[string]any{"messages": []any{map[string]any{"role": "user", "content": "hi"}}})
+	provider.transformAntigravityPayload(t.Context(), payload, "gemini-3.8-flash-tiered", "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinkingLevel"] != "medium" || thinking["includeThoughts"] != true {
+		t.Fatalf("tiered thinking config = %#v, want medium level", thinking)
+	}
+}
+
 func TestAntigravityGPTOSS120BIsSupported(t *testing.T) {
 	registry := testModelsRegistry(t)
 	if info, ok := registry.ModelInfo("gpt-oss-120b"); !ok || info.Ignored {

@@ -1,14 +1,12 @@
 {
   "providers": [
-    "command_code",
-    "zenmux"
+    "zenmux",
+    "qoder",
+    "hyper"
   ],
   "providerConfig": {
-    "command_code": {
-      "upstream": "Qwen/Qwen3.7-Plus",
-      "allowedTiers": [
-        "go"
-      ]
+    "qoder": {
+      "upstream": "qmodel"
     },
     "zenmux": {
       "upstream": "qwen/qwen3.7-plus"

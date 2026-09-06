@@ -15,18 +15,21 @@ const refreshScripts = [
   "antigravity-models.mjs",
   "cline.mjs",
   "codex.mjs",
-  "command-code.mjs",
   "kilo-code.mjs",
   "kiro.mjs",
   "opencode.mjs",
   "openrouter.mjs",
+  "perch.mjs",
+  "qoder.mjs",
   "nvidia.mjs",
   "cloudflare.mjs",
   "zenmux.mjs",
   "siliconflow.mjs",
+  "harbor.mjs",
+  "hyper.mjs",
 ];
 
-const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "command_code", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "siliconflow", "workers_ai", "zenmux"];
+const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "qoder", "siliconflow", "workers_ai", "zenmux"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

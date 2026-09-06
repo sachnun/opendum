@@ -1,13 +1,3 @@
 {
-  "providers": [
-    "command_code"
-  ],
-  "providerConfig": {
-    "command_code": {
-      "upstream": "deepseek/deepseek-v4-flash-fast",
-      "allowedTiers": [
-        "go"
-      ]
-    }
-  }
+  "providers": []
 }

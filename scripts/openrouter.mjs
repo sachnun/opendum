@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "./model-registry.mjs";
+import { buildModelIdMap, syncProviderModels } from "./model-registry.mjs";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
 import { stripParamInfoKey } from "./lib/clean-key.mjs";
 
@@ -74,26 +74,10 @@ function isFreeChatModel(model) {
 }
 
 function buildModelMap(modelIds) {
-  const map = new Map();
-
-  for (const modelId of modelIds) {
-    const baseModelKey = toModelKey(modelId);
-    if (IGNORED_MODEL_KEYS.has(baseModelKey)) {
-      continue;
-    }
-
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
-    map.set(modelKey, modelId);
-  }
-
-  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  return buildModelIdMap(
+    modelIds.filter((modelId) => !IGNORED_MODEL_KEYS.has(toModelKey(modelId))),
+    toModelKey
+  );
 }
 
 async function fetchOpenRouterFreeModelIds() {

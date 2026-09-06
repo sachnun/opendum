@@ -56,20 +56,21 @@ type Registry struct {
 
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client, customs ...CustomProviderConfig) *Registry {
 	r := &Registry{providers: map[string]Provider{
-		"opencode":     opencodeProvider{registry: registry},
-		"cline":        clineProvider{registry: registry},
-		"openrouter":   openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
-		"nvidia_nim":   openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
-		"kilo_code":    openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
-		"workers_ai":   workersAIProvider{registry: registry},
-		"kiro":         kiroProvider{registry: registry},
-		"codex":        codexProvider{registry: registry, redis: redis, db: db},
-		"antigravity":  antigravityProvider{registry: registry, db: db, redis: redis},
-		"qoder":        qoderProvider{registry: registry},
-		"zenmux":       openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
-		"siliconflow":  openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
-		"mimo_code":    mimoCodeProvider{registry: registry},
-		"command_code": commandCodeProvider{registry: registry},
+		"opencode":    opencodeProvider{registry: registry},
+		"perch":       perchProvider{registry: registry},
+		"cline":       clineProvider{registry: registry},
+		"openrouter":  openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
+		"nvidia_nim":  openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
+		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
+		"workers_ai":  workersAIProvider{registry: registry},
+		"kiro":        kiroProvider{registry: registry},
+		"harbor":      openAICompatibleProvider{name: "harbor", baseURL: "https://tokenharbor.ai/v1", supportedParams: supportedHarbor, registry: registry, trimPrefix: "harbor/"},
+		"codex":       codexProvider{registry: registry, redis: redis, db: db},
+		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
+		"qoder":       qoderProvider{registry: registry},
+		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
+		"siliconflow": openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
+		"hyper":       openAICompatibleProvider{name: "hyper", baseURL: "https://hyper.charm.land/v1", supportedParams: supportedHyper, registry: registry, trimPrefix: "hyper/"},
 	}}
 	for _, custom := range customs {
 		name := strings.TrimSpace(custom.Name)
@@ -87,6 +88,18 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client, c
 func (r *Registry) Get(name string) (Provider, bool) {
 	provider, ok := r.providers[name]
 	return provider, ok
+}
+
+func (r *Registry) Names() []string {
+	if r == nil {
+		return nil
+	}
+	names := make([]string, 0, len(r.providers))
+	for name := range r.providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (r *Registry) RefreshableProviderNames() []string {
@@ -427,6 +440,11 @@ func readLimit(r io.Reader, limit int64) string {
 	return string(data)
 }
 
+func isTruthful(value any) bool {
+	b, ok := value.(bool)
+	return ok && b
+}
+
 type sseReadCloser struct {
 	reader io.ReadCloser
 	closer io.Closer
@@ -455,10 +473,13 @@ var supportedZenmux = set("model", "messages", "temperature", "top_p", "max_toke
 
 var supportedOpenRouter = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
+var supportedHarbor = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+
 var supportedNvidia = set("model", "messages", "temperature", "top_p", "max_tokens", "stream", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format")
 
 var supportedSiliconFlow = set("model", "messages", "temperature", "top_p", "top_k", "max_tokens", "stream", "stream_options", "tools", "tool_choice", "frequency_penalty", "n", "stop", "response_format", "min_p", "enable_thinking", "thinking_budget")
 
 var supportedKilo = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+var supportedHyper = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedOpencode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedWorkersAI = set("model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "function_call", "functions", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "chat_template_kwargs", "modalities", "metadata", "prediction", "logit_bias", "logprobs", "top_logprobs", "store", "service_tier", "user", "web_search_options", "n")

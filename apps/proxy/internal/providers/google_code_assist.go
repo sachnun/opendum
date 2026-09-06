@@ -358,7 +358,7 @@ func (p googleCodeAssistProvider) normalizeCachedContent(payload map[string]any)
 func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any, model string) {
 	generation, _ := payload["generationConfig"].(map[string]any)
 	if generation == nil {
-		if providerConfigBool(p.registry, model, p.name, "thinking_model") {
+		if providerConfigBool(p.registry, model, p.name, "thinking_model") || isTieredGemini3Model(model) {
 			generation = map[string]any{}
 			payload["generationConfig"] = generation
 		} else {
@@ -457,7 +457,8 @@ func (p googleCodeAssistProvider) resolveAntigravityGemini3ModelVariant(model st
 	if !isGemini3ModelName(model) {
 		return model
 	}
-	if strings.Contains(strings.ToLower(model), "flash") && strings.Contains(strings.ToLower(model), "3.5") {
+	lower := strings.ToLower(model)
+	if strings.HasPrefix(lower, "gemini-3.5-flash") && !strings.Contains(lower, "lite") {
 		base := trimGeminiThinkingLevelSuffix(model)
 		level := geminiThinkingLevelFromModel(model)
 		if bodyLevel := p.requestedGemini3ThinkingLevel(model, body); bodyLevel != "" {
@@ -983,7 +984,22 @@ func (p googleCodeAssistProvider) normalizeAntigravityContents(ctx context.Conte
 	}
 	if strictToolSchema || providerConfigBool(p.registry, model, p.name, "sanitize_tool_blocks") {
 		payload["contents"] = sanitizeToolBlocks(contents)
+		return
 	}
+	kept := []any{}
+	for _, rawContent := range contents {
+		content, _ := rawContent.(map[string]any)
+		if content == nil {
+			continue
+		}
+		if len(anySlice(content["parts"])) == 0 {
+			// Google rejects contents whose parts were all filtered out (e.g.
+			// assistant turns that carried only an empty text part).
+			continue
+		}
+		kept = append(kept, rawContent)
+	}
+	payload["contents"] = kept
 }
 
 var toolArtifactMarker = regexp.MustCompile(`(?i)^\s*(Tool:\s*\w+|(?:thought|think)\s*:)`)
@@ -1450,6 +1466,9 @@ func (p googleCodeAssistProvider) normalizeGemini3ThinkingConfig(thinking map[st
 	if level == "" {
 		level = geminiThinkingLevelFromModel(model)
 	}
+	if level == "" && strings.HasSuffix(strings.ToLower(lastModelSegment(model)), "-tiered") {
+		level = "medium"
+	}
 	if level != "" {
 		out["thinkingLevel"] = level
 		if _, ok := out["includeThoughts"]; !ok {
@@ -1477,6 +1496,11 @@ func (p googleCodeAssistProvider) ensureGemini3MaxOutputTokens(generation map[st
 func isGemini3ModelName(model string) bool {
 	model = strings.ToLower(lastModelSegment(model))
 	return strings.HasPrefix(model, "gemini-3")
+}
+
+func isTieredGemini3Model(model string) bool {
+	model = strings.ToLower(lastModelSegment(model))
+	return strings.HasPrefix(model, "gemini-3") && strings.HasSuffix(model, "-tiered")
 }
 
 func geminiThinkingLevelFromModel(model string) string {
@@ -1568,6 +1592,7 @@ func openAIToGemini(body map[string]any) map[string]any {
 	completedToolCallIDs := completedToolCallIDs(messages)
 	toolUseIDs := toolUseIDs(messages)
 	validToolResultIDs := validToolResultIDs(messages)
+	toolCallFunctionNames := toolCallFunctionNames(messages)
 	for _, raw := range messages {
 		msg, _ := raw.(map[string]any)
 		role := stringValue(msg["role"])
@@ -1582,7 +1607,17 @@ func openAIToGemini(body map[string]any) map[string]any {
 			if toolCallID == "" || !validToolResultIDs[toolCallID] || !toolUseIDs[toolCallID] {
 				continue
 			}
-			parts = []any{map[string]any{"functionResponse": map[string]any{"name": defaultStringValue(msg["name"], "unknown"), "id": toolCallID, "response": map[string]any{"result": msg["content"]}}}}
+			functionName := stringValue(msg["name"])
+			if functionName == "" {
+				// OpenAI tool messages carry only tool_call_id + content; the
+				// upstream requires functionResponse.name to match the original
+				// functionCall.name for that id, so resolve it from history.
+				functionName = toolCallFunctionNames[toolCallID]
+			}
+			if functionName == "" {
+				functionName = "unknown"
+			}
+			parts = []any{map[string]any{"functionResponse": map[string]any{"name": functionName, "id": toolCallID, "response": map[string]any{"result": msg["content"]}}}}
 		}
 		geminiRole := "user"
 		if role == "assistant" {
@@ -1695,6 +1730,28 @@ func toolUseIDs(messages []any) map[string]bool {
 		}
 	}
 	return ids
+}
+
+func toolCallFunctionNames(messages []any) map[string]string {
+	names := map[string]string{}
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		if stringValue(msg["role"]) != "assistant" {
+			continue
+		}
+		for _, rawCall := range anySlice(msg["tool_calls"]) {
+			call, _ := rawCall.(map[string]any)
+			id := stringValue(call["id"])
+			if id == "" {
+				continue
+			}
+			fn, _ := call["function"].(map[string]any)
+			if name := stringValue(fn["name"]); name != "" {
+				names[id] = name
+			}
+		}
+	}
+	return names
 }
 
 func validToolResultIDs(messages []any) map[string]bool {
@@ -1985,6 +2042,9 @@ func openAIContentToGeminiParts(content any) []any {
 		return nil
 	}
 	if text, ok := content.(string); ok {
+		if text == "" {
+			return nil
+		}
 		return []any{map[string]any{"text": text}}
 	}
 	items, _ := content.([]any)

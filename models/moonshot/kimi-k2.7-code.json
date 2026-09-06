@@ -1,9 +1,9 @@
 {
   "providers": [
-    "workers_ai",
     "siliconflow",
-    "command_code",
-    "zenmux"
+    "zenmux",
+    "qoder",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,
@@ -11,17 +11,11 @@
     "vision": true
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "moonshotai/Kimi-K2.7-Code",
-      "allowedTiers": [
-        "go"
-      ]
+    "qoder": {
+      "upstream": "kmodel"
     },
     "siliconflow": {
       "upstream": "moonshotai/Kimi-K2.7-Code"
-    },
-    "workers_ai": {
-      "upstream": "@cf/moonshotai/kimi-k2.7-code"
     },
     "zenmux": {
       "upstream": "moonshotai/kimi-k2.7-code"
