@@ -72,6 +72,24 @@ test("stripParamInfoKey strips embedded dates inside descriptor chain", () => {
   assert.equal(stripParamInfoKey("qwen3-235b-a22b-thinking-2507"), "qwen3");
 });
 
+test("stripParamInfoKey strips MMDD date suffixes", () => {
+  assert.equal(stripParamInfoKey("deepseek-v4-flash-0731"), "deepseek-v4-flash");
+  assert.equal(stripParamInfoKey("deepseek-v4-pro-0813"), "deepseek-v4-pro");
+  assert.equal(stripParamInfoKey("deepseek-v4-flash-0801"), "deepseek-v4-flash");
+  assert.equal(stripParamInfoKey("deepseek-chat-v3-0324"), "deepseek-v3");
+  assert.equal(stripParamInfoKey("gpt-3.5-turbo-0613"), "gpt-3.5-turbo");
+});
+
+test("stripParamInfoKey strips YYMMDD date suffixes", () => {
+  assert.equal(stripParamInfoKey("qwen3-250731"), "qwen3");
+  assert.equal(stripParamInfoKey("deepseek-v4-flash-260215"), "deepseek-v4-flash");
+});
+
+test("stripParamInfoKey keeps date tokens when keepDates is set", () => {
+  assert.equal(stripParamInfoKey("deepseek-v4-flash-0731", { keepDates: true }), "deepseek-v4-flash-0731");
+  assert.equal(stripParamInfoKey("mistral-large-3-675b-instruct-2512", { keepDates: true }), "mistral-large-3-2512");
+});
+
 test("stripParamInfoKey rejects 4-6 digit dates with month > 12", () => {
   assert.equal(stripParamInfoKey("model-1234"), "model-1234");
   assert.equal(stripParamInfoKey("model-2024"), "model-2024");

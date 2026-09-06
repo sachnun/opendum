@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "./model-registry.mjs";
+import { buildModelIdMap, syncProviderModels } from "./model-registry.mjs";
 import { fetchText } from "./lib/shared.mjs";
 
 const PROVIDER_NAME = "harbor";
@@ -64,22 +64,7 @@ function toModelKey(modelId) {
 }
 
 function buildModelMap(modelIds) {
-  const map = new Map();
-
-  for (const modelId of modelIds) {
-    const baseModelKey = toModelKey(modelId);
-    let modelKey = baseModelKey;
-    let suffix = 2;
-
-    while (map.has(modelKey) && map.get(modelKey) !== modelId) {
-      modelKey = `${baseModelKey}-${suffix}`;
-      suffix += 1;
-    }
-
-    map.set(modelKey, modelId);
-  }
-
-  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  return buildModelIdMap(modelIds, toModelKey);
 }
 
 async function fetchHarborFreeModelIds() {
