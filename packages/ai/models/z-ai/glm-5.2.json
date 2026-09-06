@@ -1,9 +1,9 @@
 {
   "providers": [
-    "workers_ai",
     "siliconflow",
-    "command_code",
-    "openrouter"
+    "openrouter",
+    "qoder",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,
@@ -11,20 +11,14 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "zai-org/GLM-5.2",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "openrouter": {
       "upstream": "z-ai/glm-5.2:free"
     },
+    "qoder": {
+      "upstream": "gm51model"
+    },
     "siliconflow": {
       "upstream": "zai-org/GLM-5.2"
-    },
-    "workers_ai": {
-      "upstream": "@cf/zai-org/glm-5.2"
     }
   }
 }

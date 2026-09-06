@@ -1,6 +1,8 @@
 import type { ModelStats } from "./model-stats";
-import type { ProviderAccountKey } from "./provider-accounts";
+import type { ProviderAccountKey, QuotaProviderKey } from "./provider-accounts";
 import type { ModelMeta } from "./model-capabilities";
+
+export type { QuotaProviderKey };
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -128,6 +130,7 @@ export interface AccountStatsData {
 export interface ProviderDetailData {
   accounts: ProviderAccountDetailItem[];
   supportedModels: string[];
+  freeSupportedModels: string[];
   supportedModelsByAccountId: Record<string, string[]>;
   disabledModelsByAccountId: Record<string, string[]>;
   modelHealthByAccountId: Record<string, Record<string, ProviderAccountModelHealthItem>>;
@@ -141,6 +144,7 @@ export interface ProviderDetailDeltaData {
   accounts?: ProviderAccountDetailItem[];
   deletedAccountIds?: string[];
   supportedModels?: string[];
+  freeSupportedModels?: string[];
   supportedModelsByAccountId?: Record<string, string[]>;
   clearedSupportedModelsByAccountId?: string[];
   disabledModelsByAccountId?: Record<string, string[]>;
@@ -151,8 +155,6 @@ export interface ProviderDetailDeltaData {
 }
 
 export type ProviderDetailResponse = ProviderDetailData | ProviderDetailDeltaData;
-
-export type QuotaProviderKey = "antigravity" | "codex" | "kiro" | "openrouter" | "siliconflow" | "command_code";
 
 export interface QuotaGroupDisplay {
   name: string;

@@ -1,0 +1,15 @@
+{
+  "providers": [
+    "perch"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "perch": {
+      "upstream": "gemma-4-e2b"
+    }
+  }
+}

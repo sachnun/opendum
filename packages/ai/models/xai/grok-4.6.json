@@ -1,13 +1,3 @@
 {
-  "providers": [
-    "command_code"
-  ],
-  "providerConfig": {
-    "command_code": {
-      "upstream": "xai/grok-4.6",
-      "allowedTiers": [
-        "go"
-      ]
-    }
-  }
+  "providers": []
 }

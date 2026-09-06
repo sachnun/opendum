@@ -96,3 +96,14 @@ func (s *Service) upsertErrorHistory(ctx context.Context, accountID, userID stri
 	_, err = pipe.Exec(ctx)
 	return err
 }
+
+func (s *Service) logAccountError(ctx context.Context, accountID, userID, model string, statusCode int, message string) {
+	if isSyntheticProviderAccountID(accountID) {
+		return
+	}
+	if len(message) > maxStoredErrorLen {
+		message = message[:maxStoredErrorLen]
+	}
+	resolved := s.registry.ResolveAlias(model)
+	_ = s.upsertErrorHistory(ctx, accountID, userID, &resolved, statusCode, message, time.Now())
+}

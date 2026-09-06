@@ -1,15 +1,9 @@
 {
   "providers": [
-    "command_code",
-    "zenmux"
+    "zenmux",
+    "hyper"
   ],
   "providerConfig": {
-    "command_code": {
-      "upstream": "Qwen/Qwen3.8-Flash",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "zenmux": {
       "upstream": "qwen/qwen3.8-flash"
     }

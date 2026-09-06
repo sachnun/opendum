@@ -37,21 +37,23 @@ type Service struct {
 	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
+	quotaFetchers    map[string]quotaFetcher
 }
 
 func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *registry.Registry, secret string) *Service {
-	return &Service{
+	providerRegistry := providers.NewRegistry(registry, db, redisClient)
+	service := &Service{
 		db:               db,
 		redis:            redisClient,
 		auth:             authSvc,
 		registry:         registry,
-		providerRegistry: providers.NewRegistry(registry, db, redisClient),
-		affinity: sessionaffinity.New(redisClient, []string{
-			"zenmux", "codex", "siliconflow", "openrouter", "antigravity",
-		}),
-		secret: secret,
-		client: &http.Client{Timeout: 0},
+		providerRegistry: providerRegistry,
+		affinity:         sessionaffinity.New(redisClient, providerRegistry.Names()),
+		secret:           secret,
+		client:           &http.Client{Timeout: 0},
 	}
+	service.quotaFetcherRegistry()
+	return service
 }
 
 func (s *Service) ChatCompletions(w http.ResponseWriter, r *http.Request) {

@@ -1,8 +1,9 @@
 {
   "providers": [
     "siliconflow",
-    "command_code",
-    "zenmux"
+    "zenmux",
+    "qoder",
+    "hyper"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-pro-0813",
@@ -12,7 +13,8 @@
     "deepseek-ai/deepseek-v4-pro",
     "deepseek-ai/deepseek-v4-pro-0813",
     "deepseek-pro",
-    "deepseek-v4-pro"
+    "deepseek-v4-pro",
+    "deepseek-v4-pro-0813"
   ],
   "ignored": false,
   "meta": {
@@ -21,11 +23,8 @@
     "vision": false
   },
   "providerConfig": {
-    "command_code": {
-      "upstream": "deepseek/deepseek-v4-pro",
-      "allowedTiers": [
-        "go"
-      ]
+    "qoder": {
+      "upstream": "dmodel"
     },
     "siliconflow": {
       "upstream": "deepseek-ai/DeepSeek-V4-Pro"

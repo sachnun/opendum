@@ -3,8 +3,7 @@
     "opencode",
     "kilo_code",
     "nvidia_nim",
-    "openrouter",
-    "command_code"
+    "openrouter"
   ],
   "aliases": [
     "nemotron-3-ultra-550b-a55b",
@@ -15,12 +14,6 @@
   "ignored": false,
   "meta": {},
   "providerConfig": {
-    "command_code": {
-      "upstream": "nvidia/nemotron-3-ultra-550b-a55b",
-      "allowedTiers": [
-        "go"
-      ]
-    },
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
       "authless": true

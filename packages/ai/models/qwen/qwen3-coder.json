@@ -1,5 +1,6 @@
 {
   "providers": [
+    "perch",
     "siliconflow"
   ],
   "aliases": [
@@ -20,6 +21,9 @@
     "code": true
   },
   "providerConfig": {
+    "perch": {
+      "upstream": "qwen3-coder"
+    },
     "siliconflow": {
       "upstream": "Qwen/Qwen3-Coder-30B-A3B-Instruct"
     }

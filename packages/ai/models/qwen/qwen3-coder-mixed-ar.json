@@ -1,0 +1,14 @@
+{
+  "providers": [
+    "hyper"
+  ],
+  "meta": {
+    "toolCall": true,
+    "vision": false
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "qwen3-coder-480b-a35b-instruct-int4-mixed-ar"
+    }
+  }
+}
