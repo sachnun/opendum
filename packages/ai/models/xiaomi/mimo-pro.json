@@ -1,8 +1,6 @@
 {
   "providers": [],
   "providerConfig": {},
-  "aliases": [
-    "mimo-v2-pro"
-  ],
+  "aliases": [],
   "ignored": false
 }

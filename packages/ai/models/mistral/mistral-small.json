@@ -3,8 +3,7 @@
   "aliases": [
     "mistral-small-24b-instruct",
     "mistral-small-instruct",
-    "mistralai-mistral-small-4-119b-2603",
-    "mistralai/mistral-small-4-119b-2603"
+    "mistralai-mistral-small-4-119b-2603"
   ],
   "ignored": false,
   "meta": {
