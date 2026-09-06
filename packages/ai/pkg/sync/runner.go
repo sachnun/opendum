@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
-	"strings"
 )
 
 type ProviderResult struct {
@@ -157,66 +155,6 @@ func RunRefresh(ctx context.Context, modelsDir string, providers []Provider, sum
 			return err
 		}
 		fmt.Printf("PR summary written to %s\n", summaryPath)
-	}
-	return nil
-}
-
-func SyncDir(src, dest string) error {
-	srcFiles, err := CollectModelFiles(src)
-	if err != nil {
-		return err
-	}
-	relSeen := map[string]bool{}
-	for _, f := range srcFiles {
-		rel, err := filepath.Rel(src, f)
-		if err != nil {
-			return err
-		}
-		relSeen[rel] = true
-		destPath := filepath.Join(dest, rel)
-		content, err := os.ReadFile(f)
-		if err != nil {
-			return err
-		}
-		existing, err := os.ReadFile(destPath)
-		if err == nil && string(existing) == string(content) {
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(destPath, content, 0644); err != nil {
-			return err
-		}
-	}
-	return removeStaleFiles(dest, dest, relSeen)
-}
-
-func removeStaleFiles(root, dir string, seen map[string]bool) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	for _, e := range entries {
-		p := filepath.Join(dir, e.Name())
-		if e.IsDir() {
-			if err := removeStaleFiles(root, p, seen); err != nil {
-				return err
-			}
-			continue
-		}
-		if !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
-			return err
-		}
-		if !seen[rel] {
-			if err := os.Remove(p); err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }

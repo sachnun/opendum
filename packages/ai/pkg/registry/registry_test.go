@@ -258,20 +258,3 @@ func TestNvidiaNemotronOmniAliasUsesCurrentHostedModel(t *testing.T) {
 		}
 	}
 }
-
-func TestLoadEmbedded(t *testing.T) {
-	reg, err := LoadEmbedded()
-	if err != nil {
-		t.Fatalf("failed to load embedded registry: %v", err)
-	}
-	if len(reg.effective) == 0 {
-		t.Fatalf("expected embedded registry to have effective models, got 0")
-	}
-	info, ok := reg.ModelInfo("gpt-4o")
-	if !ok {
-		t.Errorf("expected gpt-4o to be present in embedded registry")
-	}
-	if info.ID != "gpt-4o" {
-		t.Errorf("expected ID gpt-4o, got %s", info.ID)
-	}
-}

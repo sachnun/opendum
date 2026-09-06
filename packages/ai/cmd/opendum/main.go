@@ -94,23 +94,7 @@ func runRefresh(args []string) {
 		fmt.Fprintf(os.Stderr, "Refresh failed: %v\n", err)
 		os.Exit(1)
 	}
-	if err := syncEmbeddedCopy(modelsDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Embedded copy sync failed: %v\n", err)
-		os.Exit(1)
-	}
 	fmt.Println("Model refresh finished successfully.")
-}
-
-func syncEmbeddedCopy(modelsDir string) error {
-	absModels, err := filepath.Abs(modelsDir)
-	if err != nil {
-		return err
-	}
-	dest := filepath.Join(filepath.Dir(absModels), "pkg", "registry", "models")
-	if st, err := os.Stat(dest); err != nil || !st.IsDir() {
-		return nil
-	}
-	return sync.SyncDir(absModels, dest)
 }
 
 func runValidate(args []string) {
