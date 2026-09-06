@@ -118,4 +118,26 @@ func TestValidateModelForUserCustomStoreNil(t *testing.T) {
 	}
 }
 
+func TestValidateModelForUserCustomModelRespectsWhitelist(t *testing.T) {
+	service := customValidationService(t)
+	result, err := service.ValidateModelForUser(context.Background(), "u1", "my-vllm/qwen3-32b", ModelAccess{Mode: "whitelist", Models: []string{"claude-sonnet-4-6"}})
+	if err != nil {
+		t.Fatalf("ValidateModelForUser error = %v", err)
+	}
+	if result.Valid {
+		t.Fatalf("result = %+v, want invalid: custom model not in whitelist", result)
+	}
+}
+
+func TestValidateModelForUserCustomModelRespectsBlacklist(t *testing.T) {
+	service := customValidationService(t)
+	result, err := service.ValidateModelForUser(context.Background(), "u1", "my-vllm/qwen3-32b", ModelAccess{Mode: "blacklist", Models: []string{"my-vllm/qwen3-32b"}})
+	if err != nil {
+		t.Fatalf("ValidateModelForUser error = %v", err)
+	}
+	if result.Valid {
+		t.Fatalf("result = %+v, want invalid: custom model blacklisted", result)
+	}
+}
+
 var _ providers.CustomProviderReader = (*fakeCustomProviderReader)(nil)

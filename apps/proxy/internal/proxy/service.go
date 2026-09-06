@@ -52,10 +52,19 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		customStore:      providers.NewCustomStore(db),
 		affinity:         sessionaffinity.New(redisClient, providerRegistry.Names()),
 		secret:           secret,
-		client:           &http.Client{Timeout: 0},
+		client:           guardedProxyClient(),
 	}
 	service.quotaFetcherRegistry()
 	return service
+}
+
+func guardedProxyClient() *http.Client {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.DialContext = providers.GuardedDialContext(providers.AllowPrivateRelay)
+	return &http.Client{
+		Transport:     base,
+		CheckRedirect: providers.GuardedRedirectPolicy(providers.AllowPrivateRelay),
+	}
 }
 
 func (s *Service) ChatCompletions(w http.ResponseWriter, r *http.Request) {

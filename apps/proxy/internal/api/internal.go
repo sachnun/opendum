@@ -7,16 +7,26 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/netip"
 	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
 const internalRelayMaxBodyBytes = 2 << 20
 
-var internalRelayClient = &http.Client{Timeout: 20 * time.Second}
+func guardedRelayTransport() *http.Transport {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.DialContext = providers.GuardedDialContext(providers.AllowPrivateRelay)
+	return base
+}
+
+var internalRelayClient = &http.Client{
+	Timeout:       20 * time.Second,
+	Transport:     guardedRelayTransport(),
+	CheckRedirect: providers.GuardedRedirectPolicy(providers.AllowPrivateRelay),
+}
 
 type internalRelayRequest struct {
 	URL     string            `json:"url"`
@@ -109,20 +119,11 @@ func resolveInternalRelayTarget(input internalRelayRequest) (string, string, err
 }
 
 func isPrivateRelayTarget(target *url.URL) bool {
-	host := strings.ToLower(target.Hostname())
-	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".internal") {
-		return true
-	}
-	addr, err := netip.ParseAddr(strings.Trim(host, "[]"))
-	if err != nil {
-		return false
-	}
-	return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsUnspecified() || addr.IsMulticast()
+	return providers.PrivateHost(target.Hostname())
 }
 
 func relayPrivateHostsAllowed() bool {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("OPENDUM_ALLOW_PRIVATE_RELAY")))
-	return value == "1" || value == "true" || value == "yes"
+	return providers.AllowPrivateRelay()
 }
 
 func validateInternalRelayMethod(method string) error {

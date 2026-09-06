@@ -388,7 +388,7 @@ function finish() {
 
       <div v-if="activeStep === 4" class="grid gap-4">
         <p class="text-sm text-muted-foreground">
-          Optional: attach an API key so requests are authenticated. Skip if the endpoint is public/authless.
+          Attach an API key — requests are authenticated with it.
         </p>
         <label class="grid gap-1.5">
           <span :class="labelClass">Account name (optional)</span>

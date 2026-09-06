@@ -204,7 +204,17 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
         meta: input.meta ?? {},
         customFlags: input.customFlags ?? {},
       })
-      .onConflictDoNothing({ target: [customProviderModel.providerId, customProviderModel.modelId] });
+      .onConflictDoUpdate({
+        target: [customProviderModel.providerId, customProviderModel.modelId],
+        set: {
+          upstream: input.upstream ?? input.modelId,
+          authless: input.authless ?? false,
+          minTier: input.minTier ?? null,
+          allowedTiers: input.allowedTiers ?? null,
+          meta: input.meta ?? {},
+          customFlags: input.customFlags ?? {},
+        },
+      });
     added += result.rowCount ?? 0;
   }
   return { success: true, data: { added } };

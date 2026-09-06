@@ -60,20 +60,42 @@ func (s *Service) codexChatGPTModels() []string {
 
 func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam string, access ModelAccess) (ModelValidationResult, error) {
 	provider, rawModel := ParseModelParam(modelParam)
+	mode := normalizeAccessMode(access.Mode)
+	modelSet := map[string]struct{}{}
+	for _, model := range s.normalizeModelList(access.Models) {
+		modelSet[model] = struct{}{}
+	}
+	for _, model := range access.Models {
+		if trimmed := strings.TrimSpace(model); trimmed != "" {
+			// Keep raw entries verbatim so custom `slug/model` ids (which are
+			// not registry models and get dropped by normalizeModelList) can
+			// still be whitelisted or blacklisted.
+			modelSet[trimmed] = struct{}{}
+		}
+	}
 	if provider != nil && s.customProviders != nil {
 		custom, err := s.customModelResult(ctx, userID, *provider, rawModel)
 		if err != nil {
 			return ModelValidationResult{}, err
 		}
 		if custom != nil {
+			if !custom.Valid {
+				return *custom, nil
+			}
+			if mode == "whitelist" {
+				if _, ok := modelSet[custom.Model]; !ok {
+					return s.invalidModelResult(custom.Provider, custom.Model, modelParam, nil), nil
+				}
+			}
+			if mode == "blacklist" {
+				if _, ok := modelSet[custom.Model]; ok {
+					return s.invalidModelResult(custom.Provider, custom.Model, modelParam, nil), nil
+				}
+			}
 			return *custom, nil
 		}
 	}
-	mode := normalizeAccessMode(access.Mode)
-	modelSet := map[string]struct{}{}
-	for _, model := range s.normalizeModelList(access.Models) {
-		modelSet[model] = struct{}{}
-	}
+
 	candidates, err := s.usableModelCandidates(ctx, userID, provider, mode, modelSet, access.RoamingEnabled)
 	if err != nil {
 		return ModelValidationResult{}, err
