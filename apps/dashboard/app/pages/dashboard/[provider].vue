@@ -94,10 +94,6 @@ const orderedSupportedModels = computed(() => {
   }
   return [...free, ...restricted];
 });
-const hasRestrictedSupportedModels = computed(() => {
-  const freeIds = freeSupportedModelIds.value;
-  return freeIds !== null && supportedModels.value.some((model) => !freeIds.has(model));
-});
 const disabledModelsByAccountId = computed(() => detailData.value?.disabledModelsByAccountId ?? {});
 const modelHealthByAccountId = computed(() => detailData.value?.modelHealthByAccountId ?? {});
 const supportsProviderQuota = computed(() => QUOTA_PROVIDERS.has(selectedProvider.value));
@@ -831,9 +827,6 @@ function decodeAccountHash(hash: string): string | null {
               {{ model }}
             </UiBadge>
           </div>
-          <p v-if="hasRestrictedSupportedModels" class="text-[11px] text-muted-foreground">
-            Dimmer models require a paid account tier.
-          </p>
         </div>
       </div>
     </section>
