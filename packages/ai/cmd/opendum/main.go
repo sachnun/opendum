@@ -4,13 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/opendum/opendum/packages/ai/pkg/registry"
 	"github.com/opendum/opendum/packages/ai/pkg/sync"
 	"github.com/opendum/opendum/packages/ai/pkg/sync/providers"
 )
@@ -100,28 +97,9 @@ func runRefresh(args []string) {
 func runValidate(args []string) {
 	_ = args
 	modelsDir := defaultModelsDir()
-	reg, err := registry.Load(modelsDir)
-	if err != nil {
+	if err := validateModels(modelsDir); err != nil {
 		fmt.Fprintf(os.Stderr, "Validation failed: %v\n", err)
 		os.Exit(1)
 	}
-
-	var files int
-	walkErr := filepath.WalkDir(modelsDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
-			return nil
-		}
-		files++
-		return nil
-	})
-	if walkErr != nil {
-		fmt.Fprintf(os.Stderr, "Validation failed: %v\n", walkErr)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Validated %d model files (%d effective models).\n", files, len(reg.AllModels()))
 	fmt.Println("All models valid.")
 }
