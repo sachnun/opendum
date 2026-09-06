@@ -54,7 +54,7 @@ type Registry struct {
 	providers map[string]Provider
 }
 
-func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client, customs ...CustomProviderConfig) *Registry {
+func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
 	r := &Registry{providers: map[string]Provider{
 		"opencode":    opencodeProvider{registry: registry},
 		"perch":       perchProvider{registry: registry},
@@ -72,16 +72,6 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client, c
 		"siliconflow": openAICompatibleProvider{name: "siliconflow", baseURL: "https://api.siliconflow.com/v1", supportedParams: supportedSiliconFlow, registry: registry, trimPrefix: "siliconflow/"},
 		"hyper":       openAICompatibleProvider{name: "hyper", baseURL: "https://hyper.charm.land/v1", supportedParams: supportedHyper, registry: registry, trimPrefix: "hyper/"},
 	}}
-	for _, custom := range customs {
-		name := strings.TrimSpace(custom.Name)
-		if name == "" {
-			continue
-		}
-		if _, exists := r.providers[name]; exists {
-			continue
-		}
-		r.providers[name] = custom.provider(registry)
-	}
 	return r
 }
 

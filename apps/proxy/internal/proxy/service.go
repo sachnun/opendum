@@ -41,8 +41,8 @@ type Service struct {
 	quotaFetchers    map[string]quotaFetcher
 }
 
-func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string, customs ...providers.CustomProviderConfig) *Service {
-	providerRegistry := providers.NewRegistry(registry, db, redisClient, customs...)
+func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string) *Service {
+	providerRegistry := providers.NewRegistry(registry, db, redisClient)
 	service := &Service{
 		db:               db,
 		redis:            redisClient,
