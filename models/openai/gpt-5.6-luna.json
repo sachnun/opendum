@@ -1,7 +1,8 @@
 {
   "providers": [
     "zenmux",
-    "kiro"
+    "kiro",
+    "codex"
   ],
   "providerConfig": {
     "kiro": {
