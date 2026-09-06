@@ -221,11 +221,11 @@ func FormatCanonicalToAnthropic(resp *protocol.CanonicalResponse) map[string]any
 	}
 
 	return map[string]any{
-		"id":      resp.ID,
-		"type":    "message",
-		"role":    "assistant",
-		"model":   resp.Model,
-		"content": contentBlocks,
+		"id":          resp.ID,
+		"type":        "message",
+		"role":        "assistant",
+		"model":       resp.Model,
+		"content":     contentBlocks,
 		"stop_reason": stopReason,
 		"usage": map[string]any{
 			"input_tokens":  resp.Usage.PromptTokens,

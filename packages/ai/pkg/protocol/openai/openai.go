@@ -9,25 +9,25 @@ import (
 )
 
 type ChatCompletionRequest struct {
-	Model           string           `json:"model"`
-	Messages        []ChatMessage    `json:"messages"`
-	Stream          bool             `json:"stream,omitempty"`
-	Temperature     *float64         `json:"temperature,omitempty"`
-	TopP            *float64         `json:"top_p,omitempty"`
-	MaxTokens       *int             `json:"max_tokens,omitempty"`
-	Stop            any              `json:"stop,omitempty"` // string or []string
-	Tools           []ChatTool       `json:"tools,omitempty"`
-	ToolChoice      any              `json:"tool_choice,omitempty"`
-	ReasoningEffort string           `json:"reasoning_effort,omitempty"`
-	IncludeThoughts *bool            `json:"include_thoughts,omitempty"`
+	Model           string        `json:"model"`
+	Messages        []ChatMessage `json:"messages"`
+	Stream          bool          `json:"stream,omitempty"`
+	Temperature     *float64      `json:"temperature,omitempty"`
+	TopP            *float64      `json:"top_p,omitempty"`
+	MaxTokens       *int          `json:"max_tokens,omitempty"`
+	Stop            any           `json:"stop,omitempty"` // string or []string
+	Tools           []ChatTool    `json:"tools,omitempty"`
+	ToolChoice      any           `json:"tool_choice,omitempty"`
+	ReasoningEffort string        `json:"reasoning_effort,omitempty"`
+	IncludeThoughts *bool         `json:"include_thoughts,omitempty"`
 }
 
 type ChatMessage struct {
-	Role         string         `json:"role"`
-	Content      any            `json:"content"` // string or []ContentPart
-	Name         string         `json:"name,omitempty"`
-	ToolCalls    []ChatToolCall `json:"tool_calls,omitempty"`
-	ToolCallID   string         `json:"tool_call_id,omitempty"`
+	Role       string         `json:"role"`
+	Content    any            `json:"content"` // string or []ContentPart
+	Name       string         `json:"name,omitempty"`
+	ToolCalls  []ChatToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string         `json:"tool_call_id,omitempty"`
 }
 
 type ChatTool struct {

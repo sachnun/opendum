@@ -96,13 +96,13 @@ type Usage struct {
 }
 
 type CanonicalResponse struct {
-	ID           string        `json:"id"`
-	Model        string        `json:"model"`
-	Role         Role          `json:"role"`
-	Content      string        `json:"content"`
-	Thinking     string        `json:"thinking,omitempty"`
-	ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`
-	StopReason   string        `json:"stop_reason,omitempty"`
-	Usage        Usage         `json:"usage"`
-	RawProviders []string      `json:"raw_providers,omitempty"`
+	ID           string     `json:"id"`
+	Model        string     `json:"model"`
+	Role         Role       `json:"role"`
+	Content      string     `json:"content"`
+	Thinking     string     `json:"thinking,omitempty"`
+	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
+	StopReason   string     `json:"stop_reason,omitempty"`
+	Usage        Usage      `json:"usage"`
+	RawProviders []string   `json:"raw_providers,omitempty"`
 }

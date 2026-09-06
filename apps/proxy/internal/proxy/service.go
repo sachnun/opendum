@@ -16,9 +16,9 @@ import (
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/packages/ai/pkg/registry"
 	"github.com/opendum/opendum/apps/proxy/internal/providers"
 	"github.com/opendum/opendum/apps/proxy/internal/sessionaffinity"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 const (

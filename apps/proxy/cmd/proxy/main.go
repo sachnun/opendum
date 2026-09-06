@@ -15,9 +15,9 @@ import (
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	"github.com/opendum/opendum/apps/proxy/internal/config"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
-	"github.com/opendum/opendum/packages/ai/pkg/registry"
 	"github.com/opendum/opendum/apps/proxy/internal/proxy"
 	"github.com/opendum/opendum/apps/proxy/internal/redisclient"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 func main() {

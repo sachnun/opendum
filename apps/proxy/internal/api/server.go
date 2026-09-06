@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
-	"github.com/opendum/opendum/packages/ai/pkg/registry"
 	"github.com/opendum/opendum/apps/proxy/internal/proxy"
+	"github.com/opendum/opendum/packages/ai/pkg/registry"
 )
 
 type Server struct {
