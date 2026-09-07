@@ -18,6 +18,7 @@ import (
 )
 
 const opencodeChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
+const opencodeResponsesEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/responses"
 const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
 const opencodeUserAgent = "opencode/1.15.8"
@@ -197,6 +198,10 @@ func (p openAICompatibleProvider) buildPayload(body map[string]any, model string
 }
 
 func (p openAICompatibleProvider) buildResponsesPayload(body map[string]any, modelName string, stream bool) map[string]any {
+	return buildResponsesAPIPayload(body, modelName, stream)
+}
+
+func buildResponsesAPIPayload(body map[string]any, modelName string, stream bool) map[string]any {
 	messages, _ := body["messages"].([]any)
 	payload := map[string]any{"model": modelName, "stream": stream}
 	if input, ok := body["_responsesInput"].([]any); ok {
@@ -265,22 +270,64 @@ type opencodeProvider struct {
 func (p opencodeProvider) Authless() bool { return true }
 
 func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, _ string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
+	model := stringValue(body["model"])
+	if strings.HasPrefix(model, "opencode/") {
+		model = strings.TrimPrefix(model, "opencode/")
+	}
+	modelName := model
+	if p.registry != nil {
+		modelName = p.registry.UpstreamModelName(model, "opencode")
+	}
+	headers := opencodeHeaders(body)
+	if p.requiresResponsesAPI(model) {
+		payload := buildResponsesAPIPayload(body, modelName, stream)
+		resp, err := postJSONWithHeaders(ctx, client, opencodeResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
+		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return resp, err
+		}
+		if _, nativeResponses := body["_responsesInput"].([]any); nativeResponses {
+			return resp, nil
+		}
+		if stream {
+			return sseResponse(responsesSSEToChatSSEReader(resp.Body, modelName), resp.Body), nil
+		}
+		var data map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
+		_ = resp.Body.Close()
+		return jsonResponse(http.StatusOK, responsesJSONToChatCompletion(data, modelName)), nil
+	}
 	payload := map[string]any{}
 	for key, value := range body {
 		if _, ok := supportedOpencode[key]; ok && value != nil {
 			payload[key] = value
 		}
 	}
-	model := stringValue(body["model"])
-	if strings.HasPrefix(model, "opencode/") {
-		model = strings.TrimPrefix(model, "opencode/")
-	}
-	if p.registry != nil {
-		model = p.registry.UpstreamModelName(model, "opencode")
-	}
-	payload["model"] = model
+	payload["model"] = modelName
 	payload["stream"] = stream
-	return postJSONWithHeaders(ctx, client, opencodeChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, opencodeHeaders(body))
+	resp, err := postJSONWithHeaders(ctx, client, opencodeChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
+	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return resp, err
+	}
+	if _, nativeResponses := body["_responsesInput"].([]any); nativeResponses {
+		if stream {
+			return sseResponse(chatSSEToResponsesSSEReader(resp.Body, modelName), resp.Body), nil
+		}
+		var data map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
+		_ = resp.Body.Close()
+		return jsonResponse(http.StatusOK, chatCompletionToResponsesJSON(data, modelName)), nil
+	}
+	return resp, err
+}
+
+func (p opencodeProvider) requiresResponsesAPI(model string) bool {
+	return providerConfigBool(p.registry, model, "opencode", "responses_api")
 }
 
 func opencodeHeaders(body map[string]any) map[string]string {

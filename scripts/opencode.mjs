@@ -64,16 +64,20 @@ function extractFreeModelIdsFromDocs(markdown) {
 
   const endpointModelIndex = headerIndex(endpointsTable.headers, "Model");
   const endpointModelIDIndex = headerIndex(endpointsTable.headers, "Model ID");
+  const endpointURLIndex = headerIndex(endpointsTable.headers, "Endpoint");
   const pricingModelIndex = headerIndex(pricingTable.headers, "Model");
   const pricingInputIndex = headerIndex(pricingTable.headers, "Input");
   const pricingOutputIndex = headerIndex(pricingTable.headers, "Output");
   const pricingCachedReadIndex = headerIndex(pricingTable.headers, "Cached Read");
   const modelIdsByName = new Map();
+  const endpointByModelId = new Map();
 
   for (const row of endpointsTable.body) {
     const modelName = row[endpointModelIndex];
     const modelId = row[endpointModelIDIndex];
+    const endpoint = row[endpointURLIndex];
     if (modelName && modelId) modelIdsByName.set(modelNameKey(modelName), modelId);
+    if (modelId && endpoint) endpointByModelId.set(modelId, endpoint);
   }
 
   const modelIds = [];
@@ -92,7 +96,10 @@ function extractFreeModelIdsFromDocs(markdown) {
     throw new Error("OpenCode Zen docs did not list any free models");
   }
 
-  return modelIds.sort((a, b) => a.localeCompare(b));
+  return {
+    freeModelIds: modelIds.sort((a, b) => a.localeCompare(b)),
+    endpointByModelId,
+  };
 }
 
 async function fetchOpencodeFreeModelIds() {
@@ -110,14 +117,14 @@ async function fetchOpencodeFreeModelIds() {
       .map((model) => typeof model?.id === "string" ? model.id.trim() : "")
       .filter(Boolean),
   );
-  const freeModelIds = extractFreeModelIdsFromDocs(docsMarkdown);
+  const { freeModelIds, endpointByModelId } = extractFreeModelIdsFromDocs(docsMarkdown);
   const missingModelIds = freeModelIds.filter((id) => !availableModelIds.has(id));
 
   if (missingModelIds.length > 0) {
     throw new Error(`OpenCode Zen docs list free models missing from /zen/v1/models: ${missingModelIds.join(", ")}`);
   }
 
-  return freeModelIds;
+  return { freeModelIds, endpointByModelId };
 }
 
 function buildModelMap(modelIds) {
@@ -133,13 +140,30 @@ function buildModelMap(modelIds) {
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
+function buildProviderConfigByModel(modelMap, endpointByModelId) {
+  const configByModel = new Map();
+
+  for (const [modelKey, modelId] of modelMap.entries()) {
+    const endpoint = endpointByModelId.get(modelId) ?? "";
+    if (endpoint.includes("/responses")) {
+      configByModel.set(modelKey, { responses_api: true });
+    }
+  }
+
+  return configByModel;
+}
+
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../models");
 
-  const modelIds = await fetchOpencodeFreeModelIds();
-  const modelMap = buildModelMap(modelIds);
-  const result = syncProviderModels(modelsDir, "opencode", modelMap);
+  const { freeModelIds, endpointByModelId } = await fetchOpencodeFreeModelIds();
+  const modelMap = buildModelMap(freeModelIds);
+  const providerConfigByModel = buildProviderConfigByModel(modelMap, endpointByModelId);
+  const result = syncProviderModels(modelsDir, "opencode", modelMap, {
+    providerConfigByModel,
+    managedProviderConfigKeys: ["responses_api"],
+  });
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Opencode free models are already up to date (${modelMap.size} models).`);
