@@ -4,7 +4,8 @@
     "zenmux",
     "harbor",
     "qoder",
-    "hyper"
+    "hyper",
+    "nvidia_nim"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-flash-0731",
@@ -30,6 +31,9 @@
     },
     "harbor": {
       "upstream": "deepseek-v4-flash:free"
+    },
+    "nvidia_nim": {
+      "upstream": "deepseek-ai/deepseek-v4-flash-0731"
     },
     "qoder": {
       "upstream": "dfmodel"

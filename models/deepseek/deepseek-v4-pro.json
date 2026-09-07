@@ -2,7 +2,8 @@
   "providers": [
     "zenmux",
     "qoder",
-    "hyper"
+    "hyper",
+    "nvidia_nim"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-pro-0813",
@@ -22,6 +23,9 @@
     "vision": false
   },
   "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "deepseek-ai/deepseek-v4-pro-0813"
+    },
     "qoder": {
       "upstream": "dmodel"
     },

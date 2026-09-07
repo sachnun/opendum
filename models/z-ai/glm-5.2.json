@@ -1,6 +1,5 @@
 {
   "providers": [
-    "openrouter",
     "qoder",
     "hyper"
   ],
@@ -10,9 +9,6 @@
     "vision": false
   },
   "providerConfig": {
-    "openrouter": {
-      "upstream": "z-ai/glm-5.2:free"
-    },
     "qoder": {
       "upstream": "gm51model"
     }
