@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
-import { db, providerAccount } from "@opendum/database";
+import { db, providerAccount, decrypt } from "@opendum/database";
+import { fetchAccountQuota } from "@opendum/ai";
 import { validateInternalSignature } from "../auth/internal.js";
 
 export function createInternalRoute() {
@@ -113,12 +114,20 @@ export function createInternalRoute() {
       return c.json({ success: false, error: "Account not found" }, 404);
     }
 
+    let credentials = "";
+    try {
+      credentials = account.apiKey
+        ? decrypt(account.apiKey)
+        : decrypt(account.accessToken);
+    } catch {
+      // ignore
+    }
+
+    const quotaResult = await fetchAccountQuota(account, credentials);
+
     return c.json({
       success: true,
-      data: {
-        status: "success",
-        groups: [],
-      },
+      data: quotaResult,
     });
   });
 
