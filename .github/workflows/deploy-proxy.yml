@@ -10,7 +10,8 @@ on:
       - packages/**
       - models/**
       - package.json
-      - package-lock.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -47,17 +48,22 @@ jobs:
         with:
           ref: main
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.5.2
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck proxy
-        run: npm run typecheck --workspace @opendum/proxy
+        run: pnpm --filter @opendum/proxy typecheck
 
       - name: Validate Koyeb configuration
         run: |

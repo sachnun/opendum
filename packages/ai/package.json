@@ -12,6 +12,7 @@
     "./providers": "./src/providers/registry.ts"
   },
   "dependencies": {
+    "@opendum/database": "workspace:*",
     "eventsource-parser": "^3.1.0"
   },
   "devDependencies": {

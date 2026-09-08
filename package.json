@@ -2,41 +2,35 @@
   "name": "opendum",
   "version": "0.2.0",
   "private": true,
-  "packageManager": "npm@11.14.1",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "packageManager": "pnpm@10.5.2",
   "scripts": {
-    "dev:dashboard": "npm run dev --workspace @opendum/dashboard",
-    "dev:proxy": "npm run dev --workspace @opendum/proxy",
-    "dev": "(npm run dev:dashboard & npm run dev:proxy)",
-    "build:dashboard": "npm run build --workspace @opendum/dashboard",
-    "build:proxy": "npm run build --workspace @opendum/proxy",
-    "build": "npm run build:dashboard && npm run build:proxy",
-    "db:push": "npm run db:push --workspace @opendum/database",
-    "db:studio": "npm run db:studio --workspace @opendum/database",
-    "lint": "npm run lint --workspace @opendum/dashboard && npm run typecheck --workspace @opendum/proxy",
+    "dev:dashboard": "pnpm --filter @opendum/dashboard dev",
+    "dev:proxy": "pnpm --filter @opendum/proxy dev",
+    "dev": "(pnpm dev:dashboard & pnpm dev:proxy)",
+    "build:dashboard": "pnpm --filter @opendum/dashboard build",
+    "build:proxy": "pnpm --filter @opendum/proxy build",
+    "build": "pnpm build:dashboard && pnpm build:proxy",
+    "db:push": "pnpm --filter @opendum/database db:push",
+    "db:studio": "pnpm --filter @opendum/database db:studio",
+    "lint": "pnpm --filter @opendum/dashboard lint && pnpm --filter @opendum/proxy typecheck",
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {
     "edgeone": "^1.6.34",
     "typescript": "^6.0.3"
   },
-  "overrides": {
-    "postcss": "^8.5.28",
-    "typescript-eslint": "^8.62.1",
-    "@typescript-eslint/eslint-plugin": "^8.62.1",
-    "@typescript-eslint/parser": "^8.62.1"
-  },
-  "allowScripts": {
-    "esbuild@0.18.20": true,
-    "esbuild@0.28.2": true,
-    "esbuild@0.27.7": true,
-    "esbuild@0.25.12": true,
-    "esbuild@0.19.12": true,
-    "unrs-resolver@1.12.2": true,
-    "@parcel/watcher@2.5.6": true,
-    "vue-demi@0.14.10": true
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.28",
+      "typescript-eslint": "^8.62.1",
+      "@typescript-eslint/eslint-plugin": "^8.62.1",
+      "@typescript-eslint/parser": "^8.62.1"
+    },
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild",
+      "unrs-resolver",
+      "vue-demi"
+    ]
   }
 }

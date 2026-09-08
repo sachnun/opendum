@@ -20,13 +20,22 @@ jobs:
         with:
           ref: main
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.5.2
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Refresh provider models
-        run: npm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
+        run: pnpm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
 
       - name: Build commit message
         id: commit_msg

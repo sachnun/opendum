@@ -4,6 +4,7 @@ import type { RedisClientType } from "redis";
 import {
   db,
   proxyApiKey,
+  proxyApiKeyRateLimit,
   disabledModel,
   providerAccount,
   providerAccountDisabledModel,
@@ -12,6 +13,7 @@ import {
 } from "@opendum/database";
 import type { ModelRegistry } from "@opendum/ai";
 import { config } from "../config.js";
+import type { ApiKeyRateLimitRule } from "../proxy/key-limit.js";
 
 export interface ValidateApiKeyResult {
   valid: boolean;
@@ -23,6 +25,7 @@ export interface ValidateApiKeyResult {
   accountAccessMode?: string;
   accountAccessList?: string[];
   roamingEnabled?: boolean;
+  rateLimitRules?: ApiKeyRateLimitRule[];
 }
 
 export interface AccountModelAvailability {
@@ -113,6 +116,25 @@ export class AuthService {
       return { valid: false, error: "API key is expired." };
     }
 
+    const rateLimitRows = await db
+      .select({
+        target: proxyApiKeyRateLimit.target,
+        targetType: proxyApiKeyRateLimit.targetType,
+        perMinute: proxyApiKeyRateLimit.perMinute,
+        perHour: proxyApiKeyRateLimit.perHour,
+        perDay: proxyApiKeyRateLimit.perDay,
+      })
+      .from(proxyApiKeyRateLimit)
+      .where(eq(proxyApiKeyRateLimit.apiKeyId, record.id));
+
+    const rateLimitRules: ApiKeyRateLimitRule[] = rateLimitRows.map((r) => ({
+      target: r.target,
+      targetType: r.targetType === "family" ? "family" : "model",
+      perMinute: r.perMinute,
+      perHour: r.perHour,
+      perDay: r.perDay,
+    }));
+
     const result: ValidateApiKeyResult = {
       valid: true,
       userId: record.userId,
@@ -122,6 +144,7 @@ export class AuthService {
       accountAccessMode: record.accountAccessMode,
       accountAccessList: record.accountAccessList ?? [],
       roamingEnabled: record.roamingEnabled,
+      rateLimitRules,
     };
 
     if (this.redis) {

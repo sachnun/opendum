@@ -5,8 +5,9 @@ import type { AuthService } from "../auth/service.js";
 import { LoadBalancer } from "../proxy/balancer.js";
 import { writeOpenAIError } from "../errors.js";
 import { markRateLimited, parseRetryAfterMs, getRateLimitScope } from "../proxy/rate-limit.js";
+import { checkAndIncrementRateLimit } from "../proxy/key-limit.js";
 import { createAnthropicStreamTransformer } from "@opendum/ai";
-import { convertOpenAIToAnthropicJSON } from "@opendum/ai";
+import { convertOpenAIToAnthropicJSON, sanitizeErrorMessage, prefixWithProvider } from "@opendum/ai";
 
 interface AnthropicContentBlock {
   type: string;
@@ -166,6 +167,24 @@ export function createMessagesRoute(
     const openAIBody = convertAnthropicToOpenAI(anthropicBody);
     const rawModel = String(anthropicBody.model || "");
     const canonicalModel = registry.resolveAlias(rawModel);
+
+    if (authResult.apiKeyId && authResult.rateLimitRules?.length) {
+      const rl = await checkAndIncrementRateLimit(
+        authResult.apiKeyId,
+        canonicalModel,
+        authResult.rateLimitRules
+      );
+      if (!rl.allowed) {
+        if (rl.retryAfterSeconds) {
+          c.header("Retry-After", String(rl.retryAfterSeconds));
+        }
+        return writeOpenAIError(c, 429, {
+          message: `Rate limit exceeded for ${canonicalModel}: ${rl.current}/${rl.limit} requests per ${rl.exceededWindow}. Retry after ${rl.retryAfterSeconds}s.`,
+          type: "rate_limit_error",
+        });
+      }
+    }
+
     const isStream = Boolean(anthropicBody.stream);
 
     const eligibleAccounts = await loadBalancer.getEligibleAccounts({
@@ -183,6 +202,7 @@ export function createMessagesRoute(
       });
     }
 
+    let lastError: Error | null = null;
     let selectedAccount: ProviderAccount | null = null;
     let upstreamResponse: Response | null = null;
 
@@ -219,25 +239,34 @@ export function createMessagesRoute(
             canonicalModel
           );
           await loadBalancer.markAccountFailed(account.id, canonicalModel, 429);
+          const rawErr = await resp.text().catch(() => "");
+          const { message } = sanitizeErrorMessage(429, rawErr);
+          lastError = new Error(prefixWithProvider(account.provider, message));
           continue;
         }
 
         if (resp.status >= 500) {
           await loadBalancer.markAccountFailed(account.id, canonicalModel, resp.status);
+          const rawErr = await resp.text().catch(() => "");
+          const { message } = sanitizeErrorMessage(resp.status, rawErr);
+          lastError = new Error(prefixWithProvider(account.provider, message));
           continue;
         }
 
         selectedAccount = account;
         upstreamResponse = resp;
         break;
-      } catch {
+      } catch (err: any) {
+        lastError = err;
         await loadBalancer.markAccountFailed(account.id, canonicalModel, 500);
       }
     }
 
     if (!selectedAccount || !upstreamResponse) {
       return writeOpenAIError(c, 529, {
-        message: "All eligible provider accounts failed for this request.",
+        message:
+          lastError?.message ||
+          "All eligible provider accounts failed for this request.",
         type: "api_error",
       });
     }

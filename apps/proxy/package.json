@@ -11,10 +11,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
-    "@opendum/ai": "*",
-    "@opendum/database": "*",
+    "@opendum/ai": "workspace:*",
+    "@opendum/database": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "eventsource-parser": "^3.1.0",
     "hono": "^4.7.4",
     "redis": "^6.1.0"

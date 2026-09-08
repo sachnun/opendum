@@ -14,7 +14,9 @@ import { LoadBalancer } from "../proxy/balancer.js";
 import { SessionAffinity } from "../proxy/affinity.js";
 import { writeOpenAIError } from "../errors.js";
 import { markRateLimited, parseRetryAfterMs, getRateLimitScope } from "../proxy/rate-limit.js";
+import { checkAndIncrementRateLimit } from "../proxy/key-limit.js";
 import { createSSEUsageTracker } from "../proxy/usage.js";
+import { sanitizeErrorMessage, prefixWithProvider } from "@opendum/ai";
 
 export function createChatRoute(
   authService: AuthService,
@@ -82,6 +84,24 @@ export function createChatRoute(
     }
 
     const canonicalModel = registry.resolveAlias(rawModel);
+
+    if (authResult.apiKeyId && authResult.rateLimitRules?.length) {
+      const rl = await checkAndIncrementRateLimit(
+        authResult.apiKeyId,
+        canonicalModel,
+        authResult.rateLimitRules
+      );
+      if (!rl.allowed) {
+        if (rl.retryAfterSeconds) {
+          c.header("Retry-After", String(rl.retryAfterSeconds));
+        }
+        return writeOpenAIError(c, 429, {
+          message: `Rate limit exceeded for ${canonicalModel}: ${rl.current}/${rl.limit} requests per ${rl.exceededWindow}. Retry after ${rl.retryAfterSeconds}s.`,
+          type: "rate_limit_error",
+        });
+      }
+    }
+
     const isStream = Boolean(body.stream);
     const sessionId = (body._sessionId || body.session_id || body.prompt_cache_key || c.req.header("x-session-id")) as string | undefined;
     const forcedAccountId = body._account || body.accountId || (typeof body.model === "string" && body.model.includes("/") && !registry.getProvidersForModel(registry.resolveAlias(body.model)).length ? body.model.split("/")[0] : undefined);
@@ -166,6 +186,9 @@ export function createChatRoute(
             canonicalModel
           );
           await loadBalancer.markAccountFailed(account.id, canonicalModel, 429);
+          const rawErr = await resp.text().catch(() => "");
+          const { message } = sanitizeErrorMessage(429, rawErr);
+          lastError = new Error(prefixWithProvider(account.provider, message));
           continue;
         }
 
@@ -175,6 +198,9 @@ export function createChatRoute(
             pointReservation = null;
           }
           await loadBalancer.markAccountFailed(account.id, canonicalModel, resp.status);
+          const rawErr = await resp.text().catch(() => "");
+          const { message } = sanitizeErrorMessage(resp.status, rawErr);
+          lastError = new Error(prefixWithProvider(account.provider, message));
           continue;
         }
 
