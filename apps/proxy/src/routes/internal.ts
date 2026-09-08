@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { eq, and } from "drizzle-orm";
+import { db, providerAccount } from "@opendum/database";
 import { validateInternalSignature } from "../auth/internal.js";
 
 export function createInternalRoute() {
@@ -70,6 +72,54 @@ export function createInternalRoute() {
         502
       );
     }
+  });
+
+  router.post("/internal/quota", async (c) => {
+    const rawBody = await c.req.text();
+    if (!validateInternalSignature(c, "/internal/quota", rawBody)) {
+      return c.json({ success: false, error: "Invalid internal quota signature" }, 401);
+    }
+
+    let payload: {
+      userId: string;
+      provider: string;
+      accountId: string;
+      forceRefresh?: boolean;
+    };
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return c.json({ success: false, error: "Invalid quota payload" }, 400);
+    }
+
+    const { userId, provider, accountId } = payload;
+    if (!userId || !provider || !accountId) {
+      return c.json({ success: false, error: "userId, provider, and accountId are required" }, 400);
+    }
+
+    const [account] = await db
+      .select()
+      .from(providerAccount)
+      .where(
+        and(
+          eq(providerAccount.id, accountId),
+          eq(providerAccount.userId, userId),
+          eq(providerAccount.provider, provider)
+        )
+      )
+      .limit(1);
+
+    if (!account) {
+      return c.json({ success: false, error: "Account not found" }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        status: "success",
+        groups: [],
+      },
+    });
   });
 
   return router;
