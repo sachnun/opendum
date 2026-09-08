@@ -1,4 +1,4 @@
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily, type ModelFamily } from "../families.js";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily, type ModelFamily } from "./families.js";
 
 export type ModelSortEntry = string | { id?: string; name?: string; family?: string | null };
 
@@ -37,7 +37,7 @@ function hasToken(modelId: string, token: string): boolean {
   return tokensFor(modelId).includes(token);
 }
 
-function inferModelFamily(modelId: string): ModelFamily {
+export function inferModelFamily(modelId: string): ModelFamily {
   const normalized = normalizeModelId(modelId);
   const rule = INFERRED_FAMILY_RULES.find((item) => item.test.test(normalized));
   return categorizeModelFamily(rule?.family);

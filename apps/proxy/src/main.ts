@@ -1,16 +1,21 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
-import { ModelRegistry } from "@opendum/ai";
+import { ModelRegistry, ProviderRegistry } from "@opendum/ai";
 import { config } from "./config.js";
 import { getRedisClient } from "./redis.js";
 import { AuthService } from "./auth/service.js";
+import { LoadBalancer } from "./proxy/balancer.js";
 import { writeOpenAIError } from "./errors.js";
 import {
   createHealthRoute,
   createModelsRoute,
   createInternalRoute,
+  createChatRoute,
+  createMessagesRoute,
+  createResponsesRoute,
 } from "./routes/index.js";
+import { TokenRefresherWorker } from "./workers/refresher.js";
 
 const app = new Hono();
 
@@ -29,10 +34,25 @@ async function bootstrap() {
   const registry = ModelRegistry.fromDirectory(config.modelsDir);
   const redis = await getRedisClient();
   const authService = new AuthService(redis, registry);
+  const providers = new ProviderRegistry(registry);
+  await providers.autoDiscover();
+
+  const loadBalancer = new LoadBalancer(registry);
+
+  if (config.tokenRefreshIntervalSeconds > 0) {
+    const worker = new TokenRefresherWorker(
+      providers,
+      config.tokenRefreshIntervalSeconds
+    );
+    worker.start();
+  }
 
   app.route("/", createHealthRoute());
   app.route("/", createModelsRoute(authService, registry));
   app.route("/", createInternalRoute());
+  app.route("/", createChatRoute(authService, registry, providers, loadBalancer));
+  app.route("/", createMessagesRoute(authService, registry, providers, loadBalancer));
+  app.route("/", createResponsesRoute(authService, registry, providers, loadBalancer));
 
   app.notFound((c) => {
     const path = c.req.path;

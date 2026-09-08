@@ -3,7 +3,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Provider } from "./base.js";
 import type { ModelRegistry } from "../registry/registry.js";
-import { OpenAICompatibleProvider } from "./openai-compatible.js";
+import { OpenAICompatibleProvider } from "./openai.js";
 
 const genericOpenAIParams = new Set([
   "model",
@@ -34,9 +34,9 @@ const IGNORED_FILES = new Set([
   "registry.ts",
   "registry.js",
   "registry.d.ts",
-  "openai-compatible.ts",
-  "openai-compatible.js",
-  "openai-compatible.d.ts",
+  "openai.ts",
+  "openai.js",
+  "openai.d.ts",
 ]);
 
 export class ProviderRegistry {
