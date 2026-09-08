@@ -1,7 +1,5 @@
 {
   "providers": [
-    "kilo_code",
-    "openrouter",
     "perch",
     "hyper"
   ],
@@ -11,13 +9,6 @@
     "vision": false
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "minimax/minimax-m2.7:free",
-      "authless": true
-    },
-    "openrouter": {
-      "upstream": "minimax/minimax-m2.7:free"
-    },
     "perch": {
       "upstream": "minimax-m2.7-free"
     }

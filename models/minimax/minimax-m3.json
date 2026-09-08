@@ -1,20 +1,11 @@
 {
   "providers": [
     "zenmux",
-    "kilo_code",
-    "openrouter",
     "perch",
     "qoder",
     "hyper"
   ],
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "minimax/minimax-m3:free",
-      "authless": true
-    },
-    "openrouter": {
-      "upstream": "minimax/minimax-m3:free"
-    },
     "perch": {
       "upstream": "minimax-m3-free"
     },
