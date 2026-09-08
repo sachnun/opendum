@@ -61,7 +61,7 @@ import {
   UserPlus,
   Wrench,
   X,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 
 defineOptions({ inheritAttrs: false });
 
