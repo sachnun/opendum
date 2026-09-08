@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { ModelRegistry, ProviderRegistry } from "@opendum/ai";
+import { responsesInputToMessages } from "@opendum/ai";
 import type { AuthService } from "../auth/service.js";
 import { LoadBalancer } from "../proxy/balancer.js";
 import { createChatRoute } from "./chat.js";
@@ -12,14 +13,7 @@ function convertResponsesToOpenAI(body: any): Record<string, unknown> {
   }
 
   if (Array.isArray(body.input)) {
-    for (const item of body.input) {
-      if (item.type === "message" || !item.type) {
-        messages.push({
-          role: item.role || "user",
-          content: typeof item.content === "string" ? item.content : JSON.stringify(item.content),
-        });
-      }
-    }
+    messages.push(...responsesInputToMessages(body.input));
   }
 
   return {
