@@ -3,14 +3,20 @@ import { config } from "./config.js";
 
 let redisClient: RedisClientType | null = null;
 
-export async function getRedisClient(): Promise<RedisClientType> {
+export async function getRedisClient(): Promise<RedisClientType | null> {
   if (!redisClient) {
     if (!config.redisUrl) {
-      throw new Error("REDIS_URL is required");
+      return null;
     }
-    redisClient = createClient({ url: config.redisUrl });
-    redisClient.on("error", (err) => console.error("Redis client error:", err));
-    await redisClient.connect();
+    try {
+      const client = createClient({ url: config.redisUrl });
+      client.on("error", (err) => console.error("Redis client error:", err));
+      await client.connect();
+      redisClient = client as RedisClientType;
+    } catch (e) {
+      console.warn("Could not connect to Redis, running in standalone memory mode:", e);
+      return null;
+    }
   }
   return redisClient;
 }

@@ -54,6 +54,9 @@ export async function checkAndIncrementRateLimit(
   }
 
   const redis = await getRedisClient();
+  if (!redis) {
+    return { allowed: true };
+  }
   const now = Math.floor(Date.now() / 1000);
   const windows: Array<{
     name: Window;

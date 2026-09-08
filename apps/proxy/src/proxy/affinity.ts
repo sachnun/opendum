@@ -5,7 +5,7 @@ const KEY_PREFIX = "opendum:session-affinity";
 
 export class SessionAffinity {
   constructor(
-    private redis: RedisClientType,
+    private redis: RedisClientType | null,
     private enabledProviders: Set<string> = new Set(["antigravity", "codex"])
   ) {}
 
@@ -14,7 +14,7 @@ export class SessionAffinity {
   }
 
   async lookup(userId: string, sessionId: string): Promise<string | null> {
-    if (!userId.trim() || !sessionId.trim()) return null;
+    if (!this.redis || !userId.trim() || !sessionId.trim()) return null;
     try {
       const key = `${KEY_PREFIX}:${userId}:${sessionId}`;
       return await this.redis.get(key);
@@ -24,7 +24,7 @@ export class SessionAffinity {
   }
 
   async store(userId: string, sessionId: string, accountId: string): Promise<void> {
-    if (!userId.trim() || !sessionId.trim() || !accountId.trim()) return;
+    if (!this.redis || !userId.trim() || !sessionId.trim() || !accountId.trim()) return;
     try {
       const key = `${KEY_PREFIX}:${userId}:${sessionId}`;
       await this.redis.set(key, accountId, { EX: DEFAULT_TTL_SECONDS });

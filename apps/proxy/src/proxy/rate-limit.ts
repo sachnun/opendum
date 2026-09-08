@@ -43,6 +43,7 @@ export async function isRateLimited(
   scope: RateLimitScope
 ): Promise<{ rateLimited: boolean; resetTime?: number; message?: string }> {
   const redis = await getRedisClient();
+  if (!redis) return { rateLimited: false };
   const key = getRateLimitKey(accountId, scope);
   const raw = await redis.get(key);
 
@@ -75,6 +76,7 @@ export async function markRateLimited(
   message?: string
 ): Promise<void> {
   const redis = await getRedisClient();
+  if (!redis) return;
   const key = getRateLimitKey(accountId, scope);
   const resetTime = Date.now() + Math.min(retryAfterMs, MAX_RETRY_AFTER_MS);
   const ttlSeconds = Math.ceil(retryAfterMs / 1000);

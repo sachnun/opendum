@@ -123,8 +123,13 @@ export class ProviderRegistry {
         }
       } else if (entry.isDirectory()) {
         const subfolder = resolve(baseDir, entry.name);
-        const subFiles = readdirSync(subfolder);
-        // Prioritas kandidat: client.ts, <nama-folder>.ts, index.ts
+        let subFiles: string[] = [];
+        try {
+          subFiles = readdirSync(subfolder);
+        } catch {
+          continue;
+        }
+
         const candidates = [
           "client.ts",
           "client.js",

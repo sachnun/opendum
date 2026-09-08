@@ -34,7 +34,7 @@ export interface AccountModelAvailability {
 
 export class AuthService {
   constructor(
-    private redis: RedisClientType,
+    private redis: RedisClientType | null,
     private registry: ModelRegistry
   ) {}
 
@@ -83,13 +83,15 @@ export class AuthService {
     const keyHash = hashString(rawKey);
     const cacheKey = `opendum:api_key:${keyHash}`;
 
-    try {
-      const cached = await this.redis.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch {
+        // Redis fallback
       }
-    } catch {
-      // Redis fallback
     }
 
     const rows = await db
@@ -122,15 +124,17 @@ export class AuthService {
       roamingEnabled: record.roamingEnabled,
     };
 
-    try {
-      await this.redis.set(cacheKey, JSON.stringify(result), { EX: 300 });
-      // Update lastUsedAt asynchronously
-      db.update(proxyApiKey)
-        .set({ lastUsedAt: new Date() })
-        .where(eq(proxyApiKey.id, record.id))
-        .catch(() => undefined);
-    } catch {
-      // Ignore
+    if (this.redis) {
+      try {
+        await this.redis.set(cacheKey, JSON.stringify(result), { EX: 300 });
+        // Update lastUsedAt asynchronously
+        db.update(proxyApiKey)
+          .set({ lastUsedAt: new Date() })
+          .where(eq(proxyApiKey.id, record.id))
+          .catch(() => undefined);
+      } catch {
+        // Ignore
+      }
     }
 
     return result;

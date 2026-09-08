@@ -28,8 +28,5 @@ RUN npm install --omit=dev
 
 COPY --from=builder /app/packages/database ./packages/database
 COPY --from=builder /app/packages/ai ./packages/ai
-COPY --from=builder /app/apps/proxy/dist ./apps/proxy/dist
-COPY models ./models
-
 EXPOSE 8000
-CMD ["node", "apps/proxy/dist/main.js"]
+CMD ["npx", "tsx", "apps/proxy/src/main.ts"]
