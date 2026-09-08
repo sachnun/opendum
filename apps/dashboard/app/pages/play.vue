@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { createParser, type EventSourceMessage } from "eventsource-parser";
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
-import { compareModelEntries } from "../../../lib/model-sort";
-import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../../lib/provider-accounts";
-import type { PlaygroundOptions } from "../../../lib/dashboard-api-types";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-families";
+import { compareModelEntries } from "../../lib/model-sort";
+import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../lib/provider-accounts";
+import type { PlaygroundOptions } from "../../lib/dashboard-api-types";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
@@ -155,7 +155,7 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
 
 const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => dashboardApi.playground.options());
 if (data.value && !data.value.hasAnyProviderAccount) {
-  await navigateTo("/dashboard", { replace: true });
+  await navigateTo("/", { replace: true });
 }
 
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
@@ -261,7 +261,7 @@ const isChatScenario = computed(() => selectedScenario.value.id === "chat");
 const isVisionScenario = computed(() => selectedScenario.value.id === "vision");
 
 watch(options, (value) => {
-  if (value && !value.hasAnyProviderAccount) void navigateTo("/dashboard", { replace: true });
+  if (value && !value.hasAnyProviderAccount) void navigateTo("/", { replace: true });
 });
 
 watch(options, (value) => {

@@ -36,25 +36,25 @@ const ACCOUNT_NAV_CHILDREN: NavSubItem[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
 export const primaryNavigation: NavItem[] = [
   {
     name: "Accounts",
-    href: "/dashboard",
+    href: "/",
     icon: "i-lucide-user",
     children: ACCOUNT_NAV_CHILDREN,
   },
   {
     name: "API Keys",
-    href: "/dashboard/api-keys",
+    href: "/keys",
     icon: "i-lucide-key",
     children: [
-      { name: "Sharing", href: "/dashboard/api-keys/sharing", control: "switch" },
+      { name: "Sharing", href: "/keys", control: "switch" },
     ],
   },
   {
     name: "Models",
-    href: "/dashboard/models",
+    href: "/models",
     icon: "i-lucide-cpu",
     children: MODEL_FAMILY_NAV_ITEMS.map((family) => ({
       name: family.name,
-      href: "/dashboard/models",
+      href: "/models",
       anchorId: family.anchorId,
     })),
   },

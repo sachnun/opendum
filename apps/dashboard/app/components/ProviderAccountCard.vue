@@ -685,7 +685,7 @@ const errorPlaygroundRoute = computed(() => {
     addAdditionalPlaygroundParams(query, params);
   }
 
-  return { path: "/dashboard/playground", query };
+  return { path: "/play", query };
 });
 const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < allErrorPreviewEntries.value.length - 1);
 const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
@@ -1218,7 +1218,7 @@ function cancelErrorPreviewPointer() {
               <UiButton variant="outline" size="sm" :disabled="readonly" :aria-label="`Delete ${accountTitle}`" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
             </UiTooltip>
             <UiTooltip text="Playground">
-              <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
+              <NuxtLink :to="`/play?accountId=${account.id}`">
                 <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
             </UiTooltip>

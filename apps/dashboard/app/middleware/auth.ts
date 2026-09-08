@@ -1,9 +1,11 @@
 import { authClient } from "../../lib/auth-client";
 
 export default defineNuxtRouteMiddleware(async (to) => {
+  if (to.path === "/login") return;
+
   const { data: session } = await authClient.useSession(useFetch);
 
-  if (!session.value?.user && to.path.startsWith("/dashboard")) {
-    return navigateTo({ path: "/", query: { redirect: to.fullPath } });
+  if (!session.value?.user) {
+    return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
   }
 });

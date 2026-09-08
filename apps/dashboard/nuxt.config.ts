@@ -98,8 +98,12 @@ export default defineNuxtConfig({
     spaLoadingTemplateLocation: "within",
   },
   routeRules: {
-    "/dashboard": { ssr: false },
-    "/dashboard/**": { ssr: false },
+    "/": { ssr: false },
+    "/keys": { ssr: false },
+    "/models": { ssr: false },
+    "/play": { ssr: false },
+    "/login": { ssr: false },
+    "/**": { ssr: false },
   },
   runtimeConfig: {
     proxyUrl: "",

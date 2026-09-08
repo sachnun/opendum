@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../../lib/model-families";
-import { compareModelEntries } from "../../../lib/model-sort";
-import type { ModelFamilyCounts } from "../../../lib/navigation";
-import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../../lib/model-stats";
-import { getProviderLabel } from "../../../lib/provider-accounts";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-families";
+import { compareModelEntries } from "../../lib/model-sort";
+import type { ModelFamilyCounts } from "../../lib/navigation";
+import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
+import { getProviderLabel } from "../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
@@ -315,8 +315,8 @@ watch(
       highlightTimer = null;
     }, HIGHLIGHT_DURATION_MS);
 
-    if (route.path === "/dashboard/models" && typeof window !== "undefined") {
-      window.history.replaceState(window.history.state, "", "/dashboard/models");
+    if (route.path === "/models" && typeof window !== "undefined") {
+      window.history.replaceState(window.history.state, "", "/models");
     }
   },
   { immediate: true }
@@ -393,7 +393,7 @@ watch(
                   </UiTooltip>
                   <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
                     <UiTooltip v-if="model.isEnabled" text="Playground">
-                      <NuxtLink :to="`/dashboard/playground?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
+                      <NuxtLink :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
                         <UiIcon name="i-lucide-flask-conical" class="size-3" />
                       </NuxtLink>
                     </UiTooltip>

@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../../lib/dashboard-api-types";
-import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../../lib/provider-accounts";
-import { warmDashboardIndexedDbStore } from "../../utils/dashboardIndexedDb";
+import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/dashboard-api-types";
+import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
+import { warmDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
+
+const RESERVED_PROVIDER_SLUGS = new Set(["login", "keys", "models", "play"]);
 
 definePageMeta({
   middleware: "auth",
   layout: "dashboard",
-  validate: (route) => Boolean(getProviderFromSlug(String(route.params.provider))),
+  validate: (route) => {
+    const slug = String(route.params.provider).trim().toLowerCase();
+    if (RESERVED_PROVIDER_SLUGS.has(slug)) return false;
+    return Boolean(getProviderFromSlug(slug));
+  },
 });
 
 const route = useRoute();
