@@ -31,11 +31,11 @@ jobs:
     environment:
       name: proxy
     env:
-      KOYEB_APP: ${{ vars.KOYEB_APP || 'opendum-proxy' }}
-      KOYEB_SERVICE: ${{ vars.KOYEB_SERVICE || 'proxy' }}
-      KOYEB_REGION: ${{ vars.KOYEB_REGION || 'fra' }}
-      KOYEB_INSTANCE_TYPE: ${{ vars.KOYEB_INSTANCE_TYPE || 'free' }}
-      KOYEB_ORG_ID: ${{ vars.KOYEB_ORG_ID || '527de4ee-1fdb-4d4b-a949-37019a024083' }}
+      KOYEB_APP: ${{ vars.KOYEB_APP }}
+      KOYEB_SERVICE: ${{ vars.KOYEB_SERVICE }}
+      KOYEB_REGION: ${{ vars.KOYEB_REGION }}
+      KOYEB_INSTANCE_TYPE: ${{ vars.KOYEB_INSTANCE_TYPE }}
+      KOYEB_ORG_ID: ${{ vars.KOYEB_ORG_ID }}
       KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
 
     steps:
