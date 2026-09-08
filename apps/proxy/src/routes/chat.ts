@@ -11,6 +11,7 @@ import {
 import type { ModelRegistry, ProviderRegistry } from "@opendum/ai";
 import type { AuthService } from "../auth/service.js";
 import { LoadBalancer } from "../proxy/balancer.js";
+import { SessionAffinity } from "../proxy/affinity.js";
 import { writeOpenAIError } from "../errors.js";
 import { markRateLimited, parseRetryAfterMs, getRateLimitScope } from "../proxy/rate-limit.js";
 import { createSSEUsageTracker } from "../proxy/usage.js";
@@ -19,7 +20,8 @@ export function createChatRoute(
   authService: AuthService,
   registry: ModelRegistry,
   providers: ProviderRegistry,
-  loadBalancer: LoadBalancer
+  loadBalancer: LoadBalancer,
+  affinity?: SessionAffinity
 ) {
   const router = new Hono();
 
@@ -81,9 +83,10 @@ export function createChatRoute(
 
     const canonicalModel = registry.resolveAlias(rawModel);
     const isStream = Boolean(body.stream);
+    const sessionId = (body._sessionId || body.session_id || body.prompt_cache_key || c.req.header("x-session-id")) as string | undefined;
     const forcedAccountId = body._account || body.accountId || (typeof body.model === "string" && body.model.includes("/") && !registry.getProvidersForModel(registry.resolveAlias(body.model)).length ? body.model.split("/")[0] : undefined);
 
-    const eligibleAccounts = await loadBalancer.getEligibleAccounts({
+    let eligibleAccounts = await loadBalancer.getEligibleAccounts({
       userId: authResult.userId!,
       model: canonicalModel,
       forcedAccountId,
@@ -91,6 +94,13 @@ export function createChatRoute(
       accountAccessMode: authResult.accountAccessMode,
       accountAccessList: authResult.accountAccessList,
     });
+
+    if (affinity && sessionId && !forcedAccountId) {
+      const stickyAccountId = await affinity.lookup(authResult.userId!, sessionId);
+      if (stickyAccountId) {
+        eligibleAccounts = affinity.preferStickyAccount(eligibleAccounts, stickyAccountId);
+      }
+    }
 
     if (eligibleAccounts.length === 0) {
       return writeOpenAIError(c, 503, {
@@ -191,6 +201,10 @@ export function createChatRoute(
     }
 
     await loadBalancer.markAccountSuccess(selectedAccount.id, canonicalModel);
+
+    if (affinity && sessionId && affinity.isEnabled(selectedAccount.provider)) {
+      affinity.store(authResult.userId!, sessionId, selectedAccount.id).catch(() => undefined);
+    }
 
     if (pointReservation) {
       await creditSharingPoint(

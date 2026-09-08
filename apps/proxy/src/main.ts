@@ -6,6 +6,7 @@ import { config } from "./config.js";
 import { getRedisClient } from "./redis.js";
 import { AuthService } from "./auth/service.js";
 import { LoadBalancer } from "./proxy/balancer.js";
+import { SessionAffinity } from "./proxy/affinity.js";
 import { writeOpenAIError } from "./errors.js";
 import {
   createHealthRoute,
@@ -38,6 +39,7 @@ async function bootstrap() {
   await providers.autoDiscover();
 
   const loadBalancer = new LoadBalancer(registry);
+  const affinity = new SessionAffinity(redis, new Set(providers.getNames()));
 
   if (config.tokenRefreshIntervalSeconds > 0) {
     const worker = new TokenRefresherWorker(
@@ -50,7 +52,7 @@ async function bootstrap() {
   app.route("/", createHealthRoute());
   app.route("/", createModelsRoute(authService, registry));
   app.route("/", createInternalRoute());
-  app.route("/", createChatRoute(authService, registry, providers, loadBalancer));
+  app.route("/", createChatRoute(authService, registry, providers, loadBalancer, affinity));
   app.route("/", createMessagesRoute(authService, registry, providers, loadBalancer));
   app.route("/", createResponsesRoute(authService, registry, providers, loadBalancer));
 
