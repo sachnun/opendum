@@ -165,7 +165,7 @@ export default defineNuxtConfig({
         "clsx",
         "date-fns",
         "idb-keyval",
-        "lucide-vue-next",
+        "@lucide/vue",
         "reka-ui",
         "tailwind-merge",
       ],
