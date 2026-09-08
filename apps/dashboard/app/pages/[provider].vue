@@ -3,7 +3,7 @@ import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData,
 import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
 import { warmDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
 
-const RESERVED_PROVIDER_SLUGS = new Set(["login", "keys", "models", "play"]);
+const RESERVED_PROVIDER_SLUGS = new Set(["keys", "models", "play"]);
 
 definePageMeta({
   middleware: "auth",

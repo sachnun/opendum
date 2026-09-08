@@ -1,4 +1,8 @@
 export default defineNuxtRouteMiddleware((to) => {
+  if (to.path === "/login") {
+    return navigateTo({ path: "/", query: to.query, hash: to.hash }, { redirectCode: 301 });
+  }
+
   if (!to.path.startsWith("/dashboard")) return;
 
   const slug = to.path.slice("/dashboard".length) || "/";

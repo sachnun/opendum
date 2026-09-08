@@ -718,7 +718,7 @@ async function handleSignOut() {
   }
 
   await signOut();
-  await navigateTo("/login");
+  await navigateTo("/");
 }
 
 function openAuditDialog() {

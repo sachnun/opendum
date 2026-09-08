@@ -1,14 +1,35 @@
 <script setup lang="ts">
+import { useSession } from "../../lib/auth-client";
 import { PROVIDER_ACCOUNT_DEFINITIONS, type ProviderAccountKey } from "../../lib/provider-accounts";
 
-definePageMeta({ middleware: "auth", layout: "dashboard" });
+definePageMeta({ middleware: "auth", layout: false });
+
+const route = useRoute();
+const { data: session } = await useSession(useFetch);
+const isAuthenticated = computed(() => Boolean(session.value?.user));
+
+const redirectTarget = computed(() => {
+  const redirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect;
+  return typeof redirect === "string" && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+});
+
+if (import.meta.client && session.value?.user && redirectTarget.value !== "/") {
+  await navigateTo(redirectTarget.value);
+}
 
 const dashboardApi = useDashboardApi();
 const { isAuditMode } = useDashboardAudit();
 
 const dashboardInvalidation = useDashboardDataInvalidation();
 
-const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidation.keys.accountsOverview, () => dashboardApi.accounts.overview());
+const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidation.keys.accountsOverview, () => dashboardApi.accounts.overview(), {
+  default: () => null,
+  immediate: isAuthenticated.value,
+});
+
+watch(isAuthenticated, (authenticated) => {
+  if (authenticated) void refresh();
+});
 
 const summaries = computed(() => data.value?.summaries ?? null);
 const isInitialLoading = computed(() => pending.value && !data.value);
@@ -44,29 +65,32 @@ function refreshAccountsOverview() {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="dashboard-header-divider">
-      <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
-          Provider Accounts
-        </h2>
-        <div class="flex w-full items-center sm:w-auto">
-          <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
+  <NuxtLayout v-if="isAuthenticated" name="dashboard">
+    <div class="space-y-6">
+      <div class="dashboard-header-divider">
+        <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
+            Provider Accounts
+          </h2>
+          <div class="flex w-full items-center sm:w-auto">
+            <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
+          </div>
         </div>
       </div>
-    </div>
 
-    <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
-    <div v-else-if="summaries" class="dashboard-card-grid">
-      <ProviderOverviewCard
-        v-for="provider in sortedProviders"
-        :key="provider.key"
-        :provider="provider"
-        :summary="providerSummary(provider.key)!"
-        :pinned="pinnedProviders.has(provider.key)"
-        :readonly="isAuditMode"
-      />
+      <DashboardDataNotice :error="error" />
+      <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
+      <div v-else-if="summaries" class="dashboard-card-grid">
+        <ProviderOverviewCard
+          v-for="provider in sortedProviders"
+          :key="provider.key"
+          :provider="provider"
+          :summary="providerSummary(provider.key)!"
+          :pinned="pinnedProviders.has(provider.key)"
+          :readonly="isAuditMode"
+        />
+      </div>
     </div>
-  </div>
+  </NuxtLayout>
+  <LoginScreen v-else />
 </template>

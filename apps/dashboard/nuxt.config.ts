@@ -102,7 +102,6 @@ export default defineNuxtConfig({
     "/keys": { ssr: false },
     "/models": { ssr: false },
     "/play": { ssr: false },
-    "/login": { ssr: false },
     "/**": { ssr: false },
   },
   runtimeConfig: {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { signIn, useSession } from "../../lib/auth-client";
+import { signIn } from "../../lib/auth-client";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -34,7 +34,6 @@ const tetrisPieces = [
 ];
 
 const route = useRoute();
-const { data: session } = await useSession(useFetch);
 
 useHead({
   meta: [
@@ -44,12 +43,8 @@ useHead({
 
 const redirectTarget = computed(() => {
   const redirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect;
-  return typeof redirect === "string" && redirect.startsWith("/") && !redirect.startsWith("/dashboard") ? redirect : "/";
+  return typeof redirect === "string" && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
 });
-
-if (session.value?.user) {
-  await navigateTo(redirectTarget.value);
-}
 
 const loadingProvider = ref<SocialProvider | null>(null);
 const tetrisCanvas = ref<HTMLCanvasElement | null>(null);
