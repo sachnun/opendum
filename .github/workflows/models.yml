@@ -12,18 +12,16 @@ jobs:
   refresh-models:
     name: Refresh Provider Models
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Refresh provider models
         run: npm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
@@ -40,7 +38,7 @@ jobs:
           echo 'EOF' >> "$GITHUB_OUTPUT"
 
       - name: Commit and push changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           branch: main
           commit_message: ${{ steps.commit_msg.outputs.msg }}
