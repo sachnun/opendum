@@ -1,8 +1,12 @@
 import { Hono } from "hono";
+import { decrypt, type ProviderAccount } from "@opendum/database";
 import type { ModelRegistry, ProviderRegistry } from "@opendum/ai";
 import type { AuthService } from "../auth/service.js";
 import { LoadBalancer } from "../proxy/balancer.js";
-import { createChatRoute } from "./chat.js";
+import { writeOpenAIError } from "../errors.js";
+import { markRateLimited, parseRetryAfterMs, getRateLimitScope } from "../proxy/rate-limit.js";
+import { createAnthropicStreamTransformer } from "@opendum/ai";
+import { convertOpenAIToAnthropicJSON } from "@opendum/ai";
 
 interface AnthropicContentBlock {
   type: string;
@@ -10,6 +14,9 @@ interface AnthropicContentBlock {
   id?: string;
   name?: string;
   input?: Record<string, unknown> | string;
+  tool_use_id?: string;
+  content?: string | Array<{ type: string; text?: string }>;
+  is_error?: boolean;
 }
 
 interface AnthropicMessage {
@@ -55,23 +62,50 @@ function convertAnthropicToOpenAI(body: any): Record<string, unknown> {
                     : JSON.stringify(block.input || {}),
               },
             });
+          } else if (block.type === "tool_result") {
+            const content =
+              typeof block.content === "string"
+                ? block.content
+                : Array.isArray(block.content)
+                  ? block.content.map((c: any) => c.text || "").join("\n")
+                  : JSON.stringify(block.content || "");
+            messages.push({
+              role: "tool",
+              tool_call_id: block.tool_use_id,
+              content,
+            });
           }
         }
 
-        const openAiMsg: any = { role: msg.role, content: textParts };
-        if (toolCalls.length > 0) {
-          openAiMsg.tool_calls = toolCalls;
+        if (textParts || toolCalls.length > 0) {
+          const openAiMsg: any = { role: msg.role, content: textParts };
+          if (toolCalls.length > 0) {
+            openAiMsg.tool_calls = toolCalls;
+          }
+          messages.push(openAiMsg);
         }
-        messages.push(openAiMsg);
       }
     }
   }
 
-  return {
+  const payload: any = {
     ...body,
     messages,
     max_tokens: body.max_tokens ?? 4096,
   };
+
+  if (Array.isArray(body.tools)) {
+    payload.tools = body.tools.map((t: any) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.input_schema,
+      },
+    }));
+  }
+
+  return payload;
 }
 
 export function createMessagesRoute(
@@ -81,19 +115,222 @@ export function createMessagesRoute(
   loadBalancer: LoadBalancer
 ) {
   const router = new Hono();
-  const chatRouter = createChatRoute(authService, registry, providers, loadBalancer);
 
   router.post("/v1/messages", async (c) => {
-    const anthropicBody = await c.req.json();
-    const openAIBody = convertAnthropicToOpenAI(anthropicBody);
+    const startMs = Date.now();
+    const authHeader =
+      c.req.header("authorization") || c.req.header("x-api-key");
 
-    c.req.raw = new Request(c.req.url, {
-      method: "POST",
-      headers: c.req.raw.headers,
-      body: JSON.stringify(openAIBody),
+    let authResult: any = null;
+    const playgroundUser = c.req.header("x-opendum-playground-user-id");
+    const playgroundTs = c.req.header("x-opendum-playground-timestamp");
+    const playgroundSig = c.req.header("x-opendum-playground-signature");
+
+    if (playgroundUser && playgroundTs && playgroundSig) {
+      authResult = authService.validatePlaygroundAuth(
+        playgroundUser,
+        playgroundTs,
+        playgroundSig,
+        c.req.method,
+        c.req.path
+      );
+    }
+
+    if (!authResult) {
+      if (!authHeader) {
+        return writeOpenAIError(c, 401, {
+          message: "Missing API key.",
+          type: "authentication_error",
+        });
+      }
+      authResult = await authService.validateAPIKey(authHeader);
+    }
+
+    if (!authResult.valid) {
+      return writeOpenAIError(c, 401, {
+        message: authResult.error || "Unauthorized",
+        type: "authentication_error",
+      });
+    }
+
+    let anthropicBody: any;
+    try {
+      anthropicBody = await c.req.json();
+    } catch {
+      return writeOpenAIError(c, 400, {
+        message: "Invalid JSON in request body",
+        type: "invalid_request_error",
+      });
+    }
+
+    const openAIBody = convertAnthropicToOpenAI(anthropicBody);
+    const rawModel = String(anthropicBody.model || "");
+    const canonicalModel = registry.resolveAlias(rawModel);
+    const isStream = Boolean(anthropicBody.stream);
+
+    const eligibleAccounts = await loadBalancer.getEligibleAccounts({
+      userId: authResult.userId!,
+      model: canonicalModel,
+      roamingEnabled: authResult.roamingEnabled,
+      accountAccessMode: authResult.accountAccessMode,
+      accountAccessList: authResult.accountAccessList,
     });
 
-    return chatRouter.fetch(c.req.raw);
+    if (eligibleAccounts.length === 0) {
+      return writeOpenAIError(c, 529, {
+        message: `No active accounts available for model '${canonicalModel}'.`,
+        type: "api_error",
+      });
+    }
+
+    let selectedAccount: ProviderAccount | null = null;
+    let upstreamResponse: Response | null = null;
+
+    for (const account of eligibleAccounts) {
+      const provider = providers.get(account.provider);
+      if (!provider) continue;
+
+      let credentials = "";
+      if (!provider.isAuthless?.()) {
+        try {
+          credentials = account.apiKey
+            ? decrypt(account.apiKey)
+            : decrypt(account.accessToken);
+        } catch {
+          continue;
+        }
+      }
+
+      try {
+        const resp = await provider.makeRequest({
+          account,
+          credentials,
+          body: openAIBody,
+          stream: isStream,
+        });
+
+        if (resp.status === 429) {
+          const retryAfterMs =
+            parseRetryAfterMs(resp.headers.get("retry-after")) || 60000;
+          await markRateLimited(
+            account.id,
+            getRateLimitScope(canonicalModel),
+            retryAfterMs,
+            canonicalModel
+          );
+          await loadBalancer.markAccountFailed(account.id, canonicalModel, 429);
+          continue;
+        }
+
+        if (resp.status >= 500) {
+          await loadBalancer.markAccountFailed(account.id, canonicalModel, resp.status);
+          continue;
+        }
+
+        selectedAccount = account;
+        upstreamResponse = resp;
+        break;
+      } catch {
+        await loadBalancer.markAccountFailed(account.id, canonicalModel, 500);
+      }
+    }
+
+    if (!selectedAccount || !upstreamResponse) {
+      return writeOpenAIError(c, 529, {
+        message: "All eligible provider accounts failed for this request.",
+        type: "api_error",
+      });
+    }
+
+    await loadBalancer.markAccountSuccess(selectedAccount.id, canonicalModel);
+    c.header("x-provider-account-id", selectedAccount.id);
+
+    if (isStream && upstreamResponse.body) {
+      c.header("Content-Type", "text/event-stream");
+      c.header("Cache-Control", "no-cache");
+      c.header("Connection", "keep-alive");
+
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const reader = upstreamResponse.body.getReader();
+
+      let sseBuffer = "";
+      let finalUsage = { inputTokens: 0, outputTokens: 0 };
+
+      const stream = new ReadableStream({
+        async pull(controller) {
+          const transformer = createAnthropicStreamTransformer(canonicalModel, {
+            onEvent(event, data) {
+              const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+              controller.enqueue(encoder.encode(payload));
+            },
+            onUsage(inputTokens, outputTokens) {
+              finalUsage = { inputTokens, outputTokens };
+            },
+          });
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                transformer.finish();
+                controller.close();
+                loadBalancer.logUsage({
+                  userId: authResult.userId!,
+                  providerAccountId: selectedAccount!.id,
+                  proxyApiKeyId: authResult.apiKeyId,
+                  model: canonicalModel,
+                  inputTokens: finalUsage.inputTokens,
+                  outputTokens: finalUsage.outputTokens,
+                  statusCode: 200,
+                  durationMs: Date.now() - startMs,
+                });
+                return;
+              }
+
+              sseBuffer += decoder.decode(value, { stream: true });
+              const lines = sseBuffer.split("\n");
+              sseBuffer = lines.pop() ?? "";
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith("data:")) continue;
+                const raw = trimmed.slice(5).trim();
+                if (!raw || raw === "[DONE]") continue;
+
+                try {
+                  const chunk = JSON.parse(raw);
+                  transformer.processChunk(chunk);
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          } catch (err) {
+            controller.error(err);
+          }
+        },
+      });
+
+      return c.body(stream);
+    }
+
+    const data: any = await upstreamResponse.json();
+    const anthropicResponse = convertOpenAIToAnthropicJSON(data, canonicalModel);
+    const durationMs = Date.now() - startMs;
+
+    loadBalancer.logUsage({
+      userId: authResult.userId!,
+      providerAccountId: selectedAccount.id,
+      proxyApiKeyId: authResult.apiKeyId,
+      model: canonicalModel,
+      inputTokens: (anthropicResponse.usage as any)?.input_tokens ?? 0,
+      outputTokens: (anthropicResponse.usage as any)?.output_tokens ?? 0,
+      statusCode: upstreamResponse.status,
+      durationMs,
+    });
+
+    return c.json(anthropicResponse, upstreamResponse.status as any);
   });
 
   return router;

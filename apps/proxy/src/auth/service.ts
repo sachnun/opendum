@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import { createHmac } from "node:crypto";
 import type { RedisClientType } from "redis";
 import {
   db,
@@ -10,6 +11,7 @@ import {
   hashString,
 } from "@opendum/database";
 import type { ModelRegistry } from "@opendum/ai";
+import { config } from "../config.js";
 
 export interface ValidateApiKeyResult {
   valid: boolean;
@@ -35,6 +37,42 @@ export class AuthService {
     private redis: RedisClientType,
     private registry: ModelRegistry
   ) {}
+
+  validatePlaygroundAuth(
+    userIdHeader?: string,
+    timestampHeader?: string,
+    signatureHeader?: string,
+    method?: string,
+    path?: string
+  ): ValidateApiKeyResult | null {
+    if (!userIdHeader || !timestampHeader || !signatureHeader) {
+      return null;
+    }
+
+    const secret = config.betterAuthSecret;
+    if (!secret) return { valid: false, error: "Playground auth not configured" };
+
+    const ts = parseInt(timestampHeader, 10);
+    if (isNaN(ts) || Math.abs(Math.floor(Date.now() / 1000) - ts) > 120) {
+      return { valid: false, error: "Playground session expired" };
+    }
+
+    const expected = createHmac("sha256", secret)
+      .update(`${userIdHeader}\n${timestampHeader}\n${method || "POST"}\n${path || ""}`)
+      .digest("hex");
+
+    if (signatureHeader !== expected) {
+      return { valid: false, error: "Invalid playground signature" };
+    }
+
+    return {
+      valid: true,
+      userId: userIdHeader,
+      modelAccessMode: "all",
+      accountAccessMode: "all",
+      roamingEnabled: false,
+    };
+  }
 
   async validateAPIKey(authHeader: string): Promise<ValidateApiKeyResult> {
     const rawKey = authHeader.replace(/^Bearer\s+/i, "").trim();

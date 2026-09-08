@@ -14,11 +14,30 @@ export function createModelsRoute(
       c.req.header("authorization") || c.req.header("x-api-key");
     const allModels = registry.formatModelsForOpenAI();
 
-    if (!authHeader) {
-      return c.json({ object: "list", data: allModels });
+    let authResult: any = null;
+
+    // Check Playground HMAC auth
+    const playgroundUser = c.req.header("x-opendum-playground-user-id");
+    const playgroundTs = c.req.header("x-opendum-playground-timestamp");
+    const playgroundSig = c.req.header("x-opendum-playground-signature");
+
+    if (playgroundUser && playgroundTs && playgroundSig) {
+      authResult = authService.validatePlaygroundAuth(
+        playgroundUser,
+        playgroundTs,
+        playgroundSig,
+        c.req.method,
+        c.req.path
+      );
     }
 
-    const authResult = await authService.validateAPIKey(authHeader);
+    if (!authResult && authHeader) {
+      authResult = await authService.validateAPIKey(authHeader);
+    }
+
+    if (!authHeader && !authResult) {
+      return c.json({ object: "list", data: allModels });
+    }
     if (!authResult.valid) {
       return writeOpenAIError(c, 401, {
         message: authResult.error || "Unauthorized",
@@ -35,7 +54,7 @@ export function createModelsRoute(
       );
 
     const apiKeyModelSet = new Set(
-      (authResult.modelAccessList ?? []).map((m) => registry.resolveAlias(m))
+      (authResult.modelAccessList ?? []).map((m: string) => registry.resolveAlias(m))
     );
 
     const enabled = allModels.filter((item) => {

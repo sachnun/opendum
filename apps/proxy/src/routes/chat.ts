@@ -1,5 +1,13 @@
 import { Hono } from "hono";
-import { decrypt, type ProviderAccount } from "@opendum/database";
+import {
+  db,
+  decrypt,
+  reserveRoamingPoint,
+  refundRoamingPoint,
+  creditSharingPoint,
+  type ProviderAccount,
+  type PointReservation,
+} from "@opendum/database";
 import type { ModelRegistry, ProviderRegistry } from "@opendum/ai";
 import type { AuthService } from "../auth/service.js";
 import { LoadBalancer } from "../proxy/balancer.js";
@@ -20,14 +28,32 @@ export function createChatRoute(
     const authHeader =
       c.req.header("authorization") || c.req.header("x-api-key");
 
-    if (!authHeader) {
-      return writeOpenAIError(c, 401, {
-        message: "Missing API key.",
-        type: "authentication_error",
-      });
+    let authResult: any = null;
+
+    // Check Playground HMAC auth
+    const playgroundUser = c.req.header("x-opendum-playground-user-id");
+    const playgroundTs = c.req.header("x-opendum-playground-timestamp");
+    const playgroundSig = c.req.header("x-opendum-playground-signature");
+
+    if (playgroundUser && playgroundTs && playgroundSig) {
+      authResult = authService.validatePlaygroundAuth(
+        playgroundUser,
+        playgroundTs,
+        playgroundSig,
+        c.req.method,
+        c.req.path
+      );
     }
 
-    const authResult = await authService.validateAPIKey(authHeader);
+    if (!authResult) {
+      if (!authHeader) {
+        return writeOpenAIError(c, 401, {
+          message: "Missing API key.",
+          type: "authentication_error",
+        });
+      }
+      authResult = await authService.validateAPIKey(authHeader);
+    }
     if (!authResult.valid) {
       return writeOpenAIError(c, 401, {
         message: authResult.error || "Unauthorized",
@@ -55,10 +81,12 @@ export function createChatRoute(
 
     const canonicalModel = registry.resolveAlias(rawModel);
     const isStream = Boolean(body.stream);
+    const forcedAccountId = body._account || body.accountId || (typeof body.model === "string" && body.model.includes("/") && !registry.getProvidersForModel(registry.resolveAlias(body.model)).length ? body.model.split("/")[0] : undefined);
 
     const eligibleAccounts = await loadBalancer.getEligibleAccounts({
       userId: authResult.userId!,
       model: canonicalModel,
+      forcedAccountId,
       roamingEnabled: authResult.roamingEnabled,
       accountAccessMode: authResult.accountAccessMode,
       accountAccessList: authResult.accountAccessList,
@@ -74,8 +102,23 @@ export function createChatRoute(
     let lastError: Error | null = null;
     let selectedAccount: ProviderAccount | null = null;
     let upstreamResponse: Response | null = null;
+    let pointReservation: PointReservation | null = null;
 
     for (const account of eligibleAccounts) {
+      const isShared = account.userId !== authResult.userId;
+
+      if (isShared && !forcedAccountId) {
+        const pointRes = await reserveRoamingPoint(db, authResult.userId!);
+        if (!pointRes.sufficient) {
+          return writeOpenAIError(c, 402, {
+            message: "Insufficient points. Please add more points to continue.",
+            type: "insufficient_quota",
+            code: "insufficient_points",
+          });
+        }
+        pointReservation = pointRes.reservation;
+      }
+
       const provider = providers.get(account.provider);
       if (!provider) continue;
 
@@ -100,6 +143,10 @@ export function createChatRoute(
         });
 
         if (resp.status === 429) {
+          if (pointReservation) {
+            await refundRoamingPoint(db, pointReservation);
+            pointReservation = null;
+          }
           const retryAfterMs =
             parseRetryAfterMs(resp.headers.get("retry-after")) || 60000;
           await markRateLimited(
@@ -113,6 +160,10 @@ export function createChatRoute(
         }
 
         if (resp.status >= 500) {
+          if (pointReservation) {
+            await refundRoamingPoint(db, pointReservation);
+            pointReservation = null;
+          }
           await loadBalancer.markAccountFailed(account.id, canonicalModel, resp.status);
           continue;
         }
@@ -121,6 +172,10 @@ export function createChatRoute(
         upstreamResponse = resp;
         break;
       } catch (err: any) {
+        if (pointReservation) {
+          await refundRoamingPoint(db, pointReservation);
+          pointReservation = null;
+        }
         lastError = err;
         await loadBalancer.markAccountFailed(account.id, canonicalModel, 500);
       }
@@ -136,6 +191,15 @@ export function createChatRoute(
     }
 
     await loadBalancer.markAccountSuccess(selectedAccount.id, canonicalModel);
+
+    if (pointReservation) {
+      await creditSharingPoint(
+        db,
+        selectedAccount.userId,
+        pointReservation.debitId,
+        pointReservation.amount
+      );
+    }
 
     c.header("x-provider-account-id", selectedAccount.id);
 

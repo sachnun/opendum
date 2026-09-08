@@ -5,6 +5,7 @@ import {
   providerAccount,
   providerAccountDisabledModel,
   providerAccountModelHealth,
+  userSharingSetting,
   usageLog,
   type ProviderAccount,
 } from "@opendum/database";
@@ -95,6 +96,55 @@ export class LoadBalancer {
 
       if (disabled.length > 0) continue;
       available.push(acc);
+    }
+
+    // If no owned accounts available and roaming enabled, fallback to shared accounts
+    if (available.length === 0 && filter.roamingEnabled && !filter.forcedAccountId) {
+      const sharedQuery = db
+        .select({
+          account: providerAccount,
+        })
+        .from(providerAccount)
+        .innerJoin(
+          userSharingSetting,
+          eq(userSharingSetting.userId, providerAccount.userId)
+        )
+        .where(
+          and(
+            sql`${providerAccount.userId} != ${filter.userId}`,
+            eq(userSharingSetting.enabled, true),
+            eq(providerAccount.isActive, true),
+            sql`(${providerAccount.disabledUntil} IS NULL OR ${providerAccount.disabledUntil} <= ${now})`
+          )
+        );
+
+      const sharedRows = await sharedQuery;
+      const sharedCandidates = sharedRows
+        .map((r) => r.account)
+        .filter((acc) => {
+          if (!providers.includes(acc.provider)) return false;
+          if (filter.excludeAccountIds?.includes(acc.id)) return false;
+          return true;
+        });
+
+      for (const acc of sharedCandidates) {
+        const rl = await isRateLimited(acc.id, scope);
+        if (rl.rateLimited) continue;
+
+        const disabled = await db
+          .select()
+          .from(providerAccountDisabledModel)
+          .where(
+            and(
+              eq(providerAccountDisabledModel.providerAccountId, acc.id),
+              eq(providerAccountDisabledModel.model, canonicalModel)
+            )
+          )
+          .limit(1);
+
+        if (disabled.length > 0) continue;
+        available.push(acc);
+      }
     }
 
     available.sort((a, b) => {
