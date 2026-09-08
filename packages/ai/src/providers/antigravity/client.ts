@@ -6,6 +6,7 @@ import {
   GOOGLE_OAUTH_TOKEN_ENDPOINT,
   ANTIGRAVITY_CLAUDE_BETA_HEADER,
 } from "./constants.js";
+import { transformAntigravityRequest } from "./transform/index.js";
 
 const ANTIGRAVITY_API_ENDPOINT = "https://cloudaicompanion.googleapis.com/v1";
 
@@ -66,11 +67,12 @@ export class AntigravityProvider implements Provider {
     };
 
     const url = `${ANTIGRAVITY_API_ENDPOINT}/projects/${projectId}/models/${upstreamModel}:${stream ? "streamGenerateContent" : "generateContent"}`;
+    const transformedBody = transformAntigravityRequest(body as any, rawModel, account.id);
 
     return await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify(transformedBody),
       signal,
     });
   }
