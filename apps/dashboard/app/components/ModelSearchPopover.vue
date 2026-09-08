@@ -117,7 +117,7 @@ async function selectModel(model: ModelListItem) {
   searchInput.value?.blur();
   closeSuggestions();
   await navigateTo({
-    path: "/dashboard/models",
+    path: "/models",
     hash: `#model-${encodeURIComponent(model.id)}`,
   });
 }

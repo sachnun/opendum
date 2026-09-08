@@ -233,7 +233,7 @@ export function getProviderLabel(provider: string): string {
 }
 
 export function getProviderAccountPath(provider: ProviderAccountKey): string {
-  return `/dashboard/${BY_KEY[provider].slug}`;
+  return `/${BY_KEY[provider].slug}`;
 }
 
 export function buildProviderHrefMap<V>(
