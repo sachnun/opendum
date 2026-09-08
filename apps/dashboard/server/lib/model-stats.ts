@@ -1,8 +1,7 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
-import { db } from "./db";
-import { usageLog } from "./db/schema";
+import { db, usageLog  } from "@opendum/database";
 import { getModelLookupKeys, resolveModelAlias } from "./proxy/models";
 
 interface RawModelStats {

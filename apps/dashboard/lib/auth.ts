@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db as defaultDb, schema, type Database } from "../server/lib/db";
+import { db as defaultDb, schema, type Database } from "@opendum/database";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

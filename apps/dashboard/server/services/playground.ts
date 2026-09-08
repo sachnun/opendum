@@ -1,7 +1,6 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
-import { db } from "../lib/db";
-import { disabledModel, providerAccount, providerAccountDisabledModel } from "../lib/db/schema";
+import { db, disabledModel, providerAccount, providerAccountDisabledModel  } from "@opendum/database";
 import { getAccountModelAvailability, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts } from "../lib/proxy/authless-providers";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getProvidersForModel, resolveModelAlias } from "../lib/proxy/models";

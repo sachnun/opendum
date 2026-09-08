@@ -1,9 +1,7 @@
 import { and, count as countFn, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "../lib/db";
-import { providerAccount } from "../lib/db/schema";
-import { encrypt, hashString } from "../lib/encryption";
+import { db, providerAccount , encrypt, hashString  } from "@opendum/database";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { getProviderModelMap } from "../lib/proxy/models";
 import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/constants";
