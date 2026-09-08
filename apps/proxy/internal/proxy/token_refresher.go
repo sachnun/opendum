@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,12 +16,15 @@ import (
 )
 
 const (
-	tokenRefreshLockPrefix     = "opendum:provider-account:refresh-lock:"
-	tokenRefreshLockTTL        = 2 * time.Minute
-	tokenRefreshWaitTimeout    = 3 * time.Second
-	tokenRefreshWaitInterval   = 250 * time.Millisecond
-	tokenRefreshAccountTimeout = 90 * time.Second
-	tokenRefreshBatchLimit     = 500
+	tokenRefreshLockPrefix        = "opendum:provider-account:refresh-lock:"
+	tokenRefreshLockTTL           = 2 * time.Minute
+	tokenRefreshWaitTimeout       = 3 * time.Second
+	tokenRefreshWaitInterval      = 250 * time.Millisecond
+	tokenRefreshAccountTimeout    = 90 * time.Second
+	tokenRefreshBatchLimit        = 500
+	refreshMaxConsecutiveFailures = 5
+	refreshFailCountPrefix        = "opendum:provider-account:refresh-fail-count:"
+	refreshFailCountTTL           = 30 * 24 * time.Hour
 )
 
 func (s *Service) StartTokenRefresher(ctx context.Context, interval time.Duration) {
@@ -116,12 +120,13 @@ func (s *Service) expiringRefreshableAccounts(ctx context.Context) ([]appdb.Prov
 
 		var rows []appdb.ProviderAccount
 		err := s.db.NewSelect().Model(&rows).
-			Column("id", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email").
+			Column("id", "userId", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email", "isActive").
+			Where("\"isActive\" = TRUE").
 			Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", now).
 			Where("provider = ?", name).
 			Where("\"refreshToken\" <> ''").
 			Where("\"expiresAt\" <= ?", now.Add(buffer)).
-			OrderExpr("\"isActive\" DESC, \"expiresAt\" ASC").
+			OrderExpr("\"expiresAt\" ASC").
 			Limit(tokenRefreshBatchLimit).
 			Scan(ctx)
 		if err != nil {
@@ -217,12 +222,14 @@ func (s *Service) refreshAccountCredentialsIfDue(ctx context.Context, account ap
 	}
 	refreshed, err := refresher.RefreshCredentials(ctx, s.client, refreshToken, current)
 	if err != nil {
+		s.recordRefreshFailure(ctx, current, err)
 		return "", current, false, err
 	}
 	updatedAccount, err := s.persistRefreshedCredentials(ctx, current, refreshed)
 	if err != nil {
 		return "", current, false, err
 	}
+	s.clearRefreshFailures(ctx, current.ID)
 	return refreshed.AccessToken, updatedAccount, true, nil
 }
 
@@ -236,7 +243,7 @@ func (s *Service) loadProviderAccountCredentials(ctx context.Context, account ap
 func (s *Service) loadProviderAccountCredentialsByID(ctx context.Context, accountID string) (appdb.ProviderAccount, error) {
 	var account appdb.ProviderAccount
 	err := s.db.NewSelect().Model(&account).
-		Column("id", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email").
+		Column("id", "userId", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email", "isActive").
 		Where("id = ?", accountID).
 		Limit(1).
 		Scan(ctx)
@@ -337,8 +344,118 @@ func (s *Service) waitForRefreshedAccount(ctx context.Context, previous appdb.Pr
 	}
 }
 
+func (s *Service) recordRefreshFailure(ctx context.Context, account appdb.ProviderAccount, refreshErr error) (int64, bool) {
+	if !account.IsActive {
+		return 0, false
+	}
+	now := time.Now()
+	message := refreshErr.Error()
+	if len(message) > maxStoredErrorLen {
+		message = message[:maxStoredErrorLen]
+	}
+	statusCode := parseRefreshErrorStatusCode(refreshErr)
+
+	var failCount int64 = 1
+	if s.redis != nil {
+		if count, err := s.redis.Incr(ctx, refreshFailCountKey(account.ID)).Result(); err == nil {
+			failCount = count
+			_ = s.redis.Expire(ctx, refreshFailCountKey(account.ID), refreshFailCountTTL).Err()
+		}
+	}
+
+	if s.db == nil {
+		return failCount, shouldDisableAccountAfterRefreshFailures(failCount)
+	}
+
+	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
+		Set("\"errorCount\" = \"errorCount\" + 1").
+		Set("\"lastErrorAt\" = ?", now).
+		Set("\"lastErrorCode\" = ?", statusCode).
+		Set("\"updatedAt\" = ?", now).
+		Where("id = ?", account.ID).
+		Exec(ctx)
+
+	if account.UserID != "" {
+		_ = s.upsertErrorHistory(ctx, account.ID, account.UserID, nil, statusCode, "Token refresh failed: "+message, now)
+	} else {
+		var owner appdb.ProviderAccount
+		if err := s.db.NewSelect().Model(&owner).Column("userId").Where("id = ?", account.ID).Limit(1).Scan(ctx); err == nil && owner.UserID != "" {
+			_ = s.upsertErrorHistory(ctx, account.ID, owner.UserID, nil, statusCode, "Token refresh failed: "+message, now)
+		}
+	}
+
+	if !shouldDisableAccountAfterRefreshFailures(failCount) {
+		return failCount, false
+	}
+
+	disabled := s.disableAccountAfterRefreshFailures(ctx, account.ID, now)
+	if disabled {
+		slog.Warn("disabling provider account after repeated token refresh failures", "account", account.ID, "provider", account.Provider, "failures", failCount)
+	}
+	return failCount, disabled
+}
+
+func (s *Service) disableAccountAfterRefreshFailures(ctx context.Context, accountID string, now time.Time) bool {
+	if s.db == nil || accountID == "" {
+		return false
+	}
+	res, err := s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
+		Set("\"isActive\" = FALSE").
+		Set("status = ?", "failed").
+		Set("\"statusChangedAt\" = ?", now).
+		Set("\"updatedAt\" = ?", now).
+		Where("id = ?", accountID).
+		Where("\"isActive\" = TRUE").
+		Exec(ctx)
+	if err != nil {
+		slog.Error("failed to disable provider account after refresh failures", "account", accountID, "error", err)
+		return false
+	}
+	affected, _ := res.RowsAffected()
+	return affected > 0
+}
+
+func (s *Service) clearRefreshFailures(ctx context.Context, accountID string) {
+	if s.redis == nil || accountID == "" {
+		return
+	}
+	_ = s.redis.Del(ctx, refreshFailCountKey(accountID)).Err()
+}
+
 func accountNeedsCredentialRefresh(account appdb.ProviderAccount, providerImpl providers.Provider, now time.Time) bool {
 	return now.After(account.ExpiresAt.Add(-providers.RefreshBufferFor(providerImpl)))
+}
+
+func refreshFailCountKey(accountID string) string {
+	return refreshFailCountPrefix + accountID
+}
+
+func shouldDisableAccountAfterRefreshFailures(failCount int64) bool {
+	return failCount >= int64(refreshMaxConsecutiveFailures)
+}
+
+func parseRefreshErrorStatusCode(err error) int {
+	if err == nil {
+		return 401
+	}
+	message := err.Error()
+	for i := 0; i+3 <= len(message); i++ {
+		if message[i] < '4' || message[i] > '5' {
+			continue
+		}
+		if message[i+1] < '0' || message[i+1] > '9' || message[i+2] < '0' || message[i+2] > '9' {
+			continue
+		}
+		prevIsDigit := i > 0 && message[i-1] >= '0' && message[i-1] <= '9'
+		nextIsDigit := i+3 < len(message) && message[i+3] >= '0' && message[i+3] <= '9'
+		if prevIsDigit || nextIsDigit {
+			continue
+		}
+		if code, convErr := strconv.Atoi(message[i : i+3]); convErr == nil && code >= 400 && code < 600 {
+			return code
+		}
+	}
+	return 401
 }
 
 func tokenRefreshLockKey(accountID string) string {
