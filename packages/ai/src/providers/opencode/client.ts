@@ -1,33 +1,13 @@
-import type { Provider, ProviderRequestOptions } from "./base.js";
-import type { ModelRegistry } from "../registry/registry.js";
-
-const OPENCODE_CHAT_COMPLETIONS_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions";
-const OPENCODE_RESPONSES_ENDPOINT = "https://unroxy.koyeb.app/opencode.ai/zen/v1/responses";
-const OPENCODE_PUBLIC_API_KEY = "public";
-const OPENCODE_CLIENT = "cli";
-const OPENCODE_USER_AGENT = "opencode/1.15.8";
-
-const supportedOpencodeParams = new Set([
-  "model",
-  "messages",
-  "temperature",
-  "top_p",
-  "max_tokens",
-  "max_completion_tokens",
-  "stream",
-  "stream_options",
-  "tools",
-  "tool_choice",
-  "parallel_tool_calls",
-  "presence_penalty",
-  "frequency_penalty",
-  "n",
-  "stop",
-  "seed",
-  "response_format",
-  "reasoning",
-  "reasoning_effort",
-]);
+import type { Provider, ProviderRequestOptions } from "../base.js";
+import type { ModelRegistry } from "../../registry/registry.js";
+import {
+  OPENCODE_CHAT_COMPLETIONS_ENDPOINT,
+  OPENCODE_RESPONSES_ENDPOINT,
+  OPENCODE_PUBLIC_API_KEY,
+  OPENCODE_CLIENT,
+  OPENCODE_USER_AGENT,
+  SUPPORTED_OPENCODE_PARAMS,
+} from "./constants.js";
 
 export class OpencodeProvider implements Provider {
   public name = "opencode";
@@ -48,7 +28,7 @@ export class OpencodeProvider implements Provider {
 
     const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(body)) {
-      if (supportedOpencodeParams.has(key) && value !== undefined && value !== null) {
+      if (SUPPORTED_OPENCODE_PARAMS.has(key) && value !== undefined && value !== null) {
         payload[key] = value;
       }
     }

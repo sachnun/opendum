@@ -20,7 +20,7 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 const PROXY_PROVIDER_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../packages/ai/src/providers/antigravity-constants.ts"
+  "../packages/ai/src/providers/antigravity/version.ts"
 );
 const DASHBOARD_CONSTANTS_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),

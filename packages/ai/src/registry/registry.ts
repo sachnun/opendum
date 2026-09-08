@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve, basename, dirname } from "node:path";
 import type { ModelMeta } from "./capabilities.js";
-import { compareModelEntries } from "./sort.js";
+import { compareModelEntries } from "./sort/index.js";
 
 export interface ProviderModelConfig {
   upstream?: string;

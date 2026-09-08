@@ -7,7 +7,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema.ts",
+    "./schema": "./src/schema/index.ts",
     "./relations": "./src/relations.ts",
     "./encryption": "./src/encryption.ts",
     "./points": "./src/points.ts",

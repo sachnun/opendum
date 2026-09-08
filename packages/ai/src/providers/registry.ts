@@ -1,9 +1,9 @@
 import type { Provider } from "./base.js";
 import type { ModelRegistry } from "../registry/registry.js";
 import { OpenAICompatibleProvider } from "./openai-compatible.js";
-import { ClineProvider } from "./cline.js";
-import { QoderProvider } from "./qoder.js";
-import { OpencodeProvider } from "./opencode.js";
+import { ClineProvider } from "./cline/index.js";
+import { QoderProvider } from "./qoder/index.js";
+import { OpencodeProvider } from "./opencode/index.js";
 
 const genericOpenAIParams = new Set([
   "model",

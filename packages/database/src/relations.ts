@@ -14,7 +14,7 @@ import {
   usageLog,
   pointTransaction,
   disabledModel,
-} from "./schema.js";
+} from "./schema/index.js";
 
 export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),

@@ -1,7 +1,7 @@
 import { sql, eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import type { Database } from "./client.js";
-import { pointTransaction, userPointBalance } from "./schema.js";
+import { pointTransaction, userPointBalance } from "./schema/index.js";
 
 export const INITIAL_POINT_BALANCE = 15;
 export const ROAMING_POINT_COST = 2;

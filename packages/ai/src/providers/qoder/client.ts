@@ -1,33 +1,14 @@
-import type { Provider, ProviderRequestOptions, RefreshedCredentials } from "./base.js";
-import type { ModelRegistry } from "../registry/registry.js";
+import type { Provider, ProviderRequestOptions, RefreshedCredentials } from "../base.js";
+import type { ModelRegistry } from "../../registry/registry.js";
 import type { ProviderAccount } from "@opendum/database";
-
-const QODER_BASE_URL = "https://unroxy.koyeb.app/api.qoder.com/api";
-const QODER_REFRESH_PATH = "/v1/auth/refresh";
-const QODER_CHAT_PATH = "/v1/chat/completions";
-const QODER_ACCESS_TTL_MS = 24 * 60 * 60 * 1000;
-const QODER_REFRESH_BUFFER_SECONDS = 3600;
-
-const supportedQoderParams = new Set([
-  "model",
-  "messages",
-  "temperature",
-  "top_p",
-  "max_tokens",
-  "max_completion_tokens",
-  "stream",
-  "stream_options",
-  "tools",
-  "tool_choice",
-  "presence_penalty",
-  "frequency_penalty",
-  "n",
-  "stop",
-  "seed",
-  "response_format",
-  "reasoning",
-  "reasoning_effort",
-]);
+import {
+  QODER_BASE_URL,
+  QODER_REFRESH_PATH,
+  QODER_CHAT_PATH,
+  QODER_ACCESS_TTL_MS,
+  QODER_REFRESH_BUFFER_SECONDS,
+  SUPPORTED_QODER_PARAMS,
+} from "./constants.js";
 
 export class QoderProvider implements Provider {
   public name = "qoder";
@@ -71,7 +52,7 @@ export class QoderProvider implements Provider {
 
     const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(body)) {
-      if (supportedQoderParams.has(key) && value !== undefined && value !== null) {
+      if (SUPPORTED_QODER_PARAMS.has(key) && value !== undefined && value !== null) {
         payload[key] = value;
       }
     }
