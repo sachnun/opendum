@@ -1,5 +1,6 @@
 import type { Provider, ProviderRequestOptions } from "./base.js";
 import type { ModelRegistry } from "../registry/registry.js";
+import { convertImageURLsToBase64 } from "./images.js";
 
 const supportedWorkersAIParams = new Set([
   "model",
@@ -47,6 +48,9 @@ export class WorkersAIProvider implements Provider {
     }
     payload.model = upstreamModel;
     payload.stream = stream;
+    if (Array.isArray(payload.messages)) {
+      payload.messages = await convertImageURLsToBase64(payload.messages);
+    }
 
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
 
