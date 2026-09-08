@@ -84,3 +84,5 @@ export class ClineProvider implements Provider {
     });
   }
 }
+
+export default ClineProvider;

@@ -71,3 +71,5 @@ export class QoderProvider implements Provider {
     });
   }
 }
+
+export default QoderProvider;

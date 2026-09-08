@@ -59,3 +59,5 @@ export class OpencodeProvider implements Provider {
     });
   }
 }
+
+export default OpencodeProvider;

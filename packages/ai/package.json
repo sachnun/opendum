@@ -9,7 +9,7 @@
     ".": "./src/index.ts",
     "./protocol": "./src/protocol/index.ts",
     "./registry": "./src/registry/index.ts",
-    "./providers": "./src/providers/index.ts"
+    "./providers": "./src/providers/registry.ts"
   },
   "dependencies": {
     "eventsource-parser": "^3.1.0"
