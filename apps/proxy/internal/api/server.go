@@ -36,6 +36,11 @@ func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy
 		AllowCredentials: true,
 	}))
 
+	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/v1", http.StatusPermanentRedirect)
 	})

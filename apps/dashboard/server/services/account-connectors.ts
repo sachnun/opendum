@@ -73,7 +73,7 @@ async function validateProviderApiKey(provider: ApiKeyProviderKey, apiKey: strin
     }
     return { success: true, data: undefined };
   } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate external provider API keys. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate external provider API keys. Set NUXT_PUBLIC_PROXY_URL to your proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: `${label} API key validation timed out. Please try again.` };
     return { success: false, error: `Unable to validate ${label} API key. Please check your network and try again.` };
   } finally {
@@ -129,7 +129,7 @@ async function connectQoderPATAccount(userId: string, pat: string, accountName?:
     }
     exchange = await response.json().catch(() => ({}));
   } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Qoder API keys. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Qoder API keys. Set NUXT_PUBLIC_PROXY_URL to your proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Qoder API key validation timed out. Please try again." };
     return { success: false, error: "Unable to validate Qoder API key. Please check your network and try again." };
   } finally {
@@ -209,7 +209,7 @@ async function connectCloudflare(userId: string, apiToken: string, cfAccountId: 
       return { success: false, error: `Unable to validate Cloudflare credentials (HTTP ${response.status}). Please try again.` };
     }
   } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Cloudflare credentials. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Cloudflare credentials. Set NUXT_PUBLIC_PROXY_URL to your proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Cloudflare validation timed out. Please try again." };
     return { success: false, error: "Unable to validate Cloudflare credentials. Please check your network and try again." };
   } finally {
