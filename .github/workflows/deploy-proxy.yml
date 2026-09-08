@@ -44,14 +44,17 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          go-version-file: apps/proxy/go.mod
-          cache-dependency-path: apps/proxy/go.sum
+          node-version: 22
+          cache: npm
 
-      - name: Test proxy
-        run: go -C apps/proxy test ./...
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck proxy
+        run: npm run typecheck --workspace @opendum/proxy
 
       - name: Validate Koyeb configuration
         run: |

@@ -20,7 +20,7 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 const PROXY_PROVIDER_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../apps/proxy/internal/providers/google_code_assist.go"
+  "../packages/ai/src/providers/antigravity-constants.ts"
 );
 const DASHBOARD_CONSTANTS_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -28,7 +28,7 @@ const DASHBOARD_CONSTANTS_PATH = resolve(
 );
 
 const PROXY_USER_AGENT_REGEX =
-  /((?:const\s+antigravityUserAgent\s*=\s*"antigravity\/))(\d+\.\d+\.\d+)(\s+")/;
+  /((?:export\s+const\s+ANTIGRAVITY_USER_AGENT\s*=\s*"antigravity\/))(\d+\.\d+\.\d+)(\s*";)/;
 const DASHBOARD_USER_AGENT_REGEX =
   /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 

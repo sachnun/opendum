@@ -4,18 +4,19 @@
   "private": true,
   "packageManager": "npm@11.14.1",
   "workspaces": [
+    "packages/*",
     "apps/*"
   ],
   "scripts": {
     "dev:dashboard": "npm run dev --workspace @opendum/dashboard",
-    "dev:proxy": "TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy",
+    "dev:proxy": "npm run dev --workspace @opendum/proxy",
     "dev": "(npm run dev:dashboard & npm run dev:proxy)",
     "build:dashboard": "npm run build --workspace @opendum/dashboard",
-    "build:proxy": "go -C apps/proxy build ./...",
+    "build:proxy": "npm run build --workspace @opendum/proxy",
     "build": "npm run build:dashboard && npm run build:proxy",
-    "db:push": "npm run db:push --workspace @opendum/dashboard",
-    "db:studio": "npm run db:studio --workspace @opendum/dashboard",
-    "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./...",
+    "db:push": "npm run db:push --workspace @opendum/database",
+    "db:studio": "npm run db:studio --workspace @opendum/database",
+    "lint": "npm run lint --workspace @opendum/dashboard && npm run typecheck --workspace @opendum/proxy",
     "models:refresh": "node scripts/models.mjs"
   },
   "devDependencies": {

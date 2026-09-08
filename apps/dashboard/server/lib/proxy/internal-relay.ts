@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createInternalSignature } from "@opendum/database";
 
 type InternalRelayInit = Omit<RequestInit, "headers" | "body"> & {
   headers?: HeadersInit;
@@ -27,7 +27,7 @@ function getProxyBaseUrl() {
 function internalSignature(path: string, timestamp: string, body: string): string {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret) throw new Error("BETTER_AUTH_SECRET is required for internal proxy calls.");
-  return createHmac("sha256", secret).update(`${timestamp}\n${path}\n${body}`).digest("hex");
+  return createInternalSignature(secret, path, timestamp, body);
 }
 
 async function fetchInternal(path: "/internal/refresh" | "/internal/quota", payload: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {

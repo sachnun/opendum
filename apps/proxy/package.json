@@ -1,0 +1,27 @@
+{
+  "name": "@opendum/proxy",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -b",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "@opendum/ai": "*",
+    "@opendum/database": "*",
+    "@paralleldrive/cuid2": "^3.3.0",
+    "dotenv": "^17.4.2",
+    "eventsource-parser": "^3.1.0",
+    "hono": "^4.7.4",
+    "redis": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.19.3",
+    "typescript": "^6.0.3"
+  }
+}
