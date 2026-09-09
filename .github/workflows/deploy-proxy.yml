@@ -35,16 +35,16 @@ jobs:
     environment:
       name: proxy
     env:
-      KOYEB_APP: ${{ vars.KOYEB_APP || 'opendum-proxy' }}
-      KOYEB_SERVICE: ${{ vars.KOYEB_SERVICE || 'proxy' }}
-      KOYEB_REGION: ${{ vars.KOYEB_REGION || 'fra' }}
-      KOYEB_INSTANCE_TYPE: ${{ vars.KOYEB_INSTANCE_TYPE || 'free' }}
-      KOYEB_ORG_ID: ${{ vars.KOYEB_ORG_ID || '527de4ee-1fdb-4d4b-a949-37019a024083' }}
+      KOYEB_APP: ${{ vars.KOYEB_APP }}
+      KOYEB_SERVICE: ${{ vars.KOYEB_SERVICE }}
+      KOYEB_REGION: ${{ vars.KOYEB_REGION }}
+      KOYEB_INSTANCE_TYPE: ${{ vars.KOYEB_INSTANCE_TYPE }}
+      KOYEB_ORG_ID: ${{ vars.KOYEB_ORG_ID }}
       KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: main
 
@@ -54,9 +54,9 @@ jobs:
           version: 10.5.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
