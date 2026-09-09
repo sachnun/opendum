@@ -1,9 +1,13 @@
 {
   "providers": [
     "opencode",
-    "zenmux"
+    "zenmux",
+    "cline"
   ],
   "providerConfig": {
+    "cline": {
+      "upstream": "cline-free/muse-spark-1.3-contributor"
+    },
     "opencode": {
       "upstream": "muse-spark-1.3-contributor-free",
       "responses_api": true
