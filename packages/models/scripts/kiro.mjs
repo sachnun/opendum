@@ -12,8 +12,7 @@
  * model IDs that the Kiro API may not accept for all accounts/regions.
  *
  * Usage:
- *   node scripts/kiro.mjs
- *   node scripts/kiro.mjs --dry-run
+ *   node packages/models/scripts/kiro.mjs
  */
 
 import { dirname, resolve } from "node:path";
@@ -337,7 +336,6 @@ function toCanonical(kiroModelId) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const dryRun = process.argv.includes("--dry-run");
   const verbose =
     process.argv.includes("--verbose") || process.argv.includes("-v");
 
@@ -355,7 +353,7 @@ async function main() {
       .map((m) => m.name)
   );
 
-  if (verbose || dryRun) {
+  if (verbose) {
     const freeModels = officialModels.filter((m) => !IGNORED_DISPLAY_NAMES.has(m.name) && m.freeAvailable);
     const paidModels = officialModels.filter((m) => paidOnlyDisplayNames.has(m.name));
     console.log(`\n[kiro] Tier breakdown:`);
@@ -397,7 +395,7 @@ async function main() {
 
   console.log(`[kiro] Mapped to ${modelMap.size} canonical model keys.`);
 
-  if (verbose || dryRun) {
+  if (verbose) {
     console.log("\n[kiro] Model mapping (canonical → upstream):");
     for (const [key, upstream] of [...modelMap.entries()].sort(([a], [b]) =>
       a.localeCompare(b)
@@ -421,7 +419,7 @@ async function main() {
     }
   }
 
-  if (verbose || dryRun) {
+  if (verbose) {
     console.log("\n[kiro] Provider config by model (allowedTiers):");
     for (const [key, config] of [...providerConfigByModel.entries()].sort(([a], [b]) =>
       a.localeCompare(b)
@@ -431,14 +429,9 @@ async function main() {
     console.log();
   }
 
-  if (dryRun) {
-    console.log("[kiro] Dry run - no JSON files modified.");
-    return;
-  }
-
   // 6. Sync into JSON files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,

@@ -11,8 +11,7 @@
  * Source: https://antigravity.google/docs/models
  *
  * Usage:
- *   node scripts/antigravity-models.mjs
- *   node scripts/antigravity-models.mjs --dry-run
+ *   node packages/models/scripts/antigravity-models.mjs
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -30,8 +29,9 @@ const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "models");
+const packageDir = resolve(scriptDir, "..");
+const rootDir = resolve(scriptDir, "../../..");
+const modelsDir = resolve(packageDir, "data");
 
 const QUOTA_TS_PATH = resolve(
   rootDir,
@@ -523,90 +523,18 @@ function inferMetadata(modelKey) {
 // Sync JSON files
 // ---------------------------------------------------------------------------
 
-function syncJson(modelMap, providerConfigByModel, dryRun) {
-  if (dryRun) {
-    console.log("[antigravity] Dry run - no JSON files modified.");
-
-    const index = buildModelIndex(modelsDir);
-    const wouldRemove = [];
-    const wouldKeep = [];
-
-    for (const [modelId, entry] of Object.entries(index)) {
-      const publicId = entry.id || modelId;
-      const providers = entry.data.providers || [];
-      if (!providers.includes(PROVIDER_NAME)) continue;
-
-      if (modelMap.has(modelId) || modelMap.has(publicId)) {
-        wouldKeep.push(publicId);
-      } else {
-        wouldRemove.push(publicId);
-      }
-    }
-
-    const wouldAdd = [];
-    const wouldUpdate = [];
-    for (const [key, upstream] of modelMap.entries()) {
-      const existing = findModelEntry(index, key);
-      if (!existing) {
-        // Don't propose adding antigravity to an existing model that is
-        // ignored (e.g. an alias-only entry).
-        const ignored = Object.values(index).find(
-          (entry) =>
-            entry.data.ignored &&
-            (entry.fileId === key ||
-              entry.id === key ||
-              (entry.data.aliases || []).includes(key))
-        );
-        if (!ignored) {
-          wouldAdd.push(key);
-        }
-        continue;
-      }
-
-      if (!(existing.data.providers || []).includes(PROVIDER_NAME)) {
-        wouldAdd.push(key);
-        continue;
-      }
-
-      const cfg = existing.data.providerConfig?.[PROVIDER_NAME] || {};
-      const extraConfig = providerConfigByModel.get(key) || {};
-      const existingUpstream = getExistingProviderUpstream(existing, PROVIDER_NAME);
-      if (
-        existingUpstream !== upstream ||
-        MANAGED_PROVIDER_CONFIG_KEYS.some((managedKey) => JSON.stringify(cfg[managedKey]) !== JSON.stringify(extraConfig[managedKey]))
-      ) {
-        wouldUpdate.push(key);
-      }
-    }
-
-    if (wouldRemove.length > 0) {
-      console.log(`  Would REMOVE antigravity from: ${wouldRemove.join(", ")}`);
-    }
-    if (wouldAdd.length > 0) {
-      console.log(`  Would ADD antigravity to: ${wouldAdd.join(", ")}`);
-    }
-    if (wouldUpdate.length > 0) {
-      console.log(`  Would UPDATE antigravity config for: ${wouldUpdate.join(", ")}`);
-    }
-    if (wouldKeep.length > 0) {
-      console.log(`  Would KEEP: ${wouldKeep.join(", ")}`);
-    }
-
-    return { added: wouldAdd, removed: wouldRemove, updated: wouldUpdate };
-  }
-
+function syncJson(modelMap, providerConfigByModel) {
   return syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,
     managedProviderConfigKeys: MANAGED_PROVIDER_CONFIG_KEYS,
   });
-  return { ...result, modelMap };
 }
 
 // ---------------------------------------------------------------------------
 // Update quota.ts
 // ---------------------------------------------------------------------------
 
-function updateQuotaTs(modelMap, dryRun) {
+function updateQuotaTs(modelMap) {
   const source = readFileSync(QUOTA_TS_PATH, "utf-8");
   let updated = source;
   const index = buildModelIndex(modelsDir);
@@ -647,12 +575,8 @@ function updateQuotaTs(modelMap, dryRun) {
   updated = replaceConstRecord(updated, "API_TO_USER_MODEL_MAP", apiToUser);
 
   if (updated !== source) {
-    if (dryRun) {
-      console.log("[antigravity] Would update quota.ts model maps");
-    } else {
-      writeFileSync(QUOTA_TS_PATH, updated);
-      console.log("[antigravity] Updated quota.ts model maps");
-    }
+    writeFileSync(QUOTA_TS_PATH, updated);
+    console.log("[antigravity] Updated quota.ts model maps");
   } else {
     console.log("[antigravity] quota.ts already up to date.");
   }
@@ -683,7 +607,6 @@ function escapeRegex(str) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const dryRun = process.argv.includes("--dry-run");
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
 
   console.log("[antigravity] Fetching official Antigravity model docs ...");
@@ -715,7 +638,7 @@ async function main() {
       `and preserved ${extras.length} JSON-configured extras.`
   );
 
-  if (verbose || dryRun) {
+  if (verbose) {
     console.log("\n[antigravity] Documented model mapping (display → canonical → upstream):");
     for (const entry of discovered) {
       const upstream = entry.key === entry.upstream ? entry.key : `${entry.key} → ${entry.upstream}`;
@@ -730,9 +653,9 @@ async function main() {
     console.log();
   }
 
-  const result = syncJson(modelMap, providerConfigByModel, dryRun);
+  const result = syncJson(modelMap, providerConfigByModel);
 
-  if (!dryRun && (result.added.length > 0 || result.updated.length > 0)) {
+  if (result.added.length > 0 || result.updated.length > 0) {
     enrichModelMetadata(result, documentedModelKeys);
   }
 
@@ -755,7 +678,7 @@ async function main() {
   }
 
   console.log();
-  updateQuotaTs(modelMap, dryRun);
+  updateQuotaTs(modelMap);
 }
 
 main().catch((error) => {

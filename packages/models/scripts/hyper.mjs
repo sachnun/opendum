@@ -109,7 +109,7 @@ async function fetchHyperModels() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const models = await fetchHyperModels();
   const modelMap = buildModelMap(models);

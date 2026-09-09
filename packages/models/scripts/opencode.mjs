@@ -155,7 +155,7 @@ function buildProviderConfigByModel(modelMap, endpointByModelId) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const { freeModelIds, endpointByModelId } = await fetchOpencodeFreeModelIds();
   const modelMap = buildModelMap(freeModelIds);

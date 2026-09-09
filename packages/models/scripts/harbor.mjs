@@ -82,7 +82,7 @@ async function fetchHarborFreeModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const modelIds = await fetchHarborFreeModelIds();
   const modelMap = buildModelMap(modelIds);

@@ -8,7 +8,6 @@ on:
       - .github/workflows/deploy-dashboard.yml
       - apps/dashboard/**
       - packages/**
-      - models/**
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml

@@ -13,9 +13,9 @@ function resolveModelsDir(): string {
   }
 
   const candidates = [
+    resolve(process.cwd(), "packages/models/data"),
+    resolve(process.cwd(), "../../packages/models/data"),
     resolve(process.cwd(), "models"),
-    resolve(process.cwd(), "../../models"),
-    resolve(process.cwd(), "packages/ai/models"),
   ];
 
   for (const candidate of candidates) {
@@ -24,7 +24,7 @@ function resolveModelsDir(): string {
     }
   }
 
-  return resolve(process.cwd(), "models");
+  return resolve(process.cwd(), "packages/models/data");
 }
 
 export const config = {

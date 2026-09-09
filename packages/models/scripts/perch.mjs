@@ -94,7 +94,7 @@ function buildModelMap(docNames) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const docNames = await fetchStarterPoolNames();
   const modelMap = buildModelMap(docNames);

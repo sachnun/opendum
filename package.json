@@ -13,7 +13,7 @@
     "db:push": "pnpm --filter @opendum/database db:push",
     "db:studio": "pnpm --filter @opendum/database db:studio",
     "lint": "pnpm --filter @opendum/dashboard lint && pnpm --filter @opendum/proxy typecheck",
-    "models:refresh": "node scripts/models.mjs"
+    "models:refresh": "pnpm --filter @opendum/models refresh"
   },
   "devDependencies": {
     "edgeone": "^1.6.34",

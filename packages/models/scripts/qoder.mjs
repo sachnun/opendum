@@ -97,7 +97,7 @@ function buildModelMap(catalog) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const catalog = await fetchQoderCatalog();
   const modelMap = buildModelMap(catalog);
