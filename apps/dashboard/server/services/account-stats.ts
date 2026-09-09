@@ -1,7 +1,6 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
-import { db } from "../lib/db";
-import { providerAccount, usageLog } from "../lib/db/schema";
+import { db, providerAccount, usageLog  } from "@opendum/database";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
 
 const PROVIDER_STATS_DAYS = 30;

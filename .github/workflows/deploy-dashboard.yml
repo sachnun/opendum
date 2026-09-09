@@ -7,9 +7,10 @@ on:
     paths:
       - .github/workflows/deploy-dashboard.yml
       - apps/dashboard/**
-      - models/**
+      - packages/**
       - package.json
-      - package-lock.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -40,18 +41,22 @@ jobs:
         with:
           ref: main
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.5.2
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Deploy dashboard to EdgeOne Pages
         working-directory: apps/dashboard
-        run: npm run deploy -- -t "$EDGEONE_API_TOKEN" -e production
+        run: pnpm run deploy -- -t "$EDGEONE_API_TOKEN" -e production
         env:
           EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}

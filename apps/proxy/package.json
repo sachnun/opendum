@@ -1,0 +1,29 @@
+{
+  "name": "@opendum/proxy",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/main.js --external:redis --external:pg --external:@hono/node-server --external:drizzle-orm --external:dotenv --external:@paralleldrive/cuid2 --external:eventsource-parser --external:hono",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "@opendum/ai": "workspace:*",
+    "@opendum/database": "workspace:*",
+    "@paralleldrive/cuid2": "^3.3.0",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "eventsource-parser": "^3.1.0",
+    "hono": "^4.7.4",
+    "redis": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.19.3",
+    "typescript": "^6.0.3"
+  }
+}

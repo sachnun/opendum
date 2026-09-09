@@ -7,7 +7,10 @@ on:
     paths:
       - .github/workflows/deploy-proxy.yml
       - apps/proxy/**
-      - models/**
+      - packages/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -44,14 +47,22 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Go
-        uses: actions/setup-go@v7
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
         with:
-          go-version-file: apps/proxy/go.mod
-          cache-dependency-path: apps/proxy/go.sum
+          version: 10.5.2
 
-      - name: Test proxy
-        run: go -C apps/proxy test ./...
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck proxy
+        run: pnpm --filter @opendum/proxy typecheck
 
       - name: Validate Koyeb configuration
         run: |

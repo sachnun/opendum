@@ -1,9 +1,7 @@
 import { and, asc, desc, eq, inArray, lte, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "../lib/db";
-import { providerAccount, proxyApiKey, proxyApiKeyRateLimit, usageLog } from "../lib/db/schema";
-import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
+import { db, providerAccount, proxyApiKey, proxyApiKeyRateLimit, usageLog , decrypt, encrypt, generateApiKey, getKeyPreview, hashString  } from "@opendum/database";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "../lib/proxy/authless-providers";
 import { getAllFamilies, getAllModels, getModelFamily, isModelSupported, resolveModelAlias } from "../lib/proxy/models";

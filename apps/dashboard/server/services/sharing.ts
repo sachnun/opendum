@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import { db } from "../lib/db";
-import { userSharingSetting } from "../lib/db/schema";
+import { db, userSharingSetting  } from "@opendum/database";
 
 export async function getUserSharingEnabled(userId: string): Promise<boolean> {
   const [setting] = await db

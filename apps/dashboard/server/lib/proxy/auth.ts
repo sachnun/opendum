@@ -1,7 +1,6 @@
 import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 
-import { db } from "../db/index.js";
-import { providerAccount, providerAccountDisabledModel } from "../db/schema.js";
+import { db, providerAccount, providerAccountDisabledModel } from "@opendum/database";
 import { getRedisClient } from "../redis.js";
 import {
   getAuthlessProviderModels,
