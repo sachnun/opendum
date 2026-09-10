@@ -15,6 +15,7 @@ import { PROVIDER_ACCOUNT_KEYS } from "../../services/account-providers";
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";
 const DISABLED_MODELS_PREFIX = "opendum:user:disabled-models";
+const REFRESH_FAIL_COUNT_PREFIX = "opendum:provider-account:refresh-fail-count";
 
 function getApiKeyValidationCacheKey(keyHash: string): string {
   return `${VALIDATION_PREFIX}:${keyHash}`;
@@ -58,6 +59,15 @@ export async function invalidateDisabledModelsCache(userId: string): Promise<voi
     await redis.del(getDisabledModelsCacheKey(userId));
   } catch {
     // Ignore cache invalidation failures.
+  }
+}
+
+export async function clearRefreshFailCount(accountId: string): Promise<void> {
+  try {
+    const redis = await getRedisClient();
+    await redis.del(`${REFRESH_FAIL_COUNT_PREFIX}:${accountId}`);
+  } catch {
+    return;
   }
 }
 

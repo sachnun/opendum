@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../lib/db";
 import { providerAccount } from "../lib/db/schema";
 import { encrypt, hashString } from "../lib/encryption";
+import { clearRefreshFailCount } from "../lib/proxy/auth";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { getProviderModelMap } from "../lib/proxy/models";
 import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/constants";
@@ -94,6 +95,7 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
@@ -172,6 +174,7 @@ async function connectQoderPATAccount(userId: string, pat: string, accountName?:
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "qoder"), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(accessToken), refreshToken: encrypt(refreshToken), expiresAt, accountId: packedAccountId, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
@@ -221,6 +224,7 @@ async function connectCloudflare(userId: string, apiToken: string, cfAccountId: 
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "workers_ai"), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiToken), refreshToken: encrypt(normalizedApiToken), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, accountId: normalizedAccountId, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
