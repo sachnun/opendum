@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+
+overrides:
+  postcss: ^8.5.28
+  typescript-eslint: ^8.62.1
+  '@typescript-eslint/eslint-plugin': ^8.62.1
+  '@typescript-eslint/parser': ^8.62.1
+
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  vue-demi: true
