@@ -661,10 +661,10 @@ func hyperGroups(payload map[string]any) []quotaGroupDisplay {
 	balance, hasBalance := parseQuotaNumber(payload["balance"])
 	if !hasBalance {
 		label := "active"
-		return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance (USD)", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
+		return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
 	}
 	// 1 hypercredit = $0.05
 	usd := balance * 0.05
 	label := fmt.Sprintf("$%.2f", usd)
-	return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance (USD)", Models: []string{}, RemainingFraction: 1, RemainingRequests: usd, MaxRequests: usd, UsedRequests: 0, PercentUsed: 0, IsExhausted: balance <= 0, IsEstimated: true, Confidence: "medium", RemainingLabel: &label}}
+	return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: usd, MaxRequests: usd, UsedRequests: 0, PercentUsed: 0, IsExhausted: balance <= 0, IsEstimated: true, Confidence: "medium", RemainingLabel: &label}}
 }
