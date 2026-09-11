@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uptrace/bun"
-
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 )
@@ -197,13 +195,13 @@ func (s *Service) DisabledModelSetForUser(ctx context.Context, userID string) (m
 		return toSet(cached), nil
 	}
 
-	var rows []appdb.DisabledModel
-	if err := s.db.NewSelect().Model(&rows).Column("model").Where("\"userId\" = ?", userID).Scan(ctx); err != nil {
+	rows, err := s.db.ListDisabledModelsByUser(ctx, userID)
+	if err != nil {
 		return nil, err
 	}
 	modelList := make([]string, 0, len(rows))
 	for _, row := range rows {
-		modelList = append(modelList, s.registry.ResolveAlias(row.Model))
+		modelList = append(modelList, s.registry.ResolveAlias(row))
 	}
 	modelList = s.normalizeModelList(modelList)
 	_ = s.setCachedDisabledModels(ctx, userID, modelList)
@@ -251,8 +249,9 @@ func (s *Service) GetAccountModelAvailabilityWithSharing(ctx context.Context, us
 		}
 	}
 
-	var accounts []appdb.ProviderAccount
-	if err := s.db.NewSelect().Model(&accounts).Column("id", "provider", "tier").Where("\"userId\" = ? AND \"isActive\" = TRUE", userID).Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", time.Now()).Scan(ctx); err != nil {
+	now := time.Now()
+	accounts, err := s.db.ListActiveAccountTiers(ctx, appdb.ListActiveAccountTiersParams{UserID: userID, DisabledUntil: &now})
+	if err != nil {
 		return availability, err
 	}
 
@@ -270,8 +269,8 @@ func (s *Service) GetAccountModelAvailabilityWithSharing(ctx context.Context, us
 	}
 
 	if len(accountIDs) > 0 {
-		var disabledRows []appdb.ProviderAccountDisabledModel
-		if err := s.db.NewSelect().Model(&disabledRows).Column("providerAccountId", "model").Where("\"providerAccountId\" IN (?)", bun.In(accountIDs)).Scan(ctx); err != nil {
+		disabledRows, err := s.db.ListDisabledModelsByAccounts(ctx, accountIDs)
+		if err != nil {
 			return availability, err
 		}
 		for _, row := range disabledRows {
@@ -288,8 +287,8 @@ func (s *Service) GetAccountModelAvailabilityWithSharing(ctx context.Context, us
 		return availability, nil
 	}
 
-	var sharedAccounts []appdb.ProviderAccount
-	if err := s.db.NewSelect().Model((*appdb.ProviderAccount)(nil)).Column("provider_account.id", "provider_account.provider", "provider_account.tier").Join("JOIN user_sharing_setting ON user_sharing_setting.\"userId\" = provider_account.\"userId\"").Where("provider_account.\"userId\" != ?", userID).Where("user_sharing_setting.enabled = TRUE").Where("provider_account.\"isActive\" = TRUE").Where("(provider_account.\"disabledUntil\" IS NULL OR provider_account.\"disabledUntil\" <= ?)", time.Now()).Scan(ctx, &sharedAccounts); err != nil {
+	sharedAccounts, err := s.db.ListSharedAccounts(ctx, appdb.ListSharedAccountsParams{UserID: userID, DisabledUntil: &now})
+	if err != nil {
 		return availability, err
 	}
 	sharedAccountProvider := map[string]string{}
@@ -303,8 +302,8 @@ func (s *Service) GetAccountModelAvailabilityWithSharing(ctx context.Context, us
 		}
 	}
 	if len(sharedAccountIDs) > 0 {
-		var sharedDisabledRows []appdb.ProviderAccountDisabledModel
-		if err := s.db.NewSelect().Model(&sharedDisabledRows).Column("providerAccountId", "model").Where("\"providerAccountId\" IN (?)", bun.In(sharedAccountIDs)).Scan(ctx); err != nil {
+		sharedDisabledRows, err := s.db.ListDisabledModelsByAccounts(ctx, sharedAccountIDs)
+		if err != nil {
 			return availability, err
 		}
 		for _, row := range sharedDisabledRows {

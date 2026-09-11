@@ -14,7 +14,7 @@ import {
   usageLog,
   pointTransaction,
   disabledModel,
-} from "./schema.js";
+} from "./schema/index.js";
 
 export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),
@@ -104,7 +104,7 @@ export const proxyApiKeyRateLimitRelations = relations(
   }),
 );
 
-export const usageLogRelations = relations(usageLog, ({ one }) => ({
+export const usageLogRelations = relations(usageLog, ({ one, many }) => ({
   user: one(user, {
     fields: [usageLog.userId],
     references: [user.id],
@@ -117,6 +117,7 @@ export const usageLogRelations = relations(usageLog, ({ one }) => ({
     fields: [usageLog.proxyApiKeyId],
     references: [proxyApiKey.id],
   }),
+  pointTransactions: many(pointTransaction),
 }));
 
 export const pointTransactionRelations = relations(

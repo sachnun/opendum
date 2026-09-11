@@ -2,8 +2,7 @@ import { and, asc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDashboardQuery, requireMaintenerContext } from "../../../../utils/api";
-import { db } from "../../../../lib/db";
-import { providerAccount, proxyApiKey, user } from "../../../../lib/db/schema";
+import { db, providerAccount, proxyApiKey, user } from "@opendum/database";
 import { getAccountIndicator } from "../../../../services/account-stats";
 import { PROVIDER_ACCOUNT_KEYS } from "../../../../services/account-providers";
 

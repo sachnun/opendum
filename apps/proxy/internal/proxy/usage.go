@@ -39,7 +39,7 @@ func (s *Service) logUsage(ctx context.Context, params usageParams) {
 	}
 	status := params.StatusCode
 	duration := params.DurationMS
-	row := appdb.UsageLog{
+	err := s.db.InsertUsageLog(ctx, appdb.InsertUsageLogParams{
 		ID:                appdb.NewID(),
 		UserID:            params.UserID,
 		ProviderAccountID: providerAccountID,
@@ -50,8 +50,8 @@ func (s *Service) logUsage(ctx context.Context, params usageParams) {
 		StatusCode:        &status,
 		Duration:          &duration,
 		CreatedAt:         now,
-	}
-	if _, err := s.db.NewInsert().Model(&row).Exec(ctx); err == nil {
+	})
+	if err == nil {
 		go s.auth.BumpAnalyticsCacheVersionThrottled(context.Background(), params.UserID)
 	}
 }

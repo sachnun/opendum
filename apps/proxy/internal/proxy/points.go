@@ -2,12 +2,11 @@ package proxy
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/uptrace/bun"
+	"github.com/jackc/pgx/v5"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
@@ -35,43 +34,48 @@ func (s *Service) reserveRoamingPoint(ctx context.Context, userID string) (*poin
 	}
 	now := time.Now()
 
-	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := ensurePointBalanceTx(ctx, tx, userID, now); err != nil {
-			return err
+	tx, err := s.db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
 		}
+	}()
+	q := s.db.WithTx(tx)
+	if err := ensurePointBalanceTx(ctx, q, userID, now); err != nil {
+		return nil, false, err
+	}
 
-		var balanceAfter int
-		err := tx.NewRaw(
-			`UPDATE user_point_balance SET balance = balance - ?, "updatedAt" = ? WHERE "userId" = ? AND balance >= ? RETURNING balance`,
-			reservation.Amount,
-			now,
-			userID,
-			reservation.Amount,
-		).Scan(ctx, &balanceAfter)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return errInsufficientPoints
-			}
-			return err
-		}
-
-		transaction := appdb.PointTransaction{
-			ID:           reservation.DebitID,
-			UserID:       userID,
-			Amount:       -reservation.Amount,
-			Type:         "roaming_debit",
-			BalanceAfter: balanceAfter,
-			CreatedAt:    now,
-		}
-		_, err = tx.NewInsert().Model(&transaction).Exec(ctx)
-		return err
+	balanceAfter, err := q.DebitPointBalance(ctx, appdb.DebitPointBalanceParams{
+		Balance:   reservation.Amount,
+		UpdatedAt: now,
+		UserID:    userID,
 	})
 	if err != nil {
-		if errors.Is(err, errInsufficientPoints) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
+
+	err = q.InsertPointTransaction(ctx, appdb.InsertPointTransactionParams{
+		ID:           reservation.DebitID,
+		UserID:       userID,
+		Amount:       -reservation.Amount,
+		Type:         "roaming_debit",
+		BalanceAfter: balanceAfter,
+		CreatedAt:    now,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, false, err
+	}
+	committed = true
 
 	return reservation, true, nil
 }
@@ -84,41 +88,58 @@ func (s *Service) refundRoamingPoint(ctx context.Context, reservation *pointRese
 	now := time.Now()
 	idempotencyKey := "roaming_refund:" + reservation.DebitID
 
-	_ = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := ensurePointBalanceTx(ctx, tx, reservation.UserID, now); err != nil {
+	_ = func() error {
+		tx, err := s.db.Pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_ = tx.Rollback(ctx)
+			}
+		}()
+		q := s.db.WithTx(tx)
+		if err := ensurePointBalanceTx(ctx, q, reservation.UserID, now); err != nil {
 			return err
 		}
 
-		transaction := appdb.PointTransaction{
-			ID:             appdb.NewID(),
+		transactionID := appdb.NewID()
+		affected, err := q.InsertPointTransactionOnConflictDoNothing(ctx, appdb.InsertPointTransactionOnConflictDoNothingParams{
+			ID:             transactionID,
 			UserID:         reservation.UserID,
 			Amount:         reservation.Amount,
 			Type:           "roaming_refund",
 			BalanceAfter:   0,
 			IdempotencyKey: &idempotencyKey,
 			CreatedAt:      now,
-		}
-		result, err := tx.NewInsert().Model(&transaction).On("CONFLICT (\"idempotencyKey\") DO NOTHING").Exec(ctx)
+		})
 		if err != nil {
 			return err
 		}
-		if rows, _ := result.RowsAffected(); rows == 0 {
-			return nil
+		if affected == 0 {
+			committed = true
+			return tx.Commit(ctx)
 		}
 
-		var balanceAfter int
-		if err := tx.NewRaw(
-			`UPDATE user_point_balance SET balance = balance + ?, "updatedAt" = ? WHERE "userId" = ? RETURNING balance`,
-			reservation.Amount,
-			now,
-			reservation.UserID,
-		).Scan(ctx, &balanceAfter); err != nil {
+		balanceAfter, err := q.CreditPointBalance(ctx, appdb.CreditPointBalanceParams{
+			Balance:   reservation.Amount,
+			UpdatedAt: now,
+			UserID:    reservation.UserID,
+		})
+		if err != nil {
 			return err
 		}
 
-		_, err = tx.NewUpdate().Model((*appdb.PointTransaction)(nil)).Set("\"balanceAfter\" = ?", balanceAfter).Where("id = ?", transaction.ID).Exec(ctx)
-		return err
-	})
+		if err := q.UpdatePointTransactionBalance(ctx, appdb.UpdatePointTransactionBalanceParams{
+			BalanceAfter: balanceAfter,
+			ID:           transactionID,
+		}); err != nil {
+			return err
+		}
+		committed = true
+		return tx.Commit(ctx)
+	}()
 }
 
 func (s *Service) creditSharingPoint(ctx context.Context, ownerUserID, debitID string, amount int) {
@@ -128,53 +149,74 @@ func (s *Service) creditSharingPoint(ctx context.Context, ownerUserID, debitID s
 
 	now := time.Now()
 	idempotencyKey := "sharing_credit:" + debitID
-	_ = s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := ensurePointBalanceTx(ctx, tx, ownerUserID, now); err != nil {
+	_ = func() error {
+		tx, err := s.db.Pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_ = tx.Rollback(ctx)
+			}
+		}()
+		q := s.db.WithTx(tx)
+		if err := ensurePointBalanceTx(ctx, q, ownerUserID, now); err != nil {
 			return err
 		}
 
-		transaction := appdb.PointTransaction{
-			ID:             appdb.NewID(),
+		transactionID := appdb.NewID()
+		affected, err := q.InsertPointTransactionOnConflictDoNothing(ctx, appdb.InsertPointTransactionOnConflictDoNothingParams{
+			ID:             transactionID,
 			UserID:         ownerUserID,
 			Amount:         amount,
 			Type:           "sharing_credit",
 			BalanceAfter:   0,
 			IdempotencyKey: &idempotencyKey,
 			CreatedAt:      now,
-		}
-		result, err := tx.NewInsert().Model(&transaction).On("CONFLICT (\"idempotencyKey\") DO NOTHING").Exec(ctx)
+		})
 		if err != nil {
 			return err
 		}
-		if rows, _ := result.RowsAffected(); rows == 0 {
-			return nil
+		if affected == 0 {
+			committed = true
+			return tx.Commit(ctx)
 		}
 
-		var balanceAfter int
-		if err := tx.NewRaw(
-			`UPDATE user_point_balance SET balance = balance + ?, "updatedAt" = ? WHERE "userId" = ? RETURNING balance`,
-			amount,
-			now,
-			ownerUserID,
-		).Scan(ctx, &balanceAfter); err != nil {
+		balanceAfter, err := q.CreditPointBalance(ctx, appdb.CreditPointBalanceParams{
+			Balance:   amount,
+			UpdatedAt: now,
+			UserID:    ownerUserID,
+		})
+		if err != nil {
 			return err
 		}
 
-		_, err = tx.NewUpdate().Model((*appdb.PointTransaction)(nil)).Set("\"balanceAfter\" = ?", balanceAfter).Where("id = ?", transaction.ID).Exec(ctx)
-		return err
-	})
+		if err := q.UpdatePointTransactionBalance(ctx, appdb.UpdatePointTransactionBalanceParams{
+			BalanceAfter: balanceAfter,
+			ID:           transactionID,
+		}); err != nil {
+			return err
+		}
+		committed = true
+		return tx.Commit(ctx)
+	}()
 }
 
-func ensurePointBalanceTx(ctx context.Context, tx bun.Tx, userID string, now time.Time) error {
-	balance := appdb.UserPointBalance{UserID: userID, Balance: initialPointBalance, CreatedAt: now, UpdatedAt: now}
-	result, err := tx.NewInsert().Model(&balance).On("CONFLICT (\"userId\") DO NOTHING").Exec(ctx)
+func ensurePointBalanceTx(ctx context.Context, q *appdb.Queries, userID string, now time.Time) error {
+	affected, err := q.InsertPointBalanceOnConflictDoNothing(ctx, appdb.InsertPointBalanceOnConflictDoNothingParams{
+		UserID:    userID,
+		Balance:   initialPointBalance,
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
 	if err != nil {
 		return err
 	}
 
-	if rows, _ := result.RowsAffected(); rows > 0 {
+	if affected > 0 {
 		idempotencyKey := fmt.Sprintf("initial:%s", userID)
-		transaction := appdb.PointTransaction{
+		_, err = q.InsertPointTransactionOnConflictDoNothing(ctx, appdb.InsertPointTransactionOnConflictDoNothingParams{
 			ID:             appdb.NewID(),
 			UserID:         userID,
 			Amount:         initialPointBalance,
@@ -182,8 +224,7 @@ func ensurePointBalanceTx(ctx context.Context, tx bun.Tx, userID string, now tim
 			BalanceAfter:   initialPointBalance,
 			IdempotencyKey: &idempotencyKey,
 			CreatedAt:      now,
-		}
-		_, err = tx.NewInsert().Model(&transaction).On("CONFLICT (\"idempotencyKey\") DO NOTHING").Exec(ctx)
+		})
 		return err
 	}
 

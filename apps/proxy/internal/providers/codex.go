@@ -96,7 +96,7 @@ func (p codexProvider) MakeRequest(ctx context.Context, client *http.Client, acc
 		if accountID := extractAccountIDFromJWT(accessToken); accountID != "" {
 			account.AccountID = &accountID
 			if p.db != nil && account.ID != "" {
-				_, _ = p.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"accountId\" = ?", accountID).Where("id = ?", account.ID).Exec(ctx)
+				_ = p.db.UpdateCodexAccountID(ctx, appdb.UpdateCodexAccountIDParams{AccountID: &accountID, ID: account.ID})
 			}
 		}
 	}

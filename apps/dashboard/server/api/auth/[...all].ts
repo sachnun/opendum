@@ -1,5 +1,5 @@
 import { createAuth } from "../../../lib/auth";
-import { createRequestDb } from "../../lib/db";
+import { createRequestDb } from "@opendum/database";
 
 export default defineEventHandler(async (event) => {
   const { db, close } = await createRequestDb();

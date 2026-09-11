@@ -1,8 +1,7 @@
 import { and, count as countFn, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "../lib/db";
-import { providerAccount } from "../lib/db/schema";
+import { db, providerAccount } from "@opendum/database";
 import { encrypt, hashString } from "../lib/encryption";
 import { clearRefreshFailCount } from "../lib/proxy/auth";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";

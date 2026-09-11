@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
-import { db } from "../lib/db";
+import { db, pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "@opendum/database";
 import { getRedisClient } from "../lib/redis";
-import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "../lib/db/schema";
 import { getModelFamily, getModelLookupKeys, getProviderAccessRule, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
 import { clearRefreshFailCount, invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { decrypt } from "../lib/encryption";
