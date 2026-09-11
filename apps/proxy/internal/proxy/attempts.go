@@ -323,8 +323,8 @@ func sessionID(r *http.Request) string {
 				for _, m := range messages {
 					if msg, ok := m.(map[string]any); ok {
 						if role, ok := msg["role"].(string); ok && role == "user" {
-							if content, ok := msg["content"].(string); ok && len(strings.TrimSpace(content)) > 20 {
-								trimmed := strings.TrimSpace(content)
+							if text := sessionTextContent(msg["content"]); len(strings.TrimSpace(text)) > 20 {
+								trimmed := strings.TrimSpace(text)
 								if len(trimmed) > 100 {
 									trimmed = trimmed[:100]
 								}
@@ -335,8 +335,44 @@ func sessionID(r *http.Request) string {
 					}
 				}
 			}
+			// Same fallback for Responses API input when messages are absent
+			if input, ok := body["input"].([]any); ok && len(input) > 0 {
+				for _, raw := range input {
+					if item, ok := raw.(map[string]any); ok && stringValue(item["role"]) == "user" {
+						if text := sessionTextContent(item["content"]); len(strings.TrimSpace(text)) > 20 {
+							trimmed := strings.TrimSpace(text)
+							if len(trimmed) > 100 {
+								trimmed = trimmed[:100]
+							}
+							h := sha256.Sum256([]byte(trimmed))
+							return "prompt:" + hex.EncodeToString(h[:8])
+						}
+					}
+				}
+			}
 		}
 	}
 
 	return ""
+}
+
+func sessionTextContent(content any) string {
+	if text, ok := content.(string); ok {
+		return text
+	}
+	parts, ok := content.([]any)
+	if !ok {
+		return ""
+	}
+	texts := []string{}
+	for _, raw := range parts {
+		part, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if text := strings.TrimSpace(stringValue(part["text"])); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	return strings.Join(texts, "\n")
 }
