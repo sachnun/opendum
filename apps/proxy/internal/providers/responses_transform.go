@@ -190,6 +190,7 @@ func transformResponsesSSEToChat(source io.Reader, writer io.Writer, model strin
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	sentRole := false
 	toolIndex := 0
+	reasoningStreamed := ""
 	writeChunk := func(delta map[string]any, finish any, usage map[string]any) {
 		chunk := map[string]any{"id": completionID, "object": "chat.completion.chunk", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}}
 		if usage != nil {
@@ -197,6 +198,25 @@ func transformResponsesSSEToChat(source io.Reader, writer io.Writer, model strin
 		}
 		encoded, _ := json.Marshal(chunk)
 		_, _ = writer.Write([]byte("data: " + string(encoded) + "\n\n"))
+	}
+	emitReasoning := func(text string) {
+		if text == "" {
+			return
+		}
+		if reasoningStreamed != "" {
+			if text == reasoningStreamed || strings.HasPrefix(reasoningStreamed, text) {
+				return
+			}
+			if strings.HasPrefix(text, reasoningStreamed) {
+				text = strings.TrimPrefix(text, reasoningStreamed)
+			}
+		}
+		if !sentRole {
+			writeChunk(map[string]any{"role": "assistant", "content": ""}, nil, nil)
+			sentRole = true
+		}
+		reasoningStreamed += text
+		writeChunk(map[string]any{"reasoning_content": text}, nil, nil)
 	}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -222,12 +242,20 @@ func transformResponsesSSEToChat(source io.Reader, writer io.Writer, model strin
 				writeChunk(map[string]any{"content": delta}, nil, nil)
 			}
 		case "response.reasoning.delta", "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
-			if !sentRole {
-				writeChunk(map[string]any{"role": "assistant", "content": ""}, nil, nil)
-				sentRole = true
-			}
 			if delta := stringValue(event["delta"]); delta != "" {
-				writeChunk(map[string]any{"reasoning_content": delta}, nil, nil)
+				emitReasoning(delta)
+			}
+		case "response.reasoning_text.done", "response.reasoning_summary_text.done":
+			if text := stringValue(event["text"]); text != "" {
+				emitReasoning(text)
+			}
+		case "response.reasoning_summary_part.done":
+			if part, ok := event["part"].(map[string]any); ok {
+				if text := stringValue(part["text"]); text != "" {
+					emitReasoning(text)
+				}
+			} else if text := stringValue(event["text"]); text != "" {
+				emitReasoning(text)
 			}
 		case "response.output_item.added":
 			item, _ := event["item"].(map[string]any)
@@ -247,6 +275,10 @@ func transformResponsesSSEToChat(source io.Reader, writer io.Writer, model strin
 			item, _ := event["item"].(map[string]any)
 			if typ == "response.function_call_arguments.done" || item["type"] == "function_call" {
 				toolIndex++
+			} else if item["type"] == "reasoning" {
+				if text := extractReasoningFromItem(item); text != "" {
+					emitReasoning(text)
+				}
 			}
 		case "response.completed", "response.done":
 			response, _ := event["response"].(map[string]any)
@@ -333,6 +365,14 @@ func extractReasoningFromItem(item map[string]any) string {
 				chunks = append(chunks, text)
 				continue
 			}
+			part, _ := raw.(map[string]any)
+			if text := stringValue(part["text"]); text != "" {
+				chunks = append(chunks, text)
+			}
+		}
+	}
+	if content, ok := item["content"].([]any); ok {
+		for _, raw := range content {
 			part, _ := raw.(map[string]any)
 			if text := stringValue(part["text"]); text != "" {
 				chunks = append(chunks, text)
