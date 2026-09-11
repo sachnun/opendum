@@ -2,8 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-import { db } from "../lib/db";
-import { disabledModel } from "../lib/db/schema";
+import { db, disabledModel } from "@opendum/database";
 import { getModelStatsByModel } from "../lib/model-stats";
 import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts } from "../lib/proxy/auth";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "../lib/proxy/models";

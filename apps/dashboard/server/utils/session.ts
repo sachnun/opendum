@@ -1,7 +1,7 @@
 import type { H3Event } from "h3";
 
 import { createAuth, type AuthSession } from "../../lib/auth";
-import { createRequestDb } from "../lib/db";
+import { createRequestDb } from "@opendum/database";
 
 export async function getSessionFromEvent(event: H3Event): Promise<AuthSession> {
   const { db, close } = await createRequestDb();

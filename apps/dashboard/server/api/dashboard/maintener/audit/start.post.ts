@@ -3,8 +3,7 @@ import { createError } from "h3";
 import { z } from "zod";
 
 import { readDashboardBody, requireMaintenerContext, setAuditUserCookie } from "../../../../utils/api";
-import { db } from "../../../../lib/db";
-import { user } from "../../../../lib/db/schema";
+import { db, user } from "@opendum/database";
 
 const startAuditInputSchema = z.object({ userId: z.string().min(1) });
 

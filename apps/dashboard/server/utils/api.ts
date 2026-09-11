@@ -6,8 +6,7 @@ import type { z } from "zod";
 
 import { requireSession } from "./session";
 import { getDashboardRoleForEmail, type DashboardUserRole } from "./maintainers";
-import { db } from "../lib/db";
-import { user } from "../lib/db/schema";
+import { db, user } from "@opendum/database";
 
 export const AUDIT_COOKIE_NAME = "__AuditUser";
 
