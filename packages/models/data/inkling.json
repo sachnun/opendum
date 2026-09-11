@@ -1,7 +1,6 @@
 {
   "owner": "inclusion-ai",
   "providers": [
-    "kilo_code",
     "openrouter",
     "hyper"
   ],
@@ -31,12 +30,6 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 32768
-    },
-    "kilo_code": {
-      "upstream": "thinkingmachines/inkling:free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 262144,
-      "authless": true
     },
     "openrouter": {
       "upstream": "thinkingmachines/inkling:free",
