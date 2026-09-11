@@ -65,6 +65,37 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 	for _, model := range s.normalizeModelList(access.Models) {
 		modelSet[model] = struct{}{}
 	}
+	for _, model := range access.Models {
+		if trimmed := strings.TrimSpace(model); trimmed != "" {
+			// Keep raw entries verbatim so custom `slug/model` ids (which are
+			// not registry models and get dropped by normalizeModelList) can
+			// still be whitelisted or blacklisted.
+			modelSet[trimmed] = struct{}{}
+		}
+	}
+	if provider != nil && s.customProviders != nil {
+		custom, err := s.customModelResult(ctx, userID, *provider, rawModel)
+		if err != nil {
+			return ModelValidationResult{}, err
+		}
+		if custom != nil {
+			if !custom.Valid {
+				return *custom, nil
+			}
+			if mode == "whitelist" {
+				if _, ok := modelSet[custom.Model]; !ok {
+					return s.invalidModelResult(custom.Provider, custom.Model, modelParam, nil), nil
+				}
+			}
+			if mode == "blacklist" {
+				if _, ok := modelSet[custom.Model]; ok {
+					return s.invalidModelResult(custom.Provider, custom.Model, modelParam, nil), nil
+				}
+			}
+			return *custom, nil
+		}
+	}
+
 	candidates, err := s.usableModelCandidates(ctx, userID, provider, mode, modelSet, access.RoamingEnabled)
 	if err != nil {
 		return ModelValidationResult{}, err
@@ -98,6 +129,37 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 	}
 
 	return base, nil
+}
+
+func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel string) (*ModelValidationResult, error) {
+	custom, err := s.customProviders.GetProvider(ctx, userID, slug)
+	if err != nil {
+		return nil, err
+	}
+	if custom == nil {
+		return nil, nil
+	}
+	rows, err := s.customProviders.ListModels(ctx, custom.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if row.ModelID != rawModel {
+			continue
+		}
+		provider := slug
+		result := ModelValidationResult{Valid: true, Provider: &provider, Model: slug + "/" + rawModel}
+		if value, ok := row.Meta["vision"].(bool); ok {
+			result.Vision = &value
+		}
+		if value, ok := row.Meta["toolCall"].(bool); ok {
+			result.ToolCall = &value
+		}
+		return &result, nil
+	}
+	message := "Model \"" + rawModel + "\" is not registered under your custom provider \"" + slug + "\"."
+	provider := slug
+	return &ModelValidationResult{Valid: false, Provider: &provider, Model: rawModel, Error: message, Param: "model", Code: "invalid_model"}, nil
 }
 
 func (s *Service) invalidModelResult(provider *string, model, modelParam string, candidates []string) ModelValidationResult {

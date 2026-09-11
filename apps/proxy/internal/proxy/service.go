@@ -39,6 +39,7 @@ type Service struct {
 	auth             *auth.Service
 	registry         *models.Registry
 	providerRegistry *providers.Registry
+	customStore      providers.CustomProviderReader
 	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
@@ -53,6 +54,7 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		auth:             authSvc,
 		registry:         registry,
 		providerRegistry: providerRegistry,
+		customStore:      providers.NewCustomStore(db),
 		affinity:         sessionaffinity.New(redisClient, providerRegistry.Names()),
 		secret:           secret,
 		client:           newUpstreamClient(),
@@ -67,19 +69,23 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 // as the model keeps generating. ResponseHeaderTimeout still bounds the wait
 // for the first byte, so a stalled provider fails over through account rotation
 // instead of hanging until the edge proxy returns a 504.
+//
+// The dialer and redirect policy are guarded so custom provider endpoints
+// cannot reach private networks or cloud metadata services.
 func newUpstreamClient() *http.Client {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.DialContext = providers.GuardedDialContext(providers.AllowPrivateRelay)
+	base.Proxy = http.ProxyFromEnvironment
+	base.ForceAttemptHTTP2 = true
+	base.MaxIdleConns = 200
+	base.MaxIdleConnsPerHost = 32
+	base.IdleConnTimeout = 90 * time.Second
+	base.TLSHandshakeTimeout = 15 * time.Second
+	base.ResponseHeaderTimeout = upstreamResponseHeaderTimeout
+	base.ExpectContinueTimeout = time.Second
 	return &http.Client{
-		Timeout: 0,
-		Transport: &http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          200,
-			MaxIdleConnsPerHost:   32,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   15 * time.Second,
-			ResponseHeaderTimeout: upstreamResponseHeaderTimeout,
-			ExpectContinueTimeout: time.Second,
-		},
+		Transport:     base,
+		CheckRedirect: providers.GuardedRedirectPolicy(providers.AllowPrivateRelay),
 	}
 }
 
@@ -136,7 +142,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		s.writeRouteError(w, cfg, routeErr.Status, routeErr.Message, routeErr.Type, routeErr.Param, routeErr.Code, routeErr.RetryAfter, routeErr.RetryAfterMS)
 		return
 	}
-	parsed = s.applyModelAccountSelector(parsed)
+	parsed = s.applyModelAccountSelector(parsed, ctx, authResult.UserID)
 	r = r.WithContext(context.WithValue(ctx, requestBodyContextKey{}, body))
 	ctx = r.Context()
 
@@ -215,8 +221,8 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	}
 }
 
-func (s *Service) applyModelAccountSelector(parsed parsedEndpointRequest) parsedEndpointRequest {
-	accountID, model, ok := s.modelAccountSelector(parsed.ModelParam)
+func (s *Service) applyModelAccountSelector(parsed parsedEndpointRequest, ctx context.Context, userID string) parsedEndpointRequest {
+	accountID, model, ok := s.modelAccountSelector(ctx, parsed.ModelParam, userID)
 	if !ok {
 		return parsed
 	}
@@ -225,7 +231,7 @@ func (s *Service) applyModelAccountSelector(parsed parsedEndpointRequest) parsed
 	return parsed
 }
 
-func (s *Service) modelAccountSelector(modelParam string) (string, string, bool) {
+func (s *Service) modelAccountSelector(ctx context.Context, modelParam, userID string) (string, string, bool) {
 	index := strings.Index(modelParam, "/")
 	if index < 0 {
 		return "", "", false
@@ -234,6 +240,12 @@ func (s *Service) modelAccountSelector(modelParam string) (string, string, bool)
 	model := strings.TrimSpace(modelParam[index+1:])
 	if prefix == "" || model == "" || s.isKnownModelProviderPrefix(prefix) {
 		return "", "", false
+	}
+	if s.customStore != nil {
+		custom, err := s.customStore.GetProvider(ctx, userID, prefix)
+		if err == nil && custom != nil {
+			return "", "", false
+		}
 	}
 	return prefix, model, true
 }
@@ -316,6 +328,9 @@ func playgroundSignature(secret, userID, timestamp, method, path string) string 
 func (s *Service) makeProviderRequest(ctx context.Context, account appdb.ProviderAccount, payload map[string]any, stream bool) (*http.Response, error) {
 	providerImpl, ok := s.providerRegistry.Get(account.Provider)
 	if !ok {
+		providerImpl = s.customProviderForAccount(ctx, account)
+	}
+	if providerImpl == nil {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
 	}
 	var (
@@ -340,4 +355,19 @@ func (s *Service) makeProviderRequest(ctx context.Context, account appdb.Provide
 func isAuthlessProvider(provider providers.Provider) bool {
 	authless, ok := provider.(providers.AuthlessProvider)
 	return ok && authless.Authless()
+}
+
+func (s *Service) customProviderForAccount(ctx context.Context, account appdb.ProviderAccount) providers.Provider {
+	if s.customStore == nil {
+		return nil
+	}
+	custom, err := s.customStore.GetProvider(ctx, account.UserID, account.Provider)
+	if err != nil || custom == nil {
+		return nil
+	}
+	rows, err := s.customStore.ListModels(ctx, custom.ID)
+	if err != nil {
+		return nil
+	}
+	return providers.CompileCustomProvider(custom, rows)
 }

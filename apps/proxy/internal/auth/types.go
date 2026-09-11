@@ -36,6 +36,8 @@ type ModelValidationResult struct {
 	Valid    bool
 	Provider *string
 	Model    string
+	Vision   *bool
+	ToolCall *bool
 	Error    string
 	Param    string
 	Code     string

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -127,7 +128,7 @@ func TestParseChatCompletionsReasoningNoneDoesNotRequestReasoning(t *testing.T) 
 
 func TestApplyModelAccountSelectorUsesNonProviderPrefix(t *testing.T) {
 	service := &Service{providerRegistry: providers.NewRegistry(nil, nil, nil)}
-	parsed := service.applyModelAccountSelector(parsedEndpointRequest{ModelParam: "acct_1/claude-opus-4-6"})
+	parsed := service.applyModelAccountSelector(parsedEndpointRequest{ModelParam: "acct_1/claude-opus-4-6"}, context.Background(), "")
 
 	if parsed.ModelParam != "claude-opus-4-6" {
 		t.Fatalf("ModelParam = %q, want claude-opus-4-6", parsed.ModelParam)
@@ -139,7 +140,7 @@ func TestApplyModelAccountSelectorUsesNonProviderPrefix(t *testing.T) {
 
 func TestApplyModelAccountSelectorPreservesProviderPrefix(t *testing.T) {
 	service := &Service{providerRegistry: providers.NewRegistry(nil, nil, nil)}
-	parsed := service.applyModelAccountSelector(parsedEndpointRequest{ModelParam: "openrouter/claude-opus-4-6"})
+	parsed := service.applyModelAccountSelector(parsedEndpointRequest{ModelParam: "openrouter/claude-opus-4-6"}, context.Background(), "")
 
 	if parsed.ModelParam != "openrouter/claude-opus-4-6" {
 		t.Fatalf("ModelParam = %q, want provider-prefixed model", parsed.ModelParam)
