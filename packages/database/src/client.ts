@@ -1,9 +1,9 @@
 import { drizzle as drizzleNodePg, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import * as schema from "./schema.js";
 import * as relations from "./relations.js";
+import * as schema from "./schema/index.js";
 
-const fullSchema = { ...schema, ...relations };
+export const fullSchema = { ...schema, ...relations };
 
 export type Database = NodePgDatabase<typeof fullSchema> & { $client: Pool };
 
@@ -57,6 +57,3 @@ export const db = new Proxy({} as Database, {
 if (process.env.NODE_ENV !== "production") {
   globalForDb.db ??= getDb();
 }
-
-// Re-export schema for convenience
-export { schema };
