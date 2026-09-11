@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -19,28 +18,115 @@ type Meta struct {
 	Vision    *bool `json:"vision"`
 }
 
+type Modalities struct {
+	Input  []string `json:"input"`
+	Output []string `json:"output"`
+}
+
+type ParameterSupport struct {
+	Temperature       bool `json:"temperature"`
+	TopP              bool `json:"top_p"`
+	TopK              bool `json:"top_k"`
+	FrequencyPenalty  bool `json:"frequency_penalty"`
+	PresencePenalty   bool `json:"presence_penalty"`
+	RepetitionPenalty bool `json:"repetition_penalty"`
+}
+
+type Limit struct {
+	Context int `json:"context,omitempty"`
+	Output  int `json:"output,omitempty"`
+}
+
 type ProviderAccessRule struct {
 	MinTier      string
 	AllowedTiers []string
 }
 
 type ProviderModelConfig struct {
-	Upstream     string
-	MinTier      string
-	AllowedTiers []string
-	Authless     bool
-	Aliases      []string
-	Custom       map[string]any
+	Upstream        string
+	ContextWindow   int
+	MaxOutputTokens int
+	MinTier         string
+	AllowedTiers    []string
+	Authless        bool
+	Aliases         []string
+	Custom          map[string]any
+}
+
+func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	cfg.Custom = map[string]any{}
+	for key, value := range raw {
+		switch key {
+		case "upstream":
+			var upstream string
+			if err := json.Unmarshal(value, &upstream); err != nil {
+				return err
+			}
+			cfg.Upstream = strings.TrimSpace(upstream)
+		case "contextWindow":
+			var contextWindow int
+			if err := json.Unmarshal(value, &contextWindow); err != nil {
+				return err
+			}
+			cfg.ContextWindow = contextWindow
+		case "maxOutputTokens":
+			var maxOutputTokens int
+			if err := json.Unmarshal(value, &maxOutputTokens); err != nil {
+				return err
+			}
+			cfg.MaxOutputTokens = maxOutputTokens
+		case "minTier":
+			var minTier string
+			if err := json.Unmarshal(value, &minTier); err != nil {
+				return err
+			}
+			cfg.MinTier = strings.TrimSpace(minTier)
+		case "allowedTiers":
+			if err := json.Unmarshal(value, &cfg.AllowedTiers); err != nil {
+				return err
+			}
+			cfg.AllowedTiers = compactStrings(cfg.AllowedTiers)
+		case "authless":
+			if err := json.Unmarshal(value, &cfg.Authless); err != nil {
+				return err
+			}
+		case "aliases":
+			if err := json.Unmarshal(value, &cfg.Aliases); err != nil {
+				return err
+			}
+			cfg.Aliases = compactStrings(cfg.Aliases)
+		default:
+			var custom any
+			if err := json.Unmarshal(value, &custom); err != nil {
+				return err
+			}
+			cfg.Custom[key] = custom
+		}
+	}
+
+	if len(cfg.Custom) == 0 {
+		cfg.Custom = nil
+	}
+	return nil
 }
 
 type Info struct {
 	ID             string                         `json:"id"`
+	Owner          string                         `json:"owner"`
 	Providers      []string                       `json:"providers"`
 	Aliases        []string                       `json:"aliases"`
 	Description    string                         `json:"description"`
 	Family         string                         `json:"family"`
 	Ignored        bool                           `json:"ignored"`
 	Meta           *Meta                          `json:"meta"`
+	Modalities     *Modalities                    `json:"modalities"`
+	Parameter      *ParameterSupport              `json:"parameter"`
+	Limit          *Limit                         `json:"limit"`
 	ProviderConfig map[string]ProviderModelConfig `json:"providerConfig"`
 }
 
@@ -162,56 +248,6 @@ func (r *Registry) mergeModelInfo(modelID, fileID string, info Info) {
 	} else {
 		delete(r.effective, modelID)
 	}
-}
-
-func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	cfg.Custom = map[string]any{}
-	for key, value := range raw {
-		switch key {
-		case "upstream":
-			var upstream string
-			if err := json.Unmarshal(value, &upstream); err != nil {
-				return err
-			}
-			cfg.Upstream = strings.TrimSpace(upstream)
-		case "minTier":
-			var minTier string
-			if err := json.Unmarshal(value, &minTier); err != nil {
-				return err
-			}
-			cfg.MinTier = strings.TrimSpace(minTier)
-		case "allowedTiers":
-			if err := json.Unmarshal(value, &cfg.AllowedTiers); err != nil {
-				return err
-			}
-			cfg.AllowedTiers = compactStrings(cfg.AllowedTiers)
-		case "authless":
-			if err := json.Unmarshal(value, &cfg.Authless); err != nil {
-				return err
-			}
-		case "aliases":
-			if err := json.Unmarshal(value, &cfg.Aliases); err != nil {
-				return err
-			}
-			cfg.Aliases = compactStrings(cfg.Aliases)
-		default:
-			var custom any
-			if err := json.Unmarshal(value, &custom); err != nil {
-				return err
-			}
-			cfg.Custom[key] = custom
-		}
-	}
-
-	if len(cfg.Custom) == 0 {
-		cfg.Custom = nil
-	}
-	return nil
 }
 
 func (r *Registry) buildAliases() {
@@ -482,15 +518,30 @@ func (r *Registry) ModelFamily(model string) string {
 }
 
 func (r *Registry) FormatModelsForOpenAI() []map[string]any {
-	now := time.Now().Unix()
-	data := make([]map[string]any, 0)
+	data := make([]map[string]any, 0, len(r.effective))
 	for _, model := range r.AllModels() {
 		info := r.effective[model]
 		if len(info.Providers) == 0 {
 			continue
 		}
-		ownedBy := strings.Join(info.Providers, ",")
-		data = append(data, map[string]any{"id": model, "object": "model", "created": now, "owned_by": ownedBy})
+		item := map[string]any{
+			"id":        model,
+			"object":    "model",
+			"providers": info.Providers,
+		}
+		if info.Owner != "" {
+			item["owner"] = info.Owner
+		}
+		if info.Modalities != nil {
+			item["modalities"] = info.Modalities
+		}
+		if info.Parameter != nil {
+			item["parameter"] = info.Parameter
+		}
+		if info.Limit != nil && (info.Limit.Context > 0 || info.Limit.Output > 0) {
+			item["limit"] = info.Limit
+		}
+		data = append(data, item)
 	}
 	return data
 }

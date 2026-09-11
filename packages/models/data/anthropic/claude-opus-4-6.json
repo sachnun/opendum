@@ -1,4 +1,5 @@
 {
+  "owner": "anthropic",
   "providers": [
     "antigravity",
     "kiro"
@@ -16,18 +17,33 @@
     "toolCall": true,
     "vision": true
   },
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 128000
+  },
   "providerConfig": {
-    "kiro": {
-      "upstream": "claude-opus-4.6-1m",
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "power",
-        "standalone"
-      ]
-    },
     "antigravity": {
       "upstream": "claude-opus-4-6-thinking",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
       "anthropic_beta": true,
       "anthropic_beta_thinking": true,
       "convert_external_images": true,
@@ -39,6 +55,17 @@
       "system_instruction": true,
       "thinking_model": true,
       "top_p_min_095": true
+    },
+    "kiro": {
+      "upstream": "claude-opus-4.6-1m",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
     }
   }
 }

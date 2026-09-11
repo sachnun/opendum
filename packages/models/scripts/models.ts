@@ -26,6 +26,7 @@ const refreshScripts = [
   "harbor.ts",
   "hyper.ts",
   "workbuddy.ts",
+  "../src/enrich.ts",
 ];
 
 const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "qoder", "workers_ai", "workbuddy", "zenmux"];

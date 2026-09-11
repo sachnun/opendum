@@ -1,10 +1,33 @@
 {
+  "owner": "upstage",
   "providers": [
     "cline"
   ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 524288,
+    "output": 131072
+  },
   "providerConfig": {
     "cline": {
-      "upstream": "cline-free/solar-pro4"
+      "upstream": "cline-free/solar-pro4",
+      "contextWindow": 524288,
+      "maxOutputTokens": 131072
     }
   }
 }

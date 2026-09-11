@@ -8,6 +8,7 @@
   },
   "scripts": {
     "refresh": "tsx ./scripts/models.ts",
+    "refresh:metadata": "tsx ./src/enrich.ts",
     "test": "tsx --test ./src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

@@ -1,19 +1,52 @@
 {
+  "owner": "minimax",
   "providers": [
     "zenmux",
     "perch",
     "qoder",
     "hyper"
   ],
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 512000,
+    "output": 80000
+  },
   "providerConfig": {
+    "hyper": {
+      "contextWindow": 512000,
+      "maxOutputTokens": 512000
+    },
     "perch": {
-      "upstream": "minimax-m3-free"
+      "upstream": "minimax-m3-free",
+      "contextWindow": 512000,
+      "maxOutputTokens": 80000
     },
     "qoder": {
-      "upstream": "mmodel"
+      "upstream": "mmodel",
+      "contextWindow": 512000,
+      "maxOutputTokens": 80000
     },
     "zenmux": {
-      "upstream": "minimax/minimax-m3"
+      "upstream": "minimax/minimax-m3",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 512000
     }
   }
 }

@@ -1,4 +1,5 @@
 {
+  "owner": "qwen",
   "providers": [
     "hyper"
   ],
@@ -6,9 +7,31 @@
     "toolCall": true,
     "vision": false
   },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 106000,
+    "output": 10600
+  },
   "providerConfig": {
     "hyper": {
-      "upstream": "qwen3-coder-480b-a35b-instruct-int4-mixed-ar"
+      "upstream": "qwen3-coder-480b-a35b-instruct-int4-mixed-ar",
+      "contextWindow": 106000,
+      "maxOutputTokens": 10600
     }
   }
 }

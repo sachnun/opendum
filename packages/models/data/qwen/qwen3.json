@@ -1,4 +1,5 @@
 {
+  "owner": "qwen",
   "providers": [
     "workers_ai"
   ],
@@ -26,9 +27,31 @@
     "vision": false,
     "type": "instruct"
   },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 32768,
+    "output": 32768
+  },
   "providerConfig": {
     "workers_ai": {
-      "upstream": "@cf/qwen/qwen3-30b-a3b-fp8"
+      "upstream": "@cf/qwen/qwen3-30b-a3b-fp8",
+      "contextWindow": 32768,
+      "maxOutputTokens": 32768
     }
   }
 }

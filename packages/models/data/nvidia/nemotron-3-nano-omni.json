@@ -1,4 +1,5 @@
 {
+  "owner": "nvidia",
   "providers": [
     "kilo_code",
     "nvidia_nim",
@@ -13,21 +14,50 @@
     "nano-omni",
     "nemotron-3-nano-omni-reasoning"
   ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "variant": "omni"
+  },
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 65536,
+    "output": 65536
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "contextWindow": 256000,
+      "maxOutputTokens": 65536,
       "authless": true
     },
     "nvidia_nim": {
-      "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+      "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+      "contextWindow": 65536,
+      "maxOutputTokens": 65536
     },
     "openrouter": {
-      "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+      "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "contextWindow": 256000,
+      "maxOutputTokens": 65536
     }
-  },
-  "meta": {
-    "variant": "omni",
-    "reasoning": true
-  },
-  "ignored": false
+  }
 }

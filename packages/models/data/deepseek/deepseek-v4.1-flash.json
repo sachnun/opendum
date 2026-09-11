@@ -1,4 +1,5 @@
 {
+  "owner": "deepseek",
   "providers": [
     "harbor",
     "workbuddy",
@@ -10,12 +11,45 @@
     "toolCall": true,
     "vision": true
   },
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 26214
+  },
   "providerConfig": {
     "harbor": {
-      "upstream": "deepseek-v4.1-flash:free"
+      "upstream": "deepseek-v4.1-flash:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
+    },
+    "hyper": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 26214
+    },
+    "workbuddy": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "zenmux": {
-      "upstream": "deepseek/deepseek-v4.1-flash"
+      "upstream": "deepseek/deepseek-v4.1-flash",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     }
   }
 }

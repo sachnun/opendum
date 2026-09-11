@@ -1,5 +1,6 @@
 {
   "id": "llama-4-maverick",
+  "owner": "meta",
   "providers": [
     "hyper"
   ],
@@ -16,9 +17,31 @@
     "vision": true,
     "type": "instruct"
   },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 430000,
+    "output": 43000
+  },
   "providerConfig": {
     "hyper": {
-      "upstream": "llama-4-maverick-17b-128e-instruct-fp8"
+      "upstream": "llama-4-maverick-17b-128e-instruct-fp8",
+      "contextWindow": 430000,
+      "maxOutputTokens": 43000
     }
   }
 }

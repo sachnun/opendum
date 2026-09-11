@@ -1,4 +1,5 @@
 {
+  "owner": "google",
   "providers": [
     "antigravity"
   ],
@@ -7,9 +8,35 @@
     "toolCall": true,
     "vision": true
   },
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 65536
+  },
   "providerConfig": {
     "antigravity": {
       "upstream": "gemini-3.1-flash-lite",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
       "inject_thought_signature": true,
       "scrub_model_artifacts": true,
       "signature_family": "gemini-flash",

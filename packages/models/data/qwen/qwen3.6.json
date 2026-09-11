@@ -1,4 +1,5 @@
 {
+  "owner": "qwen",
   "providers": [
     "perch"
   ],
@@ -11,9 +12,32 @@
   ],
   "ignored": false,
   "meta": {},
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262144,
+    "output": 65536
+  },
   "providerConfig": {
     "perch": {
-      "upstream": "qwen-3.6"
+      "upstream": "qwen-3.6",
+      "contextWindow": 262144,
+      "maxOutputTokens": 65536
     }
   }
 }

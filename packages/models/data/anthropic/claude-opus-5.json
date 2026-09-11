@@ -1,9 +1,34 @@
 {
+  "owner": "anthropic",
   "providers": [
     "kiro"
   ],
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 128000
+  },
   "providerConfig": {
     "kiro": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
       "allowedTiers": [
         "pro",
         "pro+",

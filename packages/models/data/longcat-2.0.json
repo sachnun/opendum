@@ -1,14 +1,39 @@
 {
+  "owner": "meituan",
   "providers": [
     "zenmux",
     "cline"
   ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1048756,
+    "output": 262144
+  },
   "providerConfig": {
     "cline": {
-      "upstream": "cline-free/longcat-2.0"
+      "upstream": "cline-free/longcat-2.0",
+      "contextWindow": 1048756,
+      "maxOutputTokens": 262144
     },
     "zenmux": {
-      "upstream": "meituan/longcat-2.0"
+      "upstream": "meituan/longcat-2.0",
+      "contextWindow": 1048756,
+      "maxOutputTokens": 262144
     }
   }
 }

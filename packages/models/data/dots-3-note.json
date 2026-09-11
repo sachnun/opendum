@@ -1,15 +1,41 @@
 {
+  "owner": "dots-studio",
   "providers": [
     "kilo_code",
     "openrouter"
   ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 512000,
+    "output": 460800
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "dots-studio/dots-3-note-preview:free",
+      "contextWindow": 512000,
+      "maxOutputTokens": 460800,
       "authless": true
     },
     "openrouter": {
-      "upstream": "dots-studio/dots-3-note-preview:free"
+      "upstream": "dots-studio/dots-3-note-preview:free",
+      "contextWindow": 512000,
+      "maxOutputTokens": 460800
     }
   }
 }

@@ -1,4 +1,5 @@
 {
+  "owner": "anthropic",
   "providers": [
     "kiro"
   ],
@@ -14,9 +15,33 @@
     "toolCall": true,
     "vision": true
   },
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 64000
+  },
   "providerConfig": {
     "kiro": {
-      "upstream": "claude-sonnet-4.5-1m"
+      "upstream": "claude-sonnet-4.5-1m",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000
     }
   }
 }

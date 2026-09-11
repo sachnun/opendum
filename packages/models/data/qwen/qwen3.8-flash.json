@@ -1,11 +1,39 @@
 {
+  "owner": "qwen",
   "providers": [
     "zenmux",
     "hyper"
   ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 991808,
+    "output": 128000
+  },
   "providerConfig": {
+    "hyper": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    },
     "zenmux": {
-      "upstream": "qwen/qwen3.8-flash"
+      "upstream": "qwen/qwen3.8-flash",
+      "contextWindow": 991808,
+      "maxOutputTokens": 131072
     }
   }
 }

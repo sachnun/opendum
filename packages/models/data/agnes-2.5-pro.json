@@ -1,10 +1,34 @@
 {
+  "owner": "sapiens-ai",
   "providers": [
     "zenmux"
   ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 65536
+  },
   "providerConfig": {
     "zenmux": {
-      "upstream": "sapiens-ai/agnes-2.5-pro"
+      "upstream": "sapiens-ai/agnes-2.5-pro",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
     }
   }
 }

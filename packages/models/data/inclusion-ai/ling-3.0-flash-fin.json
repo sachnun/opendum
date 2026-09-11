@@ -1,19 +1,46 @@
 {
+  "owner": "inclusion-ai",
   "providers": [
     "opencode",
     "kilo_code",
     "openrouter"
   ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262144,
+    "output": 32768
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "inclusionai/ling-3.0-flash-fin:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 235929,
       "authless": true
     },
     "opencode": {
-      "upstream": "ling-3.0-flash-fin-free"
+      "upstream": "ling-3.0-flash-fin-free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
     },
     "openrouter": {
-      "upstream": "inclusionai/ling-3.0-flash-fin:free"
+      "upstream": "inclusionai/ling-3.0-flash-fin:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 235929
     }
   }
 }

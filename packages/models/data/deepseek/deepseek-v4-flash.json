@@ -1,10 +1,12 @@
 {
+  "owner": "deepseek",
   "providers": [
     "cline",
     "zenmux",
     "qoder",
     "hyper",
-    "nvidia_nim"
+    "nvidia_nim",
+    "harbor"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-flash-0731",
@@ -24,18 +26,55 @@
     "toolCall": true,
     "vision": false
   },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 384000
+  },
   "providerConfig": {
     "cline": {
-      "upstream": "deepseek/deepseek-v4-flash"
+      "upstream": "deepseek/deepseek-v4-flash",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
+    },
+    "harbor": {
+      "upstream": "deepseek-v4-flash:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
+    },
+    "hyper": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "nvidia_nim": {
-      "upstream": "deepseek-ai/deepseek-v4-flash-0731"
+      "upstream": "deepseek-ai/deepseek-v4-flash-0731",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "qoder": {
-      "upstream": "dfmodel"
+      "upstream": "dfmodel",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "zenmux": {
-      "upstream": "deepseek/deepseek-v4-flash"
+      "upstream": "deepseek/deepseek-v4-flash",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     }
   }
 }

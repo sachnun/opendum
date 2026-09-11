@@ -1,4 +1,5 @@
 {
+  "owner": "qwen",
   "providers": [
     "qoder"
   ],
@@ -7,9 +8,31 @@
     "toolCall": true,
     "vision": false
   },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 65536
+  },
   "providerConfig": {
     "qoder": {
-      "upstream": "lite"
+      "upstream": "lite",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
     }
   }
 }

@@ -1,5 +1,6 @@
 {
   "id": "mimo-v2.5",
+  "owner": "xiaomi",
   "providers": [
     "opencode",
     "harbor"
@@ -12,12 +13,39 @@
   ],
   "ignored": false,
   "meta": {},
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 200000,
+    "output": 32000
+  },
   "providerConfig": {
     "harbor": {
-      "upstream": "mimo-v2.5:free"
+      "upstream": "mimo-v2.5:free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
     },
     "opencode": {
-      "upstream": "mimo-v2.5-free"
+      "upstream": "mimo-v2.5-free",
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
     }
   }
 }

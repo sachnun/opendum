@@ -13,6 +13,7 @@
     "db:studio": "pnpm --filter @opendum/dashboard db:studio",
     "lint": "pnpm --filter @opendum/dashboard lint && pnpm --filter @opendum/models typecheck && go -C apps/proxy test ./...",
     "models:refresh": "pnpm --filter @opendum/models refresh",
+    "models:metadata": "pnpm --filter @opendum/models refresh:metadata",
     "models:test": "pnpm --filter @opendum/models test"
   },
   "devDependencies": {

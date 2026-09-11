@@ -1,4 +1,5 @@
 {
+  "owner": "z-ai",
   "providers": [
     "workers_ai",
     "zenmux"
@@ -8,12 +9,36 @@
     "toolCall": true,
     "vision": false
   },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 131072,
+    "output": 64000
+  },
   "providerConfig": {
     "workers_ai": {
-      "upstream": "@cf/zai-org/glm-4.7-flash"
+      "upstream": "@cf/zai-org/glm-4.7-flash",
+      "contextWindow": 131072,
+      "maxOutputTokens": 131072
     },
     "zenmux": {
-      "upstream": "z-ai/glm-4.7-flash-free"
+      "upstream": "z-ai/glm-4.7-flash-free",
+      "contextWindow": 200000,
+      "maxOutputTokens": 64000
     }
   }
 }

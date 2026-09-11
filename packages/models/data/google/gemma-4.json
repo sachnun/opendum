@@ -1,4 +1,5 @@
 {
+  "owner": "google",
   "providers": [
     "nvidia_nim",
     "openrouter",
@@ -28,18 +29,48 @@
     "vision": true,
     "type": "instruct"
   },
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 256000,
+    "output": 8192
+  },
   "providerConfig": {
     "hyper": {
-      "upstream": "gemma-4-26b-a4b-it"
+      "upstream": "gemma-4-26b-a4b-it",
+      "contextWindow": 256000,
+      "maxOutputTokens": 25600
     },
     "nvidia_nim": {
-      "upstream": "google/gemma-4-31b-it"
+      "upstream": "google/gemma-4-31b-it",
+      "contextWindow": 256000,
+      "maxOutputTokens": 8192
     },
     "openrouter": {
-      "upstream": "google/gemma-4-26b-a4b-it:free"
+      "upstream": "google/gemma-4-26b-a4b-it:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
     },
     "workers_ai": {
-      "upstream": "@cf/google/gemma-4-26b-a4b-it"
+      "upstream": "@cf/google/gemma-4-26b-a4b-it",
+      "contextWindow": 256000,
+      "maxOutputTokens": 16384
     }
   }
 }

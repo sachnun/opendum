@@ -1,4 +1,5 @@
 {
+  "owner": "deepseek",
   "providers": [
     "zenmux",
     "qoder",
@@ -22,15 +23,45 @@
     "toolCall": true,
     "vision": false
   },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 262144
+  },
   "providerConfig": {
+    "hyper": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 262144
+    },
     "nvidia_nim": {
-      "upstream": "deepseek-ai/deepseek-v4-pro-0813"
+      "upstream": "deepseek-ai/deepseek-v4-pro-0813",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "qoder": {
-      "upstream": "dmodel"
+      "upstream": "dmodel",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     },
     "zenmux": {
-      "upstream": "deepseek/deepseek-v4-pro"
+      "upstream": "deepseek/deepseek-v4-pro",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
     }
   }
 }

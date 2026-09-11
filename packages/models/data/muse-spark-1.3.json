@@ -1,10 +1,37 @@
 {
+  "owner": "meta",
   "providers": [
     "zenmux"
   ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 943718
+  },
   "providerConfig": {
     "zenmux": {
-      "upstream": "meta/muse-spark-1.3"
+      "upstream": "meta/muse-spark-1.3",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 943718
     }
   }
 }
