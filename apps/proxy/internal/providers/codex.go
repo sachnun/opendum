@@ -320,6 +320,16 @@ func responsesStreamToCompletion(body io.Reader, model string) map[string]any {
 			messageContent += stringValue(event["delta"])
 		case "response.reasoning.delta", "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
 			reasoning += stringValue(event["delta"])
+		case "response.reasoning_text.done", "response.reasoning_summary_text.done":
+			if text := stringValue(event["text"]); text != "" && !strings.Contains(reasoning, text) {
+				reasoning += text
+			}
+		case "response.reasoning_summary_part.done":
+			if part, ok := event["part"].(map[string]any); ok {
+				if text := stringValue(part["text"]); text != "" && !strings.Contains(reasoning, text) {
+					reasoning += text
+				}
+			}
 		case "response.output_item.added":
 			item, _ := event["item"].(map[string]any)
 			if item["type"] == "function_call" {
@@ -330,6 +340,11 @@ func responsesStreamToCompletion(body io.Reader, model string) map[string]any {
 				currentTool["arguments"] = stringValue(currentTool["arguments"]) + stringValue(event["delta"])
 			}
 		case "response.function_call_arguments.done", "response.output_item.done":
+			if item, ok := event["item"].(map[string]any); ok && item["type"] == "reasoning" {
+				if text := extractReasoningFromItem(item); text != "" && !strings.Contains(reasoning, text) {
+					reasoning += text
+				}
+			}
 			if currentTool != nil {
 				toolCalls = append(toolCalls, currentTool)
 				currentTool = nil

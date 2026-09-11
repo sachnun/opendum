@@ -295,7 +295,17 @@ func buildResponsesAPIPayload(body map[string]any, modelName string, stream bool
 	} else if effort := stringValue(body["reasoning_effort"]); effort != "" {
 		payload["reasoning"] = map[string]any{"effort": effort}
 	}
-	for _, key := range []string{"include", "previous_response_id", "prompt_cache_key", "service_tier", "store", "text", "truncation", "user"} {
+	if reasoning, ok := payload["reasoning"].(map[string]any); ok && body["_includeReasoning"] == true && reasoning["summary"] == nil {
+		reasoning["summary"] = "auto"
+	}
+	include := stringSlice(body["include"])
+	if body["_includeReasoning"] == true {
+		include = append(include, "reasoning.encrypted_content")
+	}
+	if len(include) > 0 {
+		payload["include"] = uniqueStrings(include)
+	}
+	for _, key := range []string{"previous_response_id", "prompt_cache_key", "service_tier", "store", "text", "truncation", "user"} {
 		if body[key] != nil {
 			payload[key] = body[key]
 		}
