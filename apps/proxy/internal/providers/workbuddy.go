@@ -139,14 +139,27 @@ func (p workbuddyProvider) MakeRequest(ctx context.Context, client *http.Client,
 }
 
 func workbuddyEnsureSystemMessage(messages []any) []any {
-	if len(messages) > 0 {
-		if first, ok := messages[0].(map[string]any); ok && stringValue(first["role"]) == "system" {
-			return messages
+	normalized := make([]any, 0, len(messages)+1)
+	for _, raw := range messages {
+		if msg, ok := raw.(map[string]any); ok && stringValue(msg["role"]) == "developer" {
+			converted := make(map[string]any, len(msg))
+			for key, value := range msg {
+				converted[key] = value
+			}
+			converted["role"] = "system"
+			normalized = append(normalized, converted)
+			continue
+		}
+		normalized = append(normalized, raw)
+	}
+	if len(normalized) > 0 {
+		if first, ok := normalized[0].(map[string]any); ok && stringValue(first["role"]) == "system" {
+			return normalized
 		}
 	}
-	out := make([]any, 0, len(messages)+1)
+	out := make([]any, 0, len(normalized)+1)
 	out = append(out, map[string]any{"role": "system", "content": workbuddyDefaultSystem})
-	return append(out, messages...)
+	return append(out, normalized...)
 }
 
 func workbuddyExpiry(expiresAt, expiresIn int64) time.Time {
