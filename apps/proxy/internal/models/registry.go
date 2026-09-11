@@ -251,37 +251,99 @@ func (r *Registry) mergeModelInfo(modelID, fileID string, info Info) {
 }
 
 func (r *Registry) buildAliases() {
-	for canonical, info := range r.effective {
+	// Iterate canonicals in sorted order so that alias resolution is
+	// deterministic across process starts. Without this, two models declaring
+	// the same alias (for example `agi-nova-beta`) would resolve differently
+	// depending on Go map iteration order.
+	canonicals := make([]string, 0, len(r.effective))
+	for canonical := range r.effective {
+		canonicals = append(canonicals, canonical)
+	}
+	sort.Strings(canonicals)
+
+	// A canonical id always wins over an alias declared by another model.
+	for _, canonical := range canonicals {
+		r.aliasToCanonical[canonical] = canonical
+	}
+	for _, canonical := range canonicals {
+		info := r.effective[canonical]
 		if info.ID != "" && info.ID != canonical {
-			r.aliasToCanonical[info.ID] = canonical
+			r.assignAlias(info.ID, canonical)
 		}
 		for _, alias := range info.Aliases {
-			r.aliasToCanonical[alias] = canonical
+			r.assignAlias(alias, canonical)
 		}
-		upstreamNames := map[string]struct{}{}
-		for _, cfg := range info.ProviderConfig {
-			if strings.TrimSpace(cfg.Upstream) != "" {
-				upstreamNames[strings.TrimSpace(cfg.Upstream)] = struct{}{}
-			}
+	}
+
+	// Upstream names are only mapped when nothing else claims them, and are
+	// collected first so iteration order cannot influence the result.
+	upstreamNames := map[string]string{}
+	for _, canonical := range canonicals {
+		info := r.effective[canonical]
+		providers := make([]string, 0, len(info.ProviderConfig))
+		for provider := range info.ProviderConfig {
+			providers = append(providers, provider)
 		}
-		for upstreamName := range upstreamNames {
-			if _, exists := r.aliasToCanonical[upstreamName]; !exists {
-				r.aliasToCanonical[upstreamName] = canonical
+		sort.Strings(providers)
+		for _, provider := range providers {
+			upstreamName := strings.TrimSpace(info.ProviderConfig[provider].Upstream)
+			if upstreamName == "" {
+				continue
 			}
-			legacy := legacyNvidiaAlias(upstreamName)
-			if legacy != upstreamName {
-				if _, exists := r.aliasToCanonical[legacy]; !exists {
-					r.aliasToCanonical[legacy] = canonical
-				}
+			if _, exists := upstreamNames[upstreamName]; !exists {
+				upstreamNames[upstreamName] = canonical
 			}
 		}
 	}
-	for alias, canonical := range r.aliasToCanonical {
+	upstreamKeys := make([]string, 0, len(upstreamNames))
+	for upstreamName := range upstreamNames {
+		upstreamKeys = append(upstreamKeys, upstreamName)
+	}
+	sort.Strings(upstreamKeys)
+	for _, upstreamName := range upstreamKeys {
+		canonical := upstreamNames[upstreamName]
+		if _, exists := r.aliasToCanonical[upstreamName]; !exists {
+			r.aliasToCanonical[upstreamName] = canonical
+		}
+		legacy := legacyNvidiaAlias(upstreamName)
+		if legacy != upstreamName {
+			if _, exists := r.aliasToCanonical[legacy]; !exists {
+				r.aliasToCanonical[legacy] = canonical
+			}
+		}
+	}
+
+	aliases := make([]string, 0, len(r.aliasToCanonical))
+	for alias := range r.aliasToCanonical {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		canonical := r.aliasToCanonical[alias]
+		if alias == canonical {
+			continue
+		}
 		r.canonicalToAliases[canonical] = append(r.canonicalToAliases[canonical], alias)
 	}
 	for canonical := range r.canonicalToAliases {
 		r.canonicalToAliases[canonical] = uniqueSorted(r.canonicalToAliases[canonical])
 	}
+}
+
+// assignAlias records alias -> canonical unless the alias is a canonical model
+// id, or an alias already claimed by an earlier (sorted) canonical.
+func (r *Registry) assignAlias(alias, canonical string) {
+	alias = strings.TrimSpace(alias)
+	if alias == "" {
+		return
+	}
+	if _, isCanonical := r.effective[alias]; isCanonical {
+		return
+	}
+	if _, exists := r.aliasToCanonical[alias]; exists {
+		return
+	}
+	r.aliasToCanonical[alias] = canonical
 }
 
 func (r *Registry) buildSuggestionCandidates() {

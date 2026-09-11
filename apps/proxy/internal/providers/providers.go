@@ -189,19 +189,13 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
-	if _, nativeResponses := body["_responsesInput"].([]any); nativeResponses {
-		if stream {
-			return sseResponse(chatSSEToResponsesSSEReader(resp.Body, modelName), resp.Body), nil
-		}
-		var data map[string]any
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			_ = resp.Body.Close()
-			return nil, err
-		}
-		_ = resp.Body.Close()
-		return jsonResponse(http.StatusOK, chatCompletionToResponsesJSON(data, modelName)), nil
-	}
-	return resp, err
+	return resp, nil
+}
+
+// ResponsesNative reports whether the upstream already speaks the Responses API
+// for this model, in which case responses must not be converted.
+func (p openAICompatibleProvider) ResponsesNative(model string) bool {
+	return p.requiresResponsesAPI(p.normalizeModel(model))
 }
 
 func (p openAICompatibleProvider) extraRequestHeaders(account appdb.ProviderAccount) map[string]string {
@@ -382,19 +376,16 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
-	if _, nativeResponses := body["_responsesInput"].([]any); nativeResponses {
-		if stream {
-			return sseResponse(chatSSEToResponsesSSEReader(resp.Body, modelName), resp.Body), nil
-		}
-		var data map[string]any
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			_ = resp.Body.Close()
-			return nil, err
-		}
-		_ = resp.Body.Close()
-		return jsonResponse(http.StatusOK, chatCompletionToResponsesJSON(data, modelName)), nil
+	return resp, nil
+}
+
+// ResponsesNative reports whether the upstream already speaks the Responses API
+// for this model, in which case responses must not be converted.
+func (p opencodeProvider) ResponsesNative(model string) bool {
+	if strings.HasPrefix(model, "opencode/") {
+		model = strings.TrimPrefix(model, "opencode/")
 	}
-	return resp, err
+	return p.requiresResponsesAPI(model)
 }
 
 func (p opencodeProvider) postOpencodeResponses(ctx context.Context, client *http.Client, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {

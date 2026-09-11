@@ -259,3 +259,45 @@ func TestNvidiaNemotronOmniAliasUsesCurrentHostedModel(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildAliasesIsDeterministicAndPrefersCanonicalIDs(t *testing.T) {
+	newRegistry := func() *Registry {
+		return &Registry{
+			effective: map[string]Info{
+				"agi": {
+					Aliases: []string{"agi-nova-beta"},
+				},
+				"agi-nova": {
+					Aliases: []string{"agi-nova-beta"},
+				},
+				"deepseek-v4-flash": {
+					Aliases: []string{"deepseek-v4-flash"},
+				},
+				"other": {
+					Aliases: []string{"deepseek-v4-flash"},
+				},
+			},
+			aliasToCanonical:   map[string]string{},
+			canonicalToAliases: map[string][]string{},
+		}
+	}
+
+	first := newRegistry()
+	first.buildAliases()
+	for i := 0; i < 20; i++ {
+		other := newRegistry()
+		other.buildAliases()
+		for alias, canonical := range first.aliasToCanonical {
+			if got := other.aliasToCanonical[alias]; got != canonical {
+				t.Fatalf("alias %q resolved to %q then %q across builds", alias, canonical, got)
+			}
+		}
+	}
+
+	if got := first.ResolveAlias("agi-nova-beta"); got != "agi" {
+		t.Fatalf("agi-nova-beta = %q, want agi (sorted-first claimant)", got)
+	}
+	if got := first.ResolveAlias("deepseek-v4-flash"); got != "deepseek-v4-flash" {
+		t.Fatalf("deepseek-v4-flash = %q, want itself because it is a canonical id", got)
+	}
+}

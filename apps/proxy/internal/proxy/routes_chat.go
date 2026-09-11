@@ -1,6 +1,9 @@
 package proxy
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 func chatCompletionsConfig(s *Service) endpointAdapter {
 	return endpointAdapter{
@@ -42,24 +45,45 @@ func buildChatCompletions(parsed parsedEndpointRequest, model string, stream boo
 	return body
 }
 
-func reasoningRequested(body map[string]any) bool {
+// reasoningDisabled reports whether the client explicitly turned thinking off.
+// pi sends `reasoning: {effort: "none"}` (and some clients send
+// `reasoning_effort: "none"` or `include_thoughts: false`) for models whose
+// thinking level map marks "off". These must not be treated as "reasoning
+// requested", otherwise the upstream keeps thinking and the reply loses its
+// answer budget.
+func reasoningDisabled(body map[string]any) bool {
 	if include, ok := body["include_thoughts"].(bool); ok {
-		return include
+		return !include
 	}
-	if effort := stringValue(body["reasoning_effort"]); effort != "" {
-		return effort != "none"
+	if effort := strings.ToLower(strings.TrimSpace(stringValue(body["reasoning_effort"]))); effort != "" {
+		return effort == "none"
 	}
 	if reasoning, ok := body["reasoning"].(map[string]any); ok {
 		includeValue := reasoning["include_thoughts"]
 		if includeValue == nil {
 			includeValue = reasoning["includeThoughts"]
 		}
-		if include, ok := includeValue.(bool); ok {
-			return include
+		if include, ok := includeValue.(bool); ok && !include {
+			return true
 		}
-		if effort := stringValue(reasoning["effort"]); effort != "" {
-			return effort != "none"
+		if effort := strings.ToLower(strings.TrimSpace(stringValue(reasoning["effort"]))); effort != "" {
+			return effort == "none"
 		}
+	}
+	return false
+}
+
+func reasoningRequested(body map[string]any) bool {
+	if reasoningDisabled(body) {
+		return false
+	}
+	if include, ok := body["include_thoughts"].(bool); ok {
+		return include
+	}
+	if effort := stringValue(body["reasoning_effort"]); effort != "" {
+		return true
+	}
+	if _, ok := body["reasoning"].(map[string]any); ok {
 		return true
 	}
 	return body["thinking_budget"] != nil

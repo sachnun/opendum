@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,12 @@ func normalizeResponsesInput(input []any) []any {
 		}
 		copyItem := cloneAnyMap(item)
 		typ := stringValue(copyItem["type"])
+		if typ == "" {
+			typ = inferResponsesInputType(copyItem)
+			if typ != "" {
+				copyItem["type"] = typ
+			}
+		}
 		if typ == "function_call" {
 			id := toResponsesAPIID(defaultStringValue(copyItem["id"], stringValue(copyItem["call_id"])))
 			copyItem["id"] = id
@@ -71,6 +78,28 @@ func normalizeResponsesInput(input []any) []any {
 		out = append(out, copyItem)
 	}
 	return out
+}
+
+// inferResponsesInputType resolves the item type for clients that send the
+// Responses API shorthand, most notably messages as `{role, content}` with no
+// `type` field. Upstream providers reject items without an explicit type.
+func inferResponsesInputType(item map[string]any) string {
+	if _, ok := item["summary"]; ok {
+		return "reasoning"
+	}
+	if _, ok := item["encrypted_content"]; ok {
+		return "reasoning"
+	}
+	if item["call_id"] != nil && item["name"] != nil {
+		return "function_call"
+	}
+	if item["call_id"] != nil && item["output"] != nil {
+		return "function_call_output"
+	}
+	if item["role"] != nil {
+		return "message"
+	}
+	return ""
 }
 
 func normalizeResponsesContent(content any, role string) any {
@@ -483,10 +512,10 @@ func chatCompletionToResponsesJSON(data map[string]any, model string) map[string
 	content := stringValue(message["content"])
 	reasoning := stringValue(message["reasoning_content"])
 	if reasoning != "" {
-		output = append(output, map[string]any{"type": "reasoning", "text": reasoning})
+		output = append(output, responsesReasoningItem(reasoning))
 	}
 	if content != "" {
-		output = append(output, map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": content}}})
+		output = append(output, responsesMessageItem(content))
 	}
 	if tcs, _ := message["tool_calls"].([]any); len(tcs) > 0 {
 		for _, raw := range tcs {
@@ -500,28 +529,247 @@ func chatCompletionToResponsesJSON(data map[string]any, model string) map[string
 				continue
 			}
 			id := toResponsesAPIID(stringValue(tc["id"]))
-			output = append(output, map[string]any{"type": "function_call", "id": id, "call_id": id, "name": name, "arguments": defaultStringValue(fn["arguments"], "{}")})
+			output = append(output, responsesFunctionCallItem(id, name, defaultStringValue(fn["arguments"], "{}")))
 		}
 	}
 	usage, _ := data["usage"].(map[string]any)
 	status := "completed"
+	var incompleteDetails any
 	if finishReason == "length" {
 		status = "incomplete"
+		incompleteDetails = map[string]any{"reason": "max_output_tokens"}
 	}
+	response := map[string]any{
+		"id":     randomID("resp"),
+		"object": "response",
+		"model":  model,
+		"output": output,
+		"status": status,
+		"usage":  responsesUsageFromChat(usage),
+	}
+	if incompleteDetails != nil {
+		response["incomplete_details"] = incompleteDetails
+	}
+	return response
+}
+
+func responsesReasoningItem(text string) map[string]any {
 	return map[string]any{
-		"id":      randomID("resp"),
-		"object":  "response",
-		"model":   model,
-		"output":  output,
-		"status":  status,
-		"usage":   map[string]any{"input_tokens": numberFromAny(usage["prompt_tokens"]), "output_tokens": numberFromAny(usage["completion_tokens"]), "total_tokens": numberFromAny(usage["prompt_tokens"]) + numberFromAny(usage["completion_tokens"])},
+		"id":      randomID("rs"),
+		"type":    "reasoning",
+		"status":  "completed",
+		"summary": []any{map[string]any{"type": "summary_text", "text": text}},
 	}
 }
 
-type chatToolCallState struct {
-	id   string
-	name string
-	args string
+func responsesMessageItem(text string) map[string]any {
+	return map[string]any{
+		"id":      randomID("msg"),
+		"type":    "message",
+		"role":    "assistant",
+		"status":  "completed",
+		"content": []any{map[string]any{"type": "output_text", "text": text, "annotations": []any{}}},
+	}
+}
+
+func responsesFunctionCallItem(id, name, arguments string) map[string]any {
+	return map[string]any{
+		"id":        id,
+		"type":      "function_call",
+		"status":    "completed",
+		"call_id":   id,
+		"name":      name,
+		"arguments": defaultStringValue(arguments, "{}"),
+	}
+}
+
+// responsesUsageFromChat maps Chat Completions usage onto the Responses usage
+// shape. OpenAI includes cached tokens inside input_tokens, and pi subtracts
+// input_tokens_details.cached_tokens to report cache reads.
+func responsesUsageFromChat(usage map[string]any) map[string]any {
+	input := numberFromAny(usage["prompt_tokens"])
+	output := numberFromAny(usage["completion_tokens"])
+	cached := 0
+	if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
+		cached = numberFromAny(details["cached_tokens"])
+	}
+	reasoning := 0
+	if details, ok := usage["completion_tokens_details"].(map[string]any); ok {
+		reasoning = numberFromAny(details["reasoning_tokens"])
+	}
+	return map[string]any{
+		"input_tokens":          input,
+		"input_tokens_details":  map[string]any{"cached_tokens": cached},
+		"output_tokens":         output,
+		"output_tokens_details": map[string]any{"reasoning_tokens": reasoning},
+		"total_tokens":          input + output,
+	}
+}
+
+// responsesSSEState tracks the output items emitted for a streamed Chat
+// Completions response. The Responses protocol addresses items by
+// output_index and requires a response.output_item.added event before any
+// delta for that index, so items are opened lazily as content appears.
+//
+// Reasoning and text are sequential in the Chat Completions protocol and share
+// one open slot. Tool calls are addressed by an explicit `index` and can
+// interleave, so each index keeps its own open item.
+type responsesSSEState struct {
+	writer       func(map[string]any)
+	model        string
+	responseID   string
+	sequence     int
+	items        []map[string]any
+	openKind     string
+	openID       string
+	openIndex    int
+	openText     strings.Builder
+	tools        map[int]*responsesOpenTool
+	toolOrder    []int
+	finishReason string
+	usage        map[string]any
+}
+
+type responsesOpenTool struct {
+	index int
+	id    string
+	name  string
+	args  strings.Builder
+}
+
+func (s *responsesSSEState) emit(event map[string]any) {
+	event["sequence_number"] = s.sequence
+	s.sequence++
+	s.writer(event)
+}
+
+func (s *responsesSSEState) appendItem(item map[string]any, index int) {
+	s.emit(map[string]any{"type": "response.output_item.done", "output_index": index, "item": item})
+	s.items = append(s.items, item)
+}
+
+func (s *responsesSSEState) closeOpenItem() {
+	if s.openKind == "" {
+		return
+	}
+	var item map[string]any
+	switch s.openKind {
+	case "reasoning":
+		item = responsesReasoningItem(s.openText.String())
+		item["id"] = s.openID
+	case "text":
+		item = responsesMessageItem(s.openText.String())
+		item["id"] = s.openID
+	}
+	if item != nil {
+		s.appendItem(item, s.openIndex)
+	}
+	s.openKind = ""
+	s.openID = ""
+	s.openText.Reset()
+}
+
+func (s *responsesSSEState) closeTool(index int) {
+	tool, ok := s.tools[index]
+	if !ok {
+		return
+	}
+	s.appendItem(responsesFunctionCallItem(tool.id, tool.name, tool.args.String()), tool.index)
+	delete(s.tools, index)
+}
+
+func (s *responsesSSEState) closeTools() {
+	for _, index := range s.toolOrder {
+		s.closeTool(index)
+	}
+	s.toolOrder = nil
+}
+
+func (s *responsesSSEState) closeAll() {
+	s.closeTools()
+	s.closeOpenItem()
+}
+
+func (s *responsesSSEState) ensureItem(kind, id string) {
+	if s.openKind == kind && s.openID == id {
+		return
+	}
+	s.closeTools()
+	s.closeOpenItem()
+	s.openKind = kind
+	s.openID = id
+	s.openIndex = len(s.items) + len(s.tools)
+	var item map[string]any
+	switch kind {
+	case "reasoning":
+		item = map[string]any{"id": id, "type": "reasoning", "status": "in_progress", "summary": []any{}}
+	case "text":
+		item = map[string]any{"id": id, "type": "message", "role": "assistant", "status": "in_progress", "content": []any{}}
+	}
+	s.emit(map[string]any{"type": "response.output_item.added", "output_index": s.openIndex, "item": item})
+}
+
+func (s *responsesSSEState) addReasoning(text string) {
+	if text == "" {
+		return
+	}
+	s.ensureItem("reasoning", "reasoning")
+	s.openText.WriteString(text)
+	s.emit(map[string]any{"type": "response.reasoning_text.delta", "delta": text, "item_id": s.openID, "output_index": s.openIndex, "content_index": 0})
+}
+
+func (s *responsesSSEState) addText(text string) {
+	if text == "" {
+		return
+	}
+	s.ensureItem("text", "message")
+	s.openText.WriteString(text)
+	s.emit(map[string]any{"type": "response.output_text.delta", "delta": text, "item_id": s.openID, "output_index": s.openIndex, "content_index": 0})
+}
+
+func (s *responsesSSEState) addToolDelta(index int, id, name, args string) {
+	if s.tools == nil {
+		s.tools = map[int]*responsesOpenTool{}
+	}
+	// Chat Completions streams tool call deltas that omit `id` on
+	// continuation chunks, so only the first chunk for an index carries it.
+	tool, ok := s.tools[index]
+	if !ok {
+		s.closeOpenItem()
+		if id == "" {
+			id = randomID("fc")
+		}
+		tool = &responsesOpenTool{index: len(s.items) + len(s.tools), id: id}
+		s.tools[index] = tool
+		s.toolOrder = append(s.toolOrder, index)
+		s.emit(map[string]any{"type": "response.output_item.added", "output_index": tool.index, "item": map[string]any{"id": tool.id, "type": "function_call", "status": "in_progress", "call_id": tool.id, "name": name, "arguments": ""}})
+	}
+	if name != "" && tool.name == "" {
+		tool.name = name
+	}
+	if args != "" {
+		tool.args.WriteString(args)
+		s.emit(map[string]any{"type": "response.function_call_arguments.delta", "delta": args, "item_id": tool.id, "output_index": tool.index})
+	}
+}
+
+func (s *responsesSSEState) complete() {
+	s.closeAll()
+	response := map[string]any{
+		"id":     s.responseID,
+		"object": "response",
+		"model":  s.model,
+		"output": s.items,
+		"status": "completed",
+		"usage":  responsesUsageFromChat(s.usage),
+	}
+	eventType := "response.completed"
+	if s.finishReason == "length" {
+		response["status"] = "incomplete"
+		response["incomplete_details"] = map[string]any{"reason": "max_output_tokens"}
+		eventType = "response.incomplete"
+	}
+	s.emit(map[string]any{"type": eventType, "response": response})
 }
 
 func chatSSEToResponsesSSEReader(source io.Reader, model string) io.Reader {
@@ -533,20 +781,60 @@ func chatSSEToResponsesSSEReader(source io.Reader, model string) io.Reader {
 	return reader
 }
 
-func transformChatSSEToResponses(source io.Reader, writer io.Writer, model string) {
-	responseID := randomID("resp")
-	outputItemID := randomID("item")
-	textContent := ""
-	reasoningContent := ""
-	toolCallsAt := map[int]chatToolCallState{}
-	toolCallIDs := []int{}
-	writtenToolCall := map[int]bool{}
-	var promptTokens, completionTokens int
+// AdaptChatResponseToResponses reshapes a Chat Completions upstream response
+// into the Responses API shape. Every provider that talks to a chat-completions
+// upstream must call this when the client requested /v1/responses, otherwise
+// Responses clients receive chat.completion payloads they cannot parse.
+func AdaptChatResponseToResponses(resp *http.Response, model string, stream bool) (*http.Response, error) {
+	if stream {
+		return sseResponse(chatSSEToResponsesSSEReader(resp.Body, model), resp.Body), nil
+	}
+	var data map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		_ = resp.Body.Close()
+		return nil, err
+	}
+	_ = resp.Body.Close()
+	return jsonResponse(http.StatusOK, chatCompletionToResponsesJSON(data, model)), nil
+}
 
+// ResponsesNativeProvider is implemented by providers whose upstream already
+// speaks the Responses API for a given model, so their responses must be passed
+// through instead of being converted.
+type ResponsesNativeProvider interface {
+	ResponsesNative(model string) bool
+}
+
+// AdaptForResponsesClient converts an upstream Chat Completions response into
+// the Responses API shape when the client requested /v1/responses. Providers
+// whose upstream already speaks the Responses protocol are passed through.
+//
+// This lives here rather than in each provider so every provider, including
+// ones with custom MakeRequest implementations, behaves consistently.
+func AdaptForResponsesClient(provider Provider, resp *http.Response, payload map[string]any, stream bool) (*http.Response, error) {
+	if _, wantsResponses := payload["_responsesInput"].([]any); !wantsResponses {
+		return resp, nil
+	}
+	model := stringValue(payload["model"])
+	if native, ok := provider.(ResponsesNativeProvider); ok && native.ResponsesNative(model) {
+		return resp, nil
+	}
+	return AdaptChatResponseToResponses(resp, model, stream)
+}
+
+func transformChatSSEToResponses(source io.Reader, writer io.Writer, model string) {
 	writeEvent := func(event map[string]any) {
 		encoded, _ := json.Marshal(event)
 		_, _ = writer.Write([]byte("data: " + string(encoded) + "\n\n"))
 	}
+
+	state := &responsesSSEState{
+		writer:     writeEvent,
+		model:      model,
+		responseID: randomID("resp"),
+		usage:      map[string]any{},
+	}
+	state.emit(map[string]any{"type": "response.created", "response": map[string]any{"id": state.responseID, "object": "response", "model": model, "status": "in_progress", "output": []any{}}})
 
 	scanner := bufio.NewScanner(source)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -563,93 +851,45 @@ func transformChatSSEToResponses(source io.Reader, writer io.Writer, model strin
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			continue
 		}
+		if usage, ok := chunk["usage"].(map[string]any); ok && len(usage) > 0 {
+			state.usage = usage
+		}
 		choices, _ := chunk["choices"].([]any)
 		if len(choices) == 0 {
-			if usage, ok := chunk["usage"].(map[string]any); ok {
-				promptTokens = numberFromAny(usage["prompt_tokens"])
-				completionTokens = numberFromAny(usage["completion_tokens"])
-			}
 			continue
 		}
 		choice, _ := choices[0].(map[string]any)
 		if choice == nil {
 			continue
 		}
+		if usage, ok := choice["usage"].(map[string]any); ok && len(usage) > 0 {
+			state.usage = usage
+		}
 		delta, _ := choice["delta"].(map[string]any)
-		finishReason, _ := choice["finish_reason"].(string)
+		if finishReason := stringValue(choice["finish_reason"]); finishReason != "" {
+			state.finishReason = finishReason
+		}
 
 		if delta != nil {
-			if content := stringValue(delta["content"]); content != "" {
-				textContent += content
-				writeEvent(map[string]any{"type": "response.output_text.delta", "delta": content, "item_id": outputItemID, "output_index": 0, "content_index": 0})
-			}
-			if reasoning := stringValue(delta["reasoning_content"]); reasoning != "" {
-				reasoningContent += reasoning
-				writeEvent(map[string]any{"type": "response.reasoning_text.delta", "delta": reasoning, "item_id": outputItemID, "output_index": 0, "content_index": 0})
-			}
+			state.addReasoning(stringValue(delta["reasoning_content"]))
+			state.addText(stringValue(delta["content"]))
 			if tcs, _ := delta["tool_calls"].([]any); len(tcs) > 0 {
 				for _, raw := range tcs {
 					tc, _ := raw.(map[string]any)
 					if tc == nil {
 						continue
 					}
-					idx := numberFromAny(tc["index"])
 					fn, _ := tc["function"].(map[string]any)
-					if fn == nil {
-						fn = map[string]any{}
-					}
-					if _, exists := toolCallsAt[idx]; !exists {
-						id := toResponsesAPIID(stringValue(tc["id"]))
-						name := stringValue(fn["name"])
-						toolCallsAt[idx] = chatToolCallState{id: id, name: name, args: ""}
-						toolCallIDs = append(toolCallIDs, idx)
-					}
-					entry := toolCallsAt[idx]
-					if args := stringValue(fn["arguments"]); args != "" {
-						entry.args += args
-						toolCallsAt[idx] = entry
-					}
-					if !writtenToolCall[idx] {
-						writeEvent(map[string]any{"type": "response.output_item.added", "item": map[string]any{"type": "function_call", "id": entry.id, "call_id": entry.id, "name": entry.name, "arguments": ""}})
-						writtenToolCall[idx] = true
-					}
-					if args := stringValue(fn["arguments"]); args != "" {
-						writeEvent(map[string]any{"type": "response.function_call_arguments.delta", "delta": args, "item_id": entry.id, "output_index": idx})
-					}
+					id := toResponsesAPIID(stringValue(tc["id"]))
+					state.addToolDelta(numberFromAny(tc["index"]), id, stringValue(fn["name"]), stringValue(fn["arguments"]))
 				}
 			}
 		}
 
-		if usage, ok := choice["usage"].(map[string]any); ok {
-			promptTokens = numberFromAny(usage["prompt_tokens"])
-			completionTokens = numberFromAny(usage["completion_tokens"])
-		}
-
-		if finishReason != "" {
-			output := []any{}
-			if reasoningContent != "" {
-				output = append(output, map[string]any{"type": "reasoning", "text": reasoningContent})
-			}
-			if textContent != "" {
-				output = append(output, map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": textContent}}})
-			}
-			for _, idx := range toolCallIDs {
-				if entry, ok := toolCallsAt[idx]; ok {
-					output = append(output, map[string]any{"type": "function_call", "id": entry.id, "call_id": entry.id, "name": entry.name, "arguments": entry.args})
-				}
-			}
-			status := "completed"
-			if finishReason == "length" {
-				status = "incomplete"
-			}
-			writeEvent(map[string]any{"type": "response.completed", "response": map[string]any{
-				"id":     responseID,
-				"object": "response",
-				"model":  model,
-				"output": output,
-				"status": status,
-				"usage":  map[string]any{"input_tokens": promptTokens, "output_tokens": completionTokens, "total_tokens": promptTokens + completionTokens},
-			}})
+		if state.finishReason != "" {
+			state.complete()
+			return
 		}
 	}
+	state.complete()
 }
