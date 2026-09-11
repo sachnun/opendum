@@ -404,7 +404,32 @@ func responseUsageToChatUsage(raw any) map[string]any {
 	if output == 0 {
 		output = numberFromAny(usage["completion_tokens"])
 	}
-	return map[string]any{"prompt_tokens": input, "completion_tokens": output, "total_tokens": input + output}
+	out := map[string]any{"prompt_tokens": input, "completion_tokens": output, "total_tokens": input + output}
+	cached := 0
+	if details, ok := usage["input_tokens_details"].(map[string]any); ok {
+		cached = numberFromAny(details["cached_tokens"])
+	}
+	if cached == 0 {
+		if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
+			cached = numberFromAny(details["cached_tokens"])
+		}
+	}
+	if cached > 0 {
+		out["prompt_tokens_details"] = map[string]any{"cached_tokens": cached}
+	}
+	reasoning := 0
+	if details, ok := usage["output_tokens_details"].(map[string]any); ok {
+		reasoning = numberFromAny(details["reasoning_tokens"])
+	}
+	if reasoning == 0 {
+		if details, ok := usage["completion_tokens_details"].(map[string]any); ok {
+			reasoning = numberFromAny(details["reasoning_tokens"])
+		}
+	}
+	if reasoning > 0 {
+		out["completion_tokens_details"] = map[string]any{"reasoning_tokens": reasoning}
+	}
+	return out
 }
 
 func responsesJSONToChatCompletion(data map[string]any, model string) map[string]any {
