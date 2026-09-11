@@ -2,7 +2,8 @@
   "providers": [
     "harbor",
     "workbuddy",
-    "zenmux"
+    "zenmux",
+    "hyper"
   ],
   "meta": {
     "reasoning": true,
