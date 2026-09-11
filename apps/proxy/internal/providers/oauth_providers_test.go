@@ -555,9 +555,8 @@ func TestAntigravityGemini3RaisesMaxTokensAboveThinkingBudget(t *testing.T) {
 	})
 	provider := antigravityProvider{registry: registry}.delegate()
 	body := map[string]any{
-		"model":      model,
-		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
-		"max_tokens": 8192,
+		"model":    model,
+		"messages": []any{map[string]any{"role": "user", "content": "hi"}},
 	}
 	resolved := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
 	if !strings.HasSuffix(resolved, "-high") {
@@ -572,6 +571,33 @@ func TestAntigravityGemini3RaisesMaxTokensAboveThinkingBudget(t *testing.T) {
 	thinking := generation["thinkingConfig"].(map[string]any)
 	if thinking["thinkingLevel"] != "high" {
 		t.Fatalf("thinking = %#v, want high", thinking)
+	}
+}
+
+func TestAntigravityGemini3HonorsClientMaxTokens(t *testing.T) {
+	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
+		return strings.HasPrefix(cfg.Upstream, "gemini-3") && customMap(cfg, "thinking_budgets") != nil
+	})
+	provider := antigravityProvider{registry: registry}.delegate()
+
+	// A client cap below the thinking budget must not be silently overridden.
+	body := map[string]any{
+		"model":      model,
+		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens": 8192,
+	}
+	resolved := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
+	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
+	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	if generation["maxOutputTokens"] != 8192 {
+		t.Fatalf("maxOutputTokens = %#v, want 8192 (client cap): %#v", generation["maxOutputTokens"], generation)
+	}
+	if thinking, ok := generation["thinkingConfig"].(map[string]any); ok {
+		if level := stringValue(thinking["thinkingLevel"]); level != "" {
+			t.Fatalf("thinkingLevel = %q, want empty because the cap cannot fit a budget", level)
+		}
 	}
 }
 
