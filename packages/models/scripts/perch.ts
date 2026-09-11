@@ -2,8 +2,8 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "./model-registry.mjs";
-import { fetchText } from "./lib/shared.mjs";
+import { syncProviderModels } from "../src/registry.ts";
+import { fetchText } from "../src/http.ts";
 
 const PROVIDER_NAME = "perch";
 
@@ -94,7 +94,7 @@ function buildModelMap(docNames) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const docNames = await fetchStarterPoolNames();
   const modelMap = buildModelMap(docNames);

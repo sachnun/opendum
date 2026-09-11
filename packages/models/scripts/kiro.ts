@@ -12,15 +12,15 @@
  * model IDs that the Kiro API may not accept for all accounts/regions.
  *
  * Usage:
- *   node scripts/kiro.mjs
- *   node scripts/kiro.mjs --dry-run
+ *   node scripts/kiro.ts
+ *   node scripts/kiro.ts --dry-run
  */
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+import { syncProviderModels } from "../src/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -438,7 +438,7 @@ async function main() {
 
   // 6. Sync into JSON files
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap, {
     providerConfigByModel,

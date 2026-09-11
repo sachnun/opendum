@@ -2,8 +2,8 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels, buildModelIndex, writeModelJson } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
+import { syncProviderModels, buildModelIndex, writeModelJson } from "../src/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
 
 const CODEX_MODELS_URL =
   "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json";
@@ -190,7 +190,7 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const allModels = await fetchCodexModels();
   const filtered = filterModels(allModels);

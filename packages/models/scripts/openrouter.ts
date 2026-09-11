@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, syncProviderModels } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+import { buildModelIdMap, syncProviderModels } from "../src/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
@@ -125,7 +125,7 @@ async function fetchOpenRouterFreeModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const modelIds = await fetchOpenRouterFreeModelIds();
   const modelMap = buildModelMap(modelIds);

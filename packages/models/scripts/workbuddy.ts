@@ -6,8 +6,8 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { fetchJson } from "./lib/shared.mjs";
+import { buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
+import { fetchJson } from "../src/http.ts";
 
 const PROVIDER_NAME = "workbuddy";
 const WORKBUDDY_NPM_PACKAGE = "@tencent-ai/codebuddy-code";
@@ -189,7 +189,7 @@ function enforceHouseIgnored(modelsDir) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const catalog = await fetchWorkbuddyCatalog();
   const { modelMap, metadataLookup } = buildModelMap(catalog);

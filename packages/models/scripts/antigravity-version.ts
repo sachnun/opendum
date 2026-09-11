@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { fetchText } from "./lib/shared.mjs";
+import { fetchText } from "../src/http.ts";
 
 const VERSION_SOURCES = [
   "https://releasebot.io/updates/google/antigravity",
@@ -18,13 +18,16 @@ const VERSION_SOURCES = [
 ];
 const FETCH_TIMEOUT_MS = 15_000;
 
+const PACKAGE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = resolve(PACKAGE_DIR, "../..");
+
 const PROXY_PROVIDER_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../apps/proxy/internal/providers/google_code_assist.go"
+  REPO_ROOT,
+  "apps/proxy/internal/providers/google_code_assist.go"
 );
 const DASHBOARD_CONSTANTS_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../apps/dashboard/server/lib/providers/antigravity/constants.ts"
+  REPO_ROOT,
+  "apps/dashboard/server/lib/providers/antigravity/constants.ts"
 );
 
 const PROXY_USER_AGENT_REGEX =

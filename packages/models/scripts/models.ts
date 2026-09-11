@@ -4,29 +4,28 @@ import { writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex } from "./model-registry.mjs";
+import { buildModelIndex } from "../src/registry.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "models");
+const modelsDir = resolve(scriptDir, "../data");
 
 const refreshScripts = [
-  "antigravity-version.mjs",
-  "antigravity-models.mjs",
-  "cline.mjs",
-  "codex.mjs",
-  "kilo-code.mjs",
-  "kiro.mjs",
-  "opencode.mjs",
-  "openrouter.mjs",
-  "perch.mjs",
-  "qoder.mjs",
-  "nvidia.mjs",
-  "cloudflare.mjs",
-  "zenmux.mjs",
-  "harbor.mjs",
-  "hyper.mjs",
-  "workbuddy.mjs",
+  "antigravity-version.ts",
+  "antigravity-models.ts",
+  "cline.ts",
+  "codex.ts",
+  "kilo-code.ts",
+  "kiro.ts",
+  "opencode.ts",
+  "openrouter.ts",
+  "perch.ts",
+  "qoder.ts",
+  "nvidia.ts",
+  "cloudflare.ts",
+  "zenmux.ts",
+  "harbor.ts",
+  "hyper.ts",
+  "workbuddy.ts",
 ];
 
 const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "qoder", "workers_ai", "workbuddy", "zenmux"];
@@ -35,10 +34,10 @@ const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "harbor", "hyper",
 // Run a child script
 // ---------------------------------------------------------------------------
 
-function runScript(scriptName) {
+function runScript(scriptName: string): Promise<void> {
   const scriptPath = resolve(scriptDir, scriptName);
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [scriptPath], {
+    const child = spawn(process.execPath, ["--import", "tsx", scriptPath], {
       stdio: "inherit",
     });
 
@@ -123,10 +122,10 @@ function generateSummary(before, after) {
 // Main
 // ---------------------------------------------------------------------------
 
-async function main() {
+async function main(): Promise<void> {
   const before = snapshotProviderModels();
 
-  const failures = [];
+  const failures: string[] = [];
 
   for (const scriptName of refreshScripts) {
     try {

@@ -1,17 +1,23 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { aliasesFromUpstream, isDateToken } from "./lib/clean-key.mjs";
+import { aliasesFromUpstream, isDateToken } from "./clean-key.ts";
+import { inferModelFolder } from "./families.ts";
+import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "./types.ts";
 
 const MODEL_FILE_EXTENSION = ".json";
 
 const MODEL_PROPERTY_ORDER = [
   "id",
+  "owner",
   "providers",
   "aliases",
   "description",
   "ignored",
   "meta",
+  "modalities",
+  "parameter",
+  "limit",
   "providerConfig",
 ];
 
@@ -26,15 +32,15 @@ const META_PROPERTY_ORDER = [
   "status",
 ];
 
-const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "authless", "minTier", "allowedTiers", "aliases"];
+const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "minTier", "allowedTiers", "aliases"];
 const FIRST_PROVIDERS = new Set(["opencode"]);
 
-function isPlainObject(value) {
+function isPlainObject(value: unknown): value is Record<string, JsonValue> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function orderObject(value, preferredKeys = []) {
-  const result = {};
+function orderObject(value: Record<string, JsonValue>, preferredKeys: string[] = []): Record<string, JsonValue> {
+  const result: Record<string, JsonValue> = {};
   const preferred = new Set(preferredKeys);
 
   for (const key of preferredKeys) {
@@ -52,8 +58,8 @@ function orderObject(value, preferredKeys = []) {
   return result;
 }
 
-function orderProviderMap(value, preferredKeys = []) {
-  const result = {};
+function orderProviderMap(value: Record<string, JsonValue>, preferredKeys: string[]): Record<string, JsonValue> {
+  const result: Record<string, JsonValue> = {};
   for (const provider of Object.keys(value).sort()) {
     result[provider] = isPlainObject(value[provider])
       ? orderObject(value[provider], preferredKeys)
@@ -62,8 +68,7 @@ function orderProviderMap(value, preferredKeys = []) {
   return result;
 }
 
-function orderProviders(value) {
-  if (!Array.isArray(value)) return value;
+function orderProviders(value: string[]): string[] {
   return [...value].sort((a, b) => {
     const aFirst = FIRST_PROVIDERS.has(a) ? 0 : 1;
     const bFirst = FIRST_PROVIDERS.has(b) ? 0 : 1;
@@ -71,8 +76,8 @@ function orderProviders(value) {
   });
 }
 
-function orderValue(value, key) {
-  if (key === "providers") return orderProviders(value);
+function orderValue(value: JsonValue, key?: string): JsonValue {
+  if (key === "providers" && Array.isArray(value)) return orderProviders(value as string[]);
   if (Array.isArray(value)) return value.map((item) => orderValue(item));
   if (!isPlainObject(value)) return value;
 
@@ -81,29 +86,29 @@ function orderValue(value, key) {
   return orderObject(value);
 }
 
-function normalizeModelData(data) {
+function normalizeModelData(data: ModelData): Record<string, JsonValue> {
   if (data && typeof data === "object" && !Array.isArray(data)) {
     delete data.family;
   }
-  return orderObject(data, MODEL_PROPERTY_ORDER);
+  return orderObject(data as Record<string, JsonValue>, MODEL_PROPERTY_ORDER);
 }
 
-function readModelJson(content) {
-  return JSON.parse(content);
+function readModelJson(content: string): ModelData {
+  return JSON.parse(content) as ModelData;
 }
 
-function getModelPublicId(data, fileId) {
+function getModelPublicId(data: ModelData, fileId: string): string {
   const id = typeof data.id === "string" ? data.id.trim() : "";
   return id || fileId;
 }
 
-export function writeModelJson(filePath, data) {
+export function writeModelJson(filePath: string, data: ModelData): void {
   const content = JSON.stringify(normalizeModelData(data), null, 2);
   writeFileSync(filePath, `${content}\n`);
 }
 
-function collectModelFiles(modelsDir) {
-  const files = [];
+function collectModelFiles(modelsDir: string): string[] {
+  const files: string[] = [];
   for (const entry of readdirSync(modelsDir)) {
     const fullPath = join(modelsDir, entry);
     const stat = statSync(fullPath);
@@ -121,8 +126,8 @@ function collectModelFiles(modelsDir) {
 }
 
 /** Build index: modelId -> { path, data } */
-export function buildModelIndex(modelsDir) {
-  const index = {};
+export function buildModelIndex(modelsDir: string): ModelIndex {
+  const index: ModelIndex = {};
   for (const filePath of collectModelFiles(modelsDir)) {
     const fileId = basename(filePath, MODEL_FILE_EXTENSION);
     const content = readFileSync(filePath, "utf-8");
@@ -132,54 +137,14 @@ export function buildModelIndex(modelsDir) {
   return index;
 }
 
-const FAMILY_RULES = [
-  { test: /^claude-/, folder: "anthropic", family: "Anthropic" },
-  { test: /^gpt($|-)|^chatgpt-|^o($|-)|^o\d/, folder: "openai", family: "OpenAI" },
-  { test: /^gemini-?|^gemma|^diffusiongemma/, folder: "google", family: "Google" },
-  { test: /^grok-?/, folder: "xai", family: "xAI" },
-  { test: /^llama|^codellama/, folder: "meta", family: "Meta" },
-  { test: /^phi-?/, folder: "microsoft", family: "Microsoft" },
-  { test: /^qwen|^qwq-/, folder: "qwen", family: "Qwen" },
-  { test: /^deepseek-?/, folder: "deepseek", family: "DeepSeek" },
-  { test: /^kilo-auto-?/, folder: "kilo-code", family: "Kilo Code" },
-  { test: /^kimi-?/, folder: "moonshot", family: "Moonshot" },
-  { test: /^minimax-?/, folder: "minimax", family: "MiniMax" },
-  { test: /^glm-?/, folder: "z-ai", family: "Z.AI" },
-  { test: /^mistral-|^codestral|^devstral|^ministral|^mamba-codestral|^magistral|^mixtral/, folder: "mistral", family: "Mistral" },
-  { test: /^nemotron-|^nim-?/, folder: "nvidia", family: "NVIDIA" },
-  { test: /^openrouter-?/, folder: "openrouter", family: "OpenRouter" },
-  { test: /^mimo-?/, folder: "xiaomi", family: "Xiaomi" },
-  { test: /^hunyuan|^hy3/, folder: "hunyuan", family: "Hunyuan" },
-  { test: /^ling-|^ring-|^ling/, folder: "inclusion-ai", family: "InclusionAI" },
-  { test: /^mai-code/, folder: "microsoft", family: "Microsoft" },
-  { test: /^nex-n|^nex-n2/, folder: "nex-agi", family: "Nex AGI" },
-  { test: /^north-/, folder: "cohere", family: "Cohere" },
-];
-
-const FAMILY_BY_FOLDER = Object.fromEntries(
-  FAMILY_RULES.map((rule) => [rule.folder, rule.family])
-);
-
-export function inferFamilyFromFolder(folderName) {
-  if (!folderName) return null;
-  return FAMILY_BY_FOLDER[folderName] ?? null;
-}
-
-function inferModelFolder(modelKey) {
-  for (const rule of FAMILY_RULES) {
-    if (rule.test.test(modelKey.toLowerCase())) return rule.folder;
-  }
-  return null;
-}
-
-function trailingDateToken(modelId) {
+function trailingDateToken(modelId: string): string | null {
   const segment = modelId.slice(modelId.lastIndexOf("/") + 1);
   const tokens = segment.split(/[-_]/);
   const tail = tokens[tokens.length - 1].split(":")[0];
   return isDateToken(tail) ? tail : null;
 }
 
-function compareCandidatesNewestFirst(left, right) {
+function compareCandidatesNewestFirst(left: { dateToken: string | null }, right: { dateToken: string | null }): number {
   if (left.dateToken === null && right.dateToken === null) return 0;
   if (left.dateToken === null) return -1;
   if (right.dateToken === null) return 1;
@@ -197,8 +162,8 @@ function compareCandidatesNewestFirst(left, right) {
  * older date-pinned variants under `base-<date>` so the registry merge turns
  * them into aliases instead of separate models.
  */
-export function buildModelIdMap(modelIds, toModelKey) {
-  const groups = new Map();
+export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string) => string): Map<string, string> {
+  const groups = new Map<string, Array<{ modelId: string; key: string; dateToken: string | null }>>();
 
   for (const modelId of modelIds) {
     const key = toModelKey(modelId);
@@ -210,11 +175,12 @@ export function buildModelIdMap(modelIds, toModelKey) {
         ? key.slice(0, key.length - dateToken.length - 1)
         : key;
 
-    if (!groups.has(baseKey)) groups.set(baseKey, []);
-    groups.get(baseKey).push({ modelId, key, dateToken });
+    const group = groups.get(baseKey);
+    if (group) group.push({ modelId, key, dateToken });
+    else groups.set(baseKey, [{ modelId, key, dateToken }]);
   }
 
-  const map = new Map();
+  const map = new Map<string, string>();
   for (const [baseKey, candidates] of groups) {
     candidates.sort(compareCandidatesNewestFirst);
 
@@ -245,18 +211,34 @@ export function buildModelIdMap(modelIds, toModelKey) {
  * @param {{ providerConfigByModel?: Map<string, Record<string, unknown>>, managedProviderConfigKeys?: string[] }} [options]
  * @returns {{ added: string[], removed: string[], updated: string[] }}
  */
-export function syncProviderModels(modelsDir, providerName, modelMap, options = {}) {
+export interface SyncOptions {
+  providerConfigByModel?: Map<string, Record<string, JsonValue>>;
+  managedProviderConfigKeys?: string[];
+}
+
+export interface SyncResult {
+  added: string[];
+  removed: string[];
+  updated: string[];
+}
+
+export function syncProviderModels(
+  modelsDir: string,
+  providerName: string,
+  modelMap: Map<string, string>,
+  options: SyncOptions = {},
+): SyncResult {
   const index = buildModelIndex(modelsDir);
   const modelUpstreams = new Set(modelMap.values());
-  const added = [];
-  const removed = [];
-  const updated = [];
+  const added: string[] = [];
+  const removed: string[] = [];
+  const updated: string[] = [];
 
-  function extraProviderConfig(modelKey) {
+  function extraProviderConfig(modelKey: string): Record<string, JsonValue> {
     return options.providerConfigByModel?.get(modelKey) ?? {};
   }
 
-  function findParentForCollision(modelKey, upstreamName) {
+  function findParentForCollision(modelKey: string, upstreamName: string): { baseKey: string; entry: ModelIndexEntry } | null {
     const entries = Object.values(index);
     if (index[modelKey]) return null;
 
@@ -307,7 +289,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
     modelMap.delete(modelKey);
   }
 
-  function applyManagedProviderConfig(providerConfig, modelKey) {
+  function applyManagedProviderConfig(providerConfig: Record<string, JsonValue>, modelKey: string): boolean {
     let changed = false;
     const extraConfig = extraProviderConfig(modelKey);
     const managedKeys = options.managedProviderConfigKeys ?? Object.keys(extraConfig);
@@ -330,7 +312,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
     return changed;
   }
 
-  function entryMatchesProviderMap(entry) {
+  function entryMatchesProviderMap(entry: ModelIndexEntry): boolean {
     if (modelMap.has(entry.fileId) || modelMap.has(entry.id)) return true;
     const upstream = getProviderUpstream(entry.data, providerName, entry.id);
     if (upstream && modelUpstreams.has(upstream)) return true;
@@ -338,7 +320,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
     return aliases.some((alias) => modelMap.has(alias) || modelUpstreams.has(alias));
   }
 
-  function findExistingEntry(modelKey, upstreamName) {
+  function findExistingEntry(modelKey: string, upstreamName: string): ModelIndexEntry | null {
     if (index[modelKey]) return index[modelKey];
 
     const entries = Object.values(index);
@@ -387,7 +369,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
       if (upstreamName !== existing.id || Object.keys(extraConfig).length > 0 || hasManagedProviderConfig || providerConfig.upstream !== undefined) {
         if (!existing.data.providerConfig) existing.data.providerConfig = {};
         if (!existing.data.providerConfig[providerName]) existing.data.providerConfig[providerName] = {};
-        const nextProviderConfig = existing.data.providerConfig[providerName];
+        const nextProviderConfig = existing.data.providerConfig[providerName] as Record<string, JsonValue>;
         if (applyManagedProviderConfig(nextProviderConfig, modelKey)) {
           changed = true;
         }
@@ -465,7 +447,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
         continue;
       }
 
-      const data = {
+      const data: ModelData = {
         providers: [providerName],
       };
 
@@ -487,7 +469,7 @@ export function syncProviderModels(modelsDir, providerName, modelMap, options = 
   return { added, removed, updated };
 }
 
-export function getProviderUpstream(data, providerName, modelId) {
+export function getProviderUpstream(data: ModelData, providerName: string, modelId: string): string | undefined {
   const providerConfig = data.providerConfig?.[providerName];
   if (
     providerConfig &&

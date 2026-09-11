@@ -118,6 +118,9 @@ importers:
       edgeone:
         specifier: ^1.6.34
         version: 1.6.37(debug@4.4.3(supports-color@10.2.2))(magicast@0.5.4)(supports-color@10.2.2)
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -133,6 +136,9 @@ importers:
       '@nuxt/fonts':
         specifier: ^0.14.0
         version: 0.14.0(db0@0.3.4(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)))(esbuild@0.28.2)(idb-keyval@6.3.0)(ioredis@5.11.1(supports-color@10.2.2))(magic-string@1.3.1)(magicast@0.5.4)(rolldown@1.2.8)(rollup@4.63.1)(vite@8.2.2(@types/node@26.5.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+      '@opendum/models':
+        specifier: workspace:*
+        version: link:../../packages/models
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -215,6 +221,18 @@ importers:
       vue-tsc:
         specifier: ^3.3.7
         version: 3.3.11(typescript@6.0.3)
+
+  packages/models:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.5.1
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
 packages:
 

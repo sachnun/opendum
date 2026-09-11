@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+import { buildModelIdMap, buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 const KILO_CODE_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 
@@ -87,7 +87,7 @@ async function fetchKiloCodeModels() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const models = await fetchKiloCodeModels();
   const modelMap = buildModelMap(models);

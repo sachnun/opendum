@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { syncProviderModels } from "./model-registry.mjs";
-import { fetchJson } from "./lib/shared.mjs";
+import { syncProviderModels } from "../src/registry.ts";
+import { fetchJson } from "../src/http.ts";
 
 const PROVIDER_NAME = "qoder";
 const QODER_MODELS_PACKAGE = "opencode-qoder";
@@ -97,7 +97,7 @@ function buildModelMap(catalog) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const catalog = await fetchQoderCatalog();
   const modelMap = buildModelMap(catalog);

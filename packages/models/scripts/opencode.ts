@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "./model-registry.mjs";
-import { fetchText, fetchJson } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+import { syncProviderModels } from "../src/registry.ts";
+import { fetchText, fetchJson } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
@@ -155,7 +155,7 @@ function buildProviderConfigByModel(modelMap, endpointByModelId) {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const { freeModelIds, endpointByModelId } = await fetchOpencodeFreeModelIds();
   const modelMap = buildModelMap(freeModelIds);

@@ -75,7 +75,7 @@ export const PARAMETER_INFO_PATTERNS = Object.freeze({
   MODALITY_DESCRIPTOR,
 });
 
-export function isDateToken(token) {
+export function isDateToken(token: string): boolean {
   if (!DATE_CANDIDATE.test(token)) return false;
 
   if (token.length === 4) {
@@ -100,11 +100,11 @@ export function isDateToken(token) {
   return month >= 1 && month <= 12;
 }
 
-function isBehaviorDescriptor(token) {
+function isBehaviorDescriptor(token: string): boolean {
   return BEHAVIOR_DESCRIPTOR.test(token);
 }
 
-function isPairableMoESuffix(token) {
+function isPairableMoESuffix(token: string): boolean {
   return ACTIVE_PARAMS_SUFFIX.test(token) || EXPERT_COUNT_SUFFIX.test(token);
 }
 
@@ -117,8 +117,11 @@ function isPairableMoESuffix(token) {
  * Pass `{ keepDates: true }` to preserve trailing date tokens so callers
  * can build a dated variant key for a canonical base model.
  */
-export function stripParamInfoKey(modelKey, options = {}) {
-  if (typeof modelKey !== "string" || modelKey.length === 0) return modelKey;
+export function stripParamInfoKey(
+  modelKey: string | null | undefined,
+  options: { keepDescriptors?: boolean; keepDates?: boolean } = {},
+): string {
+  if (typeof modelKey !== "string" || modelKey.length === 0) return modelKey as string;
   const keepDates = options && options.keepDates === true;
 
   const tokens = modelKey.split(/[-_]/);
@@ -174,10 +177,18 @@ for (let i = 0; i < end; i += 1) {
  * The migration layer uses this so even after the basename is stripped,
  * the semantic info is preserved.
  */
-export function extractDescriptors(modelKey) {
+export interface ModelDescriptors {
+  reasoning?: boolean;
+  type?: string;
+  status?: string;
+  code?: boolean;
+  variant?: string;
+}
+
+export function extractDescriptors(modelKey: string | null | undefined): ModelDescriptors {
   if (typeof modelKey !== "string" || modelKey.length === 0) return {};
   const tokens = modelKey.split(/[-_]/);
-  const out = {};
+  const out: ModelDescriptors = {};
   for (const token of tokens) {
     if (DESCRIPTOR_TO_META.reasoning.test(token)) {
       out.reasoning = true;
@@ -206,8 +217,8 @@ export function extractDescriptors(modelKey) {
 /**
  * Generate kebab-fallback aliases for `provider/name` style upstream ids.
  */
-export function aliasesFromUpstream(upstreamNames) {
-  const aliases = new Set();
+export function aliasesFromUpstream(upstreamNames?: string[] | null): string[] {
+  const aliases = new Set<string>();
   if (!upstreamNames) return [];
 
   for (const name of upstreamNames) {
@@ -225,7 +236,7 @@ export function aliasesFromUpstream(upstreamNames) {
  * Extract the dominant size magnitude from a basename (e.g. `70b`->70,
  * `550b-a55b`->550). Used to pick a winner during collision-merge.
  */
-export function largestSizeValue(modelKey) {
+export function largestSizeValue(modelKey: string): number {
   if (typeof modelKey !== "string" || modelKey.length === 0) return 0;
   let largest = 0;
   const matches = modelKey.match(/[0-9]+(?:\.[0-9]+)?[bm]/gi) || [];

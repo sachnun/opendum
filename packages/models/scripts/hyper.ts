@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { fetchJson } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+import { buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
+import { fetchJson } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 const PROVIDER_NAME = "hyper";
 const HYPER_MODELS_URL = "https://hyper.charm.land/v1/models";
@@ -109,7 +109,7 @@ async function fetchHyperModels() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   const models = await fetchHyperModels();
   const modelMap = buildModelMap(models);

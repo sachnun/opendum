@@ -7,7 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-proxy.yml
       - apps/proxy/**
-      - models/**
+      - packages/models/**
   workflow_run:
     workflows:
       - Refresh Provider Models

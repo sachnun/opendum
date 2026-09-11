@@ -17,9 +17,9 @@ import {
   getProviderUpstream,
   syncProviderModels,
   writeModelJson,
-} from "./model-registry.mjs";
-import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+} from "../src/registry.ts";
+import { fetchJson, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 const PROVIDER_NAME = "workers_ai";
 const WORKERS_AI_MODELS_API_URL = "https://api.github.com/repos/cloudflare/cloudflare-docs/contents/src/content/workers-ai-models?ref=production";
@@ -245,7 +245,7 @@ async function fetchWorkersAIModels() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
   const reverseMap = buildReverseMap(modelsDir);
 
   const models = await fetchWorkersAIModels();

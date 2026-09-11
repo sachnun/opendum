@@ -11,16 +11,16 @@
  * Source: https://antigravity.google/docs/models
  *
  * Usage:
- *   node scripts/antigravity-models.mjs
- *   node scripts/antigravity-models.mjs --dry-run
+ *   node scripts/antigravity-models.ts
+ *   node scripts/antigravity-models.ts --dry-run
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, writeModelJson } from "./model-registry.mjs";
-import { fetchText } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+import { buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
+import { fetchText } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -30,11 +30,12 @@ const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const rootDir = resolve(scriptDir, "..");
-const modelsDir = resolve(rootDir, "models");
+const packageDir = resolve(scriptDir, "..");
+const repoRoot = resolve(packageDir, "../..");
+const modelsDir = resolve(packageDir, "data");
 
 const QUOTA_TS_PATH = resolve(
-  rootDir,
+  repoRoot,
   "apps/dashboard/server/lib/providers/antigravity/quota.ts"
 );
 

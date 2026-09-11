@@ -7,7 +7,7 @@ import {
   aliasesFromUpstream,
   largestSizeValue,
   PARAMETER_INFO_PATTERNS,
-} from "./clean-key.mjs";
+} from "./clean-key.ts";
 
 test("stripParamInfoKey preserves empty input", () => {
   assert.equal(stripParamInfoKey(""), "");
@@ -210,7 +210,7 @@ test("PARAMETER_INFO_PATTERNS exposes regex constants", () => {
 });
 
 test("toModelKey helper (openrouter.mjs) correctly trims trailing -free", () => {
-  function toModelKey(modelId) {
+  function toModelKey(modelId: string) {
     const normalizedModelId = modelId.replace(/^library\//, "");
     const providerStrippedModelId =
       normalizedModelId === "openrouter/free"
@@ -254,7 +254,7 @@ test("toModelKey helper (openrouter.mjs) correctly trims trailing -free", () => 
 });
 
 test("toModelKey regression: positive slice would have collapsed keys (must NOT happen)", () => {
-  function buggyTrim(cleaned) {
+  function buggyTrim(cleaned: string) {
     return cleaned.slice(0, "-free".length);
   }
 
@@ -272,7 +272,7 @@ test("toModelKey regression: positive slice would have collapsed keys (must NOT 
 });
 
 test("toModelKey preserves openrouter/free special-case", () => {
-  function toModelKey(modelId) {
+  function toModelKey(modelId: string) {
     const normalizedModelId = modelId.replace(/^library\//, "");
     const providerStrippedModelId =
       normalizedModelId === "openrouter/free"

@@ -2,9 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIndex, syncProviderModels, getProviderUpstream } from "./model-registry.mjs";
-import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "./lib/shared.mjs";
-import { stripParamInfoKey } from "./lib/clean-key.mjs";
+import { buildModelIndex, syncProviderModels, getProviderUpstream } from "../src/registry.ts";
+import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
+import { stripParamInfoKey } from "../src/clean-key.ts";
 
 const PROVIDER_NAME = "nvidia_nim";
 const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
@@ -297,7 +297,7 @@ async function fetchNvidiaModelIds() {
 
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const modelsDir = resolve(scriptDir, "../models");
+  const modelsDir = resolve(scriptDir, "../data");
 
   // Build existing model map from JSON files to preserve existing keys
   const index = buildModelIndex(modelsDir);
