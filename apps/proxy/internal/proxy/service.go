@@ -26,6 +26,11 @@ const (
 	playgroundTimestampHeader = "X-Opendum-Playground-Timestamp"
 	playgroundSignatureHeader = "X-Opendum-Playground-Signature"
 	playgroundAuthWindow      = 2 * time.Minute
+
+	// upstreamResponseHeaderTimeout bounds the wait for provider response
+	// headers. Reasoning models can take a while to emit the first token, so
+	// this is generous while still letting a stalled provider fail over.
+	upstreamResponseHeaderTimeout = 90 * time.Second
 )
 
 type Service struct {
@@ -50,10 +55,32 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		providerRegistry: providerRegistry,
 		affinity:         sessionaffinity.New(redisClient, providerRegistry.Names()),
 		secret:           secret,
-		client:           &http.Client{Timeout: 0},
+		client:           newUpstreamClient(),
 	}
 	service.quotaFetcherRegistry()
 	return service
+}
+
+// newUpstreamClient builds the HTTP client used for provider requests.
+//
+// There is deliberately no overall Client.Timeout: responses stream for as long
+// as the model keeps generating. ResponseHeaderTimeout still bounds the wait
+// for the first byte, so a stalled provider fails over through account rotation
+// instead of hanging until the edge proxy returns a 504.
+func newUpstreamClient() *http.Client {
+	return &http.Client{
+		Timeout: 0,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          200,
+			MaxIdleConnsPerHost:   32,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   15 * time.Second,
+			ResponseHeaderTimeout: upstreamResponseHeaderTimeout,
+			ExpectContinueTimeout: time.Second,
+		},
+	}
 }
 
 func (s *Service) SetTorEgress(tor providers.TorEgress, torClient *http.Client) {
