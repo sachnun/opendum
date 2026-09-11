@@ -1,0 +1,43 @@
+{
+  "owner": "minimax",
+  "providers": [
+    "perch",
+    "hyper"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 204800,
+    "output": 6553
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 262100,
+      "maxOutputTokens": 6553
+    },
+    "perch": {
+      "upstream": "minimax-m2.7-free",
+      "contextWindow": 204800,
+      "maxOutputTokens": 131072
+    }
+  }
+}

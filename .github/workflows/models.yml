@@ -3,7 +3,7 @@ name: Refresh Provider Models
 on:
   workflow_dispatch:
   schedule:
-    - cron: "22 3 * * *"
+    - cron: "0 */5 * * *"
 
 permissions:
   contents: write
@@ -18,13 +18,20 @@ jobs:
         with:
           ref: main
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Refresh provider models
-        run: npm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
+        run: pnpm run models:refresh --summary "$RUNNER_TEMP/summary.md"
 
       - name: Build commit message
         id: commit_msg

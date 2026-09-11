@@ -1,0 +1,33 @@
+{
+  "owner": "inclusion-ai",
+  "providers": [
+    "zenmux"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262144,
+    "output": 32768
+  },
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "inclusionai/ling-3.0-tiny",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
+    }
+  }
+}

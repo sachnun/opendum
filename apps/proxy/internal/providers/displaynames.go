@@ -6,7 +6,7 @@ var providerDisplayNames = map[string]string{
 	"cline":       "Cline",
 	"codex":       "Codex",
 	"harbor":      "Harbor",
-	"hyper":       "Hyper",
+	"hyper":       "Charm",
 	"kiro":        "Kiro",
 	"nvidia_nim":  "Nvidia",
 	"openrouter":  "OpenRouter",

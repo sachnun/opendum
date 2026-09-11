@@ -1,0 +1,47 @@
+{
+  "owner": "anthropic",
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-4-5-1m",
+    "claude-sonnet-4.5-1m",
+    "claude-sonnet-4.5",
+    "claude-sonnet4.5"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 64000
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "claude-sonnet-4.5-1m",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000
+    }
+  }
+}

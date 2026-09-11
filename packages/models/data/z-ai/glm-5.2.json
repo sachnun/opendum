@@ -1,0 +1,48 @@
+{
+  "owner": "z-ai",
+  "providers": [
+    "qoder",
+    "hyper",
+    "workbuddy"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 32768
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 32768
+    },
+    "qoder": {
+      "upstream": "gm51model",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
+    },
+    "workbuddy": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
+    }
+  }
+}

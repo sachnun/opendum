@@ -1,0 +1,33 @@
+{
+  "owner": "qwen",
+  "providers": [
+    "hyper"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 128000
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "qwen3.8-2.4t-a95b",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

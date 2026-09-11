@@ -1,0 +1,38 @@
+{
+  "owner": "inclusion-ai",
+  "providers": [
+    "zenmux"
+  ],
+  "aliases": [
+    "ling-2.6-1t"
+  ],
+  "ignored": false,
+  "meta": {},
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262000,
+    "output": 65000
+  },
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "inclusionai/ling-2.6-1t",
+      "contextWindow": 262000,
+      "maxOutputTokens": 65000
+    }
+  }
+}

@@ -647,11 +647,11 @@ func (s *Service) fetchHyperQuota(ctx context.Context, account appdb.ProviderAcc
 		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
 	}
 	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return errorQuotaInfo(account, fmt.Sprintf("Hyper credits endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
+		return errorQuotaInfo(account, fmt.Sprintf("Charm credits endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(result.Raw, &payload); err != nil {
-		return errorQuotaInfo(account, "Hyper credits response was not valid JSON", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Charm credits response was not valid JSON", time.Now().UnixMilli())
 	}
 	s.putQuotaJSONCache(ctx, result)
 	return baseQuotaInfo(account, "success", hyperGroups(payload), time.Now().UnixMilli(), "")
@@ -661,10 +661,10 @@ func hyperGroups(payload map[string]any) []quotaGroupDisplay {
 	balance, hasBalance := parseQuotaNumber(payload["balance"])
 	if !hasBalance {
 		label := "active"
-		return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance (USD)", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
+		return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
 	}
 	// 1 hypercredit = $0.05
 	usd := balance * 0.05
 	label := fmt.Sprintf("$%.2f", usd)
-	return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance (USD)", Models: []string{}, RemainingFraction: 1, RemainingRequests: usd, MaxRequests: usd, UsedRequests: 0, PercentUsed: 0, IsExhausted: balance <= 0, IsEstimated: true, Confidence: "medium", RemainingLabel: &label}}
+	return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: usd, MaxRequests: usd, UsedRequests: 0, PercentUsed: 0, IsExhausted: balance <= 0, IsEstimated: true, Confidence: "medium", RemainingLabel: &label}}
 }

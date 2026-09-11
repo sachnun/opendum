@@ -1,0 +1,42 @@
+{
+  "owner": "inclusion-ai",
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 524288,
+    "output": 262144
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "thinkingmachines/inkling-small:free",
+      "contextWindow": 524288,
+      "maxOutputTokens": 262144,
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "thinkingmachines/inkling-small:free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 262144
+    }
+  }
+}

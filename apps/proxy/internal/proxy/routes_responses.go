@@ -1,6 +1,9 @@
 package proxy
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 func responsesConfig(s *Service) endpointAdapter {
 	return endpointAdapter{
@@ -127,6 +130,7 @@ func convertResponsesInputToMessages(input []any, instructions string) []any {
 		messages = append(messages, map[string]any{"role": "system", "content": instructions})
 	}
 	pendingToolCalls := []map[string]any{}
+	pendingReasoning := ""
 	flushToolCalls := func() {
 		if len(pendingToolCalls) == 0 {
 			return
@@ -135,7 +139,12 @@ func convertResponsesInputToMessages(input []any, instructions string) []any {
 		for _, call := range pendingToolCalls {
 			calls = append(calls, call)
 		}
-		messages = append(messages, map[string]any{"role": "assistant", "content": "", "tool_calls": calls})
+		message := map[string]any{"role": "assistant", "content": "", "tool_calls": calls}
+		if pendingReasoning != "" {
+			message["reasoning_content"] = pendingReasoning
+			pendingReasoning = ""
+		}
+		messages = append(messages, message)
 		pendingToolCalls = []map[string]any{}
 	}
 	for _, raw := range input {
@@ -143,8 +152,7 @@ func convertResponsesInputToMessages(input []any, instructions string) []any {
 		if !ok {
 			continue
 		}
-		typeValue, _ := item["type"].(string)
-		switch typeValue {
+		switch responsesInputItemType(item) {
 		case "message":
 			flushToolCalls()
 			role, _ := item["role"].(string)
@@ -154,7 +162,20 @@ func convertResponsesInputToMessages(input []any, instructions string) []any {
 			if role == "" {
 				role = "user"
 			}
-			messages = append(messages, map[string]any{"role": role, "content": responsesContentToChat(item["content"])})
+			message := map[string]any{"role": role, "content": responsesContentToChat(item["content"])}
+			if role == "assistant" && pendingReasoning != "" {
+				message["reasoning_content"] = pendingReasoning
+				pendingReasoning = ""
+			}
+			messages = append(messages, message)
+		case "reasoning":
+			if text := responsesReasoningText(item); text != "" {
+				if pendingReasoning != "" {
+					pendingReasoning += "\n\n" + text
+				} else {
+					pendingReasoning = text
+				}
+			}
 		case "function_call":
 			id := stringValue(item["call_id"])
 			if id == "" {
@@ -167,11 +188,88 @@ func convertResponsesInputToMessages(input []any, instructions string) []any {
 			pendingToolCalls = append(pendingToolCalls, map[string]any{"id": id, "type": "function", "function": map[string]any{"name": stringValue(item["name"]), "arguments": defaultStringValue(item["arguments"], "{}")}})
 		case "function_call_output":
 			flushToolCalls()
-			messages = append(messages, map[string]any{"role": "tool", "content": defaultStringValue(item["output"], ""), "tool_call_id": normalizeCallID(stringValue(item["call_id"]))})
+			messages = append(messages, map[string]any{"role": "tool", "content": responsesToolOutputText(item["output"]), "tool_call_id": normalizeCallID(stringValue(item["call_id"]))})
 		}
 	}
 	flushToolCalls()
 	return messages
+}
+
+// responsesInputItemType infers the item type when a client omits it. The OpenAI
+// Responses API accepts shorthand message items without a `type` field, and pi
+// sends messages as `{role, content}` only.
+func responsesInputItemType(item map[string]any) string {
+	if typ := stringValue(item["type"]); typ != "" {
+		return typ
+	}
+	if _, ok := item["summary"]; ok {
+		return "reasoning"
+	}
+	if _, ok := item["encrypted_content"]; ok {
+		return "reasoning"
+	}
+	if item["call_id"] != nil && item["name"] != nil {
+		return "function_call"
+	}
+	if item["call_id"] != nil && item["output"] != nil {
+		return "function_call_output"
+	}
+	if item["role"] != nil {
+		return "message"
+	}
+	return ""
+}
+
+func responsesReasoningText(item map[string]any) string {
+	parts := []string{}
+	if summary, ok := item["summary"].([]any); ok {
+		for _, raw := range summary {
+			if text := responsesReasoningPartText(raw); text != "" {
+				parts = append(parts, text)
+			}
+		}
+	}
+	if content, ok := item["content"].([]any); ok {
+		for _, raw := range content {
+			if text := responsesReasoningPartText(raw); text != "" {
+				parts = append(parts, text)
+			}
+		}
+	}
+	if len(parts) == 0 {
+		if text := stringValue(item["text"]); text != "" {
+			return text
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func responsesReasoningPartText(raw any) string {
+	if text, ok := raw.(string); ok {
+		return text
+	}
+	if part, ok := raw.(map[string]any); ok {
+		return stringValue(part["text"])
+	}
+	return ""
+}
+
+func responsesToolOutputText(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	if parts, ok := value.([]any); ok {
+		chunks := []string{}
+		for _, raw := range parts {
+			if part, ok := raw.(map[string]any); ok {
+				if text := stringValue(part["text"]); text != "" {
+					chunks = append(chunks, text)
+				}
+			}
+		}
+		return strings.Join(chunks, "\n")
+	}
+	return ""
 }
 
 func normalizeCallID(id string) string {

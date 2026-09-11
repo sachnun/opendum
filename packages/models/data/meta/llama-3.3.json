@@ -1,0 +1,54 @@
+{
+  "owner": "meta",
+  "providers": [
+    "workers_ai",
+    "hyper"
+  ],
+  "aliases": [
+    "llama-3.3-70b-instruct",
+    "meta-llama-3.3-70b-instruct",
+    "meta/llama-3.3-70b-instruct",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "llama-3.3-instruct"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 24000,
+    "output": 12800
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "llama-3.3-70b-instruct",
+      "contextWindow": 128000,
+      "maxOutputTokens": 12800
+    },
+    "workers_ai": {
+      "upstream": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "contextWindow": 24000,
+      "maxOutputTokens": 24000
+    }
+  }
+}

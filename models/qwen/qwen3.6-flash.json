@@ -1,9 +1,0 @@
-{
-  "providers": [
-    "hyper"
-  ],
-  "meta": {
-    "toolCall": true,
-    "vision": true
-  }
-}

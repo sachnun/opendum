@@ -26,6 +26,11 @@ import (
 )
 
 const googleOAuthTokenEndpoint = "https://oauth2.googleapis.com/token"
+
+// minThinkingBudget is the smallest thinking budget worth sending. Below this
+// the model cannot both think and answer within the client's output cap, so
+// thinking is disabled instead of silently raising max_tokens.
+const minThinkingBudget = 1024
 const antigravitySignatureCachePrefix = "opendum:thought-signature"
 const antigravitySignatureCacheTTL = 24 * time.Hour
 const antigravityClaudeBetaHeader = "interleaved-thinking-2025-05-14"
@@ -358,7 +363,10 @@ func (p googleCodeAssistProvider) normalizeCachedContent(payload map[string]any)
 func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any, model string) {
 	generation, _ := payload["generationConfig"].(map[string]any)
 	if generation == nil {
-		if providerConfigBool(p.registry, model, p.name, "thinking_model") || isTieredGemini3Model(model) {
+		// Gemini 3 thinking is controlled through generationConfig.thinkingConfig,
+		// so the container must exist even when the client sent no sampling
+		// params. Otherwise thinking silently disappears for these models.
+		if providerConfigBool(p.registry, model, p.name, "thinking_model") || isTieredGemini3Model(model) || isGemini3ModelName(model) {
 			generation = map[string]any{}
 			payload["generationConfig"] = generation
 		} else {
@@ -368,8 +376,14 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 	rawThinking, _ := generation["thinkingConfig"].(map[string]any)
 	if isGemini3ModelName(model) {
 		if thinking := p.normalizeGemini3ThinkingConfig(rawThinking, model); thinking != nil {
+			level := p.fitGemini3ThinkingLevel(generation, model, stringValue(thinking["thinkingLevel"]))
+			if level == "" {
+				delete(generation, "thinkingConfig")
+				return
+			}
+			thinking["thinkingLevel"] = level
 			generation["thinkingConfig"] = thinking
-			p.ensureGemini3MaxOutputTokens(generation, model, stringValue(thinking["thinkingLevel"]))
+			p.ensureGemini3MaxOutputTokens(generation, model, level)
 		} else {
 			delete(generation, "thinkingConfig")
 		}
@@ -396,9 +410,27 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 		generation["thinkingConfig"] = finalThinking
 		budget := numberFromAny(defaultAny(thinking["thinkingBudget"], thinking["thinking_budget"]))
 		if budget > 0 {
-			if maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"])); maxTokens == 0 || maxTokens <= budget {
+			maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"]))
+			if maxTokens == 0 {
+				// No client cap: raise the output budget so thinking has room.
 				generation["maxOutputTokens"] = 64000
 				delete(generation, "max_output_tokens")
+			} else if maxTokens <= budget {
+				// The client capped output below the thinking budget. Never override
+				// the client's max_tokens; shrink the budget to leave room for the
+				// answer, and drop thinking entirely when the cap cannot fit a
+				// useful budget.
+				clamped := maxTokens / 2
+				if clamped < minThinkingBudget {
+					delete(generation, "thinkingConfig")
+					return
+				}
+				if _, ok := finalThinking["thinkingBudget"]; ok {
+					finalThinking["thinkingBudget"] = clamped
+				}
+				if _, ok := finalThinking["thinking_budget"]; ok {
+					finalThinking["thinking_budget"] = clamped
+				}
 			}
 		}
 		return
@@ -1487,10 +1519,37 @@ func (p googleCodeAssistProvider) ensureGemini3MaxOutputTokens(generation map[st
 	if budget <= 0 {
 		return
 	}
-	if maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"])); maxTokens == 0 || maxTokens <= budget {
+	maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"]))
+	if maxTokens == 0 {
 		generation["maxOutputTokens"] = 64000
 		delete(generation, "max_output_tokens")
 	}
+}
+
+// fitGemini3ThinkingLevel downgrades a Gemini 3 thinking level until its budget
+// fits inside the client's max_tokens. It returns an empty level when even the
+// cheapest level would consume the whole cap, signalling that thinking should
+// be dropped rather than silently overriding the client's max_tokens.
+func (p googleCodeAssistProvider) fitGemini3ThinkingLevel(generation map[string]any, model, level string) string {
+	maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"]))
+	if maxTokens <= 0 {
+		return level
+	}
+	budgets := providerConfigIntMap(p.registry, model, p.name, "thinking_budgets")
+	if len(budgets) == 0 {
+		return level
+	}
+	for _, candidate := range []string{"minimal", "low", "medium", "high", "xhigh"} {
+		budget := budgets[candidate]
+		if budget <= 0 || budget > maxTokens/2 {
+			continue
+		}
+		if normalized := p.normalizeGemini3ThinkingLevel(model, candidate); normalized != "" {
+			return normalized
+		}
+		return candidate
+	}
+	return ""
 }
 
 func isGemini3ModelName(model string) bool {

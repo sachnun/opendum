@@ -15,6 +15,7 @@ import (
 	"github.com/opendum/opendum/apps/proxy/internal/auth"
 	"github.com/opendum/opendum/apps/proxy/internal/config"
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+	"github.com/opendum/opendum/apps/proxy/internal/egress/tor"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 	"github.com/opendum/opendum/apps/proxy/internal/proxy"
 	"github.com/opendum/opendum/apps/proxy/internal/redisclient"
@@ -49,6 +50,11 @@ func main() {
 
 	authSvc := auth.NewService(database, redisClient, registry)
 	proxySvc := proxy.NewService(database, redisClient, authSvc, registry, cfg.BetterAuthSecret)
+	torPool := tor.NewPool(3, 0, 0, 0, 0)
+	torPool.Start(context.Background())
+	proxySvc.SetTorEgress(torPool, torPool.NewClient())
+	defer torPool.Close()
+	slog.Info("Tor fallback pool warming", "circuits", 3)
 	refreshCtx, stopTokenRefresher := context.WithCancel(context.Background())
 	defer stopTokenRefresher()
 	if cfg.TokenRefreshInterval > 0 {

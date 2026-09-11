@@ -90,15 +90,20 @@ func resolveModelsDir(configured string) (string, error) {
 	}
 
 	candidates := []string{
+		"packages/models/data",
 		"models",
+		"../../packages/models/data",
 		"../../models",
+		"../../../packages/models/data",
 		"../../../models",
 	}
 
 	if executable, err := os.Executable(); err == nil {
 		execDir := filepath.Dir(executable)
 		candidates = append(candidates,
+			filepath.Join(execDir, "..", "packages", "models", "data"),
 			filepath.Join(execDir, "..", "models"),
+			filepath.Join(execDir, "..", "..", "packages", "models", "data"),
 			filepath.Join(execDir, "..", "..", "models"),
 		)
 	}

@@ -1,0 +1,49 @@
+{
+  "id": "mistral-small-3.1",
+  "owner": "mistral",
+  "providers": [
+    "workers_ai"
+  ],
+  "aliases": [
+    "mistral-small-3.1-24b-instruct-2503",
+    "mistralai-mistral-small-3.1-24b-instruct-2503",
+    "mistralai/mistral-small-3.1-24b-instruct-2503",
+    "mistral-small-3.1-24b-instruct",
+    "@cf/mistralai/mistral-small-3.1-24b-instruct",
+    "mistral-small-3.1-instruct"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 128000,
+    "output": 128000
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/mistralai/mistral-small-3.1-24b-instruct",
+      "contextWindow": 128000,
+      "maxOutputTokens": 128000
+    }
+  }
+}
