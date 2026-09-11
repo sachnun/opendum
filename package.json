@@ -1,6 +1,5 @@
 {
   "name": "opendum",
-  "version": "0.2.0",
   "private": true,
   "packageManager": "npm@11.14.1",
   "workspaces": [
