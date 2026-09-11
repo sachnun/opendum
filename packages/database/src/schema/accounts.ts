@@ -97,6 +97,12 @@ export const providerAccountModelHealth = pgTable(
     lastSuccessAt: timestamp("lastSuccessAt"),
     unhealthyCountUpdatedAt: timestamp("unhealthyCountUpdatedAt"),
 
+    // Per-model quota lock. A provider can reject one model for billing while
+    // still serving cheaper models on the same account, so the lock is scoped
+    // to the model instead of deactivating the account.
+    quotaLockedUntil: timestamp("quotaLockedUntil"),
+    quotaLockReason: text("quotaLockReason"),
+
     createdAt: timestamp("createdAt").notNull().defaultNow(),
     updatedAt: timestamp("updatedAt")
       .notNull()

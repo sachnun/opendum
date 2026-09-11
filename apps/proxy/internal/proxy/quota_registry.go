@@ -32,6 +32,7 @@ func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
 			return s.fetchHyperQuota(ctx, account, forceRefresh)
 		},
 		"workbuddy": s.fetchWorkbuddyQuota,
+		"qoder":     s.fetchQoderQuota,
 	}
 	return s.quotaFetchers
 }

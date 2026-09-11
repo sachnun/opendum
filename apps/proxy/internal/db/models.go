@@ -99,6 +99,8 @@ type ProviderAccountModelHealth struct {
 	UnhealthyCountUpdatedAt *time.Time
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
+	QuotaLockedUntil        *time.Time
+	QuotaLockReason         *string
 }
 
 type ProxyAPIKey struct {

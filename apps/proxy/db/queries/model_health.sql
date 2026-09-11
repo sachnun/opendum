@@ -45,18 +45,18 @@ SET "lastRecoveredByRotationAt" = $1
 WHERE id = $2 AND "lastErrorAt" <= $3;
 
 -- name: ListModelHealthByAccounts :many
-SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt"
+SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = ANY(sqlc.arg(account_ids)::text[])
   AND model = ANY(sqlc.arg(models)::text[]);
 
 -- name: ListModelHealthByAccount :many
-SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt"
+SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = $1;
 
 -- name: GetModelHealth :one
-SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt"
+SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = $1 AND model = $2
 LIMIT 1;
@@ -99,3 +99,16 @@ WHERE id = $5;
 UPDATE provider_account_model_health
 SET "consecutiveErrors" = $1, "lastErrorAt" = $2, "lastErrorCode" = $3, "unhealthyCountUpdatedAt" = $4, status = $5, "statusChangedAt" = $6
 WHERE id = $7;
+
+-- name: LockModelQuota :exec
+INSERT INTO provider_account_model_health (id, "providerAccountId", model, "consecutiveErrors", status, "quotaLockedUntil", "quotaLockReason", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, 0, 'active', $4, $5, $6, $7)
+ON CONFLICT ("providerAccountId", model) DO UPDATE
+SET "quotaLockedUntil" = EXCLUDED."quotaLockedUntil",
+    "quotaLockReason" = EXCLUDED."quotaLockReason",
+    "updatedAt" = EXCLUDED."updatedAt";
+
+-- name: ClearModelQuotaLock :exec
+UPDATE provider_account_model_health
+SET "quotaLockedUntil" = NULL, "quotaLockReason" = NULL
+WHERE "providerAccountId" = $1 AND model = $2 AND "quotaLockedUntil" IS NOT NULL;

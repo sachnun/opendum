@@ -279,6 +279,12 @@ func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.Pr
 		account := &ready[i]
 		row, ok := health[account.ID]
 		if ok {
+			// A quota lock means this model is out of credits for this account.
+			// Skip it entirely so rotation reaches a provider that can serve the
+			// request, while sibling models on the same account stay usable.
+			if row.QuotaLockedUntil != nil && row.QuotaLockedUntil.After(now) {
+				continue
+			}
 			if row.Status == "degraded" {
 				if selected == nil {
 					selected = account
@@ -604,6 +610,8 @@ func (s *Service) markAccountSuccess(ctx context.Context, accountID, model strin
 
 func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, durationMS int, stream bool, requestStartMS, upstreamFirstResponseMS int64) {
 	s.markAccountSuccess(ctx, accountID, model)
+	// A working model must not stay skipped if it was locked earlier.
+	s.clearAccountModelQuotaLock(ctx, accountID, model)
 	if upstreamFirstResponseMS > requestStartMS {
 		s.recordLatency(ctx, provider, model, stream, upstreamFirstResponseMS-requestStartMS)
 	}
@@ -670,6 +678,38 @@ func (s *Service) markAccountFailed(ctx context.Context, accountID, model string
 
 func failedCooldownUntil(failedAt time.Time) time.Time {
 	return failedAt.Add(failedCooldown)
+}
+
+// lockAccountModelQuota records a per-model quota lock. The account stays
+// active because a provider can reject one model for billing while still
+// serving others: Qoder returns code 112 for its frontier models but keeps
+// serving `lite` on the same over-quota account. Deactivating the account would
+// take those working models down with it.
+func (s *Service) lockAccountModelQuota(ctx context.Context, accountID, model string, until time.Time, reason string) {
+	if isSyntheticProviderAccountID(accountID) || model == "" || until.IsZero() {
+		return
+	}
+	now := time.Now()
+	resolved := s.registry.ResolveAlias(model)
+	_ = s.db.LockModelQuota(ctx, appdb.LockModelQuotaParams{
+		ID:                appdb.NewID(),
+		ProviderAccountID: accountID,
+		Model:             resolved,
+		QuotaLockedUntil:  &until,
+		QuotaLockReason:   &reason,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+}
+
+// clearAccountModelQuotaLock removes a lock after the model works again, so a
+// recovered model is not skipped until the original lock expires.
+func (s *Service) clearAccountModelQuotaLock(ctx context.Context, accountID, model string) {
+	if isSyntheticProviderAccountID(accountID) || model == "" {
+		return
+	}
+	resolved := s.registry.ResolveAlias(model)
+	_ = s.db.ClearModelQuotaLock(ctx, appdb.ClearModelQuotaLockParams{ProviderAccountID: accountID, Model: resolved})
 }
 
 func (s *Service) markAccountUsageLimited(ctx context.Context, accountID, model string, disabledUntil, failedAt time.Time) {

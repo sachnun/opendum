@@ -26,6 +26,22 @@ func (q *Queries) BumpAccountRequestCount(ctx context.Context, arg BumpAccountRe
 	return err
 }
 
+const clearModelQuotaLock = `-- name: ClearModelQuotaLock :exec
+UPDATE provider_account_model_health
+SET "quotaLockedUntil" = NULL, "quotaLockReason" = NULL
+WHERE "providerAccountId" = $1 AND model = $2 AND "quotaLockedUntil" IS NOT NULL
+`
+
+type ClearModelQuotaLockParams struct {
+	ProviderAccountID string
+	Model             string
+}
+
+func (q *Queries) ClearModelQuotaLock(ctx context.Context, arg ClearModelQuotaLockParams) error {
+	_, err := q.db.Exec(ctx, clearModelQuotaLock, arg.ProviderAccountID, arg.Model)
+	return err
+}
+
 const getAccountHealthState = `-- name: GetAccountHealthState :one
 SELECT id, status, "disabledUntil", "consecutiveErrors"
 FROM provider_account
@@ -53,7 +69,7 @@ func (q *Queries) GetAccountHealthState(ctx context.Context, id string) (GetAcco
 }
 
 const getModelHealth = `-- name: GetModelHealth :one
-SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt"
+SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = $1 AND model = $2
 LIMIT 1
@@ -80,6 +96,8 @@ func (q *Queries) GetModelHealth(ctx context.Context, arg GetModelHealthParams) 
 		&i.UnhealthyCountUpdatedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.QuotaLockedUntil,
+		&i.QuotaLockReason,
 	)
 	return i, err
 }
@@ -119,7 +137,7 @@ func (q *Queries) InsertModelHealth(ctx context.Context, arg InsertModelHealthPa
 }
 
 const listModelHealthByAccount = `-- name: ListModelHealthByAccount :many
-SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt"
+SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = $1
 `
@@ -146,6 +164,8 @@ func (q *Queries) ListModelHealthByAccount(ctx context.Context, provideraccounti
 			&i.UnhealthyCountUpdatedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.QuotaLockedUntil,
+			&i.QuotaLockReason,
 		); err != nil {
 			return nil, err
 		}
@@ -158,7 +178,7 @@ func (q *Queries) ListModelHealthByAccount(ctx context.Context, provideraccounti
 }
 
 const listModelHealthByAccounts = `-- name: ListModelHealthByAccounts :many
-SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt"
+SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = ANY($1::text[])
   AND model = ANY($2::text[])
@@ -191,6 +211,8 @@ func (q *Queries) ListModelHealthByAccounts(ctx context.Context, arg ListModelHe
 			&i.UnhealthyCountUpdatedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.QuotaLockedUntil,
+			&i.QuotaLockReason,
 		); err != nil {
 			return nil, err
 		}
@@ -200,6 +222,38 @@ func (q *Queries) ListModelHealthByAccounts(ctx context.Context, arg ListModelHe
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockModelQuota = `-- name: LockModelQuota :exec
+INSERT INTO provider_account_model_health (id, "providerAccountId", model, "consecutiveErrors", status, "quotaLockedUntil", "quotaLockReason", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, 0, 'active', $4, $5, $6, $7)
+ON CONFLICT ("providerAccountId", model) DO UPDATE
+SET "quotaLockedUntil" = EXCLUDED."quotaLockedUntil",
+    "quotaLockReason" = EXCLUDED."quotaLockReason",
+    "updatedAt" = EXCLUDED."updatedAt"
+`
+
+type LockModelQuotaParams struct {
+	ID                string
+	ProviderAccountID string
+	Model             string
+	QuotaLockedUntil  *time.Time
+	QuotaLockReason   *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (q *Queries) LockModelQuota(ctx context.Context, arg LockModelQuotaParams) error {
+	_, err := q.db.Exec(ctx, lockModelQuota,
+		arg.ID,
+		arg.ProviderAccountID,
+		arg.Model,
+		arg.QuotaLockedUntil,
+		arg.QuotaLockReason,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const markAccountRecoveredByRotation = `-- name: MarkAccountRecoveredByRotation :exec

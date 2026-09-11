@@ -217,7 +217,7 @@ export const PROVIDER_ACCOUNT_KEYS: readonly ProviderAccountKey[] = PROVIDER_ACC
 export const OAUTH_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch"] as const;
 export const DEVICE_PROVIDER_KEYS = ["codex", "qoder", "cline", "workbuddy"] as const;
 export const API_KEY_PROVIDER_KEYS = ["nvidia_nim", "openrouter", "zenmux", "harbor", "hyper"] as const;
-export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch", "openrouter", "zenmux", "hyper", "workbuddy"] as const;
+export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch", "openrouter", "zenmux", "hyper", "workbuddy", "qoder"] as const;
 
 export type OAuthProviderKey = (typeof OAUTH_PROVIDER_KEYS)[number];
 export type DeviceProviderKey = (typeof DEVICE_PROVIDER_KEYS)[number];
