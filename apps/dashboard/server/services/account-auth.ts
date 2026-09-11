@@ -12,6 +12,7 @@ import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from ".
 import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "../lib/providers/workbuddy";
 import { exchangePerchOAuthCode, initiatePerchOAuth } from "../lib/providers/perch";
 import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "../lib/providers/cline";
+import { clearRefreshFailCount } from "../lib/proxy/auth";
 import type { OAuthResult } from "../lib/providers/types";
 import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "../../lib/provider-accounts";
 import type { ActionResult } from "../utils/api";
@@ -208,6 +209,7 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
   if (existingAccount) {
     const resolvedEmail = oauthResult.email && email === oauthResult.email ? oauthResult.email : existingAccount.email || email;
     await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email: resolvedEmail, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: resolvedEmail, isUpdate: true } };
   }
 

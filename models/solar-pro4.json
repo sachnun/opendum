@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "cline"
+  ],
+  "providerConfig": {
+    "cline": {
+      "upstream": "cline-free/solar-pro4"
+    }
+  }
+}

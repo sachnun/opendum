@@ -3,16 +3,9 @@ import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData,
 import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
 import { warmDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
 
-const RESERVED_PROVIDER_SLUGS = new Set(["keys", "models", "play"]);
-
 definePageMeta({
-  middleware: "auth",
+  middleware: ["provider", "auth"],
   layout: "dashboard",
-  validate: (route) => {
-    const slug = String(route.params.provider).trim().toLowerCase();
-    if (RESERVED_PROVIDER_SLUGS.has(slug)) return false;
-    return Boolean(getProviderFromSlug(slug));
-  },
 });
 
 const route = useRoute();

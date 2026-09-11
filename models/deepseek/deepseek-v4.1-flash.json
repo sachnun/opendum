@@ -1,10 +1,20 @@
 {
   "providers": [
-    "workbuddy"
+    "harbor",
+    "workbuddy",
+    "zenmux"
   ],
   "meta": {
     "reasoning": true,
     "toolCall": true,
     "vision": true
+  },
+  "providerConfig": {
+    "harbor": {
+      "upstream": "deepseek-v4.1-flash:free"
+    },
+    "zenmux": {
+      "upstream": "deepseek/deepseek-v4.1-flash"
+    }
   }
 }
