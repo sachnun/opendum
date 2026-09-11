@@ -31,6 +31,7 @@ func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
 		"hyper": func(ctx context.Context, account appdb.ProviderAccount, _ string, forceRefresh bool) accountQuotaInfo {
 			return s.fetchHyperQuota(ctx, account, forceRefresh)
 		},
+		"workbuddy": s.fetchWorkbuddyQuota,
 	}
 	return s.quotaFetchers
 }

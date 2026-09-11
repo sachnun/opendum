@@ -69,6 +69,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"codex":       codexProvider{registry: registry, redis: redis, db: db},
 		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
 		"qoder":       qoderProvider{registry: registry},
+		"workbuddy":   workbuddyProvider{registry: registry},
 		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
 		"hyper":       openAICompatibleProvider{name: "hyper", baseURL: "https://hyper.charm.land/v1", supportedParams: supportedHyper, registry: registry, trimPrefix: "hyper/"},
 	}}

@@ -1,7 +1,8 @@
 {
   "providers": [
     "kiro",
-    "codex"
+    "codex",
+    "workbuddy"
   ],
   "providerConfig": {
     "kiro": {

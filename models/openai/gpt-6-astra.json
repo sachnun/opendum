@@ -1,6 +1,7 @@
 {
   "providers": [
-    "codex"
+    "codex",
+    "workbuddy"
   ],
   "meta": {
     "reasoning": true,

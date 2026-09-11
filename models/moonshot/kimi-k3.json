@@ -2,7 +2,8 @@
   "providers": [
     "nvidia_nim",
     "qoder",
-    "hyper"
+    "hyper",
+    "workbuddy"
   ],
   "providerConfig": {
     "nvidia_nim": {

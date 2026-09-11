@@ -12,6 +12,7 @@ var providerDisplayNames = map[string]string{
 	"openrouter":  "OpenRouter",
 	"workers_ai":  "Cloudflare",
 	"qoder":       "Qoder",
+	"workbuddy":   "WorkBuddy",
 	"zenmux":      "ZenMux",
 	"opencode":    "Opencode",
 	"kilo_code":   "Kilo Code",

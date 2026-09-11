@@ -1,7 +1,8 @@
 {
   "providers": [
     "qoder",
-    "hyper"
+    "hyper",
+    "workbuddy"
   ],
   "meta": {
     "reasoning": true,

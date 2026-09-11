@@ -1,6 +1,7 @@
 {
   "providers": [
-    "antigravity"
+    "antigravity",
+    "workbuddy"
   ],
   "aliases": [
     "gemini-3.5-flash-high",

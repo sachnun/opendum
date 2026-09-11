@@ -2,6 +2,7 @@
   "providers": [
     "workbuddy"
   ],
+  "ignored": true,
   "meta": {
     "reasoning": true,
     "toolCall": true,
