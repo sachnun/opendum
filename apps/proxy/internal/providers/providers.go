@@ -58,13 +58,14 @@ type Registry struct {
 }
 
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
+	fallback := newFallbackRouter(redis)
 	return &Registry{providers: map[string]Provider{
-		"opencode":    opencodeProvider{registry: registry},
+		"opencode":    opencodeProvider{registry: registry, fallback: fallback},
 		"perch":       perchProvider{registry: registry},
 		"cline":       clineProvider{registry: registry},
 		"openrouter":  openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
 		"nvidia_nim":  openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
-		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.ai/api/gateway", fallbackBaseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
+		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.ai/api/gateway", fallbackBaseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/", fallback: fallback},
 		"workers_ai":  workersAIProvider{registry: registry},
 		"kiro":        kiroProvider{registry: registry},
 		"harbor":      openAICompatibleProvider{name: "harbor", baseURL: "https://tokenharbor.ai/v1", supportedParams: supportedHarbor, registry: registry, trimPrefix: "harbor/"},
@@ -122,6 +123,7 @@ type openAICompatibleProvider struct {
 	supportedParams map[string]struct{}
 	registry        *models.Registry
 	trimPrefix      string
+	fallback        fallbackState
 }
 
 func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
@@ -178,12 +180,16 @@ func (p openAICompatibleProvider) extraRequestHeaders(account appdb.ProviderAcco
 
 func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, path, credentials string, payload map[string]any, stream bool, model string, extraHeaders map[string]string) (*http.Response, error) {
 	authless := strings.TrimSpace(credentials) == "" && p.registry != nil && p.registry.IsAuthlessProviderModel(model, p.name)
-	resp, err := p.postOnce(ctx, client, p.baseURL+path, credentials, payload, stream, extraHeaders, authless)
-	if err != nil || resp == nil || p.fallbackBaseURL == "" || !shouldUseFallbackEndpoint(resp.StatusCode) {
-		return resp, err
+	return postWithFallback(ctx, p.fallback, p.name, p.baseURL+path, p.fallbackURL(path), func(url string) (*http.Response, error) {
+		return p.postOnce(ctx, client, url, credentials, payload, stream, extraHeaders, authless)
+	})
+}
+
+func (p openAICompatibleProvider) fallbackURL(path string) string {
+	if p.fallbackBaseURL == "" {
+		return ""
 	}
-	_ = resp.Body.Close()
-	return p.postOnce(ctx, client, p.fallbackBaseURL+path, credentials, payload, stream, extraHeaders, authless)
+	return p.fallbackBaseURL + path
 }
 
 func (p openAICompatibleProvider) postOnce(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, extraHeaders map[string]string, authless bool) (*http.Response, error) {
@@ -279,6 +285,7 @@ func (p openAICompatibleProvider) requiresResponsesAPI(model string) bool {
 
 type opencodeProvider struct {
 	registry *models.Registry
+	fallback fallbackState
 }
 
 func (p opencodeProvider) Authless() bool { return true }
@@ -295,7 +302,7 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	headers := opencodeHeaders(body)
 	if p.requiresResponsesAPI(model) {
 		payload := buildResponsesAPIPayload(body, modelName, stream)
-		resp, err := postJSONWithFallback(ctx, client, opencodeResponsesEndpoint, opencodeFallbackResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
+		resp, err := postJSONWithFallback(ctx, client, p.fallback, "opencode", opencodeResponsesEndpoint, opencodeFallbackResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
 		}
@@ -321,7 +328,7 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	}
 	payload["model"] = modelName
 	payload["stream"] = stream
-	resp, err := postJSONWithFallback(ctx, client, opencodeChatCompletionsEndpoint, opencodeFallbackChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
+	resp, err := postJSONWithFallback(ctx, client, p.fallback, "opencode", opencodeChatCompletionsEndpoint, opencodeFallbackChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
@@ -394,13 +401,10 @@ func postJSON(ctx context.Context, client *http.Client, url, bearer string, payl
 	return postJSONWithHeaders(ctx, client, url, bearer, payload, stream, nil)
 }
 
-func postJSONWithFallback(ctx context.Context, client *http.Client, url, fallbackURL, bearer string, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
-	resp, err := postJSONWithHeaders(ctx, client, url, bearer, payload, stream, headers)
-	if err != nil || resp == nil || fallbackURL == "" || !shouldUseFallbackEndpoint(resp.StatusCode) {
-		return resp, err
-	}
-	_ = resp.Body.Close()
-	return postJSONWithHeaders(ctx, client, fallbackURL, bearer, payload, stream, headers)
+func postJSONWithFallback(ctx context.Context, client *http.Client, state fallbackState, provider, url, fallbackURL, bearer string, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
+	return postWithFallback(ctx, state, provider, url, fallbackURL, func(target string) (*http.Response, error) {
+		return postJSONWithHeaders(ctx, client, target, bearer, payload, stream, headers)
+	})
 }
 
 func shouldUseFallbackEndpoint(status int) bool {
