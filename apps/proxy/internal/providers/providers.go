@@ -17,8 +17,10 @@ import (
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 )
 
-const opencodeChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
-const opencodeResponsesEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/responses"
+const opencodeChatCompletionsEndpoint = "https://opencode.ai/zen/v1/chat/completions"
+const opencodeResponsesEndpoint = "https://opencode.ai/zen/v1/responses"
+const opencodeFallbackChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
+const opencodeFallbackResponsesEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/responses"
 const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
 const opencodeUserAgent = "opencode/1.15.8"
@@ -62,7 +64,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"cline":       clineProvider{registry: registry},
 		"openrouter":  openAICompatibleProvider{name: "openrouter", baseURL: "https://openrouter.ai/api/v1", supportedParams: supportedOpenRouter, registry: registry, trimPrefix: "openrouter/"},
 		"nvidia_nim":  openAICompatibleProvider{name: "nvidia_nim", baseURL: "https://integrate.api.nvidia.com/v1", supportedParams: supportedNvidia, registry: registry, trimPrefix: "nvidia_nim/"},
-		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
+		"kilo_code":   openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.ai/api/gateway", fallbackBaseURL: "https://unroxy.koyeb.app/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"},
 		"workers_ai":  workersAIProvider{registry: registry},
 		"kiro":        kiroProvider{registry: registry},
 		"harbor":      openAICompatibleProvider{name: "harbor", baseURL: "https://tokenharbor.ai/v1", supportedParams: supportedHarbor, registry: registry, trimPrefix: "harbor/"},
@@ -116,6 +118,7 @@ func RefreshBufferFor(provider Provider) time.Duration {
 type openAICompatibleProvider struct {
 	name            string
 	baseURL         string
+	fallbackBaseURL string
 	supportedParams map[string]struct{}
 	registry        *models.Registry
 	trimPrefix      string
@@ -127,7 +130,7 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	extraHeaders := p.extraRequestHeaders(account)
 	if p.requiresResponsesAPI(model) {
 		payload := p.buildResponsesPayload(body, modelName, stream)
-		resp, err := p.post(ctx, client, p.baseURL+"/responses", credentials, payload, stream, model, extraHeaders)
+		resp, err := p.post(ctx, client, "/responses", credentials, payload, stream, model, extraHeaders)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
 		}
@@ -147,7 +150,7 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	}
 
 	payload := p.buildPayload(body, model, modelName, stream)
-	resp, err := p.post(ctx, client, p.baseURL+"/chat/completions", credentials, payload, stream, model, extraHeaders)
+	resp, err := p.post(ctx, client, "/chat/completions", credentials, payload, stream, model, extraHeaders)
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
@@ -173,8 +176,18 @@ func (p openAICompatibleProvider) extraRequestHeaders(account appdb.ProviderAcco
 	return nil
 }
 
-func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, model string, extraHeaders map[string]string) (*http.Response, error) {
-	if strings.TrimSpace(credentials) == "" && p.registry != nil && p.registry.IsAuthlessProviderModel(model, p.name) {
+func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, path, credentials string, payload map[string]any, stream bool, model string, extraHeaders map[string]string) (*http.Response, error) {
+	authless := strings.TrimSpace(credentials) == "" && p.registry != nil && p.registry.IsAuthlessProviderModel(model, p.name)
+	resp, err := p.postOnce(ctx, client, p.baseURL+path, credentials, payload, stream, extraHeaders, authless)
+	if err != nil || resp == nil || p.fallbackBaseURL == "" || !shouldUseFallbackEndpoint(resp.StatusCode) {
+		return resp, err
+	}
+	_ = resp.Body.Close()
+	return p.postOnce(ctx, client, p.fallbackBaseURL+path, credentials, payload, stream, extraHeaders, authless)
+}
+
+func (p openAICompatibleProvider) postOnce(ctx context.Context, client *http.Client, url, credentials string, payload map[string]any, stream bool, extraHeaders map[string]string, authless bool) (*http.Response, error) {
+	if authless {
 		return postJSONWithoutAuth(ctx, client, url, payload, stream)
 	}
 	if len(extraHeaders) > 0 {
@@ -282,7 +295,7 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	headers := opencodeHeaders(body)
 	if p.requiresResponsesAPI(model) {
 		payload := buildResponsesAPIPayload(body, modelName, stream)
-		resp, err := postJSONWithHeaders(ctx, client, opencodeResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
+		resp, err := postJSONWithFallback(ctx, client, opencodeResponsesEndpoint, opencodeFallbackResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
 		}
@@ -308,7 +321,7 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	}
 	payload["model"] = modelName
 	payload["stream"] = stream
-	resp, err := postJSONWithHeaders(ctx, client, opencodeChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
+	resp, err := postJSONWithFallback(ctx, client, opencodeChatCompletionsEndpoint, opencodeFallbackChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
@@ -379,6 +392,19 @@ func (p workersAIProvider) MakeRequest(ctx context.Context, client *http.Client,
 
 func postJSON(ctx context.Context, client *http.Client, url, bearer string, payload map[string]any, stream bool) (*http.Response, error) {
 	return postJSONWithHeaders(ctx, client, url, bearer, payload, stream, nil)
+}
+
+func postJSONWithFallback(ctx context.Context, client *http.Client, url, fallbackURL, bearer string, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
+	resp, err := postJSONWithHeaders(ctx, client, url, bearer, payload, stream, headers)
+	if err != nil || resp == nil || fallbackURL == "" || !shouldUseFallbackEndpoint(resp.StatusCode) {
+		return resp, err
+	}
+	_ = resp.Body.Close()
+	return postJSONWithHeaders(ctx, client, fallbackURL, bearer, payload, stream, headers)
+}
+
+func shouldUseFallbackEndpoint(status int) bool {
+	return status == http.StatusForbidden || status == http.StatusTooManyRequests
 }
 
 func postJSONWithHeaders(ctx context.Context, client *http.Client, url, bearer string, payload map[string]any, stream bool, extraHeaders map[string]string) (*http.Response, error) {
