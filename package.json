@@ -1,42 +1,24 @@
 {
   "name": "opendum",
-  "version": "0.2.0",
   "private": true,
-  "packageManager": "npm@11.14.1",
-  "workspaces": [
-    "apps/*"
-  ],
+  "packageManager": "pnpm@12.3.4",
   "scripts": {
-    "dev:dashboard": "npm run dev --workspace @opendum/dashboard",
+    "dev:dashboard": "pnpm --filter @opendum/dashboard dev",
     "dev:proxy": "TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy",
-    "dev": "(npm run dev:dashboard & npm run dev:proxy)",
-    "build:dashboard": "npm run build --workspace @opendum/dashboard",
+    "dev": "(pnpm run dev:dashboard & pnpm run dev:proxy)",
+    "build:dashboard": "pnpm --filter @opendum/dashboard build",
     "build:proxy": "go -C apps/proxy build ./...",
-    "build": "npm run build:dashboard && npm run build:proxy",
-    "db:push": "npm run db:push --workspace @opendum/dashboard",
-    "db:studio": "npm run db:studio --workspace @opendum/dashboard",
-    "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./...",
-    "models:refresh": "node scripts/models.mjs"
+    "build": "pnpm run build:dashboard && pnpm run build:proxy",
+    "db:push": "pnpm --filter @opendum/dashboard db:push",
+    "db:studio": "pnpm --filter @opendum/dashboard db:studio",
+    "lint": "pnpm --filter @opendum/dashboard lint && pnpm --filter @opendum/models typecheck && go -C apps/proxy test ./...",
+    "models:refresh": "pnpm --filter @opendum/models refresh",
+    "models:metadata": "pnpm --filter @opendum/models refresh:metadata",
+    "models:test": "pnpm --filter @opendum/models test"
   },
   "devDependencies": {
-    "edgeone": "^1.6.13",
+    "edgeone": "^1.6.34",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3"
-  },
-  "overrides": {
-    "postcss": "^8.5.16",
-    "typescript-eslint": "^8.62.1",
-    "@typescript-eslint/eslint-plugin": "^8.62.1",
-    "@typescript-eslint/parser": "^8.62.1"
-  },
-  "allowScripts": {
-    "esbuild@0.18.20": true,
-    "esbuild@0.25.5": true,
-    "esbuild@0.27.7": true,
-    "esbuild@0.25.12": true,
-    "esbuild@0.19.12": true,
-    "esbuild@0.28.1": true,
-    "unrs-resolver@1.12.2": true,
-    "@parcel/watcher@2.5.6": true,
-    "vue-demi@0.14.10": true
   }
 }

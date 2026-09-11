@@ -3,7 +3,7 @@ import { db } from "../lib/db";
 import { getRedisClient } from "../lib/redis";
 import { pinnedProvider, providerAccount, providerAccountDisabledModel, providerAccountModelHealth } from "../lib/db/schema";
 import { getModelFamily, getModelLookupKeys, getProviderAccessRule, getProviderModelSet, resolveModelAlias } from "../lib/proxy/models";
-import { invalidateDisabledModelsCache } from "../lib/proxy/auth";
+import { clearRefreshFailCount, invalidateDisabledModelsCache } from "../lib/proxy/auth";
 import { decrypt } from "../lib/encryption";
 import { compareModelEntries } from "../../lib/model-sort";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
@@ -655,7 +655,13 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       account.id,
       getProviderModelsForAccountTier(input.provider, account.tier),
     ]));
-    const supportedModels = sortProviderModels(providerModels.filter((model) => providerModelIsAccessibleByAccounts(model, input.provider, accounts)));
+    const supportedModels = sortProviderModels(
+      providerModels.filter((model) =>
+        input.provider === "codex"
+          ? true
+          : providerModelIsAccessibleByAccounts(model, input.provider, accounts)
+      )
+    );
     const freeSupportedModels = getProviderModelsForAccountTier(input.provider, "free");
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
     const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
@@ -825,6 +831,7 @@ export async function updateAccount(userId: string, input: z.infer<typeof update
 
       if (Object.keys(updates).length > 0) {
         await db.update(providerAccount).set(updates).where(eq(providerAccount.id, input.id));
+        if (manuallyReenabled) await clearRefreshFailCount(input.id);
         if (manuallyReenabled && account.status === "failed") await accelerateAccountCooldownForManualEnable(input.id, now);
         if (updates.isActive !== undefined || updates.disabledUntil !== undefined) await invalidateDisabledModelsCache(userId);
       }
@@ -897,6 +904,7 @@ export async function deleteAccount(userId: string, input: z.infer<typeof delete
 
     await db.delete(providerAccount).where(eq(providerAccount.id, input.id));
     await invalidateDisabledModelsCache(userId);
+    await clearRefreshFailCount(input.id);
     return { success: true, data: undefined } as const;
   } catch (error) {
     console.error("Failed to delete account:", error);
@@ -1028,6 +1036,7 @@ export async function resolveAccountErrors(userId: string, input: z.infer<typeof
       .where(eq(providerAccount.id, input.accountId));
     await deleteRedisErrorHistory(input.accountId);
     await db.delete(providerAccountModelHealth).where(eq(providerAccountModelHealth.providerAccountId, input.accountId));
+    await clearRefreshFailCount(input.accountId);
     return { success: true, data: undefined } as const;
   } catch (error) {
     console.error("Failed to resolve provider account errors:", error);

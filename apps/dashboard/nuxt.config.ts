@@ -3,7 +3,7 @@ import { readdirSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
-import { inferFamilyFromFolder } from "../../scripts/model-registry.mjs";
+import { inferFamilyFromFolder } from "@opendum/models/families";
 
 const redisXxhashStub = "\0redis-xxhash-stub";
 const modelRegistryVirtualModule = "virtual:opendum-model-registry";
@@ -36,7 +36,7 @@ function collectFamilyByFileId(modelsDir: string): Record<string, string | null>
 }
 
 function buildModelRegistryModule(): string {
-  const modelsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../models");
+  const modelsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/models/data");
   const modelFiles = collectModelFiles(modelsDir);
   const familyByFileId = collectFamilyByFileId(modelsDir);
   const imports = modelFiles.map((filePath, index) => `import model${index} from ${JSON.stringify(filePath)};`);
@@ -98,8 +98,11 @@ export default defineNuxtConfig({
     spaLoadingTemplateLocation: "within",
   },
   routeRules: {
-    "/dashboard": { ssr: false },
-    "/dashboard/**": { ssr: false },
+    "/": { ssr: false },
+    "/keys": { ssr: false },
+    "/models": { ssr: false },
+    "/play": { ssr: false },
+    "/**": { ssr: false },
   },
   runtimeConfig: {
     proxyUrl: "",
@@ -162,7 +165,7 @@ export default defineNuxtConfig({
         "clsx",
         "date-fns",
         "idb-keyval",
-        "lucide-vue-next",
+        "@lucide/vue",
         "reka-ui",
         "tailwind-merge",
       ],

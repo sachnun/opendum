@@ -1,0 +1,39 @@
+{
+  "owner": "z-ai",
+  "providers": [
+    "zenmux"
+  ],
+  "aliases": [
+    "z-ai-glm-4.6v-flash-free",
+    "z-ai/glm-4.6v-flash-free"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 200000,
+    "output": 64000
+  },
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "z-ai/glm-4.6v-flash",
+      "contextWindow": 200000,
+      "maxOutputTokens": 64000
+    }
+  }
+}

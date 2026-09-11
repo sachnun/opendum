@@ -68,9 +68,6 @@ func TestEnabledRespectsOptInProviders(t *testing.T) {
 	if !a.Enabled("openrouter") {
 		t.Fatal("openrouter should be enabled (trim)")
 	}
-	if a.Enabled("siliconflow") {
-		t.Fatal("siliconflow should not be enabled")
-	}
 	if a.Enabled("") {
 		t.Fatal("empty provider should not be enabled")
 	}

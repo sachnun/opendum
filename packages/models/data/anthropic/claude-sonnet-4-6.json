@@ -1,0 +1,70 @@
+{
+  "owner": "anthropic",
+  "providers": [
+    "antigravity",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-4-6-1m",
+    "claude-sonnet-4.6-1m",
+    "claude-sonnet-4.6",
+    "claude-sonnet4.6"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 64000
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "claude-sonnet-4-6",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "anthropic_beta": true,
+      "anthropic_beta_thinking": true,
+      "convert_external_images": true,
+      "force_stream_non_stream": true,
+      "sanitize_tool_blocks": true,
+      "signature_family": "claude",
+      "strict_thought_signatures": true,
+      "strict_tool_schema": true,
+      "system_instruction": true,
+      "thinking_model": true,
+      "top_p_min_095": true
+    },
+    "kiro": {
+      "upstream": "claude-sonnet-4.6-1m",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    }
+  }
+}

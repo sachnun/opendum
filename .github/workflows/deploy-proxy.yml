@@ -7,7 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-proxy.yml
       - apps/proxy/**
-      - models/**
+      - packages/models/**
   workflow_run:
     workflows:
       - Refresh Provider Models
@@ -19,32 +19,33 @@ permissions:
   contents: read
 
 concurrency:
-  group: railway-proxy-${{ github.ref }}
+  group: koyeb-proxy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   deploy:
     if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
-    name: Proxy Railway
+    name: Proxy Koyeb
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
       name: proxy
     env:
-      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT || 'production' }}
-      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
-      RAILWAY_PROXY_SERVICE_ID: ${{ vars.RAILWAY_PROXY_SERVICE_ID }}
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      DEPLOY_DIR: .railway-deploy/proxy
+      KOYEB_APP: ${{ vars.KOYEB_APP }}
+      KOYEB_SERVICE: ${{ vars.KOYEB_SERVICE }}
+      KOYEB_REGION: ${{ vars.KOYEB_REGION }}
+      KOYEB_INSTANCE_TYPE: ${{ vars.KOYEB_INSTANCE_TYPE }}
+      KOYEB_ORG_ID: ${{ vars.KOYEB_ORG_ID }}
+      KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: main
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: apps/proxy/go.mod
           cache-dependency-path: apps/proxy/go.sum
@@ -52,40 +53,57 @@ jobs:
       - name: Test proxy
         run: go -C apps/proxy test ./...
 
-      - name: Prepare Railway bundle
+      - name: Validate Koyeb configuration
         run: |
-          rm -rf "$DEPLOY_DIR"
-          mkdir -p "$DEPLOY_DIR/bin"
-          cp -R models "$DEPLOY_DIR/models"
-          cp apps/proxy/Dockerfile "$DEPLOY_DIR/Dockerfile"
-          cp apps/proxy/railway.json "$DEPLOY_DIR/railway.json"
+          test -n "$KOYEB_TOKEN"
+          test -n "$KOYEB_APP"
+          test -n "$KOYEB_SERVICE"
+          test -n "$KOYEB_REGION"
+          test -n "$KOYEB_INSTANCE_TYPE"
+          test -n "$KOYEB_ORG_ID"
+          test -f apps/proxy/Dockerfile
 
-      - name: Build proxy binary
-        run: go -C apps/proxy build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o "../../$DEPLOY_DIR/bin/proxy" ./cmd/proxy
-        env:
-          CGO_ENABLED: 0
-          GOOS: linux
-          GOARCH: amd64
-
-      - name: Validate Railway configuration
+      - name: Install Koyeb CLI
         run: |
-          test -n "$RAILWAY_PROJECT_ID"
-          test -n "$RAILWAY_ENVIRONMENT"
-          test -n "$RAILWAY_PROXY_SERVICE_ID"
-          test -n "$RAILWAY_TOKEN"
-          test -x "$DEPLOY_DIR/bin/proxy"
-          test -d "$DEPLOY_DIR/models"
-          test -f "$DEPLOY_DIR/Dockerfile"
-          test -f "$DEPLOY_DIR/railway.json"
+          curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
+          echo "$HOME/.koyeb/bin" >> "$GITHUB_PATH"
 
-      - name: Install Railway CLI
-        run: bash <(curl -fsSL railway.com/install.sh) --yes
-
-      - name: Deploy proxy to Railway
-        run: >-
-          "$HOME/.railway/bin/railway" up .railway-deploy/proxy
-          --path-as-root
-          --ci
-          --project "$RAILWAY_PROJECT_ID"
-          --environment "$RAILWAY_ENVIRONMENT"
-          --service "$RAILWAY_PROXY_SERVICE_ID"
+      # Secrets (DATABASE_URL, REDIS_URL, BETTER_AUTH_SECRET) are managed
+      # once in the Koyeb dashboard and referenced by the service as
+      # {{secret.NAME}}. This workflow only ships code and non-secret env.
+      - name: Deploy proxy to Koyeb
+        run: |
+          set -euo pipefail
+          export KOYEB_TOKEN
+          ORG=(--organization "$KOYEB_ORG_ID")
+          GIT_REPO="github.com/${{ github.repository }}"
+          COMMON_ARGS=(
+            --git "$GIT_REPO"
+            --git-branch main
+            --git-builder docker
+            --git-docker-dockerfile apps/proxy/Dockerfile
+            --type web
+            --instance-type "$KOYEB_INSTANCE_TYPE"
+            --regions "$KOYEB_REGION"
+            --ports 8000:http
+            --routes "/:8000"
+            --checks "8000:http:/health"
+            --checks-grace-period "8000=30"
+            --env PORT=8000
+            --env HOST=0.0.0.0
+            --env TOKEN_REFRESH_INTERVAL_SECONDS=600
+          )
+          # Free instances only support scale-to-zero (min 0). Paid types keep min 1.
+          if [ "$KOYEB_INSTANCE_TYPE" = "free" ]; then
+            SCALE_ARGS=(--min-scale 0 --max-scale 1)
+          else
+            SCALE_ARGS=(--min-scale 1 --max-scale 1)
+          fi
+          if ! koyeb apps get "$KOYEB_APP" "${ORG[@]}" >/dev/null 2>&1; then
+            koyeb apps create "$KOYEB_APP" "${ORG[@]}"
+          fi
+          if koyeb services get "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" >/dev/null 2>&1; then
+            koyeb services update "$KOYEB_APP/$KOYEB_SERVICE" "${ORG[@]}" "${COMMON_ARGS[@]}" "${SCALE_ARGS[@]}" --wait --wait-timeout 10m
+          else
+            koyeb services create "$KOYEB_SERVICE" --app "$KOYEB_APP" "${ORG[@]}" "${COMMON_ARGS[@]}" "${SCALE_ARGS[@]}" --wait --wait-timeout 10m
+          fi

@@ -1,6 +1,5 @@
 {
   "name": "@opendum/dashboard",
-  "version": "0.2.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -14,7 +13,9 @@
   },
   "dependencies": {
     "@internationalized/date": "^3.12.2",
+    "@lucide/vue": "^1.43.0",
     "@nuxt/fonts": "^0.14.0",
+    "@opendum/models": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@paralleldrive/cuid2": "^3.3.0",
     "better-auth": "^1.6.23",
@@ -25,8 +26,7 @@
     "eventsource-parser": "^3.1.0",
     "h3": "^1.15.0",
     "idb-keyval": "^6.3.0",
-    "lucide-vue-next": "^1.0.0",
-    "nuxt": "^4.4.8",
+    "nuxt": "^4.5.2",
     "pg": "^8.22.0",
     "redis": "^6.1.0",
     "reka-ui": "^2.10.1",

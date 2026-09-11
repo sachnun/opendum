@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -19,28 +18,115 @@ type Meta struct {
 	Vision    *bool `json:"vision"`
 }
 
+type Modalities struct {
+	Input  []string `json:"input"`
+	Output []string `json:"output"`
+}
+
+type ParameterSupport struct {
+	Temperature       bool `json:"temperature"`
+	TopP              bool `json:"top_p"`
+	TopK              bool `json:"top_k"`
+	FrequencyPenalty  bool `json:"frequency_penalty"`
+	PresencePenalty   bool `json:"presence_penalty"`
+	RepetitionPenalty bool `json:"repetition_penalty"`
+}
+
+type Limit struct {
+	Context int `json:"context,omitempty"`
+	Output  int `json:"output,omitempty"`
+}
+
 type ProviderAccessRule struct {
 	MinTier      string
 	AllowedTiers []string
 }
 
 type ProviderModelConfig struct {
-	Upstream     string
-	MinTier      string
-	AllowedTiers []string
-	Authless     bool
-	Aliases      []string
-	Custom       map[string]any
+	Upstream        string
+	ContextWindow   int
+	MaxOutputTokens int
+	MinTier         string
+	AllowedTiers    []string
+	Authless        bool
+	Aliases         []string
+	Custom          map[string]any
+}
+
+func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	cfg.Custom = map[string]any{}
+	for key, value := range raw {
+		switch key {
+		case "upstream":
+			var upstream string
+			if err := json.Unmarshal(value, &upstream); err != nil {
+				return err
+			}
+			cfg.Upstream = strings.TrimSpace(upstream)
+		case "contextWindow":
+			var contextWindow int
+			if err := json.Unmarshal(value, &contextWindow); err != nil {
+				return err
+			}
+			cfg.ContextWindow = contextWindow
+		case "maxOutputTokens":
+			var maxOutputTokens int
+			if err := json.Unmarshal(value, &maxOutputTokens); err != nil {
+				return err
+			}
+			cfg.MaxOutputTokens = maxOutputTokens
+		case "minTier":
+			var minTier string
+			if err := json.Unmarshal(value, &minTier); err != nil {
+				return err
+			}
+			cfg.MinTier = strings.TrimSpace(minTier)
+		case "allowedTiers":
+			if err := json.Unmarshal(value, &cfg.AllowedTiers); err != nil {
+				return err
+			}
+			cfg.AllowedTiers = compactStrings(cfg.AllowedTiers)
+		case "authless":
+			if err := json.Unmarshal(value, &cfg.Authless); err != nil {
+				return err
+			}
+		case "aliases":
+			if err := json.Unmarshal(value, &cfg.Aliases); err != nil {
+				return err
+			}
+			cfg.Aliases = compactStrings(cfg.Aliases)
+		default:
+			var custom any
+			if err := json.Unmarshal(value, &custom); err != nil {
+				return err
+			}
+			cfg.Custom[key] = custom
+		}
+	}
+
+	if len(cfg.Custom) == 0 {
+		cfg.Custom = nil
+	}
+	return nil
 }
 
 type Info struct {
 	ID             string                         `json:"id"`
+	Owner          string                         `json:"owner"`
 	Providers      []string                       `json:"providers"`
 	Aliases        []string                       `json:"aliases"`
 	Description    string                         `json:"description"`
 	Family         string                         `json:"family"`
 	Ignored        bool                           `json:"ignored"`
 	Meta           *Meta                          `json:"meta"`
+	Modalities     *Modalities                    `json:"modalities"`
+	Parameter      *ParameterSupport              `json:"parameter"`
+	Limit          *Limit                         `json:"limit"`
 	ProviderConfig map[string]ProviderModelConfig `json:"providerConfig"`
 }
 
@@ -164,88 +250,100 @@ func (r *Registry) mergeModelInfo(modelID, fileID string, info Info) {
 	}
 }
 
-func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	cfg.Custom = map[string]any{}
-	for key, value := range raw {
-		switch key {
-		case "upstream":
-			var upstream string
-			if err := json.Unmarshal(value, &upstream); err != nil {
-				return err
-			}
-			cfg.Upstream = strings.TrimSpace(upstream)
-		case "minTier":
-			var minTier string
-			if err := json.Unmarshal(value, &minTier); err != nil {
-				return err
-			}
-			cfg.MinTier = strings.TrimSpace(minTier)
-		case "allowedTiers":
-			if err := json.Unmarshal(value, &cfg.AllowedTiers); err != nil {
-				return err
-			}
-			cfg.AllowedTiers = compactStrings(cfg.AllowedTiers)
-		case "authless":
-			if err := json.Unmarshal(value, &cfg.Authless); err != nil {
-				return err
-			}
-		case "aliases":
-			if err := json.Unmarshal(value, &cfg.Aliases); err != nil {
-				return err
-			}
-			cfg.Aliases = compactStrings(cfg.Aliases)
-		default:
-			var custom any
-			if err := json.Unmarshal(value, &custom); err != nil {
-				return err
-			}
-			cfg.Custom[key] = custom
-		}
-	}
-
-	if len(cfg.Custom) == 0 {
-		cfg.Custom = nil
-	}
-	return nil
-}
-
 func (r *Registry) buildAliases() {
-	for canonical, info := range r.effective {
+	// Iterate canonicals in sorted order so that alias resolution is
+	// deterministic across process starts. Without this, two models declaring
+	// the same alias (for example `agi-nova-beta`) would resolve differently
+	// depending on Go map iteration order.
+	canonicals := make([]string, 0, len(r.effective))
+	for canonical := range r.effective {
+		canonicals = append(canonicals, canonical)
+	}
+	sort.Strings(canonicals)
+
+	// A canonical id always wins over an alias declared by another model.
+	for _, canonical := range canonicals {
+		r.aliasToCanonical[canonical] = canonical
+	}
+	for _, canonical := range canonicals {
+		info := r.effective[canonical]
 		if info.ID != "" && info.ID != canonical {
-			r.aliasToCanonical[info.ID] = canonical
+			r.assignAlias(info.ID, canonical)
 		}
 		for _, alias := range info.Aliases {
-			r.aliasToCanonical[alias] = canonical
+			r.assignAlias(alias, canonical)
 		}
-		upstreamNames := map[string]struct{}{}
-		for _, cfg := range info.ProviderConfig {
-			if strings.TrimSpace(cfg.Upstream) != "" {
-				upstreamNames[strings.TrimSpace(cfg.Upstream)] = struct{}{}
-			}
+	}
+
+	// Upstream names are only mapped when nothing else claims them, and are
+	// collected first so iteration order cannot influence the result.
+	upstreamNames := map[string]string{}
+	for _, canonical := range canonicals {
+		info := r.effective[canonical]
+		providers := make([]string, 0, len(info.ProviderConfig))
+		for provider := range info.ProviderConfig {
+			providers = append(providers, provider)
 		}
-		for upstreamName := range upstreamNames {
-			if _, exists := r.aliasToCanonical[upstreamName]; !exists {
-				r.aliasToCanonical[upstreamName] = canonical
+		sort.Strings(providers)
+		for _, provider := range providers {
+			upstreamName := strings.TrimSpace(info.ProviderConfig[provider].Upstream)
+			if upstreamName == "" {
+				continue
 			}
-			legacy := legacyNvidiaAlias(upstreamName)
-			if legacy != upstreamName {
-				if _, exists := r.aliasToCanonical[legacy]; !exists {
-					r.aliasToCanonical[legacy] = canonical
-				}
+			if _, exists := upstreamNames[upstreamName]; !exists {
+				upstreamNames[upstreamName] = canonical
 			}
 		}
 	}
-	for alias, canonical := range r.aliasToCanonical {
+	upstreamKeys := make([]string, 0, len(upstreamNames))
+	for upstreamName := range upstreamNames {
+		upstreamKeys = append(upstreamKeys, upstreamName)
+	}
+	sort.Strings(upstreamKeys)
+	for _, upstreamName := range upstreamKeys {
+		canonical := upstreamNames[upstreamName]
+		if _, exists := r.aliasToCanonical[upstreamName]; !exists {
+			r.aliasToCanonical[upstreamName] = canonical
+		}
+		legacy := legacyNvidiaAlias(upstreamName)
+		if legacy != upstreamName {
+			if _, exists := r.aliasToCanonical[legacy]; !exists {
+				r.aliasToCanonical[legacy] = canonical
+			}
+		}
+	}
+
+	aliases := make([]string, 0, len(r.aliasToCanonical))
+	for alias := range r.aliasToCanonical {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		canonical := r.aliasToCanonical[alias]
+		if alias == canonical {
+			continue
+		}
 		r.canonicalToAliases[canonical] = append(r.canonicalToAliases[canonical], alias)
 	}
 	for canonical := range r.canonicalToAliases {
 		r.canonicalToAliases[canonical] = uniqueSorted(r.canonicalToAliases[canonical])
 	}
+}
+
+// assignAlias records alias -> canonical unless the alias is a canonical model
+// id, or an alias already claimed by an earlier (sorted) canonical.
+func (r *Registry) assignAlias(alias, canonical string) {
+	alias = strings.TrimSpace(alias)
+	if alias == "" {
+		return
+	}
+	if _, isCanonical := r.effective[alias]; isCanonical {
+		return
+	}
+	if _, exists := r.aliasToCanonical[alias]; exists {
+		return
+	}
+	r.aliasToCanonical[alias] = canonical
 }
 
 func (r *Registry) buildSuggestionCandidates() {
@@ -482,15 +580,30 @@ func (r *Registry) ModelFamily(model string) string {
 }
 
 func (r *Registry) FormatModelsForOpenAI() []map[string]any {
-	now := time.Now().Unix()
-	data := make([]map[string]any, 0)
+	data := make([]map[string]any, 0, len(r.effective))
 	for _, model := range r.AllModels() {
 		info := r.effective[model]
 		if len(info.Providers) == 0 {
 			continue
 		}
-		ownedBy := strings.Join(info.Providers, ",")
-		data = append(data, map[string]any{"id": model, "object": "model", "created": now, "owned_by": ownedBy})
+		item := map[string]any{
+			"id":        model,
+			"object":    "model",
+			"providers": info.Providers,
+		}
+		if info.Owner != "" {
+			item["owner"] = info.Owner
+		}
+		if info.Modalities != nil {
+			item["modalities"] = info.Modalities
+		}
+		if info.Parameter != nil {
+			item["parameter"] = info.Parameter
+		}
+		if info.Limit != nil && (info.Limit.Context > 0 || info.Limit.Output > 0) {
+			item["limit"] = info.Limit
+		}
+		data = append(data, item)
 	}
 	return data
 }

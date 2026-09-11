@@ -1,0 +1,50 @@
+{
+  "owner": "qwen",
+  "providers": [
+    "hyper"
+  ],
+  "aliases": [
+    "qwen3-next-80b-a3b-instruct",
+    "qwen-qwen3-next-80b-a3b-instruct",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "qwen3-next-80b-a3b-thinking",
+    "qwen/qwen3-next-80b-a3b-thinking",
+    "qwen3-next-instruct",
+    "qwen3-next-thinking"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262144,
+    "output": 26214
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "qwen3-next-80b-a3b-instruct",
+      "contextWindow": 262144,
+      "maxOutputTokens": 26214
+    }
+  }
+}

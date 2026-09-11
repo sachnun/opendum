@@ -9,8 +9,10 @@ import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUr
 import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
 import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from "../lib/providers/qoder";
+import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "../lib/providers/workbuddy";
 import { exchangePerchOAuthCode, initiatePerchOAuth } from "../lib/providers/perch";
 import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "../lib/providers/cline";
+import { clearRefreshFailCount } from "../lib/proxy/auth";
 import type { OAuthResult } from "../lib/providers/types";
 import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "../../lib/provider-accounts";
 import type { ActionResult } from "../utils/api";
@@ -135,6 +137,24 @@ const DEVICE_PROVIDERS = {
       return { ...result, accountId: machineId ? `${userId}|${machineId}` : userId };
     },
   },
+  workbuddy: {
+    label: "WorkBuddy",
+    emailPrefix: "workbuddy",
+    initiate: async () => {
+      const result = await initiateWorkbuddyDeviceCodeFlow();
+      return {
+        deviceCode: result.deviceCode,
+        userCode: result.userCode,
+        verificationUrl: result.verificationUrl,
+        verificationUrlComplete: result.verificationUrlComplete,
+        expiresIn: result.expiresIn,
+        interval: result.interval,
+      };
+    },
+    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
+      return pollWorkbuddyDeviceCodeAuthorization(input.deviceCode);
+    },
+  },
   cline: {
     label: "Cline",
     emailPrefix: "cline",
@@ -189,6 +209,7 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
   if (existingAccount) {
     const resolvedEmail = oauthResult.email && email === oauthResult.email ? oauthResult.email : existingAccount.email || email;
     await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email: resolvedEmail, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: resolvedEmail, isUpdate: true } };
   }
 

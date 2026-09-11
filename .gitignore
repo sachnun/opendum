@@ -38,6 +38,9 @@ coverage.out
 *.db
 *.sqlite
 *.sqlite3
+*.dump
+*.rdb
+backups/
 
 # misc
 .DS_Store

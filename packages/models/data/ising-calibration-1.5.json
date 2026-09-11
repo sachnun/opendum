@@ -1,0 +1,11 @@
+{
+  "owner": "nvidia",
+  "providers": [
+    "nvidia_nim"
+  ],
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/ising-calibration-1.5-31b"
+    }
+  }
+}

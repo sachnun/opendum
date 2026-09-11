@@ -40,7 +40,7 @@ func (f *fakeCustomProviderReader) ListModels(ctx context.Context, providerID st
 
 func customValidationService(t *testing.T) *Service {
 	t.Helper()
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestValidateModelForUserRejectsForeignCustomSlug(t *testing.T) {
 }
 
 func TestValidateModelForUserCustomStoreNil(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}

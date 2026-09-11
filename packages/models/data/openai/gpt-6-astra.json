@@ -1,0 +1,53 @@
+{
+  "owner": "openai",
+  "providers": [
+    "codex",
+    "workbuddy"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1050000,
+    "output": 128000
+  },
+  "providerConfig": {
+    "codex": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "allowedTiers": [
+        "plus",
+        "pro",
+        "pro+",
+        "business",
+        "enterprise",
+        "team",
+        "student"
+      ]
+    },
+    "workbuddy": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

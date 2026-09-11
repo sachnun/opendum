@@ -86,43 +86,6 @@ func openRouterGroups(keyData, creditsData map[string]any) []quotaGroupDisplay {
 	return []quotaGroupDisplay{{Name: "key-status", DisplayName: "OpenRouter key", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
 }
 
-func (s *Service) fetchSiliconFlowQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) accountQuotaInfo {
-	apiKey, err := cryptojs.Decrypt(s.secret, account.AccessToken)
-	if err != nil {
-		return expiredQuotaInfo(account, "API key is missing or invalid. Please reconnect this account.")
-	}
-	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "siliconflow:user-info", http.MethodGet, "https://api.siliconflow.com/v1/user/info", map[string]string{"Authorization": "Bearer " + strings.TrimSpace(apiKey), "Accept": "application/json"}, nil)
-	if err != nil {
-		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
-	}
-	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return errorQuotaInfo(account, fmt.Sprintf("SiliconFlow user info endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(result.Raw, &payload); err != nil {
-		return errorQuotaInfo(account, "SiliconFlow user info response was not valid JSON", time.Now().UnixMilli())
-	}
-	data := parseQuotaRecord(payload["data"])
-	if data == nil {
-		return errorQuotaInfo(account, "SiliconFlow user info response did not include a data object", time.Now().UnixMilli())
-	}
-	s.putQuotaJSONCache(ctx, result)
-	return baseQuotaInfo(account, "success", siliconFlowGroups(data), time.Now().UnixMilli(), "")
-}
-
-func siliconFlowGroups(data map[string]any) []quotaGroupDisplay {
-	total, hasTotal := parseQuotaNumber(data["totalBalance"])
-	if !hasTotal {
-		total, hasTotal = parseQuotaNumber(data["balance"])
-	}
-	if !hasTotal {
-		label := "active"
-		return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Account balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
-	}
-	label := fmt.Sprintf("$%.2f", total)
-	return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Account balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: total <= 0, IsEstimated: true, Confidence: "medium", RemainingLabel: &label}}
-}
-
 func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
 	tier := quotaFallbackTier(account)
 	projectID := ""
@@ -684,11 +647,11 @@ func (s *Service) fetchHyperQuota(ctx context.Context, account appdb.ProviderAcc
 		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
 	}
 	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return errorQuotaInfo(account, fmt.Sprintf("Hyper credits endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
+		return errorQuotaInfo(account, fmt.Sprintf("Charm credits endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(result.Raw, &payload); err != nil {
-		return errorQuotaInfo(account, "Hyper credits response was not valid JSON", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Charm credits response was not valid JSON", time.Now().UnixMilli())
 	}
 	s.putQuotaJSONCache(ctx, result)
 	return baseQuotaInfo(account, "success", hyperGroups(payload), time.Now().UnixMilli(), "")
@@ -698,10 +661,10 @@ func hyperGroups(payload map[string]any) []quotaGroupDisplay {
 	balance, hasBalance := parseQuotaNumber(payload["balance"])
 	if !hasBalance {
 		label := "active"
-		return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance (USD)", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
+		return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: 1, MaxRequests: 1, UsedRequests: 0, PercentUsed: 0, IsExhausted: false, IsEstimated: true, Confidence: "low", RemainingLabel: &label}}
 	}
 	// 1 hypercredit = $0.05
 	usd := balance * 0.05
 	label := fmt.Sprintf("$%.2f", usd)
-	return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance (USD)", Models: []string{}, RemainingFraction: 1, RemainingRequests: usd, MaxRequests: usd, UsedRequests: 0, PercentUsed: 0, IsExhausted: balance <= 0, IsEstimated: true, Confidence: "medium", RemainingLabel: &label}}
+	return []quotaGroupDisplay{{Name: "account-balance", DisplayName: "Balance", Models: []string{}, RemainingFraction: 1, RemainingRequests: usd, MaxRequests: usd, UsedRequests: 0, PercentUsed: 0, IsExhausted: balance <= 0, IsEstimated: true, Confidence: "medium", RemainingLabel: &label}}
 }

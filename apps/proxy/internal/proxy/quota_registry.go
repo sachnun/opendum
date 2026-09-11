@@ -9,9 +9,8 @@ import (
 type quotaFetcher func(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo
 
 var quotaProvidersWithoutToken = map[string]struct{}{
-	"openrouter":  {},
-	"siliconflow": {},
-	"hyper":       {},
+	"openrouter": {},
+	"hyper":      {},
 }
 
 func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
@@ -21,9 +20,6 @@ func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
 	s.quotaFetchers = map[string]quotaFetcher{
 		"openrouter": func(ctx context.Context, account appdb.ProviderAccount, _ string, forceRefresh bool) accountQuotaInfo {
 			return s.fetchOpenRouterQuota(ctx, account, forceRefresh)
-		},
-		"siliconflow": func(ctx context.Context, account appdb.ProviderAccount, _ string, forceRefresh bool) accountQuotaInfo {
-			return s.fetchSiliconFlowQuota(ctx, account, forceRefresh)
 		},
 		"antigravity": s.fetchAntigravityQuota,
 		"codex":       s.fetchCodexQuota,
@@ -35,6 +31,7 @@ func (s *Service) quotaFetcherRegistry() map[string]quotaFetcher {
 		"hyper": func(ctx context.Context, account appdb.ProviderAccount, _ string, forceRefresh bool) accountQuotaInfo {
 			return s.fetchHyperQuota(ctx, account, forceRefresh)
 		},
+		"workbuddy": s.fetchWorkbuddyQuota,
 	}
 	return s.quotaFetchers
 }

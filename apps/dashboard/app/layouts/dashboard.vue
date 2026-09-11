@@ -66,22 +66,22 @@ const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-s
 const supportNavigation = computed<NavItem[]>(() => [
   {
     name: "Tools",
-    href: "/dashboard/tools",
+    href: "/tools",
     icon: "i-lucide-wrench",
     children: [
-      { name: "Email", href: "/dashboard/tools/email", disabled: true, tag: "soon" },
-      { name: "OTP", href: "/dashboard/tools/otp", disabled: true, tag: "soon" },
-      { name: "Card", href: "/dashboard/tools/card", disabled: true, tag: "soon" },
+      { name: "Email", href: "/tools/email", disabled: true, tag: "soon" },
+      { name: "OTP", href: "/tools/otp", disabled: true, tag: "soon" },
+      { name: "Card", href: "/tools/card", disabled: true, tag: "soon" },
     ],
   },
-  { name: "Playground", href: "/dashboard/playground", icon: "i-lucide-flask-conical" },
+  { name: "Playground", href: "/play", icon: "i-lucide-flask-conical" },
 ]);
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
 const dashboardApi = useDashboardApi();
 const dashboardInvalidation = useDashboardDataInvalidation();
-const accountsNavigationHref = "/dashboard";
+const accountsNavigationHref = "/";
 const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dashboardInvalidation.keys.accountsOverview);
 
 const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
@@ -260,7 +260,7 @@ const mobileSheetOverlayStyle = computed(() => {
 
 function isActive(href: string) {
   if (href === accountsNavigationHref && accountNavigationHrefs.value.has(route.path)) return true;
-  return route.path === href || (href !== "/dashboard" && route.path.startsWith(href));
+  return route.path === href || (href !== "/" && route.path.startsWith(href));
 }
 
 function isAccountsNavItem(item: NavItem) {
@@ -316,7 +316,7 @@ function visibleSubItems(item: NavItem) {
       });
   }
 
-  if (item.href === "/dashboard/models") {
+  if (item.href === "/models") {
     return item.children.filter((subItem) => subItem.anchorId ? (modelFamilyCounts.value[subItem.anchorId] ?? 0) > 0 : true);
   }
 
@@ -736,7 +736,7 @@ async function handleAuditSelected() {
     <div class="dashboard-layout-frame relative mx-auto flex min-h-svh w-full md:max-w-screen-md lg:max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-[118rem] min-[1920px]:max-w-[128rem]">
     <aside class="sticky top-0 hidden border-r border-border bg-background md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col">
       <div class="flex h-16 items-center border-b border-border px-6">
-        <NuxtLink to="/dashboard" class="inline-flex items-center gap-2.5">
+        <NuxtLink to="/" class="inline-flex items-center gap-2.5">
           <span class="relative flex h-2.5 w-2.5">
             <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
             <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
@@ -873,7 +873,7 @@ async function handleAuditSelected() {
                         />
                       </span>
                       <span
-                        v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
+                        v-else-if="item.href === '/models' && subItem.anchorId && modelCountFor(subItem) > 0"
                         :class="[
                           'px-1.5 py-0.5 text-[10px] font-semibold leading-none',
                           isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground',
@@ -1128,7 +1128,7 @@ async function handleAuditSelected() {
       <template #content>
         <div class="flex h-full flex-col bg-background">
           <div class="flex h-16 items-center justify-between border-b border-border px-6">
-            <NuxtLink to="/dashboard" class="inline-flex items-center gap-2 text-base font-semibold tracking-tight" @click="closeMobileSidebar">
+            <NuxtLink to="/" class="inline-flex items-center gap-2 text-base font-semibold tracking-tight" @click="closeMobileSidebar">
               <span class="relative flex h-2.5 w-2.5">
                 <span class="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                 <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
@@ -1268,7 +1268,7 @@ async function handleAuditSelected() {
                             :indicator="accountIndicatorByHref[subItem.href]"
                           />
                           <span
-                            v-else-if="item.href === '/dashboard/models' && subItem.anchorId && modelCountFor(subItem) > 0"
+                            v-else-if="item.href === '/models' && subItem.anchorId && modelCountFor(subItem) > 0"
                             :class="[
                               'px-1.5 py-0.5 text-[10px] font-semibold leading-none',
                               isSubItemActive(subItem) ? 'text-foreground' : 'text-muted-foreground',

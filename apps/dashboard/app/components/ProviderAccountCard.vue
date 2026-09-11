@@ -143,9 +143,6 @@ const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
     { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
     { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
   ],
-  siliconflow: [
-    { labelClass: "w-24", metaClass: "w-10", valueClass: "w-16", barClass: "w-4/5" },
-  ],
 };
 
 const props = defineProps<{
@@ -173,7 +170,7 @@ const emit = defineEmits<{
 }>();
 
 const dashboardApi = useDashboardApi();
-const { auditRefreshVersion, auditUser, isAuditMode } = useDashboardAudit();
+const { auditRefreshVersion, auditUser, dashboardMe, isAuditMode } = useDashboardAudit();
 const isToggling = ref(false);
 const isSubtitleVisible = ref(false);
 const editDialogOpen = ref(false);
@@ -191,7 +188,7 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
-const isDev = import.meta.dev;
+const isMaintener = computed(() => import.meta.dev || (dashboardMe.value?.isMaintener ?? false));
 const copiedSession = ref(false);
 const sessionLoading = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
@@ -688,7 +685,7 @@ const errorPlaygroundRoute = computed(() => {
     addAdditionalPlaygroundParams(query, params);
   }
 
-  return { path: "/dashboard/playground", query };
+  return { path: "/play", query };
 });
 const hasPreviousErrorPreview = computed(() => activeErrorIndex.value < allErrorPreviewEntries.value.length - 1);
 const hasNewerErrorPreview = computed(() => activeErrorIndex.value > 0);
@@ -1221,11 +1218,11 @@ function cancelErrorPreviewPointer() {
               <UiButton variant="outline" size="sm" :disabled="readonly" :aria-label="`Delete ${accountTitle}`" @click="deleteDialogOpen = true"><UiIcon name="i-lucide-trash-2" class="size-3 text-destructive" /></UiButton>
             </UiTooltip>
             <UiTooltip text="Playground">
-              <NuxtLink :to="`/dashboard/playground?accountId=${account.id}`">
+              <NuxtLink :to="`/play?accountId=${account.id}`">
                 <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
             </UiTooltip>
-            <UiTooltip v-if="isDev" :text="sessionLoading ? 'Fetching session...' : copiedSession ? 'Copied' : 'Copy session'">
+            <UiTooltip v-if="isMaintener" :text="sessionLoading ? 'Fetching session...' : copiedSession ? 'Copied' : 'Copy session'">
               <UiButton type="button" variant="outline" size="sm" :disabled="readonly || sessionLoading" :aria-label="`Copy session for ${accountTitle}`" @click="copySession">
                 <UiIcon :name="sessionLoading ? 'i-lucide-loader-2' : copiedSession ? 'i-lucide-check' : 'i-lucide-key-round'" :class="sessionLoading ? 'size-3 animate-spin' : 'size-3'" />
               </UiButton>

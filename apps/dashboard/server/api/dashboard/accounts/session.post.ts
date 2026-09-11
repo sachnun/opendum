@@ -1,11 +1,15 @@
 import { createError } from "h3";
 import { accountSessionInputSchema, getAccountSession } from "../../../services/accounts";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { readDashboardBody, requireDashboardContext } from "../../../utils/api";
 
 export default defineEventHandler(async (event) => {
-  if (process.env.NODE_ENV === "production") {
+  const context = await requireDashboardContext(event);
+  if (process.env.NODE_ENV === "production" && !context.isMaintener) {
     throw createError({ statusCode: 404, statusMessage: "Not Found" });
   }
+  if (context.isAuditMode) {
+    throw createError({ statusCode: 403, statusMessage: "Audit mode is read-only" });
+  }
 
-  return getAccountSession(await requireWritableUserId(event), await readDashboardBody(event, accountSessionInputSchema));
+  return getAccountSession(context.userId, await readDashboardBody(event, accountSessionInputSchema));
 });

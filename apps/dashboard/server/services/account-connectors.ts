@@ -4,11 +4,11 @@ import { z } from "zod";
 import { db } from "../lib/db";
 import { providerAccount } from "../lib/db/schema";
 import { encrypt, hashString } from "../lib/encryption";
+import { clearRefreshFailCount } from "../lib/proxy/auth";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { getProviderModelMap } from "../lib/proxy/models";
 import { API_BASE_URL as nvidiaApiBaseUrl } from "../lib/providers/nvidia/constants";
 import { API_BASE_URL as openRouterApiBaseUrl } from "../lib/providers/openrouter/constants";
-import { API_BASE_URL as siliconflowApiBaseUrl } from "../lib/providers/siliconflow/constants";
 import { API_BASE_URL as zenmuxApiBaseUrl } from "../lib/providers/zenmux/constants";
 import { API_BASE_URL as harborApiBaseUrl } from "../lib/providers/harbor/constants";
 import { API_BASE_URL as hyperApiBaseUrl } from "../lib/providers/hyper/constants";
@@ -28,10 +28,9 @@ type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 const API_KEY_PROVIDER_SETTINGS = {
   nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
-  siliconflow: { label: "SiliconFlow", baseUrl: siliconflowApiBaseUrl, modelMap: getProviderModelMap("siliconflow"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
-  hyper: { label: "Hyper", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
+  hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
 } satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
 
 function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
@@ -75,7 +74,7 @@ async function validateProviderApiKey(provider: ApiKeyProviderKey, apiKey: strin
     }
     return { success: true, data: undefined };
   } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate external provider API keys. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate external provider API keys. Set NUXT_PUBLIC_PROXY_URL to your proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: `${label} API key validation timed out. Please try again.` };
     return { success: false, error: `Unable to validate ${label} API key. Please check your network and try again.` };
   } finally {
@@ -96,6 +95,7 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiKey), refreshToken: encrypt(normalizedApiKey), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), ...(normalizedPlatformKey ? { accountId: normalizedPlatformKey } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
@@ -131,7 +131,7 @@ async function connectQoderPATAccount(userId: string, pat: string, accountName?:
     }
     exchange = await response.json().catch(() => ({}));
   } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Qoder API keys. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Qoder API keys. Set NUXT_PUBLIC_PROXY_URL to your proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Qoder API key validation timed out. Please try again." };
     return { success: false, error: "Unable to validate Qoder API key. Please check your network and try again." };
   } finally {
@@ -174,6 +174,7 @@ async function connectQoderPATAccount(userId: string, pat: string, accountName?:
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "qoder"), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(accessToken), refreshToken: encrypt(refreshToken), expiresAt, accountId: packedAccountId, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 
@@ -211,7 +212,7 @@ async function connectCloudflare(userId: string, apiToken: string, cfAccountId: 
       return { success: false, error: `Unable to validate Cloudflare credentials (HTTP ${response.status}). Please try again.` };
     }
   } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Cloudflare credentials. Set NUXT_PUBLIC_PROXY_URL to your Railway proxy URL." };
+    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Cloudflare credentials. Set NUXT_PUBLIC_PROXY_URL to your proxy URL." };
     if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Cloudflare validation timed out. Please try again." };
     return { success: false, error: "Unable to validate Cloudflare credentials. Please check your network and try again." };
   } finally {
@@ -223,6 +224,7 @@ async function connectCloudflare(userId: string, apiToken: string, cfAccountId: 
   const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "workers_ai"), eq(providerAccount.email, identifier))).limit(1);
   if (existingAccount) {
     await db.update(providerAccount).set({ accessToken: encrypt(normalizedApiToken), refreshToken: encrypt(normalizedApiToken), expiresAt: API_KEY_PROVIDER_ACCOUNT_EXPIRY, accountId: normalizedAccountId, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
+    await clearRefreshFailCount(existingAccount.id);
     return { success: true, data: { email: identifier, isUpdate: true } };
   }
 

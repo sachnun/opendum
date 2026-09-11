@@ -1,0 +1,11 @@
+{
+  "providers": [
+    "zenmux"
+  ],
+  "ignored": true,
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "z-ai/glm-4.7"
+    }
+  }
+}

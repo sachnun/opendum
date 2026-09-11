@@ -14,6 +14,11 @@ import (
 const imageFetchTimeout = 30 * time.Second
 const maxImageFetchBytes = 20 << 20
 
+// imageFetchUserAgent identifies the proxy when fetching external images.
+// Several CDNs (Wikimedia among them) answer 403 to requests without a
+// User-Agent, which previously made those image URLs fail to convert.
+const imageFetchUserAgent = "opendum-proxy/1.0 (+https://github.com/sachnun/opendum)"
+
 func convertImageURLsToBase64(ctx context.Context, client *http.Client, messages []any) []any {
 	if !hasExternalChatImageURL(messages) {
 		return messages
@@ -152,6 +157,8 @@ func fetchAsDataURI(ctx context.Context, client *http.Client, imageURL string) s
 	if err != nil {
 		return ""
 	}
+	req.Header.Set("User-Agent", imageFetchUserAgent)
+	req.Header.Set("Accept", "image/*,application/pdf;q=0.9,*/*;q=0.8")
 	resp, err := client.Do(req)
 	if err != nil {
 		return ""

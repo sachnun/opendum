@@ -26,6 +26,11 @@ const (
 	playgroundTimestampHeader = "X-Opendum-Playground-Timestamp"
 	playgroundSignatureHeader = "X-Opendum-Playground-Signature"
 	playgroundAuthWindow      = 2 * time.Minute
+
+	// upstreamResponseHeaderTimeout bounds the wait for provider response
+	// headers. Reasoning models can take a while to emit the first token, so
+	// this is generous while still letting a stalled provider fail over.
+	upstreamResponseHeaderTimeout = 90 * time.Second
 )
 
 type Service struct {
@@ -52,19 +57,52 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		customStore:      providers.NewCustomStore(db),
 		affinity:         sessionaffinity.New(redisClient, providerRegistry.Names()),
 		secret:           secret,
-		client:           guardedProxyClient(),
+		client:           newUpstreamClient(),
 	}
 	service.quotaFetcherRegistry()
 	return service
 }
 
-func guardedProxyClient() *http.Client {
+// newUpstreamClient builds the HTTP client used for provider requests.
+//
+// There is deliberately no overall Client.Timeout: responses stream for as long
+// as the model keeps generating. ResponseHeaderTimeout still bounds the wait
+// for the first byte, so a stalled provider fails over through account rotation
+// instead of hanging until the edge proxy returns a 504.
+//
+// The dialer and redirect policy are guarded so custom provider endpoints
+// cannot reach private networks or cloud metadata services.
+func newUpstreamClient() *http.Client {
 	base := http.DefaultTransport.(*http.Transport).Clone()
 	base.DialContext = providers.GuardedDialContext(providers.AllowPrivateRelay)
+	base.Proxy = http.ProxyFromEnvironment
+	base.ForceAttemptHTTP2 = true
+	base.MaxIdleConns = 200
+	base.MaxIdleConnsPerHost = 32
+	base.IdleConnTimeout = 90 * time.Second
+	base.TLSHandshakeTimeout = 15 * time.Second
+	base.ResponseHeaderTimeout = upstreamResponseHeaderTimeout
+	base.ExpectContinueTimeout = time.Second
 	return &http.Client{
 		Transport:     base,
 		CheckRedirect: providers.GuardedRedirectPolicy(providers.AllowPrivateRelay),
 	}
+}
+
+func (s *Service) SetTorEgress(tor providers.TorEgress, torClient *http.Client) {
+	if s == nil {
+		return
+	}
+	if s.providerRegistry != nil {
+		s.providerRegistry.SetTorEgress(tor, torClient)
+	}
+}
+
+func (s *Service) TorReady() bool {
+	if s == nil || s.providerRegistry == nil {
+		return false
+	}
+	return s.providerRegistry.TorReady()
 }
 
 func (s *Service) ChatCompletions(w http.ResponseWriter, r *http.Request) {
@@ -295,14 +333,23 @@ func (s *Service) makeProviderRequest(ctx context.Context, account appdb.Provide
 	if providerImpl == nil {
 		return nil, fmt.Errorf("provider %s is not implemented in Go proxy yet", account.Provider)
 	}
+	var (
+		resp *http.Response
+		err  error
+	)
 	if isAuthlessProvider(providerImpl) || isSyntheticProviderAccountID(account.ID) {
-		return providerImpl.MakeRequest(ctx, s.client, "", account, payload, stream)
+		resp, err = providerImpl.MakeRequest(ctx, s.client, "", account, payload, stream)
+	} else {
+		credentials, requestAccount, credErr := s.credentialsForAccount(ctx, account, providerImpl)
+		if credErr != nil {
+			return nil, credErr
+		}
+		resp, err = providerImpl.MakeRequest(ctx, s.client, credentials, requestAccount, payload, stream)
 	}
-	credentials, requestAccount, err := s.credentialsForAccount(ctx, account, providerImpl)
-	if err != nil {
-		return nil, err
+	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return resp, err
 	}
-	return providerImpl.MakeRequest(ctx, s.client, credentials, requestAccount, payload, stream)
+	return providers.AdaptForResponsesClient(providerImpl, resp, payload, stream)
 }
 
 func isAuthlessProvider(provider providers.Provider) bool {

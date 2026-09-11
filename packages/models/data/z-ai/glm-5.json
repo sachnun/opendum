@@ -1,0 +1,48 @@
+{
+  "owner": "z-ai",
+  "providers": [
+    "kiro",
+    "perch",
+    "hyper"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 202752,
+    "output": 20275
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 202752,
+      "maxOutputTokens": 20275
+    },
+    "kiro": {
+      "contextWindow": 204800,
+      "maxOutputTokens": 131072
+    },
+    "perch": {
+      "upstream": "glm-5",
+      "contextWindow": 204800,
+      "maxOutputTokens": 131072
+    }
+  }
+}

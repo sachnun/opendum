@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -46,6 +47,57 @@ func TestAccountNeedsCredentialRefreshUsesProviderBuffer(t *testing.T) {
 func TestTokenRefreshLockKey(t *testing.T) {
 	if got := tokenRefreshLockKey("acct_123"); got != "opendum:provider-account:refresh-lock:acct_123" {
 		t.Fatalf("lock key = %q", got)
+	}
+}
+
+func TestRefreshFailCountKey(t *testing.T) {
+	if got := refreshFailCountKey("acct_123"); got != "opendum:provider-account:refresh-fail-count:acct_123" {
+		t.Fatalf("fail count key = %q", got)
+	}
+}
+
+func TestShouldDisableAccountAfterRefreshFailures(t *testing.T) {
+	if shouldDisableAccountAfterRefreshFailures(4) {
+		t.Fatal("4 failures should not disable")
+	}
+	if !shouldDisableAccountAfterRefreshFailures(5) {
+		t.Fatal("5 failures should disable")
+	}
+	if !shouldDisableAccountAfterRefreshFailures(6) {
+		t.Fatal("6 failures should disable")
+	}
+}
+
+func TestParseRefreshErrorStatusCode(t *testing.T) {
+	if got := parseRefreshErrorStatusCode(errors.New("codex token refresh failed: 400 invalid_grant")); got != 400 {
+		t.Fatalf("status = %d, want 400", got)
+	}
+	if got := parseRefreshErrorStatusCode(errors.New("kiro token refresh failed: 503 service unavailable")); got != 503 {
+		t.Fatalf("status = %d, want 503", got)
+	}
+	if got := parseRefreshErrorStatusCode(errors.New("network unreachable")); got != 401 {
+		t.Fatalf("status = %d, want default 401", got)
+	}
+	if got := parseRefreshErrorStatusCode(nil); got != 401 {
+		t.Fatalf("status = %d, want default 401", got)
+	}
+}
+
+func TestRecordRefreshFailureWithoutDeps(t *testing.T) {
+	service := &Service{}
+	count, disabled := service.recordRefreshFailure(context.Background(), appdb.ProviderAccount{ID: "acct_123", Provider: "codex", IsActive: true}, errors.New("codex token refresh failed: 400 bad"))
+	if count != 1 {
+		t.Fatalf("count = %d, want 1 without redis", count)
+	}
+	if disabled {
+		t.Fatal("should not disable without redis and db")
+	}
+	if count, disabled := service.recordRefreshFailure(context.Background(), appdb.ProviderAccount{ID: "acct_123", Provider: "codex", IsActive: false}, errors.New("codex token refresh failed: 400 bad")); count != 0 || disabled {
+		t.Fatalf("inactive account should be skipped, got count=%d disabled=%v", count, disabled)
+	}
+	service.clearRefreshFailures(context.Background(), "acct_123")
+	if disabled := service.disableAccountAfterRefreshFailures(context.Background(), "acct_123", time.Now()); disabled {
+		t.Fatal("should not disable without db")
 	}
 }
 

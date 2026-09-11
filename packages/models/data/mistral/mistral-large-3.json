@@ -1,0 +1,48 @@
+{
+  "owner": "mistral",
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "mistral-large-3-675b-instruct-2512",
+    "mistralai/mistral-large-3-675b-instruct-2512",
+    "mistral-large",
+    "mistralai/mistral-large",
+    "mistral-large-3-instruct"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": true,
+    "type": "instruct"
+  },
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 256000,
+    "output": 131072
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "mistralai/mistral-large",
+      "contextWindow": 256000,
+      "maxOutputTokens": 131072
+    }
+  }
+}

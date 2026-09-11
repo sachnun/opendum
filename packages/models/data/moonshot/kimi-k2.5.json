@@ -1,0 +1,49 @@
+{
+  "owner": "moonshot",
+  "providers": [
+    "perch",
+    "workers_ai",
+    "hyper"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 256000,
+    "output": 26214
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 262144,
+      "maxOutputTokens": 26214
+    },
+    "perch": {
+      "upstream": "kimi-2.5",
+      "contextWindow": 256000,
+      "maxOutputTokens": 256000
+    },
+    "workers_ai": {
+      "upstream": "@cf/moonshotai/kimi-k2.5",
+      "contextWindow": 256000,
+      "maxOutputTokens": 256000
+    }
+  }
+}

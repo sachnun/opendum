@@ -1,7 +1,12 @@
 {
   "name": "opendum",
   "installCommand": "true",
-  "buildCommand": "npm run build",
+  "buildCommand": "pnpm run build",
   "outputDirectory": ".edgeone/assets",
-  "nodeVersion": "22.11.0"
+  "nodeVersion": "22.11.0",
+  "cloudFunctions": {
+    "regions": {
+      "overseas": ["eu-frankfurt"]
+    }
+  }
 }

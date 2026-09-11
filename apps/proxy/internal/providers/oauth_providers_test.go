@@ -126,6 +126,84 @@ func TestOpenAICompatibleProviderKeepsAuthForKiloAccount(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleProviderFallsBackOnForbidden(t *testing.T) {
+	registry := testModelsRegistry(t)
+	model := anyProviderModel(t, registry, "kilo_code")
+	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", fallbackBaseURL: "https://unroxy.kilo.test/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
+	requests := []string{}
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.URL.String())
+		if len(requests) == 1 {
+			return jsonTestResponse(http.StatusForbidden, `{"error":{"message":"blocked"}}`), nil
+		}
+		return jsonTestResponse(http.StatusOK, `{"choices":[{"message":{"content":"ok"}}]}`), nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":    "kilo_code/" + model,
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if len(requests) != 2 || requests[0] != "https://api.kilo.test/api/gateway/chat/completions" || requests[1] != "https://unroxy.kilo.test/api.kilo.ai/api/gateway/chat/completions" {
+		t.Fatalf("requests = %#v", requests)
+	}
+}
+
+func TestOpenAICompatibleProviderKeepsPrimaryOnOtherErrors(t *testing.T) {
+	registry := testModelsRegistry(t)
+	model := anyProviderModel(t, registry, "kilo_code")
+	provider := openAICompatibleProvider{name: "kilo_code", baseURL: "https://api.kilo.test/api/gateway", fallbackBaseURL: "https://unroxy.kilo.test/api.kilo.ai/api/gateway", supportedParams: supportedKilo, registry: registry, trimPrefix: "kilo_code/"}
+	requests := []string{}
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.URL.String())
+		return jsonTestResponse(http.StatusBadRequest, `{"error":{"message":"bad"}}`), nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "token", appdb.ProviderAccount{}, map[string]any{
+		"model":    "kilo_code/" + model,
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest || len(requests) != 1 {
+		t.Fatalf("status = %d, requests = %#v", resp.StatusCode, requests)
+	}
+}
+
+func TestOpencodeProviderFallsBackOnRateLimit(t *testing.T) {
+	registry := testModelsRegistry(t)
+	model := anyProviderModel(t, registry, "opencode")
+	provider := opencodeProvider{registry: registry}
+	requests := []string{}
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.URL.String())
+		if len(requests) == 1 {
+			return jsonTestResponse(http.StatusTooManyRequests, `{"error":{"message":"rate limited"}}`), nil
+		}
+		return jsonTestResponse(http.StatusOK, `{"choices":[{"message":{"content":"ok"}}]}`), nil
+	})}
+
+	resp, err := provider.MakeRequest(t.Context(), client, "", appdb.ProviderAccount{}, map[string]any{
+		"model":    "opencode/" + model,
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if len(requests) != 2 || !strings.HasPrefix(requests[0], "https://opencode.ai/zen/v1/") || !strings.HasPrefix(requests[1], "https://unroxy.koyeb.app/opencode.ai/zen/v1/") {
+		t.Fatalf("requests = %#v", requests)
+	}
+}
+
 func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 	registry := testModelsRegistry(t)
 	model := anyProviderModel(t, registry, "opencode")
@@ -477,9 +555,8 @@ func TestAntigravityGemini3RaisesMaxTokensAboveThinkingBudget(t *testing.T) {
 	})
 	provider := antigravityProvider{registry: registry}.delegate()
 	body := map[string]any{
-		"model":      model,
-		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
-		"max_tokens": 8192,
+		"model":    model,
+		"messages": []any{map[string]any{"role": "user", "content": "hi"}},
 	}
 	resolved := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
 	if !strings.HasSuffix(resolved, "-high") {
@@ -494,6 +571,33 @@ func TestAntigravityGemini3RaisesMaxTokensAboveThinkingBudget(t *testing.T) {
 	thinking := generation["thinkingConfig"].(map[string]any)
 	if thinking["thinkingLevel"] != "high" {
 		t.Fatalf("thinking = %#v, want high", thinking)
+	}
+}
+
+func TestAntigravityGemini3HonorsClientMaxTokens(t *testing.T) {
+	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
+		return strings.HasPrefix(cfg.Upstream, "gemini-3") && customMap(cfg, "thinking_budgets") != nil
+	})
+	provider := antigravityProvider{registry: registry}.delegate()
+
+	// A client cap below the thinking budget must not be silently overridden.
+	body := map[string]any{
+		"model":      model,
+		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens": 8192,
+	}
+	resolved := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
+	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
+	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	if generation["maxOutputTokens"] != 8192 {
+		t.Fatalf("maxOutputTokens = %#v, want 8192 (client cap): %#v", generation["maxOutputTokens"], generation)
+	}
+	if thinking, ok := generation["thinkingConfig"].(map[string]any); ok {
+		if level := stringValue(thinking["thinkingLevel"]); level != "" {
+			t.Fatalf("thinkingLevel = %q, want empty because the cap cannot fit a budget", level)
+		}
 	}
 }
 
@@ -912,7 +1016,7 @@ func jsonTestResponse(status int, body string) *http.Response {
 
 func testModelsRegistry(t *testing.T) *models.Registry {
 	t.Helper()
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -28,14 +28,23 @@ type Server struct {
 func NewServer(registry *models.Registry, authSvc *auth.Service, proxySvc *proxy.Service, secret string) http.Handler {
 	s := &Server{registry: registry, auth: authSvc, proxy: proxySvc, secret: secret}
 	r := chi.NewRouter()
+	// The dashboard playground calls this API directly from the browser with a
+	// Bearer token. Credentials (cookies) are never used for proxy auth, and
+	// combining AllowCredentials with a wildcard origin is rejected by browsers
+	// and would let any origin read authenticated responses.
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"*"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 	}))
 
+	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/v1", http.StatusPermanentRedirect)
 	})

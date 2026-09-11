@@ -153,25 +153,23 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
     navOrder: 8,
   },
   {
-    key: "siliconflow",
-    slug: "siliconflow",
-    label: "SiliconFlow",
-    category: "api_key",
-    emptyMessage: "No SiliconFlow connections yet.",
+    key: "workbuddy",
+    slug: "workbuddy",
+    label: "WorkBuddy",
+    category: "oauth",
+    emptyMessage: "No WorkBuddy connections yet.",
     showTier: false,
-    authMethods: ["api_key"],
+    authMethods: ["device_code"],
     supportsQuota: true,
-    apiKeyPortalUrl: "https://cloud.siliconflow.com/account/ak",
-    apiKeyPlaceholder: "sk-...",
+    showInNav: false,
     displayOrder: 11,
-    navOrder: 9,
   },
   {
     key: "hyper",
     slug: "hyper",
-    label: "Hyper",
+    label: "Charm",
     category: "api_key",
-    emptyMessage: "No Hyper connections yet.",
+    emptyMessage: "No Charm connections yet.",
     showTier: false,
     authMethods: ["api_key"],
     supportsQuota: true,
@@ -217,9 +215,9 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: readonly ProviderAccountDefinition[] 
 export const PROVIDER_ACCOUNT_KEYS: readonly ProviderAccountKey[] = PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => definition.key);
 
 export const OAUTH_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch"] as const;
-export const DEVICE_PROVIDER_KEYS = ["codex", "qoder", "cline"] as const;
-export const API_KEY_PROVIDER_KEYS = ["nvidia_nim", "openrouter", "siliconflow", "zenmux", "harbor", "hyper"] as const;
-export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch", "openrouter", "siliconflow", "zenmux", "hyper"] as const;
+export const DEVICE_PROVIDER_KEYS = ["codex", "qoder", "cline", "workbuddy"] as const;
+export const API_KEY_PROVIDER_KEYS = ["nvidia_nim", "openrouter", "zenmux", "harbor", "hyper"] as const;
+export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch", "openrouter", "zenmux", "hyper", "workbuddy"] as const;
 
 export type OAuthProviderKey = (typeof OAUTH_PROVIDER_KEYS)[number];
 export type DeviceProviderKey = (typeof DEVICE_PROVIDER_KEYS)[number];
@@ -247,7 +245,7 @@ export function getProviderLabel(provider: string): string {
 }
 
 export function getProviderAccountPath(provider: ProviderAccountKey): string {
-  return `/dashboard/${BY_KEY[provider].slug}`;
+  return `/${BY_KEY[provider].slug}`;
 }
 
 export function buildProviderHrefMap<V>(
