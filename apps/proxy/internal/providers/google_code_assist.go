@@ -150,7 +150,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 			projectID = p.defaultProject
 		}
 		if projectID != "" && p.db != nil {
-			_, _ = p.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"projectId\" = ?", projectID).Set("tier = ?", info.tier).Set("email = ?", info.email).Where("id = ?", account.ID).Exec(ctx)
+			_ = p.db.UpdateAntigravityAccountInfo(ctx, appdb.UpdateAntigravityAccountInfoParams{ProjectID: &projectID, Tier: &info.tier, Email: &info.email, ID: account.ID})
 		}
 	}
 	if projectID == "" {

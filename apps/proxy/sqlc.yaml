@@ -1,0 +1,41 @@
+version: "1"
+packages:
+  - name: "db"
+    path: "internal/db"
+    engine: "postgresql"
+    schema: "../dashboard/drizzle"
+    queries: "db/queries"
+    sql_package: "pgx/v5"
+    emit_pointers_for_null_types: true
+    emit_empty_slices: true
+    overrides:
+      - db_type: "pg_catalog.int4"
+        go_type: "int"
+      - db_type: "pg_catalog.int4"
+        nullable: true
+        go_type:
+          type: "int"
+          pointer: true
+      - db_type: "pg_catalog.timestamp"
+        go_type:
+          import: "time"
+          type: "Time"
+      - db_type: "pg_catalog.timestamp"
+        nullable: true
+        go_type:
+          import: "time"
+          type: "Time"
+          pointer: true
+rename:
+  userId: UserID
+  accountId: AccountID
+  providerId: ProviderID
+  apiKey: APIKey
+  apiKeyId: APIKeyID
+  projectId: ProjectID
+  providerAccountId: ProviderAccountID
+  proxyApiKeyId: ProxyAPIKeyID
+  idToken: IDToken
+  ipAddress: IPAddress
+  proxy_api_key: ProxyAPIKey
+  proxy_api_key_rate_limit: ProxyAPIKeyRateLimit

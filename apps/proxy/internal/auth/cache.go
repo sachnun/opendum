@@ -52,7 +52,7 @@ func (s *Service) touchAPIKeyLastUsed(ctx context.Context, apiKeyID string) {
 	if err == nil && !updated {
 		return
 	}
-	_, _ = s.db.NewUpdate().TableExpr("proxy_api_key").Set("\"lastUsedAt\" = NOW()").Where("id = ?", apiKeyID).Exec(ctx)
+	_ = s.db.TouchAPIKeyLastUsed(ctx, apiKeyID)
 }
 
 func (s *Service) getCachedDisabledModels(ctx context.Context, userID string) ([]string, bool) {

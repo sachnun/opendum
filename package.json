@@ -14,6 +14,10 @@
     "build:proxy": "go -C apps/proxy build ./...",
     "build": "npm run build:dashboard && npm run build:proxy",
     "db:push": "npm run db:push --workspace @opendum/dashboard",
+    "db:generate": "npm run db:generate --workspace @opendum/dashboard",
+    "db:migrate": "npm run db:migrate --workspace @opendum/dashboard",
+    "db:sqlc": "sqlc -f apps/proxy/sqlc.yaml generate",
+    "db:sqlc:diff": "sqlc -f apps/proxy/sqlc.yaml diff",
     "db:studio": "npm run db:studio --workspace @opendum/dashboard",
     "lint": "npm run lint --workspace @opendum/dashboard && go -C apps/proxy test ./...",
     "models:refresh": "node scripts/models.mjs"

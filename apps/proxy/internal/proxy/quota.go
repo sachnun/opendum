@@ -142,15 +142,15 @@ func (s *Service) validateInternalSignature(r *http.Request, path string, body [
 }
 
 func (s *Service) loadQuotaAccount(ctx context.Context, input quotaRequest) (appdb.ProviderAccount, error) {
-	var account appdb.ProviderAccount
-	err := s.db.NewSelect().Model(&account).
-		Column("id", "userId", "provider", "name", "accessToken", "refreshToken", "expiresAt", "apiKey", "projectId", "tier", "accountId", "email", "isActive", "lastUsedAt").
-		Where("id = ?", input.AccountID).
-		Where("\"userId\" = ?", input.UserID).
-		Where("provider = ?", input.Provider).
-		Limit(1).
-		Scan(ctx)
-	return account, err
+	row, err := s.db.GetQuotaAccount(ctx, appdb.GetQuotaAccountParams{
+		ID:       input.AccountID,
+		UserID:   input.UserID,
+		Provider: input.Provider,
+	})
+	if err != nil {
+		return appdb.ProviderAccount{}, err
+	}
+	return appdb.ProviderAccountFromQuota(row), nil
 }
 
 func (s *Service) fetchAccountQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) (accountQuotaInfo, error) {

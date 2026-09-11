@@ -2,11 +2,11 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/opendum/opendum/apps/proxy/internal/cryptojs"
@@ -66,14 +66,9 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 		}
 	}
 
-	var apiKey appdb.ProxyAPIKey
-	err := s.db.NewSelect().Model(&apiKey).
-		Column("id", "userId", "isActive", "expiresAt", "updatedAt", "modelAccessMode", "modelAccessList", "accountAccessMode", "accountAccessList", "roamingEnabled").
-		Where("\"keyHash\" = ?", keyHash).
-		Limit(1).
-		Scan(ctx)
+	apiKey, err := s.db.GetAPIKeyByHash(ctx, keyHash)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			_ = s.setCachedAPIKeyValidation(ctx, keyHash, cacheValue{Valid: false, Error: "Invalid API key"}, invalidTTL)
 			return Result{Valid: false, Error: "Invalid API key"}, nil
 		}
@@ -88,7 +83,7 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 
 	if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
 		go func() {
-			_, _ = s.db.NewUpdate().Model((*appdb.ProxyAPIKey)(nil)).Set("\"isActive\" = FALSE").Where("id = ?", apiKey.ID).Exec(context.Background())
+			_ = s.db.DeactivateAPIKey(context.Background(), apiKey.ID)
 		}()
 		_ = s.setCachedAPIKeyValidation(ctx, keyHash, cacheValue{Valid: false, APIKeyID: apiKey.ID, UpdatedAtMicros: &updatedAtMicros, Error: "API key has expired"}, invalidTTL)
 		return Result{Valid: false, Error: "API key has expired"}, nil
@@ -142,14 +137,9 @@ func (s *Service) isCachedAPIKeyValidationCurrent(ctx context.Context, cached ca
 		return false
 	}
 
-	var apiKey appdb.ProxyAPIKey
-	err := s.db.NewSelect().Model(&apiKey).
-		Column("id", "isActive", "expiresAt", "updatedAt").
-		Where("id = ?", cached.APIKeyID).
-		Limit(1).
-		Scan(ctx)
+	apiKey, err := s.db.GetAPIKeyFreshnessByID(ctx, cached.APIKeyID)
 	if err != nil {
-		return !errors.Is(err, sql.ErrNoRows)
+		return !errors.Is(err, pgx.ErrNoRows)
 	}
 	if apiKey.UpdatedAt.UnixMicro() != *cached.UpdatedAtMicros {
 		return false
@@ -164,11 +154,7 @@ func (s *Service) isCachedAPIKeyValidationCurrent(ctx context.Context, cached ca
 }
 
 func (s *Service) getRateLimitRules(ctx context.Context, apiKeyID string) ([]RateLimitRule, error) {
-	var rows []appdb.ProxyAPIKeyRateLimit
-	err := s.db.NewSelect().Model(&rows).
-		Column("target", "targetType", "perMinute", "perHour", "perDay").
-		Where("\"apiKeyId\" = ?", apiKeyID).
-		Scan(ctx)
+	rows, err := s.db.ListAPIKeyRateLimits(ctx, apiKeyID)
 	if err != nil {
 		return nil, err
 	}
