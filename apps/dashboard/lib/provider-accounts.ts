@@ -167,9 +167,9 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
   {
     key: "hyper",
     slug: "hyper",
-    label: "Hyper",
+    label: "Charm",
     category: "api_key",
-    emptyMessage: "No Hyper connections yet.",
+    emptyMessage: "No Charm connections yet.",
     showTier: false,
     authMethods: ["api_key"],
     supportsQuota: true,

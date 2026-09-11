@@ -647,11 +647,11 @@ func (s *Service) fetchHyperQuota(ctx context.Context, account appdb.ProviderAcc
 		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
 	}
 	if result.Response.StatusCode < 200 || result.Response.StatusCode >= 300 {
-		return errorQuotaInfo(account, fmt.Sprintf("Hyper credits endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
+		return errorQuotaInfo(account, fmt.Sprintf("Charm credits endpoint failed: HTTP %d %s", result.Response.StatusCode, string(result.Raw)), time.Now().UnixMilli())
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(result.Raw, &payload); err != nil {
-		return errorQuotaInfo(account, "Hyper credits response was not valid JSON", time.Now().UnixMilli())
+		return errorQuotaInfo(account, "Charm credits response was not valid JSON", time.Now().UnixMilli())
 	}
 	s.putQuotaJSONCache(ctx, result)
 	return baseQuotaInfo(account, "success", hyperGroups(payload), time.Now().UnixMilli(), "")
