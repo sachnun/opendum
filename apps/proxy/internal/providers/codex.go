@@ -310,7 +310,10 @@ func responsesStreamToCompletion(body io.Reader, model string) map[string]any {
 	events := parseSSEDataLines(string(text))
 	completion := map[string]any{"output": []any{}, "usage": map[string]any{}}
 	messageContent := ""
-	reasoning := ""
+	reasoning := newReasoningParts()
+	appendReasoning := func(key, text string) {
+		reasoning.append(key, text)
+	}
 	toolCalls := []any{}
 	currentTool := map[string]any{}
 	for _, event := range events {
@@ -318,18 +321,21 @@ func responsesStreamToCompletion(body io.Reader, model string) map[string]any {
 		switch typ {
 		case "response.output_text.delta":
 			messageContent += stringValue(event["delta"])
-		case "response.reasoning.delta", "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
-			reasoning += stringValue(event["delta"])
-		case "response.reasoning_text.done", "response.reasoning_summary_text.done":
-			if text := stringValue(event["text"]); text != "" && !strings.Contains(reasoning, text) {
-				reasoning += text
-			}
+		case "response.reasoning.delta", "response.reasoning_text.delta":
+			appendReasoning(reasoningKey("text", event["content_index"]), stringValue(event["delta"]))
+		case "response.reasoning_summary_text.delta":
+			appendReasoning(reasoningKey("summary", event["summary_index"]), stringValue(event["delta"]))
+		case "response.reasoning_text.done":
+			appendReasoning(reasoningKey("text", event["content_index"]), stringValue(event["text"]))
+		case "response.reasoning_summary_text.done":
+			appendReasoning(reasoningKey("summary", event["summary_index"]), stringValue(event["text"]))
 		case "response.reasoning_summary_part.done":
-			if part, ok := event["part"].(map[string]any); ok {
-				if text := stringValue(part["text"]); text != "" && !strings.Contains(reasoning, text) {
-					reasoning += text
-				}
+			part, _ := event["part"].(map[string]any)
+			text := stringValue(part["text"])
+			if text == "" {
+				text = stringValue(event["text"])
 			}
+			appendReasoning(reasoningKey("summary", event["summary_index"]), text)
 		case "response.output_item.added":
 			item, _ := event["item"].(map[string]any)
 			if item["type"] == "function_call" {
@@ -341,9 +347,7 @@ func responsesStreamToCompletion(body io.Reader, model string) map[string]any {
 			}
 		case "response.function_call_arguments.done", "response.output_item.done":
 			if item, ok := event["item"].(map[string]any); ok && item["type"] == "reasoning" {
-				if text := extractReasoningFromItem(item); text != "" && !strings.Contains(reasoning, text) {
-					reasoning += text
-				}
+				reasoning.addItem(item, appendReasoning)
 			}
 			if currentTool != nil {
 				toolCalls = append(toolCalls, currentTool)
@@ -362,8 +366,8 @@ func responsesStreamToCompletion(body io.Reader, model string) map[string]any {
 	if messageContent != "" {
 		output = append(output, map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": messageContent}}})
 	}
-	if reasoning != "" {
-		output = append(output, map[string]any{"type": "reasoning", "text": reasoning})
+	if reasoningText := reasoning.text(); reasoningText != "" {
+		output = append(output, map[string]any{"type": "reasoning", "text": reasoningText})
 	}
 	output = append(output, toolCalls...)
 	completion["output"] = output
