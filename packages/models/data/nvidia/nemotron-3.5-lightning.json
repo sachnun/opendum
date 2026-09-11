@@ -1,0 +1,52 @@
+{
+  "owner": "nvidia",
+  "providers": [
+    "opencode",
+    "kilo_code",
+    "openrouter",
+    "nvidia_nim"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262144,
+    "output": 65536
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "nvidia/nemotron-3.5-lightning:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536,
+      "authless": true
+    },
+    "nvidia_nim": {
+      "upstream": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
+    },
+    "opencode": {
+      "upstream": "nemotron-3.5-lightning-free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
+    },
+    "openrouter": {
+      "upstream": "nvidia/nemotron-3.5-lightning:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072
+    }
+  }
+}

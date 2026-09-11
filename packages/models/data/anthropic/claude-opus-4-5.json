@@ -1,0 +1,50 @@
+{
+  "owner": "anthropic",
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "claude-opus-4.5",
+    "claude-opus4.5"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 200000,
+    "output": 64000
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "claude-opus-4.5",
+      "contextWindow": 200000,
+      "maxOutputTokens": 64000,
+      "allowedTiers": [
+        "pro",
+        "pro+",
+        "power",
+        "standalone"
+      ]
+    }
+  }
+}

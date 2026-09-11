@@ -1,0 +1,50 @@
+{
+  "owner": "opencode",
+  "providers": [
+    "opencode",
+    "zenmux",
+    "cline"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 131072
+  },
+  "providerConfig": {
+    "cline": {
+      "upstream": "cline-free/muse-spark-1.3-contributor",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 943718
+    },
+    "opencode": {
+      "upstream": "muse-spark-1.3-contributor-free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "responses_api": true
+    },
+    "zenmux": {
+      "upstream": "meta/muse-spark-1.3-contributor",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 943718
+    }
+  }
+}

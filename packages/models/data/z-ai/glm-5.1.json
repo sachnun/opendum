@@ -1,0 +1,32 @@
+{
+  "owner": "z-ai",
+  "providers": [
+    "hyper"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 202750,
+    "output": 3276
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 202750,
+      "maxOutputTokens": 3276
+    }
+  }
+}

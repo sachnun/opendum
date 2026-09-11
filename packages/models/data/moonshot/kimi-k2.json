@@ -1,0 +1,45 @@
+{
+  "owner": "moonshot",
+  "providers": [
+    "hyper"
+  ],
+  "aliases": [
+    "kimi-k2-0905",
+    "kimi-k2-instruct-0905",
+    "kimi-k2-instruct"
+  ],
+  "ignored": false,
+  "meta": {
+    "reasoning": false,
+    "toolCall": true,
+    "vision": false,
+    "type": "instruct"
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262144,
+    "output": 26214
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "kimi-k2-thinking",
+      "contextWindow": 262144,
+      "maxOutputTokens": 26214
+    }
+  }
+}

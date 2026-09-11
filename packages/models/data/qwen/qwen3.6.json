@@ -1,0 +1,43 @@
+{
+  "owner": "qwen",
+  "providers": [
+    "perch"
+  ],
+  "aliases": [
+    "Qwen-Qwen3.6-35B-A3B",
+    "Qwen/Qwen3.6-27B",
+    "Qwen/Qwen3.6-35B-A3B",
+    "qwen3.6-27b",
+    "qwen3.6-35b-a3b"
+  ],
+  "ignored": false,
+  "meta": {},
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262144,
+    "output": 65536
+  },
+  "providerConfig": {
+    "perch": {
+      "upstream": "qwen-3.6",
+      "contextWindow": 262144,
+      "maxOutputTokens": 65536
+    }
+  }
+}

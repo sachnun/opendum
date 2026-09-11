@@ -1,0 +1,37 @@
+{
+  "owner": "opencode",
+  "providers": [
+    "opencode"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 200000,
+    "output": 32000
+  },
+  "providerConfig": {
+    "opencode": {
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  }
+}

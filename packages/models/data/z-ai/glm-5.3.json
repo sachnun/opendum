@@ -1,0 +1,43 @@
+{
+  "owner": "z-ai",
+  "providers": [
+    "hyper",
+    "workbuddy"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false
+  },
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 131072
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 262144
+    },
+    "workbuddy": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
+    }
+  }
+}

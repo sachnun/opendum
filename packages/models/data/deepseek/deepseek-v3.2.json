@@ -1,0 +1,43 @@
+{
+  "owner": "deepseek",
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "deepseek-ai-DeepSeek-V3.2-Exp",
+    "deepseek-ai/DeepSeek-V3.2-Exp"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": false,
+    "status": "stable"
+  },
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 128000,
+    "output": 64000
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "deepseek-3.2",
+      "contextWindow": 128000,
+      "maxOutputTokens": 64000
+    }
+  }
+}

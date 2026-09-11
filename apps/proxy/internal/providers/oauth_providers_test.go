@@ -990,7 +990,7 @@ func jsonTestResponse(status int, body string) *http.Response {
 
 func testModelsRegistry(t *testing.T) *models.Registry {
 	t.Helper()
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}

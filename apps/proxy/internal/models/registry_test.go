@@ -54,7 +54,7 @@ func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
 }
 
 func TestWorkersAIModelsDeclareCloudflareUpstream(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestWorkersAIModelsDeclareCloudflareUpstream(t *testing.T) {
 }
 
 func TestKiloCodeOnlyExposesFreeAuthlessModels(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestKiloCodeOnlyExposesFreeAuthlessModels(t *testing.T) {
 }
 
 func TestNvidiaMistralLargeAliasUsesCurrentHostedModel(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestNvidiaMistralLargeAliasUsesCurrentHostedModel(t *testing.T) {
 }
 
 func TestNvidiaNemotronNanoVLDisablesToolCalling(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestNvidiaNemotronNanoVLDisablesToolCalling(t *testing.T) {
 }
 
 func TestProviderAliasesUseConfiguredUpstreams(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestProviderAliasesUseConfiguredUpstreams(t *testing.T) {
 }
 
 func TestDeepSeekV4AliasesResolveToCanonical(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func TestDeepSeekV4AliasesResolveToCanonical(t *testing.T) {
 }
 
 func TestNvidiaNemotronOmniAliasUsesCurrentHostedModel(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "models"))
+	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
 	if err != nil {
 		t.Fatal(err)
 	}

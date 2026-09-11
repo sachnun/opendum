@@ -1,0 +1,51 @@
+{
+  "owner": "moonshot",
+  "providers": [
+    "zenmux",
+    "qoder",
+    "hyper"
+  ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 262000,
+    "output": 16000
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 262000,
+      "maxOutputTokens": 16000
+    },
+    "qoder": {
+      "upstream": "kmodel",
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
+    },
+    "zenmux": {
+      "upstream": "moonshotai/kimi-k2.7-code",
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
+    }
+  }
+}
