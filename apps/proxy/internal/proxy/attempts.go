@@ -25,6 +25,8 @@ type accountRotationRunner interface {
 	logAccountError(context.Context, string, string, string, int, string)
 	markAccountUsageLimited(context.Context, string, string, time.Time, time.Time)
 	logUsage(context.Context, usageParams)
+	lockAccountModelQuota(context.Context, string, string, time.Time, string)
+	clearAccountModelQuotaLock(context.Context, string, string)
 	isVisionModel(string) bool
 	isToolCallModel(string) bool
 	canAccountUseModel(appdb.ProviderAccount, string) bool
@@ -163,6 +165,12 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 					failedAt = runner.markAccountFailed(ctx, attempt.account.ID, validation.Model, resp.StatusCode, detailed)
 					if disabledUntil, ok := codexUsageLimitDisabledUntil(attempt.account.Provider, resp.StatusCode, bodyText, failedAt); ok {
 						runner.markAccountUsageLimited(ctx, attempt.account.ID, validation.Model, disabledUntil, failedAt)
+					}
+					// A billing block only affects this model: the same account can
+					// still serve cheaper models. Lock the model instead of the
+					// account so rotation moves on without disabling the rest.
+					if lockedUntil, ok := quotaBlockedUntil(attempt.account.Provider, resp.StatusCode, bodyText, failedAt); ok {
+						runner.lockAccountModelQuota(ctx, attempt.account.ID, validation.Model, lockedUntil, detailed)
 					}
 				}
 			} else {

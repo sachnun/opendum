@@ -182,6 +182,138 @@ func codexUsageLimitDisabledUntil(provider string, status int, body string, now 
 	return time.Time{}, false
 }
 
+// quotaBlockedUntil reports whether a provider response indicates the account
+// is out of quota for this model, and until when the model should be skipped.
+//
+// Providers disagree on how to signal this, and some hide it inside a success
+// status, so detection is per provider and matches on the response body.
+func quotaBlockedUntil(provider string, status int, body string, now time.Time) (time.Time, bool) {
+	switch provider {
+	case "qoder":
+		return qoderQuotaBlockedUntil(status, body, now)
+	}
+	return time.Time{}, false
+}
+
+const (
+	// qoderQuotaLockDuration is used when Qoder does not publish a reset time.
+	// Qoder quota windows are not documented, so this errs on the long side: a
+	// locked model is skipped while sibling models on the same account keep
+	// working.
+	qoderQuotaLockDuration = 6 * time.Hour
+
+	// qoderQuotaCodeExhausted is the billing block Qoder returns once the
+	// account has no credits left.
+	qoderQuotaCodeExhausted = "112"
+
+	// qoderQuotaCodeThrottled is a queue throttle. It clears on its own, so it
+	// must not take the model out of rotation for long.
+	qoderQuotaCodeThrottled    = "10605"
+	qoderQuotaThrottleDuration = 5 * time.Minute
+)
+
+// qoderQuotaBlockedUntil detects Qoder's billing blocks. Qoder answers with
+// HTTP 200 and hides the failure inside the response body, using code 112 for
+// exhausted credits, code 10605 for a transient queue throttle, and a
+// pricingUrl field as an upgrade nudge. Only the exhausted signal locks the
+// model; the throttle gets a short cooldown.
+func qoderQuotaBlockedUntil(status int, body string, now time.Time) (time.Time, bool) {
+	trimmed := strings.TrimSpace(body)
+	if trimmed == "" {
+		return time.Time{}, false
+	}
+
+	// The provider layer already turns a failed envelope into a real status, so
+	// a non-403/429 response is not a quota block.
+	if status != http.StatusForbidden && status != http.StatusTooManyRequests && status != http.StatusPaymentRequired {
+		return time.Time{}, false
+	}
+
+	code := qoderBodyCode(trimmed)
+	switch code {
+	case qoderQuotaCodeExhausted:
+		return now.Add(qoderQuotaLockDuration), true
+	case qoderQuotaCodeThrottled:
+		return now.Add(qoderQuotaThrottleDuration), true
+	}
+
+	// Some responses carry only the pricing nudge, which also means exhausted.
+	if strings.Contains(strings.ToLower(trimmed), "pricingurl") {
+		return now.Add(qoderQuotaLockDuration), true
+	}
+	return time.Time{}, false
+}
+
+// qoderBodyCode extracts the `code` field from a Qoder error body. Qoder wraps
+// the payload several ways depending on the path: the code may sit at the top
+// level, under `error.message`, or inside a JSON-encoded string, and the string
+// is often prefixed with provider context such as `Qoder: {...}`.
+func qoderBodyCode(body string) string {
+	for _, candidate := range qoderBodyCandidates(body, 0) {
+		if code := qoderCodeFromText(candidate); code != "" {
+			return code
+		}
+	}
+	return ""
+}
+
+// qoderBodyCandidates collects the strings worth scanning for a code field,
+// unwrapping nested JSON objects and JSON-encoded strings a few levels deep.
+func qoderBodyCandidates(value string, depth int) []string {
+	if depth > 3 || strings.TrimSpace(value) == "" {
+		return nil
+	}
+	candidates := []string{value}
+	var payload map[string]any
+	if json.Unmarshal([]byte(value), &payload) != nil {
+		return candidates
+	}
+	for _, nested := range payload {
+		switch typed := nested.(type) {
+		case string:
+			candidates = append(candidates, qoderBodyCandidates(typed, depth+1)...)
+		case map[string]any:
+			encoded, err := json.Marshal(typed)
+			if err == nil {
+				candidates = append(candidates, qoderBodyCandidates(string(encoded), depth+1)...)
+			}
+		}
+	}
+	return candidates
+}
+
+// qoderCodeFromText reads a `code` field from JSON text, tolerating a provider
+// prefix such as `Qoder: {...}`.
+func qoderCodeFromText(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if start := strings.Index(trimmed, "{"); start > 0 {
+		trimmed = trimmed[start:]
+	}
+	var payload map[string]any
+	if json.Unmarshal([]byte(trimmed), &payload) == nil {
+		switch code := payload["code"].(type) {
+		case string:
+			return strings.TrimSpace(code)
+		case float64:
+			return strconv.Itoa(int(code))
+		}
+	}
+	// The value may still be JSON-encoded inside a string, so fall back to a
+	// direct match on the field.
+	if match := qoderCodePattern.FindStringSubmatch(value); len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+// qoderCodePattern matches `"code": "112"` or `"code":112` in raw text,
+// including escaped forms such as `\"code\":\"112\"`.
+var qoderCodePattern = regexp.MustCompile(`code\?"?\s*:\s*\?"?([0-9]+)`)
+
+func qoderCodeFromJSON(value string) string {
+	return qoderCodeFromText(value)
+}
+
 func int64Value(value any) (int64, bool) {
 	switch v := value.(type) {
 	case float64:

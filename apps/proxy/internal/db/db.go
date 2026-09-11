@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -27,7 +28,29 @@ func Open(databaseURL string) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{DB: bun.NewDB(sqldb, pgdialect.New())}, nil
+	db := &DB{DB: bun.NewDB(sqldb, pgdialect.New())}
+	if err := db.ensureSchema(ctx); err != nil {
+		_ = sqldb.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+// ensureSchema adds columns the proxy needs but that the dashboard's schema push
+// may not have applied yet. Schema changes here ship with the proxy deploy, which
+// is independent of the dashboard, so the proxy cannot assume a matching schema.
+// Each statement is idempotent and safe to run on every boot.
+func (db *DB) ensureSchema(ctx context.Context) error {
+	statements := []string{
+		`ALTER TABLE provider_account_model_health ADD COLUMN IF NOT EXISTS "quotaLockedUntil" TIMESTAMP`,
+		`ALTER TABLE provider_account_model_health ADD COLUMN IF NOT EXISTS "quotaLockReason" TEXT`,
+	}
+	for _, statement := range statements {
+		if _, err := db.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("ensure schema: %w", err)
+		}
+	}
+	return nil
 }
 
 type ProviderAccount struct {
@@ -164,6 +187,8 @@ type ProviderAccountModelHealth struct {
 	LastErrorCode           *int       `bun:"lastErrorCode"`
 	LastSuccessAt           *time.Time `bun:"lastSuccessAt"`
 	UnhealthyCountUpdatedAt *time.Time `bun:"unhealthyCountUpdatedAt"`
+	QuotaLockedUntil        *time.Time `bun:"quotaLockedUntil"`
+	QuotaLockReason         *string    `bun:"quotaLockReason"`
 	CreatedAt               time.Time  `bun:"createdAt"`
 	UpdatedAt               time.Time  `bun:"updatedAt"`
 }
