@@ -27,7 +27,7 @@ jobs:
           node-version: 24
 
       - name: Refresh provider models
-        run: pnpm run models:refresh -- --summary "$RUNNER_TEMP/summary.md"
+        run: pnpm run models:refresh --summary "$RUNNER_TEMP/summary.md"
 
       - name: Build commit message
         id: commit_msg
