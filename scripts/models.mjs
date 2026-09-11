@@ -26,9 +26,10 @@ const refreshScripts = [
   "zenmux.mjs",
   "harbor.mjs",
   "hyper.mjs",
+  "workbuddy.mjs",
 ];
 
-const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "qoder", "workers_ai", "zenmux"];
+const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "qoder", "workers_ai", "workbuddy", "zenmux"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

@@ -1,5 +1,7 @@
 {
-  "providers": [],
+  "providers": [
+    "workbuddy"
+  ],
   "meta": {
     "reasoning": true,
     "toolCall": true,
