@@ -56,6 +56,22 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 	return service
 }
 
+func (s *Service) SetTorEgress(tor providers.TorEgress, torClient *http.Client) {
+	if s == nil {
+		return
+	}
+	if s.providerRegistry != nil {
+		s.providerRegistry.SetTorEgress(tor, torClient)
+	}
+}
+
+func (s *Service) TorReady() bool {
+	if s == nil || s.providerRegistry == nil {
+		return false
+	}
+	return s.providerRegistry.TorReady()
+}
+
 func (s *Service) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	s.handle(w, r, chatCompletionsConfig(s))
 }
