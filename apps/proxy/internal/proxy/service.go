@@ -42,10 +42,11 @@ type Service struct {
 	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
+	requestTimeout   time.Duration
 	quotaFetchers    map[string]quotaFetcher
 }
 
-func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string) *Service {
+func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, registry *models.Registry, secret string, requestTimeout time.Duration) *Service {
 	providerRegistry := providers.NewRegistry(registry, db, redisClient)
 	service := &Service{
 		db:               db,
@@ -56,6 +57,7 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 		affinity:         sessionaffinity.New(redisClient, providerRegistry.Names()),
 		secret:           secret,
 		client:           newUpstreamClient(),
+		requestTimeout:   requestTimeout,
 	}
 	service.quotaFetcherRegistry()
 	return service
@@ -114,6 +116,15 @@ func (s *Service) Messages(w http.ResponseWriter, r *http.Request) {
 func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAdapter) {
 	startMS := time.Now().UnixMilli()
 	ctx := r.Context()
+	// Bound the whole request, including provider rotation and streamed reads.
+	// The edge proxy cuts the connection at roughly 100s, so a deadline keeps the
+	// failure inside the origin where it can be reported and the account rotated.
+	if s.requestTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.requestTimeout)
+		defer cancel()
+		r = r.WithContext(ctx)
+	}
 
 	authResult, playgroundAuth, err := s.authenticateRequest(ctx, r)
 	if err != nil {

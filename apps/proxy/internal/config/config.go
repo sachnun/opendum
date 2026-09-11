@@ -21,6 +21,7 @@ type Config struct {
 	ReadTimeout          time.Duration
 	WriteTimeout         time.Duration
 	IdleTimeout          time.Duration
+	RequestTimeout       time.Duration
 	TokenRefreshInterval time.Duration
 }
 
@@ -48,6 +49,7 @@ func Load() (Config, error) {
 		ReadTimeout:          30 * time.Second,
 		WriteTimeout:         0,
 		IdleTimeout:          120 * time.Second,
+		RequestTimeout:       durationSeconds("REQUEST_TIMEOUT_SECONDS", 90*time.Second),
 		TokenRefreshInterval: durationSeconds("TOKEN_REFRESH_INTERVAL_SECONDS", 10*time.Minute),
 	}
 
