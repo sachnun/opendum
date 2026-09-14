@@ -1,7 +1,6 @@
 {
   "owner": "deepseek",
   "providers": [
-    "cline",
     "zenmux",
     "qoder",
     "hyper",
@@ -47,11 +46,6 @@
     "output": 384000
   },
   "providerConfig": {
-    "cline": {
-      "upstream": "deepseek/deepseek-v4-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 384000
-    },
     "harbor": {
       "upstream": "deepseek-v4-flash:free",
       "contextWindow": 1000000,

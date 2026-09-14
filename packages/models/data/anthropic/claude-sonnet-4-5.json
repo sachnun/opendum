@@ -34,13 +34,13 @@
     "top_p": false
   },
   "limit": {
-    "context": 1000000,
+    "context": 200000,
     "output": 64000
   },
   "providerConfig": {
     "kiro": {
       "upstream": "claude-sonnet-4.5-1m",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutputTokens": 64000
     }
   }
