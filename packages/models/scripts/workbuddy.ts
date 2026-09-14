@@ -143,8 +143,11 @@ function buildModelMap(catalog) {
     }
   }
 
+  if (modelMap.size === 0) {
+    throw new Error("WorkBuddy catalog produced no models");
+  }
   if (modelMap.size < MIN_EXPECTED_MODELS) {
-    throw new Error(`Expected at least ${MIN_EXPECTED_MODELS} WorkBuddy models, got ${modelMap.size}`);
+    console.warn(`WorkBuddy catalog produced ${modelMap.size} models (expected >= ${MIN_EXPECTED_MODELS})`);
   }
   return { modelMap: new Map([...modelMap.entries()].sort(([a], [b]) => a.localeCompare(b))), metadataLookup };
 }

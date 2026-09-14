@@ -38,18 +38,15 @@ const (
 // https://www.perchai.app/docs/concepts/models) reversed from the perchai-cli
 // bundle (v2.4.98): perch alias -> manualModelOptionId. Only Starter-pool pins
 // resolve on a free account; every premium entry is Pro-only and is rejected
-// by the server, so it is intentionally not mapped. MiniMax M2.7/M3 free
-// variants are a promotion and may leave the Starter pool.
+// by the server, so it is intentionally not mapped.
 var perchManualOptionIDs = map[string]string{
-	"minimax-m3-free":   "gmi-minimaxai-minimax-m3",
-	"minimax-m2.7-free": "openrouter-minimax-minimax-m2-7-free",
-	"qwen-3.6":          "wandb-qwen3-6-35b-a3b",
-	"kimi-2.5":          "bedrock-mantle-moonshotai-kimi-k2-5",
-	"glm-5":             "bedrock-mantle-zai-glm-5",
-	"qwen3-coder":       "bedrock-mantle-qwen-qwen3-coder-480b-a35b-instruct",
-	"nemotron-super":    "bedrock-mantle-nvidia-nemotron-super-3-120b",
-	"gemma-4-e2b":       "bedrock-mantle-google-gemma-4-e2b",
-	"gemma-4-31b":       "bedrock-mantle-google-gemma-4-31b",
+	"qwen-3.6":       "wandb-qwen3-6-35b-a3b",
+	"kimi-2.5":       "bedrock-mantle-moonshotai-kimi-k2-5",
+	"glm-5":          "bedrock-mantle-zai-glm-5",
+	"qwen3-coder":    "bedrock-mantle-qwen-qwen3-coder-480b-a35b-instruct",
+	"nemotron-super": "bedrock-mantle-nvidia-nemotron-super-3-120b",
+	"gemma-4-e2b":    "bedrock-mantle-google-gemma-4-e2b",
+	"gemma-4-31b":    "bedrock-mantle-google-gemma-4-31b",
 }
 
 type perchAuthConfig struct {

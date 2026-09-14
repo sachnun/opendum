@@ -78,10 +78,10 @@ func perchDeltaText(chunk map[string]any) string {
 
 func TestPerchModelOptionIDResolvesPoolAliases(t *testing.T) {
 	cases := map[string]string{
-		"qwen-3.6":        "wandb-qwen3-6-35b-a3b",
-		"glm-5":           "bedrock-mantle-zai-glm-5",
-		"kimi-2.5":        "bedrock-mantle-moonshotai-kimi-k2-5",
-		"minimax-m3-free": "gmi-minimaxai-minimax-m3",
+		"qwen-3.6":       "wandb-qwen3-6-35b-a3b",
+		"glm-5":          "bedrock-mantle-zai-glm-5",
+		"kimi-2.5":       "bedrock-mantle-moonshotai-kimi-k2-5",
+		"nemotron-super": "bedrock-mantle-nvidia-nemotron-super-3-120b",
 	}
 	for alias, want := range cases {
 		got, ok := perchModelOptionID(alias)
