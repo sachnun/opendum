@@ -1,15 +1,11 @@
 {
-  "owner": "minimax",
   "providers": [
-    "hyper"
+    "zenmux"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
   "modalities": {
     "input": [
+      "image",
+      "pdf",
       "text"
     ],
     "output": [
@@ -20,18 +16,19 @@
     "frequency_penalty": false,
     "presence_penalty": false,
     "repetition_penalty": false,
-    "temperature": true,
+    "temperature": false,
     "top_k": false,
     "top_p": false
   },
   "limit": {
-    "context": 262100,
-    "output": 6553
+    "context": 1000000,
+    "output": 128000
   },
   "providerConfig": {
-    "hyper": {
-      "contextWindow": 262100,
-      "maxOutputTokens": 6553
+    "zenmux": {
+      "upstream": "sakana/fugu-ultra-v2",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
     }
   }
 }

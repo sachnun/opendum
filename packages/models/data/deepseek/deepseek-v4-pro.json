@@ -3,8 +3,7 @@
   "providers": [
     "zenmux",
     "qoder",
-    "hyper",
-    "nvidia_nim"
+    "hyper"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-pro-0813",
@@ -47,11 +46,6 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 262144
-    },
-    "nvidia_nim": {
-      "upstream": "deepseek-ai/deepseek-v4-pro-0813",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 384000
     },
     "qoder": {
       "upstream": "dmodel",

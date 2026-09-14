@@ -38,13 +38,13 @@
   },
   "limit": {
     "context": 256000,
-    "output": 16384
+    "output": 65536
   },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 16384,
+      "maxOutputTokens": 235929,
       "authless": true
     },
     "nvidia_nim": {
@@ -55,7 +55,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 16384
+      "maxOutputTokens": 235929
     },
     "perch": {
       "upstream": "nemotron-super",

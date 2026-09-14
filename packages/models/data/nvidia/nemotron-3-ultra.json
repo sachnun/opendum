@@ -32,7 +32,7 @@
   },
   "limit": {
     "context": 131072,
-    "output": 32768
+    "output": 65536
   },
   "providerConfig": {
     "kilo_code": {
@@ -54,7 +54,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 182520
     }
   }
 }

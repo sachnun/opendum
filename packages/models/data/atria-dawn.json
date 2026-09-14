@@ -1,0 +1,22 @@
+{
+  "providers": [
+    "zenmux"
+  ],
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 8191
+  },
+  "providerConfig": {
+    "zenmux": {
+      "upstream": "atria-asi/atria-dawn-preview",
+      "contextWindow": 8191
+    }
+  }
+}

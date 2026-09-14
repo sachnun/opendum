@@ -30,7 +30,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 26214
+    "output": 13107
   },
   "providerConfig": {
     "harbor": {
@@ -39,8 +39,8 @@
       "maxOutputTokens": 384000
     },
     "hyper": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 26214
+      "contextWindow": 1000000,
+      "maxOutputTokens": 13107
     },
     "workbuddy": {
       "contextWindow": 1000000,

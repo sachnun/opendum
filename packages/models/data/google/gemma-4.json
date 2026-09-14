@@ -65,7 +65,7 @@
     "openrouter": {
       "upstream": "google/gemma-4-26b-a4b-it:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 235929
     },
     "workers_ai": {
       "upstream": "@cf/google/gemma-4-26b-a4b-it",
