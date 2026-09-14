@@ -1,8 +1,14 @@
 {
   "owner": "qwen",
   "providers": [
-    "hyper"
+    "hyper",
+    "workers_ai"
   ],
+  "meta": {
+    "reasoning": true,
+    "toolCall": true,
+    "vision": true
+  },
   "modalities": {
     "input": [
       "text"
@@ -20,7 +26,7 @@
     "top_p": false
   },
   "limit": {
-    "context": 1000000,
+    "context": 262144,
     "output": 128000
   },
   "providerConfig": {
@@ -28,6 +34,11 @@
       "upstream": "qwen3.8-2.4t-a95b",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000
+    },
+    "workers_ai": {
+      "upstream": "@cf/qwen/qwen3.8-27b",
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     }
   }
 }
