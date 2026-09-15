@@ -22,13 +22,13 @@ const { isAuditMode } = useDashboardAudit();
 
 const dashboardInvalidation = useDashboardDataInvalidation();
 
-const { data, error, pending, refresh } = await useAsyncData(dashboardInvalidation.keys.accountsOverview, () => dashboardApi.accounts.overview(), {
+const { data, error, pending, refresh } = useAsyncData(dashboardInvalidation.keys.accountsOverview, () => dashboardApi.accounts.overview(), {
   default: () => null,
-  immediate: isAuthenticated.value,
+  lazy: true,
 });
 
 watch(isAuthenticated, (authenticated) => {
-  if (authenticated) void refresh();
+  if (authenticated && !data.value && !pending.value) void refresh();
 });
 
 const summaries = computed(() => data.value?.summaries ?? null);
