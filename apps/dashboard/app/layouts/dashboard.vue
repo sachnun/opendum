@@ -12,6 +12,7 @@ import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
 import type { ProviderAccountKey } from "../../lib/provider-accounts";
 import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
+import { avatarUrl } from "../../lib/utils";
 
 const route = useRoute();
 const { data: session } = await useSession(useFetch);
@@ -32,7 +33,7 @@ const isMobileSidebarDragging = ref(false);
 
 const userLabel = computed(() => session.value?.user?.name || session.value?.user?.email || "Account");
 const userEmail = computed(() => session.value?.user?.email || "");
-const userImage = computed(() => session.value?.user?.image || "");
+const userImage = computed(() => avatarUrl(session.value?.user?.image || ""));
 const userInitial = computed(() => (session.value?.user?.name?.[0] || "U").toUpperCase());
 
 const emptyAccountCounts = Object.fromEntries(
@@ -97,7 +98,7 @@ const pointBalance = computed(() => (dashboardMe.value as DashboardMeData | null
 const formattedPointBalance = computed(() => pointBalance.value.toLocaleString("en-US"));
 const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
 const auditUserEmail = computed(() => auditUser.value?.email || "");
-const auditUserImage = computed(() => auditUser.value?.image || "");
+const auditUserImage = computed(() => avatarUrl(auditUser.value?.image || ""));
 const auditUserInitial = computed(() => (auditUserLabel.value[0] || "U").toUpperCase());
 
 watch(dashboardMe, (value) => {

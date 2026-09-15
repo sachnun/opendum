@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MaintenerAuditSearchUser, MaintenerAuditUser } from "../../lib/dashboard-api-types";
+import { avatarUrl } from "../../lib/utils";
 
 const open = defineModel<boolean>("open", { default: false });
 
@@ -195,7 +196,7 @@ async function selectUser(user: MaintenerAuditSearchUser) {
           >
             <span class="relative flex size-9 shrink-0 select-none">
               <span class="flex size-9 overflow-hidden rounded-full">
-                <img v-if="user.image" :src="user.image" alt="" class="aspect-square size-full">
+                <img v-if="user.image" :src="avatarUrl(user.image)" alt="" class="aspect-square size-full">
                 <span v-else class="flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground">
                   {{ userInitial(user) }}
                 </span>
