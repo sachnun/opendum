@@ -693,8 +693,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <UiButton variant="outline" size="icon" :class="triggerClass" :disabled="readonly" aria-label="Add account" @click="open = true">
+  <UiButton variant="outline" :class="cn('gap-2', triggerClass)" :disabled="readonly" @click="open = true">
     <UiIcon name="i-lucide-plus" class="size-4" />
+    Add Account
   </UiButton>
 
   <UiDialog
@@ -767,7 +768,10 @@ onBeforeUnmount(() => {
               )"
               @click="selectCustom"
             >
-              <span class="text-sm font-medium">Custom</span>
+              <span class="flex items-center gap-2 text-sm font-medium">
+                <UiIcon name="i-lucide-plus" class="size-4" />
+                Custom
+              </span>
             </button>
           </div>
         </div>

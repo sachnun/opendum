@@ -950,7 +950,7 @@ function decodeAccountHash(hash: string): string | null {
             v-if="providerMeta"
             :initial-provider="providerMeta.key"
             :readonly="isAuditMode"
-            trigger-class="sm:w-auto sm:flex-none"
+            trigger-class="flex-1 sm:w-auto sm:flex-none"
             @connected="handleAccountConnected"
           />
         </div>

@@ -26,13 +26,14 @@ const step = ref(1);
 const busy = ref("");
 const errorMessage = ref("");
 
+const name = ref("");
 const baseUrl = ref("");
 const headers = ref<HeaderRow[]>([]);
 const apiKey = ref("");
 const models = ref<ModelRow[]>([]);
 const synced = ref(false);
 
-const providerName = computed(() => {
+const host = computed(() => {
   try {
     return new URL(baseUrl.value.trim()).hostname.toLowerCase().replace(/^www\./, "");
   } catch {
@@ -40,14 +41,14 @@ const providerName = computed(() => {
   }
 });
 
-const slug = computed(() => providerName.value
+const slug = computed(() => host.value
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-+/, "")
   .replace(/-{2,}/g, "-")
   .slice(0, 32)
   .replace(/-+$/, ""));
 
-const canCreate = computed(() => baseUrl.value.trim() !== "" && /^[a-z]/.test(slug.value));
+const canCreate = computed(() => name.value.trim() !== "" && baseUrl.value.trim() !== "" && /^[a-z]/.test(slug.value));
 
 function run(action: () => Promise<ActionResult<unknown>>, key: string) {
   busy.value = key;
@@ -99,7 +100,7 @@ async function createProvider() {
   }
   const ok = await run(() => dashboardApi.customProviders.create({
     slug: slug.value,
-    name: providerName.value || slug.value,
+    name: name.value.trim(),
     baseUrl: baseUrl.value.trim(),
     extraHeaders: headersPayload(),
   }), "create");
@@ -184,9 +185,12 @@ function finish() {
 
       <div v-if="step === 1" class="space-y-4">
         <label class="grid gap-1.5">
+          <span :class="labelClass">Name</span>
+          <input v-model="name" :class="inputClass" placeholder="My vLLM">
+        </label>
+        <label class="grid gap-1.5">
           <span :class="labelClass">Base URL</span>
           <input v-model="baseUrl" :class="inputClass" class="font-mono" placeholder="https://vllm.example.com/v1">
-          <span class="font-mono text-xs text-muted-foreground">{{ slug ? `name: ${providerName} · slug: ${slug}` : "name and slug are generated from the base URL" }}</span>
         </label>
         <div class="grid gap-1.5">
           <div class="flex items-center justify-between">
@@ -245,9 +249,9 @@ function finish() {
     <div class="flex flex-row items-center justify-between gap-2">
       <UiButton type="button" variant="ghost" :disabled="busy !== ''" @click="back">
         <UiIcon name="i-lucide-arrow-left" class="size-4" />
-        {{ step === 1 ? "Cancel" : "Back" }}
+        Back
       </UiButton>
-      <UiButton type="button" :disabled="busy !== '' || (step === 1 && !canCreate)" @click="next">
+      <UiButton type="button" variant="ghost" class="ml-auto" :disabled="busy !== '' || (step === 1 && !canCreate)" @click="next">
         {{ step === 1 ? (busy === "create" ? "Creating…" : "Next") : "Finish" }}
         <UiIcon name="i-lucide-arrow-right" class="size-4" />
       </UiButton>

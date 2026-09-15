@@ -85,7 +85,7 @@ function refreshAccountsOverview() {
             Provider Accounts
           </h2>
           <div class="flex w-full items-center sm:w-auto">
-            <AddAccountDialog :readonly="isAuditMode" trigger-class="sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" @custom-created="() => refreshCustomProviders()" />
+            <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" @custom-created="() => refreshCustomProviders()" />
           </div>
         </div>
       </div>
