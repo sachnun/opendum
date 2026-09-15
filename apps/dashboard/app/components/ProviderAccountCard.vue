@@ -158,7 +158,7 @@ const freebuffActiveModel = computed<string | null>(() => (props.freebuffSession
 const api = useApi();
 const { auditRefreshVersion, auditUser, me, isAuditMode } = useAudit();
 const isToggling = ref(false);
-const isSubtitleVisible = ref(false);
+const isSubtitleVisible = ref(true);
 const editDialogOpen = ref(false);
 const deleteDialogOpen = ref(false);
 const errorDialogOpen = ref(false);
