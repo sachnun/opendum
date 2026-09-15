@@ -85,8 +85,9 @@ const dashboardInvalidation = useDashboardDataInvalidation();
 const accountsNavigationHref = "/";
 const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dashboardInvalidation.keys.accountsOverview);
 
-const { data: dashboardMe } = await useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
+const { data: dashboardMe } = useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
+  lazy: true,
 });
 const { auditUser, dashboardMe: dashboardMeState, isAuditMode, refreshAfterAuditChange } = useDashboardAudit();
 dashboardMeState.value = dashboardMe.value ?? null;
@@ -158,7 +159,7 @@ function applyAccountOverviewResponse(summary: AccountOverviewResponse): Account
 
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
-const { data: accountSummaryData, refresh: refreshAccountSummary } = await useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+const { data: accountSummaryData, refresh: refreshAccountSummary } = useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   const useOverview = isProviderOverviewRoute.value;
   if (useOverview) {
     const cursor = accountsOverviewData.value?.cursor;
@@ -167,7 +168,7 @@ const { data: accountSummaryData, refresh: refreshAccountSummary } = await useAs
   }
 
   return toShellAccountSummary(await dashboardApi.accounts.ping());
-});
+}, { lazy: true });
 
 const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptyShellAccountSummary.accountCounts);
 const activeAccountCounts = computed(() => accountSummaryData.value?.activeAccountCounts ?? emptyShellAccountSummary.activeAccountCounts);
@@ -203,11 +204,12 @@ function normalizeModelFamilyCounts(counts: Record<string, number>) {
   return nextCounts;
 }
 
-const { data: defaultModelFamilyCounts } = await useAsyncData("dashboard-shell-model-family-counts", async () => {
+const { data: defaultModelFamilyCounts } = useAsyncData("dashboard-shell-model-family-counts", async () => {
   const counts = await dashboardApi.models.familyCounts();
   return normalizeModelFamilyCounts(counts);
 }, {
   default: () => ({ ...emptyModelFamilyCounts }),
+  lazy: true,
 });
 
 const modelFamilyCounts = computed(() => modelFamilyCountsOverride.value ?? defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
