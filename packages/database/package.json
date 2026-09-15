@@ -14,7 +14,6 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
     "test": "tsx --test ./src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

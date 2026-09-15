@@ -118,12 +118,6 @@ importers:
       edgeone:
         specifier: ^1.6.34
         version: 1.6.37(debug@4.4.3(supports-color@10.2.2))(magicast@0.5.4)(supports-color@10.2.2)
-      tsx:
-        specifier: ^4.23.13
-        version: 4.23.13
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
 
   apps/dashboard:
     dependencies:
@@ -142,9 +136,6 @@ importers:
       '@opendum/models':
         specifier: workspace:*
         version: link:../../packages/models
-      '@opentelemetry/api':
-        specifier: ^1.9.1
-        version: 1.9.1
       better-auth:
         specifier: ^1.6.23
         version: 1.7.3(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(pg@8.23.0)(vue@3.5.42(typescript@6.0.3))
@@ -7237,7 +7228,8 @@ snapshots:
       - webpack
       - yaml
 
-  '@opentelemetry/api@1.9.1': {}
+  '@opentelemetry/api@1.9.1':
+    optional: true
 
   '@opentelemetry/semantic-conventions@1.43.0': {}
 

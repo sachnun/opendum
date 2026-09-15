@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
-    "deploy": "edgeone makers deploy -n opendum -a overseas",
     "lint": "nuxt prepare && eslint .",
     "typecheck": "vue-tsc --noEmit"
   },
@@ -15,7 +14,6 @@
     "@nuxt/fonts": "^0.14.0",
     "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
-    "@opentelemetry/api": "^1.9.1",
     "better-auth": "^1.6.23",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
