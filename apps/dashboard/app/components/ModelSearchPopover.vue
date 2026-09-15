@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { get, set } from "idb-keyval";
 import { getProviderLabel } from "../../lib/provider-accounts";
-import type { ModelSearchItem } from "../../lib/dashboard-api-types";
-import { createDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
+import type { ModelSearchItem } from "../../lib/api-types";
+import { createIdbStore } from "../utils/idb";
 
 type ModelListItem = ModelSearchItem;
 
@@ -15,7 +15,7 @@ const MODEL_SEARCH_CACHE_KEY = "model-search";
 const MODEL_SEARCH_CACHE_TTL_MS = 60 * 60_000;
 const MODEL_SEARCH_DB_NAME = "opendum-dashboard";
 const MODEL_SEARCH_STORE_NAME = "model-search";
-const modelSearchStore = createDashboardIndexedDbStore(MODEL_SEARCH_DB_NAME, MODEL_SEARCH_STORE_NAME);
+const modelSearchStore = createIdbStore(MODEL_SEARCH_DB_NAME, MODEL_SEARCH_STORE_NAME);
 
 async function readCachedModelSearch(): Promise<CachedModelSearch | null> {
   if (!modelSearchStore) return null;
@@ -38,10 +38,10 @@ async function writeCachedModelSearch(models: ModelListItem[]) {
   }
 }
 
-const dashboardApi = useDashboardApi();
+const api = useApi();
 
 async function loadModelSearch() {
-  const models = await dashboardApi.models.search();
+  const models = await api.models.search();
   void writeCachedModelSearch(models);
   return models;
 }
@@ -62,7 +62,7 @@ let placeholderTimer: number | null = null;
 const suggestionListId = "model-search-suggestions";
 const MAX_SUGGESTIONS = 50;
 
-const { data, refresh, pending } = useAsyncData(dashboardDataKeys.modelSearch, loadModelSearch, {
+const { data, refresh, pending } = useAsyncData(dataKeys.modelSearch, loadModelSearch, {
   default: () => [] as ModelListItem[],
   lazy: true,
   immediate: false,

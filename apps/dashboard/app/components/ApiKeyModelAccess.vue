@@ -15,7 +15,7 @@ const emit = defineEmits<{
   updated: [value: { mode: AccessMode; models: string[] }];
 }>();
 
-const dashboardApi = useDashboardApi();
+const api = useApi();
 const modelPickerOpen = ref(false);
 const modelSearch = ref("");
 const isSaving = ref(false);
@@ -64,7 +64,7 @@ async function save() {
   isSaving.value = true;
   errorMessage.value = "";
   try {
-    const result = await dashboardApi.apiKeys.updateModelAccess({ id: props.apiKeyId, mode: draftMode.value, models: modelsForSave });
+    const result = await api.apiKeys.updateModelAccess({ id: props.apiKeyId, mode: draftMode.value, models: modelsForSave });
     if (!result.success) throw new Error(result.error);
     savedMode.value = result.data.mode;
     savedModels.value = normalizeModels(result.data.models);

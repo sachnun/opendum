@@ -1,4 +1,4 @@
 import { errorHistoryInputSchema, getAccountErrorHistory } from "../../../../services/accounts";
-import { getDashboardQuery, requireReadableUserId } from "../../../../utils/api";
+import { parseQuery, requireReadableUserId } from "../../../../utils/api";
 
-export default defineEventHandler(async (event) => getAccountErrorHistory(await requireReadableUserId(event), getDashboardQuery(event, errorHistoryInputSchema)));
+export default defineEventHandler(async (event) => getAccountErrorHistory(await requireReadableUserId(event), parseQuery(event, errorHistoryInputSchema)));

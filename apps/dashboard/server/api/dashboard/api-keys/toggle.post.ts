@@ -1,7 +1,7 @@
 import { apiKeyIdInputSchema, toggleApiKey } from "../../../services/api-keys";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { parseBody, requireWritableUserId } from "../../../utils/api";
 
 export default defineEventHandler(async (event) => {
-  const input = await readDashboardBody(event, apiKeyIdInputSchema);
+  const input = await parseBody(event, apiKeyIdInputSchema);
   return toggleApiKey(await requireWritableUserId(event), input.id);
 });

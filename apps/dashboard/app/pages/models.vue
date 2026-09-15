@@ -8,19 +8,16 @@ import { getProviderLabel } from "../../lib/provider-accounts";
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
 const route = useRoute();
-const dashboardApi = useDashboardApi();
-const { isAuditMode } = useDashboardAudit();
-const dashboardInvalidation = useDashboardDataInvalidation();
-const nuxtApp = useNuxtApp();
+const api = useApi();
+const { isAuditMode } = useAudit();
+const invalidation = useInvalidate();
 
-type ModelListItem = Awaited<ReturnType<typeof dashboardApi.models.list>>[number];
+type ModelListItem = Awaited<ReturnType<typeof api.models.list>>[number];
 const MODEL_STATS_BATCH_SIZE = 24;
 const MODEL_STATS_POLL_MS = 30_000;
 const HIGHLIGHT_DURATION_MS = 2500;
 
-const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardDataKeys.models).data.value !== undefined;
-const shouldRefreshCachedModelsOnMount = import.meta.client && !nuxtApp.isHydrating && cachedModelsBeforePageLoad;
-const { data, error, refresh } = await useAsyncData(dashboardDataKeys.models, () => dashboardApi.models.list({ includeStats: false }));
+const { data, error } = useCachedData(dataKeys.models, () => api.models.list({ includeStats: false }));
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = ref<Record<string, ModelStats>>({});
@@ -39,7 +36,7 @@ const availableProviders = computed(() => {
 const activeProviders = ref<string[]>([]);
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
-const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(dashboardStateKeys.modelFamilyCountsOverride, () => null);
+const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(stateKeys.modelFamilyCountsOverride, () => null);
 const modelCardRefs = ref<Array<Element | { $el?: Element }>>([]);
 const highlightedModelId = ref<string | null>(null);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
@@ -96,10 +93,6 @@ onUnmounted(() => {
 
 onMounted(() => {
   startModelStatsPolling();
-
-  if (shouldRefreshCachedModelsOnMount) {
-    void refreshModels();
-  }
 });
 
 onBeforeUnmount(() => {
@@ -110,11 +103,6 @@ onBeforeUnmount(() => {
     highlightTimer = null;
   }
 });
-
-async function refreshModels() {
-  await refresh();
-  queueModelStatsLoad(models.value.map((model) => model.id), { force: true });
-}
 
 function getModelStats(model: ModelListItem): ModelStats {
   return modelStatsById.value[model.id] ?? model.stats ?? emptyModelStats;
@@ -165,7 +153,7 @@ async function loadModelStats(modelIds: string[], options: { force?: boolean } =
   for (const modelId of requestedModelIds) loadingModelStatsIds.add(modelId);
 
   try {
-    const response = await dashboardApi.models.stats({
+    const response = await api.models.stats({
       models: requestedModelIds,
       cursors: Object.fromEntries(requestedModelIds.map((modelId) => [modelId, modelStatsCursorById.value[modelId] ?? ""])),
     });
@@ -274,10 +262,10 @@ async function setModelEnabled(model: ModelListItem, enabled: boolean) {
   updateModelEnabled(model.id, enabled);
 
   try {
-    const result = await dashboardApi.models.setEnabled({ modelId: model.id, enabled });
+    const result = await api.models.setEnabled({ modelId: model.id, enabled });
     if (!result.success) throw new Error(result.error);
-    dashboardInvalidation.patchModelEnabled(result.data.model, result.data.enabled);
-    void dashboardInvalidation.invalidateModelAvailability();
+    invalidation.patchModelEnabled(result.data.model, result.data.enabled);
+    void invalidation.invalidateModelAvailability();
   } catch (error) {
     updateModelEnabled(model.id, previousValue);
     console.error(error);
@@ -332,7 +320,7 @@ watch(
       </div>
     </div>
 
-    <DashboardDataNotice :error="error" />
+    <DataNotice :error="error" />
     <div v-if="models.length > 0" class="space-y-4 md:space-y-2">
       <div class="flex flex-wrap gap-1.5 pb-2">
         <button

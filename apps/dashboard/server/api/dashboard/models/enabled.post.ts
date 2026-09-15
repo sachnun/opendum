@@ -1,4 +1,4 @@
 import { setModelEnabled, setModelEnabledInputSchema } from "../../../services/models";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { parseBody, requireWritableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => setModelEnabled(await requireWritableUserId(event), await readDashboardBody(event, setModelEnabledInputSchema)));
+export default defineEventHandler(async (event) => setModelEnabled(await requireWritableUserId(event), await parseBody(event, setModelEnabledInputSchema)));

@@ -7,7 +7,7 @@ import type {
   PlaygroundOptions,
   ProviderAccountDetailItem,
   ProviderDetailData,
-} from "../../lib/dashboard-api-types";
+} from "../../lib/api-types";
 import type { ProviderAccountKey } from "../../lib/provider-accounts";
 
 type ShellAccountSummary = {
@@ -26,14 +26,19 @@ type ApiKeyPageData = {
 function patchNuxtData<T>(key: string, patcher: (value: T) => T) {
   const { data } = useNuxtData<T>(key);
   if (!data.value) return;
-  data.value = patcher(data.value);
+
+  const next = patcher(data.value);
+  data.value = next;
+  writeDataCache(key, next);
 }
 
-function refreshDashboardData(keys: string | string[]) {
+function refreshData(keys: string | string[]) {
+  removeDataCache(keys);
   return refreshNuxtData(keys);
 }
 
-function clearDashboardData(keys: string | string[]) {
+function clearData(keys: string | string[]) {
+  removeDataCache(keys);
   clearNuxtData(keys);
 }
 
@@ -43,14 +48,14 @@ function replacePinnedProvider(providers: ProviderAccountKey[], provider: Provid
 }
 
 function patchProviderAccount(provider: string, accountId: string, patch: Partial<ProviderAccountDetailItem>) {
-  patchNuxtData<ProviderDetailData>(dashboardDataKeys.accountsDetail(provider), (value) => ({
+  patchNuxtData<ProviderDetailData>(dataKeys.accountsDetail(provider), (value) => ({
     ...value,
     accounts: value.accounts.map((account) => (account.id === accountId ? { ...account, ...patch } : account)),
   }));
 }
 
 function removeProviderAccount(provider: string, accountId: string) {
-  patchNuxtData<ProviderDetailData>(dashboardDataKeys.accountsDetail(provider), (value) => ({
+  patchNuxtData<ProviderDetailData>(dataKeys.accountsDetail(provider), (value) => ({
     ...value,
     accounts: value.accounts.filter((account) => account.id !== accountId),
     supportedModelsByAccountId: Object.fromEntries(Object.entries(value.supportedModelsByAccountId).filter(([id]) => id !== accountId)),
@@ -60,7 +65,7 @@ function removeProviderAccount(provider: string, accountId: string) {
 }
 
 function patchAccountNameInOptions(accountId: string, name: string) {
-  patchNuxtData<ApiKeyPageData>(dashboardDataKeys.apiKeys, (value) => ({
+  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => ({
     ...value,
     options: {
       ...value.options,
@@ -68,14 +73,14 @@ function patchAccountNameInOptions(accountId: string, name: string) {
     },
   }));
 
-  patchNuxtData<PlaygroundOptions>(dashboardDataKeys.playgroundOptions, (value) => ({
+  patchNuxtData<PlaygroundOptions>(dataKeys.playgroundOptions, (value) => ({
     ...value,
     providerAccounts: value.providerAccounts.map((account) => (account.id === accountId ? { ...account, name } : account)),
   }));
 }
 
 function patchDisabledModels(provider: string, accountId: string, disabledModels: string[]) {
-  patchNuxtData<ProviderDetailData>(dashboardDataKeys.accountsDetail(provider), (value) => ({
+  patchNuxtData<ProviderDetailData>(dataKeys.accountsDetail(provider), (value) => ({
     ...value,
     disabledModelsByAccountId: {
       ...value.disabledModelsByAccountId,
@@ -83,21 +88,21 @@ function patchDisabledModels(provider: string, accountId: string, disabledModels
     },
   }));
 
-  patchNuxtData<PlaygroundOptions>(dashboardDataKeys.playgroundOptions, (value) => ({
+  patchNuxtData<PlaygroundOptions>(dataKeys.playgroundOptions, (value) => ({
     ...value,
     providerAccounts: value.providerAccounts.map((account) => (account.id === accountId ? { ...account, disabledModels } : account)),
   }));
 }
 
 function patchApiKey(apiKeyId: string, patch: Partial<ApiKeyListItem>) {
-  patchNuxtData<ApiKeyPageData>(dashboardDataKeys.apiKeys, (value) => ({
+  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => ({
     ...value,
     apiKeys: value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, ...patch } : apiKey)),
   }));
 }
 
 function patchApiKeyRoamingPoints(roamingPointsByApiKeyId: Record<string, number>) {
-  patchNuxtData<ApiKeyPageData>(dashboardDataKeys.apiKeys, (value) => ({
+  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => ({
     ...value,
     apiKeys: value.apiKeys.map((apiKey) => (Object.prototype.hasOwnProperty.call(roamingPointsByApiKeyId, apiKey.id)
       ? { ...apiKey, roamingPointsUsed: roamingPointsByApiKeyId[apiKey.id] ?? 0 }
@@ -106,7 +111,7 @@ function patchApiKeyRoamingPoints(roamingPointsByApiKeyId: Record<string, number
 }
 
 function removeApiKey(apiKeyId: string) {
-  patchNuxtData<ApiKeyPageData>(dashboardDataKeys.apiKeys, (value) => {
+  patchNuxtData<ApiKeyPageData>(dataKeys.apiKeys, (value) => {
     const { [apiKeyId]: _removedRateLimits, ...rateLimitsByKeyId } = value.options.rateLimitsByKeyId;
 
     return {
@@ -121,62 +126,62 @@ function removeApiKey(apiKeyId: string) {
 }
 
 function patchModelEnabled(modelId: string, enabled: boolean) {
-  patchNuxtData<ModelListItem[]>(dashboardDataKeys.models, (value) => value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model)));
-  patchNuxtData<ModelSearchItem[]>(dashboardDataKeys.modelSearch, (value) => value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model)));
+  patchNuxtData<ModelListItem[]>(dataKeys.models, (value) => value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model)));
+  patchNuxtData<ModelSearchItem[]>(dataKeys.modelSearch, (value) => value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model)));
 }
 
 function invalidateAccountCollection(provider: string) {
-  return refreshDashboardData([
-    dashboardDataKeys.shellAccounts,
-    dashboardDataKeys.accountsOverview,
-    dashboardDataKeys.accountsDetail(provider),
-    dashboardDataKeys.models,
-    dashboardDataKeys.shellModelFamilyCounts,
-    dashboardDataKeys.modelSearch,
-    dashboardDataKeys.playgroundOptions,
-    dashboardDataKeys.apiKeys,
+  return refreshData([
+    dataKeys.shellAccounts,
+    dataKeys.accountsOverview,
+    dataKeys.accountsDetail(provider),
+    dataKeys.models,
+    dataKeys.shellModelFamilyCounts,
+    dataKeys.modelSearch,
+    dataKeys.playgroundOptions,
+    dataKeys.apiKeys,
   ]);
 }
 
 function invalidateAccountOverview() {
-  return refreshDashboardData([dashboardDataKeys.shellAccounts, dashboardDataKeys.accountsOverview]);
+  return refreshData([dataKeys.shellAccounts, dataKeys.accountsOverview]);
 }
 
 function clearAccountDependentOptions() {
-  clearDashboardData([dashboardDataKeys.playgroundOptions, dashboardDataKeys.apiKeys]);
+  clearData([dataKeys.playgroundOptions, dataKeys.apiKeys]);
 }
 
 function invalidateModelAvailability() {
-  return refreshDashboardData([
-    dashboardDataKeys.modelSearch,
-    dashboardDataKeys.shellModelFamilyCounts,
-    dashboardDataKeys.playgroundOptions,
-    dashboardDataKeys.apiKeys,
+  return refreshData([
+    dataKeys.modelSearch,
+    dataKeys.shellModelFamilyCounts,
+    dataKeys.playgroundOptions,
+    dataKeys.apiKeys,
   ]);
 }
 
 function clearModelAvailability() {
-  return refreshDashboardData([dashboardDataKeys.models, dashboardDataKeys.modelSearch, dashboardDataKeys.shellModelFamilyCounts]);
+  return refreshData([dataKeys.models, dataKeys.modelSearch, dataKeys.shellModelFamilyCounts]);
 }
 
 function patchPinnedProvider(provider: ProviderAccountKey, pinned: boolean) {
-  patchNuxtData<ShellAccountSummary>(dashboardDataKeys.shellAccounts, (value) => ({
+  patchNuxtData<ShellAccountSummary>(dataKeys.shellAccounts, (value) => ({
     ...value,
     pinnedProviders: replacePinnedProvider(value.pinnedProviders, provider, pinned),
   }));
 
-  patchNuxtData<AccountOverviewData>(dashboardDataKeys.accountsOverview, (value) => ({
+  patchNuxtData<AccountOverviewData>(dataKeys.accountsOverview, (value) => ({
     ...value,
     pinnedProviders: replacePinnedProvider(value.pinnedProviders, provider, pinned),
   }));
 
-  patchNuxtData<ProviderDetailData>(dashboardDataKeys.accountsDetail(provider), (value) => ({
+  patchNuxtData<ProviderDetailData>(dataKeys.accountsDetail(provider), (value) => ({
     ...value,
     pinnedProviders: replacePinnedProvider(value.pinnedProviders, provider, pinned),
   }));
 }
 
-export function useDashboardDataInvalidation() {
+export function useInvalidate() {
   return {
     clearAccountDependentOptions,
     invalidateAccountCollection,
@@ -190,7 +195,7 @@ export function useDashboardDataInvalidation() {
     patchModelEnabled,
     patchPinnedProvider,
     patchProviderAccount,
-    refreshDashboardData,
+    refreshData,
     removeApiKey,
     removeProviderAccount,
   };

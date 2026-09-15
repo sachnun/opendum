@@ -13,7 +13,7 @@ const props = defineProps<{
   animateDeltas?: boolean;
 }>();
 
-const { auditRefreshVersion, auditUser, isAuditMode } = useDashboardAudit();
+const { auditRefreshVersion, auditUser, isAuditMode } = useAudit();
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);

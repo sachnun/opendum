@@ -1,18 +1,18 @@
 <script setup lang="ts">
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
-const dashboardApi = useDashboardApi();
-const { isAuditMode } = useDashboardAudit();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const { isAuditMode } = useAudit();
+const invalidation = useInvalidate();
 const config = useRuntimeConfig();
 
-type ApiKeyListItem = Awaited<ReturnType<typeof dashboardApi.apiKeys.list>>[number];
-type ApiKeyOptions = Awaited<ReturnType<typeof dashboardApi.apiKeys.options>>;
+type ApiKeyListItem = Awaited<ReturnType<typeof api.apiKeys.list>>[number];
+type ApiKeyOptions = Awaited<ReturnType<typeof api.apiKeys.options>>;
 type AccessMode = "all" | "whitelist" | "blacklist";
 type RateLimitRule = ApiKeyOptions["rateLimitsByKeyId"][string][number];
 
-const { data, error, refresh } = await useAsyncData(dashboardDataKeys.apiKeys, async () => {
-  const [apiKeys, options] = await Promise.all([dashboardApi.apiKeys.list(), dashboardApi.apiKeys.options()]);
+const { data, error, refresh } = useCachedData(dataKeys.apiKeys, async () => {
+  const [apiKeys, options] = await Promise.all([api.apiKeys.list(), api.apiKeys.options()]);
   return { apiKeys, options };
 });
 
@@ -128,7 +128,7 @@ function updateApiKeyPatch(apiKeyId: string, value: Partial<ApiKeyListItem>) {
     ...data.value,
     apiKeys: data.value.apiKeys.map((apiKey) => (apiKey.id === apiKeyId ? { ...apiKey, ...value } : apiKey)),
   };
-  dashboardInvalidation.patchApiKey(apiKeyId, value);
+  invalidation.patchApiKey(apiKeyId, value);
 }
 
 function deleteApiKey(apiKeyId: string) {
@@ -142,7 +142,7 @@ function deleteApiKey(apiKeyId: string) {
       rateLimitsByKeyId,
     },
   };
-  dashboardInvalidation.removeApiKey(apiKeyId);
+  invalidation.removeApiKey(apiKeyId);
 }
 
 async function toggleApiKey(apiKey: ApiKeyListItem) {
@@ -155,7 +155,7 @@ async function toggleApiKey(apiKey: ApiKeyListItem) {
   toggleErrors.value = { ...toggleErrors.value, [apiKey.id]: "" };
 
   try {
-    const result = await dashboardApi.apiKeys.toggle({ id: apiKey.id });
+    const result = await api.apiKeys.toggle({ id: apiKey.id });
     if (!result.success) throw new Error(result.error);
     updateApiKeyState(apiKey.id, { isActive: result.data.isActive, expiresAt: result.data.expiresAt });
   } catch (error) {
@@ -180,7 +180,7 @@ async function toggleRoaming(apiKey: ApiKeyListItem, enabled: boolean) {
   roamingErrors.value = { ...roamingErrors.value, [apiKey.id]: "" };
 
   try {
-    const result = await dashboardApi.apiKeys.updateRoaming({ id: apiKey.id, enabled });
+    const result = await api.apiKeys.updateRoaming({ id: apiKey.id, enabled });
     if (!result.success) throw new Error(result.error);
     updateApiKeyPatch(apiKey.id, { roamingEnabled: result.data.roamingEnabled });
   } catch (error) {
@@ -240,7 +240,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
       </div>
     </div>
 
-    <DashboardDataNotice :error="error" />
+    <DataNotice :error="error" />
 
     <UiCard class="bg-card">
       <UiCardContent class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">

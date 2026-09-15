@@ -1,4 +1,4 @@
-type DashboardIndexedDbStore = <T>(txMode: IDBTransactionMode, callback: (store: IDBObjectStore) => T | PromiseLike<T>) => Promise<T>;
+type IdbStore = <T>(txMode: IDBTransactionMode, callback: (store: IDBObjectStore) => T | PromiseLike<T>) => Promise<T>;
 
 const openDatabases = new Map<string, IDBDatabase>();
 const databaseQueues = new Map<string, Promise<unknown>>();
@@ -57,7 +57,7 @@ async function ensureObjectStore(dbName: string, storeName: string): Promise<IDB
   });
 }
 
-export function createDashboardIndexedDbStore(dbName: string, storeName: string): DashboardIndexedDbStore | null {
+export function createIdbStore(dbName: string, storeName: string): IdbStore | null {
   if (!import.meta.client) return null;
 
   return async (txMode, callback) => {
@@ -66,7 +66,7 @@ export function createDashboardIndexedDbStore(dbName: string, storeName: string)
   };
 }
 
-export async function warmDashboardIndexedDbStore(dbName: string, storeName: string): Promise<void> {
+export async function warmIdbStore(dbName: string, storeName: string): Promise<void> {
   if (!import.meta.client) return;
   await ensureObjectStore(dbName, storeName);
 }

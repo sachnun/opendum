@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/dashboard-api-types";
+import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
 import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
-import { warmDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
+import { warmIdbStore } from "../utils/idb";
 
 definePageMeta({
   middleware: ["provider", "auth"],
@@ -9,9 +9,9 @@ definePageMeta({
 });
 
 const route = useRoute();
-const dashboardApi = useDashboardApi();
-const { isAuditMode } = useDashboardAudit();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const { isAuditMode } = useAudit();
+const invalidation = useInvalidate();
 const selectedProvider = computed<ProviderAccountKey>(() => getProviderFromSlug(String(route.params.provider))!);
 const providerMeta = computed(() => BY_KEY[selectedProvider.value]);
 
@@ -37,9 +37,9 @@ const ACCOUNT_STATS_STORE_NAME = "account-stats";
 const ACCOUNT_QUOTA_STORE_NAME = "account-quota";
 const HIGHLIGHT_DURATION_MS = 2500;
 
-const { data, error, pending, refresh } = await useAsyncData(
-  () => dashboardDataKeys.accountsDetail(selectedProvider.value),
-  () => dashboardApi.accounts.byProviderDetailed({ provider: selectedProvider.value }),
+const { data, error, pending, refresh } = useCachedData(
+  () => dataKeys.accountsDetail(selectedProvider.value),
+  () => api.accounts.byProviderDetailed({ provider: selectedProvider.value }),
   { watch: [selectedProvider] }
 );
 
@@ -294,8 +294,8 @@ function applyProviderDetailResponse(detail: ProviderDetailResponse): ProviderDe
 async function refreshProviderDetail() {
   const cursor = data.value?.cursor;
   applyProviderDetailResponse(cursor
-    ? await dashboardApi.accounts.byProviderDetailedDelta({ provider: selectedProvider.value, cursor })
-    : await dashboardApi.accounts.byProviderDetailed({ provider: selectedProvider.value }));
+    ? await api.accounts.byProviderDetailedDelta({ provider: selectedProvider.value, cursor })
+    : await api.accounts.byProviderDetailed({ provider: selectedProvider.value }));
 }
 
 watch(
@@ -342,7 +342,7 @@ const {
   pruneQuotaState,
   runQuotaQueue,
   waitForQuotaQueue,
-} = useAccountQuotaMonitor({
+} = useQuotaMonitor({
   accounts,
   quotaCapableAccounts,
   toQuotaProvider,
@@ -358,8 +358,8 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  void warmDashboardIndexedDbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_STATS_STORE_NAME);
-  void warmDashboardIndexedDbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_QUOTA_STORE_NAME);
+  void warmIdbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_STATS_STORE_NAME);
+  void warmIdbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_QUOTA_STORE_NAME);
   startProviderDetailRefresh();
   void hydrateAccountStatsCache();
   startAccountStatsPolling();
@@ -456,7 +456,7 @@ async function hydrateAccountStatsCache() {
   const accountsToHydrate = accounts.value.filter((account) => !hydratedAccountStatsIds.value[account.id]);
   if (accountsToHydrate.length === 0) return;
 
-  const cachedStats = await readCachedAccountStats(accountsToHydrate.map((account) => account.id));
+  const cachedStats = await readStatsCache(accountsToHydrate.map((account) => account.id));
   const nextStatsById = { ...accountStatsById.value };
   const nextHydratedIds = { ...hydratedAccountStatsIds.value };
   let hasStatsChanges = false;
@@ -572,7 +572,7 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
   for (const accountId of requestedAccountIds) loadingAccountStatsIds.add(accountId);
 
   try {
-    const response = await dashboardApi.accounts.stats({
+    const response = await api.accounts.stats({
       accountIds: requestedAccountIds,
       cursors: Object.fromEntries(requestedAccountIds.map((accountId) => [accountId, accountStatsCursorById.value[accountId] ?? ""])),
     });
@@ -590,7 +590,7 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
     accountStatsCursorById.value = nextCursorById;
     accountStatsDeltaReadyById.value = nextDeltaReadyById;
     accountStatsFetchedById.value = nextFetchedById;
-    void writeCachedAccountStats(stats);
+    void writeStatsCache(stats);
   } catch (error) {
     console.error("Failed to load account stats:", error);
   } finally {
@@ -609,7 +609,7 @@ async function loadErrorHistories(accountIds: string[]) {
   for (const accountId of requestedAccountIds) loadingErrorHistoryIds.add(accountId);
 
   try {
-    const response = await dashboardApi.accounts.errorHistories({ accountIds: requestedAccountIds, limit: 100 });
+    const response = await api.accounts.errorHistories({ accountIds: requestedAccountIds, limit: 100 });
     const nextHistoryById = { ...errorHistoryByAccountId.value };
     const nextErrorById = { ...errorHistoryErrorByAccountId.value };
     const nextFetchedById = { ...errorHistoryFetchedById.value };
@@ -742,22 +742,22 @@ watch(
 );
 
 function handleAccountRenamed(account: ProviderAccountUpdateData) {
-  dashboardInvalidation.patchProviderAccount(selectedProvider.value, account.id, { name: account.name });
-  dashboardInvalidation.patchAccountNameInOptions(account.id, account.name);
+  invalidation.patchProviderAccount(selectedProvider.value, account.id, { name: account.name });
+  invalidation.patchAccountNameInOptions(account.id, account.name);
 }
 
 function handleAccountActiveUpdated(account: ProviderAccountUpdateData) {
-  dashboardInvalidation.patchProviderAccount(selectedProvider.value, account.id, account);
-  void dashboardInvalidation.invalidateAccountOverview();
-  dashboardInvalidation.clearAccountDependentOptions();
-  dashboardInvalidation.clearModelAvailability();
+  invalidation.patchProviderAccount(selectedProvider.value, account.id, account);
+  void invalidation.invalidateAccountOverview();
+  invalidation.clearAccountDependentOptions();
+  invalidation.clearModelAvailability();
 }
 
 function handleAccountDeleted(accountId: string) {
-  dashboardInvalidation.removeProviderAccount(selectedProvider.value, accountId);
-  void dashboardInvalidation.invalidateAccountOverview();
-  dashboardInvalidation.clearAccountDependentOptions();
-  dashboardInvalidation.clearModelAvailability();
+  invalidation.removeProviderAccount(selectedProvider.value, accountId);
+  void invalidation.invalidateAccountOverview();
+  invalidation.clearAccountDependentOptions();
+  invalidation.clearModelAvailability();
 }
 
 function handleAccountErrorsResolved(accountId: string) {
@@ -765,7 +765,7 @@ function handleAccountErrorsResolved(accountId: string) {
   errorHistoryErrorByAccountId.value = { ...errorHistoryErrorByAccountId.value, [accountId]: null };
   errorHistoryFetchedById.value = { ...errorHistoryFetchedById.value, [accountId]: true };
   void refresh();
-  void dashboardInvalidation.invalidateAccountOverview();
+  void invalidation.invalidateAccountOverview();
 }
 
 function handleAccountConnected(result: { provider: ProviderAccountKey; isUpdate: boolean }) {
@@ -810,7 +810,7 @@ function decodeAccountHash(hash: string): string | null {
       </div>
     </div>
 
-    <DashboardDataNotice :error="error" />
+    <DataNotice :error="error" />
 
     <section v-if="!isLoadingAccounts && accounts.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="space-y-3 pt-1">

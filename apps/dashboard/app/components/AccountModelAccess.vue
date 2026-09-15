@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { compareModelIds } from "../../lib/model-sort";
-import type { ProviderAccountModelHealthItem } from "../../lib/dashboard-api-types";
+import type { ProviderAccountModelHealthItem } from "../../lib/api-types";
 
 const props = defineProps<{
   accountId: string;
@@ -11,8 +11,8 @@ const props = defineProps<{
   readonly?: boolean;
 }>();
 
-const dashboardApi = useDashboardApi();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const invalidation = useInvalidate();
 const disabledModels = ref(new Set(props.initialDisabledModels));
 const togglingModels = ref(new Set<string>());
 const expanded = ref(false);
@@ -62,10 +62,10 @@ async function toggleModel(model: string) {
   togglingModels.value = new Set(togglingModels.value).add(model);
 
   try {
-    const result = await dashboardApi.accounts.setAccountModelEnabled({ accountId: props.accountId, modelId: model, enabled });
+    const result = await api.accounts.setAccountModelEnabled({ accountId: props.accountId, modelId: model, enabled });
     if (!result.success) throw new Error(result.error);
-    dashboardInvalidation.patchDisabledModels(props.provider, props.accountId, Array.from(disabledModels.value));
-    dashboardInvalidation.clearAccountDependentOptions();
+    invalidation.patchDisabledModels(props.provider, props.accountId, Array.from(disabledModels.value));
+    invalidation.clearAccountDependentOptions();
   } catch {
     disabledModels.value = previous;
   } finally {
