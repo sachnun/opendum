@@ -62,7 +62,7 @@ let placeholderTimer: number | null = null;
 const suggestionListId = "model-search-suggestions";
 const MAX_SUGGESTIONS = 50;
 
-const { data, refresh, pending } = useAsyncData("layout-model-search", loadModelSearch, {
+const { data, refresh, pending } = useAsyncData(dashboardDataKeys.modelSearch, loadModelSearch, {
   default: () => [] as ModelListItem[],
   lazy: true,
   immediate: false,

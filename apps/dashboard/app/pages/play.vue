@@ -153,7 +153,7 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
   { value: "xhigh", label: "XHigh" },
 ];
 
-const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => dashboardApi.playground.options());
+const { data, error, pending } = await useAsyncData(dashboardDataKeys.playgroundOptions, () => dashboardApi.playground.options());
 if (data.value && !data.value.hasAnyProviderAccount) {
   await navigateTo("/", { replace: true });
 }

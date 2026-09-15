@@ -7,8 +7,8 @@ const emptyAuditInfo: DashboardAuditInfo = {
 };
 
 export function useDashboardAudit() {
-  const dashboardMe = useState<DashboardMeData | null>("dashboard-me-state", () => null);
-  const auditRefreshVersion = useState("dashboard-audit-refresh-version", () => 0);
+  const dashboardMe = useState<DashboardMeData | null>(dashboardStateKeys.me, () => null);
+  const auditRefreshVersion = useState(dashboardStateKeys.auditRefreshVersion, () => 0);
 
   const audit = computed(() => dashboardMe.value?.audit ?? emptyAuditInfo);
   const isAuditMode = computed(() => audit.value.active && Boolean(audit.value.user));
@@ -16,10 +16,10 @@ export function useDashboardAudit() {
 
   async function refreshAfterAuditChange() {
     auditRefreshVersion.value += 1;
-    useState<Record<string, unknown>>("account-quota-by-account-id", () => ({})).value = {};
-    useState<Record<string, string>>("account-quota-error-by-account-id", () => ({})).value = {};
-    useState<Record<string, boolean>>("account-quota-loading-by-account-id", () => ({})).value = {};
-    useState<Record<string, boolean>>("account-quota-hydrated-account-ids", () => ({})).value = {};
+    useState<Record<string, unknown>>(dashboardStateKeys.quotaByAccountId, () => ({})).value = {};
+    useState<Record<string, string>>(dashboardStateKeys.quotaErrorByAccountId, () => ({})).value = {};
+    useState<Record<string, boolean>>(dashboardStateKeys.quotaLoadingByAccountId, () => ({})).value = {};
+    useState<Record<string, boolean>>(dashboardStateKeys.quotaHydratedAccountIds, () => ({})).value = {};
     await refreshNuxtData();
   }
 

@@ -22,7 +22,7 @@ const emit = defineEmits<{
 }>();
 
 const dashboardApi = useDashboardApi();
-const { data: dashboardMe } = useNuxtData<DashboardMeData>("dashboard-me");
+const { data: dashboardMe } = useNuxtData<DashboardMeData>(dashboardDataKeys.dashboardMe);
 const API_KEY_MIN_LENGTH = 3;
 const API_KEY_MAX_LENGTH = 100;
 const API_KEY_UPDATE_POINT_COST = 100;
@@ -91,7 +91,7 @@ async function updateName() {
     const result = await dashboardApi.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedApiKeyValue.value } : {}) });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
-    if (saveCostsPoints.value) void refreshNuxtData("dashboard-me");
+    if (saveCostsPoints.value) void refreshNuxtData(dashboardDataKeys.dashboardMe);
     emit("updated", { name: result.data.name, keyPreview: result.data.keyPreview });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update API key";

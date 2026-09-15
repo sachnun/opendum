@@ -20,9 +20,7 @@ if (import.meta.client && session.value?.user && redirectTarget.value !== "/") {
 const dashboardApi = useDashboardApi();
 const { isAuditMode } = useDashboardAudit();
 
-const dashboardInvalidation = useDashboardDataInvalidation();
-
-const { data, error, pending, refresh } = useAsyncData(dashboardInvalidation.keys.accountsOverview, () => dashboardApi.accounts.overview(), {
+const { data, error, pending, refresh } = useAsyncData(dashboardDataKeys.accountsOverview, () => dashboardApi.accounts.overview(), {
   default: () => null,
   lazy: true,
 });

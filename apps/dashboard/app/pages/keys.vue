@@ -11,7 +11,7 @@ type ApiKeyOptions = Awaited<ReturnType<typeof dashboardApi.apiKeys.options>>;
 type AccessMode = "all" | "whitelist" | "blacklist";
 type RateLimitRule = ApiKeyOptions["rateLimitsByKeyId"][string][number];
 
-const { data, error, refresh } = await useAsyncData("dashboard-api-keys", async () => {
+const { data, error, refresh } = await useAsyncData(dashboardDataKeys.apiKeys, async () => {
   const [apiKeys, options] = await Promise.all([dashboardApi.apiKeys.list(), dashboardApi.apiKeys.options()]);
   return { apiKeys, options };
 });

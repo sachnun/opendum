@@ -23,17 +23,6 @@ type ApiKeyPageData = {
   options: ApiKeyOptions;
 };
 
-export const dashboardDataKeys = {
-  shellAccounts: "dashboard-shell-accounts",
-  accountsOverview: "dashboard-accounts-overview",
-  accountsDetail: (provider: string) => `dashboard-accounts-detail-${provider}`,
-  models: "dashboard-models",
-  shellModelFamilyCounts: "dashboard-shell-model-family-counts",
-  modelSearch: "layout-model-search",
-  playgroundOptions: "dashboard-playground-options",
-  apiKeys: "dashboard-api-keys",
-} as const;
-
 function patchNuxtData<T>(key: string, patcher: (value: T) => T) {
   const { data } = useNuxtData<T>(key);
   if (!data.value) return;
@@ -189,7 +178,6 @@ function patchPinnedProvider(provider: ProviderAccountKey, pinned: boolean) {
 
 export function useDashboardDataInvalidation() {
   return {
-    keys: dashboardDataKeys,
     clearAccountDependentOptions,
     invalidateAccountCollection,
     invalidateAccountOverview,

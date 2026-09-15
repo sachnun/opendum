@@ -18,9 +18,9 @@ const MODEL_STATS_BATCH_SIZE = 24;
 const MODEL_STATS_POLL_MS = 30_000;
 const HIGHLIGHT_DURATION_MS = 2500;
 
-const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardInvalidation.keys.models).data.value !== undefined;
+const cachedModelsBeforePageLoad = useNuxtData<ModelListItem[]>(dashboardDataKeys.models).data.value !== undefined;
 const shouldRefreshCachedModelsOnMount = import.meta.client && !nuxtApp.isHydrating && cachedModelsBeforePageLoad;
-const { data, error, refresh } = await useAsyncData(dashboardInvalidation.keys.models, () => dashboardApi.models.list({ includeStats: false }));
+const { data, error, refresh } = await useAsyncData(dashboardDataKeys.models, () => dashboardApi.models.list({ includeStats: false }));
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = ref<Record<string, ModelStats>>({});
@@ -39,7 +39,7 @@ const availableProviders = computed(() => {
 const activeProviders = ref<string[]>([]);
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
-const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
+const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(dashboardStateKeys.modelFamilyCountsOverride, () => null);
 const modelCardRefs = ref<Array<Element | { $el?: Element }>>([]);
 const highlightedModelId = ref<string | null>(null);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;

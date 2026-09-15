@@ -63,8 +63,8 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 };
 
 const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
-const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>("dashboard-model-family-counts-override", () => null);
-const cachedPinnedProviders = useState<ProviderAccountKey[] | null>("dashboard-shell-pinned-providers", () => null);
+const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(dashboardStateKeys.modelFamilyCountsOverride, () => null);
+const cachedPinnedProviders = useState<ProviderAccountKey[] | null>(dashboardStateKeys.pinnedProviders, () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
   {
@@ -85,9 +85,9 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 const dashboardApi = useDashboardApi();
 const dashboardInvalidation = useDashboardDataInvalidation();
 const accountsNavigationHref = "/";
-const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dashboardInvalidation.keys.accountsOverview);
+const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dashboardDataKeys.accountsOverview);
 
-const { data: dashboardMe } = useAsyncData("dashboard-me", () => dashboardApi.me.get(), {
+const { data: dashboardMe } = useAsyncData(dashboardDataKeys.dashboardMe, () => dashboardApi.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
   lazy: true,
 });
@@ -162,7 +162,7 @@ function applyAccountOverviewResponse(summary: AccountOverviewResponse): Account
 
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
-const { data: accountSummaryData, refresh: refreshAccountSummary } = useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+const { data: accountSummaryData, refresh: refreshAccountSummary } = useAsyncData(dashboardDataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   const useOverview = isProviderOverviewRoute.value;
   if (useOverview) {
     const snapshot = accountsOverviewData.value;
@@ -215,7 +215,7 @@ function normalizeModelFamilyCounts(counts: Record<string, number>) {
   return nextCounts;
 }
 
-const { data: defaultModelFamilyCounts } = useAsyncData("dashboard-shell-model-family-counts", async () => {
+const { data: defaultModelFamilyCounts } = useAsyncData(dashboardDataKeys.shellModelFamilyCounts, async () => {
   const counts = await dashboardApi.models.familyCounts();
   return normalizeModelFamilyCounts(counts);
 }, {

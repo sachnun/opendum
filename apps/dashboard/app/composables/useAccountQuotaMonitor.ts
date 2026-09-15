@@ -60,10 +60,10 @@ export function useAccountQuotaMonitor(options: {
   shouldQueueAccount?: (account: Account) => boolean;
 }) {
   const dashboardApi = useDashboardApi();
-  const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>("account-quota-by-account-id", () => ({}));
-  const quotaErrorByAccountId = useState<Record<string, string>>("account-quota-error-by-account-id", () => ({}));
-  const quotaLoadingByAccountId = useState<Record<string, boolean>>("account-quota-loading-by-account-id", () => ({}));
-  const hydratedAccountIds = useState<Record<string, boolean>>("account-quota-hydrated-account-ids", () => ({}));
+  const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>(dashboardStateKeys.quotaByAccountId, () => ({}));
+  const quotaErrorByAccountId = useState<Record<string, string>>(dashboardStateKeys.quotaErrorByAccountId, () => ({}));
+  const quotaLoadingByAccountId = useState<Record<string, boolean>>(dashboardStateKeys.quotaLoadingByAccountId, () => ({}));
+  const hydratedAccountIds = useState<Record<string, boolean>>(dashboardStateKeys.quotaHydratedAccountIds, () => ({}));
   let quotaQueueRunId = 0;
   let quotaRunInFlight: Promise<void> | null = null;
   const quotaLoadingRunByAccountId = new Map<string, number>();

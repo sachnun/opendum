@@ -38,7 +38,7 @@ const ACCOUNT_QUOTA_STORE_NAME = "account-quota";
 const HIGHLIGHT_DURATION_MS = 2500;
 
 const { data, error, pending, refresh } = await useAsyncData(
-  () => `dashboard-accounts-detail-${selectedProvider.value}`,
+  () => dashboardDataKeys.accountsDetail(selectedProvider.value),
   () => dashboardApi.accounts.byProviderDetailed({ provider: selectedProvider.value }),
   { watch: [selectedProvider] }
 );
