@@ -106,6 +106,7 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"workbuddy":   workbuddyProvider{registry: registry},
 		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
 		"hyper":       openAICompatibleProvider{name: "hyper", baseURL: "https://hyper.charm.land/v1", supportedParams: supportedHyper, registry: registry, trimPrefix: "hyper/"},
+		"freebuff":    newFreebuffProvider(registry, redis),
 	}}
 }
 

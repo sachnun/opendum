@@ -4,7 +4,8 @@
     "zenmux",
     "qoder",
     "hyper",
-    "perch"
+    "perch",
+    "freebuff"
   ],
   "modalities": {
     "input": [
@@ -29,6 +30,10 @@
     "output": 80000
   },
   "providerConfig": {
+    "freebuff": {
+      "upstream": "minimax/minimax-m3",
+      "agent": "base2-free-minimax-m3"
+    },
     "hyper": {
       "contextWindow": 512000,
       "maxOutputTokens": 512000

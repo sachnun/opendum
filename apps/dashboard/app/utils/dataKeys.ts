@@ -20,4 +20,5 @@ export const stateKeys = {
   quotaErrorByAccountId: "account-quota-error-by-account-id",
   quotaLoadingByAccountId: "account-quota-loading-by-account-id",
   quotaHydratedAccountIds: "account-quota-hydrated-account-ids",
+  freebuffSessionsByAccountId: "freebuff-sessions-by-account-id",
 } as const;

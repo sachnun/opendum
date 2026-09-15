@@ -1,3 +1,11 @@
 {
-  "providers": []
+  "providers": [
+    "freebuff"
+  ],
+  "providerConfig": {
+    "freebuff": {
+      "upstream": "stealth/ox-alpha",
+      "agent": "base2-free-ox-alpha"
+    }
+  }
 }

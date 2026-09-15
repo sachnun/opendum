@@ -5,6 +5,7 @@ var providerDisplayNames = map[string]string{
 	"perch":       "Perch",
 	"cline":       "Cline",
 	"codex":       "Codex",
+	"freebuff":    "Freebuff",
 	"harbor":      "Harbor",
 	"hyper":       "Charm",
 	"kiro":        "Kiro",

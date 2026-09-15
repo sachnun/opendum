@@ -4,8 +4,8 @@
   ],
   "providerConfig": {
     "freebuff": {
-      "upstream": "anthropic/claude-fable-5",
-      "agent": "base2-free-fable"
+      "upstream": "crof/kimi-k3-eco",
+      "agent": "base2-free-kimi-k3-eco"
     }
   }
 }

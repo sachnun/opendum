@@ -8,6 +8,7 @@ const props = defineProps<{
   supportedModels: string[];
   initialDisabledModels: string[];
   modelHealth: Record<string, ProviderAccountModelHealthItem>;
+  activeModel?: string | null;
   readonly?: boolean;
 }>();
 
@@ -37,15 +38,17 @@ function modelSortWeight(model: string): number {
   return 1;
 }
 
-function modelButtonTitle(model: string): string {
-  return disabledModels.value.has(model) ? "Enable" : "Disable";
-}
-
 function modelButtonClass(model: string): string {
   if (disabledModels.value.has(model)) return "border border-border/60 bg-transparent text-muted-foreground/60 line-through";
+  if (props.activeModel === model) return "border border-green-500 bg-green-500/10 text-green-700";
   const status = props.modelHealth[model]?.status;
   if (status === "degraded") return "border border-yellow-500/45 bg-transparent text-yellow-700";
   return "border border-border bg-transparent text-foreground hover:bg-muted/30";
+}
+
+function modelButtonTitle(model: string): string {
+  if (props.activeModel === model) return "Active session";
+  return disabledModels.value.has(model) ? "Enable" : "Disable";
 }
 
 async function toggleModel(model: string) {
