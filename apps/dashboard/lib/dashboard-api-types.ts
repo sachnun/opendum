@@ -28,6 +28,7 @@ export interface DashboardMeData {
   isMaintener: boolean;
   points?: {
     balance: number;
+    roamingPointsByApiKeyId?: Record<string, number>;
   };
   sharing?: {
     enabled: boolean;
