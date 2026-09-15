@@ -581,6 +581,12 @@ const allErrorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
     }))
     .sort((a, b) => (toTimeMs(b.createdAt) ?? 0) - (toTimeMs(a.createdAt) ?? 0));
 });
+const lastErrorAt = computed(() => {
+  const accountMs = toTimeMs(props.account.lastErrorAt) ?? 0;
+  const newestEntry = allErrorPreviewEntries.value[0];
+  const historyMs = toTimeMs(newestEntry?.createdAt) ?? 0;
+  return historyMs > accountMs ? (newestEntry?.createdAt ?? null) : props.account.lastErrorAt;
+});
 const errorPreviewWindowStart = computed(() => {
   const total = allErrorPreviewEntries.value.length;
   if (total <= ERROR_PREVIEW_VISIBLE_COUNT) return 0;
@@ -1051,7 +1057,7 @@ function cancelErrorPreviewPointer() {
           </div>
 
           <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : '-' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">Last error</span><span :class="['font-medium', account.lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ account.lastErrorAt ? formatRelativeTime(account.lastErrorAt) : '-' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">Last error</span><span :class="['font-medium', lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ lastErrorAt ? formatRelativeTime(lastErrorAt) : '-' }}</span></div>
 
           <div :class="['min-h-14', activeErrorEntry ? '' : 'hidden sm:block']">
             <div class="space-y-1.5 pt-2">
