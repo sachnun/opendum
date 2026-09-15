@@ -20,7 +20,7 @@ const emit = defineEmits<{
 
 const STEP_COUNT = 2;
 const inputClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50";
-const labelClass = "text-xs font-medium text-muted-foreground";
+const labelClass = "text-xs font-medium text-foreground";
 const dashboardApi = useApi();
 
 const step = ref(1);
@@ -139,9 +139,13 @@ async function syncModels() {
 }
 
 async function finish() {
-  if (!(await ensureProvider())) return;
   const token = apiKey.value.trim();
-  if (token && !(await run(() => dashboardApi.customProviders.connect({ slug: slug.value, token }), "connect"))) return;
+  if (!token) {
+    errorMessage.value = "API key is required.";
+    return;
+  }
+  if (!(await ensureProvider())) return;
+  if (!(await run(() => dashboardApi.customProviders.connect({ slug: slug.value, token }), "connect"))) return;
   const rows = filledModels.value;
   if (rows.length > 0) {
     const payload = rows.map((row) => ({ modelId: row.alias.trim() || row.model.trim(), upstream: row.model.trim() }));
@@ -199,11 +203,11 @@ function next() {
 
       <div v-if="step === 1" class="space-y-4">
         <label class="grid gap-1.5">
-          <span :class="labelClass">Name</span>
+          <span :class="labelClass">Name <span aria-hidden="true" class="text-destructive">*</span></span>
           <input v-model="name" :class="inputClass" placeholder="My vLLM">
         </label>
         <label class="grid gap-1.5">
-          <span :class="labelClass">Base URL</span>
+          <span :class="labelClass">Base URL <span aria-hidden="true" class="text-destructive">*</span></span>
           <input v-model="baseUrl" :class="inputClass" class="font-mono" placeholder="https://vllm.example.com/v1">
         </label>
         <div class="grid gap-2">
@@ -220,16 +224,17 @@ function next() {
 
       <div v-if="step === 2" class="space-y-3">
         <label class="grid gap-1.5">
-          <span :class="labelClass">API key (optional, adds the provider account)</span>
+          <span :class="labelClass">API key <span aria-hidden="true" class="text-destructive">*</span></span>
           <input v-model="apiKey" type="password" :class="inputClass" class="font-mono" placeholder="sk-...">
         </label>
         <div class="grid gap-2">
           <div class="flex items-center justify-between">
             <span :class="labelClass">Models ({{ filledModels.length }})</span>
-            <UiButton size="xs" variant="outline" :disabled="busy === 'sync' || baseUrl.trim() === ''" @click="syncModels">
-              <UiIcon name="i-lucide-refresh-cw" :class="['size-4', busy === 'sync' ? 'animate-spin' : '']" />
-              Sync from upstream
-            </UiButton>
+            <UiTooltip text="Refresh">
+              <UiButton size="icon-sm" variant="outline" :disabled="busy === 'sync' || baseUrl.trim() === ''" @click="syncModels">
+                <UiIcon name="i-lucide-refresh-cw" :class="['size-4', busy === 'sync' ? 'animate-spin' : '']" />
+              </UiButton>
+            </UiTooltip>
           </div>
           <div v-for="(row, index) in models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" :class="inputClass" class="flex-1 font-mono" placeholder="model">
@@ -245,7 +250,7 @@ function next() {
         <UiIcon name="i-lucide-arrow-left" class="size-4" />
         Back
       </UiButton>
-      <UiButton type="button" variant="ghost" class="ml-auto" :disabled="busy !== '' || (step === 1 && !canCreate)" @click="next">
+      <UiButton type="button" variant="ghost" class="ml-auto" :disabled="busy !== '' || (step === 1 && !canCreate) || (step === 2 && apiKey.trim() === '')" @click="next">
         {{ step === 1 ? "Next" : busy !== "" ? "Saving…" : "Finish" }}
         <UiIcon name="i-lucide-arrow-right" class="size-4" />
       </UiButton>

@@ -1071,15 +1071,15 @@ function decodeAccountHash(hash: string): string | null {
           {{ settingsError }}
         </div>
         <label class="grid gap-1.5">
-          <span class="text-xs font-medium text-muted-foreground">Name</span>
+          <span class="text-xs font-medium text-foreground">Name</span>
           <input v-model="settingsForm.name" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
         </label>
         <label class="grid gap-1.5">
-          <span class="text-xs font-medium text-muted-foreground">Base URL</span>
+          <span class="text-xs font-medium text-foreground">Base URL</span>
           <input v-model="settingsForm.baseUrl" class="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
         </label>
         <div class="grid gap-2">
-          <span class="text-xs font-medium text-muted-foreground">Headers</span>
+          <span class="text-xs font-medium text-foreground">Headers</span>
           <div v-for="(header, index) in settingsForm.headers" :key="index" class="flex items-center gap-2">
             <input v-model="header.key" class="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" list="provider-settings-header-names" placeholder="Header">
             <input v-model="header.value" class="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="Value">
@@ -1089,16 +1089,18 @@ function decodeAccountHash(hash: string): string | null {
           </datalist>
         </div>
         <label class="flex items-center justify-between">
-          <span class="text-xs font-medium text-muted-foreground">Enabled</span>
+          <span class="text-xs font-medium text-foreground">Enabled</span>
           <UiSwitch v-model="settingsForm.enabled" />
         </label>
 
         <div class="grid gap-2 border-t border-border pt-3">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-muted-foreground">Models ({{ filledSettingsModels.length }})</span>
-            <UiButton size="icon-sm" variant="outline" :title="`Refresh models from ${settingsForm.baseUrl}`" :disabled="settingsBusy === 'model-sync'" @click="syncModels">
-              <UiIcon name="i-lucide-refresh-cw" :class="['size-4', settingsBusy === 'model-sync' ? 'animate-spin' : '']" />
-            </UiButton>
+            <span class="text-xs font-medium text-foreground">Models ({{ filledSettingsModels.length }})</span>
+            <UiTooltip text="Refresh">
+              <UiButton size="icon-sm" variant="outline" :disabled="settingsBusy === 'model-sync'" @click="syncModels">
+                <UiIcon name="i-lucide-refresh-cw" :class="['size-4', settingsBusy === 'model-sync' ? 'animate-spin' : '']" />
+              </UiButton>
+            </UiTooltip>
           </div>
           <div v-for="(row, index) in settingsForm.models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="model">
