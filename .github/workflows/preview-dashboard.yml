@@ -1,27 +1,46 @@
 name: Preview Dashboard
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/preview-dashboard.yml
-      - apps/dashboard/**
-      - packages/database/**
-      - packages/models/**
-      - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
 permissions:
   contents: read
   pull-requests: write
 
 concurrency:
-  group: edgeone-dashboard-preview-${{ github.event.pull_request.number }}
+  group: edgeone-dashboard-preview-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
+  paths:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    name: Check dashboard paths
+    runs-on: ubuntu-latest
+    outputs:
+      pr: ${{ github.event.workflow_run.pull_requests[0].number }}
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        if: github.event.workflow_run.pull_requests[0].number
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/pulls/${{ github.event.workflow_run.pull_requests[0].number }}/files" \
+            --paginate --jq '.[].filename' | grep -qE \
+            '^(apps/dashboard/|packages/(database|models)/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.github/workflows/preview-dashboard\.yml$)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   preview:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: paths
+    if: needs.paths.outputs.changed == 'true'
     name: Dashboard EdgeOne Pages preview
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -29,8 +48,10 @@ jobs:
       name: dashboard
 
     steps:
-      - name: Checkout repository
+      - name: Checkout pull request
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -67,8 +88,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
-          PR: ${{ github.event.pull_request.number }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ needs.paths.outputs.pr }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           marker="<!-- edgeone-dashboard-preview -->"
