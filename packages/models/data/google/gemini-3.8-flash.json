@@ -59,6 +59,8 @@
     },
     "freebuff": {
       "upstream": "google/gemini-3.8-flash",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
       "agent": "base2-free-gemini-3-8-flash"
     },
     "zenmux": {

@@ -40,6 +40,8 @@
   "providerConfig": {
     "freebuff": {
       "upstream": "mimo/mimo-v2.5",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
       "agent": "base2-free-mimo"
     },
     "harbor": {

@@ -37,6 +37,8 @@
   "providerConfig": {
     "freebuff": {
       "upstream": "z-ai/glm-5.2",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072,
       "agent": "base2-free-glm"
     },
     "hyper": {

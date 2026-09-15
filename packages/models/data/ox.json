@@ -1,10 +1,35 @@
 {
+  "owner": "opencode",
   "providers": [
     "freebuff"
   ],
+  "modalities": {
+    "input": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": true,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 131072
+  },
   "providerConfig": {
     "freebuff": {
       "upstream": "stealth/ox-alpha",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072,
       "agent": "base2-free-ox-alpha"
     }
   }
