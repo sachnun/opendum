@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { aliasesFromUpstream, stripParamInfoKey } from "@opendum/models/clean-key";
 import { buildModelIdMap } from "@opendum/models/registry";
-import { encrypt, hashString } from "../lib/encryption";
+import { decrypt, encrypt, hashString } from "../lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 import type { ActionResult } from "../utils/api";
@@ -42,6 +42,12 @@ export const createCustomProviderSchema = z.object({
   name: z.string().trim().min(1).max(120),
   baseUrl: z.string().trim().min(1).max(500),
   extraHeaders: z.record(z.string(), z.string()).optional(),
+});
+
+export const previewCustomModelsSchema = z.object({
+  baseUrl: z.string().trim().min(1).max(500),
+  extraHeaders: z.record(z.string(), z.string()).optional(),
+  token: z.string().trim().optional(),
 });
 
 export const updateCustomProviderSchema = z.object({
@@ -113,6 +119,21 @@ async function ownedProvider(userId: string, slug: string) {
     .where(and(eq(customProvider.userId, userId), eq(customProvider.slug, slug)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+async function storedAccountKey(userId: string, slug: string): Promise<string | null> {
+  const rows = await db
+    .select({ accessToken: providerAccount.accessToken })
+    .from(providerAccount)
+    .where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, slug), eq(providerAccount.isActive, true)))
+    .limit(1);
+  const accessToken = rows[0]?.accessToken;
+  if (!accessToken) return null;
+  try {
+    return decrypt(accessToken);
+  } catch {
+    return null;
+  }
 }
 
 export async function listCustomProviders(userId: string) {
@@ -234,13 +255,13 @@ export async function deleteCustomModel(userId: string, slug: string, modelId: s
   return { success: true };
 }
 
-async function syncFromUpstream(baseUrl: string, token?: string): Promise<ActionResult<{ ids: string[] }>> {
+async function syncFromUpstream(baseUrl: string, token?: string, extraHeaders?: Record<string, string>): Promise<ActionResult<{ ids: string[] }>> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), VALIDATION_TIMEOUT_MS);
   try {
     const response = await fetchInternalProvider(`${baseUrl}/models`, {
       method: "GET",
-      headers: token ? { Accept: "application/json", Authorization: `Bearer ${token}` } : { Accept: "application/json" },
+      headers: { ...extraHeaders, Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       signal: controller.signal,
     });
     if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to reach the provider through the proxy." };
@@ -264,11 +285,20 @@ async function syncFromUpstream(baseUrl: string, token?: string): Promise<Action
 export async function syncCustomModels(userId: string, slug: string, token?: string): Promise<ActionResult<{ added: number; discovered: number }>> {
   const provider = await ownedProvider(userId, slug);
   if (!provider) return { success: false, error: `Custom provider "${slug}" not found.` };
-  const fetched = await syncFromUpstream(provider.baseUrl, token);
+  const effectiveToken = token?.trim() || (await storedAccountKey(userId, slug)) || undefined;
+  const fetched = await syncFromUpstream(provider.baseUrl, effectiveToken, provider.extraHeaders ?? undefined);
   if (!fetched.success) return fetched;
   const upserted = await upsertCustomModels(userId, slug, cleanCustomModels(fetched.data.ids));
   if (!upserted.success) return upserted;
   return { success: true, data: { added: upserted.data.added, discovered: fetched.data.ids.length } };
+}
+
+export async function previewCustomModels(input: z.infer<typeof previewCustomModelsSchema>): Promise<ActionResult<{ models: Array<{ modelId: string; upstream: string }> }>> {
+  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  if (!baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address." };
+  const fetched = await syncFromUpstream(baseUrl, input.token, input.extraHeaders);
+  if (!fetched.success) return fetched;
+  return { success: true, data: { models: cleanCustomModels(fetched.data.ids) } };
 }
 
 /**
@@ -314,7 +344,7 @@ export async function connectCustomProviderAccount(userId: string, slug: string,
   try {
     const response = await fetchInternalProvider(`${provider.baseUrl}/models`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${normalizedKey}`, Accept: "application/json" },
+      headers: { ...provider.extraHeaders, Authorization: `Bearer ${normalizedKey}`, Accept: "application/json" },
       signal: controller.signal,
     });
     if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to validate the API key through the proxy." };

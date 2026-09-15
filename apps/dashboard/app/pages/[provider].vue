@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ActionResult, CustomProviderListItem, CustomProviderModelRow, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
 import { BY_KEY, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
+import { COMMON_HEADER_NAMES } from "../../lib/headers";
 import { requestErrorMessage } from "../../lib/utils";
 import { warmIdbStore } from "../utils/idb";
 
@@ -21,10 +22,16 @@ interface HeaderRow {
   value: string;
 }
 
+interface ModelRow {
+  model: string;
+  alias: string;
+}
+
 interface SettingsForm {
   name: string;
   baseUrl: string;
   headers: HeaderRow[];
+  models: ModelRow[];
   enabled: boolean;
 }
 
@@ -808,8 +815,14 @@ const settingsOpen = ref(false);
 const settingsForm = ref<SettingsForm | null>(null);
 const settingsBusy = ref("");
 const settingsError = ref("");
-const modelDraft = ref({ model: "", alias: "" });
 const customModels = computed<CustomProviderModelRow[]>(() => customProvider.value?.models ?? []);
+const filledSettingsModels = computed(() => (settingsForm.value?.models ?? []).filter((row) => row.model.trim() !== ""));
+
+function modelRowFromCustom(model: CustomProviderModelRow): ModelRow {
+  const upstream = model.upstream ?? "";
+  const source = upstream || model.modelId;
+  return { model: source, alias: model.modelId === source ? "" : model.modelId };
+}
 
 function openSettings() {
   const custom = customProvider.value;
@@ -818,12 +831,30 @@ function openSettings() {
     name: custom.name,
     baseUrl: custom.baseUrl,
     headers: Object.entries(custom.extraHeaders ?? {}).map(([key, value]) => ({ key, value })),
+    models: custom.models.map(modelRowFromCustom),
     enabled: custom.enabled,
   };
-  modelDraft.value = { model: "", alias: "" };
   settingsError.value = "";
   settingsOpen.value = true;
 }
+
+watch(() => settingsForm.value?.headers, (rows) => {
+  if (!rows) return;
+  for (let index = rows.length - 2; index >= 0; index--) {
+    if (rows[index].key.trim() === "" && rows[index].value.trim() === "") rows.splice(index, 1);
+  }
+  const last = rows[rows.length - 1];
+  if (!last || last.key.trim() !== "" || last.value.trim() !== "") rows.push({ key: "", value: "" });
+}, { deep: true });
+
+watch(() => settingsForm.value?.models, (rows) => {
+  if (!rows) return;
+  for (let index = rows.length - 2; index >= 0; index--) {
+    if (rows[index].model.trim() === "" && rows[index].alias.trim() === "") rows.splice(index, 1);
+  }
+  const last = rows[rows.length - 1];
+  if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "" });
+}, { deep: true });
 
 function headersPayload(form: SettingsForm): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -860,37 +891,45 @@ async function saveSettings() {
   const form = settingsForm.value;
   const key = providerMeta.value?.key;
   if (!form || !key) return;
-  const ok = await runSettingsAction(() => api.customProviders.update({
-    slug: key,
-    name: form.name.trim() || undefined,
-    baseUrl: form.baseUrl.trim() || undefined,
-    extraHeaders: headersPayload(form),
-    enabled: form.enabled,
-  }), "save");
-  if (ok) settingsOpen.value = false;
+  settingsBusy.value = "save";
+  settingsError.value = "";
+  try {
+    const updated = await api.customProviders.update({
+      slug: key,
+      name: form.name.trim() || undefined,
+      baseUrl: form.baseUrl.trim() || undefined,
+      extraHeaders: headersPayload(form),
+      enabled: form.enabled,
+    });
+    if (!updated.success) throw new Error(updated.error);
+
+    const desired = form.models
+      .filter((row) => row.model.trim() !== "")
+      .map((row) => ({ modelId: row.alias.trim() || row.model.trim(), upstream: row.model.trim() }));
+    const desiredIds = new Set(desired.map((row) => row.modelId));
+    for (const model of customModels.value.filter((row) => !desiredIds.has(row.modelId))) {
+      const removed = await api.customProviders.deleteModel({ slug: key, modelId: model.modelId });
+      if (!removed.success) throw new Error(removed.error);
+    }
+    if (desired.length > 0) {
+      const added = await api.customProviders.addModels({ slug: key, models: desired });
+      if (!added.success) throw new Error(added.error);
+    }
+
+    await refreshCustomProviders();
+    settingsOpen.value = false;
+  } catch (error) {
+    settingsError.value = requestErrorMessage(error);
+  } finally {
+    settingsBusy.value = "";
+  }
 }
 
-async function addModel() {
+async function syncModels() {
   const key = providerMeta.value?.key;
-  const model = modelDraft.value.model.trim();
-  if (!key || !model) return;
-  const ok = await runSettingsAction(() => api.customProviders.addModels({
-    slug: key,
-    models: [{ modelId: modelDraft.value.alias.trim() || model, upstream: model }],
-  }), "model-add");
-  if (ok) modelDraft.value = { model: "", alias: "" };
-}
-
-function removeModel(modelId: string) {
-  const key = providerMeta.value?.key;
-  if (!key) return;
-  void runSettingsAction(() => api.customProviders.deleteModel({ slug: key, modelId }), `model-remove-${modelId}`);
-}
-
-function syncModels() {
-  const key = providerMeta.value?.key;
-  if (!key) return;
-  void runSettingsAction(() => api.customProviders.syncModels({ slug: key }), "model-sync");
+  if (!key || !settingsForm.value) return;
+  const ok = await runSettingsAction(() => api.customProviders.syncModels({ slug: key }), "model-sync");
+  if (ok && settingsForm.value) settingsForm.value.models = customModels.value.map(modelRowFromCustom);
 }
 
 const deleteOpen = ref(false);
@@ -950,7 +989,7 @@ function decodeAccountHash(hash: string): string | null {
             v-if="providerMeta"
             :initial-provider="providerMeta.key"
             :readonly="isAuditMode"
-            trigger-class="sm:w-auto sm:flex-none"
+            trigger-class="flex-1 sm:w-auto sm:flex-none"
             @connected="handleAccountConnected"
           />
         </div>
@@ -1039,20 +1078,15 @@ function decodeAccountHash(hash: string): string | null {
           <span class="text-xs font-medium text-muted-foreground">Base URL</span>
           <input v-model="settingsForm.baseUrl" class="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
         </label>
-        <div class="grid gap-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-muted-foreground">Headers</span>
-            <UiButton size="xs" variant="outline" @click="settingsForm.headers.push({ key: '', value: '' })">
-              Add
-            </UiButton>
-          </div>
+        <div class="grid gap-2">
+          <span class="text-xs font-medium text-muted-foreground">Headers</span>
           <div v-for="(header, index) in settingsForm.headers" :key="index" class="flex items-center gap-2">
-            <input v-model="header.key" class="h-9 w-2/5 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="Header">
+            <input v-model="header.key" class="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" list="provider-settings-header-names" placeholder="Header">
             <input v-model="header.value" class="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="Value">
-            <UiButton size="icon-sm" variant="ghost" @click="settingsForm.headers.splice(index, 1)">
-              ✕
-            </UiButton>
           </div>
+          <datalist id="provider-settings-header-names">
+            <option v-for="headerName in COMMON_HEADER_NAMES" :key="headerName" :value="headerName" />
+          </datalist>
         </div>
         <label class="flex items-center justify-between">
           <span class="text-xs font-medium text-muted-foreground">Enabled</span>
@@ -1061,23 +1095,14 @@ function decodeAccountHash(hash: string): string | null {
 
         <div class="grid gap-2 border-t border-border pt-3">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-muted-foreground">Models ({{ customModels.length }})</span>
+            <span class="text-xs font-medium text-muted-foreground">Models ({{ filledSettingsModels.length }})</span>
             <UiButton size="icon-sm" variant="outline" :title="`Refresh models from ${settingsForm.baseUrl}`" :disabled="settingsBusy === 'model-sync'" @click="syncModels">
               <UiIcon name="i-lucide-refresh-cw" :class="['size-4', settingsBusy === 'model-sync' ? 'animate-spin' : '']" />
             </UiButton>
           </div>
-          <div v-for="model in customModels" :key="model.id" class="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
-            <span class="truncate font-mono text-xs">{{ model.modelId }}</span>
-            <UiButton size="icon-xs" variant="ghost" :disabled="settingsBusy === `model-remove-${model.modelId}`" @click="removeModel(model.modelId)">
-              ✕
-            </UiButton>
-          </div>
-          <div class="flex items-center gap-2">
-            <input v-model="modelDraft.model" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="model">
-            <input v-model="modelDraft.alias" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="alias (optional)">
-            <UiButton size="xs" :disabled="settingsBusy === 'model-add' || !modelDraft.model.trim()" @click="addModel">
-              Add
-            </UiButton>
+          <div v-for="(row, index) in settingsForm.models" :key="index" class="flex items-center gap-2">
+            <input v-model="row.model" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="model">
+            <input v-model="row.alias" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="alias (optional)">
           </div>
         </div>
       </div>
