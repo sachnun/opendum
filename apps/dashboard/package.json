@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "nuxt dev",
+    "dev:emulate": "AUTH_OAUTH_EMULATOR=1 nuxt dev",
+    "emulate": "node scripts/emulate-oauth.mjs",
     "build": "nuxt build",
     "lint": "nuxt prepare && eslint .",
     "typecheck": "vue-tsc --noEmit"
@@ -28,6 +30,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@emulators/core": "^0.11.2",
+    "@emulators/github": "^0.11.2",
+    "@emulators/google": "^0.11.2",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "^1.16.0",
     "@tailwindcss/postcss": "^4.3.2",
