@@ -5,7 +5,8 @@
     "kiro",
     "codex",
     "workbuddy",
-    "perch"
+    "perch",
+    "freebuff"
   ],
   "modalities": {
     "input": [
@@ -33,6 +34,10 @@
     "codex": {
       "contextWindow": 1050000,
       "maxOutputTokens": 128000
+    },
+    "freebuff": {
+      "upstream": "openai/gpt-5.6-luna",
+      "agent": "base2-free-luna"
     },
     "kiro": {
       "contextWindow": 1050000,
