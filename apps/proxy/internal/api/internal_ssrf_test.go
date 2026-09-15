@@ -3,7 +3,6 @@ package api
 import "testing"
 
 func TestResolveInternalRelayTargetRejectsPrivateHosts(t *testing.T) {
-	t.Setenv("OPENDUM_ALLOW_PRIVATE_RELAY", "")
 	private := []string{
 		"https://127.0.0.1/v1/models",
 		"https://10.0.0.1/v1/models",
@@ -21,12 +20,5 @@ func TestResolveInternalRelayTargetRejectsPrivateHosts(t *testing.T) {
 	}
 	if _, _, err := resolveInternalRelayTarget(internalRelayRequest{URL: "https://openrouter.ai/api/v1/models", Method: "GET"}); err != nil {
 		t.Fatalf("resolveInternalRelayTarget(public) error = %v, want nil", err)
-	}
-}
-
-func TestResolveInternalRelayTargetAllowsPrivateHostsWhenConfigured(t *testing.T) {
-	t.Setenv("OPENDUM_ALLOW_PRIVATE_RELAY", "true")
-	if _, _, err := resolveInternalRelayTarget(internalRelayRequest{URL: "https://127.0.0.1:4000/v1/models", Method: "GET"}); err != nil {
-		t.Fatalf("resolveInternalRelayTarget(private with override) error = %v, want nil", err)
 	}
 }

@@ -76,7 +76,7 @@ func NewService(db *appdb.DB, redisClient *redis.Client, authSvc *auth.Service, 
 // cannot reach private networks or cloud metadata services.
 func newUpstreamClient() *http.Client {
 	base := http.DefaultTransport.(*http.Transport).Clone()
-	base.DialContext = providers.GuardedDialContext(providers.AllowPrivateRelay)
+	base.DialContext = providers.GuardedDialContext()
 	base.Proxy = http.ProxyFromEnvironment
 	base.ForceAttemptHTTP2 = true
 	base.MaxIdleConns = 200
@@ -87,7 +87,7 @@ func newUpstreamClient() *http.Client {
 	base.ExpectContinueTimeout = time.Second
 	return &http.Client{
 		Transport:     base,
-		CheckRedirect: providers.GuardedRedirectPolicy(providers.AllowPrivateRelay),
+		CheckRedirect: providers.GuardedRedirectPolicy(),
 	}
 }
 

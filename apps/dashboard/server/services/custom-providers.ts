@@ -97,15 +97,10 @@ function isProbablyPrivateTarget(raw: string): boolean {
   return false;
 }
 
-function privateTargetsAllowed(): boolean {
-  const value = process.env.ALLOW_PRIVATE_CUSTOM_PROVIDERS?.trim().toLowerCase();
-  return value === "1" || value === "true" || value === "yes";
-}
-
 function normalizeBaseUrl(raw: string): string | null {
   const trimmed = raw.trim().replace(/\/+$/, "");
   if (!trimmed) return null;
-  if (isProbablyPrivateTarget(trimmed) && !privateTargetsAllowed()) return null;
+  if (isProbablyPrivateTarget(trimmed)) return null;
   return trimmed;
 }
 
@@ -141,7 +136,7 @@ export async function listCustomProviders(userId: string) {
 
 export async function createCustomProvider(userId: string, input: z.infer<typeof createCustomProviderSchema>): Promise<ActionResult<{ id: string; slug: string }>> {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
-  if (!baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address (set ALLOW_PRIVATE_CUSTOM_PROVIDERS=true to allow)." };
+  if (!baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address." };
   if (PROVIDER_ACCOUNT_KEYS.includes(input.slug as (typeof PROVIDER_ACCOUNT_KEYS)[number])) return { success: false, error: `Slug "${input.slug}" is reserved for a built-in provider.` };
   const existing = await ownedProvider(userId, input.slug);
   if (existing) return { success: false, error: `Custom provider "${input.slug}" already exists.` };
@@ -164,7 +159,7 @@ export async function updateCustomProvider(userId: string, input: z.infer<typeof
   const provider = await ownedProvider(userId, input.slug);
   if (!provider) return { success: false, error: `Custom provider "${input.slug}" not found.` };
   const baseUrl = input.baseUrl == null ? undefined : normalizeBaseUrl(input.baseUrl);
-  if (input.baseUrl != null && !baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address (set ALLOW_PRIVATE_CUSTOM_PROVIDERS=true to allow)." };
+  if (input.baseUrl != null && !baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address." };
   await db
     .update(customProvider)
     .set({

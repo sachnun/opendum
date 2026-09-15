@@ -7,24 +7,10 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"os"
 	"strings"
 )
 
 const maxRedirectHops = 10
-
-// AllowPrivateRelay reports whether the operator opted out of the default
-// private-network guard. Both spellings are honored so a single deployment
-// variable works regardless of which side (dashboard or proxy) is configured.
-func AllowPrivateRelay() bool {
-	for _, key := range []string{"OPENDUM_ALLOW_PRIVATE_RELAY", "ALLOW_PRIVATE_CUSTOM_PROVIDERS"} {
-		value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
-		if value == "1" || value == "true" || value == "yes" {
-			return true
-		}
-	}
-	return false
-}
 
 func privateIP(ip net.IP) bool {
 	if ip == nil {
@@ -69,12 +55,9 @@ func PrivateHost(host string) bool {
 // private, loopback, link-local, or multicast. Because every TCP connection
 // goes through this hook, it covers literal hosts, DNS rebinding, and
 // redirects in one place instead of only validating the initial URL.
-func GuardedDialContext(allow func() bool) func(ctx context.Context, network, address string) (net.Conn, error) {
+func GuardedDialContext() func(ctx context.Context, network, address string) (net.Conn, error) {
 	resolver := net.DefaultResolver
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		if allow != nil && allow() {
-			return (&net.Dialer{}).DialContext(ctx, network, address)
-		}
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
 			return nil, err
@@ -95,13 +78,10 @@ func GuardedDialContext(allow func() bool) func(ctx context.Context, network, ad
 // GuardedRedirectPolicy rejects redirect hops to private targets and https
 // downgrades so a hostile upstream cannot bounce the proxy to internal
 // networks or metadata endpoints.
-func GuardedRedirectPolicy(allow func() bool) func(req *http.Request, via []*http.Request) error {
+func GuardedRedirectPolicy() func(req *http.Request, via []*http.Request) error {
 	return func(req *http.Request, via []*http.Request) error {
 		if len(via) >= maxRedirectHops {
 			return errors.New("stopped after 10 redirects")
-		}
-		if allow != nil && allow() {
-			return nil
 		}
 		target := req.URL
 		if target.Scheme != "https" {

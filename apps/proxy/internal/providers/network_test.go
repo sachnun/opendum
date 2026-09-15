@@ -50,7 +50,7 @@ func redirectRequest(rawURL string) *http.Request {
 }
 
 func TestGuardedRedirectPolicy(t *testing.T) {
-	policy := GuardedRedirectPolicy(func() bool { return false })
+	policy := GuardedRedirectPolicy()
 
 	if err := policy(redirectRequest("https://openrouter.ai/v1"), nil); err != nil {
 		t.Fatalf("public https redirect rejected: %v", err)
@@ -69,12 +69,5 @@ func TestGuardedRedirectPolicy(t *testing.T) {
 	hops := make([]*http.Request, 10)
 	if err := policy(redirectRequest("https://openrouter.ai/v1"), hops); err == nil {
 		t.Fatal("redirect loop accepted, want rejection after 10 hops")
-	}
-}
-
-func TestGuardedRedirectPolicyAllowsPrivateWhenConfigured(t *testing.T) {
-	policy := GuardedRedirectPolicy(func() bool { return true })
-	if err := policy(redirectRequest("https://127.0.0.1:4000/v1/models"), nil); err != nil {
-		t.Fatalf("private redirect rejected despite override: %v", err)
 	}
 }
