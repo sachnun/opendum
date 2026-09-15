@@ -3,7 +3,8 @@
   "owner": "xiaomi",
   "providers": [
     "opencode",
-    "harbor"
+    "harbor",
+    "freebuff"
   ],
   "aliases": [
     "mimo",
@@ -37,6 +38,10 @@
     "output": 32000
   },
   "providerConfig": {
+    "freebuff": {
+      "upstream": "mimo/mimo-v2.5",
+      "agent": "base2-free-mimo"
+    },
     "harbor": {
       "upstream": "mimo-v2.5:free",
       "contextWindow": 1048576,

@@ -1,3 +1,11 @@
 {
-  "providers": []
+  "providers": [
+    "freebuff"
+  ],
+  "providerConfig": {
+    "freebuff": {
+      "upstream": "meta/muse-spark-1.2-contributor",
+      "agent": "base2-free-muse-spark"
+    }
+  }
 }

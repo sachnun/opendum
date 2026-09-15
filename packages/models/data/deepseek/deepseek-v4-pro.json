@@ -4,7 +4,8 @@
     "zenmux",
     "qoder",
     "hyper",
-    "perch"
+    "perch",
+    "freebuff"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-pro-0813",
@@ -44,6 +45,10 @@
     "output": 262144
   },
   "providerConfig": {
+    "freebuff": {
+      "upstream": "deepseek/deepseek-v4-pro",
+      "agent": "base2-free-deepseek"
+    },
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 262144

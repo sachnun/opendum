@@ -11,6 +11,7 @@ import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from ".
 import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "../lib/providers/workbuddy";
 import { exchangePerchOAuthCode, initiatePerchOAuth } from "../lib/providers/perch";
 import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "../lib/providers/cline";
+import { initiateFreebuffDeviceCodeFlow, pollFreebuffDeviceCodeAuthorization } from "../lib/providers/freebuff/client";
 import { clearRefreshFailCount } from "../lib/proxy/auth";
 import type { OAuthResult } from "../lib/providers/types";
 import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "../../lib/provider-accounts";
@@ -170,6 +171,24 @@ const DEVICE_PROVIDERS = {
     },
     poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
       return pollClineDeviceCodeAuthorization(input.deviceCode);
+    },
+  },
+  freebuff: {
+    label: "Freebuff",
+    emailPrefix: "freebuff",
+    initiate: async () => {
+      const result = await initiateFreebuffDeviceCodeFlow();
+      return {
+        deviceCode: result.deviceCode,
+        userCode: result.userCode,
+        verificationUrl: result.verificationUrl,
+        verificationUrlComplete: result.verificationUrlComplete,
+        expiresIn: result.expiresIn,
+        interval: result.interval,
+      };
+    },
+    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
+      return pollFreebuffDeviceCodeAuthorization(input.deviceCode);
     },
   },
 } satisfies Record<DeviceProviderKey, { label: string; emailPrefix: string; initiate: (input: z.infer<typeof initiateDeviceAuthInputSchema>) => Promise<unknown>; poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => Promise<unknown> }>;

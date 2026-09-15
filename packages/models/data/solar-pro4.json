@@ -1,7 +1,8 @@
 {
   "owner": "upstage",
   "providers": [
-    "cline"
+    "cline",
+    "freebuff"
   ],
   "modalities": {
     "input": [
@@ -28,6 +29,10 @@
       "upstream": "cline-free/solar-pro4",
       "contextWindow": 524288,
       "maxOutputTokens": 131072
+    },
+    "freebuff": {
+      "upstream": "upstage/solar-pro4",
+      "agent": "base2-free-solar-pro4"
     }
   }
 }
