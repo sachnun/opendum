@@ -60,6 +60,7 @@ const placeholderModelIndex = ref(0);
 let placeholderTimer: number | null = null;
 
 const suggestionListId = "model-search-suggestions";
+const MAX_SUGGESTIONS = 50;
 
 const { data, refresh, pending } = useAsyncData("layout-model-search", loadModelSearch, {
   default: () => [] as ModelListItem[],
@@ -72,7 +73,7 @@ const models = computed<ModelListItem[]>(() => data.value ?? []);
 const placeholderModels = computed(() => models.value.filter((model) => model.isEnabled !== false).map((model) => model.id).slice(0, 24));
 const activePlaceholderModel = computed(() => placeholderModels.value[placeholderModelIndex.value] ?? null);
 const showAnimatedPlaceholder = computed(() => search.value.length === 0 && activePlaceholderModel.value !== null);
-const filteredModels = computed(() => {
+const matchedModels = computed(() => {
   const term = search.value.trim().toLowerCase();
 
   if (!term) return models.value;
@@ -82,6 +83,8 @@ const filteredModels = computed(() => {
     return `${model.id} ${providers}`.toLowerCase().includes(term);
   });
 });
+const filteredModels = computed(() => matchedModels.value.slice(0, MAX_SUGGESTIONS));
+const hasMoreMatches = computed(() => matchedModels.value.length > filteredModels.value.length);
 const activeSuggestionModel = computed(() => filteredModels.value[activeSuggestionIndex.value] ?? null);
 
 watch(filteredModels, (items) => {
@@ -257,7 +260,7 @@ async function selectModel(model: ModelListItem) {
           role="option"
           :aria-selected="activeSuggestionIndex === index"
           :class="[
-            'flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors',
+            'flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors [contain-intrinsic-size:auto_3.25rem] [content-visibility:auto]',
             activeSuggestionIndex === index ? 'bg-accent text-accent-foreground' : 'hover:bg-accent hover:text-accent-foreground',
           ]"
           @mouseenter="activeSuggestionIndex = index"
@@ -272,6 +275,7 @@ async function selectModel(model: ModelListItem) {
             </div>
           </div>
         </button>
+        <p v-if="hasMoreMatches" class="px-2 py-1.5 text-xs text-muted-foreground">Refine your search to see more.</p>
       </div>
     </div>
   </div>
