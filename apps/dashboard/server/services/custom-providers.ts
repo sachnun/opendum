@@ -44,6 +44,12 @@ export const createCustomProviderSchema = z.object({
   extraHeaders: z.record(z.string(), z.string()).optional(),
 });
 
+export const previewCustomModelsSchema = z.object({
+  baseUrl: z.string().trim().min(1).max(500),
+  extraHeaders: z.record(z.string(), z.string()).optional(),
+  token: z.string().trim().optional(),
+});
+
 export const updateCustomProviderSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
   name: z.string().trim().min(1).max(120).optional(),
@@ -234,13 +240,13 @@ export async function deleteCustomModel(userId: string, slug: string, modelId: s
   return { success: true };
 }
 
-async function syncFromUpstream(baseUrl: string, token?: string): Promise<ActionResult<{ ids: string[] }>> {
+async function syncFromUpstream(baseUrl: string, token?: string, extraHeaders?: Record<string, string>): Promise<ActionResult<{ ids: string[] }>> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), VALIDATION_TIMEOUT_MS);
   try {
     const response = await fetchInternalProvider(`${baseUrl}/models`, {
       method: "GET",
-      headers: token ? { Accept: "application/json", Authorization: `Bearer ${token}` } : { Accept: "application/json" },
+      headers: { ...extraHeaders, Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       signal: controller.signal,
     });
     if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to reach the provider through the proxy." };
@@ -269,6 +275,14 @@ export async function syncCustomModels(userId: string, slug: string, token?: str
   const upserted = await upsertCustomModels(userId, slug, cleanCustomModels(fetched.data.ids));
   if (!upserted.success) return upserted;
   return { success: true, data: { added: upserted.data.added, discovered: fetched.data.ids.length } };
+}
+
+export async function previewCustomModels(input: z.infer<typeof previewCustomModelsSchema>): Promise<ActionResult<{ models: Array<{ modelId: string; upstream: string }> }>> {
+  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  if (!baseUrl) return { success: false, error: "baseUrl is invalid or targets a private network address." };
+  const fetched = await syncFromUpstream(baseUrl, input.token, input.extraHeaders);
+  if (!fetched.success) return fetched;
+  return { success: true, data: { models: cleanCustomModels(fetched.data.ids) } };
 }
 
 /**

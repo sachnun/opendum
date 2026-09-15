@@ -173,6 +173,7 @@ function handleCustomCreated(createdSlug: string) {
   open.value = false;
   emit("customCreated", createdSlug);
   void invalidation.refreshData(dataKeys.customProviders);
+  void invalidation.invalidateAccountCollection(createdSlug);
 }
 
 watch(open, (value) => {
