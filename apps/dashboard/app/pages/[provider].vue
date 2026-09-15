@@ -812,20 +812,17 @@ function decodeAccountHash(hash: string): string | null {
 
     <DataNotice :error="error" />
 
-    <section v-if="!isLoadingAccounts && accounts.length === 0" class="scroll-mt-24 space-y-4 md:space-y-2">
-      <div class="space-y-3 pt-1">
-        <p class="text-sm text-muted-foreground">{{ providerMeta?.emptyMessage ?? 'No accounts connected yet.' }}</p>
-        <div v-if="supportedModels.length" class="space-y-2">
-          <div class="flex flex-wrap gap-1.5">
-            <UiBadge
-              v-for="model in orderedSupportedModels"
-              :key="model"
-              variant="secondary"
-              :class="['text-xs font-normal', freeSupportedModelIds === null || freeSupportedModelIds.has(model) ? '' : 'opacity-40']"
-            >
-              {{ model }}
-            </UiBadge>
-          </div>
+    <section v-if="!isLoadingAccounts && accounts.length === 0 && supportedModels.length" class="scroll-mt-24 space-y-4 md:space-y-2">
+      <div class="pt-1">
+        <div class="flex flex-wrap gap-1.5">
+          <UiBadge
+            v-for="model in orderedSupportedModels"
+            :key="model"
+            variant="secondary"
+            :class="['text-xs font-normal', freeSupportedModelIds === null || freeSupportedModelIds.has(model) ? '' : 'opacity-40']"
+          >
+            {{ model }}
+          </UiBadge>
         </div>
       </div>
     </section>
