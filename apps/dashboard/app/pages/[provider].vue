@@ -347,6 +347,7 @@ const {
   quotaCapableAccounts,
   toQuotaProvider,
 });
+const { sessions: freebuffSessions } = useFreebuffSessions(accounts);
 
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
@@ -863,6 +864,7 @@ function decodeAccountHash(hash: string): string | null {
           :error-history-error="errorHistoryErrorByAccountId[account.id] ?? null"
           :quota-info="quotaByAccountId[account.id] ?? null"
           :quota-error="quotaErrorByAccountId[account.id] ?? null"
+          :freebuff-session="freebuffSessions[account.id] ?? null"
           :highlight="highlightedAccountIds.has(account.id)"
           :animate-deltas="accountStatsDeltaReadyById[account.id] === true"
           :readonly="isAuditMode"

@@ -130,3 +130,31 @@ func TestReadySessionRequiresModelMatch(t *testing.T) {
 		t.Fatalf("ready session = %q, ok=%v", id, ok)
 	}
 }
+
+func TestSnapshotStatus(t *testing.T) {
+	active := &accountState{session: &cachedSession{status: statusActive, model: "deepseek-v4-flash", instanceID: "inst"}}
+	snap := active.snapshot("acc")
+	if snap.Status != "active" || snap.Model != "deepseek-v4-flash" || snap.InstanceID != "inst" || snap.AccountID != "acc" {
+		t.Fatalf("active snapshot = %#v", snap)
+	}
+
+	queued := &accountState{session: &cachedSession{status: statusQueued, model: "m"}}
+	if snap := queued.snapshot("acc"); snap.Status != "queued" {
+		t.Fatalf("queued status = %q", snap.Status)
+	}
+
+	cooling := &accountState{cooldownUntil: time.Now().Add(time.Minute), lastError: "rate limited"}
+	if snap := cooling.snapshot("acc"); snap.Status != "cooling" || snap.CooldownUntil == "" || snap.LastError != "rate limited" {
+		t.Fatalf("cooling snapshot = %#v", snap)
+	}
+
+	disabled := &accountState{disabled: true}
+	if snap := disabled.snapshot("acc"); snap.Status != "disabled" {
+		t.Fatalf("disabled status = %q", snap.Status)
+	}
+
+	idle := &accountState{}
+	if snap := idle.snapshot("acc"); snap.Status != "idle" {
+		t.Fatalf("idle status = %q", snap.Status)
+	}
+}

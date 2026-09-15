@@ -18,6 +18,7 @@ import type {
   AccountQuotaBatchResult,
   AccountQuotaInfo,
   AccountQuotaRequest,
+  FreebuffSessionBatchData,
   CustomProviderListItem,
   CustomProviderCreateResult,
   CustomProviderSyncResult,
@@ -92,6 +93,7 @@ export function useApi() {
       pollDeviceAuth: (body: { provider: DeviceProviderKey; deviceCode: string; userCode?: string; codeVerifier?: string; method?: string; machineId?: string }) => post<ActionResult<{ status: "pending"; retryAfterSeconds?: number } | { status: "error"; message: string } | { status: "success"; email: string; isUpdate: boolean }>>(apiFetch, "/api/dashboard/accounts/device-auth/poll", body),
       quota: (body: AccountQuotaRequest, options?: ApiFetchOptions) => post<ActionResult<AccountQuotaInfo>>(apiFetch, "/api/dashboard/accounts/quota", body, options),
       quotas: (body: AccountQuotaBatchRequest, options?: ApiFetchOptions) => post<ActionResult<AccountQuotaBatchResult>>(apiFetch, "/api/dashboard/accounts/quotas", body, options),
+      freebuffSessions: (body: { accountIds: string[] }, options?: ApiFetchOptions) => post<FreebuffSessionBatchData>(apiFetch, "/api/dashboard/accounts/freebuff-sessions", body, options),
     },
     customProviders: {
       list: () => apiFetch<CustomProviderListItem[]>("/api/dashboard/custom-providers"),

@@ -101,6 +101,21 @@ export interface ProviderAccountModelHealthItem {
   lastSuccessAt: string | Date | null;
 }
 
+export type FreebuffSessionStatus = "active" | "queued" | "cooling" | "blocked" | "disabled" | "idle" | "error";
+
+export interface FreebuffSessionInfo {
+  accountId: string;
+  status: FreebuffSessionStatus;
+  model?: string;
+  instanceId?: string;
+  expiresAt?: string;
+  cooldownUntil?: string;
+  lastError?: string;
+  updatedAt?: string;
+}
+
+export type FreebuffSessionBatchData = Record<string, FreebuffSessionInfo>;
+
 export interface AccountOverviewData {
   summaries: Record<ProviderAccountKey, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
   pinnedProviders: ProviderAccountKey[];

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/redis/go-redis/v9"
+
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 	"github.com/opendum/opendum/apps/proxy/internal/freebuff"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
@@ -24,9 +26,9 @@ type freebuffProvider struct {
 	manager  *freebuff.Manager
 }
 
-func newFreebuffProvider(registry *models.Registry) freebuffProvider {
+func newFreebuffProvider(registry *models.Registry, redisClient *redis.Client) freebuffProvider {
 	client := freebuff.NewClient(freebuffAPIBaseURL)
-	return freebuffProvider{registry: registry, client: client, manager: freebuff.NewManager(client)}
+	return freebuffProvider{registry: registry, client: client, manager: freebuff.NewManager(client, redisClient)}
 }
 
 func (p freebuffProvider) MakeRequest(ctx context.Context, _ *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {

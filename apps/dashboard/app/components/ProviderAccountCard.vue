@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNowStrict } from "date-fns";
-import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "../../lib/api-types";
+import type { AccountQuotaInfo, ErrorHistoryResult, FreebuffSessionInfo, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "../../lib/api-types";
 import { QUOTA_PROVIDER_KEYS } from "../../lib/provider-accounts";
 
 type Account = ProviderDetailData["accounts"][number];
@@ -120,6 +120,7 @@ const props = defineProps<{
   errorHistoryError?: string | null;
   quotaInfo?: AccountQuotaInfo | null;
   quotaError?: string | null;
+  freebuffSession?: FreebuffSessionInfo | null;
   highlight?: boolean;
   animateDeltas?: boolean;
   readonly?: boolean;
@@ -132,6 +133,27 @@ const emit = defineEmits<{
   deleted: [accountId: string];
   "errors-resolved": [accountId: string];
 }>();
+
+const freebuffBadge = computed<{ label: string; icon: string; class: string } | null>(() => {
+  const session = props.freebuffSession;
+  if (!session) return null;
+  switch (session.status) {
+    case "cooling":
+      return { label: "Cooldown", icon: "i-lucide-timer", class: "border-yellow-500 text-yellow-600" };
+    case "queued":
+      return { label: "Queued", icon: "i-lucide-hourglass", class: "border-sky-500 text-sky-600" };
+    case "blocked":
+      return { label: "Blocked", icon: "i-lucide-ban", class: "border-destructive/60 text-destructive" };
+    case "disabled":
+      return { label: "Disabled", icon: "i-lucide-alert-circle", class: "border-destructive/60 text-destructive" };
+    case "error":
+      return { label: "Error", icon: "i-lucide-triangle-alert", class: "border-destructive/60 text-destructive" };
+    default:
+      return null;
+  }
+});
+
+const freebuffActiveModel = computed<string | null>(() => (props.freebuffSession?.status === "active" ? props.freebuffSession.model ?? null : null));
 
 const api = useApi();
 const { auditRefreshVersion, auditUser, me, isAuditMode } = useAudit();
@@ -1016,6 +1038,10 @@ function cancelErrorPreviewPointer() {
               <UiIcon name="i-lucide-triangle-alert" class="size-3" />
               {{ account.unhealthyCount }}
             </UiBadge>
+            <UiBadge v-if="freebuffBadge" variant="outline" :class="['gap-1', freebuffBadge?.class]">
+              <UiIcon :name="freebuffBadge?.icon ?? ''" class="size-3" />
+              {{ freebuffBadge?.label }}
+            </UiBadge>
           </div>
         </div>
         <div v-if="subtitleDisplay" :class="['flex min-w-0 items-center gap-1', isSubtitleVisible ? '' : 'w-full overflow-hidden']">
@@ -1155,7 +1181,7 @@ function cancelErrorPreviewPointer() {
               <p v-else class="text-xs text-red-500">{{ quotaInfo?.error ?? 'Failed to fetch quota data.' }}</p>
           </div>
 
-          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" :readonly="readonly" />
+          <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" :active-model="freebuffActiveModel" :readonly="readonly" />
         </div>
         <div class="mt-4 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">

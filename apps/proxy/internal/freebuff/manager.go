@@ -7,15 +7,19 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type Manager struct {
 	client   *Client
+	redis    *redis.Client
 	mu       sync.Mutex
 	accounts map[string]*accountState
 }
 
 type accountState struct {
+	id            string
 	mu            sync.Mutex
 	session       *cachedSession
 	runs          map[string]*runState
@@ -48,8 +52,8 @@ func (l *Lease) Release() {
 	l.account.mu.Unlock()
 }
 
-func NewManager(client *Client) *Manager {
-	return &Manager{client: client, accounts: map[string]*accountState{}}
+func NewManager(client *Client, redisClient *redis.Client) *Manager {
+	return &Manager{client: client, redis: redisClient, accounts: map[string]*accountState{}}
 }
 
 func (m *Manager) state(accountID string) *accountState {
@@ -57,7 +61,7 @@ func (m *Manager) state(accountID string) *accountState {
 	defer m.mu.Unlock()
 	state, ok := m.accounts[accountID]
 	if !ok {
-		state = &accountState{runs: map[string]*runState{}, clientID: newClientID()}
+		state = &accountState{id: accountID, runs: map[string]*runState{}, clientID: newClientID()}
 		m.accounts[accountID] = state
 	}
 	return state
@@ -72,7 +76,9 @@ func (m *Manager) Prepare(ctx context.Context, accountID, token, userID, agent, 
 
 	if state.disabled {
 		err := state.lastError
+		snap := state.snapshot(accountID)
 		state.mu.Unlock()
+		m.store(snap)
 		if err == "" {
 			err = "freebuff account is disabled"
 		}
@@ -80,8 +86,11 @@ func (m *Manager) Prepare(ctx context.Context, accountID, token, userID, agent, 
 	}
 	if now := time.Now(); now.Before(state.cooldownUntil) {
 		remaining := time.Until(state.cooldownUntil)
+		snap := state.snapshot(accountID)
+		err := &cooldownError{until: state.cooldownUntil, retryAfter: remaining, reason: state.lastError}
 		state.mu.Unlock()
-		return nil, &cooldownError{until: state.cooldownUntil, retryAfter: remaining, reason: state.lastError}
+		m.store(snap)
+		return nil, err
 	}
 
 	run := state.runs[agent]
@@ -92,7 +101,9 @@ func (m *Manager) Prepare(ctx context.Context, accountID, token, userID, agent, 
 			if isBannedMessage(err.Error()) {
 				state.disabled = true
 			}
+			snap := state.snapshot(accountID)
 			state.mu.Unlock()
+			m.store(snap)
 			return nil, err
 		}
 		run = &runState{id: runID}
@@ -101,12 +112,16 @@ func (m *Manager) Prepare(ctx context.Context, accountID, token, userID, agent, 
 
 	instanceID, err := m.ensureSession(ctx, state, token, userID, model)
 	if err != nil {
+		snap := state.snapshot(accountID)
 		state.mu.Unlock()
+		m.store(snap)
 		return nil, err
 	}
 
 	step := run.steps
 	run.steps++
+	snap := state.snapshot(accountID)
+	m.store(snap)
 	return &Lease{RunID: run.id, InstanceID: instanceID, Step: step, ClientID: state.clientID, account: state, held: true}, nil
 }
 
@@ -114,7 +129,9 @@ func (m *Manager) InvalidateSession(accountID string) {
 	state := m.state(accountID)
 	state.mu.Lock()
 	state.session = nil
+	snap := state.snapshot(accountID)
 	state.mu.Unlock()
+	m.store(snap)
 }
 
 func (m *Manager) ensureSession(ctx context.Context, state *accountState, token, userID, model string) (string, error) {
