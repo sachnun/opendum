@@ -12,7 +12,6 @@
   },
   "modalities": {
     "input": [
-      "image",
       "text"
     ],
     "output": [

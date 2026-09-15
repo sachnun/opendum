@@ -4,7 +4,9 @@
     "qoder",
     "hyper",
     "workbuddy",
-    "perch"
+    "perch",
+    "kilo_code",
+    "openrouter"
   ],
   "meta": {
     "reasoning": true,
@@ -35,6 +37,17 @@
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 32768
+    },
+    "kilo_code": {
+      "upstream": "z-ai/glm-5.2:free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 128000,
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "z-ai/glm-5.2:free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 128000
     },
     "perch": {
       "upstream": "glm-5-2",
