@@ -32,6 +32,8 @@
     },
     "freebuff": {
       "upstream": "upstage/solar-pro4",
+      "contextWindow": 524288,
+      "maxOutputTokens": 131072,
       "agent": "base2-free-solar-pro4"
     }
   }

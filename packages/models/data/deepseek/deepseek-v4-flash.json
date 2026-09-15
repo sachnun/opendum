@@ -49,6 +49,8 @@
   "providerConfig": {
     "freebuff": {
       "upstream": "deepseek/deepseek-v4-flash",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000,
       "agent": "base2-free-deepseek-flash"
     },
     "harbor": {

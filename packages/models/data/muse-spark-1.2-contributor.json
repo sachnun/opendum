@@ -1,10 +1,37 @@
 {
+  "owner": "meta",
   "providers": [
     "freebuff"
   ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "parameter": {
+    "frequency_penalty": false,
+    "presence_penalty": false,
+    "repetition_penalty": false,
+    "temperature": false,
+    "top_k": false,
+    "top_p": false
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 65536
+  },
   "providerConfig": {
     "freebuff": {
       "upstream": "meta/muse-spark-1.2-contributor",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536,
       "agent": "base2-free-muse-spark"
     }
   }

@@ -3,7 +3,8 @@
   "providers": [
     "hyper",
     "workbuddy",
-    "perch"
+    "perch",
+    "nvidia_nim"
   ],
   "meta": {
     "reasoning": true,
@@ -34,6 +35,11 @@
     "hyper": {
       "contextWindow": 1048576,
       "maxOutputTokens": 128000
+    },
+    "nvidia_nim": {
+      "upstream": "z-ai/glm-5.3",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "glm-5-3",

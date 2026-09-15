@@ -32,6 +32,8 @@
   "providerConfig": {
     "freebuff": {
       "upstream": "minimax/minimax-m3",
+      "contextWindow": 512000,
+      "maxOutputTokens": 80000,
       "agent": "base2-free-minimax-m3"
     },
     "hyper": {
