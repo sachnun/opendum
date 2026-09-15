@@ -20,8 +20,9 @@ let placeholderTimer: number | null = null;
 
 const suggestionListId = "model-search-suggestions";
 
-const { data } = await useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
+const { data } = useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
   default: () => [] as ModelListItem[],
+  lazy: true,
 });
 
 const models = computed<ModelListItem[]>(() => data.value ?? []);
