@@ -249,7 +249,7 @@ function submitDeleteModel() {
 
 function submitSync(row: CustomProviderListItem) {
   void runAction(() => dashboardApi.customProviders.syncModels({ slug: row.slug }), `sync-${row.slug}`, (result) => {
-    actionNotice.value = `Synced "${row.slug}": ${result.data.discovered} model(s) found, ${result.data.added} added.`;
+    actionNotice.value = `Refreshed "${row.slug}": ${result.data.discovered} model(s) found, ${result.data.added} cleaned & added.`;
   });
 }
 
@@ -329,8 +329,15 @@ function modelFlagLabel(model: CustomProviderModelRow): string {
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <UiButton size="sm" variant="outline" :disabled="busyAction === `sync-${provider.slug}`" @click="submitSync(provider)">
-              {{ busyAction === `sync-${provider.slug}` ? "Syncing…" : "Sync models" }}
+            <UiButton
+              size="icon-sm"
+              variant="outline"
+              :title="`Refresh models from ${provider.baseUrl}`"
+              :aria-label="`Refresh models from ${provider.baseUrl}`"
+              :disabled="busyAction === `sync-${provider.slug}`"
+              @click="submitSync(provider)"
+            >
+              <UiIcon name="i-lucide-refresh-cw" :class="['size-4', busyAction === `sync-${provider.slug}` ? 'animate-spin' : '']" />
             </UiButton>
             <UiButton size="sm" variant="outline" @click="openConnect(provider)">
               Connect key
@@ -361,7 +368,7 @@ function modelFlagLabel(model: CustomProviderModelRow): string {
             <tbody>
               <tr v-if="provider.models.length === 0">
                 <td colspan="4" class="px-3 py-4 text-center text-muted-foreground">
-                  No models yet — add manually or use "Sync models".
+                  No models yet — add manually or use the refresh icon.
                 </td>
               </tr>
               <template v-else>
@@ -434,7 +441,7 @@ function modelFlagLabel(model: CustomProviderModelRow): string {
         <div class="grid gap-1.5">
           <span :class="labelClass">Model ID (public)</span>
           <input v-model="modelForm.modelId" :class="inputClass" class="font-mono" placeholder="qwen3-32b">
-          <span class="text-xs text-muted-foreground">Called as <code class="rounded bg-muted px-1">slug/modelId</code>. Exact match — no alias resolution.</span>
+          <span class="text-xs text-muted-foreground">Called as <code class="rounded bg-muted px-1">slug/modelId</code>. Refresh derives cleaned aliases automatically; manual ids match exactly.</span>
         </div>
         <div class="grid gap-1.5">
           <span :class="labelClass">Upstream (sent to the API)</span>
