@@ -30,6 +30,8 @@ const mainContent = ref<HTMLElement | null>(null);
 const activeAnchorId = ref<string | null>(null);
 const mobileSidebarDragX = ref(0);
 const isMobileSidebarDragging = ref(false);
+const isDesktopViewport = ref(true);
+let desktopViewportQuery: MediaQueryList | null = null;
 
 const userLabel = computed(() => session.value?.user?.name || session.value?.user?.email || "Account");
 const userEmail = computed(() => session.value?.user?.email || "");
@@ -163,13 +165,21 @@ const isProviderOverviewRoute = computed(() => route.path === accountsNavigation
 const { data: accountSummaryData, refresh: refreshAccountSummary } = useAsyncData(dashboardInvalidation.keys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   const useOverview = isProviderOverviewRoute.value;
   if (useOverview) {
-    const cursor = accountsOverviewData.value?.cursor;
-    const summary = applyAccountOverviewResponse(cursor ? await dashboardApi.accounts.overviewDelta({ cursor }) : await dashboardApi.accounts.overview());
+    const snapshot = accountsOverviewData.value;
+    if (!snapshot) return emptyShellAccountSummary;
+
+    const summary = applyAccountOverviewResponse(snapshot.cursor ? await dashboardApi.accounts.overviewDelta({ cursor: snapshot.cursor }) : snapshot);
     return toShellAccountSummary(summary);
   }
 
   return toShellAccountSummary(await dashboardApi.accounts.ping());
 }, { lazy: true });
+
+watch(accountsOverviewData, (snapshot) => {
+  if (!snapshot || !isProviderOverviewRoute.value) return;
+
+  accountSummaryData.value = toShellAccountSummary(snapshot);
+}, { immediate: true });
 
 const accountCounts = computed(() => accountSummaryData.value?.accountCounts ?? emptyShellAccountSummary.accountCounts);
 const activeAccountCounts = computed(() => accountSummaryData.value?.activeAccountCounts ?? emptyShellAccountSummary.activeAccountCounts);
@@ -179,7 +189,7 @@ const accountIndicators = computed(
 const pinnedProviders = computed(() => accountSummaryData.value?.pinnedProviders ?? cachedPinnedProviders.value ?? emptyShellAccountSummary.pinnedProviders);
 const hasLoadedAccountSummary = computed(() => Boolean(accountSummaryData.value));
 const hasResolvedPinnedProviders = computed(() => hasLoadedAccountSummary.value || cachedPinnedProviders.value !== null);
-const shouldRefreshAccountSummary = computed(() => true);
+const shouldRefreshAccountSummary = computed(() => isDesktopViewport.value || mobileOpen.value);
 
 watch(accountSummaryData, (value) => {
   if (value) cachedPinnedProviders.value = value.pinnedProviders;
@@ -639,8 +649,16 @@ function handleVisibilityChange() {
   void refreshPointStatusOnce();
 }
 
+function syncDesktopViewport(event: MediaQueryListEvent | MediaQueryList) {
+  isDesktopViewport.value = event.matches;
+}
+
 onMounted(() => {
   startPointStatusRefresh();
+
+  desktopViewportQuery = window.matchMedia("(min-width: 768px)");
+  syncDesktopViewport(desktopViewportQuery);
+  desktopViewportQuery.addEventListener("change", syncDesktopViewport);
 
   document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -650,12 +668,14 @@ onMounted(() => {
   }
 
   watch(shouldRefreshAccountSummary, (shouldRefresh) => {
-    if (shouldRefresh) {
-      startAccountSummaryRefresh();
+    if (!shouldRefresh) {
+      stopAccountSummaryRefresh();
       return;
     }
 
-    stopAccountSummaryRefresh();
+    startAccountSummaryRefresh();
+
+    if (!isDesktopViewport.value) void refreshAccountSummaryOnce();
   }, { immediate: true });
 
   watch(subNavigationAnchorIds, (anchorIds, _previousAnchorIds, onCleanup) => {
@@ -727,6 +747,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  desktopViewportQuery?.removeEventListener("change", syncDesktopViewport);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   stopAccountSummaryRefresh();
   stopPointStatusRefresh();
