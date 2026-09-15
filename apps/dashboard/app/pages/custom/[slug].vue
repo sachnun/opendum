@@ -6,6 +6,7 @@ import type {
   CustomProviderModelMeta,
   CustomProviderModelRow,
 } from "../../../lib/api-types";
+import { requestErrorMessage } from "../../../lib/utils";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
@@ -95,8 +96,8 @@ function runAction<T>(action: () => Promise<ActionResult<T>>, key: string, onSuc
       if (onSuccess && "data" in result) onSuccess(result as Extract<ActionResult<T>, { success: true }>);
       void refresh();
     })
-    .catch(() => {
-      actionError.value = "Request failed. Please try again.";
+    .catch((error) => {
+      actionError.value = requestErrorMessage(error);
     })
     .finally(() => {
       busyAction.value = "";

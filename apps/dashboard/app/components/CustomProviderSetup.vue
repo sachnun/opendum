@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { cn } from "../../lib/utils";
+import { cn, requestErrorMessage } from "../../lib/utils";
 import type {
   ActionResult,
   CustomProviderListItem,
@@ -65,8 +65,8 @@ function run(action: () => Promise<ActionResult<unknown>>, key: string) {
       }
       return true;
     })
-    .catch(() => {
-      errorMessage.value = "Request failed. Please try again.";
+    .catch((error) => {
+      errorMessage.value = requestErrorMessage(error);
       return false;
     })
     .finally(() => {
