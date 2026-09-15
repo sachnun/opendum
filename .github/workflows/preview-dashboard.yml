@@ -1,0 +1,83 @@
+name: Preview Dashboard
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/preview-dashboard.yml
+      - apps/dashboard/**
+      - packages/database/**
+      - packages/models/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: edgeone-dashboard-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    name: Dashboard EdgeOne Pages preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: dashboard
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy dashboard preview to EdgeOne Pages
+        id: deploy
+        working-directory: apps/dashboard
+        env:
+          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          pnpm exec edgeone makers deploy -n opendum -a overseas -e preview --json \
+            -t "$EDGEONE_API_TOKEN" | tee "$RUNNER_TEMP/deploy.log"
+          node -e '
+            const fs = require("node:fs");
+            const log = fs.readFileSync(process.env.RUNNER_TEMP + "/deploy.log", "utf8");
+            const line = [...log.matchAll(/\{"status":"(?:success|error)"[^\n]*?\}/g)].pop();
+            if (!line) throw new Error("No deploy result found in CLI output");
+            const result = JSON.parse(line[0]);
+            if (result.status !== "success") throw new Error(result.error || "EdgeOne deploy failed");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `url=${result.url}\n`);
+          '
+
+      - name: Comment preview link
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          marker="<!-- edgeone-dashboard-preview -->"
+          body=$(printf '%s\n\n**Dashboard preview:** [%s](%s)\n\nCommit: `%s`' \
+            "$marker" "$PREVIEW_URL" "$PREVIEW_URL" "${SHA::7}")
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body"
+          fi
