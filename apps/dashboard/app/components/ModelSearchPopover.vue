@@ -1,10 +1,51 @@
 <script setup lang="ts">
+import { get, set } from "idb-keyval";
 import { getProviderLabel } from "../../lib/provider-accounts";
 import type { ModelSearchItem } from "../../lib/dashboard-api-types";
+import { createDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
 
 type ModelListItem = ModelSearchItem;
 
+type CachedModelSearch = {
+  models: ModelListItem[];
+  cachedAt: number;
+};
+
+const MODEL_SEARCH_CACHE_KEY = "model-search";
+const MODEL_SEARCH_CACHE_TTL_MS = 60 * 60_000;
+const MODEL_SEARCH_DB_NAME = "opendum-dashboard";
+const MODEL_SEARCH_STORE_NAME = "model-search";
+const modelSearchStore = createDashboardIndexedDbStore(MODEL_SEARCH_DB_NAME, MODEL_SEARCH_STORE_NAME);
+
+async function readCachedModelSearch(): Promise<CachedModelSearch | null> {
+  if (!modelSearchStore) return null;
+
+  try {
+    return (await get<CachedModelSearch>(MODEL_SEARCH_CACHE_KEY, modelSearchStore)) ?? null;
+  } catch (error) {
+    console.warn("Failed to read model search cache:", error);
+    return null;
+  }
+}
+
+async function writeCachedModelSearch(models: ModelListItem[]) {
+  if (!modelSearchStore) return;
+
+  try {
+    await set(MODEL_SEARCH_CACHE_KEY, { models, cachedAt: Date.now() } satisfies CachedModelSearch, modelSearchStore);
+  } catch (error) {
+    console.warn("Failed to write model search cache:", error);
+  }
+}
+
 const dashboardApi = useDashboardApi();
+
+async function loadModelSearch() {
+  const models = await dashboardApi.models.search();
+  void writeCachedModelSearch(models);
+  return models;
+}
+
 const route = useRoute();
 const emit = defineEmits<{
   focusChange: [focused: boolean];
@@ -19,16 +60,20 @@ const placeholderModelIndex = ref(0);
 let placeholderTimer: number | null = null;
 
 const suggestionListId = "model-search-suggestions";
+const MAX_SUGGESTIONS = 50;
 
-const { data } = await useAsyncData("layout-model-search", () => dashboardApi.models.search(), {
+const { data, refresh, pending } = useAsyncData("layout-model-search", loadModelSearch, {
   default: () => [] as ModelListItem[],
+  lazy: true,
+  immediate: false,
 });
+const modelsRequested = ref(false);
 
 const models = computed<ModelListItem[]>(() => data.value ?? []);
 const placeholderModels = computed(() => models.value.filter((model) => model.isEnabled !== false).map((model) => model.id).slice(0, 24));
 const activePlaceholderModel = computed(() => placeholderModels.value[placeholderModelIndex.value] ?? null);
 const showAnimatedPlaceholder = computed(() => search.value.length === 0 && activePlaceholderModel.value !== null);
-const filteredModels = computed(() => {
+const matchedModels = computed(() => {
   const term = search.value.trim().toLowerCase();
 
   if (!term) return models.value;
@@ -38,6 +83,8 @@ const filteredModels = computed(() => {
     return `${model.id} ${providers}`.toLowerCase().includes(term);
   });
 });
+const filteredModels = computed(() => matchedModels.value.slice(0, MAX_SUGGESTIONS));
+const hasMoreMatches = computed(() => matchedModels.value.length > filteredModels.value.length);
 const activeSuggestionModel = computed(() => filteredModels.value[activeSuggestionIndex.value] ?? null);
 
 watch(filteredModels, (items) => {
@@ -61,7 +108,16 @@ watch(() => route.fullPath, () => {
   search.value = "";
 });
 
-onMounted(() => {
+onMounted(async () => {
+  const cached = await readCachedModelSearch();
+
+  if (cached?.models.length) {
+    if (models.value.length === 0) data.value = cached.models;
+    modelsRequested.value = true;
+
+    if (Date.now() - cached.cachedAt >= MODEL_SEARCH_CACHE_TTL_MS) void refresh();
+  }
+
   placeholderTimer = window.setInterval(() => {
     const total = placeholderModels.value.length;
     if (total <= 1) return;
@@ -73,7 +129,15 @@ onBeforeUnmount(() => {
   if (placeholderTimer) window.clearInterval(placeholderTimer);
 });
 
+function ensureModelsLoaded() {
+  if (modelsRequested.value || models.value.length > 0) return;
+
+  modelsRequested.value = true;
+  void refresh();
+}
+
 function openSuggestions() {
+  ensureModelsLoaded();
   emit("focusChange", true);
   suggestionsOpen.value = true;
   if (filteredModels.value.length > 0 && activeSuggestionIndex.value === -1) {
@@ -185,7 +249,7 @@ async function selectModel(model: ModelListItem) {
       role="listbox"
       class="absolute left-0 right-0 top-full z-40 mt-1 max-h-[min(22rem,calc(100vh-5rem))] overflow-y-auto rounded-lg border border-border bg-background p-1 text-foreground shadow-lg"
     >
-      <p v-if="filteredModels.length === 0" class="py-6 text-center text-sm text-muted-foreground">No model found.</p>
+      <p v-if="filteredModels.length === 0" class="py-6 text-center text-sm text-muted-foreground">{{ pending ? "Loading models..." : "No model found." }}</p>
       <div v-else class="space-y-1">
         <p class="px-2 py-1.5 text-xs font-medium text-muted-foreground">Models</p>
         <button
@@ -196,7 +260,7 @@ async function selectModel(model: ModelListItem) {
           role="option"
           :aria-selected="activeSuggestionIndex === index"
           :class="[
-            'flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors',
+            'flex w-full cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors [contain-intrinsic-size:auto_3.25rem] [content-visibility:auto]',
             activeSuggestionIndex === index ? 'bg-accent text-accent-foreground' : 'hover:bg-accent hover:text-accent-foreground',
           ]"
           @mouseenter="activeSuggestionIndex = index"
@@ -211,6 +275,7 @@ async function selectModel(model: ModelListItem) {
             </div>
           </div>
         </button>
+        <p v-if="hasMoreMatches" class="px-2 py-1.5 text-xs text-muted-foreground">Refine your search to see more.</p>
       </div>
     </div>
   </div>
