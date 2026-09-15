@@ -4,13 +4,13 @@ import type {
   NavItem,
   NavSubItem,
   ProviderAccountCounts,
+  ProviderAccountIndicator,
   ProviderAccountIndicators,
 } from "../../lib/navigation";
 import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData, MeData, PointStatusData } from "../../lib/api-types";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
 import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
-import type { ProviderAccountKey } from "../../lib/provider-accounts";
 import { buildProviderHrefMap, getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
 import { avatarUrl } from "../../lib/utils";
 
@@ -50,7 +50,7 @@ interface ShellAccountSummary {
   accountCounts: ProviderAccountCounts;
   activeAccountCounts: ProviderAccountCounts;
   accountIndicators: ProviderAccountIndicators;
-  pinnedProviders: ProviderAccountKey[];
+  pinnedProviders: string[];
   hasConnectedAccounts: boolean;
 }
 
@@ -64,7 +64,7 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 
 const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(stateKeys.modelFamilyCountsOverride, () => null);
-const cachedPinnedProviders = useState<ProviderAccountKey[] | null>(stateKeys.pinnedProviders, () => null);
+const cachedPinnedProviders = useState<string[] | null>(stateKeys.pinnedProviders, () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
   {
@@ -85,6 +85,23 @@ const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 const api = useApi();
 const invalidation = useInvalidate();
 const { prefetch } = usePrefetch();
+const { data: customProvidersData } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const customProviders = computed(() => customProvidersData.value ?? []);
+const providerHrefByKey = computed<Record<string, string>>(() => Object.fromEntries([
+  ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => [definition.key, getProviderAccountPath(definition.key)]),
+  ...customProviders.value.map((provider) => [provider.slug, `/${provider.slug}`]),
+]));
+const navigation = computed<NavItem[]>(() => primaryNavigation.map((item) => item.href === accountsNavigationHref
+  ? {
+      ...item,
+      children: [
+        ...[...PROVIDER_ACCOUNT_DEFINITIONS]
+          .sort((a, b) => (a.navOrder ?? Number.MAX_SAFE_INTEGER) - (b.navOrder ?? Number.MAX_SAFE_INTEGER))
+          .map((definition) => ({ name: definition.label, href: getProviderAccountPath(definition.key) })),
+        ...customProviders.value.map((provider) => ({ name: provider.name, href: `/${provider.slug}` })),
+      ],
+    }
+  : item));
 const accountsNavigationHref = "/";
 const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
 
@@ -110,21 +127,20 @@ watch(me, (value) => {
 }, { immediate: true });
 
 function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
-  const nextAccountCounts = { ...emptyAccountCounts };
-  const nextActiveAccountCounts = { ...emptyAccountCounts };
-  const nextAccountIndicators = { ...emptyAccountIndicators };
+  const nextAccountCounts: ProviderAccountCounts = { ...emptyAccountCounts };
+  const nextActiveAccountCounts: ProviderAccountCounts = { ...emptyAccountCounts };
+  const nextAccountIndicators: ProviderAccountIndicators = { ...emptyAccountIndicators };
   let hasConnectedAccounts = "hasConnectedAccounts" in summary ? summary.hasConnectedAccounts : false;
 
-  for (const definition of PROVIDER_ACCOUNT_DEFINITIONS) {
-    const providerSummary = summary.summaries[definition.key];
+  for (const [key, providerSummary] of Object.entries(summary.summaries) as Array<[string, { connected?: number; active: number; indicator: ProviderAccountIndicator } | undefined]>) {
     if (!providerSummary) continue;
 
-    const connected = "connected" in providerSummary ? providerSummary.connected : providerSummary.active;
+    const connected = providerSummary.connected ?? providerSummary.active;
     if (connected > 0) hasConnectedAccounts = true;
 
-    nextAccountCounts[definition.key] = connected;
-    nextActiveAccountCounts[definition.key] = providerSummary.active;
-    nextAccountIndicators[definition.key] = providerSummary.indicator;
+    nextAccountCounts[key] = connected;
+    nextActiveAccountCounts[key] = providerSummary.active;
+    nextAccountIndicators[key] = providerSummary.indicator;
   }
 
   return {
@@ -152,7 +168,7 @@ function applyAccountOverviewResponse(summary: AccountOverviewResponse): Account
   }
 
   const next: AccountOverviewData = {
-    summaries: summary.summaries ? { ...current.summaries, ...summary.summaries } : current.summaries,
+    summaries: summary.summaries ? ({ ...current.summaries, ...summary.summaries } as AccountOverviewData["summaries"]) : current.summaries,
     pinnedProviders: summary.pinnedProviders ?? current.pinnedProviders,
     cursor: summary.cursor,
   };
@@ -195,10 +211,22 @@ watch(accountSummaryData, (value) => {
   if (value) cachedPinnedProviders.value = value.pinnedProviders;
 }, { immediate: true });
 
-const activeAccountCountByHref = computed(() => buildProviderHrefMap(activeAccountCounts.value));
-const accountCountByHref = computed(() => buildProviderHrefMap(accountCounts.value));
-const accountIndicatorByHref = computed(() => buildProviderHrefMap(accountIndicators.value));
-const accountNavigationHrefs = computed(() => new Set(PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => getProviderAccountPath(definition.key))));
+const activeAccountCountByHref = computed<Record<string, number>>(() => ({ ...buildProviderHrefMap(activeAccountCounts.value), ...customHrefCounts(activeAccountCounts.value) }));
+const accountCountByHref = computed<Record<string, number>>(() => ({ ...buildProviderHrefMap(accountCounts.value), ...customHrefCounts(accountCounts.value) }));
+const accountIndicatorByHref = computed<Record<string, ProviderAccountIndicator>>(() => ({ ...buildProviderHrefMap(accountIndicators.value), ...customHrefCounts(accountIndicators.value) }));
+const accountNavigationHrefs = computed(() => new Set([
+  ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => getProviderAccountPath(definition.key)),
+  ...customProviders.value.map((provider) => `/${provider.slug}`),
+]));
+
+function customHrefCounts<V>(counts: Record<string, V>): Record<string, V> {
+  const result: Record<string, V> = {};
+  for (const provider of customProviders.value) {
+    const value = counts[provider.slug];
+    if (value !== undefined) result[`/${provider.slug}`] = value;
+  }
+  return result;
+}
 
 function normalizeModelFamilyCounts(counts: Record<string, number>) {
   const nextCounts = { ...emptyModelFamilyCounts };
@@ -246,11 +274,8 @@ const pinnedProviderHrefs = computed(() => {
   const hrefs = new Set<string>();
 
   pinnedProviders.value.forEach((key) => {
-    const provider = PROVIDER_ACCOUNT_DEFINITIONS.find((definition) => definition.key === key);
-
-    if (provider) {
-      hrefs.add(getProviderAccountPath(provider.key));
-    }
+    const href = providerHrefByKey.value[key];
+    if (href) hrefs.add(href);
   });
 
   return hrefs;
@@ -811,7 +836,7 @@ async function handleAuditSelected() {
       <div class="flex min-h-0 flex-1 flex-col px-3 py-4">
         <nav class="scrollbar-none min-h-0 flex-1 overflow-y-auto pr-1">
           <div class="space-y-1">
-            <div v-for="item in primaryNavigation" :key="item.name" class="space-y-1">
+            <div v-for="item in navigation" :key="item.name" class="space-y-1">
               <NuxtLink
                 :to="item.href"
                 :class="[
@@ -1208,7 +1233,7 @@ async function handleAuditSelected() {
           <div class="flex min-h-0 flex-1 flex-col px-3 py-4">
             <nav class="scrollbar-none min-h-0 flex-1 overflow-y-auto pr-1">
               <div class="space-y-1">
-                <div v-for="item in primaryNavigation" :key="`mobile-${item.name}`" class="space-y-1">
+                <div v-for="item in navigation" :key="`mobile-${item.name}`" class="space-y-1">
                   <NuxtLink
                     :to="item.href"
                     :class="[

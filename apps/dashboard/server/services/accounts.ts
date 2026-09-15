@@ -7,7 +7,8 @@ import { decrypt } from "../lib/encryption";
 import { compareModelEntries } from "../../lib/model-sort";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
+import { isKnownProvider, PROVIDER_ACCOUNT_KEYS } from "./account-providers";
+import { customProviderModels } from "./custom-providers";
 import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
 
 export { createAccount, createAccountInputSchema } from "./account-connectors";
@@ -102,8 +103,9 @@ type ProviderDetailCursor = {
   pinnedProviders: string;
 };
 
+const PROVIDER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 export const providerInputSchema = z.object({
-  provider: z.string().trim().refine(isKnownProvider, "Invalid provider"),
+  provider: z.string().trim().toLowerCase().regex(PROVIDER_KEY_PATTERN, "Invalid provider"),
 });
 const accountIdSchema = z.string().trim().min(1);
 export const updateAccountInputSchema = z.object({ id: accountIdSchema, name: z.string().max(120).optional(), isActive: z.boolean().optional(), disabledUntil: z.coerce.date().nullable().optional() });
@@ -405,7 +407,7 @@ function hashAccountOverviewValue(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url").slice(0, 16);
 }
 
-function encodeAccountOverviewCursor(pinnedProviders: ProviderAccountKey[], summaries: Record<ProviderAccountKey, AccountOverviewSummary>) {
+function encodeAccountOverviewCursor(pinnedProviders: string[], summaries: Record<string, AccountOverviewSummary>) {
   return [ACCOUNT_OVERVIEW_CURSOR_VERSION, hashAccountOverviewValue(pinnedProviders), hashAccountOverviewValue(summaries)].join(".");
 }
 
@@ -418,7 +420,7 @@ function decodeAccountOverviewCursor(cursor: string | undefined): AccountOvervie
   return { pinned, summaries };
 }
 
-function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; freeSupportedModels: string[]; supportedModelsByAccountId: Record<string, string[]>; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: ProviderAccountKey[] }) {
+function encodeProviderDetailCursor(detail: { accounts: Array<{ id: string }>; supportedModels: string[]; freeSupportedModels: string[]; supportedModelsByAccountId: Record<string, string[]>; disabledModelsByAccountId: Record<string, string[]>; modelHealthByAccountId: Record<string, unknown>; pinnedProviders: string[] }) {
   const cursor: ProviderDetailCursor = {
     v: PROVIDER_DETAIL_CURSOR_VERSION,
     accounts: Object.fromEntries(detail.accounts.map((account) => [account.id, hashAccountOverviewValue(account)])),
@@ -470,12 +472,10 @@ function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], healthBy
         indicator: "normal" as ProviderAccountIndicator,
       },
     ])
-  ) as Record<ProviderAccountKey, { connected: number; active: number; indicator: ProviderAccountIndicator }>;
+  ) as Record<string, { connected: number; active: number; indicator: ProviderAccountIndicator }>;
 
   for (const account of accounts) {
-    if (!isKnownProvider(account.provider)) continue;
-
-    const summary = summaries[account.provider];
+    const summary = (summaries[account.provider] ??= { connected: 0, active: 0, indicator: "normal" });
     summary.connected += 1;
 
     if (!accountIsEffectivelyActive(account, now)) continue;
@@ -497,7 +497,7 @@ function buildAccountPingSummaries(accounts: AccountSummarySourceRow[], healthBy
   return summaries;
 }
 
-async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>, options: AccountReadOptions = {}): Promise<ProviderAccountKey[]> {
+async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Iterable<string>, options: AccountReadOptions = {}): Promise<string[]> {
   const rows = await db.select({ providerKey: pinnedProvider.providerKey }).from(pinnedProvider).where(eq(pinnedProvider.userId, userId)).orderBy(asc(pinnedProvider.createdAt));
 
   if (rows.length === 0 && providersWithAccounts && options.autoPin !== false) {
@@ -515,7 +515,7 @@ async function getPinnedProviderKeys(userId: string, providersWithAccounts?: Ite
     return autoPinKeys;
   }
 
-  return rows.map((row) => row.providerKey).filter((provider): provider is ProviderAccountKey => isKnownProvider(provider));
+  return rows.map((row) => row.providerKey);
 }
 
 export async function listAccounts(userId: string) {
@@ -570,15 +570,16 @@ export async function getAccountOverview(userId: string, options: AccountOvervie
 
     const pingSummaries = buildAccountPingSummaries(accounts, buildAccountHealthByAccountId(healthRows, now, getCooldownRecoveryAccountIds(accounts, now)), now);
 
+    const providerKeys = Array.from(new Set<string>([...PROVIDER_ACCOUNT_KEYS, ...accounts.map((account) => account.provider)]));
     const summaries = Object.fromEntries(
-      PROVIDER_ACCOUNT_KEYS.map((provider) => [
+      providerKeys.map((provider) => [
         provider,
         {
-          ...pingSummaries[provider],
-          stats: providerStats[provider],
+          ...(pingSummaries[provider] ?? { connected: 0, active: 0, indicator: "normal" as ProviderAccountIndicator }),
+          stats: providerStats[provider] ?? buildEmptyProviderStats(),
         },
       ])
-    ) as Record<ProviderAccountKey, AccountOverviewSummary>;
+    ) as Record<string, AccountOverviewSummary>;
     const cursor = encodeAccountOverviewCursor(pinnedProviders, summaries);
     const previousCursor = decodeAccountOverviewCursor(options.cursor);
 
@@ -631,7 +632,7 @@ export async function getAccountPing(userId: string, options: AccountReadOptions
     return {
       summaries: Object.fromEntries(pinnedProviders.map((provider) => [provider, pingSummaries[provider]])),
       pinnedProviders,
-      hasConnectedAccounts: accounts.some((account) => isKnownProvider(account.provider)),
+      hasConnectedAccounts: accounts.length > 0,
     };
   } catch (error) {
     console.error("Failed to ping account summaries:", error);
@@ -649,19 +650,23 @@ export async function getAccountsByProviderDetailed(userId: string, input: z.inf
       .orderBy(...providerAccountLastUsedOrder);
 
     const accountIds = accounts.map((account) => account.id);
-    const providerModels = Array.from(getProviderModelSet(input.provider));
+    const isBuiltin = isKnownProvider(input.provider);
+    const customModels = isBuiltin ? [] : await customProviderModels(userId, input.provider);
+    const providerModels = isBuiltin ? Array.from(getProviderModelSet(input.provider)) : customModels;
     const supportedModelsByAccountId = Object.fromEntries(accounts.map((account) => [
       account.id,
-      getProviderModelsForAccountTier(input.provider, account.tier),
+      isBuiltin ? getProviderModelsForAccountTier(input.provider, account.tier) : customModels,
     ]));
     const supportedModels = sortProviderModels(
-      providerModels.filter((model) =>
-        input.provider === "codex"
-          ? true
-          : providerModelIsAccessibleByAccounts(model, input.provider, accounts)
-      )
+      isBuiltin
+        ? providerModels.filter((model) =>
+            input.provider === "codex"
+              ? true
+              : providerModelIsAccessibleByAccounts(model, input.provider, accounts)
+          )
+        : providerModels
     );
-    const freeSupportedModels = getProviderModelsForAccountTier(input.provider, "free");
+    const freeSupportedModels = isBuiltin ? getProviderModelsForAccountTier(input.provider, "free") : customModels;
     const healthModelKeys = Array.from(new Set(supportedModels.flatMap((model) => getModelLookupKeys(model))));
     const [disabledModelRows, healthRows, pinnedProviders] = await Promise.all([
       accountIds.length > 0
@@ -912,7 +917,7 @@ export async function deleteAccount(userId: string, input: z.infer<typeof delete
 }
 
 export async function togglePinnedProvider(userId: string, input: z.infer<typeof togglePinnedProviderInputSchema>) {
-  if (!isKnownProvider(input.providerKey)) return { success: false, error: "Invalid provider" } as const;
+  if (!PROVIDER_KEY_PATTERN.test(input.providerKey)) return { success: false, error: "Invalid provider" } as const;
 
   try {
     const [existing] = await db

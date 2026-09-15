@@ -1,5 +1,5 @@
 import type { ModelStats } from "./model-stats";
-import type { ProviderAccountKey, QuotaProviderKey } from "./provider-accounts";
+import type { QuotaProviderKey } from "./provider-accounts";
 import type { ModelMeta } from "./model-capabilities";
 
 export type { QuotaProviderKey };
@@ -117,8 +117,8 @@ export interface FreebuffSessionInfo {
 export type FreebuffSessionBatchData = Record<string, FreebuffSessionInfo>;
 
 export interface AccountOverviewData {
-  summaries: Record<ProviderAccountKey, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
-  pinnedProviders: ProviderAccountKey[];
+  summaries: Record<string, { connected: number; active: number; indicator: "normal" | "warning" | "error"; stats: ProviderStats }>;
+  pinnedProviders: string[];
   cursor?: string;
 }
 
@@ -126,14 +126,14 @@ export interface AccountOverviewDeltaData {
   delta: true;
   cursor: string;
   summaries?: Partial<AccountOverviewData["summaries"]>;
-  pinnedProviders?: ProviderAccountKey[];
+  pinnedProviders?: string[];
 }
 
 export type AccountOverviewResponse = AccountOverviewData | AccountOverviewDeltaData;
 
 export interface AccountPingData {
-  summaries: Partial<Record<ProviderAccountKey, { active: number; indicator: "normal" | "warning" | "error" }>>;
-  pinnedProviders: ProviderAccountKey[];
+  summaries: Partial<Record<string, { active: number; indicator: "normal" | "warning" | "error" }>>;
+  pinnedProviders: string[];
   hasConnectedAccounts: boolean;
 }
 
@@ -150,7 +150,7 @@ export interface ProviderDetailData {
   supportedModelsByAccountId: Record<string, string[]>;
   disabledModelsByAccountId: Record<string, string[]>;
   modelHealthByAccountId: Record<string, Record<string, ProviderAccountModelHealthItem>>;
-  pinnedProviders: ProviderAccountKey[];
+  pinnedProviders: string[];
   cursor?: string;
 }
 
@@ -167,7 +167,7 @@ export interface ProviderDetailDeltaData {
   clearedDisabledModelsByAccountId?: string[];
   modelHealthByAccountId?: Record<string, Record<string, ProviderAccountModelHealthItem>>;
   clearedModelHealthByAccountId?: string[];
-  pinnedProviders?: ProviderAccountKey[];
+  pinnedProviders?: string[];
 }
 
 export type ProviderDetailResponse = ProviderDetailData | ProviderDetailDeltaData;

@@ -1,7 +1,6 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { db, providerAccount, usageLog } from "@opendum/database";
-import { isKnownProvider, PROVIDER_ACCOUNT_KEYS, type ProviderAccountKey } from "./account-providers";
 
 const PROVIDER_STATS_DAYS = 30;
 const PROVIDER_DURATION_LOOKBACK_HOURS = 24;
@@ -100,7 +99,7 @@ export function getAccountIndicator(lastErrorAt: Date | string | null, lastSucce
   return "warning";
 }
 
-async function buildProviderStats(userId: string, provider?: string): Promise<{ dayKeys: string[]; hourKeys: string[]; statsByProvider: Map<ProviderAccountKey, RawProviderStats> }> {
+async function buildProviderStats(userId: string, provider?: string): Promise<{ dayKeys: string[]; hourKeys: string[]; statsByProvider: Map<string, RawProviderStats> }> {
   const dayKeys = buildDayKeys(PROVIDER_STATS_DAYS);
   const dayKeySet = new Set(dayKeys);
   const hourKeys = buildHourKeys(PROVIDER_DURATION_LOOKBACK_HOURS);
@@ -125,9 +124,8 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
     db.select({ provider: providerAccount.provider, hourBucket: hourBucketExpression, durationTotal: sql<number>`coalesce(sum(${usageLog.duration}), 0)`, durationCount: sql<number>`count(${usageLog.duration})` }).from(usageLog).innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id)).where(and(...durationConditions)).groupBy(providerAccount.provider, hourBucketExpression),
   ]);
 
-  const statsByProvider = new Map<ProviderAccountKey, RawProviderStats>();
+  const statsByProvider = new Map<string, RawProviderStats>();
   for (const row of allTimeRows) {
-    if (!isKnownProvider(row.provider)) continue;
     const current = statsByProvider.get(row.provider) ?? createRawStats();
     current.totalRequests += toNumber(row.requestCount);
     current.totalTokens += toNumber(row.totalTokens);
@@ -137,7 +135,6 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
     statsByProvider.set(row.provider, current);
   }
   for (const row of dailyUsageRows) {
-    if (!isKnownProvider(row.provider)) continue;
     const date = toDate(row.dayBucket);
     if (!date) continue;
     const dayKey = date.toISOString().split("T")[0] ?? "";
@@ -148,7 +145,6 @@ async function buildProviderStats(userId: string, provider?: string): Promise<{ 
     statsByProvider.set(row.provider, current);
   }
   for (const row of durationRows) {
-    if (!isKnownProvider(row.provider)) continue;
     addDurationBucket(statsByProvider, row.provider, row.hourBucket, row.durationTotal, row.durationCount, hourKeySet);
   }
   return { dayKeys, hourKeys, statsByProvider };
@@ -169,10 +165,11 @@ function addDurationBucket(stats: Map<string, RawProviderStats>, key: string, ra
   stats.set(key, current);
 }
 
-export async function getProviderSummaryStats(userId: string): Promise<Record<ProviderAccountKey, ProviderStats>> {
+export async function getProviderSummaryStats(userId: string): Promise<Record<string, ProviderStats>> {
   const providerUsage = await buildProviderStats(userId);
-  const stats = Object.fromEntries(PROVIDER_ACCOUNT_KEYS.map((provider) => [provider, buildStatsFromRaw(providerUsage.statsByProvider.get(provider), providerUsage.dayKeys, providerUsage.hourKeys)])) as Record<ProviderAccountKey, ProviderStats>;
-  return stats;
+  return Object.fromEntries(
+    [...providerUsage.statsByProvider].map(([provider, raw]) => [provider, buildStatsFromRaw(raw, providerUsage.dayKeys, providerUsage.hourKeys)])
+  );
 }
 
 export async function buildAccountStats(userId: string, accountIds: string[]): Promise<Record<string, ProviderStats>> {

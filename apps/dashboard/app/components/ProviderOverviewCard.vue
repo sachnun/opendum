@@ -1,22 +1,20 @@
 <script setup lang="ts">
-import type { ProviderAccountDefinition, ProviderAccountKey } from "../../lib/provider-accounts";
-import { getProviderAccountPath } from "../../lib/provider-accounts";
 import type { AccountOverviewData } from "../../lib/api-types";
 
-type ProviderOverview = AccountOverviewData["summaries"][ProviderAccountKey];
+type ProviderOverview = AccountOverviewData["summaries"][string];
 type StatDeltaTone = "positive" | "negative" | "neutral";
 type StatHitEffect = { text: string; tone: StatDeltaTone; version: number };
 type StatMetric = { key: string; label: string; value: string; numericValue: number; formatDelta: (delta: number) => string; getTone?: (delta: number) => StatDeltaTone };
 
 const props = defineProps<{
-  provider: ProviderAccountDefinition;
+  provider: { key: string; slug: string; label: string };
   summary: ProviderOverview;
   pinned: boolean;
   readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
-  toggled: [providerKey: ProviderAccountKey, pinned: boolean];
+  toggled: [providerKey: string, pinned: boolean];
 }>();
 
 const { auditRefreshVersion, auditUser, isAuditMode } = useAudit();
@@ -181,14 +179,14 @@ watch([statMetrics, statAnimationContextKey], ([items, contextKey]) => {
   statHitEffects.value = nextHitEffects;
 }, { immediate: true });
 
-function handlePinnedToggled(providerKey: ProviderAccountKey, pinned: boolean) {
+function handlePinnedToggled(providerKey: string, pinned: boolean) {
   emit("toggled", providerKey, pinned);
 }
 </script>
 
 <template>
   <UiCard class="group relative h-full gap-3 border-transparent bg-transparent p-0 shadow-none transition-colors">
-    <NuxtLink :to="getProviderAccountPath(provider.key)" class="absolute inset-0 z-10 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
+    <NuxtLink :to="`/${provider.slug}`" class="absolute inset-0 z-10 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" :aria-label="`Open ${provider.label} accounts`" />
 
     <div class="pointer-events-none relative z-20 flex items-start justify-between gap-2">
       <div class="flex items-center gap-1">

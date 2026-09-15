@@ -8,13 +8,12 @@ import type {
   ProviderAccountDetailItem,
   ProviderDetailData,
 } from "../../lib/api-types";
-import type { ProviderAccountKey } from "../../lib/provider-accounts";
 
 type ShellAccountSummary = {
   accountCounts: Record<string, number>;
   activeAccountCounts: Record<string, number>;
   accountIndicators: Record<string, "normal" | "warning" | "error">;
-  pinnedProviders: ProviderAccountKey[];
+  pinnedProviders: string[];
   hasConnectedAccounts: boolean;
 };
 
@@ -42,7 +41,7 @@ function clearData(keys: string | string[]) {
   clearNuxtData(keys);
 }
 
-function replacePinnedProvider(providers: ProviderAccountKey[], provider: ProviderAccountKey, pinned: boolean): ProviderAccountKey[] {
+function replacePinnedProvider(providers: string[], provider: string, pinned: boolean): string[] {
   const nextProviders = providers.filter((item) => item !== provider);
   return pinned ? [...nextProviders, provider] : nextProviders;
 }
@@ -164,7 +163,7 @@ function clearModelAvailability() {
   return refreshData([dataKeys.models, dataKeys.modelSearch, dataKeys.shellModelFamilyCounts]);
 }
 
-function patchPinnedProvider(provider: ProviderAccountKey, pinned: boolean) {
+function patchPinnedProvider(provider: string, pinned: boolean) {
   patchNuxtData<ShellAccountSummary>(dataKeys.shellAccounts, (value) => ({
     ...value,
     pinnedProviders: replacePinnedProvider(value.pinnedProviders, provider, pinned),

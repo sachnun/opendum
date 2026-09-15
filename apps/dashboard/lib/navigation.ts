@@ -1,5 +1,5 @@
 import { MODEL_FAMILY_NAV_ITEMS } from "./model-families";
-import { getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS, type ProviderAccountKey } from "./provider-accounts";
+import { getProviderAccountPath, PROVIDER_ACCOUNT_DEFINITIONS } from "./provider-accounts";
 
 export interface NavItem {
   name: string;
@@ -18,11 +18,11 @@ export interface NavSubItem {
   tag?: string;
 }
 
-export type ProviderAccountCounts = Record<ProviderAccountKey, number>;
+export type ProviderAccountCounts = Record<string, number>;
 
 export type ProviderAccountIndicator = "normal" | "warning" | "error";
 
-export type ProviderAccountIndicators = Record<ProviderAccountKey, ProviderAccountIndicator>;
+export type ProviderAccountIndicators = Record<string, ProviderAccountIndicator>;
 
 export interface ModelFamilyCounts {
   [anchorId: string]: number;
