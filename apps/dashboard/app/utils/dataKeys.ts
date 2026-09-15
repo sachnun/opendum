@@ -1,5 +1,5 @@
-export const dashboardDataKeys = {
-  dashboardMe: "dashboard-me",
+export const dataKeys = {
+  me: "dashboard-me",
   shellAccounts: "dashboard-shell-accounts",
   accountsOverview: "dashboard-accounts-overview",
   accountsDetail: (provider: string) => `dashboard-accounts-detail-${provider}`,
@@ -10,7 +10,7 @@ export const dashboardDataKeys = {
   apiKeys: "dashboard-api-keys",
 } as const;
 
-export const dashboardStateKeys = {
+export const stateKeys = {
   modelFamilyCountsOverride: "dashboard-model-family-counts-override",
   pinnedProviders: "dashboard-shell-pinned-providers",
   me: "dashboard-me-state",

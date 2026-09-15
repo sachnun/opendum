@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProviderAccountDefinition, ProviderAccountKey } from "../../lib/provider-accounts";
 import { getProviderAccountPath } from "../../lib/provider-accounts";
-import type { AccountOverviewData } from "../../lib/dashboard-api-types";
+import type { AccountOverviewData } from "../../lib/api-types";
 
 type ProviderOverview = AccountOverviewData["summaries"][ProviderAccountKey];
 type StatDeltaTone = "positive" | "negative" | "neutral";
@@ -19,7 +19,7 @@ const emit = defineEmits<{
   toggled: [providerKey: ProviderAccountKey, pinned: boolean];
 }>();
 
-const { auditRefreshVersion, auditUser, isAuditMode } = useDashboardAudit();
+const { auditRefreshVersion, auditUser, isAuditMode } = useAudit();
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
 const previousStatValues = ref<Record<string, number> | null>(null);
 const previousStatAnimationContextKey = ref<string | null>(null);

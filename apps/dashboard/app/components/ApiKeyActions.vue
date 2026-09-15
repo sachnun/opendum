@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn } from "../../lib/utils";
-import type { ApiKeyListItem } from "../../lib/dashboard-api-types";
+import type { ApiKeyListItem } from "../../lib/api-types";
 
 type ApiKey = ApiKeyListItem;
 
@@ -14,7 +14,7 @@ const emit = defineEmits<{
   renamed: [value: { name: string | null; keyPreview?: string }];
 }>();
 
-const dashboardApi = useDashboardApi();
+const api = useApi();
 const isDeleting = ref(false);
 const deleteDialogOpen = ref(false);
 const isRevealed = ref(false);
@@ -52,7 +52,7 @@ async function revealKey() {
   isLoading.value = true;
   errorMessage.value = "";
   try {
-    const result = await dashboardApi.apiKeys.reveal({ id: props.apiKey.id });
+    const result = await api.apiKeys.reveal({ id: props.apiKey.id });
     if (!result.success) throw new Error(result.error);
     revealedKey.value = result.data.key;
     isRevealed.value = true;
@@ -70,7 +70,7 @@ async function copyKey() {
   errorMessage.value = "";
   try {
     if (!key) {
-      const result = await dashboardApi.apiKeys.reveal({ id: props.apiKey.id });
+      const result = await api.apiKeys.reveal({ id: props.apiKey.id });
       if (!result.success) throw new Error(result.error);
       key = result.data.key;
     }
@@ -97,7 +97,7 @@ async function deleteKey() {
   isDeleting.value = true;
   errorMessage.value = "";
   try {
-    const result = await dashboardApi.apiKeys.delete({ id: props.apiKey.id });
+    const result = await api.apiKeys.delete({ id: props.apiKey.id });
     if (!result.success) throw new Error(result.error);
     deleteDialogOpen.value = false;
     emit("deleted", props.apiKey.id);

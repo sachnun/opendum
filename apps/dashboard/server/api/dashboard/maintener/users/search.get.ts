@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { getDashboardQuery, requireMaintenerContext } from "../../../../utils/api";
+import { parseQuery, requireMaintenerContext } from "../../../../utils/api";
 import { db, providerAccount, proxyApiKey, user } from "@opendum/database";
 import { getAccountIndicator } from "../../../../services/account-stats";
 import { PROVIDER_ACCOUNT_KEYS } from "../../../../services/account-providers";
@@ -25,7 +25,7 @@ function accountIsEffectivelyActive(account: { isActive: boolean; disabledUntil:
 
 export default defineEventHandler(async (event) => {
   const context = await requireMaintenerContext(event);
-  const input = getDashboardQuery(event, userSearchInputSchema);
+  const input = parseQuery(event, userSearchInputSchema);
   const query = input?.q?.trim() ?? "";
   const offset = input?.offset ?? 0;
   const limit = input?.limit ?? DEFAULT_LIMIT;

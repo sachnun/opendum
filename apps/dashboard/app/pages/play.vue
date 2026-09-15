@@ -3,7 +3,7 @@ import { createParser, type EventSourceMessage } from "eventsource-parser";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-families";
 import { compareModelEntries } from "../../lib/model-sort";
 import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../lib/provider-accounts";
-import type { PlaygroundOptions } from "../../lib/dashboard-api-types";
+import type { PlaygroundOptions } from "../../lib/api-types";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
@@ -41,8 +41,8 @@ interface Scenario {
   requestOverrides?: Record<string, unknown>;
 }
 
-const dashboardApi = useDashboardApi();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const invalidation = useInvalidate();
 const route = useRoute();
 
 type ModelOption = PlaygroundOptions["models"][number];
@@ -153,13 +153,12 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
   { value: "xhigh", label: "XHigh" },
 ];
 
-const { data, error, pending } = await useAsyncData(dashboardDataKeys.playgroundOptions, () => dashboardApi.playground.options());
-if (data.value && !data.value.hasAnyProviderAccount) {
-  await navigateTo("/", { replace: true });
-}
+const { data, error } = useCachedData(dataKeys.playgroundOptions, () => api.playground.options());
+watch(data, (value) => {
+  if (value && !value.hasAnyProviderAccount) void navigateTo("/", { replace: true });
+}, { immediate: true });
 
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
-const isInitialLoading = computed(() => pending.value && !data.value);
 const models = computed<ModelOption[]>(() => options.value?.models ?? []);
 const providerAccounts = computed<ProviderAccountOption[]>(() => options.value?.providerAccounts ?? []);
 const hasAnyProviderAccount = computed(() => Boolean(options.value?.hasAnyProviderAccount));
@@ -1365,7 +1364,7 @@ function refreshAccountOverview() {
   if (accountOverviewInvalidationTimer) clearTimeout(accountOverviewInvalidationTimer);
   accountOverviewInvalidationTimer = setTimeout(() => {
     accountOverviewInvalidationTimer = null;
-    void dashboardInvalidation.invalidateAccountOverview();
+    void invalidation.invalidateAccountOverview();
   }, ACCOUNT_OVERVIEW_INVALIDATION_DELAY_MS);
 }
 
@@ -1421,7 +1420,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
     const controller = new AbortController();
     controllers.set(panelId, controller);
-    const auth = await dashboardApi.playground.auth({ endpoint: currentSettings.endpoint });
+    const auth = await api.playground.auth({ endpoint: currentSettings.endpoint });
     if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
     const url = `${getProxyBaseUrl()}${getEndpointPath(currentSettings.endpoint)}`;
@@ -1819,10 +1818,8 @@ async function copyPanelError(panelId: string) {
       </div>
     </div>
 
-    <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
+    <DataNotice :error="error" />
 
-    <template v-else>
       <div class="space-y-3">
         <div v-if="playgroundSetupMessage" class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           {{ playgroundSetupMessage }}
@@ -2040,11 +2037,7 @@ async function copyPanelError(panelId: string) {
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.content }}<span v-if="responses[panel.id]?.isLoading" class="animate-pulse text-primary">▌</span></pre>
                     </div>
                     <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning && responses[panel.id]?.isLoading" class="rounded-lg bg-card/50 px-3 py-2">
-                      <div class="space-y-1.5">
-                        <UiSkeleton class="h-3 w-full" />
-                        <UiSkeleton class="h-3 w-4/5" />
-                        <UiSkeleton class="h-3 w-3/5" />
-                      </div>
+                      <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed"><span class="animate-pulse text-primary">▌</span></pre>
                     </div>
                     <div v-if="responses[panel.id]?.toolCalls?.length" class="rounded-lg bg-muted/20 px-3 py-2">
                       <div class="mb-1.5 flex items-center gap-1.5">
@@ -2077,11 +2070,7 @@ async function copyPanelError(panelId: string) {
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.content }}<span class="animate-pulse text-primary">▌</span></pre>
                     </div>
                     <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning" class="rounded-lg bg-card/50 px-3 py-2">
-                      <div class="space-y-1.5">
-                        <UiSkeleton class="h-3 w-full" />
-                        <UiSkeleton class="h-3 w-4/5" />
-                        <UiSkeleton class="h-3 w-3/5" />
-                      </div>
+                      <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed"><span class="animate-pulse text-primary">▌</span></pre>
                     </div>
                   </div>
                 </div>
@@ -2137,7 +2126,6 @@ async function copyPanelError(panelId: string) {
           </button>
         </UiCard>
       </div>
-    </template>
   </div>
   </div>
 </template>

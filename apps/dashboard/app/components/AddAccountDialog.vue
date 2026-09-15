@@ -40,8 +40,8 @@ const emit = defineEmits<{
   connected: [result: { provider: Provider; email: string; isUpdate: boolean }];
 }>();
 
-const dashboardApi = useDashboardApi();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const invalidation = useInvalidate();
 
 const providerMethodLabels: Record<ProviderAuthMethodKey, { name: string; disabled?: boolean }> = {
   oauth_redirect: { name: "Browser OAuth" },
@@ -177,7 +177,7 @@ watch([open, step, provider, selectedMethod], async () => {
   try {
     if (selectedFlowType === "oauth_redirect") {
       if (!isOAuthProvider(selectedProvider)) return;
-      const result = await dashboardApi.accounts.getAuthUrl({ provider: selectedProvider });
+      const result = await api.accounts.getAuthUrl({ provider: selectedProvider });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       authUrl.value = result.data.authUrl;
@@ -188,7 +188,7 @@ watch([open, step, provider, selectedMethod], async () => {
 
     if (selectedFlowType === "device_code") {
       if (!isDeviceProvider(selectedProvider)) return;
-      const result = await dashboardApi.accounts.initiateDeviceAuth({ provider: selectedProvider });
+      const result = await api.accounts.initiateDeviceAuth({ provider: selectedProvider });
       if (!result.success) throw new Error(result.error);
       if (provider.value !== selectedProvider || activeFlowType.value !== selectedFlowType || step.value !== selectedStep) return;
       deviceCodeInfo.value = {
@@ -274,7 +274,7 @@ function finishConnection(result: { email: string; isUpdate: boolean }) {
 
   open.value = false;
   emit("connected", { provider: connectedProvider, ...result });
-  void dashboardInvalidation.invalidateAccountCollection(connectedProvider);
+  void invalidation.invalidateAccountCollection(connectedProvider);
 }
 
 function selectProvider(providerKey: Provider) {
@@ -424,7 +424,7 @@ function startDevicePolling(popup: Window | null) {
     }
 
     try {
-      const result = await dashboardApi.accounts.pollDeviceAuth({
+      const result = await api.accounts.pollDeviceAuth({
         provider: deviceCodeInfo.value.provider,
         deviceCode: deviceCodeInfo.value.deviceCode,
         userCode: deviceCodeInfo.value.userCode,
@@ -481,7 +481,7 @@ async function handleConnectApiKey() {
 
   isLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.create({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined, platformKey: platformKey.value.trim() || undefined });
+    const result = await api.accounts.create({ provider: provider.value, token: apiKey.value.trim(), cfAccountId: cfAccountId.value.trim() || undefined, platformKey: platformKey.value.trim() || undefined });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {
@@ -502,7 +502,7 @@ async function handleConnectCodexSession() {
 
   isLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.connectCodexSession({ sessionJson: chatgptSessionJson.value.trim() });
+    const result = await api.accounts.connectCodexSession({ sessionJson: chatgptSessionJson.value.trim() });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {
@@ -531,7 +531,7 @@ async function handleExchangeOAuth() {
 
   isLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.exchangeOAuth({ provider: selectedProvider, callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
+    const result = await api.accounts.exchangeOAuth({ provider: selectedProvider, callbackUrl: callbackUrl.value.trim(), state: oauthState.value, codeVerifier: oauthCodeVerifier.value });
     if (!result.success) throw new Error(result.error);
     finishConnection(result.data);
   } catch (error) {

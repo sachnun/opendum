@@ -1,7 +1,7 @@
 import { getMany, set } from "idb-keyval";
 import type { ComputedRef } from "vue";
-import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "../../lib/dashboard-api-types";
-import { createDashboardIndexedDbStore } from "../utils/dashboardIndexedDb";
+import type { AccountQuotaInfo, ProviderDetailData, QuotaProviderKey } from "../../lib/api-types";
+import { createIdbStore } from "../utils/idb";
 
 type Account = ProviderDetailData["accounts"][number];
 
@@ -26,7 +26,7 @@ type RunQuotaRefreshOptions = {
 
 const QUOTA_DB_NAME = "opendum-dashboard";
 const QUOTA_STORE_NAME = "account-quota";
-const quotaStore = createDashboardIndexedDbStore(QUOTA_DB_NAME, QUOTA_STORE_NAME);
+const quotaStore = createIdbStore(QUOTA_DB_NAME, QUOTA_STORE_NAME);
 
 function getQuotaCacheKey(accountId: string) {
   return `account-quota:${accountId}`;
@@ -53,17 +53,17 @@ async function writeCachedQuota(account: Account, provider: QuotaProviderKey, qu
   }
 }
 
-export function useAccountQuotaMonitor(options: {
+export function useQuotaMonitor(options: {
   accounts: ComputedRef<Account[]>;
   quotaCapableAccounts: ComputedRef<Account[]>;
   toQuotaProvider: (provider: string) => QuotaProviderKey | null;
   shouldQueueAccount?: (account: Account) => boolean;
 }) {
-  const dashboardApi = useDashboardApi();
-  const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>(dashboardStateKeys.quotaByAccountId, () => ({}));
-  const quotaErrorByAccountId = useState<Record<string, string>>(dashboardStateKeys.quotaErrorByAccountId, () => ({}));
-  const quotaLoadingByAccountId = useState<Record<string, boolean>>(dashboardStateKeys.quotaLoadingByAccountId, () => ({}));
-  const hydratedAccountIds = useState<Record<string, boolean>>(dashboardStateKeys.quotaHydratedAccountIds, () => ({}));
+  const api = useApi();
+  const quotaByAccountId = useState<Record<string, AccountQuotaInfo>>(stateKeys.quotaByAccountId, () => ({}));
+  const quotaErrorByAccountId = useState<Record<string, string>>(stateKeys.quotaErrorByAccountId, () => ({}));
+  const quotaLoadingByAccountId = useState<Record<string, boolean>>(stateKeys.quotaLoadingByAccountId, () => ({}));
+  const hydratedAccountIds = useState<Record<string, boolean>>(stateKeys.quotaHydratedAccountIds, () => ({}));
   let quotaQueueRunId = 0;
   let quotaRunInFlight: Promise<void> | null = null;
   const quotaLoadingRunByAccountId = new Map<string, number>();
@@ -133,7 +133,7 @@ export function useAccountQuotaMonitor(options: {
     quotaErrorByAccountId.value = { ...quotaErrorByAccountId.value, [account.id]: "" };
 
     try {
-      const result = await dashboardApi.accounts.quota({ provider, accountId: account.id, forceRefresh });
+      const result = await api.accounts.quota({ provider, accountId: account.id, forceRefresh });
       if (runId !== undefined && runId !== quotaQueueRunId) return;
       if (!result.success) throw new Error(result.error);
 
@@ -183,7 +183,7 @@ export function useAccountQuotaMonitor(options: {
 
       const providerResults = await Promise.all(Array.from(accountsByProvider.entries()).map(async ([provider, providerAccounts]) => {
         try {
-          const result = await dashboardApi.accounts.quotas({ provider, accountIds: providerAccounts.map((account) => account.id), forceRefresh });
+          const result = await api.accounts.quotas({ provider, accountIds: providerAccounts.map((account) => account.id), forceRefresh });
           if (!result.success) throw new Error(result.error);
           return { ok: true as const, provider, providerAccounts, data: result.data };
         } catch (error) {

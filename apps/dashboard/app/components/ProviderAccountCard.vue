@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNowStrict } from "date-fns";
-import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/dashboard-api-types";
+import type { AccountQuotaInfo, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, QuotaGroupDisplay } from "../../lib/api-types";
 import { QUOTA_PROVIDER_KEYS } from "../../lib/provider-accounts";
 
 type Account = ProviderDetailData["accounts"][number];
@@ -14,13 +14,6 @@ type ErrorPreviewEntry = {
 };
 
 type TemporaryOffUnit = "minutes" | "hours" | "days";
-
-type QuotaSkeletonRow = {
-  labelClass: string;
-  metaClass: string;
-  valueClass: string;
-  barClass: string;
-};
 
 type ParsedErrorDetails = {
   error: string | null;
@@ -43,7 +36,6 @@ type DurationPoint = { time: string; avgDuration: number | null };
 type ErrorPlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 
 const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
-const DEFAULT_MAX_QUOTA_SKELETON_ROWS = 3;
 const TEMPORARY_OFF_LONG_PRESS_MS = 600;
 const ERROR_PREVIEW_SWIPE_THRESHOLD_PX = 45;
 const ERROR_PREVIEW_VISIBLE_COUNT = 9;
@@ -117,33 +109,6 @@ const HTTP_STATUS_DESCRIPTIONS: Record<number, string> = {
   510: "Not Extended",
   511: "Network Authentication Required",
 };
-const QUOTA_SKELETON_ROWS: Record<QuotaProviderKey, QuotaSkeletonRow[]> = {
-  antigravity: [
-    { labelClass: "w-14", metaClass: "w-10", valueClass: "w-8", barClass: "w-11/12" },
-    { labelClass: "w-24", metaClass: "w-12", valueClass: "w-8", barClass: "w-4/5" },
-  ],
-  codex: [
-    { labelClass: "w-32", metaClass: "w-10", valueClass: "w-8", barClass: "w-4/5" },
-    { labelClass: "w-36", metaClass: "w-12", valueClass: "w-8", barClass: "w-2/3" },
-  ],
-  kiro: [
-    { labelClass: "w-24", metaClass: "w-10", valueClass: "w-8", barClass: "w-4/5" },
-    { labelClass: "w-28", metaClass: "w-12", valueClass: "w-8", barClass: "w-2/3" },
-    { labelClass: "w-24", metaClass: "w-9", valueClass: "w-7", barClass: "w-5/6" },
-    { labelClass: "w-16", metaClass: "w-10", valueClass: "w-8", barClass: "w-3/5" },
-    { labelClass: "w-14", metaClass: "w-11", valueClass: "w-7", barClass: "w-1/2" },
-    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-8", barClass: "w-3/4" },
-    { labelClass: "w-20", metaClass: "w-12", valueClass: "w-7", barClass: "w-2/3" },
-  ],
-  openrouter: [
-    { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
-    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
-  ],
-  zenmux: [
-    { labelClass: "w-24", metaClass: "w-0", valueClass: "w-20", barClass: "w-4/5" },
-    { labelClass: "w-20", metaClass: "w-10", valueClass: "w-16", barClass: "w-3/5" },
-  ],
-};
 
 const props = defineProps<{
   account: Account;
@@ -155,7 +120,6 @@ const props = defineProps<{
   errorHistoryError?: string | null;
   quotaInfo?: AccountQuotaInfo | null;
   quotaError?: string | null;
-  quotaSkeletonLimit?: number | null;
   highlight?: boolean;
   animateDeltas?: boolean;
   readonly?: boolean;
@@ -169,8 +133,8 @@ const emit = defineEmits<{
   "errors-resolved": [accountId: string];
 }>();
 
-const dashboardApi = useDashboardApi();
-const { auditRefreshVersion, auditUser, dashboardMe, isAuditMode } = useDashboardAudit();
+const api = useApi();
+const { auditRefreshVersion, auditUser, me, isAuditMode } = useAudit();
 const isToggling = ref(false);
 const isSubtitleVisible = ref(false);
 const editDialogOpen = ref(false);
@@ -188,7 +152,7 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
-const isMaintener = computed(() => import.meta.dev || (dashboardMe.value?.isMaintener ?? false));
+const isMaintener = computed(() => import.meta.dev || (me.value?.isMaintener ?? false));
 const copiedSession = ref(false);
 const sessionLoading = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
@@ -541,11 +505,6 @@ const normalizedTier = computed(() => effectiveTier.value?.trim().toLowerCase() 
 const tierBadgeLabel = computed(() => formatTierBadgeLabel(normalizedTier.value, props.account.provider));
 const showTierBadge = computed(() => props.showTier && tierBadgeLabel.value !== "");
 const supportsQuotaMonitor = computed(() => QUOTA_PROVIDERS.has(props.account.provider));
-const quotaSkeletonRows = computed(() => {
-  const rows = QUOTA_SKELETON_ROWS[props.account.provider as QuotaProviderKey] ?? [];
-  const limit = props.quotaSkeletonLimit ?? DEFAULT_MAX_QUOTA_SKELETON_ROWS;
-  return limit > 0 ? rows.slice(0, limit) : rows;
-});
 const usageChartColor = computed(() => props.account.isActive ? "var(--chart-1)" : "var(--muted-foreground)");
 const usageChartColorAlt = computed(() => props.account.isActive ? "var(--chart-2)" : "var(--muted-foreground)");
 const activeDisabledUntil = computed(() => {
@@ -846,7 +805,7 @@ async function toggleActive() {
 
   isToggling.value = true;
   try {
-    const result = await dashboardApi.accounts.update({ id: props.account.id, isActive: !props.account.isActive });
+    const result = await api.accounts.update({ id: props.account.id, isActive: !props.account.isActive });
     if (!result.success) throw new Error(result.error);
     emit("active-updated", result.data);
   } finally {
@@ -865,7 +824,7 @@ async function disableTemporarily() {
   isTemporaryDisabling.value = true;
   temporaryOffError.value = "";
   try {
-    const result = await dashboardApi.accounts.update({ id: props.account.id, disabledUntil: disabledUntil.toISOString() });
+    const result = await api.accounts.update({ id: props.account.id, disabledUntil: disabledUntil.toISOString() });
     if (!result.success) throw new Error(result.error);
     temporaryOffDialogOpen.value = false;
     emit("temporarily-disabled", result.data);
@@ -880,7 +839,7 @@ async function renameAccount() {
   if (props.readonly) return;
   savingName.value = true;
   try {
-    const result = await dashboardApi.accounts.update({ id: props.account.id, name: editName.value });
+    const result = await api.accounts.update({ id: props.account.id, name: editName.value });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
     emit("renamed", result.data);
@@ -893,7 +852,7 @@ async function deleteAccount() {
   if (props.readonly) return;
   deleting.value = true;
   try {
-    const result = await dashboardApi.accounts.delete({ id: props.account.id });
+    const result = await api.accounts.delete({ id: props.account.id });
     if (!result.success) throw new Error(result.error);
     deleteDialogOpen.value = false;
     emit("deleted", props.account.id);
@@ -905,7 +864,7 @@ async function deleteAccount() {
 async function resolveErrors() {
   resolvingErrors.value = true;
   try {
-    const result = await dashboardApi.accounts.resolveErrors({ accountId: props.account.id });
+    const result = await api.accounts.resolveErrors({ accountId: props.account.id });
     if (!result.success) throw new Error(result.error);
     errorDialogOpen.value = false;
     activeErrorIndex.value = 0;
@@ -964,7 +923,7 @@ async function copyAllErrors() {
 async function copySession() {
   sessionLoading.value = true;
   try {
-    const result = await dashboardApi.accounts.copySession({ id: props.account.id });
+    const result = await api.accounts.copySession({ id: props.account.id });
     if (!result.success || !(await copyToClipboard(result.data.session))) return;
     copiedSession.value = true;
     resetFlag(copiedSession);
@@ -1163,28 +1122,12 @@ function cancelErrorPreviewPointer() {
             </div>
           </div>
 
-          <div v-if="supportsQuotaMonitor" class="mt-3 space-y-2 border-t pt-3">
+          <div v-if="supportsQuotaMonitor && (quotaInfo || quotaError)" class="mt-3 space-y-2 border-t pt-3">
             <div>
               <span class="text-xs font-medium text-muted-foreground">Quota</span>
             </div>
 
-              <div v-if="!quotaInfo && !quotaError" class="space-y-2" aria-hidden="true">
-                <div v-for="(row, index) in quotaSkeletonRows" :key="index" class="space-y-1">
-                  <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
-                    <UiSkeleton :class="['h-3', row.labelClass].filter(Boolean).join(' ')" />
-                    <span class="flex min-w-0 max-w-28 shrink-0 items-center justify-end gap-1.5 overflow-hidden">
-                      <UiSkeleton v-if="row.metaClass !== 'w-0'" :class="['h-2.5', row.metaClass].filter(Boolean).join(' ')" />
-                      <UiSkeleton :class="['h-3', row.valueClass].filter(Boolean).join(' ')" />
-                    </span>
-                  </div>
-                  <div class="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <UiSkeleton :class="['h-full rounded-full', row.barClass].filter(Boolean).join(' ')" />
-                  </div>
-                </div>
-              </div>
-
-            <template v-else>
-              <p v-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
+            <p v-if="quotaError" class="text-xs text-red-500">{{ quotaError }}</p>
               <div v-else-if="quotaInfo?.status === 'success' && quotaInfo.groups.length > 0" class="space-y-2">
                 <div v-for="group in quotaInfo.groups" :key="group.name" class="space-y-1">
                   <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-xs">
@@ -1204,7 +1147,6 @@ function cancelErrorPreviewPointer() {
                 </div>
               </div>
               <p v-else class="text-xs text-red-500">{{ quotaInfo?.error ?? 'Failed to fetch quota data.' }}</p>
-            </template>
           </div>
 
           <AccountModelAccess v-if="supportedModels?.length" :account-id="account.id" :provider="account.provider" :supported-models="supportedModels" :initial-disabled-models="disabledModels ?? []" :model-health="modelHealth ?? {}" :readonly="readonly" />

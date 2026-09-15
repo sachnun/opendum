@@ -16,7 +16,7 @@ const emit = defineEmits<{
   created: [];
 }>();
 
-const dashboardApi = useDashboardApi();
+const api = useApi();
 const open = ref(false);
 const name = ref("");
 const isCreating = ref(false);
@@ -46,7 +46,7 @@ async function createKey() {
   isCreating.value = true;
   errorMessage.value = "";
   try {
-    const result = await dashboardApi.apiKeys.create({ name: name.value.trim() || undefined });
+    const result = await api.apiKeys.create({ name: name.value.trim() || undefined });
     if (!result.success) throw new Error(result.error);
     createdKey.value = result.data.key;
     hasCreatedKey.value = true;

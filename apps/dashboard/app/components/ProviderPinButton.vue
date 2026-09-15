@@ -13,8 +13,8 @@ const emit = defineEmits<{
   toggled: [providerKey: ProviderAccountKey, pinned: boolean];
 }>();
 
-const dashboardApi = useDashboardApi();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const invalidation = useInvalidate();
 const localPinned = ref(props.pinned);
 const pending = ref(false);
 const pinButtonLabel = computed(() => (localPinned.value ? "Unpin provider" : "Pin provider"));
@@ -35,10 +35,10 @@ async function togglePin(event: Event) {
   localPinned.value = !previous;
   pending.value = true;
   try {
-    const result = await dashboardApi.accounts.togglePinned({ providerKey: props.providerKey });
+    const result = await api.accounts.togglePinned({ providerKey: props.providerKey });
     if (!result.success) throw new Error(result.error);
     localPinned.value = result.data.pinned;
-    dashboardInvalidation.patchPinnedProvider(props.providerKey, result.data.pinned);
+    invalidation.patchPinnedProvider(props.providerKey, result.data.pinned);
     emit("toggled", props.providerKey, result.data.pinned);
   } catch {
     localPinned.value = previous;

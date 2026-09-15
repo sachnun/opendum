@@ -1,9 +1,9 @@
 import { createError } from "h3";
 import { accountSessionInputSchema, getAccountSession } from "../../../services/accounts";
-import { readDashboardBody, requireDashboardContext } from "../../../utils/api";
+import { parseBody, requireContext } from "../../../utils/api";
 
 export default defineEventHandler(async (event) => {
-  const context = await requireDashboardContext(event);
+  const context = await requireContext(event);
   if (process.env.NODE_ENV === "production" && !context.isMaintener) {
     throw createError({ statusCode: 404, statusMessage: "Not Found" });
   }
@@ -11,5 +11,5 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: "Audit mode is read-only" });
   }
 
-  return getAccountSession(context.userId, await readDashboardBody(event, accountSessionInputSchema));
+  return getAccountSession(context.userId, await parseBody(event, accountSessionInputSchema));
 });

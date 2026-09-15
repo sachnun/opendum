@@ -1,7 +1,7 @@
 import { getAccountAuthUrl, getAuthUrlInputSchema } from "../../../../services/account-auth";
-import { readDashboardBody, requireWritableUserId } from "../../../../utils/api";
+import { parseBody, requireWritableUserId } from "../../../../utils/api";
 
 export default defineEventHandler(async (event) => {
   await requireWritableUserId(event);
-  return getAccountAuthUrl(await readDashboardBody(event, getAuthUrlInputSchema));
+  return getAccountAuthUrl(await parseBody(event, getAuthUrlInputSchema));
 });

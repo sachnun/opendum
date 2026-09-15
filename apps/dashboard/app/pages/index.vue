@@ -17,20 +17,12 @@ if (import.meta.client && session.value?.user && redirectTarget.value !== "/") {
   await navigateTo(redirectTarget.value);
 }
 
-const dashboardApi = useDashboardApi();
-const { isAuditMode } = useDashboardAudit();
+const api = useApi();
+const { isAuditMode } = useAudit();
 
-const { data, error, pending, refresh } = useAsyncData(dashboardDataKeys.accountsOverview, () => dashboardApi.accounts.overview(), {
-  default: () => null,
-  lazy: true,
-});
-
-watch(isAuthenticated, (authenticated) => {
-  if (authenticated && !data.value && !pending.value) void refresh();
-});
+const { data, error, refresh } = useCachedData(dataKeys.accountsOverview, () => api.accounts.overview());
 
 const summaries = computed(() => data.value?.summaries ?? null);
-const isInitialLoading = computed(() => pending.value && !data.value);
 const pinnedProviders = computed(() => new Set(data.value?.pinnedProviders ?? []));
 const providerAvailabilityOrder = { active: 0, inactive: 1 } as const;
 const providerStatusOrder = { error: 0, warning: 1, normal: 2 } as const;
@@ -76,9 +68,8 @@ function refreshAccountsOverview() {
         </div>
       </div>
 
-      <DashboardDataNotice :error="error" />
-      <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
-      <div v-else-if="summaries" class="dashboard-card-grid">
+      <DataNotice :error="error" />
+      <div v-if="summaries" class="dashboard-card-grid">
         <ProviderOverviewCard
           v-for="provider in sortedProviders"
           :key="provider.key"

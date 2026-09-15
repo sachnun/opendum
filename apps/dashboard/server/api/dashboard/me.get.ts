@@ -1,9 +1,9 @@
-import { requireDashboardContext } from "../../utils/api";
+import { requireContext } from "../../utils/api";
 import { getUserPointStatus } from "../../services/points";
 import { getUserSharingEnabled } from "../../services/sharing";
 
 export default defineEventHandler(async (event) => {
-  const context = await requireDashboardContext(event);
+  const context = await requireContext(event);
   const [pointStatus, sharingEnabled] = await Promise.all([
     getUserPointStatus(context.userId),
     getUserSharingEnabled(context.userId),

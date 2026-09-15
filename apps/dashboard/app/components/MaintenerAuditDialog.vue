@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MaintenerAuditSearchUser, MaintenerAuditUser } from "../../lib/dashboard-api-types";
+import type { MaintenerAuditSearchUser, MaintenerAuditUser } from "../../lib/api-types";
 import { avatarUrl } from "../../lib/utils";
 
 const open = defineModel<boolean>("open", { default: false });
@@ -8,7 +8,7 @@ const emit = defineEmits<{
   selected: [user: MaintenerAuditUser];
 }>();
 
-const dashboardApi = useDashboardApi();
+const api = useApi();
 const PAGE_SIZE = 12;
 const SCROLL_LOAD_THRESHOLD = 48;
 
@@ -64,7 +64,7 @@ async function loadUsers(requestId: number, append = false) {
   errorMessage.value = "";
 
   try {
-    const result = await dashboardApi.maintener.users.search({
+    const result = await api.maintener.users.search({
       q: normalizedQuery || undefined,
       offset: append ? nextOffset.value : 0,
       limit: PAGE_SIZE,
@@ -145,7 +145,7 @@ async function selectUser(user: MaintenerAuditSearchUser) {
   errorMessage.value = "";
 
   try {
-    const result = await dashboardApi.maintener.audit.start({ userId: user.id });
+    const result = await api.maintener.audit.start({ userId: user.id });
     if (!result.success) throw new Error(result.error);
     open.value = false;
     emit("selected", result.data.user);

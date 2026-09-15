@@ -1,7 +1,7 @@
-export type DashboardUserRole = "user" | "maintener";
+export type UserRole = "user" | "maintener";
 
-const MAINTENER_ROLE: DashboardUserRole = "maintener";
-const USER_ROLE: DashboardUserRole = "user";
+const MAINTENER_ROLE: UserRole = "maintener";
+const USER_ROLE: UserRole = "user";
 
 let hasWarnedInvalidMaintainers = false;
 
@@ -43,7 +43,7 @@ function getMaintenerEmails(): Set<string> {
   }
 }
 
-export function getDashboardRoleForEmail(email: string | null | undefined): DashboardUserRole {
+export function roleForEmail(email: string | null | undefined): UserRole {
   if (!email) return USER_ROLE;
 
   return getMaintenerEmails().has(normalizeEmail(email)) ? MAINTENER_ROLE : USER_ROLE;

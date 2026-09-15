@@ -6,7 +6,7 @@ import type {
   ProviderAccountCounts,
   ProviderAccountIndicators,
 } from "../../lib/navigation";
-import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData, DashboardMeData, PointStatusData } from "../../lib/dashboard-api-types";
+import type { AccountOverviewData, AccountOverviewDeltaData, AccountOverviewResponse, AccountPingData, MeData, PointStatusData } from "../../lib/api-types";
 import { MODEL_FAMILY_NAV_ITEMS, categorizeModelFamily } from "../../lib/model-families";
 import { primaryNavigation } from "../../lib/navigation";
 import { signOut, useSession } from "../../lib/auth-client";
@@ -63,8 +63,8 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 };
 
 const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
-const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(dashboardStateKeys.modelFamilyCountsOverride, () => null);
-const cachedPinnedProviders = useState<ProviderAccountKey[] | null>(dashboardStateKeys.pinnedProviders, () => null);
+const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(stateKeys.modelFamilyCountsOverride, () => null);
+const cachedPinnedProviders = useState<ProviderAccountKey[] | null>(stateKeys.pinnedProviders, () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
   {
@@ -82,31 +82,31 @@ const supportNavigation = computed<NavItem[]>(() => [
 const PROVIDER_AVAILABILITY_ORDER = { active: 0, inactive: 1 } as const;
 const PROVIDER_STATUS_ORDER = { error: 0, warning: 1, normal: 2 } as const;
 
-const dashboardApi = useDashboardApi();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const invalidation = useInvalidate();
+const { prefetch } = usePrefetch();
 const accountsNavigationHref = "/";
-const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dashboardDataKeys.accountsOverview);
+const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
 
-const { data: dashboardMe } = useAsyncData(dashboardDataKeys.dashboardMe, () => dashboardApi.me.get(), {
+const { data: me } = useCachedData(dataKeys.me, () => api.me.get(), {
   default: () => ({ role: "user" as const, isMaintener: false }),
-  lazy: true,
 });
-const { auditUser, dashboardMe: dashboardMeState, isAuditMode, refreshAfterAuditChange } = useDashboardAudit();
-dashboardMeState.value = dashboardMe.value ?? null;
-watch(dashboardMe, (value) => {
-  dashboardMeState.value = value ?? null;
-  dashboardInvalidation.patchApiKeyRoamingPoints(value?.points?.roamingPointsByApiKeyId ?? {});
+const { auditUser, me: meState, isAuditMode, refreshAfterAuditChange } = useAudit();
+meState.value = me.value ?? null;
+watch(me, (value) => {
+  meState.value = value ?? null;
+  invalidation.patchApiKeyRoamingPoints(value?.points?.roamingPointsByApiKeyId ?? {});
 }, { immediate: true });
-const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
-const pointBalance = computed(() => (dashboardMe.value as DashboardMeData | null | undefined)?.points?.balance ?? 0);
+const isMaintener = computed(() => me.value?.isMaintener ?? false);
+const pointBalance = computed(() => (me.value as MeData | null | undefined)?.points?.balance ?? 0);
 const formattedPointBalance = computed(() => pointBalance.value.toLocaleString("en-US"));
 const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
 const auditUserEmail = computed(() => auditUser.value?.email || "");
 const auditUserImage = computed(() => avatarUrl(auditUser.value?.image || ""));
 const auditUserInitial = computed(() => (auditUserLabel.value[0] || "U").toUpperCase());
 
-watch(dashboardMe, (value) => {
-  sharingEnabled.value = (value as DashboardMeData | null | undefined)?.sharing?.enabled ?? false;
+watch(me, (value) => {
+  sharingEnabled.value = (value as MeData | null | undefined)?.sharing?.enabled ?? false;
 }, { immediate: true });
 
 function toShellAccountSummary(summary: AccountOverviewData | AccountPingData): ShellAccountSummary {
@@ -162,18 +162,18 @@ function applyAccountOverviewResponse(summary: AccountOverviewResponse): Account
 
 const isProviderOverviewRoute = computed(() => route.path === accountsNavigationHref);
 
-const { data: accountSummaryData, refresh: refreshAccountSummary } = useAsyncData(dashboardDataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
+const { data: accountSummaryData, refresh: refreshAccountSummary } = useCachedData(dataKeys.shellAccounts, async (): Promise<ShellAccountSummary> => {
   const useOverview = isProviderOverviewRoute.value;
   if (useOverview) {
     const snapshot = accountsOverviewData.value;
     if (!snapshot) return emptyShellAccountSummary;
 
-    const summary = applyAccountOverviewResponse(snapshot.cursor ? await dashboardApi.accounts.overviewDelta({ cursor: snapshot.cursor }) : snapshot);
+    const summary = applyAccountOverviewResponse(snapshot.cursor ? await api.accounts.overviewDelta({ cursor: snapshot.cursor }) : snapshot);
     return toShellAccountSummary(summary);
   }
 
-  return toShellAccountSummary(await dashboardApi.accounts.ping());
-}, { lazy: true });
+  return toShellAccountSummary(await api.accounts.ping());
+});
 
 watch(accountsOverviewData, (snapshot) => {
   if (!snapshot || !isProviderOverviewRoute.value) return;
@@ -215,12 +215,11 @@ function normalizeModelFamilyCounts(counts: Record<string, number>) {
   return nextCounts;
 }
 
-const { data: defaultModelFamilyCounts } = useAsyncData(dashboardDataKeys.shellModelFamilyCounts, async () => {
-  const counts = await dashboardApi.models.familyCounts();
+const { data: defaultModelFamilyCounts } = useCachedData(dataKeys.shellModelFamilyCounts, async () => {
+  const counts = await api.models.familyCounts();
   return normalizeModelFamilyCounts(counts);
 }, {
   default: () => ({ ...emptyModelFamilyCounts }),
-  lazy: true,
 });
 
 const modelFamilyCounts = computed(() => modelFamilyCountsOverride.value ?? defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
@@ -354,11 +353,11 @@ async function updateSharing(enabled: boolean) {
 
   sharingUpdating.value = true;
   try {
-    const result = await dashboardApi.sharing.update({ enabled });
+    const result = await api.sharing.update({ enabled });
     sharingEnabled.value = result.enabled;
-    if (dashboardMe.value) {
-      dashboardMe.value = {
-        ...dashboardMe.value,
+    if (me.value) {
+      me.value = {
+        ...me.value,
         sharing: { enabled: result.enabled },
       };
     }
@@ -588,14 +587,14 @@ function startAccountSummaryRefresh() {
 }
 
 function applyPointStatus(status: PointStatusData) {
-  if (dashboardMe.value) {
-    dashboardMe.value = {
-      ...dashboardMe.value,
+  if (me.value) {
+    me.value = {
+      ...me.value,
       points: { balance: status.balance },
     };
   }
 
-  dashboardInvalidation.patchApiKeyRoamingPoints(status.roamingPointsByApiKeyId);
+  invalidation.patchApiKeyRoamingPoints(status.roamingPointsByApiKeyId);
 }
 
 async function refreshPointStatusOnce() {
@@ -604,7 +603,7 @@ async function refreshPointStatusOnce() {
     return;
   }
 
-  pointStatusRefreshInFlight = dashboardApi.points.status().then(applyPointStatus);
+  pointStatusRefreshInFlight = api.points.status().then(applyPointStatus);
   try {
     await pointStatusRefreshInFlight;
   } catch (error) {
@@ -636,6 +635,18 @@ function startPointStatusRefresh() {
   }, POINT_STATUS_REFRESH_MS);
 }
 
+function schedulePrefetch() {
+  const run = () => prefetch();
+  if (!import.meta.client || typeof window === "undefined") return;
+
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(run, { timeout: 3000 });
+    return;
+  }
+
+  window.setTimeout(run, 1500);
+}
+
 function handleVisibilityChange() {
   if (document.hidden) {
     stopAccountSummaryRefresh();
@@ -655,6 +666,7 @@ function syncDesktopViewport(event: MediaQueryListEvent | MediaQueryList) {
 
 onMounted(() => {
   startPointStatusRefresh();
+  schedulePrefetch();
 
   desktopViewportQuery = window.matchMedia("(min-width: 768px)");
   syncDesktopViewport(desktopViewportQuery);
@@ -756,13 +768,14 @@ onBeforeUnmount(() => {
 
 async function handleSignOut() {
   if (isAuditMode.value) {
-    await dashboardApi.maintener.audit.stop();
+    await api.maintener.audit.stop();
     userMenuOpen.value = false;
     await refreshAfterAuditChange();
     return;
   }
 
   await signOut();
+  clearDataCache();
   await navigateTo("/");
 }
 
