@@ -202,7 +202,7 @@ function next() {
         <div class="grid gap-2">
           <span :class="labelClass">Headers</span>
           <div v-for="(header, index) in headers" :key="index" class="flex items-center gap-2">
-            <input v-model="header.key" :class="inputClass" class="basis-2/5" placeholder="Header">
+            <input v-model="header.key" :class="inputClass" class="flex-1" placeholder="Header">
             <input v-model="header.value" :class="inputClass" class="flex-1" placeholder="Value">
             <UiButton v-if="header.key.trim() || header.value.trim()" size="icon-sm" variant="ghost" @click="headers.splice(index, 1)">
               ✕
