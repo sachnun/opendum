@@ -60,7 +60,7 @@ jobs:
             if (!line) throw new Error("No deploy result found in CLI output");
             const result = JSON.parse(line[0]);
             if (result.status !== "success") throw new Error(result.error || "EdgeOne deploy failed");
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `url=${result.url}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `url=${new URL(result.url).origin}\n`);
           '
 
       - name: Comment preview link
