@@ -93,6 +93,7 @@ const { auditUser, dashboardMe: dashboardMeState, isAuditMode, refreshAfterAudit
 dashboardMeState.value = dashboardMe.value ?? null;
 watch(dashboardMe, (value) => {
   dashboardMeState.value = value ?? null;
+  dashboardInvalidation.patchApiKeyRoamingPoints(value?.points?.roamingPointsByApiKeyId ?? {});
 }, { immediate: true });
 const isMaintener = computed(() => dashboardMe.value?.isMaintener ?? false);
 const pointBalance = computed(() => (dashboardMe.value as DashboardMeData | null | undefined)?.points?.balance ?? 0);
@@ -620,14 +621,33 @@ function stopPointStatusRefresh() {
 function startPointStatusRefresh() {
   if (pointStatusRefreshTimer) return;
 
-  void refreshPointStatusOnce();
   pointStatusRefreshTimer = setInterval(() => {
     void refreshPointStatusOnce();
   }, POINT_STATUS_REFRESH_MS);
 }
 
+function handleVisibilityChange() {
+  if (document.hidden) {
+    stopAccountSummaryRefresh();
+    stopPointStatusRefresh();
+    return;
+  }
+
+  startAccountSummaryRefresh();
+  startPointStatusRefresh();
+  void refreshAccountSummaryOnce();
+  void refreshPointStatusOnce();
+}
+
 onMounted(() => {
   startPointStatusRefresh();
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  if (document.hidden) {
+    stopAccountSummaryRefresh();
+    stopPointStatusRefresh();
+  }
 
   watch(shouldRefreshAccountSummary, (shouldRefresh) => {
     if (shouldRefresh) {
@@ -707,6 +727,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
   stopAccountSummaryRefresh();
   stopPointStatusRefresh();
   resetMobileSidebarSwipe();
