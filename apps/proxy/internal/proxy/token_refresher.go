@@ -118,21 +118,18 @@ func (s *Service) expiringRefreshableAccounts(ctx context.Context) ([]appdb.Prov
 			continue
 		}
 
-		var rows []appdb.ProviderAccount
-		err := s.db.NewSelect().Model(&rows).
-			Column("id", "userId", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email", "isActive").
-			Where("\"isActive\" = TRUE").
-			Where("(\"disabledUntil\" IS NULL OR \"disabledUntil\" <= ?)", now).
-			Where("provider = ?", name).
-			Where("\"refreshToken\" <> ''").
-			Where("\"expiresAt\" <= ?", now.Add(buffer)).
-			OrderExpr("\"expiresAt\" ASC").
-			Limit(tokenRefreshBatchLimit).
-			Scan(ctx)
+		rows, err := s.db.ListExpiringRefreshableAccounts(ctx, appdb.ListExpiringRefreshableAccountsParams{
+			Now:           &now,
+			Provider:      name,
+			ExpiresBefore: now.Add(buffer),
+			BatchLimit:    tokenRefreshBatchLimit,
+		})
 		if err != nil {
 			return nil, err
 		}
-		accounts = append(accounts, rows...)
+		for _, row := range rows {
+			accounts = append(accounts, appdb.ProviderAccountFromExpiring(row))
+		}
 	}
 	return accounts, nil
 }
@@ -241,13 +238,11 @@ func (s *Service) loadProviderAccountCredentials(ctx context.Context, account ap
 }
 
 func (s *Service) loadProviderAccountCredentialsByID(ctx context.Context, accountID string) (appdb.ProviderAccount, error) {
-	var account appdb.ProviderAccount
-	err := s.db.NewSelect().Model(&account).
-		Column("id", "userId", "provider", "accessToken", "refreshToken", "expiresAt", "accountId", "projectId", "tier", "email", "isActive").
-		Where("id = ?", accountID).
-		Limit(1).
-		Scan(ctx)
-	return account, err
+	row, err := s.db.GetAccountCredentialsByID(ctx, accountID)
+	if err != nil {
+		return appdb.ProviderAccount{}, err
+	}
+	return appdb.ProviderAccountFromCredentials(row), nil
 }
 
 func (s *Service) persistRefreshedCredentials(ctx context.Context, account appdb.ProviderAccount, refreshed providers.RefreshedCredentials) (appdb.ProviderAccount, error) {
@@ -268,36 +263,44 @@ func (s *Service) persistRefreshedCredentials(ctx context.Context, account appdb
 	}
 
 	now := time.Now()
-	query := s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
-		Set("\"accessToken\" = ?", encryptedAccess).
-		Set("\"refreshToken\" = ?", encryptedRefresh).
-		Set("\"expiresAt\" = ?", refreshed.ExpiresAt).
-		Set("\"updatedAt\" = ?", now).
-		Where("id = ?", account.ID)
+	projectID := account.ProjectID
+	if refreshed.ProjectID != "" {
+		projectID = strPtr(refreshed.ProjectID)
+	}
+	tier := account.Tier
+	if refreshed.Tier != "" {
+		tier = strPtr(refreshed.Tier)
+	}
+	email := account.Email
+	if refreshed.Email != "" {
+		email = strPtr(refreshed.Email)
+	}
+	accountID := account.AccountID
+	if refreshed.AccountID != "" {
+		accountID = strPtr(refreshed.AccountID)
+	}
 
+	if err := s.db.UpdateRefreshedCredentials(ctx, appdb.UpdateRefreshedCredentialsParams{
+		AccessToken:  encryptedAccess,
+		RefreshToken: encryptedRefresh,
+		ExpiresAt:    refreshed.ExpiresAt,
+		ProjectID:    projectID,
+		Tier:         tier,
+		Email:        email,
+		AccountID:    accountID,
+		UpdatedAt:    now,
+		ID:           account.ID,
+	}); err != nil {
+		return account, err
+	}
 	account.AccessToken = encryptedAccess
 	account.RefreshToken = encryptedRefresh
 	account.ExpiresAt = refreshed.ExpiresAt
 	account.UpdatedAt = now
-	if refreshed.ProjectID != "" {
-		query.Set("\"projectId\" = ?", refreshed.ProjectID)
-		account.ProjectID = strPtr(refreshed.ProjectID)
-	}
-	if refreshed.Tier != "" {
-		query.Set("tier = ?", refreshed.Tier)
-		account.Tier = strPtr(refreshed.Tier)
-	}
-	if refreshed.Email != "" {
-		query.Set("email = ?", refreshed.Email)
-		account.Email = strPtr(refreshed.Email)
-	}
-	if refreshed.AccountID != "" {
-		query.Set("\"accountId\" = ?", refreshed.AccountID)
-		account.AccountID = strPtr(refreshed.AccountID)
-	}
-	if _, err := query.Exec(ctx); err != nil {
-		return account, err
-	}
+	account.ProjectID = projectID
+	account.Tier = tier
+	account.Email = email
+	account.AccountID = accountID
 	return account, nil
 }
 
@@ -367,20 +370,17 @@ func (s *Service) recordRefreshFailure(ctx context.Context, account appdb.Provid
 		return failCount, shouldDisableAccountAfterRefreshFailures(failCount)
 	}
 
-	_, _ = s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
-		Set("\"errorCount\" = \"errorCount\" + 1").
-		Set("\"lastErrorAt\" = ?", now).
-		Set("\"lastErrorCode\" = ?", statusCode).
-		Set("\"updatedAt\" = ?", now).
-		Where("id = ?", account.ID).
-		Exec(ctx)
+	_ = s.db.RecordAccountError(ctx, appdb.RecordAccountErrorParams{
+		LastErrorAt:   &now,
+		LastErrorCode: &statusCode,
+		ID:            account.ID,
+	})
 
 	if account.UserID != "" {
 		_ = s.upsertErrorHistory(ctx, account.ID, account.UserID, nil, statusCode, "Token refresh failed: "+message, now)
 	} else {
-		var owner appdb.ProviderAccount
-		if err := s.db.NewSelect().Model(&owner).Column("userId").Where("id = ?", account.ID).Limit(1).Scan(ctx); err == nil && owner.UserID != "" {
-			_ = s.upsertErrorHistory(ctx, account.ID, owner.UserID, nil, statusCode, "Token refresh failed: "+message, now)
+		if ownerUserID, err := s.db.GetAccountOwnerUserID(ctx, account.ID); err == nil && ownerUserID != "" {
+			_ = s.upsertErrorHistory(ctx, account.ID, ownerUserID, nil, statusCode, "Token refresh failed: "+message, now)
 		}
 	}
 
@@ -399,19 +399,15 @@ func (s *Service) disableAccountAfterRefreshFailures(ctx context.Context, accoun
 	if s.db == nil || accountID == "" {
 		return false
 	}
-	res, err := s.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).
-		Set("\"isActive\" = FALSE").
-		Set("status = ?", "failed").
-		Set("\"statusChangedAt\" = ?", now).
-		Set("\"updatedAt\" = ?", now).
-		Where("id = ?", accountID).
-		Where("\"isActive\" = TRUE").
-		Exec(ctx)
+	affected, err := s.db.DisableFailedAccount(ctx, appdb.DisableFailedAccountParams{
+		Status:          "failed",
+		StatusChangedAt: &now,
+		ID:              accountID,
+	})
 	if err != nil {
 		slog.Error("failed to disable provider account after refresh failures", "account", accountID, "error", err)
 		return false
 	}
-	affected, _ := res.RowsAffected()
 	return affected > 0
 }
 

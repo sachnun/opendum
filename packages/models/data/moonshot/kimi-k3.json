@@ -4,7 +4,8 @@
     "nvidia_nim",
     "qoder",
     "hyper",
-    "workbuddy"
+    "workbuddy",
+    "perch"
   ],
   "modalities": {
     "input": [
@@ -34,6 +35,10 @@
     },
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k3",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "perch": {
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },

@@ -14,7 +14,7 @@ const emit = defineEmits<{
   updated: [value: { expiresAt: string | Date | null }];
 }>();
 
-const dashboardApi = useDashboardApi();
+const api = useApi();
 const open = ref(false);
 const isSaving = ref(false);
 const expiresAt = ref<Date | null>(props.initialExpiresAt ? new Date(props.initialExpiresAt) : null);
@@ -96,7 +96,7 @@ async function saveExpiration(value: Date | null) {
   isSaving.value = true;
   errorMessage.value = "";
   try {
-    const result = await dashboardApi.apiKeys.updateExpiration({ id: props.apiKeyId, expiresAt: value });
+    const result = await api.apiKeys.updateExpiration({ id: props.apiKeyId, expiresAt: value });
     if (!result.success) throw new Error(result.error);
     expiresAt.value = result.data.expiresAt ? new Date(result.data.expiresAt) : null;
     open.value = false;

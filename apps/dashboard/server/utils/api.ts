@@ -5,25 +5,24 @@ import { ZodError } from "zod";
 import type { z } from "zod";
 
 import { requireSession } from "./session";
-import { getDashboardRoleForEmail, type DashboardUserRole } from "./maintainers";
-import { db } from "../lib/db";
-import { user } from "../lib/db/schema";
+import { roleForEmail, type UserRole } from "./maintainers";
+import { db, user } from "@opendum/database";
 
 export const AUDIT_COOKIE_NAME = "__AuditUser";
 
-export interface DashboardActorUser {
+export interface ActorUser {
   id: string;
   name: string | null;
   email: string | null;
   image: string | null;
 }
 
-export interface DashboardRequestContext {
-  actor: DashboardActorUser;
-  role: DashboardUserRole;
+export interface RequestContext {
+  actor: ActorUser;
+  role: UserRole;
   isMaintener: boolean;
   userId: string;
-  auditUser: DashboardActorUser | null;
+  auditUser: ActorUser | null;
   isAuditMode: boolean;
 }
 
@@ -31,7 +30,7 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-function toDashboardActorUser(value: { id: string; name?: string | null; email?: string | null; image?: string | null }): DashboardActorUser {
+function toActorUser(value: { id: string; name?: string | null; email?: string | null; image?: string | null }): ActorUser {
   return {
     id: value.id,
     name: value.name ?? null,
@@ -60,7 +59,7 @@ export function clearAuditUserCookie(event: H3Event) {
   deleteCookie(event, AUDIT_COOKIE_NAME, auditCookieOptions());
 }
 
-async function getAuditTargetUser(event: H3Event, actorId: string, isMaintener: boolean): Promise<DashboardActorUser | null> {
+async function getAuditTargetUser(event: H3Event, actorId: string, isMaintener: boolean): Promise<ActorUser | null> {
   const auditUserId = getCookie(event, AUDIT_COOKIE_NAME)?.trim();
   if (!auditUserId || !isMaintener) return null;
 
@@ -83,10 +82,10 @@ async function getAuditTargetUser(event: H3Event, actorId: string, isMaintener: 
   return targetUser;
 }
 
-export async function requireDashboardContext(event: H3Event): Promise<DashboardRequestContext> {
+export async function requireContext(event: H3Event): Promise<RequestContext> {
   const session = await requireSession(event);
-  const role = getDashboardRoleForEmail(session.user.email);
-  const actor = toDashboardActorUser(session.user);
+  const role = roleForEmail(session.user.email);
+  const actor = toActorUser(session.user);
   const isMaintener = role === "maintener";
   const auditUser = await getAuditTargetUser(event, actor.id, isMaintener);
 
@@ -100,8 +99,8 @@ export async function requireDashboardContext(event: H3Event): Promise<Dashboard
   };
 }
 
-export async function requireMaintenerContext(event: H3Event): Promise<DashboardRequestContext> {
-  const context = await requireDashboardContext(event);
+export async function requireMaintenerContext(event: H3Event): Promise<RequestContext> {
+  const context = await requireContext(event);
   if (!context.isMaintener) {
     throw createError({ statusCode: 403, statusMessage: "Maintener access required" });
   }
@@ -109,16 +108,16 @@ export async function requireMaintenerContext(event: H3Event): Promise<Dashboard
   return context;
 }
 
-export async function requireReadableDashboardContext(event: H3Event): Promise<DashboardRequestContext> {
-  return requireDashboardContext(event);
+export async function requireReadContext(event: H3Event): Promise<RequestContext> {
+  return requireContext(event);
 }
 
 export async function requireReadableUserId(event: H3Event): Promise<string> {
-  return (await requireReadableDashboardContext(event)).userId;
+  return (await requireReadContext(event)).userId;
 }
 
-async function requireWritableDashboardContext(event: H3Event): Promise<DashboardRequestContext> {
-  const context = await requireDashboardContext(event);
+async function requireWriteContext(event: H3Event): Promise<RequestContext> {
+  const context = await requireContext(event);
   if (context.isAuditMode) {
     throw createError({ statusCode: 403, statusMessage: "Audit mode is read-only" });
   }
@@ -127,7 +126,7 @@ async function requireWritableDashboardContext(event: H3Event): Promise<Dashboar
 }
 
 export async function requireWritableUserId(event: H3Event): Promise<string> {
-  return (await requireWritableDashboardContext(event)).userId;
+  return (await requireWriteContext(event)).userId;
 }
 
 function badRequestFromZod(error: ZodError): never {
@@ -135,7 +134,7 @@ function badRequestFromZod(error: ZodError): never {
   throw createError({ statusCode: 400, statusMessage: message });
 }
 
-export async function readDashboardBody<TSchema extends z.ZodType>(
+export async function parseBody<TSchema extends z.ZodType>(
   event: H3Event,
   schema: TSchema
 ): Promise<z.output<TSchema>> {
@@ -147,7 +146,7 @@ export async function readDashboardBody<TSchema extends z.ZodType>(
   }
 }
 
-export function getDashboardQuery<TSchema extends z.ZodType>(
+export function parseQuery<TSchema extends z.ZodType>(
   event: H3Event,
   schema: TSchema
 ): z.output<TSchema> {

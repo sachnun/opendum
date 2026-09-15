@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DashboardMeData } from "../../lib/dashboard-api-types";
+import type { MeData } from "../../lib/api-types";
 
 const props = withDefaults(
   defineProps<{
@@ -21,8 +21,8 @@ const emit = defineEmits<{
   updated: [value: { name: string | null; keyPreview?: string }];
 }>();
 
-const dashboardApi = useDashboardApi();
-const { data: dashboardMe } = useNuxtData<DashboardMeData>("dashboard-me");
+const api = useApi();
+const { data: me } = useNuxtData<MeData>(dataKeys.me);
 const API_KEY_MIN_LENGTH = 3;
 const API_KEY_MAX_LENGTH = 100;
 const API_KEY_UPDATE_POINT_COST = 100;
@@ -38,7 +38,7 @@ const errorMessage = ref("");
 const maskedApiKey = computed(() => props.keyPreview || "********");
 const normalizedApiKeyValue = computed(() => apiKeyValue.value.trim());
 const saveCostsPoints = computed(() => isApiKeyDirty.value && normalizedApiKeyValue.value !== revealedApiKey.value);
-const pointBalance = computed(() => dashboardMe.value?.points?.balance ?? 0);
+const pointBalance = computed(() => me.value?.points?.balance ?? 0);
 const formattedApiKeyUpdatePointCost = computed(() => API_KEY_UPDATE_POINT_COST.toLocaleString("en-US"));
 const hasInsufficientPoints = computed(() => saveCostsPoints.value && pointBalance.value < API_KEY_UPDATE_POINT_COST);
 const apiKeyValidationError = computed(() => {
@@ -64,7 +64,7 @@ async function revealApiKeyForEdit() {
   isRevealingApiKey.value = true;
   errorMessage.value = "";
   try {
-    const result = await dashboardApi.apiKeys.reveal({ id: props.id });
+    const result = await api.apiKeys.reveal({ id: props.id });
     if (!result.success) throw new Error(result.error);
     revealedApiKey.value = result.data.key;
     apiKeyValue.value = result.data.key;
@@ -88,10 +88,10 @@ async function updateName() {
   isUpdating.value = true;
   errorMessage.value = "";
   try {
-    const result = await dashboardApi.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedApiKeyValue.value } : {}) });
+    const result = await api.apiKeys.updateName({ id: props.id, name: newName.value, ...(saveCostsPoints.value ? { key: normalizedApiKeyValue.value } : {}) });
     if (!result.success) throw new Error(result.error);
     editDialogOpen.value = false;
-    if (saveCostsPoints.value) void refreshNuxtData("dashboard-me");
+    if (saveCostsPoints.value) void refreshNuxtData(dataKeys.me);
     emit("updated", { name: result.data.name, keyPreview: result.data.keyPreview });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to update API key";

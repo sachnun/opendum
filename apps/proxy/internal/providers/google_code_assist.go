@@ -155,7 +155,7 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 			projectID = p.defaultProject
 		}
 		if projectID != "" && p.db != nil {
-			_, _ = p.db.NewUpdate().Model((*appdb.ProviderAccount)(nil)).Set("\"projectId\" = ?", projectID).Set("tier = ?", info.tier).Set("email = ?", info.email).Where("id = ?", account.ID).Exec(ctx)
+			_ = p.db.UpdateAntigravityAccountInfo(ctx, appdb.UpdateAntigravityAccountInfoParams{ProjectID: &projectID, Tier: &info.tier, Email: &info.email, ID: account.ID})
 		}
 	}
 	if projectID == "" {
@@ -319,7 +319,24 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	sortFunctionDeclarations(payload)
 	p.applyAntigravitySystemInstruction(payload, model)
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
+	stripTrailingModelTurns(payload)
 	payload["sessionId"] = sessionID
+}
+
+// Antigravity rejects a request that ends on a model turn: Gemini answers HTTP 400
+// "Requests ending with a model turn are not supported" and Vertex answers the same
+// shape for Claude with "This model does not support assistant message prefill".
+// Drop trailing model turns, always keeping one content entry so contents stays valid.
+func stripTrailingModelTurns(payload map[string]any) {
+	contents, _ := payload["contents"].([]any)
+	for len(contents) > 1 {
+		last, _ := contents[len(contents)-1].(map[string]any)
+		if last["role"] != "model" {
+			break
+		}
+		contents = contents[:len(contents)-1]
+	}
+	payload["contents"] = contents
 }
 
 // sortFunctionDeclarations sorts function declarations within each tool block

@@ -3,7 +3,7 @@ import { createParser, type EventSourceMessage } from "eventsource-parser";
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-families";
 import { compareModelEntries } from "../../lib/model-sort";
 import { BY_KEY, getProviderAccountPath, getProviderLabel, type ProviderAccountKey } from "../../lib/provider-accounts";
-import type { PlaygroundOptions } from "../../lib/dashboard-api-types";
+import type { PlaygroundOptions } from "../../lib/api-types";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
@@ -14,7 +14,7 @@ type ParsedUsageData = { inputTokens: number | null; outputTokens: number | null
 type ToolCallData = { name: string; arguments: string };
 type ParsedCompletionData = { content: string; reasoning: string; toolCalls: ToolCallData[]; usage: ParsedUsageData | null };
 type ResponseMetrics = { waitMs: number | null; firstResponseMs: number | null; inputTokens: number | null; outputTokens: number | null; totalTokens: number | null };
-type ResponseData = { content: string; reasoning: string; toolCalls: ToolCallData[]; isLoading: boolean; error?: string; metrics: ResponseMetrics; usedAccountId?: string | null; startedAt?: number | null };
+type ResponseData = { content: string; reasoning: string; toolCalls: ToolCallData[]; isLoading: boolean; error?: string; errorDetails?: string; metrics: ResponseMetrics; usedAccountId?: string | null; startedAt?: number | null };
 type FetchModelResult = "success" | "error" | "aborted";
 type StreamHeaderInfo = { status: number; statusText: string; getHeader: (name: string) => string | null };
 type StreamProxyRequestInput = { url: string; headers: Record<string, string>; body: string; signal: AbortSignal; endpoint: PlaygroundEndpoint; onHeaders: (info: StreamHeaderInfo) => void; onChunk: (chunk: ParsedCompletionData) => void };
@@ -41,8 +41,8 @@ interface Scenario {
   requestOverrides?: Record<string, unknown>;
 }
 
-const dashboardApi = useDashboardApi();
-const dashboardInvalidation = useDashboardDataInvalidation();
+const api = useApi();
+const invalidation = useInvalidate();
 const route = useRoute();
 
 type ModelOption = PlaygroundOptions["models"][number];
@@ -153,13 +153,12 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
   { value: "xhigh", label: "XHigh" },
 ];
 
-const { data, error, pending } = await useAsyncData("dashboard-playground-options", () => dashboardApi.playground.options());
-if (data.value && !data.value.hasAnyProviderAccount) {
-  await navigateTo("/", { replace: true });
-}
+const { data, error } = useCachedData(dataKeys.playgroundOptions, () => api.playground.options());
+watch(data, (value) => {
+  if (value && !value.hasAnyProviderAccount) void navigateTo("/", { replace: true });
+}, { immediate: true });
 
 const options = computed<PlaygroundOptions | null>(() => data.value ?? null);
-const isInitialLoading = computed(() => pending.value && !data.value);
 const models = computed<ModelOption[]>(() => options.value?.models ?? []);
 const providerAccounts = computed<ProviderAccountOption[]>(() => options.value?.providerAccounts ?? []);
 const hasAnyProviderAccount = computed(() => Boolean(options.value?.hasAnyProviderAccount));
@@ -1139,6 +1138,103 @@ function getErrorMessageFromText(text: string): string {
   return trimmed;
 }
 
+const ERROR_STRING_LIMIT = 200;
+const ERROR_ARRAY_PREVIEW_LIMIT = 10;
+const ERROR_MESSAGE_LIMIT = 30;
+const ERROR_RAW_MESSAGE_LIMIT = 2000;
+
+function truncateErrorString(value: string): string {
+  if (value.length <= ERROR_STRING_LIMIT) return value;
+  return `${value.slice(0, ERROR_STRING_LIMIT)}...[truncated, ${value.length} chars total]`;
+}
+
+function summarizeToolsForError(tools: unknown[]): string {
+  const names: string[] = [];
+  const limit = Math.min(tools.length, ERROR_ARRAY_PREVIEW_LIMIT);
+  for (let i = 0; i < limit; i += 1) {
+    const tool = tools[i];
+    if (!tool || typeof tool !== "object") continue;
+    const fn = (tool as { function?: unknown }).function;
+    if (fn && typeof fn === "object") {
+      if (typeof (fn as { name?: unknown }).name === "string") names.push((fn as { name: string }).name);
+      continue;
+    }
+    if (typeof (tool as { name?: unknown }).name === "string") names.push((tool as { name: string }).name);
+  }
+  const suffix = tools.length > ERROR_ARRAY_PREVIEW_LIMIT ? `, +${tools.length - ERROR_ARRAY_PREVIEW_LIMIT} more` : "";
+  return `[${tools.length} tool(s): ${names.join(", ")}${suffix}]`;
+}
+
+function sanitizeErrorValue(value: unknown, key: string): unknown {
+  if (typeof value === "string") return truncateErrorString(value);
+  if (Array.isArray(value)) {
+    if (key === "tools") return summarizeToolsForError(value);
+    const items = value.slice(0, ERROR_ARRAY_PREVIEW_LIMIT).map((item) => sanitizeErrorValue(item, key));
+    if (value.length > ERROR_ARRAY_PREVIEW_LIMIT) items.push(`...[truncated, ${value.length} items total]`);
+    return items;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) out[nestedKey] = sanitizeErrorValue(nestedValue, nestedKey);
+    return out;
+  }
+  return value;
+}
+
+function sanitizeErrorParameters(parameters: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parameters)) {
+    out[key] = key === "messages" ? '[redacted: see "Messages (object keys only)"]' : sanitizeErrorValue(value, key);
+  }
+  return out;
+}
+
+function errorTypeName(value: unknown): string {
+  if (value === null) return "null";
+  if (typeof value === "string") return "string";
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "number") return "number";
+  return "object";
+}
+
+function summarizeErrorMessages(messages: unknown): string {
+  if (!Array.isArray(messages)) return "";
+  const entries: Array<Record<string, unknown>> = [];
+  const limit = Math.min(messages.length, ERROR_MESSAGE_LIMIT);
+  for (let i = 0; i < limit; i += 1) {
+    const item = messages[i];
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      entries.push({ index: i, keys: Object.keys(item as Record<string, unknown>).sort() });
+    } else if (Array.isArray(item)) {
+      entries.push({ index: i, type: "array" });
+    } else {
+      entries.push({ index: i, type: errorTypeName(item) });
+    }
+  }
+  if (messages.length > ERROR_MESSAGE_LIMIT) entries.push({ index: ERROR_MESSAGE_LIMIT, type: `truncated_${messages.length - ERROR_MESSAGE_LIMIT}_more_items` });
+  return JSON.stringify(entries, null, 2);
+}
+
+function buildPlaygroundErrorMessage(errorMessage: string, context: { model: string; provider: string | null; endpoint: PlaygroundEndpoint; parameters: Record<string, unknown> | null; messages: unknown }): string {
+  const truncatedError = errorMessage.length > ERROR_RAW_MESSAGE_LIMIT ? `${errorMessage.slice(0, ERROR_RAW_MESSAGE_LIMIT)}...[truncated, ${errorMessage.length} chars total]` : errorMessage;
+
+  let serializedParameters = "{}";
+  if (context.parameters) {
+    try {
+      serializedParameters = JSON.stringify(sanitizeErrorParameters(context.parameters), null, 2);
+    } catch {
+      serializedParameters = '"[unserializable parameters]"';
+    }
+  }
+
+  const lines = [`Error: ${truncatedError}`];
+  if (context.provider) lines.push(`Provider: ${context.provider}`);
+  lines.push(`Endpoint: ${getEndpointPath(context.endpoint)}`, `Model: ${context.model}`, `Parameters: ${serializedParameters}`);
+  const messagesSummary = summarizeErrorMessages(context.messages);
+  if (messagesSummary) lines.push(`Messages (object keys only): ${messagesSummary}`);
+  return lines.join("\n");
+}
+
 function streamProxyRequest(input: StreamProxyRequestInput): Promise<void> {
   return new Promise((resolve, reject) => {
     if (input.signal.aborted) {
@@ -1365,7 +1461,7 @@ function refreshAccountOverview() {
   if (accountOverviewInvalidationTimer) clearTimeout(accountOverviewInvalidationTimer);
   accountOverviewInvalidationTimer = setTimeout(() => {
     accountOverviewInvalidationTimer = null;
-    void dashboardInvalidation.invalidateAccountOverview();
+    void invalidation.invalidateAccountOverview();
   }, ACCOUNT_OVERVIEW_INVALIDATION_DELAY_MS);
 }
 
@@ -1403,6 +1499,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
   let waitMs: number | null = null;
   let usedAccountId: string | null = null;
   let shouldRefreshAccountOverview = false;
+  let errorContextParameters: Record<string, unknown> | null = null;
 
   controllers.get(panelId)?.abort();
   requestIds.set(panelId, requestId);
@@ -1411,6 +1508,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
   try {
     const requestBody = buildRequestBody(modelId, messages, currentSettings);
+    errorContextParameters = requestBody;
     const endpointOverrides = adaptRequestOverridesForEndpoint(scenario.requestOverrides, currentSettings.endpoint);
     if (endpointOverrides) Object.assign(requestBody, endpointOverrides);
     const additionalParameters = parseAdditionalParameters(additionalParametersInput.value);
@@ -1421,7 +1519,7 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
 
     const controller = new AbortController();
     controllers.set(panelId, controller);
-    const auth = await dashboardApi.playground.auth({ endpoint: currentSettings.endpoint });
+    const auth = await api.playground.auth({ endpoint: currentSettings.endpoint });
     if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
     const url = `${getProxyBaseUrl()}${getEndpointPath(currentSettings.endpoint)}`;
@@ -1499,7 +1597,10 @@ async function fetchFromModel(panelId: string, modelId: string, scenario: Scenar
       return "aborted";
     }
 
-    setResponseIfCurrent(panelId, requestId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: error instanceof Error ? error.message : "Unknown error", metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorProvider = provider ?? (accountId ? providerAccountsById.value.get(accountId)?.provider ?? null : null) ?? (usedAccountId ? providerAccountsById.value.get(usedAccountId)?.provider ?? null : null);
+    const errorDetails = buildPlaygroundErrorMessage(errorMessage, { model: modelId, provider: errorProvider, endpoint: currentSettings.endpoint, parameters: errorContextParameters, messages });
+    setResponseIfCurrent(panelId, requestId, { content: "", reasoning: "", toolCalls: [], isLoading: false, error: errorMessage, errorDetails, metrics: buildResponseMetrics(waitMs, null, null), usedAccountId });
     return "error";
   } finally {
     if (requestIds.get(panelId) === requestId) {
@@ -1630,11 +1731,12 @@ function formatToolArguments(value: string): string {
 }
 
 async function copyPanelError(panelId: string) {
-  const error = responses.value[panelId]?.error;
+  const response = responses.value[panelId];
+  const error = response?.error;
   if (!error) return;
 
   try {
-    await navigator.clipboard.writeText(error);
+    await navigator.clipboard.writeText(response.errorDetails ?? error);
     copiedErrorByPanel[panelId] = true;
     const existingTimeout = copyErrorTimeouts.get(panelId);
     if (existingTimeout) clearTimeout(existingTimeout);
@@ -1819,10 +1921,8 @@ async function copyPanelError(panelId: string) {
       </div>
     </div>
 
-    <DashboardDataNotice :error="error" />
-    <UiSkeleton v-if="isInitialLoading" class="h-96 rounded-xl" />
+    <DataNotice :error="error" />
 
-    <template v-else>
       <div class="space-y-3">
         <div v-if="playgroundSetupMessage" class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           {{ playgroundSetupMessage }}
@@ -2040,11 +2140,7 @@ async function copyPanelError(panelId: string) {
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.content }}<span v-if="responses[panel.id]?.isLoading" class="animate-pulse text-primary">▌</span></pre>
                     </div>
                     <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning && responses[panel.id]?.isLoading" class="rounded-lg bg-card/50 px-3 py-2">
-                      <div class="space-y-1.5">
-                        <UiSkeleton class="h-3 w-full" />
-                        <UiSkeleton class="h-3 w-4/5" />
-                        <UiSkeleton class="h-3 w-3/5" />
-                      </div>
+                      <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed"><span class="animate-pulse text-primary">▌</span></pre>
                     </div>
                     <div v-if="responses[panel.id]?.toolCalls?.length" class="rounded-lg bg-muted/20 px-3 py-2">
                       <div class="mb-1.5 flex items-center gap-1.5">
@@ -2077,11 +2173,7 @@ async function copyPanelError(panelId: string) {
                       <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ responses[panel.id]?.content }}<span class="animate-pulse text-primary">▌</span></pre>
                     </div>
                     <div v-if="!responses[panel.id]?.content && !responses[panel.id]?.reasoning" class="rounded-lg bg-card/50 px-3 py-2">
-                      <div class="space-y-1.5">
-                        <UiSkeleton class="h-3 w-full" />
-                        <UiSkeleton class="h-3 w-4/5" />
-                        <UiSkeleton class="h-3 w-3/5" />
-                      </div>
+                      <pre class="whitespace-pre-wrap font-sans text-xs leading-relaxed"><span class="animate-pulse text-primary">▌</span></pre>
                     </div>
                   </div>
                 </div>
@@ -2137,7 +2229,6 @@ async function copyPanelError(panelId: string) {
           </button>
         </UiCard>
       </div>
-    </template>
   </div>
   </div>
 </template>

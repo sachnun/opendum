@@ -3,7 +3,8 @@
   "providers": [
     "kiro",
     "codex",
-    "workbuddy"
+    "workbuddy",
+    "perch"
   ],
   "modalities": {
     "input": [
@@ -50,6 +51,11 @@
         "power",
         "standalone"
       ]
+    },
+    "perch": {
+      "upstream": "gpt-5-6-sol",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
     },
     "workbuddy": {
       "contextWindow": 1050000,

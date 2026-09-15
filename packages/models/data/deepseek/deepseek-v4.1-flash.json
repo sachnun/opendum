@@ -4,7 +4,8 @@
     "harbor",
     "workbuddy",
     "zenmux",
-    "hyper"
+    "hyper",
+    "cline"
   ],
   "meta": {
     "reasoning": true,
@@ -30,17 +31,22 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 26214
+    "output": 13107
   },
   "providerConfig": {
+    "cline": {
+      "upstream": "cline-free/deepseek-v4.1-flash",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
+    },
     "harbor": {
       "upstream": "deepseek-v4.1-flash:free",
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
     "hyper": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 26214
+      "contextWindow": 1000000,
+      "maxOutputTokens": 13107
     },
     "workbuddy": {
       "contextWindow": 1000000,

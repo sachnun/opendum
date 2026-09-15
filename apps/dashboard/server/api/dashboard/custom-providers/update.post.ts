@@ -1,4 +1,4 @@
 import { updateCustomProvider, updateCustomProviderSchema } from "../../../services/custom-providers";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { parseBody, requireWritableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => updateCustomProvider(await requireWritableUserId(event), await readDashboardBody(event, updateCustomProviderSchema)));
+export default defineEventHandler(async (event) => updateCustomProvider(await requireWritableUserId(event), await parseBody(event, updateCustomProviderSchema)));

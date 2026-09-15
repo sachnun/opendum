@@ -168,12 +168,7 @@ func (p openAICompatibleProvider) MakeRequest(ctx context.Context, client *http.
 	modelName := p.resolveModel(model)
 	extraHeaders := p.extraRequestHeaders(account)
 	if p.requiresResponsesAPI(model) {
-		payload := p.buildResponsesPayload(body, modelName, stream)
-		if p.convertImages(model) {
-			if input, ok := payload["input"].([]any); ok {
-				payload["input"] = convertResponsesInputImageURLsToBase64(ctx, client, input)
-			}
-		}
+		payload := p.buildResponsesPayload(ctx, client, body, modelName, stream)
 		resp, err := p.post(ctx, client, "/responses", credentials, payload, stream, model, extraHeaders)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
@@ -270,17 +265,28 @@ func (p openAICompatibleProvider) buildPayload(body map[string]any, model string
 	return payload
 }
 
-func (p openAICompatibleProvider) buildResponsesPayload(body map[string]any, modelName string, stream bool) map[string]any {
-	return buildResponsesAPIPayload(body, modelName, stream)
+func (p openAICompatibleProvider) buildResponsesPayload(ctx context.Context, client *http.Client, body map[string]any, modelName string, stream bool) map[string]any {
+	return buildResponsesAPIPayload(ctx, client, body, modelName, stream)
 }
 
-func buildResponsesAPIPayload(body map[string]any, modelName string, stream bool) map[string]any {
+func clampPromptCacheKey(key string) string {
+	chars := []rune(key)
+	if len(chars) > 64 {
+		return string(chars[:64])
+	}
+	return key
+}
+
+func buildResponsesAPIPayload(ctx context.Context, client *http.Client, body map[string]any, modelName string, stream bool) map[string]any {
 	messages, _ := body["messages"].([]any)
 	payload := map[string]any{"model": modelName, "stream": stream}
 	if input, ok := body["_responsesInput"].([]any); ok {
 		payload["input"] = normalizeResponsesInput(input)
 	} else {
 		payload["input"] = messagesToResponsesInput(messages)
+	}
+	if input, ok := payload["input"].([]any); ok {
+		payload["input"] = convertResponsesInputImageURLsToBase64(ctx, client, input)
 	}
 	if instructions := stringValue(body["instructions"]); instructions != "" {
 		payload["instructions"] = instructions
@@ -295,6 +301,8 @@ func buildResponsesAPIPayload(body map[string]any, modelName string, stream bool
 		payload["max_output_tokens"] = body["max_tokens"]
 	} else if body["max_completion_tokens"] != nil {
 		payload["max_output_tokens"] = body["max_completion_tokens"]
+	} else if body["max_output_tokens"] != nil {
+		payload["max_output_tokens"] = body["max_output_tokens"]
 	}
 	if tools := convertToolsForResponses(body["tools"]); len(tools) > 0 {
 		payload["tools"] = tools
@@ -323,6 +331,11 @@ func buildResponsesAPIPayload(body map[string]any, modelName string, stream bool
 	for _, key := range []string{"previous_response_id", "prompt_cache_key", "service_tier", "store", "text", "truncation", "user"} {
 		if body[key] != nil {
 			payload[key] = body[key]
+		}
+	}
+	if payload["prompt_cache_key"] == nil {
+		if sessionID := stringValue(body["_sessionId"]); sessionID != "" {
+			payload["prompt_cache_key"] = clampPromptCacheKey(sessionID)
 		}
 	}
 	return payload
@@ -388,7 +401,7 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 	}
 	headers := opencodeHeaders(body)
 	if p.requiresResponsesAPI(model) {
-		payload := buildResponsesAPIPayload(body, modelName, stream)
+		payload := buildResponsesAPIPayload(ctx, client, body, modelName, stream)
 		resp, err := p.postOpencodeResponses(ctx, client, payload, stream, headers)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
@@ -600,5 +613,5 @@ var supportedNvidia = set("model", "messages", "temperature", "top_p", "max_toke
 
 var supportedKilo = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 var supportedHyper = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
-var supportedOpencode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
+var supportedOpencode = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort", "prompt_cache_key")
 var supportedWorkersAI = set("model", "messages", "audio", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "function_call", "functions", "presence_penalty", "frequency_penalty", "stop", "seed", "response_format", "reasoning_effort", "chat_template_kwargs", "modalities", "metadata", "prediction", "logit_bias", "logprobs", "top_logprobs", "store", "service_tier", "user", "web_search_options", "n")

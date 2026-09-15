@@ -2,15 +2,14 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { z } from "zod";
 
-import { readDashboardBody, requireMaintenerContext, setAuditUserCookie } from "../../../../utils/api";
-import { db } from "../../../../lib/db";
-import { user } from "../../../../lib/db/schema";
+import { parseBody, requireMaintenerContext, setAuditUserCookie } from "../../../../utils/api";
+import { db, user } from "@opendum/database";
 
 const startAuditInputSchema = z.object({ userId: z.string().min(1) });
 
 export default defineEventHandler(async (event) => {
   const context = await requireMaintenerContext(event);
-  const input = await readDashboardBody(event, startAuditInputSchema);
+  const input = await parseBody(event, startAuditInputSchema);
 
   if (input.userId === context.actor.id) {
     throw createError({ statusCode: 400, statusMessage: "Cannot audit your own account" });

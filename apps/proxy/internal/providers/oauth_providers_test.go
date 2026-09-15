@@ -260,6 +260,25 @@ func TestWorkersAIProviderConvertsImageURL(t *testing.T) {
 	assertChatImageDataURI(t, payload)
 }
 
+func TestResponsesPayloadConvertsInputImageURL(t *testing.T) {
+	var captured map[string]any
+	client := imageCaptureClient(t, &captured)
+	payload := buildResponsesAPIPayload(t.Context(), client, map[string]any{
+		"_responsesInput": []any{map[string]any{"type": "message", "role": "user", "content": []any{
+			map[string]any{"type": "text", "text": "describe"},
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "https://8.8.8.8/image.png"}},
+		}}},
+	}, "unit-test-model", false)
+	input := payload["input"].([]any)
+	part := input[0].(map[string]any)["content"].([]any)[1].(map[string]any)
+	if part["type"] != "input_image" {
+		t.Fatalf("type = %v", part["type"])
+	}
+	if got := stringValue(part["image_url"]); !strings.HasPrefix(got, "data:image/png;base64,") {
+		t.Fatalf("image url = %q", got)
+	}
+}
+
 func TestAntigravityGenerationHeadersIncludeCodeAssistMetadata(t *testing.T) {
 	provider := antigravityProvider{}.delegate()
 	req, err := http.NewRequest(http.MethodPost, "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent", nil)

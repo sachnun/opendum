@@ -1,7 +1,7 @@
 import { deleteCustomModel, deleteCustomModelSchema } from "../../../services/custom-providers";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { parseBody, requireWritableUserId } from "../../../utils/api";
 
 export default defineEventHandler(async (event) => {
-  const input = await readDashboardBody(event, deleteCustomModelSchema);
+  const input = await parseBody(event, deleteCustomModelSchema);
   return deleteCustomModel(await requireWritableUserId(event), input.slug, input.modelId);
 });

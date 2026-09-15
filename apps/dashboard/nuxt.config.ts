@@ -89,20 +89,14 @@ function buildModelRegistryModule(): string {
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
+  ssr: false,
   sourcemap: false,
-  modules: ["@nuxt/eslint", "@nuxt/fonts"],
+  modules: ["@nuxt/a11y", "@nuxt/eslint", "@nuxt/fonts"],
   css: ["~/assets/css/main.css"],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
   spaLoadingTemplate: "./loading.html",
   experimental: {
     spaLoadingTemplateLocation: "within",
-  },
-  routeRules: {
-    "/": { ssr: false },
-    "/keys": { ssr: false },
-    "/models": { ssr: false },
-    "/play": { ssr: false },
-    "/**": { ssr: false },
   },
   runtimeConfig: {
     proxyUrl: "",

@@ -1,8 +1,7 @@
 import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "../lib/db";
-import { customProvider, customProviderModel, providerAccount } from "../lib/db/schema";
+import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { encrypt, hashString } from "../lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";

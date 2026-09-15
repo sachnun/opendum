@@ -2,7 +2,8 @@
   "owner": "inclusion-ai",
   "providers": [
     "kilo_code",
-    "openrouter"
+    "openrouter",
+    "zenmux"
   ],
   "modalities": {
     "input": [
@@ -23,7 +24,7 @@
     "top_p": false
   },
   "limit": {
-    "context": 262144,
+    "context": 131072,
     "output": 32768
   },
   "providerConfig": {
@@ -35,6 +36,11 @@
     },
     "openrouter": {
       "upstream": "inclusionai/ling-3.0-flash-vl:free",
+      "contextWindow": 131072,
+      "maxOutputTokens": 32768
+    },
+    "zenmux": {
+      "upstream": "inclusionai/ling-3.0-flash-vl",
       "contextWindow": 262144,
       "maxOutputTokens": 32768
     }

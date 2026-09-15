@@ -8,32 +8,33 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-export type DashboardUserRole = "user" | "maintener";
+export type UserRole = "user" | "maintener";
 
-export interface DashboardUserIdentity {
+export interface UserIdentity {
   id: string;
   name: string | null;
   email: string | null;
   image: string | null;
 }
 
-export interface DashboardAuditInfo {
+export interface AuditInfo {
   active: boolean;
   readonly: boolean;
-  user: DashboardUserIdentity | null;
+  user: UserIdentity | null;
 }
 
-export interface DashboardMeData {
-  role: DashboardUserRole;
+export interface MeData {
+  role: UserRole;
   isMaintener: boolean;
   points?: {
     balance: number;
+    roamingPointsByApiKeyId?: Record<string, number>;
   };
   sharing?: {
     enabled: boolean;
   };
-  actor?: DashboardUserIdentity;
-  audit?: DashboardAuditInfo;
+  actor?: UserIdentity;
+  audit?: AuditInfo;
 }
 
 export interface PointStatusData {
@@ -41,9 +42,9 @@ export interface PointStatusData {
   roamingPointsByApiKeyId: Record<string, number>;
 }
 
-export type MaintenerAuditUser = DashboardUserIdentity;
+export type MaintenerAuditUser = UserIdentity;
 
-export type MaintenerAuditSearchUser = DashboardUserIdentity & {
+export type MaintenerAuditSearchUser = UserIdentity & {
   hasProviderIssue: boolean;
   lastUsedAt: string | Date | null;
 };

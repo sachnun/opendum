@@ -49,7 +49,7 @@ func main() {
 	}
 
 	authSvc := auth.NewService(database, redisClient, registry)
-	proxySvc := proxy.NewService(database, redisClient, authSvc, registry, cfg.BetterAuthSecret)
+	proxySvc := proxy.NewService(database, redisClient, authSvc, registry, cfg.BetterAuthSecret, cfg.RequestTimeout)
 	torPool := tor.NewPool(3, 0, 0, 0, 0)
 	torPool.Start(context.Background())
 	proxySvc.SetTorEgress(torPool, torPool.NewClient())

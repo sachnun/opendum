@@ -1,5 +1,4 @@
-import { db } from "../lib/db";
-import { providerAccount, proxyApiKey, usageLog } from "../lib/db/schema";
+import { db, providerAccount, proxyApiKey, usageLog } from "@opendum/database";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 

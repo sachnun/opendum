@@ -5,7 +5,7 @@ import type {
   CustomProviderListItem,
   CustomProviderModelFlags,
   CustomProviderModelMeta,
-} from "../../lib/dashboard-api-types";
+} from "../../lib/api-types";
 
 interface HeaderRow {
   key: string;
@@ -31,7 +31,7 @@ const emit = defineEmits<{
 const STEP_LABELS = ["Basics", "Connect", "Models", "API Key", "Review"] as const;
 const inputClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50";
 const labelClass = "text-sm font-medium";
-const dashboardApi = useDashboardApi();
+const dashboardApi = useApi();
 
 const activeStep = ref(1);
 const busy = ref<string>("");

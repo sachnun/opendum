@@ -31,6 +31,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test database
+        run: pnpm --filter @opendum/database test
+
+      - name: Typecheck database
+        run: pnpm --filter @opendum/database typecheck
+
+      - name: Test models
+        run: pnpm --filter @opendum/models test
+
+      - name: Typecheck models
+        run: pnpm --filter @opendum/models typecheck
+
       - name: Lint dashboard
         run: pnpm --filter @opendum/dashboard lint
 

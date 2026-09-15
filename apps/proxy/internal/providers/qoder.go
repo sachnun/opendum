@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -227,10 +228,37 @@ func (p qoderProvider) MakeRequest(ctx context.Context, client *http.Client, acc
 	}
 	MarkUpstreamResponseStarted(ctx)
 
-	if stream {
-		return sseResponse(qoderSSEToChatSSEReader(resp.Body, modelName), resp.Body), nil
+	// Qoder answers auth, quota and signature failures with HTTP 200 plus an SSE
+	// envelope carrying the real status, and then keeps the connection open with
+	// no further data and no EOF. Left alone, the reader below blocks until the
+	// edge proxy times out. Read the first envelope so the failure becomes a real
+	// HTTP status the rotation logic can act on, and so the stream is never
+	// consumed waiting for an EOF that never arrives.
+	buffered := bufio.NewReader(resp.Body)
+	firstPayload, peekErr := qoderPeekEnvelope(resp, buffered, qoderPeekTimeout)
+	if peekErr != nil {
+		_ = resp.Body.Close()
+		return jsonResponse(http.StatusBadGateway, map[string]any{"error": map[string]any{
+			"message": "Qoder did not start a response in time. Please try again.",
+			"type":    "api_error",
+			"code":    "qoder_no_response",
+		}}), nil
 	}
-	completion := qoderStreamToCompletion(resp.Body, modelName)
+	if envelope := parseQoderEnvelope(firstPayload); envelope.failed() {
+		status, message := envelope.errorStatus()
+		_ = resp.Body.Close()
+		return jsonResponse(status, map[string]any{"error": map[string]any{
+			"message": "Qoder: " + message,
+			"type":    "api_error",
+		}}), nil
+	}
+
+	// Replay the peeked envelope for the reader that consumes the rest.
+	rest := io.MultiReader(strings.NewReader("data: "+firstPayload+"\n\n"), buffered)
+	if stream {
+		return sseResponse(qoderSSEToChatSSEReader(rest, modelName), resp.Body), nil
+	}
+	completion := qoderStreamToCompletion(rest, modelName)
 	_ = resp.Body.Close()
 	return jsonResponse(http.StatusOK, completion), nil
 }
@@ -466,6 +494,127 @@ func qoderEncodeBody(plaintext []byte) string {
 
 // --- response transform ---
 
+// qoderPeekTimeout bounds the wait for the first SSE envelope. Qoder returns
+// headers immediately and only then decides whether to stream, so a stalled or
+// silent connection must not block the request indefinitely.
+const qoderPeekTimeout = 30 * time.Second
+
+var errQoderPeekTimeout = errors.New("qoder: timed out waiting for the first stream event")
+
+type qoderEnvelope struct {
+	Body            json.RawMessage `json:"body"`
+	StatusCode      string          `json:"statusCode"`
+	StatusCodeValue int             `json:"statusCodeValue"`
+}
+
+func parseQoderEnvelope(payload string) qoderEnvelope {
+	var envelope qoderEnvelope
+	_ = json.Unmarshal([]byte(payload), &envelope)
+	return envelope
+}
+
+// inner returns the payload the envelope wraps. Qoder sends the OpenAI chunk as
+// a JSON string inside `body`, but some frames carry an object.
+func (e qoderEnvelope) inner() string {
+	if len(e.Body) == 0 {
+		return ""
+	}
+	var text string
+	if json.Unmarshal(e.Body, &text) == nil {
+		return text
+	}
+	return string(e.Body)
+}
+
+// failed reports whether the envelope is a terminal error. Qoder uses
+// `statusCode: "FORBIDDEN"` with `statusCodeValue: 403` for expired tokens,
+// exhausted quota and rejected signatures.
+func (e qoderEnvelope) failed() bool {
+	if e.StatusCodeValue >= 400 {
+		return true
+	}
+	switch strings.ToUpper(strings.TrimSpace(e.StatusCode)) {
+	case "", "OK", "SUCCESS":
+		return false
+	default:
+		return true
+	}
+}
+
+// errorStatus extracts an HTTP status and a human readable reason from the
+// envelope, unwrapping the nested `{code, message}` Qoder puts in `body`.
+func (e qoderEnvelope) errorStatus() (int, string) {
+	status := e.StatusCodeValue
+	if status < 400 {
+		status = http.StatusForbidden
+	}
+	var payload struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if inner := e.inner(); inner != "" && json.Unmarshal([]byte(inner), &payload) == nil {
+		message := strings.TrimSpace(payload.Message)
+		if message == "" {
+			message = strings.TrimSpace(payload.Code)
+		}
+		if message != "" {
+			return status, message
+		}
+	}
+	if code := strings.TrimSpace(e.StatusCode); code != "" {
+		return status, code
+	}
+	return status, "request failed"
+}
+
+// isFinish reports whether the inner payload is Qoder's terminal frame. Qoder
+// leaves the connection open after sending it, so it is the only end-of-stream
+// signal available.
+func (e qoderEnvelope) isFinish() bool {
+	inner := e.inner()
+	return strings.Contains(inner, `"event":"finish"`) ||
+		strings.Contains(inner, `"event": "finish"`) ||
+		strings.Contains(inner, "event:finish")
+}
+
+// qoderPeekEnvelope reads the first SSE data payload. A goroutine drives the
+// read so a silent connection fails fast instead of hanging; the body is closed
+// on timeout, which also releases the blocked reader.
+func qoderPeekEnvelope(resp *http.Response, reader *bufio.Reader, timeout time.Duration) (string, error) {
+	type peekResult struct {
+		payload string
+		err     error
+	}
+	results := make(chan peekResult, 1)
+	go func() {
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				results <- peekResult{err: err}
+				return
+			}
+			trimmed := strings.TrimSpace(line)
+			if !strings.HasPrefix(trimmed, "data:") {
+				continue
+			}
+			payload := strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
+			if payload == "" {
+				continue
+			}
+			results <- peekResult{payload: payload}
+			return
+		}
+	}()
+
+	select {
+	case result := <-results:
+		return result.payload, result.err
+	case <-time.After(timeout):
+		_ = resp.Body.Close()
+		return "", errQoderPeekTimeout
+	}
+}
+
 // qoderSSEToChatSSEReader unwraps the nested envelope Qoder streams:
 // `data:{"body":"<openai chunk json>","statusCode":"OK"}`. Each inner body is
 // re-emitted as a standard `data:<body>` SSE event so downstream readers see
@@ -476,29 +625,31 @@ func qoderSSEToChatSSEReader(body io.Reader, model string) io.Reader {
 		defer pw.Close()
 		scanner := bufio.NewScanner(body)
 		scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-		finished := false
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 			if line == "" || !strings.HasPrefix(line, "data:") {
 				continue
 			}
 			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			if payload == "" || payload == "[DONE]" {
+			if payload == "" {
 				continue
 			}
-			inner := qoderExtractBody(payload)
-			if inner == "" {
-				continue
+			if payload == "[DONE]" {
+				break
 			}
-			if strings.Contains(inner, `"event":`) || strings.Contains(inner, `event:finish`) {
-				// The finish envelope carries timing metadata, not completion
-				// data; keep reading until the stream is closed.
+			envelope := parseQoderEnvelope(payload)
+			if envelope.failed() {
+				_, message := envelope.errorStatus()
+				_, _ = fmt.Fprintf(pw, "data: %s\n\n", qoderErrorChunk(message))
+				break
 			}
-			if _, err := fmt.Fprintf(pw, "data: %s\n\n", inner); err != nil {
-				return
+			if inner := envelope.inner(); inner != "" {
+				if _, err := fmt.Fprintf(pw, "data: %s\n\n", inner); err != nil {
+					return
+				}
 			}
-			if !finished {
-				_ = finished
+			if envelope.isFinish() {
+				break
 			}
 		}
 		_, _ = fmt.Fprintf(pw, "data: [DONE]\n\n")
@@ -506,26 +657,11 @@ func qoderSSEToChatSSEReader(body io.Reader, model string) io.Reader {
 	return pr
 }
 
-func qoderExtractBody(payload string) string {
-	var envelope struct {
-		Body       json.RawMessage `json:"body"`
-		StatusCode string          `json:"statusCode"`
-	}
-	if err := json.Unmarshal([]byte(payload), &envelope); err != nil {
-		return payload
-	}
-	if len(envelope.Body) == 0 && envelope.StatusCode != "" {
-		return ""
-	}
-	if len(envelope.Body) == 0 {
-		return ""
-	}
-	// body is a JSON string containing the inner OpenAI chunk JSON.
-	var inner string
-	if err := json.Unmarshal(envelope.Body, &inner); err == nil {
-		return inner
-	}
-	return string(envelope.Body)
+// qoderErrorChunk renders a failure as an OpenAI error chunk so streaming
+// clients surface the reason instead of seeing an empty successful turn.
+func qoderErrorChunk(message string) string {
+	payload, _ := json.Marshal(map[string]any{"error": map[string]any{"message": "Qoder: " + message, "type": "api_error"}})
+	return string(payload)
 }
 
 func qoderStreamToCompletion(body io.Reader, model string) map[string]any {

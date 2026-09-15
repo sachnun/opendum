@@ -1,7 +1,6 @@
 import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
 
-import { db, type Database } from "../lib/db";
-import { pointTransaction, providerAccount, proxyApiKey, usageLog, userPointBalance } from "../lib/db/schema";
+import { db, type Database, pointTransaction, providerAccount, proxyApiKey, usageLog, userPointBalance } from "@opendum/database";
 
 export const API_KEY_UPDATE_POINT_COST = 100;
 export const ROAMING_POINT_COST = 2;

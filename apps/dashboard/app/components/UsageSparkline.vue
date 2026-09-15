@@ -64,12 +64,10 @@ onMounted(() => {
     return;
   }
 
-  const updateChartWidth = () => {
-    chartWidth.value = Math.max(1, Math.round(element.getBoundingClientRect().width));
-  };
-
-  updateChartWidth();
-  observer = new ResizeObserver(updateChartWidth);
+  observer = new ResizeObserver((entries) => {
+    const width = entries[0]?.contentRect.width ?? element.getBoundingClientRect().width;
+    chartWidth.value = Math.max(1, Math.round(width));
+  });
   observer.observe(element);
 });
 

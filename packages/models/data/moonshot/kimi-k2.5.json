@@ -2,7 +2,6 @@
   "owner": "moonshot",
   "providers": [
     "perch",
-    "workers_ai",
     "hyper"
   ],
   "meta": {
@@ -37,11 +36,6 @@
     },
     "perch": {
       "upstream": "kimi-2.5",
-      "contextWindow": 256000,
-      "maxOutputTokens": 256000
-    },
-    "workers_ai": {
-      "upstream": "@cf/moonshotai/kimi-k2.5",
       "contextWindow": 256000,
       "maxOutputTokens": 256000
     }

@@ -100,8 +100,11 @@ async function fetchHyperModels() {
   const models = payload.data.filter(
     (model) => typeof model.id === "string" && model.id.trim().length > 0
   );
+  if (models.length === 0) {
+    throw new Error("Hyper /v1/models returned no models");
+  }
   if (models.length < MIN_EXPECTED_MODELS) {
-    throw new Error(`Hyper /v1/models returned only ${models.length} models (expected >= ${MIN_EXPECTED_MODELS})`);
+    console.warn(`Hyper /v1/models returned only ${models.length} models (expected >= ${MIN_EXPECTED_MODELS})`);
   }
 
   return models;

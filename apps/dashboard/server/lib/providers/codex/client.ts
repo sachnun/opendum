@@ -1,8 +1,7 @@
 import { Buffer } from "node:buffer";
 import { eq } from "drizzle-orm";
 
-import { db } from "../../db/index.js";
-import { providerAccount, type ProviderAccount } from "../../db/schema.js";
+import { db, providerAccount, type ProviderAccount } from "@opendum/database";
 import { decrypt, encrypt } from "../../encryption.js";
 import { fetchInternalProvider } from "../../proxy/internal-relay.js";
 import type { OAuthResult } from "../types.js";

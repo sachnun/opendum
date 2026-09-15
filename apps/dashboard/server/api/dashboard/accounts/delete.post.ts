@@ -1,4 +1,4 @@
 import { deleteAccount, deleteAccountInputSchema } from "../../../services/accounts";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { parseBody, requireWritableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => deleteAccount(await requireWritableUserId(event), await readDashboardBody(event, deleteAccountInputSchema)));
+export default defineEventHandler(async (event) => deleteAccount(await requireWritableUserId(event), await parseBody(event, deleteAccountInputSchema)));

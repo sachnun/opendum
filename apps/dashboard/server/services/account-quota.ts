@@ -1,8 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "../lib/db";
-import { providerAccount } from "../lib/db/schema";
+import { db, providerAccount } from "@opendum/database";
 import { fetchInternalQuota, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { QUOTA_PROVIDER_KEYS, type QuotaProviderKey } from "../../lib/provider-accounts";
 

@@ -1,4 +1,4 @@
 import { deleteCustomProvider, deleteCustomProviderSchema } from "../../../services/custom-providers";
-import { readDashboardBody, requireWritableUserId } from "../../../utils/api";
+import { parseBody, requireWritableUserId } from "../../../utils/api";
 
-export default defineEventHandler(async (event) => deleteCustomProvider(await requireWritableUserId(event), (await readDashboardBody(event, deleteCustomProviderSchema)).slug));
+export default defineEventHandler(async (event) => deleteCustomProvider(await requireWritableUserId(event), (await parseBody(event, deleteCustomProviderSchema)).slug));

@@ -1,9 +1,9 @@
 import { drizzle as drizzleNodePg, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import * as schema from "./schema.js";
 import * as relations from "./relations.js";
+import * as schema from "./schema/index.js";
 
-const fullSchema = { ...schema, ...relations };
+export const fullSchema = { ...schema, ...relations };
 
 export type Database = NodePgDatabase<typeof fullSchema> & { $client: Pool };
 
@@ -22,22 +22,21 @@ function getConnectionString(): string {
 }
 
 function createDb(): Database {
-  return drizzleNodePg(getConnectionString(), { schema: fullSchema });
-}
-
-export async function createRequestDb(): Promise<{ db: Database; close: () => Promise<void> }> {
-  const db = createDb();
-
-  return {
-    db,
-    close: async () => {
-      try {
-        await db.$client.end();
-      } catch (error) {
-        console.warn("Failed to close Postgres client:", error);
-      }
+  const db = drizzleNodePg({
+    connection: {
+      connectionString: getConnectionString(),
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
     },
-  };
+    schema: fullSchema,
+  });
+
+  db.$client.on("error", (error) => {
+    console.warn("Postgres pool error:", error);
+  });
+
+  return db;
 }
 
 function getDb(): Database {
@@ -57,6 +56,3 @@ export const db = new Proxy({} as Database, {
 if (process.env.NODE_ENV !== "production") {
   globalForDb.db ??= getDb();
 }
-
-// Re-export schema for convenience
-export { schema };

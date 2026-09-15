@@ -29,6 +29,9 @@ const QODER_UPSTREAM_BY_CANONICAL = new Map([
 
 const MIN_EXPECTED_UPSTREAM_KEYS = 8;
 
+// Catalog ids that are routing/plan modes, not pinned models.
+const QODER_NON_MODEL_IDS = new Set(["auto", "ultimate", "performance", "efficient"]);
+
 async function fetchQoderCatalog() {
   const metadata = await fetchJson(`https://registry.npmjs.org/${QODER_MODELS_PACKAGE}`, {
     label: `${QODER_MODELS_PACKAGE} npm metadata`,
@@ -83,14 +86,31 @@ function buildModelMap(catalog) {
   }
 
   const modelMap = new Map();
+  const missing = [];
   for (const [canonicalKey, upstreamKey] of QODER_UPSTREAM_BY_CANONICAL) {
     if (upstreamKeys.has(upstreamKey)) {
       modelMap.set(canonicalKey, upstreamKey);
+    } else {
+      missing.push(canonicalKey);
     }
   }
 
+  const mappedUpstreamKeys = new Set(QODER_UPSTREAM_BY_CANONICAL.values());
+  const unmapped = [...upstreamKeys].filter(
+    (upstreamKey) => !mappedUpstreamKeys.has(upstreamKey) && !QODER_NON_MODEL_IDS.has(upstreamKey),
+  );
+
+  if (modelMap.size === 0) {
+    throw new Error("Qoder catalog matched no known upstream model keys");
+  }
   if (modelMap.size < MIN_EXPECTED_UPSTREAM_KEYS) {
-    throw new Error(`Expected at least ${MIN_EXPECTED_UPSTREAM_KEYS} Qoder upstream model keys, got ${modelMap.size}`);
+    console.warn(`Qoder catalog matched only ${modelMap.size} models (expected >= ${MIN_EXPECTED_UPSTREAM_KEYS})`);
+  }
+  if (missing.length > 0) {
+    console.warn(`[qoder] upstream key(s) missing from catalog: ${missing.join(", ")}`);
+  }
+  if (unmapped.length > 0) {
+    console.warn(`[qoder] catalog model(s) not mapped: ${unmapped.join(", ")}`);
   }
   return modelMap;
 }

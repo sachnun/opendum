@@ -2,8 +2,9 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { syncProviderModels } from "../src/registry.ts";
+import { buildModelIndex, syncProviderModels } from "../src/registry.ts";
 import { fetchText } from "../src/http.ts";
+import { normalizeName } from "../src/similarity.ts";
 
 const PROVIDER_NAME = "perch";
 
@@ -11,25 +12,10 @@ const PROVIDER_NAME = "perch";
 // (https://www.perchai.app/docs/concepts/models). That page is the live source
 // of truth for which models a free account can pin; anything outside the
 // Starter pool is Pro-only and paid, so it is intentionally never registered.
-// The docs table only carries display names, so each name maps to the opendum
-// canonical model id and the Perch pool alias used for the model-call pin.
+// The table only carries display names, so each name is resolved against the
+// registry to reuse the canonical model id and the Perch pool alias already
+// pinned for that model.
 const PERCH_DOCS_URL = "https://www.perchai.app/docs/concepts/models";
-
-// Minimum number of Starter models expected; guards against silent breakage of
-// the docs table extraction.
-const MIN_EXPECTED_MODELS = 8;
-
-const STARTER_POOL = new Map([
-  ["Qwen 3.6", { canonical: "qwen3.6", alias: "qwen-3.6" }],
-  ["Kimi K2.5", { canonical: "kimi-k2.5", alias: "kimi-2.5" }],
-  ["GLM 5", { canonical: "glm-5", alias: "glm-5" }],
-  ["Qwen3 Coder", { canonical: "qwen3-coder", alias: "qwen3-coder" }],
-  ["Nemotron Super", { canonical: "nemotron-3-super", alias: "nemotron-super" }],
-  ["MiniMax M2.7", { canonical: "minimax-m2.7", alias: "minimax-m2.7-free" }],
-  ["MiniMax M3", { canonical: "minimax-m3", alias: "minimax-m3-free" }],
-  ["Gemma 4 E2B", { canonical: "gemma-4-e2b", alias: "gemma-4-e2b" }],
-  ["Gemma 4 31B", { canonical: "gemma-4-31b", alias: "gemma-4-31b" }],
-]);
 
 function decodeHtmlEntities(text) {
   return text
@@ -66,30 +52,45 @@ async function fetchStarterPoolNames() {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; opendum-model-sync)" },
   });
   const names = extractStarterPoolNames(html);
-  if (names.length < MIN_EXPECTED_MODELS) {
-    throw new Error(`Expected at least ${MIN_EXPECTED_MODELS} Perch Starter model(s), got ${names.length}`);
+  if (names.length === 0) {
+    throw new Error("Perch Starter pool table is empty");
   }
   return names;
 }
 
-function buildModelMap(docNames) {
+function perchUpstream(entry) {
+  const upstream = entry.data.providerConfig?.perch?.upstream;
+  return typeof upstream === "string" && upstream.trim() ? upstream.trim() : null;
+}
+
+function resolveStarterPool(modelsDir, docNames) {
+  const byName = new Map();
+  for (const entry of Object.values(buildModelIndex(modelsDir))) {
+    const keys = [entry.fileId, entry.id, ...(entry.data.aliases || []), perchUpstream(entry)];
+    for (const key of keys) {
+      const normalized = key ? normalizeName(key) : "";
+      if (normalized && !byName.has(normalized)) byName.set(normalized, entry);
+    }
+  }
+
   const modelMap = new Map();
-  const unmapped = [];
+  const unresolved = [];
   for (const docName of docNames) {
-    const entry = STARTER_POOL.get(docName);
+    const entry = byName.get(normalizeName(docName));
     if (!entry) {
-      unmapped.push(docName);
+      unresolved.push(docName);
       continue;
     }
-    if (modelMap.has(entry.canonical) && modelMap.get(entry.canonical) !== entry.alias) {
-      throw new Error(`Duplicate Perch Starter mapping for ${entry.canonical}`);
+    const alias = perchUpstream(entry) ?? normalizeName(docName);
+    if (modelMap.has(entry.fileId) && modelMap.get(entry.fileId) !== alias) {
+      throw new Error(`Duplicate Perch Starter mapping for ${entry.fileId}`);
     }
-    modelMap.set(entry.canonical, entry.alias);
+    modelMap.set(entry.fileId, alias);
   }
-  if (unmapped.length > 0) {
-    throw new Error(`Unmapped Perch Starter model(s): ${unmapped.join(", ")}. Add them to STARTER_POOL.`);
-  }
-  return new Map([...modelMap.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  return {
+    modelMap: new Map([...modelMap.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    unresolved,
+  };
 }
 
 async function main() {
@@ -97,7 +98,10 @@ async function main() {
   const modelsDir = resolve(scriptDir, "../data");
 
   const docNames = await fetchStarterPoolNames();
-  const modelMap = buildModelMap(docNames);
+  const { modelMap, unresolved } = resolveStarterPool(modelsDir, docNames);
+  if (unresolved.length > 0) {
+    console.warn(`[perch] Skipped Starter model(s) absent from the registry: ${unresolved.join(", ")}`);
+  }
 
   const result = syncProviderModels(modelsDir, PROVIDER_NAME, modelMap);
 

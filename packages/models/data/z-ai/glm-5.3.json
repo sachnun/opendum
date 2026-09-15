@@ -2,7 +2,8 @@
   "owner": "z-ai",
   "providers": [
     "hyper",
-    "workbuddy"
+    "workbuddy",
+    "perch"
   ],
   "meta": {
     "reasoning": true,
@@ -11,7 +12,6 @@
   },
   "modalities": {
     "input": [
-      "image",
       "text"
     ],
     "output": [
@@ -28,12 +28,17 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 131072
+    "output": 128000
   },
   "providerConfig": {
     "hyper": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 128000
+    },
+    "perch": {
+      "upstream": "glm-5-3",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
     },
     "workbuddy": {
       "contextWindow": 1000000,

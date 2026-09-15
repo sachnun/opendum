@@ -1,8 +1,7 @@
 {
   "owner": "meituan",
   "providers": [
-    "zenmux",
-    "cline"
+    "zenmux"
   ],
   "modalities": {
     "input": [
@@ -25,11 +24,6 @@
     "output": 262144
   },
   "providerConfig": {
-    "cline": {
-      "upstream": "cline-free/longcat-2.0",
-      "contextWindow": 1048756,
-      "maxOutputTokens": 262144
-    },
     "zenmux": {
       "upstream": "meituan/longcat-2.0",
       "contextWindow": 1048756,

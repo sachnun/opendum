@@ -652,6 +652,22 @@ type testRotationRunner struct {
 	reserved              []pointReservation
 	refunded              []string
 	insufficientPoints    bool
+	quotaLocks            []quotaLockRecord
+	quotaUnlocks          []string
+}
+
+type quotaLockRecord struct {
+	accountID string
+	model     string
+	reason    string
+}
+
+func (r *testRotationRunner) lockAccountModelQuota(_ context.Context, accountID, model string, _ time.Time, reason string) {
+	r.quotaLocks = append(r.quotaLocks, quotaLockRecord{accountID: accountID, model: model, reason: reason})
+}
+
+func (r *testRotationRunner) clearAccountModelQuotaLock(_ context.Context, accountID, model string) {
+	r.quotaUnlocks = append(r.quotaUnlocks, accountID+"|"+model)
 }
 
 func (r *testRotationRunner) getNextAvailableAccount(_ context.Context, _ string, _ string, _ *string, exclude, excludeProviders []string, _ auth.AccountAccess, _ string) (*appdb.ProviderAccount, bool, error) {
@@ -757,3 +773,87 @@ func (r *testRotationRunner) isVisionModel(string) bool { return false }
 func (r *testRotationRunner) isToolCallModel(string) bool { return true }
 
 func (r *testRotationRunner) canAccountUseModel(appdb.ProviderAccount, string) bool { return true }
+
+func TestExecuteAccountRotationLocksQoderModelNotAccount(t *testing.T) {
+	// Qoder answers 403 with the billing payload inside a 200-style body. The
+	// account must stay usable for other models: only this model is locked.
+	runner := &testRotationRunner{
+		accounts:     []appdb.ProviderAccount{{ID: "qoder-account", Provider: "qoder"}},
+		responseBody: `{"error":{"message":"Qoder: {\"pricingUrl\":\"https://qoder.com/pricing?client=qoder\"}"}}`,
+		statusByProvider: map[string]int{
+			"qoder": http.StatusForbidden,
+		},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, _, routeErr := executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "deepseek-v4-flash", Provider: strPtr("qoder")},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if routeErr == nil {
+		t.Fatal("expected the quota block to surface as an error")
+	}
+	if len(runner.quotaLocks) != 1 {
+		t.Fatalf("quota locks = %#v, want exactly 1", runner.quotaLocks)
+	}
+	lock := runner.quotaLocks[0]
+	if lock.accountID != "qoder-account" {
+		t.Fatalf("locked account = %q, want qoder-account", lock.accountID)
+	}
+	if lock.model != "deepseek-v4-flash" {
+		t.Fatalf("locked model = %q, want deepseek-v4-flash", lock.model)
+	}
+	if len(runner.usageLimitedAccountID) != 0 {
+		t.Fatal("account-wide usage limit must not be applied: sibling models stay usable")
+	}
+}
+
+func TestExecuteAccountRotationDoesNotLockHealthyModels(t *testing.T) {
+	// A plain 403 without a billing signal must not lock the model.
+	runner := &testRotationRunner{
+		accounts:     []appdb.ProviderAccount{{ID: "qoder-account", Provider: "qoder"}},
+		responseBody: `{"error":{"message":"forbidden"}}`,
+		statusByProvider: map[string]int{
+			"qoder": http.StatusForbidden,
+		},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	cfg := endpointAdapter{
+		Endpoint:             "/v1/chat/completions",
+		NoAccountsStatusCode: http.StatusTooManyRequests,
+		Build: func(parsed parsedEndpointRequest, model string, stream bool, sessionID string) map[string]any {
+			return map[string]any{"model": model, "stream": stream}
+		},
+	}
+
+	_, _, _, _, _, _, _ = executeAccountRotation(
+		runner,
+		context.Background(),
+		request,
+		cfg,
+		parsedEndpointRequest{Stream: false},
+		auth.Result{UserID: "user_1"},
+		auth.ModelValidationResult{Valid: true, Model: "deepseek-v4-flash", Provider: strPtr("qoder")},
+		nil,
+		time.Now().UnixMilli(),
+	)
+
+	if len(runner.quotaLocks) != 0 {
+		t.Fatalf("quota locks = %#v, want none for a non-billing 403", runner.quotaLocks)
+	}
+}

@@ -4,7 +4,7 @@
     "zenmux",
     "qoder",
     "hyper",
-    "nvidia_nim"
+    "perch"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-pro-0813",
@@ -45,11 +45,10 @@
   },
   "providerConfig": {
     "hyper": {
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 262144
     },
-    "nvidia_nim": {
-      "upstream": "deepseek-ai/deepseek-v4-pro-0813",
+    "perch": {
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },

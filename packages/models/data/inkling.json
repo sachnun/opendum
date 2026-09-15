@@ -1,9 +1,9 @@
 {
   "owner": "inclusion-ai",
   "providers": [
-    "kilo_code",
     "openrouter",
-    "hyper"
+    "hyper",
+    "perch"
   ],
   "modalities": {
     "input": [
@@ -24,7 +24,7 @@
     "top_p": false
   },
   "limit": {
-    "context": 1048576,
+    "context": 1048000,
     "output": 32768
   },
   "providerConfig": {
@@ -32,15 +32,13 @@
       "contextWindow": 1048576,
       "maxOutputTokens": 32768
     },
-    "kilo_code": {
-      "upstream": "thinkingmachines/inkling:free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 262144,
-      "authless": true
-    },
     "openrouter": {
       "upstream": "thinkingmachines/inkling:free",
       "contextWindow": 1048576,
+      "maxOutputTokens": 471859
+    },
+    "perch": {
+      "contextWindow": 1048000,
       "maxOutputTokens": 32768
     }
   }
