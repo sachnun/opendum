@@ -11,7 +11,18 @@ const props = defineProps<{
   compact?: boolean;
   disabled?: boolean;
   animateDeltas?: boolean;
+  statsMap?: Record<string, ModelStats>;
+  modelId?: string;
 }>();
+
+const resolvedStats = computed(() => {
+  if (props.modelId && props.statsMap) {
+    const mapped = props.statsMap[props.modelId];
+    if (mapped) return mapped;
+  }
+
+  return props.stats;
+});
 
 const { auditRefreshVersion, auditUser, isAuditMode } = useAudit();
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
@@ -51,9 +62,9 @@ function expandDurationPoints(points: Array<{ time: string; avgDuration: number 
   return buildHourKeys(24).map((time) => ({ time, avgDuration: valuesByTime.get(time) ?? null }));
 }
 
-const dailyPoints = computed(() => expandDailyPoints(props.stats.dailyRequests));
+const dailyPoints = computed(() => expandDailyPoints(resolvedStats.value.dailyRequests));
 const dailyValues = computed(() => dailyPoints.value.map((point) => point.count));
-const durationPoints = computed(() => expandDurationPoints(props.stats.durationLast24Hours));
+const durationPoints = computed(() => expandDurationPoints(resolvedStats.value.durationLast24Hours));
 const durationValues = computed(() => durationPoints.value.map((point) => point.avgDuration ?? 0));
 const usageChartColor = computed(() => props.disabled ? "var(--muted-foreground)" : "var(--chart-1)");
 const durationChartColor = computed(() => props.disabled ? "var(--muted-foreground)" : "var(--chart-2)");
@@ -104,14 +115,14 @@ function collectStatValues(items: StatMetric[]): Record<string, number> {
 }
 
 const statMetrics = computed<StatMetric[]>(() => [
-  { key: "totalRequests", label: "Requests", value: props.stats.totalRequests.toLocaleString(), numericValue: props.stats.totalRequests, formatDelta: formatSignedInteger },
-  { key: "totalTokens", label: "Token", value: compactNumber(props.stats.totalTokens), numericValue: props.stats.totalTokens, formatDelta: formatSignedInteger },
-  { key: "successRate", label: "Success", value: props.stats.successRate === null ? "-" : `${props.stats.successRate}%`, numericValue: props.stats.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
+  { key: "totalRequests", label: "Requests", value: resolvedStats.value.totalRequests.toLocaleString(), numericValue: resolvedStats.value.totalRequests, formatDelta: formatSignedInteger },
+  { key: "totalTokens", label: "Token", value: compactNumber(resolvedStats.value.totalTokens), numericValue: resolvedStats.value.totalTokens, formatDelta: formatSignedInteger },
+  { key: "successRate", label: "Success", value: resolvedStats.value.successRate === null ? "-" : `${resolvedStats.value.successRate}%`, numericValue: resolvedStats.value.successRate ?? Number.NaN, formatDelta: formatSignedPercent },
   {
     key: "avgDuration",
     label: "Latency",
-    value: formatDuration(props.stats.avgDurationLastDay),
-    numericValue: props.stats.avgDurationLastDay ?? Number.NaN,
+    value: formatDuration(resolvedStats.value.avgDurationLastDay),
+    numericValue: resolvedStats.value.avgDurationLastDay ?? Number.NaN,
     formatDelta: formatSignedDuration,
     getTone: (delta) => delta > 0 ? "negative" : "positive",
   },
