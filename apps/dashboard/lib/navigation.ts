@@ -58,9 +58,4 @@ export const primaryNavigation: NavItem[] = [
       anchorId: family.anchorId,
     })),
   },
-  {
-    name: "Custom Providers",
-    href: "/custom",
-    icon: "i-lucide-plug",
-  },
 ];

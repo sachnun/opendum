@@ -21,7 +21,9 @@ const api = useApi();
 const { isAuditMode } = useAudit();
 
 const { data, error, refresh } = useCachedData(dataKeys.accountsOverview, () => api.accounts.overview());
+const { data: customProviders, refresh: refreshCustomProviders } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
 
+const customList = computed(() => customProviders.value ?? []);
 const summaries = computed(() => data.value?.summaries ?? null);
 const pinnedProviders = computed(() => new Set(data.value?.pinnedProviders ?? []));
 const providerAvailabilityOrder = { active: 0, inactive: 1 } as const;
@@ -51,6 +53,7 @@ function providerSummary(provider: ProviderAccountKey) {
 
 function refreshAccountsOverview() {
   void refresh();
+  void refreshCustomProviders();
 }
 </script>
 
@@ -63,7 +66,7 @@ function refreshAccountsOverview() {
             Provider Accounts
           </h2>
           <div class="flex w-full items-center sm:w-auto">
-            <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" />
+            <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" @custom-created="refreshCustomProviders" />
           </div>
         </div>
       </div>
@@ -77,6 +80,11 @@ function refreshAccountsOverview() {
           :summary="providerSummary(provider.key)!"
           :pinned="pinnedProviders.has(provider.key)"
           :readonly="isAuditMode"
+        />
+        <CustomProviderOverviewCard
+          v-for="provider in customList"
+          :key="provider.id"
+          :provider="provider"
         />
       </div>
     </div>

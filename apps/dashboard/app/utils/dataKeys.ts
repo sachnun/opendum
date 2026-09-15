@@ -8,6 +8,7 @@ export const dataKeys = {
   modelSearch: "layout-model-search",
   playgroundOptions: "dashboard-playground-options",
   apiKeys: "dashboard-api-keys",
+  customProviders: "dashboard-custom-providers",
 } as const;
 
 export const stateKeys = {

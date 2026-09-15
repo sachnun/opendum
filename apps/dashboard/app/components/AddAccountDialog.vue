@@ -38,6 +38,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   connected: [result: { provider: Provider; email: string; isUpdate: boolean }];
+  customCreated: [slug: string];
 }>();
 
 const api = useApi();
@@ -96,6 +97,7 @@ const providerOptions: Provider[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
   .map((definition) => definition.key);
 
 const open = ref(false);
+const customMode = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
 const step = ref(minimumStep.value);
 const provider = ref<Provider | null>(props.initialProvider);
@@ -145,14 +147,22 @@ const displayedSteps = computed(() => {
 });
 const shouldPreventOutsideClose = computed(() => {
   const flowType = activeFlowType.value;
-  return isPolling.value || (step.value === authStep.value && (flowType === "api_key" || flowType === "api_key_with_account_id" || flowType === "chatgpt_session")) || (step.value === finishStep.value && flowType === "oauth_redirect");
+  return customMode.value || isPolling.value || (step.value === authStep.value && (flowType === "api_key" || flowType === "api_key_with_account_id" || flowType === "chatgpt_session")) || (step.value === finishStep.value && flowType === "oauth_redirect");
 });
+
+function handleCustomCreated(createdSlug: string) {
+  customMode.value = false;
+  open.value = false;
+  emit("customCreated", createdSlug);
+  void navigateTo(`/custom/${createdSlug}`);
+}
 
 watch(open, (value) => {
   if (value) {
     step.value = minimumStep.value;
     provider.value = props.initialProvider;
     selectedMethod.value = null;
+    customMode.value = false;
     return;
   }
 
@@ -214,6 +224,7 @@ watch([open, step, provider, selectedMethod], async () => {
 
 function resetForm() {
   step.value = minimumStep.value;
+  customMode.value = false;
   provider.value = props.initialProvider;
   callbackUrl.value = "";
   chatgptSessionJson.value = "";
@@ -282,6 +293,13 @@ function selectProvider(providerKey: Provider) {
   provider.value = providerKey;
   selectedMethod.value = null;
   step.value = 2;
+}
+
+function selectCustom() {
+  if (props.readonly) return;
+  provider.value = null;
+  selectedMethod.value = null;
+  customMode.value = true;
 }
 
 function resetAuthProgress() {
@@ -649,13 +667,14 @@ onBeforeUnmount(() => {
     <template #content>
       <div class="space-y-1.5 pr-6">
         <h2 class="text-lg font-semibold leading-none tracking-tight">
-          {{ selectedConfig ? `Add ${selectedConfig.name} Account` : 'Add Provider Account' }}
+          {{ customMode ? 'Add Custom Provider' : selectedConfig ? `Add ${selectedConfig.name} Account` : 'Add Provider Account' }}
         </h2>
         <p class="sr-only">
           {{ selectedConfig ? `Connect a new ${selectedConfig.name} account for load balancing` : 'Connect a new AI provider account for load balancing' }}
         </p>
       </div>
 
+      <template v-if="!customMode">
       <div class="flex items-center justify-center py-2">
         <template v-for="(stepNumber, index) in displayedSteps" :key="stepNumber">
           <div class="flex items-center">
@@ -687,6 +706,17 @@ onBeforeUnmount(() => {
               @click="selectProvider(providerKey)"
             >
               <span class="text-sm font-medium">{{ providerConfigs[providerKey].name }}</span>
+            </button>
+            <button
+              v-if="!readonly"
+              type="button"
+              :class="cn(
+                'flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors hover:bg-muted/40',
+                customMode ? 'border-foreground/30 bg-muted/30' : 'border-border',
+              )"
+              @click="selectCustom"
+            >
+              <span class="text-sm font-medium">Custom</span>
             </button>
           </div>
         </div>
@@ -1025,6 +1055,8 @@ onBeforeUnmount(() => {
           <UiIcon name="i-lucide-arrow-right" class="size-4" />
         </UiButton>
       </div>
+      </template>
+      <CustomProviderSetup v-else @cancel="customMode = false" @created="handleCustomCreated" />
     </template>
   </UiDialog>
 </template>
