@@ -125,7 +125,6 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
     supportsQuota: false,
     apiKeyPortalUrl: "https://qoder.com/account/integrations",
     apiKeyPlaceholder: "pt-...",
-    showInNav: false,
     displayOrder: 9,
   },
   {
@@ -149,8 +148,8 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
     showTier: false,
     authMethods: ["device_code"],
     supportsQuota: true,
-    showInNav: false,
     displayOrder: 11,
+    navOrder: 9,
   },
   {
     key: "hyper",
@@ -175,7 +174,6 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
   supportsQuota: boolean;
   displayOrder: number;
   navOrder?: number;
-  showInNav?: boolean;
   apiKeyPortalUrl?: string;
   apiKeyPlaceholder?: string;
   accountIdLabel?: string;
@@ -184,7 +182,6 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
 }[];
 
 export type ProviderAccountDefinition = (typeof PROVIDER_ACCOUNT_DEFINITIONS_SOURCE)[number] & {
-  showInNav?: boolean;
   navOrder?: number;
   displayOrder?: number;
   apiKeyPortalUrl?: string;

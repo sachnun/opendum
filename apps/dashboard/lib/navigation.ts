@@ -29,7 +29,6 @@ export interface ModelFamilyCounts {
 }
 
 const ACCOUNT_NAV_CHILDREN: NavSubItem[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
-  .filter((definition) => definition.showInNav !== false)
   .sort((a, b) => (a.navOrder ?? Number.MAX_SAFE_INTEGER) - (b.navOrder ?? Number.MAX_SAFE_INTEGER))
   .map((definition) => ({ name: definition.label, href: getProviderAccountPath(definition.key) }));
 
