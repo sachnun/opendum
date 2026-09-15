@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
 import { aliasesFromUpstream, stripParamInfoKey } from "@opendum/models/clean-key";
+import { buildModelIdMap } from "@opendum/models/registry";
 import { encrypt, hashString } from "../lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
@@ -267,33 +268,33 @@ export async function syncCustomModels(userId: string, slug: string): Promise<Ac
 }
 
 /**
- * Derive a cleaned public id (alias) from an upstream model id by dropping the
- * provider prefix and parameter info (size, quantization, date, descriptors).
+ * Derive a cleaned public id from an upstream model id: drop the provider
+ * prefix, sanitize separators, then strip parameter info (size, quantization,
+ * date, descriptors). Mirrors the generic `toModelKey` used by the provider
+ * scripts in `@opendum/models`.
  */
-function cleanedModelId(upstream: string): string {
-  const basename = upstream.includes("/") ? upstream.slice(upstream.lastIndexOf("/") + 1) : upstream;
+function toModelKey(upstream: string): string {
+  const slashIndex = upstream.indexOf("/");
+  const basename = slashIndex === -1 ? upstream : upstream.slice(slashIndex + 1);
   const slug = basename
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^[-.]+|[-.]+$/g, "")
-    .toLowerCase();
+    .replace(/-{2,}/g, "-");
   const cleaned = stripParamInfoKey(slug);
-  return cleaned.length > 0 ? cleaned : slug;
+  return cleaned.endsWith("-free") ? cleaned.slice(0, -"-free".length) : cleaned;
 }
 
 /**
- * Map upstream ids to cleaned model ids plus their kebab/raw aliases, so a
- * refreshed provider can be called by either the clean alias or the original
- * upstream id. First writer wins on collision to keep the result stable.
+ * Clean an upstream model list into public model ids and keep their kebab/raw
+ * aliases. `buildModelIdMap` owns collision handling (newest date variant wins
+ * the base key, older ones get a `-<date>` key), matching `@opendum/models`.
  */
 function cleanCustomModels(upstreamIds: string[]): Array<{ modelId: string; upstream: string }> {
   const byModelId = new Map<string, string>();
-  for (const upstream of upstreamIds) {
-    for (const candidate of [cleanedModelId(upstream), ...aliasesFromUpstream([upstream])]) {
-      const modelId = candidate.trim().toLowerCase();
-      if (!modelId || byModelId.has(modelId)) continue;
-      byModelId.set(modelId, upstream);
+  for (const [modelId, upstream] of buildModelIdMap(upstreamIds, toModelKey)) {
+    if (!byModelId.has(modelId)) byModelId.set(modelId, upstream);
+    for (const alias of aliasesFromUpstream([upstream])) {
+      if (!byModelId.has(alias)) byModelId.set(alias, upstream);
     }
   }
   return [...byModelId].map(([modelId, upstream]) => ({ modelId, upstream }));
