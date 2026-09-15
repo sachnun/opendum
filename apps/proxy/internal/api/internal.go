@@ -10,11 +10,23 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/opendum/opendum/apps/proxy/internal/providers"
 )
 
 const internalRelayMaxBodyBytes = 2 << 20
 
-var internalRelayClient = &http.Client{Timeout: 20 * time.Second}
+func guardedRelayTransport() *http.Transport {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.DialContext = providers.GuardedDialContext(providers.AllowPrivateRelay)
+	return base
+}
+
+var internalRelayClient = &http.Client{
+	Timeout:       20 * time.Second,
+	Transport:     guardedRelayTransport(),
+	CheckRedirect: providers.GuardedRedirectPolicy(providers.AllowPrivateRelay),
+}
 
 type internalRelayRequest struct {
 	URL     string            `json:"url"`
@@ -100,7 +112,18 @@ func resolveInternalRelayTarget(input internalRelayRequest) (string, string, err
 	if target.Scheme != "https" || target.Hostname() == "" || target.User != nil {
 		return "", "", errors.New("url must be an https provider URL")
 	}
+	if isPrivateRelayTarget(target) && !relayPrivateHostsAllowed() {
+		return "", "", errors.New("url must not target a private network address")
+	}
 	return method, target.String(), nil
+}
+
+func isPrivateRelayTarget(target *url.URL) bool {
+	return providers.PrivateHost(target.Hostname())
+}
+
+func relayPrivateHostsAllowed() bool {
+	return providers.AllowPrivateRelay()
 }
 
 func validateInternalRelayMethod(method string) error {

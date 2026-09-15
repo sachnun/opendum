@@ -192,6 +192,15 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 	if len(targetProviders) == 0 {
 		return nil, false, nil
 	}
+	if provider != nil && s.customStore != nil {
+		custom, err := s.customStore.GetProvider(ctx, userID, *provider)
+		if err != nil {
+			return nil, false, err
+		}
+		if custom != nil {
+			return nil, false, nil
+		}
+	}
 
 	now := time.Now()
 	sharedRows, err := s.db.ListSharedEligibleAccounts(ctx, appdb.ListSharedEligibleAccountsParams{

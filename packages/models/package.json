@@ -4,7 +4,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./families": "./src/families.ts"
+    "./families": "./src/families.ts",
+    "./clean-key": "./src/clean-key.ts",
+    "./registry": "./src/registry.ts"
   },
   "scripts": {
     "refresh": "tsx ./scripts/models.ts",

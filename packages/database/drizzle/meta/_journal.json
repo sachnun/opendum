@@ -15,6 +15,13 @@
       "when": 1789130455304,
       "tag": "0001_quota_model_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789200000000,
+      "tag": "0002_custom_providers",
+      "breakpoints": true
     }
   ]
 }

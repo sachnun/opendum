@@ -50,6 +50,7 @@ const DRIZZLE_TYPE_BY_SQL_TYPE: Record<string, string> = {
   integer: "number",
   boolean: "boolean",
   timestamp: "date",
+  jsonb: "json",
   "text[]": "array",
 };
 

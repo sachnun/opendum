@@ -14,6 +14,8 @@ import {
   usageLog,
   pointTransaction,
   disabledModel,
+  customProvider,
+  customProviderModel,
 } from "./schema/index.js";
 
 export const userRelations = relations(user, ({ one, many }) => ({
@@ -33,6 +35,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
   proxyApiKeys: many(proxyApiKey),
   usageLogs: many(usageLog),
   disabledModels: many(disabledModel),
+  customProviders: many(customProvider),
 }));
 
 export const userPointBalanceRelations = relations(
@@ -164,6 +167,27 @@ export const providerAccountModelHealthRelations = relations(
     providerAccount: one(providerAccount, {
       fields: [providerAccountModelHealth.providerAccountId],
       references: [providerAccount.id],
+    }),
+  }),
+);
+
+export const customProviderRelations = relations(
+  customProvider,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [customProvider.userId],
+      references: [user.id],
+    }),
+    models: many(customProviderModel),
+  }),
+);
+
+export const customProviderModelRelations = relations(
+  customProviderModel,
+  ({ one }) => ({
+    provider: one(customProvider, {
+      fields: [customProviderModel.providerId],
+      references: [customProvider.id],
     }),
   }),
 );
