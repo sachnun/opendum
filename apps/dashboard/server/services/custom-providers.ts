@@ -122,16 +122,13 @@ export async function listCustomProviders(userId: string) {
     .where(eq(providerAccount.userId, userId))
     .groupBy(providerAccount.provider);
   const countByProvider = new Map(accountCounts.map((row) => [row.provider, row.value]));
-  return {
-    success: true as const,
-    data: providers.map((provider) => ({
-      ...provider,
-      accountCount: countByProvider.get(provider.slug) ?? 0,
-      models: models
-        .filter((row) => row.providerId === provider.id)
-        .sort((a, b) => a.modelId.localeCompare(b.modelId)),
-    })),
-  };
+  return providers.map((provider) => ({
+    ...provider,
+    accountCount: countByProvider.get(provider.slug) ?? 0,
+    models: models
+      .filter((row) => row.providerId === provider.id)
+      .sort((a, b) => a.modelId.localeCompare(b.modelId)),
+  }));
 }
 
 export async function createCustomProvider(userId: string, input: z.infer<typeof createCustomProviderSchema>): Promise<ActionResult<{ id: string; slug: string }>> {
