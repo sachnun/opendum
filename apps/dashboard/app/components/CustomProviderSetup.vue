@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { cn, requestErrorMessage } from "../../lib/utils";
-import type {
-  ActionResult,
-  CustomProviderListItem,
-  CustomProviderModelFlags,
-  CustomProviderModelMeta,
-} from "../../lib/api-types";
+import type { ActionResult, CustomProviderListItem } from "../../lib/api-types";
 
 interface HeaderRow {
   key: string;
@@ -13,13 +8,8 @@ interface HeaderRow {
 }
 
 interface ModelRow {
-  modelId: string;
-  upstream: string;
-  reasoning: boolean;
-  toolCall: boolean;
-  vision: boolean;
-  authless: boolean;
-  responsesApi: boolean;
+  model: string;
+  alias: string;
 }
 
 const emit = defineEmits<{
@@ -27,7 +17,7 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
-const STEP_COUNT = 3;
+const STEP_COUNT = 2;
 const inputClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50";
 const labelClass = "text-xs font-medium text-muted-foreground";
 const dashboardApi = useApi();
@@ -36,23 +26,28 @@ const step = ref(1);
 const busy = ref("");
 const errorMessage = ref("");
 
-const name = ref("");
 const baseUrl = ref("");
 const headers = ref<HeaderRow[]>([]);
+const apiKey = ref("");
 const models = ref<ModelRow[]>([]);
 const synced = ref(false);
-const connectName = ref("");
-const connectToken = ref("");
 
-const slug = computed(() => name.value
-  .toLowerCase()
+const providerName = computed(() => {
+  try {
+    return new URL(baseUrl.value.trim()).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+});
+
+const slug = computed(() => providerName.value
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-+/, "")
   .replace(/-{2,}/g, "-")
   .slice(0, 32)
   .replace(/-+$/, ""));
 
-const canCreate = computed(() => name.value.trim() !== "" && slug.value !== "" && baseUrl.value.trim() !== "");
+const canCreate = computed(() => baseUrl.value.trim() !== "" && /^[a-z]/.test(slug.value));
 
 function run(action: () => Promise<ActionResult<unknown>>, key: string) {
   busy.value = key;
@@ -92,25 +87,19 @@ async function reloadModels() {
 }
 
 function toModelRow(model: CustomProviderListItem["models"][number]): ModelRow {
-  return {
-    modelId: model.modelId,
-    upstream: model.upstream ?? "",
-    reasoning: model.meta?.reasoning ?? true,
-    toolCall: model.meta?.toolCall ?? true,
-    vision: model.meta?.vision ?? true,
-    authless: model.authless,
-    responsesApi: model.customFlags?.responses_api ?? false,
-  };
+  const upstream = model.upstream ?? "";
+  const source = upstream || model.modelId;
+  return { model: source, alias: model.modelId === source ? "" : model.modelId };
 }
 
 async function createProvider() {
   if (!canCreate.value) {
-    errorMessage.value = "Name and base URL are required.";
+    errorMessage.value = "A valid base URL is required.";
     return;
   }
   const ok = await run(() => dashboardApi.customProviders.create({
     slug: slug.value,
-    name: name.value.trim(),
+    name: providerName.value || slug.value,
     baseUrl: baseUrl.value.trim(),
     extraHeaders: headersPayload(),
   }), "create");
@@ -119,56 +108,31 @@ async function createProvider() {
 }
 
 async function syncModels() {
-  const ok = await run(() => dashboardApi.customProviders.syncModels({ slug: slug.value }), "sync");
+  const ok = await run(() => dashboardApi.customProviders.syncModels({ slug: slug.value, token: apiKey.value.trim() || undefined }), "sync");
   if (!ok) return;
   await reloadModels();
   synced.value = true;
 }
 
-function metaFor(row: ModelRow): CustomProviderModelMeta {
-  return { reasoning: row.reasoning, toolCall: row.toolCall, vision: row.vision };
-}
-
-function flagsFor(row: ModelRow): CustomProviderModelFlags {
-  return { responses_api: row.responsesApi };
-}
-
 async function saveModel(row: ModelRow) {
-  const modelId = row.modelId.trim();
-  if (!modelId) return;
+  const model = row.model.trim();
+  if (!model) return;
   const ok = await run(() => dashboardApi.customProviders.addModels({
     slug: slug.value,
-    models: [{
-      modelId,
-      upstream: row.upstream.trim() || undefined,
-      authless: row.authless,
-      meta: metaFor(row),
-      customFlags: flagsFor(row),
-    }],
-  }), `save-${modelId}`);
+    models: [{ modelId: row.alias.trim() || model, upstream: model }],
+  }), `save-${model}`);
   if (ok) await reloadModels();
 }
 
 async function removeModel(index: number) {
   const row = models.value[index];
   if (!row) return;
-  if (!row.modelId) {
+  if (!row.model) {
     models.value.splice(index, 1);
     return;
   }
-  const ok = await run(() => dashboardApi.customProviders.deleteModel({ slug: slug.value, modelId: row.modelId }), `remove-${row.modelId}`);
+  const ok = await run(() => dashboardApi.customProviders.deleteModel({ slug: slug.value, modelId: row.alias.trim() || row.model.trim() }), `remove-${row.model}`);
   if (ok) await reloadModels();
-}
-
-async function connectKey() {
-  if (!connectToken.value.trim()) return;
-  const ok = await run(() => dashboardApi.customProviders.connect({
-    slug: slug.value,
-    token: connectToken.value.trim(),
-    name: connectName.value.trim() || undefined,
-  }), "connect");
-  if (!ok) return;
-  emit("created", slug.value);
 }
 
 function back() {
@@ -186,16 +150,10 @@ function next() {
     void createProvider();
     return;
   }
-  if (step.value === 2) {
-    step.value = 3;
-  }
+  finish();
 }
 
 function finish() {
-  if (connectToken.value.trim()) {
-    void connectKey();
-    return;
-  }
   emit("created", slug.value);
 }
 </script>
@@ -226,13 +184,9 @@ function finish() {
 
       <div v-if="step === 1" class="space-y-4">
         <label class="grid gap-1.5">
-          <span :class="labelClass">Name</span>
-          <input v-model="name" :class="inputClass" placeholder="My vLLM">
-          <span class="font-mono text-xs text-muted-foreground">{{ slug ? `slug: ${slug}` : "slug is generated from the name" }}</span>
-        </label>
-        <label class="grid gap-1.5">
           <span :class="labelClass">Base URL</span>
           <input v-model="baseUrl" :class="inputClass" class="font-mono" placeholder="https://vllm.example.com/v1">
+          <span class="font-mono text-xs text-muted-foreground">{{ slug ? `name: ${providerName} · slug: ${slug}` : "name and slug are generated from the base URL" }}</span>
         </label>
         <div class="grid gap-1.5">
           <div class="flex items-center justify-between">
@@ -252,13 +206,17 @@ function finish() {
       </div>
 
       <div v-if="step === 2" class="space-y-3">
+        <label class="grid gap-1.5">
+          <span :class="labelClass">API key (optional, only to refresh models)</span>
+          <input v-model="apiKey" type="password" :class="inputClass" class="font-mono" placeholder="sk-...">
+        </label>
         <div class="flex items-center justify-between">
           <p class="text-sm font-medium">Models ({{ models.length }})</p>
           <div class="flex items-center gap-2">
             <UiButton size="xs" variant="outline" :disabled="busy === 'sync'" @click="syncModels">
               {{ busy === "sync" ? "Syncing…" : "Sync from upstream" }}
             </UiButton>
-            <UiButton size="xs" variant="outline" @click="models.push({ modelId: '', upstream: '', reasoning: true, toolCall: true, vision: true, authless: false, responsesApi: false })">
+            <UiButton size="xs" variant="outline" @click="models.push({ model: '', alias: '' })">
               Add
             </UiButton>
           </div>
@@ -269,36 +227,18 @@ function finish() {
           </div>
           <div v-for="(row, index) in models" :key="index" class="rounded-lg border border-border p-3">
             <div class="flex items-center gap-2">
-              <input v-model="row.modelId" :class="inputClass" class="flex-1 font-mono" placeholder="model id">
-              <input v-model="row.upstream" :class="inputClass" class="flex-1 font-mono" placeholder="upstream (optional)">
-              <UiButton size="xs" :disabled="busy === `save-${row.modelId}` || !row.modelId.trim()" @click="saveModel(row)">
+              <input v-model="row.model" :class="inputClass" class="flex-1 font-mono" placeholder="model">
+              <input v-model="row.alias" :class="inputClass" class="flex-1 font-mono" placeholder="alias (optional)">
+              <UiButton size="xs" :disabled="busy === `save-${row.model}` || !row.model.trim()" @click="saveModel(row)">
                 Save
               </UiButton>
               <UiButton size="icon-xs" variant="ghost" @click="removeModel(index)">
                 ✕
               </UiButton>
             </div>
-            <div class="mt-2 flex flex-wrap items-center gap-4 text-xs">
-              <label v-for="flag in (['reasoning', 'toolCall', 'vision', 'authless', 'responsesApi'] as const)" :key="flag" class="flex items-center gap-1.5">
-                <UiSwitch v-model="row[flag]" size="sm" />
-                {{ flag }}
-              </label>
-            </div>
           </div>
         </div>
-        <p v-if="synced" class="text-xs text-muted-foreground">Synced {{ models.length }} model(s).</p>
-      </div>
-
-      <div v-if="step === 3" class="space-y-4">
-        <p class="text-sm text-muted-foreground">Connect an API key to start routing requests. Optional — you can also add it later.</p>
-        <label class="grid gap-1.5">
-          <span :class="labelClass">Name (optional)</span>
-          <input v-model="connectName" :class="inputClass" placeholder="prod key">
-        </label>
-        <label class="grid gap-1.5">
-          <span :class="labelClass">API key</span>
-          <input v-model="connectToken" type="password" :class="inputClass" class="font-mono" placeholder="sk-...">
-        </label>
+        <p v-if="synced" class="text-xs text-muted-foreground">Synced {{ models.length }} model(s). Add the provider API key from the account wizard when you're ready to route requests.</p>
       </div>
     </div>
 
@@ -307,12 +247,9 @@ function finish() {
         <UiIcon name="i-lucide-arrow-left" class="size-4" />
         {{ step === 1 ? "Cancel" : "Back" }}
       </UiButton>
-      <UiButton v-if="step < STEP_COUNT" type="button" :disabled="busy !== '' || (step === 1 && !canCreate)" @click="next">
-        {{ step === 1 ? (busy === "create" ? "Creating…" : "Create provider") : "Next" }}
+      <UiButton type="button" :disabled="busy !== '' || (step === 1 && !canCreate)" @click="next">
+        {{ step === 1 ? (busy === "create" ? "Creating…" : "Next") : "Finish" }}
         <UiIcon name="i-lucide-arrow-right" class="size-4" />
-      </UiButton>
-      <UiButton v-else type="button" :disabled="busy !== ''" @click="finish">
-        {{ busy === "connect" ? "Connecting…" : "Finish" }}
       </UiButton>
     </div>
   </div>

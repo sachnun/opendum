@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import type { ProviderAccountKey } from "../../lib/provider-accounts";
 import { cn } from "../../lib/utils";
 
 const props = defineProps<{
-  providerKey: ProviderAccountKey;
+  providerKey: string;
   pinned: boolean;
   readonly?: boolean;
   class?: string | string[];
 }>();
 
 const emit = defineEmits<{
-  toggled: [providerKey: ProviderAccountKey, pinned: boolean];
+  toggled: [providerKey: string, pinned: boolean];
 }>();
 
 const api = useApi();

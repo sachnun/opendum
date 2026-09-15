@@ -101,7 +101,7 @@ export function useApi() {
       update: (body: { slug: string; name?: string; baseUrl?: string; extraHeaders?: Record<string, string>; enabled?: boolean }) => post<ActionResult>(apiFetch, "/api/dashboard/custom-providers/update", body),
       remove: (body: { slug: string }) => post<ActionResult>(apiFetch, "/api/dashboard/custom-providers/delete", body),
       connect: (body: { slug: string; token: string; name?: string }) => post<ActionResult<CustomProviderConnectResult>>(apiFetch, "/api/dashboard/custom-providers/connect", body),
-      syncModels: (body: { slug: string }) => post<ActionResult<CustomProviderSyncResult>>(apiFetch, "/api/dashboard/custom-providers/sync-models", body),
+      syncModels: (body: { slug: string; token?: string }) => post<ActionResult<CustomProviderSyncResult>>(apiFetch, "/api/dashboard/custom-providers/sync-models", body),
       addModels: (body: { slug: string; models: Array<{ modelId: string; upstream?: string; authless?: boolean; minTier?: string; allowedTiers?: string[]; meta?: CustomProviderModelMeta; customFlags?: CustomProviderModelFlags }> }) => post<ActionResult<{ added: number }>>(apiFetch, "/api/dashboard/custom-providers/models", body),
       deleteModel: (body: { slug: string; modelId: string }) => post<ActionResult>(apiFetch, "/api/dashboard/custom-providers/models/delete", body),
     },

@@ -11,6 +11,7 @@ import type { ActionResult } from "../utils/api";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const API_KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
+const DEFAULT_CUSTOM_MODEL_META = { reasoning: true, toolCall: true, vision: true };
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 const VALIDATION_TIMEOUT_MS = 15000;
 
@@ -73,6 +74,7 @@ export const deleteCustomModelSchema = z.object({
 
 export const syncCustomModelsSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_PATTERN, "Invalid slug"),
+  token: z.string().trim().optional(),
 });
 
 function isProbablyPrivateTarget(raw: string): boolean {
@@ -129,6 +131,16 @@ export async function listCustomProviders(userId: string) {
       .filter((row) => row.providerId === provider.id)
       .sort((a, b) => a.modelId.localeCompare(b.modelId)),
   }));
+}
+
+export async function customProviderModels(userId: string, slug: string): Promise<string[]> {
+  const provider = await ownedProvider(userId, slug);
+  if (!provider) return [];
+  const rows = await db
+    .select({ modelId: customProviderModel.modelId })
+    .from(customProviderModel)
+    .where(eq(customProviderModel.providerId, provider.id));
+  return rows.map((row) => row.modelId);
 }
 
 export async function createCustomProvider(userId: string, input: z.infer<typeof createCustomProviderSchema>): Promise<ActionResult<{ id: string; slug: string }>> {
@@ -194,7 +206,7 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
         authless: input.authless ?? false,
         minTier: input.minTier ?? null,
         allowedTiers: input.allowedTiers ?? null,
-        meta: input.meta ?? {},
+        meta: input.meta ?? DEFAULT_CUSTOM_MODEL_META,
         customFlags: input.customFlags ?? {},
       })
       .onConflictDoUpdate({
@@ -204,7 +216,7 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
           authless: input.authless ?? false,
           minTier: input.minTier ?? null,
           allowedTiers: input.allowedTiers ?? null,
-          meta: input.meta ?? {},
+          meta: input.meta ?? DEFAULT_CUSTOM_MODEL_META,
           customFlags: input.customFlags ?? {},
         },
       });
@@ -222,13 +234,13 @@ export async function deleteCustomModel(userId: string, slug: string, modelId: s
   return { success: true };
 }
 
-async function syncFromUpstream(baseUrl: string): Promise<ActionResult<{ discovered: number; total: number }>> {
+async function syncFromUpstream(baseUrl: string, token?: string): Promise<ActionResult<{ ids: string[] }>> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), VALIDATION_TIMEOUT_MS);
   try {
     const response = await fetchInternalProvider(`${baseUrl}/models`, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: token ? { Accept: "application/json", Authorization: `Bearer ${token}` } : { Accept: "application/json" },
       signal: controller.signal,
     });
     if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to reach the provider through the proxy." };
@@ -249,10 +261,10 @@ async function syncFromUpstream(baseUrl: string): Promise<ActionResult<{ discove
   }
 }
 
-export async function syncCustomModels(userId: string, slug: string): Promise<ActionResult<{ added: number; discovered: number }>> {
+export async function syncCustomModels(userId: string, slug: string, token?: string): Promise<ActionResult<{ added: number; discovered: number }>> {
   const provider = await ownedProvider(userId, slug);
   if (!provider) return { success: false, error: `Custom provider "${slug}" not found.` };
-  const fetched = await syncFromUpstream(provider.baseUrl);
+  const fetched = await syncFromUpstream(provider.baseUrl, token);
   if (!fetched.success) return fetched;
   const upserted = await upsertCustomModels(userId, slug, cleanCustomModels(fetched.data.ids));
   if (!upserted.success) return upserted;

@@ -244,7 +244,7 @@ export function getProviderAccountPath(provider: ProviderAccountKey): string {
 }
 
 export function buildProviderHrefMap<V>(
-  data: Record<ProviderAccountKey, V>
+  data: Record<string, V>
 ): Record<string, V> {
   return Object.fromEntries(
     PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => [

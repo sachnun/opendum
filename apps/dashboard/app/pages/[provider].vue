@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
-import { BY_KEY, getProviderAccountPath, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
+import type { ActionResult, CustomProviderListItem, CustomProviderModelRow, ErrorHistoryResult, ProviderAccountUpdateData, ProviderDetailData, ProviderDetailDeltaData, ProviderDetailResponse, ProviderStats, QuotaGroupDisplay, QuotaProviderKey } from "../../lib/api-types";
+import { BY_KEY, getProviderFromSlug, QUOTA_PROVIDER_KEYS, type ProviderAccountKey } from "../../lib/provider-accounts";
+import { requestErrorMessage } from "../../lib/utils";
 import { warmIdbStore } from "../utils/idb";
 
 definePageMeta({
@@ -8,12 +9,42 @@ definePageMeta({
   layout: "dashboard",
 });
 
+interface ProviderMeta {
+  key: string;
+  slug: string;
+  label: string;
+  showTier: boolean;
+}
+
+interface HeaderRow {
+  key: string;
+  value: string;
+}
+
+interface SettingsForm {
+  name: string;
+  baseUrl: string;
+  headers: HeaderRow[];
+  enabled: boolean;
+}
+
 const route = useRoute();
 const api = useApi();
 const { isAuditMode } = useAudit();
 const invalidation = useInvalidate();
-const selectedProvider = computed<ProviderAccountKey>(() => getProviderFromSlug(String(route.params.provider))!);
-const providerMeta = computed(() => BY_KEY[selectedProvider.value]);
+const routeProvider = computed(() => String(route.params.provider));
+const selectedProvider = computed<string>(() => getProviderFromSlug(routeProvider.value) ?? routeProvider.value);
+const { data: customProvidersData, refresh: refreshCustomProviders } = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const customProvider = computed<CustomProviderListItem | null>(() => (customProvidersData.value ?? []).find((row) => row.slug === selectedProvider.value) ?? null);
+const providerMeta = computed<ProviderMeta | null>(() => {
+  const builtin = BY_KEY[selectedProvider.value as ProviderAccountKey];
+  if (builtin) return { key: builtin.key, slug: builtin.slug, label: builtin.label, showTier: builtin.showTier };
+  const custom = customProvider.value;
+  if (custom) return { key: custom.slug, slug: custom.slug, label: custom.name, showTier: false };
+  return null;
+});
+const providerSlug = computed(() => providerMeta.value?.slug ?? selectedProvider.value);
+const providerNotFound = computed(() => !providerMeta.value && customProvidersData.value !== undefined);
 
 type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
@@ -319,7 +350,7 @@ watch(
     accountElement?.scrollIntoView({ block: "center", behavior: "smooth" });
 
     setTimeout(() => {
-      if (route.path === getProviderAccountPath(selectedProvider.value) && decodeAccountHash(route.hash) === accountId) {
+      if (route.path === `/${providerSlug.value}` && decodeAccountHash(route.hash) === accountId) {
         if (typeof window !== "undefined") {
           window.history.replaceState(window.history.state, "", route.path);
         }
@@ -333,7 +364,7 @@ const quotaCapableAccounts = computed(() => accounts.value.filter((account) => a
 const activeQuotaAccounts = computed(() => quotaCapableAccounts.value.filter((account) => account.isActive));
 let previousQuotaAccountKeys = new Set<string>();
 let previousQuotaAccountStates = new Map<string, QuotaAccountState>();
-let previousQuotaProvider: ProviderAccountKey | null = null;
+let previousQuotaProvider: string | null = null;
 const {
   quotaByAccountId,
   quotaErrorByAccountId,
@@ -769,8 +800,120 @@ function handleAccountErrorsResolved(accountId: string) {
   void invalidation.invalidateAccountOverview();
 }
 
-function handleAccountConnected(result: { provider: ProviderAccountKey; isUpdate: boolean }) {
+function handleAccountConnected(result: { provider: string; isUpdate: boolean }) {
   if (result.provider === selectedProvider.value && !result.isUpdate) shouldPromoteNextNewAccount = true;
+}
+
+const settingsOpen = ref(false);
+const settingsForm = ref<SettingsForm | null>(null);
+const settingsBusy = ref("");
+const settingsError = ref("");
+const modelDraft = ref({ model: "", alias: "" });
+const customModels = computed<CustomProviderModelRow[]>(() => customProvider.value?.models ?? []);
+
+function openSettings() {
+  const custom = customProvider.value;
+  if (!custom) return;
+  settingsForm.value = {
+    name: custom.name,
+    baseUrl: custom.baseUrl,
+    headers: Object.entries(custom.extraHeaders ?? {}).map(([key, value]) => ({ key, value })),
+    enabled: custom.enabled,
+  };
+  modelDraft.value = { model: "", alias: "" };
+  settingsError.value = "";
+  settingsOpen.value = true;
+}
+
+function headersPayload(form: SettingsForm): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const row of form.headers) {
+    const key = row.key.trim();
+    const value = row.value.trim();
+    if (key && value) headers[key] = value;
+  }
+  return headers;
+}
+
+function runSettingsAction(action: () => Promise<ActionResult<unknown>>, key: string) {
+  settingsBusy.value = key;
+  settingsError.value = "";
+  return action()
+    .then(async (result) => {
+      if (!result.success) {
+        settingsError.value = result.error;
+        return false;
+      }
+      await refreshCustomProviders();
+      return true;
+    })
+    .catch((error) => {
+      settingsError.value = requestErrorMessage(error);
+      return false;
+    })
+    .finally(() => {
+      settingsBusy.value = "";
+    });
+}
+
+async function saveSettings() {
+  const form = settingsForm.value;
+  const key = providerMeta.value?.key;
+  if (!form || !key) return;
+  const ok = await runSettingsAction(() => api.customProviders.update({
+    slug: key,
+    name: form.name.trim() || undefined,
+    baseUrl: form.baseUrl.trim() || undefined,
+    extraHeaders: headersPayload(form),
+    enabled: form.enabled,
+  }), "save");
+  if (ok) settingsOpen.value = false;
+}
+
+async function addModel() {
+  const key = providerMeta.value?.key;
+  const model = modelDraft.value.model.trim();
+  if (!key || !model) return;
+  const ok = await runSettingsAction(() => api.customProviders.addModels({
+    slug: key,
+    models: [{ modelId: modelDraft.value.alias.trim() || model, upstream: model }],
+  }), "model-add");
+  if (ok) modelDraft.value = { model: "", alias: "" };
+}
+
+function removeModel(modelId: string) {
+  const key = providerMeta.value?.key;
+  if (!key) return;
+  void runSettingsAction(() => api.customProviders.deleteModel({ slug: key, modelId }), `model-remove-${modelId}`);
+}
+
+function syncModels() {
+  const key = providerMeta.value?.key;
+  if (!key) return;
+  void runSettingsAction(() => api.customProviders.syncModels({ slug: key }), "model-sync");
+}
+
+const deleteOpen = ref(false);
+const deleteBusy = ref(false);
+const deleteError = ref("");
+
+async function deleteProvider() {
+  const key = providerMeta.value?.key;
+  if (!key) return;
+  deleteBusy.value = true;
+  deleteError.value = "";
+  try {
+    const result = await api.customProviders.remove({ slug: key });
+    if (!result.success) throw new Error(result.error);
+    deleteOpen.value = false;
+    settingsOpen.value = false;
+    await refreshCustomProviders();
+    await navigateTo("/");
+  } catch (error) {
+    deleteError.value = requestErrorMessage(error);
+  } finally {
+    deleteBusy.value = false;
+  }
 }
 
 function decodeAccountHash(hash: string): string | null {
@@ -799,12 +942,15 @@ function decodeAccountHash(hash: string): string | null {
           {{ providerMeta?.label ?? selectedProvider.replaceAll('_', ' ') }}
           <UiBadge v-if="accounts.length > 0" variant="outline" class="text-xs">{{ activeAccountCount }}/{{ accounts.length }}</UiBadge>
         </h2>
-        <div class="flex w-full items-center sm:w-auto">
+        <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
+          <UiButton v-if="customProvider" variant="outline" size="icon" :disabled="isAuditMode" aria-label="Provider settings" @click="openSettings">
+            <UiIcon name="i-lucide-settings" class="size-4" />
+          </UiButton>
           <AddAccountDialog
             v-if="providerMeta"
             :initial-provider="providerMeta.key"
             :readonly="isAuditMode"
-            trigger-class="flex-1 sm:w-auto sm:flex-none"
+            trigger-class="sm:w-auto sm:flex-none"
             @connected="handleAccountConnected"
           />
         </div>
@@ -813,7 +959,12 @@ function decodeAccountHash(hash: string): string | null {
 
     <DataNotice :error="error" />
 
-    <section v-if="!isLoadingAccounts && accounts.length === 0 && supportedModels.length" class="scroll-mt-24 space-y-4 md:space-y-2">
+    <div v-if="providerNotFound" class="rounded-xl border border-dashed border-border p-10 text-center">
+      <p class="text-sm font-medium text-foreground">Provider not found</p>
+      <UiButton variant="outline" class="mt-4" @click="navigateTo('/')">Back to providers</UiButton>
+    </div>
+
+    <section v-else-if="!isLoadingAccounts && accounts.length === 0 && supportedModels.length" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="pt-1">
         <div class="flex flex-wrap gap-1.5">
           <UiBadge
@@ -873,5 +1024,92 @@ function decodeAccountHash(hash: string): string | null {
         />
       </div>
     </section>
+
+    <UiDialog v-model:open="settingsOpen" ui.content="sm:max-w-xl">
+      <h3 class="text-lg font-semibold">Settings</h3>
+      <div v-if="settingsForm" class="min-h-0 flex-1 space-y-4 overflow-y-auto">
+        <div v-if="settingsError" class="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {{ settingsError }}
+        </div>
+        <label class="grid gap-1.5">
+          <span class="text-xs font-medium text-muted-foreground">Name</span>
+          <input v-model="settingsForm.name" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
+        </label>
+        <label class="grid gap-1.5">
+          <span class="text-xs font-medium text-muted-foreground">Base URL</span>
+          <input v-model="settingsForm.baseUrl" class="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
+        </label>
+        <div class="grid gap-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-muted-foreground">Headers</span>
+            <UiButton size="xs" variant="outline" @click="settingsForm.headers.push({ key: '', value: '' })">
+              Add
+            </UiButton>
+          </div>
+          <div v-for="(header, index) in settingsForm.headers" :key="index" class="flex items-center gap-2">
+            <input v-model="header.key" class="h-9 w-2/5 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="Header">
+            <input v-model="header.value" class="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="Value">
+            <UiButton size="icon-sm" variant="ghost" @click="settingsForm.headers.splice(index, 1)">
+              ✕
+            </UiButton>
+          </div>
+        </div>
+        <label class="flex items-center justify-between">
+          <span class="text-xs font-medium text-muted-foreground">Enabled</span>
+          <UiSwitch v-model="settingsForm.enabled" />
+        </label>
+
+        <div class="grid gap-2 border-t border-border pt-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-muted-foreground">Models ({{ customModels.length }})</span>
+            <UiButton size="icon-sm" variant="outline" :title="`Refresh models from ${settingsForm.baseUrl}`" :disabled="settingsBusy === 'model-sync'" @click="syncModels">
+              <UiIcon name="i-lucide-refresh-cw" :class="['size-4', settingsBusy === 'model-sync' ? 'animate-spin' : '']" />
+            </UiButton>
+          </div>
+          <div v-for="model in customModels" :key="model.id" class="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+            <span class="truncate font-mono text-xs">{{ model.modelId }}</span>
+            <UiButton size="icon-xs" variant="ghost" :disabled="settingsBusy === `model-remove-${model.modelId}`" @click="removeModel(model.modelId)">
+              ✕
+            </UiButton>
+          </div>
+          <div class="flex items-center gap-2">
+            <input v-model="modelDraft.model" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="model">
+            <input v-model="modelDraft.alias" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="alias (optional)">
+            <UiButton size="xs" :disabled="settingsBusy === 'model-add' || !modelDraft.model.trim()" @click="addModel">
+              Add
+            </UiButton>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <UiButton variant="destructive" class="mr-auto" @click="deleteOpen = true">
+          Delete provider
+        </UiButton>
+        <UiButton variant="outline" @click="settingsOpen = false">
+          Cancel
+        </UiButton>
+        <UiButton :disabled="settingsBusy === 'save'" @click="saveSettings">
+          {{ settingsBusy === "save" ? "Saving…" : "Save" }}
+        </UiButton>
+      </div>
+    </UiDialog>
+
+    <UiDialog v-model:open="deleteOpen" ui.content="sm:max-w-md">
+      <h3 class="text-lg font-semibold">
+        Delete {{ providerMeta?.label }}?
+      </h3>
+      <p class="text-sm text-muted-foreground">
+        The provider, its models, and its accounts will be removed. This cannot be undone.
+      </p>
+      <p v-if="deleteError" class="text-sm text-destructive">{{ deleteError }}</p>
+      <div class="flex justify-end gap-2">
+        <UiButton variant="outline" :disabled="deleteBusy" @click="deleteOpen = false">
+          Cancel
+        </UiButton>
+        <UiButton variant="destructive" :disabled="deleteBusy" @click="deleteProvider">
+          {{ deleteBusy ? "Deleting…" : "Delete" }}
+        </UiButton>
+      </div>
+    </UiDialog>
   </div>
 </template>

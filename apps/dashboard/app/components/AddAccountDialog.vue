@@ -2,7 +2,7 @@
 import { BY_KEY, DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, PROVIDER_ACCOUNT_DEFINITIONS, type DeviceProviderKey, type OAuthProviderKey, type ProviderAccountKey, type ProviderAuthMethodKey } from "../../lib/provider-accounts";
 import { cn } from "../../lib/utils";
 
-type Provider = ProviderAccountKey;
+type Provider = string;
 type FlowType = "oauth_redirect" | "device_code" | "chatgpt_session" | "api_key" | "api_key_with_account_id";
 type MethodKey = FlowType;
 
@@ -96,6 +96,20 @@ const providerOptions: Provider[] = [...PROVIDER_ACCOUNT_DEFINITIONS]
   .sort((a, b) => (a.displayOrder ?? Number.MAX_SAFE_INTEGER) - (b.displayOrder ?? Number.MAX_SAFE_INTEGER))
   .map((definition) => definition.key);
 
+const customProviders = useCachedData(dataKeys.customProviders, () => api.customProviders.list());
+const customList = computed(() => customProviders.data.value ?? []);
+const customProviderConfigs = computed<Record<string, ProviderConfig>>(() => Object.fromEntries(
+  customList.value.map((row) => [row.slug, {
+    name: row.name,
+    methods: [{ key: "api_key" as MethodKey, name: "API Key" }],
+    apiKeyPlaceholder: "sk-...",
+  } satisfies ProviderConfig]),
+));
+
+function isCustomProvider(providerKey: string | null): boolean {
+  return providerKey !== null && customList.value.some((row) => row.slug === providerKey);
+}
+
 const open = ref(false);
 const customMode = ref(false);
 const minimumStep = computed(() => (props.initialProvider ? 2 : 1));
@@ -126,7 +140,11 @@ let copiedCallbackUrlTimer: ReturnType<typeof setTimeout> | null = null;
 let copyAutoNextTimer: ReturnType<typeof setTimeout> | null = null;
 let callbackAutoExchangeTimer: ReturnType<typeof setTimeout> | null = null;
 
-const selectedConfig = computed(() => (provider.value ? providerConfigs[provider.value] : null));
+const selectedConfig = computed<ProviderConfig | null>(() => {
+  const key = provider.value;
+  if (!key) return null;
+  return (providerConfigs as Record<string, ProviderConfig | undefined>)[key] ?? customProviderConfigs.value[key] ?? null;
+});
 const activeFlowType = computed<FlowType | null>(() => {
   if (!selectedConfig.value || !selectedMethod.value) return null;
   const method = selectedConfig.value.methods.find((item) => item.key === selectedMethod.value && !item.disabled);
@@ -154,7 +172,7 @@ function handleCustomCreated(createdSlug: string) {
   customMode.value = false;
   open.value = false;
   emit("customCreated", createdSlug);
-  void navigateTo(`/custom/${createdSlug}`);
+  void invalidation.refreshData(dataKeys.customProviders);
 }
 
 watch(open, (value) => {
@@ -212,7 +230,7 @@ watch([open, step, provider, selectedMethod], async () => {
       return;
     }
 
-    authUrl.value = providerConfigs[selectedProvider].apiKeyPortalUrl ?? "";
+    authUrl.value = selectedConfig.value?.apiKeyPortalUrl ?? "";
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "Failed to start account connection";
   } finally {
@@ -286,6 +304,7 @@ function finishConnection(result: { email: string; isUpdate: boolean }) {
   open.value = false;
   emit("connected", { provider: connectedProvider, ...result });
   void invalidation.invalidateAccountCollection(connectedProvider);
+  if (isCustomProvider(connectedProvider)) void invalidation.refreshData(dataKeys.customProviders);
 }
 
 function selectProvider(providerKey: Provider) {
@@ -331,15 +350,18 @@ function stopDevicePolling() {
 
 function selectLoginMethod(method: MethodKey) {
   if (props.readonly) return;
-  if (!selectedConfig.value?.methods.some((item) => item.key === method && !item.disabled)) return;
+  const config = selectedConfig.value;
+  const target = config?.methods.find((item) => item.key === method && !item.disabled);
+  if (!config || !target) return;
   resetAuthProgress();
   selectedMethod.value = method;
-  step.value = authStep.value;
+  const flow = target.flow ?? (method as FlowType);
+  step.value = flow === "api_key" && !config.apiKeyPortalUrl ? finishStep.value : authStep.value;
 }
 
 function callbackPlaceholder(providerKey: Provider | null) {
-  if (providerKey) {
-    const definition = BY_KEY[providerKey];
+  if (providerKey && providerKey in BY_KEY) {
+    const definition = BY_KEY[providerKey as ProviderAccountKey];
     if (definition.callbackPlaceholder) return definition.callbackPlaceholder;
   }
   return "http://localhost:1/oauth2callback?code=...";
@@ -487,6 +509,20 @@ async function handleConnectApiKey() {
     errorMessage.value = activeFlowType.value === "api_key_with_account_id" ? "Please enter an API token" : "Please enter an API key";
     return;
   }
+  const activeProvider = provider.value;
+  if (isCustomProvider(activeProvider)) {
+    isLoading.value = true;
+    try {
+      const result = await api.customProviders.connect({ slug: activeProvider, token: apiKey.value.trim() });
+      if (!result.success) throw new Error(result.error);
+      finishConnection({ email: `custom-${activeProvider}`, isUpdate: result.data.isUpdate });
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : "Failed to connect account";
+    } finally {
+      isLoading.value = false;
+    }
+    return;
+  }
   if (provider.value === "zenmux" && !platformKey.value.trim()) {
     errorMessage.value = "Please enter a Platform Key. Get it from ZenMux → Management → API Keys.";
     return;
@@ -610,7 +646,11 @@ async function handleCallbackPaste(event: ClipboardEvent) {
 
 function goBack() {
   clearCopyAutoNextTimer();
-  const nextStep = Math.max(minimumStep.value, step.value - 1);
+  const previousStep = step.value;
+  let nextStep = Math.max(minimumStep.value, step.value - 1);
+  if (nextStep === authStep.value && previousStep === finishStep.value && isCustomProvider(provider.value)) {
+    nextStep = Math.max(minimumStep.value, authStep.value - 1);
+  }
   step.value = nextStep;
 
   if (step.value === 1) {
@@ -653,9 +693,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <UiButton variant="outline" :class="cn('gap-2', triggerClass)" :disabled="readonly" @click="open = true">
+  <UiButton variant="outline" size="icon" :class="triggerClass" :disabled="readonly" aria-label="Add account" @click="open = true">
     <UiIcon name="i-lucide-plus" class="size-4" />
-    Add Account
   </UiButton>
 
   <UiDialog
@@ -705,7 +744,19 @@ onBeforeUnmount(() => {
               )"
               @click="selectProvider(providerKey)"
             >
-              <span class="text-sm font-medium">{{ providerConfigs[providerKey].name }}</span>
+              <span class="text-sm font-medium">{{ providerConfigs[providerKey]?.name }}</span>
+            </button>
+            <button
+              v-for="row in customList"
+              :key="row.slug"
+              type="button"
+              :class="cn(
+                'flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors hover:bg-muted/40',
+                provider === row.slug ? 'border-foreground/30 bg-muted/30' : 'border-border',
+              )"
+              @click="selectProvider(row.slug)"
+            >
+              <span class="text-sm font-medium">{{ row.name }}</span>
             </button>
             <button
               v-if="!readonly"

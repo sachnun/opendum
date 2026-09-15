@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useSession } from "../../lib/auth-client";
-import { PROVIDER_ACCOUNT_DEFINITIONS, type ProviderAccountKey } from "../../lib/provider-accounts";
+import { PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: false });
 
@@ -28,7 +28,12 @@ const summaries = computed(() => data.value?.summaries ?? null);
 const pinnedProviders = computed(() => new Set(data.value?.pinnedProviders ?? []));
 const providerAvailabilityOrder = { active: 0, inactive: 1 } as const;
 const providerStatusOrder = { error: 0, warning: 1, normal: 2 } as const;
-const sortedProviders = computed(() => [...PROVIDER_ACCOUNT_DEFINITIONS].sort((a, b) => {
+const customProviderEntries = computed(() => customList.value.map((provider) => ({ key: provider.slug, slug: provider.slug, label: provider.name })));
+const providerEntries = computed(() => [
+  ...PROVIDER_ACCOUNT_DEFINITIONS.map((definition) => ({ key: definition.key as string, slug: definition.slug, label: definition.label })),
+  ...customProviderEntries.value,
+]);
+const sortedProviders = computed(() => [...providerEntries.value].sort((a, b) => {
   const aPinned = pinnedProviders.value.has(a.key) ? 0 : 1;
   const bPinned = pinnedProviders.value.has(b.key) ? 0 : 1;
   const aSummary = summaries.value?.[a.key];
@@ -47,9 +52,23 @@ const sortedProviders = computed(() => [...PROVIDER_ACCOUNT_DEFINITIONS].sort((a
     || a.label.localeCompare(b.label);
 }));
 
-function providerSummary(provider: ProviderAccountKey) {
+function providerSummary(provider: string) {
   return summaries.value?.[provider] ?? null;
 }
+
+const emptyProviderSummary = {
+  connected: 0,
+  active: 0,
+  indicator: "normal" as const,
+  stats: {
+    totalRequests: 0,
+    totalTokens: 0,
+    successRate: null,
+    dailyRequests: [] as Array<{ date: string; count: number }>,
+    avgDurationLastDay: null,
+    durationLast24Hours: [] as Array<{ time: string; avgDuration: number }>,
+  },
+};
 
 function refreshAccountsOverview() {
   void refresh();
@@ -66,7 +85,7 @@ function refreshAccountsOverview() {
             Provider Accounts
           </h2>
           <div class="flex w-full items-center sm:w-auto">
-            <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" @custom-created="refreshCustomProviders" />
+            <AddAccountDialog :readonly="isAuditMode" trigger-class="sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" @custom-created="() => refreshCustomProviders()" />
           </div>
         </div>
       </div>
@@ -77,14 +96,9 @@ function refreshAccountsOverview() {
           v-for="provider in sortedProviders"
           :key="provider.key"
           :provider="provider"
-          :summary="providerSummary(provider.key)!"
+          :summary="providerSummary(provider.key) ?? emptyProviderSummary"
           :pinned="pinnedProviders.has(provider.key)"
           :readonly="isAuditMode"
-        />
-        <CustomProviderOverviewCard
-          v-for="provider in customList"
-          :key="provider.id"
-          :provider="provider"
         />
       </div>
     </div>
