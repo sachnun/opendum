@@ -2,7 +2,8 @@
   "owner": "inclusion-ai",
   "providers": [
     "openrouter",
-    "hyper"
+    "hyper",
+    "perch"
   ],
   "modalities": {
     "input": [
@@ -23,7 +24,7 @@
     "top_p": false
   },
   "limit": {
-    "context": 1048576,
+    "context": 1048000,
     "output": 32768
   },
   "providerConfig": {
@@ -35,6 +36,10 @@
       "upstream": "thinkingmachines/inkling:free",
       "contextWindow": 1048576,
       "maxOutputTokens": 471859
+    },
+    "perch": {
+      "contextWindow": 1048000,
+      "maxOutputTokens": 32768
     }
   }
 }

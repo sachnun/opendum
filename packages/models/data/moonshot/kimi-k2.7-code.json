@@ -3,7 +3,8 @@
   "providers": [
     "zenmux",
     "qoder",
-    "hyper"
+    "hyper",
+    "perch"
   ],
   "meta": {
     "reasoning": true,
@@ -36,6 +37,11 @@
     "hyper": {
       "contextWindow": 256000,
       "maxOutputTokens": 16000
+    },
+    "perch": {
+      "upstream": "kimi-k2-7-code",
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
     },
     "qoder": {
       "upstream": "kmodel",

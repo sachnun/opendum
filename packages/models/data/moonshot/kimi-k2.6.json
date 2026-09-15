@@ -3,7 +3,8 @@
   "providers": [
     "nvidia_nim",
     "hyper",
-    "workbuddy"
+    "workbuddy",
+    "perch"
   ],
   "meta": {
     "reasoning": true,
@@ -38,6 +39,11 @@
     },
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6",
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144
+    },
+    "perch": {
+      "upstream": "kimi-k2-6",
       "contextWindow": 262144,
       "maxOutputTokens": 262144
     },

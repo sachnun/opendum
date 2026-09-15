@@ -4,7 +4,8 @@
     "opencode",
     "kilo_code",
     "openrouter",
-    "nvidia_nim"
+    "nvidia_nim",
+    "perch"
   ],
   "modalities": {
     "input": [
@@ -47,6 +48,11 @@
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
       "maxOutputTokens": 131072
+    },
+    "perch": {
+      "upstream": "nemotron-3-5-lightning",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536
     }
   }
 }

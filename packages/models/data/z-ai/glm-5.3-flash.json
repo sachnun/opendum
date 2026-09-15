@@ -3,7 +3,8 @@
   "providers": [
     "cline",
     "zenmux",
-    "hyper"
+    "hyper",
+    "perch"
   ],
   "meta": {
     "reasoning": true,
@@ -39,6 +40,11 @@
     },
     "hyper": {
       "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "perch": {
+      "upstream": "glm-5-3-flash",
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     },
     "zenmux": {
