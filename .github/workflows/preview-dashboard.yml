@@ -72,8 +72,8 @@ jobs:
         run: |
           set -euo pipefail
           marker="<!-- edgeone-dashboard-preview -->"
-          body=$(printf '%s\n\n**Dashboard preview:** [%s](%s)\n\nCommit: `%s`' \
-            "$marker" "$PREVIEW_URL" "$PREVIEW_URL" "${SHA::7}")
+          body=$(printf '%s\n\n**Dashboard preview:** %s\n\nCommit: `%s`' \
+            "$marker" "$PREVIEW_URL" "${SHA::7}")
           id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
             --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
           if [ -n "$id" ]; then
