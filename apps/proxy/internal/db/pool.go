@@ -18,9 +18,10 @@ func Open(databaseURL string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	config.MaxConns = 25
-	config.MinConns = 5
+	config.MaxConns = 5
+	config.MinConns = 1
 	config.MaxConnLifetime = 30 * time.Minute
+	config.MaxConnIdleTime = 5 * time.Minute
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {

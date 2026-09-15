@@ -22,22 +22,21 @@ function getConnectionString(): string {
 }
 
 function createDb(): Database {
-  return drizzleNodePg(getConnectionString(), { schema: fullSchema });
-}
-
-export async function createRequestDb(): Promise<{ db: Database; close: () => Promise<void> }> {
-  const db = createDb();
-
-  return {
-    db,
-    close: async () => {
-      try {
-        await db.$client.end();
-      } catch (error) {
-        console.warn("Failed to close Postgres client:", error);
-      }
+  const db = drizzleNodePg({
+    connection: {
+      connectionString: getConnectionString(),
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
     },
-  };
+    schema: fullSchema,
+  });
+
+  db.$client.on("error", (error) => {
+    console.warn("Postgres pool error:", error);
+  });
+
+  return db;
 }
 
 function getDb(): Database {
