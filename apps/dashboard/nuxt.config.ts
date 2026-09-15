@@ -90,7 +90,7 @@ function buildModelRegistryModule(): string {
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   sourcemap: false,
-  modules: ["@nuxt/eslint", "@nuxt/fonts"],
+  modules: ["@nuxt/a11y", "@nuxt/eslint", "@nuxt/fonts"],
   css: ["~/assets/css/main.css"],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
   spaLoadingTemplate: "./loading.html",
