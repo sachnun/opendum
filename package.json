@@ -4,6 +4,7 @@
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "(pnpm --filter @opendum/dashboard dev & TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy)",
+    "dev:emulate": "(pnpm --filter @opendum/dashboard emulate & pnpm --filter @opendum/dashboard dev:emulate & TOKEN_REFRESH_INTERVAL_SECONDS=0 go -C apps/proxy run ./cmd/proxy)",
     "build": "pnpm --filter @opendum/dashboard build && go -C apps/proxy build ./...",
     "db:push": "pnpm --filter @opendum/database db:push",
     "db:generate": "pnpm --filter @opendum/database db:generate",

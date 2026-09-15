@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { signIn } from "../../lib/auth-client";
+import { authProvider, type SocialProvider } from "../../lib/oauth-emulator";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -8,7 +9,6 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Local development sign in failed. Please try again.",
 };
 
-type SocialProvider = "github" | "google";
 type TetrisCell = string | null;
 type TetrisPiece = {
   shape: number[][];
@@ -34,6 +34,7 @@ const tetrisPieces = [
 ];
 
 const route = useRoute();
+const useOAuthEmulator = useRuntimeConfig().public.authOauthEmulator;
 
 useHead({
   meta: [
@@ -65,7 +66,7 @@ async function continueWithProvider(provider: SocialProvider) {
 
   try {
     await signIn.social({
-      provider,
+      provider: authProvider(provider, useOAuthEmulator),
       callbackURL: redirectTarget.value,
     });
   } finally {

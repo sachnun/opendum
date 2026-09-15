@@ -102,6 +102,7 @@ export default defineNuxtConfig({
     proxyUrl: "",
     public: {
       proxyUrl: "",
+      authOauthEmulator: process.env.AUTH_OAUTH_EMULATOR === "1",
     },
   },
   fonts: {
