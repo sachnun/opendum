@@ -1056,7 +1056,7 @@ function cancelErrorPreviewPointer() {
               <UiIcon :name="isSubtitleVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
             </UiButton>
           </UiTooltip>
-          <p :class="['min-w-0 font-mono text-sm text-muted-foreground', isSubtitleVisible ? 'break-all whitespace-normal' : 'truncate whitespace-nowrap']">{{ subtitleDisplay }}</p>
+          <p :title="subtitleDisplay" class="min-w-0 truncate whitespace-nowrap font-mono text-sm text-muted-foreground">{{ subtitleDisplay }}</p>
         </div>
       </UiCardHeader>
       <UiCardContent class="flex flex-1 flex-col pt-0">
