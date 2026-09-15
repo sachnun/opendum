@@ -1219,7 +1219,7 @@ function cancelErrorPreviewPointer() {
             </UiTooltip>
             <UiTooltip text="Playground">
               <NuxtLink :to="`/play?accountId=${account.id}`">
-                <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
+                <UiButton variant="outline" size="sm" :aria-label="`Playground for ${accountTitle}`"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
             </UiTooltip>
             <UiTooltip v-if="isMaintener" :text="sessionLoading ? 'Fetching session...' : copiedSession ? 'Copied' : 'Copy session'">

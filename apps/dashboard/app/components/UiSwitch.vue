@@ -25,6 +25,7 @@ const checked = defineModel<boolean>({ default: false });
     <SwitchRoot
       v-model="checked"
       :disabled="disabled"
+      :aria-label="title"
       :data-size="size"
       :class="cn(
         'peer group/switch inline-flex shrink-0 cursor-pointer items-center rounded-full border border-transparent shadow-xs outline-none transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:opacity-50 data-[size=default]:h-[1.15rem] data-[size=default]:w-8 data-[size=sm]:h-3.5 data-[size=sm]:w-6',
