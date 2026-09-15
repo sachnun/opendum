@@ -28,12 +28,12 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 131072
+    "output": 128000
   },
   "providerConfig": {
     "hyper": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 128000
     },
     "perch": {
       "upstream": "glm-5-3",
