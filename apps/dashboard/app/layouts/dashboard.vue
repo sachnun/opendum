@@ -833,6 +833,7 @@ async function handleAuditSelected() {
                         class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
                         @click.stop="toggleSharing"
                       >
+                        <span class="sr-only">{{ subItem.name }}</span>
                         <span
                           aria-hidden="true"
                           :class="[
@@ -990,9 +991,9 @@ async function handleAuditSelected() {
             <UiPopover v-model:open="userMenuOpen" :content="{ align: 'end', sideOffset: 8, arrowClass: 'translate-x-5' }">
               <button
                 type="button"
-                aria-label="Open account menu"
                 class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-1 transition-opacity hover:opacity-80"
               >
+                <span class="sr-only">Open account menu</span>
                 <PointCoinIcon
                   :class="[
                     'size-6 shrink-0 text-foreground/85 drop-shadow-[0_0_0.35rem_rgba(255,255,255,0.18)]',
@@ -1229,6 +1230,7 @@ async function handleAuditSelected() {
                             class="inline-flex shrink-0 cursor-pointer outline-none disabled:cursor-default"
                             @click.stop="toggleSharing"
                           >
+                            <span class="sr-only">{{ subItem.name }}</span>
                             <span
                               aria-hidden="true"
                               :class="[
