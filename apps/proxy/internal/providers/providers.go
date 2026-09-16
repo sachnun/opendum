@@ -20,8 +20,10 @@ import (
 
 const opencodeChatCompletionsEndpoint = "https://opencode.ai/zen/v1/chat/completions"
 const opencodeResponsesEndpoint = "https://opencode.ai/zen/v1/responses"
+const opencodeMessagesEndpoint = "https://opencode.ai/zen/v1/messages"
 const opencodeFallbackChatCompletionsEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/chat/completions"
 const opencodeFallbackResponsesEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/responses"
+const opencodeFallbackMessagesEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/messages"
 const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
 const opencodeUserAgent = "opencode/1.15.8"
@@ -431,6 +433,23 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 		_ = resp.Body.Close()
 		return jsonResponse(http.StatusOK, responsesJSONToChatCompletion(data, modelName)), nil
 	}
+	if p.requiresMessagesAPI(model) {
+		payload := buildAnthropicMessagesPayload(ctx, client, body, modelName, stream)
+		resp, err := p.postOpencodeMessages(ctx, client, payload, stream, headers)
+		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return resp, err
+		}
+		if stream {
+			return sseResponse(anthropicMessagesSSEToChatSSEReader(resp.Body, modelName), resp.Body), nil
+		}
+		var data map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
+		_ = resp.Body.Close()
+		return jsonResponse(http.StatusOK, anthropicMessagesToChatCompletion(data, modelName)), nil
+	}
 	payload := map[string]any{}
 	for key, value := range body {
 		if _, ok := supportedOpencode[key]; ok && value != nil {
@@ -467,8 +486,19 @@ func (p opencodeProvider) postOpencodeChat(ctx context.Context, client *http.Cli
 	return postJSONWithFallback(ctx, client, p.fallback, "opencode", opencodeChatCompletionsEndpoint, opencodeFallbackChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
 }
 
+func (p opencodeProvider) postOpencodeMessages(ctx context.Context, client *http.Client, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
+	if torReady(p.tor, p.torClient) {
+		return postJSONWithTorFallback(ctx, client, p.torClient, p.tor, p.fallback, "opencode", opencodeMessagesEndpoint, opencodePublicAPIKey, payload, stream, headers)
+	}
+	return postJSONWithFallback(ctx, client, p.fallback, "opencode", opencodeMessagesEndpoint, opencodeFallbackMessagesEndpoint, opencodePublicAPIKey, payload, stream, headers)
+}
+
 func (p opencodeProvider) requiresResponsesAPI(model string) bool {
 	return providerConfigBool(p.registry, model, "opencode", "responses_api")
+}
+
+func (p opencodeProvider) requiresMessagesAPI(model string) bool {
+	return providerConfigBool(p.registry, model, "opencode", "messages_api")
 }
 
 func opencodeHeaders(body map[string]any) map[string]string {

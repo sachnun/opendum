@@ -147,6 +147,8 @@ function buildProviderConfigByModel(modelMap, endpointByModelId) {
     const endpoint = endpointByModelId.get(modelId) ?? "";
     if (endpoint.includes("/responses")) {
       configByModel.set(modelKey, { responses_api: true });
+    } else if (endpoint.includes("/messages")) {
+      configByModel.set(modelKey, { messages_api: true });
     }
   }
 
@@ -162,7 +164,7 @@ async function main() {
   const providerConfigByModel = buildProviderConfigByModel(modelMap, endpointByModelId);
   const result = syncProviderModels(modelsDir, "opencode", modelMap, {
     providerConfigByModel,
-    managedProviderConfigKeys: ["responses_api"],
+    managedProviderConfigKeys: ["responses_api", "messages_api"],
   });
 
   if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
