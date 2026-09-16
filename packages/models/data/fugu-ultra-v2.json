@@ -11,14 +11,6 @@
       "text"
     ]
   },
-  "parameter": {
-    "frequency_penalty": false,
-    "presence_penalty": false,
-    "repetition_penalty": false,
-    "temperature": false,
-    "top_k": false,
-    "top_p": false
-  },
   "limit": {
     "context": 1000000,
     "output": 1000000

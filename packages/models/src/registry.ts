@@ -16,7 +16,6 @@ const MODEL_PROPERTY_ORDER = [
   "ignored",
   "meta",
   "modalities",
-  "parameter",
   "limit",
   "providerConfig",
 ];

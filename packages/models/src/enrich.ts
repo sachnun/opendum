@@ -3,7 +3,7 @@
 /**
  * Enrich the local model registry with external metadata.
  *
- * Fills `owner`, `modalities`, `parameter`, `limit`, and the per-provider
+ * Fills `owner`, `modalities`, `limit`, and the per-provider
  * `contextWindow` / `maxOutputTokens` by matching local model ids against
  * OpenRouter, models.dev, LiteLLM, and NVIDIA NIM.
  *
@@ -63,11 +63,6 @@ function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
     changed = true;
   }
 
-  if (patch.parameter && !sameValue(data.parameter, patch.parameter)) {
-    data.parameter = patch.parameter;
-    changed = true;
-  }
-
   if (Object.keys(patch.limits).length > 0 && !sameValue(data.limit, patch.limits)) {
     data.limit = patch.limits;
     changed = true;
@@ -111,7 +106,6 @@ interface Stats {
   owner: number;
   limit: number;
   modalities: number;
-  parameter: number;
   providerLimits: number;
   unmatched: string[];
   divergent: Array<{ id: string; min: number; max: number }>;
@@ -128,7 +122,7 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
   console.log(`[metadata] models: ${stats.models}`);
   console.log(
     `[metadata] owner: ${stats.owner}  limit: ${stats.limit}  modalities: ${stats.modalities}`
-    + `  parameter: ${stats.parameter}  providerLimits: ${stats.providerLimits}`,
+    + `  providerLimits: ${stats.providerLimits}`,
   );
   console.log(`[metadata] updated: ${updatedCount}${dryRun ? " (dry run)" : ""}`);
 
@@ -160,7 +154,6 @@ async function main(): Promise<void> {
     owner: 0,
     limit: 0,
     modalities: 0,
-    parameter: 0,
     providerLimits: 0,
     unmatched: [],
     divergent: [],
@@ -193,7 +186,6 @@ async function main(): Promise<void> {
 
     const hasAnything = patch.owner
       || patch.modalities
-      || patch.parameter
       || Object.keys(patch.providerLimits).length > 0;
     if (!hasAnything) {
       stats.unmatched.push(id);
@@ -202,7 +194,6 @@ async function main(): Promise<void> {
 
     if (patch.owner) stats.owner += 1;
     if (patch.modalities) stats.modalities += 1;
-    if (patch.parameter) stats.parameter += 1;
     if (Object.keys(patch.limits).length > 0) stats.limit += 1;
     if (Object.keys(patch.providerLimits).length > 0) stats.providerLimits += 1;
 

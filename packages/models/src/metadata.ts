@@ -2,8 +2,8 @@
  * External model registry clients and metadata extraction.
  *
  * Pulls model metadata from OpenRouter, models.dev, LiteLLM, and NVIDIA NIM so
- * the local registry can be enriched with `owner`, `limit`, `modalities`, and
- * `parameter` without hand-maintaining those fields.
+ * the local registry can be enriched with `owner`, `limit`, and `modalities`
+ * without hand-maintaining those fields.
  */
 
 import { fetchJson } from "./http.ts";
@@ -35,15 +35,6 @@ export type Modality = "text" | "image" | "pdf" | "audio" | "video";
 export interface Modalities {
   input: Modality[];
   output: Modality[];
-}
-
-export interface ModelParameter {
-  temperature: boolean;
-  top_p: boolean;
-  top_k: boolean;
-  frequency_penalty: boolean;
-  presence_penalty: boolean;
-  repetition_penalty: boolean;
 }
 
 export interface ProviderLimits {
@@ -86,7 +77,6 @@ export interface ModelMetadataPatch {
   owner: string | null;
   providerLimits: Record<string, ProviderLimits>;
   modalities: Modalities | null;
-  parameter: ModelParameter | null;
   limits: ModelLimit;
   resolvedProviders: number;
   minimumProviderContext: number | null;
@@ -175,35 +165,6 @@ function modalitiesFrom(source: RegistryName, entry: unknown): Modalities | null
     const modalities = asRecord(record.modalities);
     if (!modalities) return null;
     return readModalities(modalities.input, modalities.output);
-  }
-
-  return null;
-}
-
-function parameterFrom(source: RegistryName, entry: unknown): ModelParameter | null {
-  const record = asRecord(entry);
-  if (!record) return null;
-
-  if (source === "modelsdev") {
-    return {
-      temperature: record.temperature === true,
-      top_p: record.top_p === true,
-      top_k: record.top_k === true,
-      frequency_penalty: record.frequency_penalty === true,
-      presence_penalty: record.presence_penalty === true,
-      repetition_penalty: record.repetition_penalty === true,
-    };
-  }
-
-  if (source === "litellm") {
-    return {
-      temperature: record.supports_temperature === true,
-      top_p: record.supports_top_p === true,
-      top_k: record.supports_top_k === true,
-      frequency_penalty: record.supports_frequency_penalty === true,
-      presence_penalty: record.supports_presence_penalty === true,
-      repetition_penalty: record.supports_repetition_penalty === true,
-    };
   }
 
   return null;
@@ -443,7 +404,6 @@ export function buildModelPatch(
   }
 
   const modalities = firstDefined(candidates.map((item) => modalitiesFrom(item.source, item.entry)));
-  const parameter = firstDefined(candidates.map((item) => parameterFrom(item.source, item.entry)));
 
   const contexts = Object.values(providerLimits)
     .map((item) => item.contextWindow)
@@ -460,7 +420,6 @@ export function buildModelPatch(
     owner,
     providerLimits,
     modalities,
-    parameter,
     limits,
     resolvedProviders: Object.keys(resolved.perProvider).length,
     minimumProviderContext: contexts.length > 0 ? Math.min(...contexts) : null,

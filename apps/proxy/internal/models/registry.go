@@ -23,15 +23,6 @@ type Modalities struct {
 	Output []string `json:"output"`
 }
 
-type ParameterSupport struct {
-	Temperature       bool `json:"temperature"`
-	TopP              bool `json:"top_p"`
-	TopK              bool `json:"top_k"`
-	FrequencyPenalty  bool `json:"frequency_penalty"`
-	PresencePenalty   bool `json:"presence_penalty"`
-	RepetitionPenalty bool `json:"repetition_penalty"`
-}
-
 type Limit struct {
 	Context int `json:"context,omitempty"`
 	Output  int `json:"output,omitempty"`
@@ -125,7 +116,6 @@ type Info struct {
 	Ignored        bool                           `json:"ignored"`
 	Meta           *Meta                          `json:"meta"`
 	Modalities     *Modalities                    `json:"modalities"`
-	Parameter      *ParameterSupport              `json:"parameter"`
 	Limit          *Limit                         `json:"limit"`
 	ProviderConfig map[string]ProviderModelConfig `json:"providerConfig"`
 }
@@ -596,9 +586,6 @@ func (r *Registry) FormatModelsForOpenAI() []map[string]any {
 		}
 		if info.Modalities != nil {
 			item["modalities"] = info.Modalities
-		}
-		if info.Parameter != nil {
-			item["parameter"] = info.Parameter
 		}
 		if info.Limit != nil && (info.Limit.Context > 0 || info.Limit.Output > 0) {
 			item["limit"] = info.Limit

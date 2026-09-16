@@ -10,15 +10,6 @@ export interface ModelModalities {
   output: string[];
 }
 
-export interface ModelParameterSupport {
-  temperature: boolean;
-  top_p: boolean;
-  top_k: boolean;
-  frequency_penalty: boolean;
-  presence_penalty: boolean;
-  repetition_penalty: boolean;
-}
-
 export interface ModelLimit {
   context?: number;
   output?: number;
@@ -55,7 +46,6 @@ export interface ModelData {
   ignored?: boolean;
   meta?: ModelMeta;
   modalities?: ModelModalities;
-  parameter?: ModelParameterSupport;
   limit?: ModelLimit;
   providerConfig?: Record<string, ProviderModelConfig>;
   family?: string;
