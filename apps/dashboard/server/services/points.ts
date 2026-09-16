@@ -36,7 +36,10 @@ async function isUserRewardExcluded(client: PointDatabase, userId: string): Prom
   const [match] = await client
     .select({ email: providerEmailRegistry.email })
     .from(providerEmailRegistry)
-    .where(eq(providerEmailRegistry.email, normalized))
+    .where(and(
+      eq(providerEmailRegistry.email, normalized),
+      ne(providerEmailRegistry.userId, userId),
+    ))
     .limit(1);
 
   return Boolean(match);
@@ -166,13 +169,8 @@ export async function trackProviderEmail(userId: string, email: string): Promise
 
   await db
     .insert(providerEmailRegistry)
-    .values({ email: normalized })
-    .onConflictDoNothing({ target: providerEmailRegistry.email });
-
-  const [owner] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1);
-  if (!owner?.email || normalizeEmail(owner.email) !== normalized) return;
-
-  await db.transaction((tx) => revokeUserBonusWithClient(tx, userId));
+    .values({ email: normalized, userId })
+    .onConflictDoNothing({ target: [providerEmailRegistry.email, providerEmailRegistry.userId] });
 }
 
 export async function claimDailyAccessPoints(userId: string): Promise<boolean> {

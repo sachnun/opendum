@@ -129,6 +129,7 @@ function parseSql(statements: string[]): ParsedSchema {
 
   for (const statement of statements) {
     if (/^INSERT INTO /.test(statement)) continue;
+    if (/^DELETE FROM /.test(statement)) continue;
 
     const createTable = statement.match(/^CREATE TABLE "([^"]+)" \(([\s\S]*)\)$/);
     if (createTable) {
@@ -175,6 +176,14 @@ function parseSql(statements: string[]): ParsedSchema {
       const table = parsed.tables.get(dropColumn[1]);
       if (!table) throw new Error(`Unknown table in ALTER TABLE: ${dropColumn[1]}`);
       table.columns.delete(dropColumn[2]);
+      continue;
+    }
+
+    const dropConstraint = statement.match(/^ALTER TABLE "([^"]+)" DROP CONSTRAINT "([^"]+)"$/);
+    if (dropConstraint) {
+      const table = parsed.tables.get(dropConstraint[1]);
+      if (!table) throw new Error(`Unknown table in ALTER TABLE: ${dropConstraint[1]}`);
+      for (const column of table.columns.values()) column.primary = false;
       continue;
     }
 

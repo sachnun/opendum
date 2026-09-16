@@ -3,14 +3,24 @@ import type { InferSelectModel } from "drizzle-orm";
 import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth.js";
 
-export const providerEmailRegistry = pgTable("provider_email_registry", {
-  email: text("email").primaryKey(),
-  createdAt: timestamp("createdAt").notNull().defaultNow(),
-  updatedAt: timestamp("updatedAt")
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const providerEmailRegistry = pgTable(
+  "provider_email_registry",
+  {
+    email: text("email").notNull(),
+    userId: text("userId"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("provider_email_registry_email_userId_key").on(
+      table.email,
+      table.userId,
+    ),
+  ],
+);
 
 export const providerAccount = pgTable(
   "provider_account",
