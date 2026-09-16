@@ -7,21 +7,14 @@ import (
 )
 
 func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
-	visionFalse := false
-	visionTrue := true
+	visionMeta := &Modalities{Input: []string{"text", "image"}}
+	textMeta := &Modalities{Input: []string{"text"}}
 	reasoningFalse := false
-	toolCallFalse := false
 	registry := &Registry{effective: map[string]Info{
-		"no-meta":               {},
-		"empty-meta":            {Meta: &Meta{}},
-		"explicit-vision-false": {Meta: &Meta{Vision: &visionFalse}},
-		"explicit-vision-true":  {Meta: &Meta{Vision: &visionTrue}},
-		"explicit-reasoning-off": {Meta: &Meta{
-			Reasoning: &reasoningFalse,
-		}},
-		"explicit-tool-off": {Meta: &Meta{
-			ToolCall: &toolCallFalse,
-		}},
+		"no-meta":     {},
+		"text-only":   {Modalities: textMeta},
+		"vision":      {Modalities: visionMeta},
+		"reasoning-off": {Reasoning: &reasoningFalse},
 	}}
 
 	tests := []struct {
@@ -29,19 +22,13 @@ func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
 		got  bool
 		want bool
 	}{
-		{name: "vision no meta", got: registry.IsVisionModel("no-meta"), want: true},
-		{name: "vision empty meta", got: registry.IsVisionModel("empty-meta"), want: true},
-		{name: "vision explicit false", got: registry.IsVisionModel("explicit-vision-false"), want: false},
-		{name: "vision explicit true", got: registry.IsVisionModel("explicit-vision-true"), want: true},
+		{name: "vision no modalities", got: registry.IsVisionModel("no-meta"), want: true},
+		{name: "vision text only", got: registry.IsVisionModel("text-only"), want: false},
+		{name: "vision image", got: registry.IsVisionModel("vision"), want: true},
 		{name: "vision unknown", got: registry.IsVisionModel("unknown"), want: false},
 		{name: "reasoning no meta", got: registry.IsReasoningModel("no-meta"), want: true},
-		{name: "reasoning empty meta", got: registry.IsReasoningModel("empty-meta"), want: true},
-		{name: "reasoning explicit false", got: registry.IsReasoningModel("explicit-reasoning-off"), want: false},
+		{name: "reasoning explicit false", got: registry.IsReasoningModel("reasoning-off"), want: false},
 		{name: "reasoning unknown", got: registry.IsReasoningModel("unknown"), want: false},
-		{name: "tool no meta", got: registry.IsToolCallModel("no-meta"), want: true},
-		{name: "tool empty meta", got: registry.IsToolCallModel("empty-meta"), want: true},
-		{name: "tool explicit false", got: registry.IsToolCallModel("explicit-tool-off"), want: false},
-		{name: "tool unknown", got: registry.IsToolCallModel("unknown"), want: false},
 	}
 
 	for _, tt := range tests {
@@ -105,68 +92,6 @@ func TestNvidiaMistralLargeAliasUsesCurrentHostedModel(t *testing.T) {
 	}
 	if _, ok := registry.ProviderModelMap("nvidia_nim")["mistral-large"]; ok {
 		t.Fatal("deprecated mistral-large model key should not be exposed as a separate NVIDIA NIM registry entry")
-	}
-}
-
-func TestNvidiaNemotronNanoVLDisablesToolCalling(t *testing.T) {
-	registry, err := Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Collect unique registry entries whose canonical or aliases mention the
-	// Nemotron Nano VL family. The registry.models map covers both active
-	// and ignored entries so this test stays valid even if a particular
-	// canonical is later deprecated via the ignored flag.
-	hasNemotronVL := func(value string) bool {
-		cl := strings.ToLower(value)
-		return strings.Contains(cl, "nemotron") &&
-			strings.Contains(cl, "nano") &&
-			strings.Contains(cl, "vl")
-	}
-
-	seen := make(map[string]struct{})
-	var models []string
-	for canonical, info := range registry.models {
-		if len(info.Providers) == 0 {
-			continue
-		}
-		addMatch := func(value string) bool {
-			if !hasNemotronVL(value) {
-				return false
-			}
-			if _, ok := seen[value]; ok {
-				return false
-			}
-			seen[value] = struct{}{}
-			return true
-		}
-		if addMatch(canonical) {
-			models = append(models, canonical)
-		}
-		if addMatch(info.ID) {
-			models = append(models, info.ID)
-		}
-	}
-
-	if len(models) == 0 {
-		t.Skip("no Nemotron Nano VL model files contain provider config")
-	}
-
-	for _, model := range models {
-		info, ok := registry.models[model]
-		if !ok {
-			continue
-		}
-		// Every Nemotron Nano VL variant must declare vision-capable meta so
-		// downstream providers can dispatch the right payload shape.
-		if info.Meta == nil {
-			t.Errorf("%s should declare meta with vision=true", model)
-			continue
-		}
-		if info.Meta.Vision == nil || !*info.Meta.Vision {
-			t.Errorf("%s should declare meta.vision=true", model)
-		}
 	}
 }
 

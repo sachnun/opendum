@@ -11,8 +11,7 @@
     "db:migrate": "pnpm --filter @opendum/database db:migrate",
     "db:sqlc": "sqlc -f apps/proxy/sqlc.yaml generate",
     "db:sqlc:diff": "sqlc -f apps/proxy/sqlc.yaml diff",
-    "models:refresh": "pnpm --filter @opendum/models refresh",
-    "models:metadata": "pnpm --filter @opendum/models refresh:metadata"
+    "models:refresh": "pnpm --filter @opendum/models refresh"
   },
   "devDependencies": {
     "edgeone": "^1.6.34"

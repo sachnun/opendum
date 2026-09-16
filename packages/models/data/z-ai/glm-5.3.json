@@ -1,16 +1,11 @@
 {
-  "owner": "z-ai",
   "providers": [
     "hyper",
     "workbuddy",
     "perch",
     "nvidia_nim"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

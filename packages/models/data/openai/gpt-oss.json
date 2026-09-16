@@ -18,10 +18,14 @@
     "openai/gpt-oss-20b:free"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
   },
   "providerConfig": {
     "hyper": {

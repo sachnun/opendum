@@ -1,5 +1,4 @@
 {
-  "owner": "qwen",
   "providers": [
     "perch"
   ],
@@ -11,7 +10,7 @@
     "qwen3.6-35b-a3b"
   ],
   "ignored": false,
-  "meta": {},
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

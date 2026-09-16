@@ -1,13 +1,8 @@
 {
-  "owner": "google",
   "providers": [
     "perch"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

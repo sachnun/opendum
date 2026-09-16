@@ -13,9 +13,5 @@
     "claude-sonnet4.0"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  }
+  "reasoning": true
 }

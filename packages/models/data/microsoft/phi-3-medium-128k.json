@@ -6,11 +6,6 @@
     "microsoft/phi-3-medium-128k-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "providerConfig": {}
 }

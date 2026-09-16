@@ -1,13 +1,8 @@
 {
-  "owner": "minimax",
   "providers": [
     "hyper"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

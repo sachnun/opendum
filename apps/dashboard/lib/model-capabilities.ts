@@ -1,24 +1,21 @@
-export interface ModelMeta {
+export interface ModelModalities {
+  input: string[];
+  output: string[];
+}
+
+export interface ModelCapabilitiesInput {
   reasoning?: boolean;
-  toolCall?: boolean;
-  vision?: boolean;
+  modalities?: ModelModalities;
 }
 
 export interface EffectiveModelCapabilities {
   reasoning: boolean;
-  toolCall: boolean;
   vision: boolean;
 }
 
-function defaultEnabledCapability(meta: ModelMeta | undefined, value: boolean | undefined): boolean {
-  if (!meta || value === undefined) return true;
-  return value;
-}
-
-export function getEffectiveModelCapabilities(meta?: ModelMeta): EffectiveModelCapabilities {
+export function getEffectiveModelCapabilities(model?: ModelCapabilitiesInput): EffectiveModelCapabilities {
   return {
-    reasoning: defaultEnabledCapability(meta, meta?.reasoning),
-    toolCall: defaultEnabledCapability(meta, meta?.toolCall),
-    vision: defaultEnabledCapability(meta, meta?.vision),
+    reasoning: model?.reasoning === true,
+    vision: (model?.modalities?.input ?? []).includes("image"),
   };
 }

@@ -1,5 +1,4 @@
 {
-  "owner": "qwen",
   "providers": [
     "hyper"
   ],
@@ -14,12 +13,7 @@
     "qwen3-next-thinking"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"

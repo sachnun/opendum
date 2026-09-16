@@ -11,10 +11,5 @@
     "mistralai/mistral-7b-instruct-v0.3"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  }
+  "reasoning": false
 }

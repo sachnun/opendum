@@ -5,9 +5,5 @@
     "gemini-3-pro-image-preview"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": true
-  }
+  "reasoning": false
 }

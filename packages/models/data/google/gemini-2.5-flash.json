@@ -1,16 +1,11 @@
 {
-  "owner": "google",
   "providers": [
     "antigravity"
   ],
   "aliases": [
     "gemini-2.5-flash-thinking"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

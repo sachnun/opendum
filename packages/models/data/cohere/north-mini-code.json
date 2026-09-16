@@ -1,9 +1,9 @@
 {
-  "owner": "cohere",
   "providers": [
     "kilo_code",
     "openrouter"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

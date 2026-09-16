@@ -1,15 +1,10 @@
 {
-  "owner": "moonshot",
   "providers": [
     "zenmux",
     "hyper",
     "perch"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

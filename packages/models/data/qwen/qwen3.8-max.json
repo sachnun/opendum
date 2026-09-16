@@ -1,5 +1,4 @@
 {
-  "owner": "qwen",
   "providers": [
     "hyper"
   ],
@@ -7,6 +6,7 @@
     "Qwen-Qwen3.8-Max",
     "Qwen/Qwen3.8-Max"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

@@ -1,5 +1,4 @@
 {
-  "owner": "nvidia",
   "providers": [
     "opencode",
     "kilo_code",
@@ -7,6 +6,7 @@
     "nvidia_nim",
     "perch"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

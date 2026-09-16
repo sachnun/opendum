@@ -11,7 +11,6 @@ import type { ActionResult } from "../utils/api";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const API_KEY_ACCOUNT_EXPIRY = new Date("2100-01-01T00:00:00.000Z");
-const DEFAULT_CUSTOM_MODEL_META = { reasoning: true, toolCall: true, vision: true };
 const INTERNAL_RELAY_ERROR_HEADER = "X-Opendum-Internal-Relay-Error";
 const VALIDATION_TIMEOUT_MS = 15000;
 
@@ -21,13 +20,6 @@ export const customModelInputSchema = z.object({
   authless: z.boolean().optional(),
   minTier: z.string().trim().max(60).optional(),
   allowedTiers: z.array(z.string().trim().min(1)).optional(),
-  meta: z
-    .object({
-      reasoning: z.boolean().optional(),
-      toolCall: z.boolean().optional(),
-      vision: z.boolean().optional(),
-    })
-    .optional(),
   customFlags: z
     .object({
       responses_api: z.boolean().optional(),
@@ -227,7 +219,6 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
         authless: input.authless ?? false,
         minTier: input.minTier ?? null,
         allowedTiers: input.allowedTiers ?? null,
-        meta: input.meta ?? DEFAULT_CUSTOM_MODEL_META,
         customFlags: input.customFlags ?? {},
       })
       .onConflictDoUpdate({
@@ -237,7 +228,6 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
           authless: input.authless ?? false,
           minTier: input.minTier ?? null,
           allowedTiers: input.allowedTiers ?? null,
-          meta: input.meta ?? DEFAULT_CUSTOM_MODEL_META,
           customFlags: input.customFlags ?? {},
         },
       });

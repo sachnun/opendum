@@ -2,19 +2,23 @@
   "providers": [
     "workers_ai"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": false,
-    "vision": false
+  "aliases": [
+    "deepseek-r1-distill-qwen-32b",
+    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+  ],
+  "ignored": true,
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
   },
   "providerConfig": {
     "workers_ai": {
       "upstream": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
     }
-  },
-  "ignored": true,
-  "aliases": [
-    "deepseek-r1-distill-qwen-32b",
-    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
-  ]
+  }
 }

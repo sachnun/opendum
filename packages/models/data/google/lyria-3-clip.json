@@ -1,11 +1,8 @@
 {
   "providers": [],
-  "providerConfig": {},
-  "meta": {
-    "status": "preview"
-  },
-  "ignored": false,
   "aliases": [
     "lyria-3-clip-preview"
-  ]
+  ],
+  "ignored": false,
+  "providerConfig": {}
 }

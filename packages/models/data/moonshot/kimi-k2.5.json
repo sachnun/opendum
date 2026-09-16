@@ -1,14 +1,9 @@
 {
-  "owner": "moonshot",
   "providers": [
     "perch",
     "hyper"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

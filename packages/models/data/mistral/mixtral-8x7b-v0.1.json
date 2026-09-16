@@ -10,10 +10,5 @@
     "mixtral-8x7b-instruct-v0.1"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false,
-    "type": "instruct"
-  }
+  "reasoning": false
 }

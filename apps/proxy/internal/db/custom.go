@@ -28,7 +28,6 @@ type CustomProviderModel struct {
 	Authless     bool
 	MinTier      string
 	AllowedTiers []string
-	Meta         map[string]any
 	CustomFlags  map[string]any
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -78,7 +77,7 @@ func (d *DB) ListCustomProviderModels(ctx context.Context, providerID string) ([
 		return nil, nil
 	}
 	rows, err := d.Pool.Query(ctx, `
-		SELECT id, "providerId", "modelId", upstream, authless, "minTier", "allowedTiers", meta, "customFlags", "createdAt", "updatedAt"
+		SELECT id, "providerId", "modelId", upstream, authless, "minTier", "allowedTiers", "customFlags", "createdAt", "updatedAt"
 		FROM custom_provider_model
 		WHERE "providerId" = $1
 		ORDER BY "modelId" ASC`, providerID)
@@ -90,8 +89,8 @@ func (d *DB) ListCustomProviderModels(ctx context.Context, providerID string) ([
 	for rows.Next() {
 		var row CustomProviderModel
 		var upstream, minTier *string
-		var meta, flags []byte
-		if err := rows.Scan(&row.ID, &row.ProviderID, &row.ModelID, &upstream, &row.Authless, &minTier, &row.AllowedTiers, &meta, &flags, &row.CreatedAt, &row.UpdatedAt); err != nil {
+		var flags []byte
+		if err := rows.Scan(&row.ID, &row.ProviderID, &row.ModelID, &upstream, &row.Authless, &minTier, &row.AllowedTiers, &flags, &row.CreatedAt, &row.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if upstream != nil {
@@ -99,9 +98,6 @@ func (d *DB) ListCustomProviderModels(ctx context.Context, providerID string) ([
 		}
 		if minTier != nil {
 			row.MinTier = *minTier
-		}
-		if len(meta) > 0 {
-			_ = json.Unmarshal(meta, &row.Meta)
 		}
 		if len(flags) > 0 {
 			_ = json.Unmarshal(flags, &row.CustomFlags)

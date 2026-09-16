@@ -754,6 +754,4 @@ func (r *testRotationRunner) logUsage(context.Context, usageParams) {}
 
 func (r *testRotationRunner) isVisionModel(string) bool { return false }
 
-func (r *testRotationRunner) isToolCallModel(string) bool { return true }
-
 func (r *testRotationRunner) canAccountUseModel(appdb.ProviderAccount, string) bool { return true }

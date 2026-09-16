@@ -1,13 +1,8 @@
 {
-  "owner": "qwen",
   "providers": [
     "kiro"
   ],
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"

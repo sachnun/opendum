@@ -6,9 +6,5 @@
     "gemini-3-flash-preview-latest"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  }
+  "reasoning": true
 }

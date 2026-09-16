@@ -9,13 +9,7 @@
     "deepseek-coder-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "code": true,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "deepseek-ai/deepseek-coder-6.7b-instruct"

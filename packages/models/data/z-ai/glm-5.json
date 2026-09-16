@@ -1,15 +1,10 @@
 {
-  "owner": "z-ai",
   "providers": [
     "kiro",
     "perch",
     "hyper"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

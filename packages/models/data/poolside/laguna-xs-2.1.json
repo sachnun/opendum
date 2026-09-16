@@ -1,10 +1,10 @@
 {
-  "owner": "poolside",
   "providers": [
     "kilo_code",
     "openrouter",
     "nvidia_nim"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

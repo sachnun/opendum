@@ -1,5 +1,4 @@
 {
-  "owner": "google",
   "providers": [
     "antigravity",
     "workbuddy"
@@ -10,11 +9,7 @@
     "gemini-3.5-flash-medium",
     "gemini-3.5-flash-minimal"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

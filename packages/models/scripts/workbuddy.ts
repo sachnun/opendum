@@ -39,9 +39,9 @@ const WORKBUDDY_HOUSE_MODEL_IDS = new Set([
 ]);
 
 const WORKBUDDY_ONLY_SUPPLEMENTS = new Map([
-  ["deepseek-v4.1-flash", { reasoning: true, toolCall: true, vision: true }],
-  ["gpt-6-astra", { reasoning: true, toolCall: true, vision: true }],
-  ["hy4-preview", { reasoning: true, toolCall: true, vision: true }],
+  ["deepseek-v4.1-flash", { reasoning: true }],
+  ["gpt-6-astra", { reasoning: true }],
+  ["hy4-preview", { reasoning: true }],
 ]);
 
 function isExcludedId(id) {
@@ -113,8 +113,6 @@ function readLocalCatalog() {
 function metaFromCatalogEntry(entry) {
   return {
     reasoning: entry?.supportsReasoning === true,
-    toolCall: entry?.supportsToolCall === true,
-    vision: entry?.supportsImages === true,
   };
 }
 
@@ -166,10 +164,7 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
     if (!meta) continue;
 
     const data = entry.data;
-    if (!data.meta) data.meta = {};
-    data.meta.reasoning = meta.reasoning;
-    data.meta.toolCall = meta.toolCall;
-    data.meta.vision = meta.vision;
+    data.reasoning = meta.reasoning;
 
     writeModelJson(entry.path, data);
   }

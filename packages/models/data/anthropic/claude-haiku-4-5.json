@@ -1,5 +1,4 @@
 {
-  "owner": "anthropic",
   "providers": [
     "kiro"
   ],
@@ -7,11 +6,7 @@
     "claude-haiku-4.5",
     "claude-haiku4.5"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

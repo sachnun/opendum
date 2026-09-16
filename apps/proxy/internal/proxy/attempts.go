@@ -26,7 +26,6 @@ type accountRotationRunner interface {
 	markAccountUsageLimited(context.Context, string, string, time.Time, time.Time)
 	logUsage(context.Context, usageParams)
 	isVisionModel(string) bool
-	isToolCallModel(string) bool
 	canAccountUseModel(appdb.ProviderAccount, string) bool
 }
 
@@ -118,13 +117,6 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			}
 		} else if !*validation.Vision {
 			stripImageContent(payload)
-		}
-		if validation.ToolCall == nil {
-			if !runner.isToolCallModel(validation.Model) {
-				stripToolCallParameters(payload)
-			}
-		} else if !*validation.ToolCall {
-			stripToolCallParameters(payload)
 		}
 		requestStart := time.Now().UnixMilli()
 		upstreamFirstResponseMS := int64(0)
@@ -220,13 +212,6 @@ func (s *Service) isVisionModel(model string) bool {
 		return true
 	}
 	return s.registry.IsVisionModel(model)
-}
-
-func (s *Service) isToolCallModel(model string) bool {
-	if s.registry == nil {
-		return true
-	}
-	return s.registry.IsToolCallModel(model)
 }
 
 func (s *Service) canAccountUseModel(account appdb.ProviderAccount, model string) bool {

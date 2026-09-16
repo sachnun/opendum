@@ -1,10 +1,10 @@
 {
-  "owner": "inclusion-ai",
   "providers": [
     "openrouter",
     "hyper",
     "perch"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

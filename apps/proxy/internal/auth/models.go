@@ -147,12 +147,27 @@ func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel 
 		}
 		provider := slug
 		result := ModelValidationResult{Valid: true, Provider: &provider, Model: slug + "/" + rawModel}
-		if value, ok := row.Meta["vision"].(bool); ok {
-			result.Vision = &value
+		vision := true
+		if s.registry != nil {
+			for _, candidate := range []string{row.Upstream, row.ModelID} {
+				if candidate == "" {
+					continue
+				}
+				info, ok := s.registry.ModelInfo(candidate)
+				if !ok || info.Modalities == nil {
+					continue
+				}
+				vision = false
+				for _, modality := range info.Modalities.Input {
+					if modality == "image" {
+						vision = true
+						break
+					}
+				}
+				break
+			}
 		}
-		if value, ok := row.Meta["toolCall"].(bool); ok {
-			result.ToolCall = &value
-		}
+		result.Vision = &vision
 		return &result, nil
 	}
 	message := "Model \"" + rawModel + "\" is not registered under your custom provider \"" + slug + "\"."

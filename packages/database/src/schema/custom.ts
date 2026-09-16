@@ -42,11 +42,6 @@ export const customProviderModel = pgTable(
     authless: boolean("authless").notNull().default(false),
     minTier: text("minTier"),
     allowedTiers: text("allowedTiers").array(),
-    meta: jsonb("meta").$type<{
-      reasoning?: boolean;
-      toolCall?: boolean;
-      vision?: boolean;
-    }>(),
     customFlags: jsonb("customFlags").$type<{
       responses_api?: boolean;
       top_p_deprecated?: boolean;

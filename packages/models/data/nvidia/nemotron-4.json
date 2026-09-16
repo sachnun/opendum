@@ -9,12 +9,7 @@
     "nemotron-4-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-4-340b-instruct"

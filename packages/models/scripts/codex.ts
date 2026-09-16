@@ -164,21 +164,12 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
 
     const data = entry.data;
 
-    // reasoning
     const hasReasoning =
       Array.isArray(meta.supported_reasoning_levels) &&
       meta.supported_reasoning_levels.length > 0;
-    if (!data.meta) data.meta = {};
-    if (hasReasoning) data.meta.reasoning = true;
-
-    // tool_call (if shell_type exists, model supports tool use)
-    if (meta.shell_type) data.meta.toolCall = true;
-
-    // attachment / vision (input_modalities includes "image")
-    const inputModalities = Array.isArray(meta.input_modalities)
-      ? meta.input_modalities
-      : [];
-    data.meta.vision = inputModalities.includes("image");
+    if (hasReasoning && data.reasoning !== true) {
+      data.reasoning = true;
+    }
 
     writeModelJson(entry.path, data);
   }

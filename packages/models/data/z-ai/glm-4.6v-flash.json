@@ -1,5 +1,4 @@
 {
-  "owner": "z-ai",
   "providers": [
     "zenmux"
   ],
@@ -7,6 +6,7 @@
     "z-ai-glm-4.6v-flash-free",
     "z-ai/glm-4.6v-flash-free"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

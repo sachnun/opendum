@@ -1,9 +1,9 @@
 {
-  "owner": "inclusion-ai",
   "providers": [
     "kilo_code",
     "openrouter"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

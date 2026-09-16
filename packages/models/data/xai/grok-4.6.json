@@ -1,8 +1,8 @@
 {
-  "owner": "xai",
   "providers": [
     "perch"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

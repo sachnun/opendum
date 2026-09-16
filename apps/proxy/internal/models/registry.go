@@ -12,12 +12,6 @@ import (
 
 const suggestionThreshold = 0.7
 
-type Meta struct {
-	Reasoning *bool `json:"reasoning"`
-	ToolCall  *bool `json:"toolCall"`
-	Vision    *bool `json:"vision"`
-}
-
 type Modalities struct {
 	Input  []string `json:"input"`
 	Output []string `json:"output"`
@@ -114,7 +108,7 @@ type Info struct {
 	Description    string                         `json:"description"`
 	Family         string                         `json:"family"`
 	Ignored        bool                           `json:"ignored"`
-	Meta           *Meta                          `json:"meta"`
+	Reasoning      *bool                          `json:"reasoning"`
 	Modalities     *Modalities                    `json:"modalities"`
 	Limit          *Limit                         `json:"limit"`
 	ProviderConfig map[string]ProviderModelConfig `json:"providerConfig"`
@@ -171,6 +165,9 @@ func Load(dir string) (*Registry, error) {
 		info.ID = strings.TrimSpace(info.ID)
 		info.Providers = compactStrings(info.Providers)
 		info.Aliases = compactStrings(info.Aliases)
+		if parent := filepath.Dir(path); parent != dir {
+			info.Owner = filepath.Base(parent)
+		}
 		fileID := strings.TrimSuffix(filepath.Base(path), ".json")
 		modelID := fileID
 		if info.ID != "" {
@@ -220,8 +217,11 @@ func (r *Registry) mergeModelInfo(modelID, fileID string, info Info) {
 		merged.Family = info.Family
 	}
 	merged.Ignored = merged.Ignored && info.Ignored
-	if merged.Meta == nil {
-		merged.Meta = info.Meta
+	if merged.Reasoning == nil {
+		merged.Reasoning = info.Reasoning
+	}
+	if merged.Modalities == nil {
+		merged.Modalities = info.Modalities
 	}
 	if len(info.ProviderConfig) > 0 {
 		if merged.ProviderConfig == nil {
@@ -596,30 +596,30 @@ func (r *Registry) FormatModelsForOpenAI() []map[string]any {
 }
 
 func (r *Registry) IsReasoningModel(model string) bool {
-	return r.defaultEnabledBoolCapability(model, func(meta *Meta) *bool { return meta.Reasoning })
-}
-
-func (r *Registry) IsToolCallModel(model string) bool {
-	return r.defaultEnabledBoolCapability(model, func(meta *Meta) *bool { return meta.ToolCall })
-}
-
-func (r *Registry) IsVisionModel(model string) bool {
-	return r.defaultEnabledBoolCapability(model, func(meta *Meta) *bool { return meta.Vision })
-}
-
-func (r *Registry) defaultEnabledBoolCapability(model string, getCapability func(*Meta) *bool) bool {
 	info, ok := r.ModelInfo(model)
 	if !ok {
 		return false
 	}
-	if info.Meta == nil {
+	if info.Reasoning == nil {
 		return true
 	}
-	capability := getCapability(info.Meta)
-	if capability == nil {
+	return *info.Reasoning
+}
+
+func (r *Registry) IsVisionModel(model string) bool {
+	info, ok := r.ModelInfo(model)
+	if !ok {
+		return false
+	}
+	if info.Modalities == nil {
 		return true
 	}
-	return *capability
+	for _, modality := range info.Modalities.Input {
+		if modality == "image" {
+			return true
+		}
+	}
+	return false
 }
 
 func NormalizeProviderAlias(provider string) string {

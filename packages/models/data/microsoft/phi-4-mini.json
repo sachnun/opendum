@@ -6,10 +6,5 @@
     "microsoft/phi-4-mini-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false,
-    "type": "instruct"
-  }
+  "reasoning": false
 }

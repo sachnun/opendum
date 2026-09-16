@@ -1,5 +1,4 @@
 {
-  "owner": "qwen",
   "providers": [
     "perch"
   ],
@@ -13,13 +12,7 @@
     "qwen3-coder-480b-a35b-instruct"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct",
-    "code": true
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"

@@ -1,9 +1,9 @@
 {
-  "owner": "qwen",
   "providers": [
     "zenmux",
     "hyper"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

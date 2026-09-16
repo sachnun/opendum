@@ -5,9 +5,5 @@
     "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false
-  }
+  "reasoning": false
 }

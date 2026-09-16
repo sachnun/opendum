@@ -18,11 +18,14 @@
     "meta/llama-3.1-8b-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
+  "reasoning": false,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
   },
   "providerConfig": {
     "workers_ai": {

@@ -1,14 +1,9 @@
 {
-  "owner": "qwen",
   "providers": [
     "hyper",
     "workers_ai"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

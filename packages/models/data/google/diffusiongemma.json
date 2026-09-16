@@ -1,5 +1,4 @@
 {
-  "owner": "google",
   "providers": [
     "nvidia_nim"
   ],
@@ -9,9 +8,7 @@
     "diffusiongemma-it"
   ],
   "ignored": false,
-  "meta": {
-    "type": "instruct"
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

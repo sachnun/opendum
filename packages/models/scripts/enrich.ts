@@ -1,21 +1,25 @@
 #!/usr/bin/env -S npx tsx
 
 /**
- * Enrich the local model registry with external metadata.
+ * Enrich the local model registry with external metadata and normalize file
+ * placement.
  *
- * Fills `owner`, `modalities`, `limit`, and the per-provider
+ * Fills `reasoning`, `modalities`, `limit`, and the per-provider
  * `contextWindow` / `maxOutputTokens` by matching local model ids against
- * OpenRouter, models.dev, LiteLLM, and NVIDIA NIM.
+ * OpenRouter, models.dev, LiteLLM, and NVIDIA NIM. Also moves root-level model
+ * files into their inferred family folder.
  *
- * Run after the provider refresh scripts so newly added models are covered:
+ * Runs as the final step of the provider refresh:
  *   pnpm run models:refresh
  */
 
-import { dirname, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { existsSync, mkdirSync, renameSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { buildModelIndex, writeModelJson } from "./registry.ts";
-import type { ModelData } from "./types.ts";
+import { inferModelFolder } from "../src/families.ts";
+import { buildModelIndex, writeModelJson } from "../src/registry.ts";
+import type { ModelData } from "../src/types.ts";
 import {
   buildModelPatch,
   fetchExternalRegistries,
@@ -23,7 +27,7 @@ import {
   type ModelMetadataInput,
   type ModelMetadataPatch,
   type Registries,
-} from "./metadata.ts";
+} from "../src/metadata.ts";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");
@@ -50,12 +54,9 @@ function sameValue(left: unknown, right: unknown): boolean {
 function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
   let changed = false;
 
-  if (patch.owner) {
-    const current = typeof data.owner === "string" ? data.owner.trim().toLowerCase() : null;
-    if (current !== patch.owner) {
-      data.owner = patch.owner;
-      changed = true;
-    }
+  if (patch.reasoning !== null && data.reasoning !== patch.reasoning) {
+    data.reasoning = patch.reasoning;
+    changed = true;
   }
 
   if (patch.modalities && !sameValue(data.modalities, patch.modalities)) {
@@ -103,7 +104,7 @@ function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
 
 interface Stats {
   models: number;
-  owner: number;
+  reasoning: number;
   limit: number;
   modalities: number;
   providerLimits: number;
@@ -121,8 +122,8 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
   console.log("");
   console.log(`[metadata] models: ${stats.models}`);
   console.log(
-    `[metadata] owner: ${stats.owner}  limit: ${stats.limit}  modalities: ${stats.modalities}`
-    + `  providerLimits: ${stats.providerLimits}`,
+    `[metadata] reasoning: ${stats.reasoning}  limit: ${stats.limit}`
+    + `  modalities: ${stats.modalities}  providerLimits: ${stats.providerLimits}`,
   );
   console.log(`[metadata] updated: ${updatedCount}${dryRun ? " (dry run)" : ""}`);
 
@@ -138,6 +139,25 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
   }
 }
 
+function relocateRootFiles(dryRun: boolean): string[] {
+  const index = buildModelIndex(modelsDir);
+  const moved: string[] = [];
+  for (const [fileId, entry] of Object.entries(index)) {
+    if (dirname(entry.path) !== modelsDir) continue;
+    const id = entry.id || fileId;
+    const folder = inferModelFolder(id);
+    if (!folder) continue;
+    const target = join(modelsDir, folder, basename(entry.path));
+    if (existsSync(target)) continue;
+    moved.push(`${id} -> ${folder}/`);
+    if (!dryRun) {
+      mkdirSync(join(modelsDir, folder), { recursive: true });
+      renameSync(entry.path, target);
+    }
+  }
+  return moved;
+}
+
 async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
@@ -151,7 +171,7 @@ async function main(): Promise<void> {
   const index = buildModelIndex(modelsDir);
   const stats: Stats = {
     models: 0,
-    owner: 0,
+    reasoning: 0,
     limit: 0,
     modalities: 0,
     providerLimits: 0,
@@ -175,16 +195,10 @@ async function main(): Promise<void> {
       providers,
     };
 
-    const upstreams: Record<string, string | undefined> = {};
-    for (const provider of providers) {
-      const upstream = data.providerConfig?.[provider]?.upstream;
-      if (typeof upstream === "string") upstreams[provider] = upstream;
-    }
-
     const resolved = resolveModelMetadata(model, registries);
-    const patch = buildModelPatch(model, resolved, upstreams);
+    const patch = buildModelPatch(model, resolved);
 
-    const hasAnything = patch.owner
+    const hasAnything = patch.reasoning !== null
       || patch.modalities
       || Object.keys(patch.providerLimits).length > 0;
     if (!hasAnything) {
@@ -192,7 +206,7 @@ async function main(): Promise<void> {
       continue;
     }
 
-    if (patch.owner) stats.owner += 1;
+    if (patch.reasoning !== null) stats.reasoning += 1;
     if (patch.modalities) stats.modalities += 1;
     if (Object.keys(patch.limits).length > 0) stats.limit += 1;
     if (Object.keys(patch.providerLimits).length > 0) stats.providerLimits += 1;
@@ -205,12 +219,18 @@ async function main(): Promise<void> {
       updated.push(id);
       if (!dryRun) writeModelJson(entry.path, data);
       if (verbose) {
-        console.log(`[metadata] ${id} owner=${patch.owner} limit=${JSON.stringify(patch.limits)}`);
+        console.log(`[metadata] ${id} reasoning=${patch.reasoning} limit=${JSON.stringify(patch.limits)}`);
       }
     }
   }
 
   reportStats(stats, updated.length, dryRun);
+
+  const moved = relocateRootFiles(dryRun);
+  if (moved.length > 0) {
+    console.log(`[metadata] relocated ${moved.length} model files into family folders${dryRun ? " (dry run)" : ""}:`);
+    for (const item of moved) console.log(`  ${item}`);
+  }
 }
 
 main().catch((error: unknown) => {

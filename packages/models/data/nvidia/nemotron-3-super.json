@@ -1,6 +1,5 @@
 {
   "id": "nemotron-3-super",
-  "owner": "nvidia",
   "providers": [
     "kilo_code",
     "nvidia_nim",
@@ -15,11 +14,7 @@
     "@cf/nvidia/nemotron-3-120b-a12b"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

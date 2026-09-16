@@ -8,11 +8,7 @@
     "nvidia-llama-3.1-nemotron-ultra-253b-v1",
     "nvidia/llama-3.1-nemotron-ultra-253b-v1"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
-  "providerConfig": {},
-  "ignored": false
+  "ignored": false,
+  "reasoning": true,
+  "providerConfig": {}
 }

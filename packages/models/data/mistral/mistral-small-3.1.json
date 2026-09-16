@@ -1,6 +1,5 @@
 {
   "id": "mistral-small-3.1",
-  "owner": "mistral",
   "providers": [
     "workers_ai"
   ],
@@ -13,12 +12,7 @@
     "mistral-small-3.1-instruct"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"

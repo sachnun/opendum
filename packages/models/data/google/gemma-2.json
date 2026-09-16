@@ -11,10 +11,5 @@
     "gemma-2-it"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  }
+  "reasoning": false
 }

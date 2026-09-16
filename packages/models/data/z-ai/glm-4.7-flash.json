@@ -1,14 +1,9 @@
 {
-  "owner": "z-ai",
   "providers": [
     "workers_ai",
     "zenmux"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

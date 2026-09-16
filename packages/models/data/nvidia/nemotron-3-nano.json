@@ -6,9 +6,5 @@
     "nvidia/nemotron-3-nano-30b-a3b:free"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  }
+  "reasoning": true
 }

@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "scripts/enrich.ts"]
 }

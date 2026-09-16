@@ -1,5 +1,4 @@
 {
-  "owner": "deepseek",
   "providers": [
     "harbor",
     "workbuddy",
@@ -7,11 +6,7 @@
     "hyper",
     "cline"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

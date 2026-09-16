@@ -1,5 +1,4 @@
 {
-  "owner": "nvidia",
   "providers": [
     "nvidia_nim"
   ],

@@ -1,16 +1,11 @@
 {
-  "owner": "moonshot",
   "providers": [
     "nvidia_nim",
     "hyper",
     "workbuddy",
     "perch"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

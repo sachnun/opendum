@@ -1,10 +1,10 @@
 {
-  "owner": "opencode",
   "providers": [
     "opencode",
     "zenmux",
     "cline"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

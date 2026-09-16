@@ -75,15 +75,13 @@ function enrichNewModels(modelsDir, addedKeys, modelMap, metadataLookup) {
     if (!model) continue;
 
     const data = entry.data;
-    if (!data.meta) data.meta = {};
 
     const hasReasoning =
       Array.isArray(model.reasoning?.effort_levels) &&
       model.reasoning.effort_levels.length > 0;
-    if (hasReasoning) data.meta.reasoning = true;
-
-    data.meta.toolCall = true;
-    data.meta.vision = model.capabilities?.vision === true;
+    if (hasReasoning && data.reasoning !== true) {
+      data.reasoning = true;
+    }
 
     writeModelJson(entry.path, data);
   }

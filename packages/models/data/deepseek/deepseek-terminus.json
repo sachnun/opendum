@@ -8,9 +8,5 @@
     "deepseek-v3.1-terminus"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  }
+  "reasoning": true
 }

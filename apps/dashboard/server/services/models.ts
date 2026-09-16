@@ -47,7 +47,8 @@ export async function listModels(userId: string, options: { includeStats?: boole
       name: model,
       family: getModelFamily(model),
       providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
-      meta: MODEL_REGISTRY[model]?.meta,
+      reasoning: MODEL_REGISTRY[model]?.reasoning,
+      modalities: MODEL_REGISTRY[model]?.modalities,
       isEnabled: !disabledModelSet.has(model),
       ...(includeStats ? { stats: statsByModel[model] } : {}),
     }));
@@ -65,7 +66,8 @@ export async function searchModels(userId: string) {
     return models.map((model) => ({
       id: model,
       providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
-      meta: MODEL_REGISTRY[model]?.meta,
+      reasoning: MODEL_REGISTRY[model]?.reasoning,
+      modalities: MODEL_REGISTRY[model]?.modalities,
       isEnabled: !disabledModelSet.has(model),
     }));
   } catch (error) {

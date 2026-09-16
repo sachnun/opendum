@@ -472,7 +472,7 @@ watch(
 
               <UiCardContent class="flex flex-1 flex-col pt-0">
                 <div class="mt-auto space-y-3">
-                  <ModelFeatureBadges :meta="model.meta" />
+                  <ModelFeatureBadges :model="model" />
                   <ModelStatsPanel
                     v-if="visibleModelIds.has(model.id)"
                     :stats="model.stats ?? emptyModelStats"

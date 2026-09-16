@@ -6,10 +6,5 @@
     "mistralai/mistral-large-2-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  }
+  "reasoning": false
 }

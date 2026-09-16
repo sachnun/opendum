@@ -1,15 +1,12 @@
 {
-  "owner": "meta",
   "providers": [
-    "freebuff"
+    "zenmux"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
-      "audio",
       "image",
-      "pdf",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
@@ -20,11 +17,10 @@
     "output": 65536
   },
   "providerConfig": {
-    "freebuff": {
-      "upstream": "meta/muse-spark-1.2-contributor",
+    "zenmux": {
+      "upstream": "sapiens-ai/agnes-2.5-pro",
       "contextWindow": 1000000,
-      "maxOutputTokens": 65536,
-      "agent": "base2-free-muse-spark"
+      "maxOutputTokens": 65536
     }
   }
 }

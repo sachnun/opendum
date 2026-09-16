@@ -58,10 +58,6 @@ const MODALITY_DESCRIPTOR = /^(?:coder|codex|code|vl|vision|omni|multimodal)$/i;
 
 const DESCRIPTOR_TO_META = Object.freeze({
   reasoning: /^(?:thinking|reasoning)$/i,
-  type: /^(?:instruct|it)$/i,
-  status: /^(?:preview|beta|alpha|experimental|exp|deprecated)$/i,
-  code: /^(?:coder|code|x?codex|code)$/i,
-  variant: /^(?:vl|vision|omni|multimodal)$/i,
 });
 
 export const PARAMETER_INFO_PATTERNS = Object.freeze({
@@ -179,10 +175,6 @@ for (let i = 0; i < end; i += 1) {
  */
 export interface ModelDescriptors {
   reasoning?: boolean;
-  type?: string;
-  status?: string;
-  code?: boolean;
-  variant?: string;
 }
 
 export function extractDescriptors(modelKey: string | null | undefined): ModelDescriptors {
@@ -192,23 +184,6 @@ export function extractDescriptors(modelKey: string | null | undefined): ModelDe
   for (const token of tokens) {
     if (DESCRIPTOR_TO_META.reasoning.test(token)) {
       out.reasoning = true;
-    } else if (DESCRIPTOR_TO_META.type.test(token)) {
-      out.type = "instruct";
-    } else if (DESCRIPTOR_TO_META.status.test(token)) {
-      const normalized = token.toLowerCase();
-      out.status = normalized === "exp" ? "experimental" : normalized;
-    } else if (DESCRIPTOR_TO_META.code.test(token)) {
-      out.code = true;
-    } else if (DESCRIPTOR_TO_META.variant.test(token)) {
-      const normalized = token.toLowerCase();
-      out.variant =
-        normalized === "vision"
-          ? "vision"
-          : normalized === "vl"
-            ? "vl"
-            : normalized === "omni"
-              ? "omni"
-              : "multimodal";
     }
   }
   return out;

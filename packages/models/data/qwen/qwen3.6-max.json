@@ -1,8 +1,8 @@
 {
-  "owner": "qwen",
   "providers": [
     "hyper"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

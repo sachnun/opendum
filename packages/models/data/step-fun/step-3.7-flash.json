@@ -1,5 +1,4 @@
 {
-  "owner": "stepfun",
   "providers": [
     "kilo_code",
     "zenmux"
@@ -8,6 +7,7 @@
     "stepfun-step-3.7-flash-free",
     "stepfun/step-3.7-flash-free"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

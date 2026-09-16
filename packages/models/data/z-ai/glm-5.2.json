@@ -1,5 +1,4 @@
 {
-  "owner": "z-ai",
   "providers": [
     "hyper",
     "workbuddy",
@@ -7,11 +6,7 @@
     "kilo_code",
     "openrouter"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

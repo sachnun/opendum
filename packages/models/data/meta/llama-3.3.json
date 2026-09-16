@@ -1,5 +1,4 @@
 {
-  "owner": "meta",
   "providers": [
     "workers_ai",
     "hyper"
@@ -13,12 +12,7 @@
     "llama-3.3-instruct"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"

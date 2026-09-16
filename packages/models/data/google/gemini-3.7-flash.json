@@ -1,5 +1,4 @@
 {
-  "owner": "google",
   "providers": [
     "antigravity"
   ],
@@ -8,11 +7,7 @@
     "gemini-3.7-flash-low",
     "gemini-3.7-flash-medium"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

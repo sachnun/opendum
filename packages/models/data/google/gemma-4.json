@@ -1,5 +1,4 @@
 {
-  "owner": "google",
   "providers": [
     "nvidia_nim",
     "openrouter",
@@ -23,12 +22,7 @@
     "google/gemma-4-31b-it:free"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true,
-    "type": "instruct"
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

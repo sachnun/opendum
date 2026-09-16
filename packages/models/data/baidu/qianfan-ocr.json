@@ -1,9 +1,8 @@
 {
   "providers": [],
-  "ignored": true,
-  "providerConfig": {},
-  "meta": {},
   "aliases": [
     "qianfan-ocr-fast"
-  ]
+  ],
+  "ignored": true,
+  "providerConfig": {}
 }

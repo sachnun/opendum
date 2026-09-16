@@ -7,9 +7,5 @@
     "mistralai/mistral-large-3-675b-instruct-2512"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": true
-  }
+  "reasoning": false
 }

@@ -1,5 +1,4 @@
 {
-  "owner": "deepseek",
   "providers": [
     "kiro"
   ],
@@ -7,12 +6,7 @@
     "deepseek-ai-DeepSeek-V3.2-Exp",
     "deepseek-ai/DeepSeek-V3.2-Exp"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false,
-    "status": "stable"
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

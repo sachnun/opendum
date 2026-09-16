@@ -1,12 +1,9 @@
 {
   "providers": [],
-  "ignored": true,
-  "providerConfig": {},
-  "meta": {
-    "type": "instruct"
-  },
   "aliases": [
     "breeze-7b-instruct",
     "breeze-instruct"
-  ]
+  ],
+  "ignored": true,
+  "providerConfig": {}
 }

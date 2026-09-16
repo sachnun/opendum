@@ -14,9 +14,6 @@
     "riva-translate-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "type": "instruct"
-  },
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "nvidia/riva-translate-4b-instruct-v1.1"

@@ -1,6 +1,5 @@
 {
   "id": "mimo-v2.5",
-  "owner": "xiaomi",
   "providers": [
     "opencode",
     "harbor",
@@ -13,7 +12,7 @@
     "xiaomi/mimo-v2.5"
   ],
   "ignored": false,
-  "meta": {},
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

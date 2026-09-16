@@ -1,6 +1,5 @@
 {
   "id": "llama-4-scout",
-  "owner": "meta",
   "providers": [
     "workers_ai"
   ],
@@ -12,12 +11,7 @@
     "llama-4-scout-16e-instruct"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": true,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "image",

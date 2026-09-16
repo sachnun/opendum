@@ -8,9 +8,5 @@
     "nvidia/nemotron-nano-12b-v2-vl:free"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  }
+  "reasoning": true
 }

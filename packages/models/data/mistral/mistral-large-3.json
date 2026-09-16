@@ -1,5 +1,4 @@
 {
-  "owner": "mistral",
   "providers": [
     "nvidia_nim"
   ],
@@ -11,12 +10,7 @@
     "mistral-large-3-instruct"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": true,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "image",

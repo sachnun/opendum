@@ -8,11 +8,7 @@
     "google/codegemma-7b"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false
-  },
+  "reasoning": false,
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "google/codegemma-7b"

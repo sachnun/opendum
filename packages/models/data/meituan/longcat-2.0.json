@@ -1,11 +1,10 @@
 {
-  "owner": "sapiens-ai",
   "providers": [
     "zenmux"
   ],
+  "reasoning": false,
   "modalities": {
     "input": [
-      "image",
       "text"
     ],
     "output": [
@@ -13,14 +12,14 @@
     ]
   },
   "limit": {
-    "context": 512000,
-    "output": 65536
+    "context": 1048756,
+    "output": 262144
   },
   "providerConfig": {
     "zenmux": {
-      "upstream": "sapiens-ai/agnes-2.5-flash",
-      "contextWindow": 512000,
-      "maxOutputTokens": 65536
+      "upstream": "meituan/longcat-2.0",
+      "contextWindow": 1048756,
+      "maxOutputTokens": 262144
     }
   }
 }

@@ -1,6 +1,6 @@
 import type { ModelStats } from "./model-stats";
 import type { QuotaProviderKey } from "./provider-accounts";
-import type { ModelMeta } from "./model-capabilities";
+import type { ModelModalities } from "./model-capabilities";
 
 export type { QuotaProviderKey };
 
@@ -242,7 +242,8 @@ export interface ModelListItem {
   name: string;
   family: string;
   providers: string[];
-  meta?: ModelMeta;
+  reasoning?: boolean;
+  modalities?: ModelModalities;
   isEnabled: boolean;
   stats?: ModelStats;
 }
@@ -258,7 +259,7 @@ export type ModelSearchItem = Omit<ModelListItem, "name" | "family" | "stats">;
 export interface PlaygroundOptions {
   proxyBaseUrl?: string;
   hasAnyProviderAccount: boolean;
-  models: Array<{ id: string; name: string; family: string; providers: string[]; meta?: ModelMeta; topPDeprecatedProviders?: string[] }>;
+  models: Array<{ id: string; name: string; family: string; providers: string[]; reasoning?: boolean; modalities?: ModelModalities; topPDeprecatedProviders?: string[] }>;
   providerAccounts: Array<{ id: string; provider: string; name: string; email: string | null; isActive: boolean; disabledUntil: string | Date | null; disabledModels: string[]; supportedModels?: string[] | null }>;
 }
 
@@ -289,12 +290,6 @@ export interface AnalyticsData {
 
 export type AnalyticsSeriesData = Pick<AnalyticsData, "requestsOverTime" | "tokenUsage" | "successRate" | "durationOverTime" | "granularity">;
 
-export interface CustomProviderModelMeta {
-  reasoning?: boolean;
-  toolCall?: boolean;
-  vision?: boolean;
-}
-
 export interface CustomProviderModelFlags {
   responses_api?: boolean;
   top_p_deprecated?: boolean;
@@ -309,7 +304,6 @@ export interface CustomProviderModelRow {
   authless: boolean;
   minTier: string | null;
   allowedTiers: string[] | null;
-  meta: CustomProviderModelMeta | null;
   customFlags: CustomProviderModelFlags | null;
   createdAt: string;
   updatedAt: string;

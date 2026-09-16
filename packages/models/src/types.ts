@@ -26,25 +26,13 @@ export interface ProviderModelConfig {
   [key: string]: unknown;
 }
 
-export interface ModelMeta {
-  reasoning?: boolean;
-  toolCall?: boolean;
-  vision?: boolean;
-  type?: string;
-  code?: boolean;
-  tier?: string;
-  variant?: string;
-  status?: string;
-}
-
 export interface ModelData {
   id?: string;
-  owner?: string;
   providers?: string[];
   aliases?: string[];
   description?: string;
   ignored?: boolean;
-  meta?: ModelMeta;
+  reasoning?: boolean;
   modalities?: ModelModalities;
   limit?: ModelLimit;
   providerConfig?: Record<string, ProviderModelConfig>;

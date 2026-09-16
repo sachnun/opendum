@@ -1,8 +1,8 @@
 {
-  "owner": "inclusion-ai",
   "providers": [
     "zenmux"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

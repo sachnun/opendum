@@ -3,9 +3,5 @@
     "kiro"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  }
+  "reasoning": true
 }

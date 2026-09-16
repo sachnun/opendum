@@ -7,6 +7,5 @@
     "baichuan2-chat"
   ],
   "ignored": true,
-  "providerConfig": {},
-  "meta": {}
+  "providerConfig": {}
 }

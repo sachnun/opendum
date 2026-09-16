@@ -1,9 +1,9 @@
 {
-  "owner": "nvidia",
   "providers": [
     "kilo_code",
     "openrouter"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

@@ -1,13 +1,8 @@
 {
-  "owner": "google",
   "providers": [
     "antigravity"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "audio",

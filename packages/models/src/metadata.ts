@@ -8,7 +8,6 @@
 
 import { fetchJson } from "./http.ts";
 import { buildIndex, resolveCandidates, type IndexedModel } from "./similarity.ts";
-import { vendorFromFamily, vendorFromProviderId, vendorFromUpstream } from "./vendors.ts";
 
 export const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 export const MODELSDEV_URL = "https://models.dev/api.json";
@@ -74,7 +73,7 @@ export interface ResolvedMetadata {
 }
 
 export interface ModelMetadataPatch {
-  owner: string | null;
+  reasoning: boolean | null;
   providerLimits: Record<string, ProviderLimits>;
   modalities: Modalities | null;
   limits: ModelLimit;
@@ -170,19 +169,25 @@ function modalitiesFrom(source: RegistryName, entry: unknown): Modalities | null
   return null;
 }
 
-function ownerFrom(source: RegistryName, entry: unknown, provider?: string): string | null {
+function reasoningFrom(source: RegistryName, entry: unknown): boolean | null {
   const record = asRecord(entry);
   if (!record) return null;
 
-  if (source === "nvidia") {
-    const ownedBy = typeof record.owned_by === "string" ? record.owned_by.trim().toLowerCase() : "";
-    if (!ownedBy) return null;
-    return vendorFromUpstream(ownedBy) ?? vendorFromProviderId(ownedBy) ?? vendorFromFamily(ownedBy) ?? ownedBy;
+  if (source === "openrouter") {
+    const reasoning = record.reasoning;
+    if (typeof reasoning === "boolean") return reasoning;
+    if (reasoning && typeof reasoning === "object") return true;
+    const supported = Array.isArray(record.supported_parameters) ? record.supported_parameters : [];
+    if (supported.includes("reasoning")) return true;
+    return null;
   }
 
-  if (source === "modelsdev") {
-    const family = typeof record.family === "string" ? record.family : null;
-    return vendorFromFamily(family) ?? vendorFromProviderId(provider);
+  if (source === "modelsdev" && typeof record.reasoning === "boolean") {
+    return record.reasoning;
+  }
+
+  if (source === "litellm" && typeof record.supports_reasoning === "boolean") {
+    return record.supports_reasoning;
   }
 
   return null;
@@ -364,7 +369,6 @@ export function resolveModelMetadata(
 export function buildModelPatch(
   model: ModelMetadataInput,
   resolved: ResolvedMetadata,
-  upstreams: Record<string, string | undefined> = {},
 ): ModelMetadataPatch {
   const providerOrder = [...model.providers];
   const candidates: Array<ResolvedHit & { scope: "provider" | "global" }> = [];
@@ -376,14 +380,6 @@ export function buildModelPatch(
   for (const hit of Object.values(resolved.global)) {
     if (hit) candidates.push({ ...hit, scope: "global" });
   }
-
-  const ownerFromRegistry = firstDefined(candidates.map((item) => ownerFrom(item.source, item.entry, item.provider)));
-  const ownerFromProvider = firstDefined(
-    providerOrder.map((provider) => vendorFromUpstream(upstreams[provider])),
-  );
-  const owner = ownerFromRegistry
-    ?? ownerFromProvider
-    ?? vendorFromFamily(model.id);
 
   const providerLimits: Record<string, ProviderLimits> = {};
   for (const [provider, hit] of Object.entries(resolved.perProvider)) {
@@ -405,6 +401,8 @@ export function buildModelPatch(
 
   const modalities = firstDefined(candidates.map((item) => modalitiesFrom(item.source, item.entry)));
 
+  const reasoning = firstDefined(candidates.map((item) => reasoningFrom(item.source, item.entry)));
+
   const contexts = Object.values(providerLimits)
     .map((item) => item.contextWindow)
     .filter((value): value is number => typeof value === "number");
@@ -417,7 +415,7 @@ export function buildModelPatch(
   if (outputs.length > 0) limits.output = Math.max(...outputs);
 
   return {
-    owner,
+    reasoning,
     providerLimits,
     modalities,
     limits,

@@ -1,9 +1,9 @@
 {
-  "owner": "upstage",
   "providers": [
     "cline",
     "freebuff"
   ],
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"

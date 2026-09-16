@@ -4,8 +4,5 @@
     "owl-alpha",
     "openrouter/owl-alpha"
   ],
-  "ignored": false,
-  "meta": {
-    "status": "alpha"
-  }
+  "ignored": false
 }

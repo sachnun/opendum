@@ -504,27 +504,6 @@ func TestStripImageContent(t *testing.T) {
 	}
 }
 
-func TestStripToolCallParameters(t *testing.T) {
-	payload := map[string]any{
-		"model":               "test-model",
-		"messages":            []any{},
-		"tools":               []any{map[string]any{"type": "function"}},
-		"tool_choice":         "auto",
-		"parallel_tool_calls": true,
-	}
-
-	stripToolCallParameters(payload)
-
-	for _, key := range []string{"tools", "tool_choice", "parallel_tool_calls"} {
-		if _, ok := payload[key]; ok {
-			t.Fatalf("%s was not stripped: %#v", key, payload)
-		}
-	}
-	if payload["model"] != "test-model" || payload["messages"] == nil {
-		t.Fatalf("non-tool fields changed: %#v", payload)
-	}
-}
-
 func TestSanitizedProxyError(t *testing.T) {
 	tests := []struct {
 		name        string

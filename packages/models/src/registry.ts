@@ -9,26 +9,14 @@ const MODEL_FILE_EXTENSION = ".json";
 
 const MODEL_PROPERTY_ORDER = [
   "id",
-  "owner",
   "providers",
   "aliases",
   "description",
   "ignored",
-  "meta",
+  "reasoning",
   "modalities",
   "limit",
   "providerConfig",
-];
-
-const META_PROPERTY_ORDER = [
-  "reasoning",
-  "toolCall",
-  "vision",
-  "type",
-  "code",
-  "tier",
-  "variant",
-  "status",
 ];
 
 const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "minTier", "allowedTiers", "aliases"];
@@ -80,7 +68,6 @@ function orderValue(value: JsonValue, key?: string): JsonValue {
   if (Array.isArray(value)) return value.map((item) => orderValue(item));
   if (!isPlainObject(value)) return value;
 
-  if (key === "meta") return orderObject(value, META_PROPERTY_ORDER);
   if (key === "providerConfig") return orderProviderMap(value, PROVIDER_CONFIG_PROPERTY_ORDER);
   return orderObject(value);
 }

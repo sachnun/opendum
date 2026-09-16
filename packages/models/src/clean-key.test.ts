@@ -141,11 +141,11 @@ test("stripParamInfoKey falls back to input when nothing remains", () => {
 
 test("extractDescriptors extracts meta updates", () => {
   assert.deepEqual(extractDescriptors("claude-opus-4-6-thinking"), { reasoning: true });
-  assert.deepEqual(extractDescriptors("qwen3-coder-30b-a3b-instruct"), { code: true, type: "instruct" });
-  assert.deepEqual(extractDescriptors("qwen3-vl-30b-a3b-thinking"), { variant: "vl", reasoning: true });
-  assert.deepEqual(extractDescriptors("mistral-large-3-exp"), { status: "experimental" });
-  assert.deepEqual(extractDescriptors("gemini-2-flash-preview"), { status: "preview" });
-  assert.deepEqual(extractDescriptors("mistral-large-3-instruct"), { type: "instruct" });
+  assert.deepEqual(extractDescriptors("qwen3-vl-30b-a3b-thinking"), { reasoning: true });
+  assert.deepEqual(extractDescriptors("qwen3-coder-30b-a3b-instruct"), {});
+  assert.deepEqual(extractDescriptors("mistral-large-3-exp"), {});
+  assert.deepEqual(extractDescriptors("gemini-2-flash-preview"), {});
+  assert.deepEqual(extractDescriptors("mistral-large-3-instruct"), {});
 });
 
 test("extractDescriptors returns empty object when input empty", () => {

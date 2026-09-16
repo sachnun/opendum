@@ -111,11 +111,11 @@ function deriveFamily(modelKey) {
   return undefined;
 }
 
-function buildMeta(model) {
+function buildCapabilities(model) {
+  const vision = isTrue(getProperty(model, "vision"));
   return {
     reasoning: isTrue(getProperty(model, "reasoning")),
-    toolCall: isTrue(getProperty(model, "function_calling")),
-    vision: isTrue(getProperty(model, "vision")),
+    modalities: { input: vision ? ["text", "image"] : ["text"], output: ["text"] },
   };
 }
 
@@ -170,9 +170,11 @@ function buildModelMap(models, modelsDir, reverseMap) {
     }
 
     map.set(modelKey, upstream);
+    const capabilities = buildCapabilities(item.model);
     metadata.set(modelKey, {
       family: deriveFamily(modelKey),
-      meta: buildMeta(item.model),
+      reasoning: capabilities.reasoning,
+      modalities: capabilities.modalities,
     });
   }
 
@@ -180,21 +182,6 @@ function buildModelMap(models, modelsDir, reverseMap) {
     modelMap: new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b))),
     metadata,
   };
-}
-
-function mergeMissingMeta(target, source) {
-  let changed = false;
-
-  for (const [key, value] of Object.entries(source)) {
-    if (value === undefined) continue;
-
-    if (target[key] === undefined) {
-      target[key] = value;
-      changed = true;
-    }
-  }
-
-  return changed;
 }
 
 function applyMetadata(modelsDir, metadata) {
@@ -207,10 +194,12 @@ function applyMetadata(modelsDir, metadata) {
 
     let changed = false;
 
-    if (!entry.data.meta) {
-      entry.data.meta = info.meta;
+    if (info.reasoning !== undefined && entry.data.reasoning === undefined) {
+      entry.data.reasoning = info.reasoning;
       changed = true;
-    } else if (mergeMissingMeta(entry.data.meta, info.meta)) {
+    }
+    if (info.modalities !== undefined && entry.data.modalities === undefined) {
+      entry.data.modalities = info.modalities;
       changed = true;
     }
 

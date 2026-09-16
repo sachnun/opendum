@@ -8,12 +8,7 @@
     "microsoft/phi-3.5-moe-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": false,
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "microsoft/phi-3.5-moe-instruct"

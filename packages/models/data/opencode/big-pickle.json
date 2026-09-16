@@ -1,13 +1,8 @@
 {
-  "owner": "opencode",
   "providers": [
     "opencode"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

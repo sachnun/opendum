@@ -1,8 +1,8 @@
 {
-  "owner": "dots-studio",
   "providers": [
     "zenmux"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

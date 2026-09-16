@@ -5,9 +5,5 @@
     "claude-3-7-sonnet-latest",
     "claude-3.7-sonnet-latest"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  }
+  "reasoning": true
 }

@@ -2,6 +2,7 @@
   "providers": [
     "zenmux"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

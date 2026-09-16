@@ -9,10 +9,5 @@
     "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": false,
-    "vision": true,
-    "variant": "vl"
-  }
+  "reasoning": true
 }

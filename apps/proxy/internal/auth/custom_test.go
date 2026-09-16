@@ -46,7 +46,8 @@ func customValidationService(t *testing.T) *Service {
 	}
 	provider := db.CustomProvider{ID: "prov_1", UserID: "u1", Slug: "my-vllm", BaseURL: "https://vllm.internal/v1", Enabled: true}
 	rows := []db.CustomProviderModel{
-		{ID: "m_1", ProviderID: "prov_1", ModelID: "qwen3-32b", Upstream: "Qwen/Qwen3-32B", Meta: map[string]any{"vision": true, "toolCall": false}},
+		{ID: "m_1", ProviderID: "prov_1", ModelID: "qwen3-32b", Upstream: "Qwen/Qwen3-32B"},
+		{ID: "m_2", ProviderID: "prov_1", ModelID: "my-local-vlm", Upstream: "local/my-local-vlm"},
 	}
 	reader := &fakeCustomProviderReader{
 		providers:  []db.CustomProvider{provider},
@@ -70,11 +71,22 @@ func TestValidateModelForUserAcceptsOwnedCustomModel(t *testing.T) {
 	if result.Model != "my-vllm/qwen3-32b" {
 		t.Fatalf("Model = %q, want my-vllm/qwen3-32b", result.Model)
 	}
-	if result.Vision == nil || !*result.Vision {
-		t.Fatalf("Vision = %v, want true", result.Vision)
+	if result.Vision == nil || *result.Vision {
+		t.Fatalf("Vision = %v, want false for text-only built-in alias", result.Vision)
 	}
-	if result.ToolCall == nil || *result.ToolCall {
-		t.Fatalf("ToolCall = %v, want false", result.ToolCall)
+}
+
+func TestValidateModelForUserTreatsUnknownCustomModelAsSupported(t *testing.T) {
+	service := customValidationService(t)
+	result, err := service.ValidateModelForUser(context.Background(), "u1", "my-vllm/my-local-vlm", ModelAccess{})
+	if err != nil {
+		t.Fatalf("ValidateModelForUser error = %v", err)
+	}
+	if !result.Valid {
+		t.Fatalf("result = %+v, want valid", result)
+	}
+	if result.Vision == nil || !*result.Vision {
+		t.Fatalf("Vision = %v, want true for unknown custom model", result.Vision)
 	}
 }
 

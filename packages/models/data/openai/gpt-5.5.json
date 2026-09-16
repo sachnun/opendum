@@ -1,9 +1,9 @@
 {
-  "owner": "openai",
   "providers": [
     "codex",
     "workbuddy"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

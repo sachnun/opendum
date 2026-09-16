@@ -60,9 +60,3 @@ func filterImageParts(content []any) []any {
 	}
 	return filtered
 }
-
-func stripToolCallParameters(payload map[string]any) {
-	delete(payload, "tools")
-	delete(payload, "tool_choice")
-	delete(payload, "parallel_tool_calls")
-}

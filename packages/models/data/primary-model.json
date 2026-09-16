@@ -3,9 +3,5 @@
     "workbuddy"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  }
+  "reasoning": true
 }

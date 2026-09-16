@@ -1,5 +1,4 @@
 {
-  "owner": "qwen",
   "providers": [
     "workers_ai"
   ],
@@ -21,12 +20,7 @@
     "qwen3-instruct"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

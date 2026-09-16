@@ -1,10 +1,10 @@
 {
-  "owner": "inclusion-ai",
   "providers": [
     "kilo_code",
     "openrouter",
     "zenmux"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

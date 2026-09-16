@@ -5,8 +5,5 @@
     "nvidia/nemotron-mini-4b-instruct",
     "nemotron-mini-instruct"
   ],
-  "ignored": true,
-  "meta": {
-    "type": "instruct"
-  }
+  "ignored": true
 }

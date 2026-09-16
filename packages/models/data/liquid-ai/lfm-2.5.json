@@ -13,12 +13,7 @@
     "liquid/lfm-2.5-1.2b-thinking:free"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": true,
-    "toolCall": false,
-    "vision": false,
-    "type": "instruct"
-  },
+  "reasoning": true,
   "providerConfig": {
     "kilo_code": {
       "upstream": "liquid/lfm-2.5-2.6b:free",

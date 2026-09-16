@@ -1,8 +1,4 @@
 {
   "providers": [],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  }
+  "reasoning": true
 }

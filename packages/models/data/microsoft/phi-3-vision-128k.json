@@ -8,13 +8,7 @@
     "microsoft/phi-3-vision-128k-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "variant": "vision",
-    "type": "instruct"
-  },
+  "reasoning": false,
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "microsoft/phi-3-vision-128k-instruct"

@@ -1,13 +1,8 @@
 {
-  "owner": "stepfun",
   "providers": [
     "zenmux"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": false,
   "modalities": {
     "input": [
       "text"

@@ -1,10 +1,10 @@
 {
-  "owner": "minimax",
   "providers": [
     "zenmux",
     "hyper",
     "perch"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

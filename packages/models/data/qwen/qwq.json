@@ -6,10 +6,6 @@
     "qwen/qwq-32b"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false
-  },
+  "reasoning": false,
   "providerConfig": {}
 }

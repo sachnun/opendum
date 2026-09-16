@@ -5,11 +5,5 @@
     "microsoft/phi-4-multimodal-instruct"
   ],
   "ignored": true,
-  "meta": {
-    "reasoning": false,
-    "toolCall": false,
-    "vision": false,
-    "type": "instruct",
-    "variant": "multimodal"
-  }
+  "reasoning": false
 }

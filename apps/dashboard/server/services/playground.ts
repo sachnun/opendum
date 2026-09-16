@@ -73,7 +73,8 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
           name: model,
           family: getModelFamily(model),
           providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
-          meta: MODEL_REGISTRY[model]?.meta,
+          reasoning: MODEL_REGISTRY[model]?.reasoning,
+          modalities: MODEL_REGISTRY[model]?.modalities,
           topPDeprecatedProviders: topPDeprecatedProviders.length > 0 ? topPDeprecatedProviders : undefined,
         };
       })

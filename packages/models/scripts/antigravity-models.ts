@@ -472,8 +472,12 @@ function enrichModelMetadata(result, documentedModelKeys) {
       continue;
     }
 
-    if (JSON.stringify(data.meta) !== JSON.stringify(nextMeta)) {
-      data.meta = nextMeta;
+    if (data.reasoning !== nextMeta.reasoning) {
+      data.reasoning = nextMeta.reasoning;
+      changed = true;
+    }
+    if (JSON.stringify(data.modalities) !== JSON.stringify(nextMeta.modalities)) {
+      data.modalities = nextMeta.modalities;
       changed = true;
     }
 
@@ -500,22 +504,22 @@ function inferMetadata(modelKey) {
   if (modelKey.startsWith("gemini-")) {
     return {
       reasoning: !isGeminiImageModel(modelKey),
-      toolCall: !isGeminiImageModel(modelKey),
-      vision: true,
+      modalities: {
+        input: ["text", "image"],
+        output: isGeminiImageModel(modelKey) ? ["image"] : ["text"],
+      },
     };
   }
   if (modelKey.startsWith("claude-")) {
     return {
       reasoning: true,
-      toolCall: true,
-      vision: true,
+      modalities: { input: ["text", "image"], output: ["text"] },
     };
   }
   if (modelKey.startsWith("gpt-oss-")) {
     return {
       reasoning: true,
-      toolCall: true,
-      vision: false,
+      modalities: { input: ["text"], output: ["text"] },
     };
   }
   return null;

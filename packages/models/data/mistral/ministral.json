@@ -6,10 +6,5 @@
     "ministral-instruct"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": false,
-    "toolCall": true,
-    "vision": false,
-    "type": "instruct"
-  }
+  "reasoning": false
 }

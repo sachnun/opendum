@@ -1,5 +1,4 @@
 {
-  "owner": "deepseek",
   "providers": [
     "zenmux",
     "hyper",
@@ -20,11 +19,7 @@
     "deepseek-v4-flash-free"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": false
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "text"

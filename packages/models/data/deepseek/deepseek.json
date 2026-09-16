@@ -16,8 +16,5 @@
     "deepseek-v3.2",
     "deepseek-v3.2-exp"
   ],
-  "ignored": true,
-  "meta": {
-    "status": "experimental"
-  }
+  "ignored": true
 }

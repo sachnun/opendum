@@ -1,5 +1,4 @@
 {
-  "owner": "nvidia",
   "providers": [
     "kilo_code",
     "nvidia_nim",
@@ -15,10 +14,7 @@
     "nemotron-3-nano-omni-reasoning"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "variant": "omni"
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

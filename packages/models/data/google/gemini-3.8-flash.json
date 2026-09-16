@@ -1,5 +1,4 @@
 {
-  "owner": "google",
   "providers": [
     "antigravity",
     "zenmux"
@@ -9,11 +8,7 @@
     "gemini-3.8-flash-low",
     "gemini-3.8-flash-medium"
   ],
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "audio",

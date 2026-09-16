@@ -1,5 +1,4 @@
 {
-  "owner": "anthropic",
   "providers": [
     "kiro"
   ],
@@ -10,11 +9,7 @@
     "claude-sonnet4.5"
   ],
   "ignored": false,
-  "meta": {
-    "reasoning": true,
-    "toolCall": true,
-    "vision": true
-  },
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",

@@ -5,6 +5,5 @@
     "mistral-medium-3.5-128b",
     "mistralai/mistral-medium-3.5-128b"
   ],
-  "ignored": false,
-  "meta": {}
+  "ignored": false
 }

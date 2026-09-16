@@ -1,11 +1,11 @@
 {
-  "owner": "openai",
   "providers": [
     "kiro",
     "codex",
     "workbuddy",
     "perch"
   ],
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",
