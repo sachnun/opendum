@@ -16,7 +16,6 @@ const defaultBaseURL = "https://www.codebuff.com"
 
 const (
 	sessionPath           = "/api/v1/freebuff/session"
-	admissionPath         = "/api/v1/freebuff/session/admission"
 	sessionRequestTimeout = 20 * time.Second
 )
 
@@ -162,28 +161,11 @@ func (c *Client) sessionRequest(ctx context.Context, method, token, userID, inst
 	ctx, cancel := context.WithTimeout(ctx, sessionRequestTimeout)
 	defer cancel()
 
-	path := sessionPath
-	if method == http.MethodPost {
-		path = admissionPath
-	}
-	resp, responseBody, err := c.doSession(ctx, method, path, token, userID, instanceID, model)
+	resp, responseBody, err := c.doSession(ctx, method, sessionPath, token, userID, instanceID, model)
 	if err != nil {
 		return freeSessionResponse{}, err
 	}
-	if method == http.MethodPost && sessionPathUnsupported(resp.StatusCode) {
-		resp, responseBody, err = c.doSession(ctx, method, sessionPath, token, userID, instanceID, model)
-		if err != nil {
-			return freeSessionResponse{}, err
-		}
-		if sessionPathUnsupported(resp.StatusCode) {
-			return freeSessionResponse{}, &sessionRequestError{statusCode: resp.StatusCode, body: []byte("free session admission is not supported by this upstream")}
-		}
-	}
 	return decodeSessionResponse(method, resp, responseBody)
-}
-
-func sessionPathUnsupported(statusCode int) bool {
-	return statusCode == http.StatusNotFound || statusCode == http.StatusMethodNotAllowed
 }
 
 func (c *Client) doSession(ctx context.Context, method, path, token, userID, instanceID, model string) (*http.Response, []byte, error) {
@@ -200,7 +182,6 @@ func (c *Client) doSession(ctx context.Context, method, path, token, userID, ins
 	req.Header.Set("User-Agent", ClientUserAgent())
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("x-freebuff-wallet-spend-limit", "0")
 		if strings.TrimSpace(model) != "" {
 			req.Header.Set("x-freebuff-model", strings.TrimSpace(model))
 		}

@@ -93,12 +93,10 @@ func (r *Registry) StartFreebuffMaintenance(ctx context.Context) {
 	if r == nil {
 		return
 	}
-	provider, ok := r.providers["freebuff"].(freebuffProvider)
-	if !ok {
+	if _, ok := r.providers["freebuff"].(freebuffProvider); !ok {
 		return
 	}
 	freebuff.StartVersionRefresher(ctx)
-	go provider.manager.StartIdleReaper(ctx)
 }
 
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
