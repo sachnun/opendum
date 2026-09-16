@@ -878,8 +878,11 @@ func transformChatSSEToResponses(source io.Reader, writer io.Writer, model strin
 			continue
 		}
 		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		if data == "" || data == "[DONE]" {
+		if data == "" {
 			continue
+		}
+		if data == "[DONE]" {
+			break
 		}
 		var chunk map[string]any
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
@@ -918,11 +921,6 @@ func transformChatSSEToResponses(source io.Reader, writer io.Writer, model strin
 					state.addToolDelta(numberFromAny(tc["index"]), id, stringValue(fn["name"]), stringValue(fn["arguments"]))
 				}
 			}
-		}
-
-		if state.finishReason != "" {
-			state.complete()
-			return
 		}
 	}
 	state.complete()
