@@ -406,16 +406,23 @@ func responseUsageToChatUsage(raw any) map[string]any {
 	}
 	out := map[string]any{"prompt_tokens": input, "completion_tokens": output, "total_tokens": input + output}
 	cached := 0
+	write := 0
 	if details, ok := usage["input_tokens_details"].(map[string]any); ok {
 		cached = numberFromAny(details["cached_tokens"])
+		write = numberFromAny(details["cache_write_tokens"])
 	}
-	if cached == 0 {
+	if cached == 0 || write == 0 {
 		if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
-			cached = numberFromAny(details["cached_tokens"])
+			if cached == 0 {
+				cached = numberFromAny(details["cached_tokens"])
+			}
+			if write == 0 {
+				write = numberFromAny(details["cache_write_tokens"])
+			}
 		}
 	}
-	if cached > 0 {
-		out["prompt_tokens_details"] = map[string]any{"cached_tokens": cached}
+	if cached > 0 || write > 0 {
+		out["prompt_tokens_details"] = map[string]any{"cached_tokens": cached, "cache_write_tokens": write}
 	}
 	reasoning := 0
 	if details, ok := usage["output_tokens_details"].(map[string]any); ok {
@@ -615,8 +622,10 @@ func responsesUsageFromChat(usage map[string]any) map[string]any {
 	input := numberFromAny(usage["prompt_tokens"])
 	output := numberFromAny(usage["completion_tokens"])
 	cached := 0
+	write := 0
 	if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
 		cached = numberFromAny(details["cached_tokens"])
+		write = numberFromAny(details["cache_write_tokens"])
 	}
 	reasoning := 0
 	if details, ok := usage["completion_tokens_details"].(map[string]any); ok {
@@ -624,7 +633,7 @@ func responsesUsageFromChat(usage map[string]any) map[string]any {
 	}
 	return map[string]any{
 		"input_tokens":          input,
-		"input_tokens_details":  map[string]any{"cached_tokens": cached},
+		"input_tokens_details":  map[string]any{"cached_tokens": cached, "cache_write_tokens": write},
 		"output_tokens":         output,
 		"output_tokens_details": map[string]any{"reasoning_tokens": reasoning},
 		"total_tokens":          input + output,

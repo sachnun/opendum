@@ -558,6 +558,44 @@ func TestPassthroughUsageTrackerProcessesSplitSSE(t *testing.T) {
 	}
 }
 
+func TestUsageFromJSONReadsCacheTokens(t *testing.T) {
+	tests := []struct {
+		name       string
+		usage      map[string]any
+		cached     int
+		cacheWrite int
+	}{
+		{"chat completions", map[string]any{"prompt_tokens": 10, "prompt_tokens_details": map[string]any{"cached_tokens": 4, "cache_write_tokens": 6}}, 4, 6},
+		{"responses", map[string]any{"input_tokens": 10, "input_tokens_details": map[string]any{"cached_tokens": 7, "cache_write_tokens": 3}}, 7, 3},
+		{"anthropic messages", map[string]any{"input_tokens": 10, "cache_read_input_tokens": 8, "cache_creation_input_tokens": 2}, 8, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			counts := usageFromJSON(map[string]any{"usage": tt.usage})
+			if counts.cachedTokens != tt.cached || counts.cacheWriteTokens != tt.cacheWrite {
+				t.Fatalf("cache tokens = (%d, %d), want (%d, %d)", counts.cachedTokens, counts.cacheWriteTokens, tt.cached, tt.cacheWrite)
+			}
+		})
+	}
+}
+
+func TestUsageReadsResponsesAPINestedUsage(t *testing.T) {
+	event := map[string]any{"type": "response.completed", "response": map[string]any{"usage": map[string]any{"input_tokens": 100, "output_tokens": 20, "input_tokens_details": map[string]any{"cached_tokens": 80, "cache_write_tokens": 10}}}}
+
+	tracker := &openAIStreamUsageTracker{}
+	tracker.Process([]byte(openAIStreamEvent(t, event)))
+	tracker.Flush()
+	if tracker.inputTokens != 100 || tracker.outputTokens != 20 || tracker.cachedTokens != 80 || tracker.cacheWriteTokens != 10 {
+		t.Fatalf("stream usage = (%d, %d, %d, %d), want (100, 20, 80, 10)", tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens)
+	}
+
+	counts := usageFromJSON(event)
+	if counts.inputTokens != 100 || counts.outputTokens != 20 || counts.cachedTokens != 80 || counts.cacheWriteTokens != 10 {
+		t.Fatalf("non-stream usage = (%d, %d, %d, %d), want (100, 20, 80, 10)", counts.inputTokens, counts.outputTokens, counts.cachedTokens, counts.cacheWriteTokens)
+	}
+}
+
 func TestAnthropicStreamTrackerTransformsOpenAIContentBlocks(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	tracker := &anthropicStreamTracker{writer: recorder}

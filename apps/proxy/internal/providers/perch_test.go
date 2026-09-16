@@ -189,6 +189,9 @@ func TestPerchSSEToChatCompletionBuffersTextToolsAndUsage(t *testing.T) {
 	if usage["prompt_tokens"] != 13 || usage["completion_tokens"] != 5 || usage["total_tokens"] != 18 {
 		t.Fatalf("usage = %#v", usage)
 	}
+	if details, ok := usage["prompt_tokens_details"].(map[string]any); !ok || details["cached_tokens"] != 3 {
+		t.Fatalf("cached tokens = %#v", usage["prompt_tokens_details"])
+	}
 }
 
 func TestPerchSSEStreamEmitsChatChunks(t *testing.T) {
