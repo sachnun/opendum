@@ -236,6 +236,34 @@ func TestChatCompletionToResponsesJSONUsesResponsesShape(t *testing.T) {
 	}
 }
 
+func TestChatSSEToResponsesKeepsTrailingUsage(t *testing.T) {
+	chat := strings.Join([]string{
+		`data: {"choices":[{"index":0,"delta":{"content":"pong"},"finish_reason":null}]}`,
+		`data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+		`data: {"choices":[],"usage":{"prompt_tokens":77,"completion_tokens":1,"prompt_tokens_details":{"cached_tokens":40,"cache_write_tokens":5}}}`,
+		`data: [DONE]`,
+		"",
+	}, "\n\n")
+
+	var out strings.Builder
+	transformChatSSEToResponses(strings.NewReader(chat), &out, "m")
+
+	events := decodeSSEEvents(t, out.String())
+	last := events[len(events)-1]
+	if last["type"] != "response.completed" {
+		t.Fatalf("last event = %#v", last)
+	}
+	response, _ := last["response"].(map[string]any)
+	usage, _ := response["usage"].(map[string]any)
+	details, _ := usage["input_tokens_details"].(map[string]any)
+	if numberFromAny(usage["input_tokens"]) != 77 || numberFromAny(usage["output_tokens"]) != 1 {
+		t.Fatalf("usage = %#v", usage)
+	}
+	if numberFromAny(details["cached_tokens"]) != 40 || numberFromAny(details["cache_write_tokens"]) != 5 {
+		t.Fatalf("input_tokens_details = %#v", details)
+	}
+}
+
 func decodeSSEEvents(t *testing.T, payload string) []map[string]any {
 	t.Helper()
 	events := []map[string]any{}
