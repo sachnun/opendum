@@ -1923,9 +1923,6 @@ async function copyPanelError(panelId: string) {
     <DataNotice :error="error" />
 
       <div class="space-y-3">
-        <div v-if="playgroundSetupMessage" class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          {{ playgroundSetupMessage }}
-        </div>
         <h2 class="text-sm font-medium text-muted-foreground">Scenario</h2>
         <div class="flex flex-wrap gap-2">
           <button
