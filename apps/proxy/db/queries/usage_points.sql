@@ -1,6 +1,6 @@
 -- name: InsertUsageLog :exec
-INSERT INTO usage_log (id, "userId", "providerAccountId", "proxyApiKeyId", model, "inputTokens", "outputTokens", "statusCode", duration, "createdAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+INSERT INTO usage_log (id, "userId", "providerAccountId", "proxyApiKeyId", model, "inputTokens", "outputTokens", "cachedTokens", "cacheWriteTokens", "statusCode", duration, "createdAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 
 -- name: DebitPointBalance :one
 UPDATE user_point_balance SET balance = balance - $1, "updatedAt" = $2 WHERE "userId" = $3 AND balance >= $1 RETURNING balance;

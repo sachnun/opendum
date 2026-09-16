@@ -181,6 +181,8 @@ type UsageLog struct {
 	StatusCode        *int
 	Duration          *int
 	CreatedAt         time.Time
+	CachedTokens      int
+	CacheWriteTokens  int
 }
 
 type User struct {

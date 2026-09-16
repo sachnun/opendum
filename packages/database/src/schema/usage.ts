@@ -48,6 +48,8 @@ export const usageLog = pgTable(
     model: text("model").notNull(),
     inputTokens: integer("inputTokens").notNull().default(0),
     outputTokens: integer("outputTokens").notNull().default(0),
+    cachedTokens: integer("cachedTokens").notNull().default(0),
+    cacheWriteTokens: integer("cacheWriteTokens").notNull().default(0),
 
     // Request metadata
     statusCode: integer("statusCode"),
