@@ -552,3 +552,64 @@ func TestSessionStatusClassification(t *testing.T) {
 		}
 	}
 }
+
+func TestEndSessionReportsRefundSettlement(t *testing.T) {
+	client := newSessionTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ended","freebucksRefundPending":true}`))
+	})
+
+	result, err := client.EndSession(context.Background(), "token", "user", "inst_1")
+	if err != nil {
+		t.Fatalf("end session: %v", err)
+	}
+	if result.Status != "ended" || !result.RefundPending || result.Refund != 0 {
+		t.Fatalf("result = %#v, want pending refund", result)
+	}
+
+	settled := newSessionTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ended","freebucksRefundPending":false,"freebucksRefund":4.5}`))
+	})
+	result, err = settled.EndSession(context.Background(), "token", "user", "inst_1")
+	if err != nil {
+		t.Fatalf("end session: %v", err)
+	}
+	if result.RefundPending || result.Refund != 4.5 {
+		t.Fatalf("result = %#v, want settled refund of 4.5", result)
+	}
+}
+
+func TestEndSessionSettlesPendingRefund(t *testing.T) {
+	previousInterval := refundSettlementInterval
+	refundSettlementInterval = 5 * time.Millisecond
+	t.Cleanup(func() { refundSettlementInterval = previousInterval })
+
+	var deletes atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if deletes.Add(1) == 1 {
+			_, _ = w.Write([]byte(`{"status":"ended","freebucksRefundPending":true}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"status":"ended","freebucksRefund":4.5}`))
+	}))
+	t.Cleanup(server.Close)
+
+	manager := NewManager(&Client{baseURL: server.URL, http: server.Client()}, nil)
+	seedIdleState(manager, "acc", time.Now().Add(-16*time.Minute))
+
+	manager.EndIdleSessions(context.Background())
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && deletes.Load() < 2 {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := deletes.Load(); got != 2 {
+		t.Fatalf("end session calls = %d, want 2 (initial delete plus one settlement)", got)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if got := deletes.Load(); got != 2 {
+		t.Fatalf("settlement kept retrying after the refund settled: %d calls", got)
+	}
+}

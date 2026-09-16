@@ -103,39 +103,47 @@ func (c *Client) GetSession(ctx context.Context, token, userID, instanceID strin
 	return c.sessionRequest(ctx, http.MethodGet, token, userID, instanceID, "")
 }
 
-func (c *Client) EndSession(ctx context.Context, token, userID, instanceID string) error {
+type EndSessionResult struct {
+	Status        string
+	RefundPending bool
+	Refund        float64
+}
+
+func (c *Client) EndSession(ctx context.Context, token, userID, instanceID string) (EndSessionResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, sessionRequestTimeout)
 	defer cancel()
 	req, err := c.newRequest(ctx, http.MethodDelete, sessionPath, nil, token, userID, false)
 	if err != nil {
-		return err
+		return EndSessionResult{}, err
 	}
 	if id := strings.TrimSpace(instanceID); id != "" {
 		req.Header.Set("x-freebuff-instance-id", id)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return EndSessionResult{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return nil
+		return EndSessionResult{Status: string(statusNone)}, nil
 	}
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("free session delete failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return EndSessionResult{}, fmt.Errorf("free session delete failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	var parsed struct {
-		Status string `json:"status"`
+		Status        string  `json:"status"`
+		RefundPending bool    `json:"freebucksRefundPending"`
+		Refund        float64 `json:"freebucksRefund"`
 	}
 	if err := json.Unmarshal(body, &parsed); err == nil && strings.TrimSpace(parsed.Status) != "" {
 		switch strings.TrimSpace(parsed.Status) {
 		case "ended", "none":
-			return nil
+			return EndSessionResult{Status: strings.TrimSpace(parsed.Status), RefundPending: parsed.RefundPending, Refund: parsed.Refund}, nil
 		}
-		return fmt.Errorf("free session delete was not confirmed: %s", strings.TrimSpace(string(body)))
+		return EndSessionResult{}, fmt.Errorf("free session delete was not confirmed: %s", strings.TrimSpace(string(body)))
 	}
-	return nil
+	return EndSessionResult{Status: "ended"}, nil
 }
 
 func (c *Client) Chat(ctx context.Context, token, userID string, body []byte) (*http.Response, []byte, error) {

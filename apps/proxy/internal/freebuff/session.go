@@ -40,9 +40,10 @@ const (
 	maxWaitingRoomWait       = 60 * time.Second
 
 	capacityDeferredCooldown = 10 * time.Second
-	idleSessionTimeoutMin    = 10 * time.Minute
-	idleSessionTimeoutMax    = 15 * time.Minute
+	idleSessionTimeoutMin    = 45 * time.Minute
+	idleSessionTimeoutMax    = 50 * time.Minute
 	idleReaperInterval       = time.Minute
+	refundSettlementAttempts = 20
 )
 
 type freeSessionRateLimit struct {
@@ -188,3 +189,7 @@ func parseOptionalTime(value string) time.Time {
 	}
 	return parsed
 }
+
+// refundSettlementInterval is the delay between refund settlement attempts;
+// it is a variable so tests can shorten it.
+var refundSettlementInterval = 3 * time.Second

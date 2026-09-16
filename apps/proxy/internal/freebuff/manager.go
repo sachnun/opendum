@@ -185,7 +185,7 @@ func (m *Manager) RotateRun(ctx context.Context, accountID, agent string) {
 }
 
 // StartIdleReaper ends active free sessions that saw no chat interaction for a
-// jittered 10-15 minute window, releasing the upstream model lock and slot.
+// jittered window late in their paid hour, releasing the upstream model lock and slot.
 func (m *Manager) StartIdleReaper(ctx context.Context) {
 	if m == nil {
 		return
@@ -232,7 +232,7 @@ func (m *Manager) endIdleSession(ctx context.Context, state *accountState) {
 		state.mu.Unlock()
 		return
 	}
-	if err := m.client.EndSession(ctx, token, userID, session.instanceID); err != nil {
+	if err := m.endSession(ctx, state.id, token, userID, session.instanceID); err != nil {
 		state.lastError = err.Error()
 		snap := state.snapshot(state.id)
 		state.mu.Unlock()
@@ -245,6 +245,52 @@ func (m *Manager) endIdleSession(ctx context.Context, state *accountState) {
 	snap := state.snapshot(state.id)
 	state.mu.Unlock()
 	m.store(snap)
+}
+
+// endSession ends an upstream session and, when the server reports a pending
+// Freebucks refund, keeps re-ending it until the refund settles.
+func (m *Manager) endSession(ctx context.Context, accountID, token, userID, instanceID string) error {
+	if strings.TrimSpace(instanceID) == "" {
+		return nil
+	}
+	result, err := m.client.EndSession(ctx, token, userID, instanceID)
+	if err != nil {
+		return err
+	}
+	if result.RefundPending {
+		go m.settleRefund(ctx, accountID, token, userID, instanceID)
+		return nil
+	}
+	logRefund(accountID, result.Refund)
+	return nil
+}
+
+func (m *Manager) settleRefund(ctx context.Context, accountID, token, userID, instanceID string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refundSettlementInterval*time.Duration(refundSettlementAttempts))
+	defer cancel()
+	for attempt := 0; attempt < refundSettlementAttempts; attempt++ {
+		if err := sleepCtx(ctx, refundSettlementInterval); err != nil {
+			return
+		}
+		result, err := m.client.EndSession(ctx, token, userID, instanceID)
+		if err != nil {
+			slog.Warn("freebuff refund settlement failed", "account", accountID, "error", err)
+			return
+		}
+		if result.RefundPending {
+			continue
+		}
+		logRefund(accountID, result.Refund)
+		return
+	}
+	slog.Info("freebuff refund still pending", "account", accountID)
+}
+
+func logRefund(accountID string, refund float64) {
+	if refund <= 0 {
+		return
+	}
+	slog.Info("freebuff freebucks refund settled", "account", accountID, "refund", refund)
 }
 
 func jitteredIdleTimeout() time.Duration {
@@ -335,7 +381,7 @@ func (m *Manager) refreshSession(ctx context.Context, state *accountState, token
 				return nil, &sessionBlockedError{status: string(statusModelLocked), retryAfter: stateResponse.retryAfter}
 			}
 			retriedSwitch = true
-			_ = m.client.EndSession(ctx, token, userID, strings.TrimSpace(stateResponse.InstanceID))
+			_ = m.endSession(ctx, state.id, token, userID, strings.TrimSpace(stateResponse.InstanceID))
 			stateResponse, err = m.client.CreateOrRefreshSession(ctx, token, userID, model)
 			if err != nil {
 				state.lastError = err.Error()
