@@ -27,9 +27,9 @@ type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 const API_KEY_PROVIDER_SETTINGS = {
   nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true },
   openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
-  zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
+  zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true },
   harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
-  hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
+  hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true },
 } satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean; skipInference?: boolean }>;
 
 function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
