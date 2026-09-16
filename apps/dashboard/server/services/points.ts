@@ -1,9 +1,9 @@
 import { and, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 
-import { db, normalizeEmail, pointTransaction, providerAccount, providerEmailRegistry, proxyApiKey, usageLog, user, userPointBalance, type Database } from "@opendum/database";
+import { db, normalizeEmail, pointTransaction, providerEmailRegistry, proxyApiKey, user, userPointBalance, type Database } from "@opendum/database";
+import { roamingUsagePointsByApiKey } from "../lib/roaming-points";
 
 export const API_KEY_UPDATE_POINT_COST = 100;
-export const ROAMING_POINT_COST = 2;
 export const DAILY_ACCESS_POINTS = 5;
 
 const INITIAL_POINT_BALANCE = 15;
@@ -213,29 +213,8 @@ export async function getUserPointStatus(userId: string): Promise<{ balance: num
       .where(and(eq(proxyApiKey.userId, userId), eq(proxyApiKey.roamingEnabled, true))),
   ]);
   const apiKeyIds = roamingApiKeys.map((apiKey) => apiKey.id);
-  const roamingPointsByApiKeyId: Record<string, number> = Object.fromEntries(apiKeyIds.map((id) => [id, 0]));
-
-  if (apiKeyIds.length > 0) {
-    const rows = await db
-      .select({
-        apiKeyId: usageLog.proxyApiKeyId,
-        pointsUsed: sql<number>`coalesce(count(*) * ${ROAMING_POINT_COST}, 0)`,
-      })
-      .from(usageLog)
-      .innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id))
-      .where(and(
-        eq(usageLog.userId, userId),
-        inArray(usageLog.proxyApiKeyId, apiKeyIds),
-        ne(providerAccount.userId, userId),
-        sql`${usageLog.statusCode} >= 200`,
-        sql`${usageLog.statusCode} < 400`,
-      ))
-      .groupBy(usageLog.proxyApiKeyId);
-
-    for (const row of rows) {
-      if (row.apiKeyId) roamingPointsByApiKeyId[row.apiKeyId] = Number(row.pointsUsed ?? 0);
-    }
-  }
+  const pointsByApiKeyId = await roamingUsagePointsByApiKey(userId, apiKeyIds);
+  const roamingPointsByApiKeyId: Record<string, number> = Object.fromEntries(apiKeyIds.map((id) => [id, pointsByApiKeyId.get(id) ?? 0]));
 
   return { balance, roamingPointsByApiKeyId };
 }

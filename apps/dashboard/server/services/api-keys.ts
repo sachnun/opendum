@@ -1,15 +1,16 @@
-import { and, asc, desc, eq, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 
-import { db, providerAccount, proxyApiKey, proxyApiKeyRateLimit, usageLog } from "@opendum/database";
+import { db, providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "@opendum/database";
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "../lib/proxy/authless-providers";
 import { getAllFamilies, getAllModels, getModelFamily, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
+import { roamingUsagePointsByApiKey } from "../lib/roaming-points";
 import { compareModelEntries } from "../../lib/model-sort";
 import type { ActionResult } from "../utils/api";
 import { PROVIDER_ACCOUNT_KEYS } from "./account-providers";
-import { API_KEY_UPDATE_POINT_COST, ROAMING_POINT_COST, debitUserPoints } from "./points";
+import { API_KEY_UPDATE_POINT_COST, debitUserPoints } from "./points";
 
 const MAX_API_KEY_ACCESS_ENTRIES = 500;
 const MAX_API_KEY_RATE_LIMIT_RULES = 500;
@@ -147,24 +148,7 @@ export async function listApiKeys(userId: string, options: ApiKeyReadOptions = {
       .where(eq(proxyApiKey.userId, userId))
       .orderBy(desc(proxyApiKey.createdAt));
     const apiKeyIds = apiKeys.map((apiKey) => apiKey.id);
-    const roamingPointRows = apiKeyIds.length > 0
-      ? await db
-          .select({
-            apiKeyId: usageLog.proxyApiKeyId,
-            pointsUsed: sql<number>`coalesce(count(*) * ${ROAMING_POINT_COST}, 0)`,
-          })
-          .from(usageLog)
-          .innerJoin(providerAccount, eq(usageLog.providerAccountId, providerAccount.id))
-          .where(and(
-            eq(usageLog.userId, userId),
-            inArray(usageLog.proxyApiKeyId, apiKeyIds),
-            ne(providerAccount.userId, userId),
-            sql`${usageLog.statusCode} >= 200`,
-            sql`${usageLog.statusCode} < 400`,
-          ))
-          .groupBy(usageLog.proxyApiKeyId)
-      : [];
-    const roamingPointsByKeyId = new Map(roamingPointRows.map((row) => [row.apiKeyId, Number(row.pointsUsed ?? 0)]));
+    const roamingPointsByKeyId = await roamingUsagePointsByApiKey(userId, apiKeyIds);
 
     return apiKeys.map(({ encryptedKey, ...apiKey }) => ({
       ...apiKey,

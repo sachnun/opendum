@@ -98,6 +98,7 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 	}
 	tracker.Flush()
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	ctx.setUsage(tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens)
 	if ctx.Provider == "hyper" && (tracker.hypercreditsRemaining != nil || tracker.hypercreditsCost > 0) {
 		go s.storeHypercreditsUsage(context.Background(), ctx.AccountID, tracker.hypercreditsRemaining, tracker.hypercreditsCost)
 	}
@@ -135,6 +136,7 @@ func (s *Service) passthroughNonStream(ctx responseContext) error {
 	ctx.Writer.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(ctx.Writer, bytes.NewReader(body))
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	ctx.setUsage(counts.inputTokens, counts.outputTokens, counts.cachedTokens, counts.cacheWriteTokens)
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, counts.inputTokens, counts.outputTokens, counts.cachedTokens, counts.cacheWriteTokens, durationMS, false, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
 }

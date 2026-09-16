@@ -17,7 +17,7 @@ import (
 type accountRotationRunner interface {
 	getNextAvailableAccount(context.Context, string, string, *string, []string, []string, auth.AccountAccess, string) (*appdb.ProviderAccount, bool, error)
 	getNextSharedAccount(context.Context, string, string, *string, []string, []string) (*appdb.ProviderAccount, bool, error)
-	reserveRoamingPoint(context.Context, string) (*pointReservation, bool, error)
+	reserveRoamingPoint(context.Context, string, string) (*pointReservation, bool, error)
 	refundRoamingPoint(context.Context, *pointReservation)
 	bumpAccountRequestCount(context.Context, string, time.Time)
 	makeProviderRequest(context.Context, appdb.ProviderAccount, map[string]any, bool) (*http.Response, error)
@@ -91,7 +91,7 @@ func executeAccountRotation(runner accountRotationRunner, ctx context.Context, r
 			return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusServiceUnavailable, Message: "No available accounts for this request.", Type: "api_error"}
 		}
 		if useShared && forced == nil {
-			points, allowed, err := runner.reserveRoamingPoint(ctx, authResult.UserID)
+			points, allowed, err := runner.reserveRoamingPoint(ctx, authResult.UserID, validation.Model)
 			if err != nil {
 				return nil, nil, 0, 0, recoverableFailures, nil, &routeError{Status: http.StatusInternalServerError, Message: "Internal server error", Type: "api_error"}
 			}
