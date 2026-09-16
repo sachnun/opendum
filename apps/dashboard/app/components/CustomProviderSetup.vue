@@ -35,6 +35,8 @@ const apiKey = ref("");
 const models = ref<ModelRow[]>([{ model: "", alias: "" }]);
 const synced = ref(false);
 
+const MULTIPART_SUFFIXES = new Set(["ac", "biz", "co", "com", "edu", "go", "gov", "mil", "my", "ne", "net", "or", "org", "sch", "web"]);
+
 const host = computed(() => {
   try {
     return new URL(baseUrl.value.trim()).hostname.toLowerCase().replace(/^www\./, "");
@@ -43,7 +45,16 @@ const host = computed(() => {
   }
 });
 
-const slug = computed(() => host.value
+const domain = computed(() => {
+  const labels = host.value.split(".");
+  if (labels.length < 2) return host.value;
+  const suffix = labels[labels.length - 2] ?? "";
+  const extension = labels[labels.length - 1] ?? "";
+  const suffixLength = labels.length > 2 && extension.length === 2 && MULTIPART_SUFFIXES.has(suffix) ? 2 : 1;
+  return labels[labels.length - 1 - suffixLength] ?? "";
+});
+
+const slug = computed(() => domain.value
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-+/, "")
   .replace(/-{2,}/g, "-")
