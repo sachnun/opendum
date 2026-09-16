@@ -25,21 +25,23 @@ export const createAccountInputSchema = z.object({ provider: z.string(), name: z
 type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
 
 const API_KEY_PROVIDER_SETTINGS = {
-  nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
+  nvidia_nim: { label: "Nvidia", baseUrl: nvidiaApiBaseUrl, modelMap: getProviderModelMap("nvidia_nim"), validationPath: "/chat/completions", requireSuccessfulStatus: false, skipInference: true },
   openrouter: { label: "OpenRouter", baseUrl: openRouterApiBaseUrl, modelMap: getProviderModelMap("openrouter"), validationPath: "/models", requireSuccessfulStatus: true },
   zenmux: { label: "ZenMux", baseUrl: zenmuxApiBaseUrl, modelMap: getProviderModelMap("zenmux"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
   harbor: { label: "Harbor", baseUrl: harborApiBaseUrl, modelMap: getProviderModelMap("harbor"), validationPath: "/models", requireSuccessfulStatus: true },
   hyper: { label: "Charm", baseUrl: hyperApiBaseUrl, modelMap: getProviderModelMap("hyper"), validationPath: "/chat/completions", requireSuccessfulStatus: false },
-} satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean }>;
+} satisfies Record<ApiKeyProviderKey, { label: string; baseUrl: string; modelMap: Record<string, string>; validationPath: "/models" | "/chat/completions"; requireSuccessfulStatus: boolean; skipInference?: boolean }>;
 
 function buildValidationRequest(provider: ApiKeyProviderKey, apiKey: string) {
-  const { baseUrl, modelMap, validationPath } = API_KEY_PROVIDER_SETTINGS[provider];
+  const { baseUrl, modelMap, validationPath, skipInference } = API_KEY_PROVIDER_SETTINGS[provider];
   const validationModel = Object.values(modelMap)[0];
   const isPost = validationPath === "/chat/completions";
   const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" };
   let body: Record<string, unknown> | undefined;
   if (validationPath === "/chat/completions") {
-    body = { model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false };
+    body = skipInference
+      ? { model: validationModel, messages: [] }
+      : { model: validationModel, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false };
   }
   return {
     validationModel,
