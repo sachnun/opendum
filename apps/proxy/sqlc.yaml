@@ -9,6 +9,12 @@ packages:
     emit_pointers_for_null_types: true
     emit_empty_slices: true
     overrides:
+      - column: "custom_provider.extraHeaders"
+        go_type:
+          type: "map[string]string"
+      - column: "custom_provider_model.customFlags"
+        go_type:
+          type: "map[string]any"
       - db_type: "pg_catalog.int4"
         go_type: "int"
       - db_type: "pg_catalog.int4"
@@ -37,5 +43,7 @@ rename:
   proxyApiKeyId: ProxyAPIKeyID
   idToken: IDToken
   ipAddress: IPAddress
+  baseUrl: BaseURL
+  modelId: ModelID
   proxy_api_key: ProxyAPIKey
   proxy_api_key_rate_limit: ProxyAPIKeyRateLimit

@@ -12,9 +12,10 @@ func TestCompileCustomProviderHooks(t *testing.T) {
 		BaseURL:      "https://vllm.internal/v1",
 		ExtraHeaders: map[string]string{"x-tenant": "opendum"},
 	}
+	upstream := "Qwen/Qwen3-32B"
 	rows := []appdb.CustomProviderModel{
-		{ModelID: "qwen3-32b", Upstream: "Qwen/Qwen3-32B", Authless: true, CustomFlags: map[string]any{"responses_api": true, "top_p_deprecated": true, "convert_external_images": true}},
-		{ModelID: "plain", Upstream: ""},
+		{ModelID: "qwen3-32b", Upstream: &upstream, Authless: true, CustomFlags: map[string]any{"responses_api": true, "top_p_deprecated": true, "convert_external_images": true}},
+		{ModelID: "plain"},
 	}
 	compiled := CompileCustomProvider(provider, rows).(openAICompatibleProvider)
 	if got := compiled.normalizeModel("my-vllm/qwen3-32b"); got != "qwen3-32b" {

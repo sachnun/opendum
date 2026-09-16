@@ -45,9 +45,11 @@ func customValidationService(t *testing.T) *Service {
 		t.Fatalf("load registry: %v", err)
 	}
 	provider := db.CustomProvider{ID: "prov_1", UserID: "u1", Slug: "my-vllm", BaseURL: "https://vllm.internal/v1", Enabled: true}
+	qwenUpstream := "Qwen/Qwen3-32B"
+	localUpstream := "local/my-local-vlm"
 	rows := []db.CustomProviderModel{
-		{ID: "m_1", ProviderID: "prov_1", ModelID: "qwen3-32b", Upstream: "Qwen/Qwen3-32B"},
-		{ID: "m_2", ProviderID: "prov_1", ModelID: "my-local-vlm", Upstream: "local/my-local-vlm"},
+		{ID: "m_1", ProviderID: "prov_1", ModelID: "qwen3-32b", Upstream: &qwenUpstream},
+		{ID: "m_2", ProviderID: "prov_1", ModelID: "my-local-vlm", Upstream: &localUpstream},
 	}
 	reader := &fakeCustomProviderReader{
 		providers:  []db.CustomProvider{provider},

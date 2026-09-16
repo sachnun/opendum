@@ -15,10 +15,10 @@ func CompileCustomProvider(provider *appdb.CustomProvider, models []appdb.Custom
 	}
 	upstream := func(model string) string {
 		row, ok := byModel[model]
-		if !ok || strings.TrimSpace(row.Upstream) == "" {
+		if !ok || row.Upstream == nil || strings.TrimSpace(*row.Upstream) == "" {
 			return model
 		}
-		return row.Upstream
+		return *row.Upstream
 	}
 	flags := func(model string) map[string]any {
 		row, ok := byModel[model]

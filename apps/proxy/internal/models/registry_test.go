@@ -11,9 +11,9 @@ func TestCapabilityChecksDefaultToSupportedForMissingMetadata(t *testing.T) {
 	textMeta := &Modalities{Input: []string{"text"}}
 	reasoningFalse := false
 	registry := &Registry{effective: map[string]Info{
-		"no-meta":     {},
-		"text-only":   {Modalities: textMeta},
-		"vision":      {Modalities: visionMeta},
+		"no-meta":       {},
+		"text-only":     {Modalities: textMeta},
+		"vision":        {Modalities: visionMeta},
 		"reasoning-off": {Reasoning: &reasoningFalse},
 	}}
 

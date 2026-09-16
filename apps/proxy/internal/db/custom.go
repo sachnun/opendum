@@ -3,35 +3,9 @@ package db
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 )
-
-type CustomProvider struct {
-	ID           string
-	UserID       string
-	Slug         string
-	Name         string
-	BaseURL      string
-	ExtraHeaders map[string]string
-	Enabled      bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
-
-type CustomProviderModel struct {
-	ID           string
-	ProviderID   string
-	ModelID      string
-	Upstream     string
-	Authless     bool
-	MinTier      string
-	AllowedTiers []string
-	CustomFlags  map[string]any
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-}
 
 func (d *DB) ListCustomProviders(ctx context.Context, userID string) ([]CustomProvider, error) {
 	if d == nil || d.Pool == nil {
@@ -93,12 +67,8 @@ func (d *DB) ListCustomProviderModels(ctx context.Context, providerID string) ([
 		if err := rows.Scan(&row.ID, &row.ProviderID, &row.ModelID, &upstream, &row.Authless, &minTier, &row.AllowedTiers, &flags, &row.CreatedAt, &row.UpdatedAt); err != nil {
 			return nil, err
 		}
-		if upstream != nil {
-			row.Upstream = *upstream
-		}
-		if minTier != nil {
-			row.MinTier = *minTier
-		}
+		row.Upstream = upstream
+		row.MinTier = minTier
 		if len(flags) > 0 {
 			_ = json.Unmarshal(flags, &row.CustomFlags)
 		}

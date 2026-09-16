@@ -149,7 +149,11 @@ func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel 
 		result := ModelValidationResult{Valid: true, Provider: &provider, Model: slug + "/" + rawModel}
 		vision := true
 		if s.registry != nil {
-			for _, candidate := range []string{row.Upstream, row.ModelID} {
+			candidates := []string{row.ModelID}
+			if row.Upstream != nil {
+				candidates = append([]string{*row.Upstream}, candidates...)
+			}
+			for _, candidate := range candidates {
 				if candidate == "" {
 					continue
 				}
