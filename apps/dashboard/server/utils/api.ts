@@ -20,7 +20,7 @@ export interface ActorUser {
 export interface RequestContext {
   actor: ActorUser;
   role: UserRole;
-  isMaintener: boolean;
+  isMaintainer: boolean;
   userId: string;
   auditUser: ActorUser | null;
   isAuditMode: boolean;
@@ -59,9 +59,9 @@ export function clearAuditUserCookie(event: H3Event) {
   deleteCookie(event, AUDIT_COOKIE_NAME, auditCookieOptions());
 }
 
-async function getAuditTargetUser(event: H3Event, actorId: string, isMaintener: boolean): Promise<ActorUser | null> {
+async function getAuditTargetUser(event: H3Event, actorId: string, isMaintainer: boolean): Promise<ActorUser | null> {
   const auditUserId = getCookie(event, AUDIT_COOKIE_NAME)?.trim();
-  if (!auditUserId || !isMaintener) return null;
+  if (!auditUserId || !isMaintainer) return null;
 
   if (auditUserId === actorId) {
     clearAuditUserCookie(event);
@@ -86,23 +86,23 @@ export async function requireContext(event: H3Event): Promise<RequestContext> {
   const session = await requireSession(event);
   const role = roleForEmail(session.user.email);
   const actor = toActorUser(session.user);
-  const isMaintener = role === "maintener";
-  const auditUser = await getAuditTargetUser(event, actor.id, isMaintener);
+  const isMaintainer = role === "maintainer";
+  const auditUser = await getAuditTargetUser(event, actor.id, isMaintainer);
 
   return {
     actor,
     role,
-    isMaintener,
+    isMaintainer,
     userId: auditUser?.id ?? actor.id,
     auditUser,
     isAuditMode: Boolean(auditUser),
   };
 }
 
-export async function requireMaintenerContext(event: H3Event): Promise<RequestContext> {
+export async function requireMaintainerContext(event: H3Event): Promise<RequestContext> {
   const context = await requireContext(event);
-  if (!context.isMaintener) {
-    throw createError({ statusCode: 403, statusMessage: "Maintener access required" });
+  if (!context.isMaintainer) {
+    throw createError({ statusCode: 403, statusMessage: "Maintainer access required" });
   }
 
   return context;

@@ -2,13 +2,13 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { z } from "zod";
 
-import { parseBody, requireMaintenerContext, setAuditUserCookie } from "../../../../utils/api";
+import { parseBody, requireMaintainerContext, setAuditUserCookie } from "../../../../utils/api";
 import { db, user } from "@opendum/database";
 
 const startAuditInputSchema = z.object({ userId: z.string().min(1) });
 
 export default defineEventHandler(async (event) => {
-  const context = await requireMaintenerContext(event);
+  const context = await requireMaintainerContext(event);
   const input = await parseBody(event, startAuditInputSchema);
 
   if (input.userId === context.actor.id) {

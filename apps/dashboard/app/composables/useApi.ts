@@ -8,8 +8,8 @@ import type {
   AnalyticsFilter,
   AnalyticsSeriesData,
   MeData,
-  MaintenerAuditUser,
-  MaintenerAuditUserListResult,
+  MaintainerAuditUser,
+  MaintainerAuditUserListResult,
   AccountQuotaBatchRequest,
   ApiKeyListItem,
   ApiKeyOptions,
@@ -140,13 +140,13 @@ export function useApi() {
       options: () => apiFetch<PlaygroundOptions>("/api/dashboard/playground/options"),
       auth: (body: { endpoint: PlaygroundEndpoint }) => post<PlaygroundProxyAuth>(apiFetch, "/api/dashboard/playground/auth", body),
     },
-    maintener: {
+    maintainer: {
       users: {
-        search: (query?: { q?: string; offset?: number; limit?: number }) => apiFetch<MaintenerAuditUserListResult>("/api/dashboard/maintener/users/search", { query }),
+        search: (query?: { q?: string; offset?: number; limit?: number }) => apiFetch<MaintainerAuditUserListResult>("/api/dashboard/maintainer/users/search", { query }),
       },
       audit: {
-        start: (body: { userId: string }) => post<ActionResult<{ user: MaintenerAuditUser }>>(apiFetch, "/api/dashboard/maintener/audit/start", body),
-        stop: () => post<ActionResult>(apiFetch, "/api/dashboard/maintener/audit/stop"),
+        start: (body: { userId: string }) => post<ActionResult<{ user: MaintainerAuditUser }>>(apiFetch, "/api/dashboard/maintainer/audit/start", body),
+        stop: () => post<ActionResult>(apiFetch, "/api/dashboard/maintainer/audit/stop"),
       },
     },
   };

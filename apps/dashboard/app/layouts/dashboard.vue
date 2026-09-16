@@ -106,7 +106,7 @@ const accountsNavigationHref = "/";
 const { data: accountsOverviewData } = useNuxtData<AccountOverviewData>(dataKeys.accountsOverview);
 
 const { data: me } = useCachedData(dataKeys.me, () => api.me.get(), {
-  default: () => ({ role: "user" as const, isMaintener: false }),
+  default: () => ({ role: "user" as const, isMaintainer: false }),
 });
 const { auditUser, me: meState, isAuditMode, refreshAfterAuditChange } = useAudit();
 meState.value = me.value ?? null;
@@ -114,7 +114,7 @@ watch(me, (value) => {
   meState.value = value ?? null;
   invalidation.patchApiKeyRoamingPoints(value?.points?.roamingPointsByApiKeyId ?? {});
 }, { immediate: true });
-const isMaintener = computed(() => me.value?.isMaintener ?? false);
+const isMaintainer = computed(() => me.value?.isMaintainer ?? false);
 const pointBalance = computed(() => (me.value as MeData | null | undefined)?.points?.balance ?? 0);
 const formattedPointBalance = computed(() => pointBalance.value.toLocaleString("en-US"));
 const auditUserLabel = computed(() => auditUser.value?.name || auditUser.value?.email || "Audit user");
@@ -793,7 +793,7 @@ onBeforeUnmount(() => {
 
 async function handleSignOut() {
   if (isAuditMode.value) {
-    await api.maintener.audit.stop();
+    await api.maintainer.audit.stop();
     userMenuOpen.value = false;
     await refreshAfterAuditChange();
     return;
@@ -826,7 +826,7 @@ async function handleAuditSelected() {
           </span>
           <span class="inline-flex items-center gap-2 text-base font-semibold tracking-tight">
             Opendum
-            <span v-if="isMaintener" class="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
+            <span v-if="isMaintainer" class="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
               dev
             </span>
           </span>
@@ -1137,7 +1137,7 @@ async function handleAuditSelected() {
                       class="group flex w-full cursor-pointer items-center gap-3 rounded-sm px-2 py-1.5 text-left text-sm font-medium text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                       @click="pointMenuOpen = !pointMenuOpen"
                     >
-                      <span class="min-w-0 flex-1">Point</span>
+                      <span class="min-w-0 flex-1">Points</span>
                       <UiIcon name="i-lucide-chevron-down" :class="['size-3.5 transition-transform', pointMenuOpen ? 'rotate-0' : '-rotate-90']" />
                     </button>
                     <div v-if="pointMenuOpen" class="ml-3 space-y-1 border-l border-border/60 pl-3">
@@ -1166,7 +1166,7 @@ async function handleAuditSelected() {
                     </div>
                   </div>
                   <button
-                    v-if="isMaintener && !isAuditMode"
+                    v-if="isMaintainer && !isAuditMode"
                     type="button"
                     class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                     @click="openAuditDialog"
@@ -1219,7 +1219,7 @@ async function handleAuditSelected() {
               </span>
               <span class="inline-flex items-center gap-2">
                 Opendum
-                <span v-if="isMaintener" class="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
+                <span v-if="isMaintainer" class="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
                   dev
                 </span>
               </span>
@@ -1463,6 +1463,6 @@ async function handleAuditSelected() {
       </template>
     </UiDialog>
 
-    <MaintenerAuditDialog v-model:open="auditDialogOpen" @selected="handleAuditSelected" />
+    <MaintainerAuditDialog v-model:open="auditDialogOpen" @selected="handleAuditSelected" />
   </div>
 </template>

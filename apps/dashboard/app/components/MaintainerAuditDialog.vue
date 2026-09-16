@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { MaintenerAuditSearchUser, MaintenerAuditUser } from "../../lib/api-types";
+import type { MaintainerAuditSearchUser, MaintainerAuditUser } from "../../lib/api-types";
 import { avatarUrl } from "../../lib/utils";
 
 const open = defineModel<boolean>("open", { default: false });
 
 const emit = defineEmits<{
-  selected: [user: MaintenerAuditUser];
+  selected: [user: MaintainerAuditUser];
 }>();
 
 const api = useApi();
@@ -13,7 +13,7 @@ const PAGE_SIZE = 12;
 const SCROLL_LOAD_THRESHOLD = 48;
 
 const query = ref("");
-const users = ref<MaintenerAuditSearchUser[]>([]);
+const users = ref<MaintainerAuditSearchUser[]>([]);
 const isSearching = ref(false);
 const isLoadingMore = ref(false);
 const hasMore = ref(false);
@@ -23,7 +23,7 @@ const errorMessage = ref("");
 let searchRequestId = 0;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-function userInitial(user: MaintenerAuditSearchUser) {
+function userInitial(user: MaintainerAuditSearchUser) {
   return (user.name?.[0] || user.email?.[0] || "U").toUpperCase();
 }
 
@@ -64,7 +64,7 @@ async function loadUsers(requestId: number, append = false) {
   errorMessage.value = "";
 
   try {
-    const result = await api.maintener.users.search({
+    const result = await api.maintainer.users.search({
       q: normalizedQuery || undefined,
       offset: append ? nextOffset.value : 0,
       limit: PAGE_SIZE,
@@ -140,12 +140,12 @@ onBeforeUnmount(() => {
   clearSearchTimer();
 });
 
-async function selectUser(user: MaintenerAuditSearchUser) {
+async function selectUser(user: MaintainerAuditSearchUser) {
   selectingUserId.value = user.id;
   errorMessage.value = "";
 
   try {
-    const result = await api.maintener.audit.start({ userId: user.id });
+    const result = await api.maintainer.audit.start({ userId: user.id });
     if (!result.success) throw new Error(result.error);
     open.value = false;
     emit("selected", result.data.user);

@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
 
   return {
     role: context.role,
-    isMaintener: context.isMaintener,
+    isMaintainer: context.isMaintainer,
     points: {
       balance: pointStatus.balance,
       roamingPointsByApiKeyId: pointStatus.roamingPointsByApiKeyId,

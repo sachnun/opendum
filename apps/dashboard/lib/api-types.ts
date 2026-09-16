@@ -9,7 +9,7 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-type UserRole = "user" | "maintener";
+type UserRole = "user" | "maintainer";
 
 interface UserIdentity {
   id: string;
@@ -26,7 +26,7 @@ export interface AuditInfo {
 
 export interface MeData {
   role: UserRole;
-  isMaintener: boolean;
+  isMaintainer: boolean;
   points?: {
     balance: number;
     roamingPointsByApiKeyId?: Record<string, number>;
@@ -43,15 +43,15 @@ export interface PointStatusData {
   roamingPointsByApiKeyId: Record<string, number>;
 }
 
-export type MaintenerAuditUser = UserIdentity;
+export type MaintainerAuditUser = UserIdentity;
 
-export type MaintenerAuditSearchUser = UserIdentity & {
+export type MaintainerAuditSearchUser = UserIdentity & {
   hasProviderIssue: boolean;
   lastUsedAt: string | Date | null;
 };
 
-export interface MaintenerAuditUserListResult {
-  users: MaintenerAuditSearchUser[];
+export interface MaintainerAuditUserListResult {
+  users: MaintainerAuditSearchUser[];
   hasMore: boolean;
   nextOffset: number;
 }

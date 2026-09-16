@@ -175,7 +175,7 @@ const resolvingErrors = ref(false);
 const copiedErrorDetails = ref(false);
 const copiedAllErrors = ref(false);
 const copiedErrorPreview = ref(false);
-const isMaintener = computed(() => import.meta.dev || (me.value?.isMaintener ?? false));
+const isMaintainer = computed(() => import.meta.dev || (me.value?.isMaintainer ?? false));
 const copiedSession = ref(false);
 const sessionLoading = ref(false);
 const statHitEffects = ref<Record<string, StatHitEffect>>({});
@@ -1197,7 +1197,7 @@ function cancelErrorPreviewPointer() {
                 <UiButton variant="outline" size="sm"><UiIcon name="i-lucide-flask-conical" class="size-3" /></UiButton>
               </NuxtLink>
             </UiTooltip>
-            <UiTooltip v-if="isMaintener" :text="sessionLoading ? 'Fetching session...' : copiedSession ? 'Copied' : 'Copy session'">
+            <UiTooltip v-if="isMaintainer" :text="sessionLoading ? 'Fetching session...' : copiedSession ? 'Copied' : 'Copy session'">
               <UiButton type="button" variant="outline" size="sm" :disabled="readonly || sessionLoading" :aria-label="`Copy session for ${accountTitle}`" @click="copySession">
                 <UiIcon :name="sessionLoading ? 'i-lucide-loader-2' : copiedSession ? 'i-lucide-check' : 'i-lucide-key-round'" :class="sessionLoading ? 'size-3 animate-spin' : 'size-3'" />
               </UiButton>

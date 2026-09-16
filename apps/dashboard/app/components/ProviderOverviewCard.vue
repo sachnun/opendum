@@ -25,7 +25,7 @@ const pendingStatBaselineContextKey = ref<string | null>(null);
 
 function indicatorBadge(indicator: string) {
   if (indicator === "error") return { label: "Issue", class: "border-destructive/60 text-destructive" };
-  if (indicator === "warning") return { label: "Unhealty", class: "border-yellow-500 text-yellow-600" };
+  if (indicator === "warning") return { label: "Unhealthy", class: "border-yellow-500 text-yellow-600" };
   return { label: "Healthy", class: "border-green-500 text-green-600" };
 }
 
