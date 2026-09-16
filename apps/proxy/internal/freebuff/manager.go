@@ -343,7 +343,7 @@ func (m *Manager) refreshSession(ctx context.Context, state *accountState, token
 			}
 		case statusDisabled:
 			return nil, &sessionBlockedError{status: string(statusDisabled)}
-		case statusModelUnavailable, statusRateLimited, statusSpendLimited, statusIPCapped, statusCountryBlocked, statusBanned:
+		case statusModelUnavailable, statusRateLimited, statusSpendLimited, statusIPCapped, statusCountryBlocked, statusBanned, statusConsentRequired, statusSessionLimitReached:
 			blocked := &sessionBlockedError{status: string(sessionStatus(strings.TrimSpace(stateResponse.Status))), retryAfter: stateResponse.retryAfter}
 			if cooldown := blocked.cooldown(); cooldown > 0 {
 				state.cooldownUntil = time.Now().Add(cooldown)

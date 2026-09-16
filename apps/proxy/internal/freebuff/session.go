@@ -11,19 +11,21 @@ import (
 type sessionStatus string
 
 const (
-	statusDisabled         sessionStatus = "disabled"
-	statusNone             sessionStatus = "none"
-	statusQueued           sessionStatus = "queued"
-	statusActive           sessionStatus = "active"
-	statusEnded            sessionStatus = "ended"
-	statusSuperseded       sessionStatus = "superseded"
-	statusModelLocked      sessionStatus = "model_locked"
-	statusModelUnavailable sessionStatus = "model_unavailable"
-	statusRateLimited      sessionStatus = "rate_limited"
-	statusSpendLimited     sessionStatus = "spend_limited"
-	statusIPCapped         sessionStatus = "ip_capped"
-	statusCountryBlocked   sessionStatus = "country_blocked"
-	statusBanned           sessionStatus = "banned"
+	statusDisabled            sessionStatus = "disabled"
+	statusNone                sessionStatus = "none"
+	statusQueued              sessionStatus = "queued"
+	statusActive              sessionStatus = "active"
+	statusEnded               sessionStatus = "ended"
+	statusSuperseded          sessionStatus = "superseded"
+	statusModelLocked         sessionStatus = "model_locked"
+	statusModelUnavailable    sessionStatus = "model_unavailable"
+	statusConsentRequired     sessionStatus = "consent_required"
+	statusSessionLimitReached sessionStatus = "session_limit_reached"
+	statusRateLimited         sessionStatus = "rate_limited"
+	statusSpendLimited        sessionStatus = "spend_limited"
+	statusIPCapped            sessionStatus = "ip_capped"
+	statusCountryBlocked      sessionStatus = "country_blocked"
+	statusBanned              sessionStatus = "banned"
 )
 
 const (
@@ -103,6 +105,8 @@ func (e *sessionBlockedError) cooldown() time.Duration {
 		return countryBlockedCooldown
 	case string(statusModelLocked), string(statusModelUnavailable):
 		return modelUnavailableCooldown
+	case string(statusSessionLimitReached):
+		return dailyQuotaCooldown
 	default:
 		return 0
 	}

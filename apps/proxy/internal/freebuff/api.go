@@ -37,7 +37,7 @@ func Classify(err error) (*Error, bool) {
 		switch blocked.status {
 		case string(statusCountryBlocked), string(statusBanned):
 			status = http.StatusForbidden
-		case string(statusModelLocked):
+		case string(statusModelLocked), string(statusModelUnavailable), string(statusConsentRequired), string(statusSessionLimitReached):
 			status = http.StatusConflict
 		}
 		return &Error{Status: status, Message: blocked.Error(), RetryAfter: blocked.cooldown()}, true

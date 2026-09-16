@@ -9,9 +9,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 const defaultBaseURL = "https://www.codebuff.com"
+
+const (
+	sessionPath           = "/api/v1/freebuff/session"
+	admissionPath         = "/api/v1/freebuff/session/admission"
+	sessionRequestTimeout = 20 * time.Second
+)
 
 type Client struct {
 	baseURL string
@@ -134,19 +141,48 @@ func (c *Client) Chat(ctx context.Context, token, userID string, body []byte) (*
 }
 
 func (c *Client) sessionRequest(ctx context.Context, method, token, userID, instanceID, model string) (freeSessionResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, sessionRequestTimeout)
+	defer cancel()
+
+	path := sessionPath
+	if method == http.MethodPost {
+		path = admissionPath
+	}
+	resp, responseBody, err := c.doSession(ctx, method, path, token, userID, instanceID, model)
+	if err != nil {
+		return freeSessionResponse{}, err
+	}
+	if method == http.MethodPost && sessionPathUnsupported(resp.StatusCode) {
+		resp, responseBody, err = c.doSession(ctx, method, sessionPath, token, userID, instanceID, model)
+		if err != nil {
+			return freeSessionResponse{}, err
+		}
+		if sessionPathUnsupported(resp.StatusCode) {
+			return freeSessionResponse{}, &sessionRequestError{statusCode: resp.StatusCode, body: []byte("free session admission is not supported by this upstream")}
+		}
+	}
+	return decodeSessionResponse(method, resp, responseBody)
+}
+
+func sessionPathUnsupported(statusCode int) bool {
+	return statusCode == http.StatusNotFound || statusCode == http.StatusMethodNotAllowed
+}
+
+func (c *Client) doSession(ctx context.Context, method, path, token, userID, instanceID, model string) (*http.Response, []byte, error) {
 	var body []byte
 	if method == http.MethodPost {
 		body = []byte("{}")
 	}
-	req, err := c.newRequest(ctx, method, "/api/v1/freebuff/session", body, token, userID, false)
+	req, err := c.newRequest(ctx, method, path, body, token, userID, false)
 	if err != nil {
-		return freeSessionResponse{}, err
+		return nil, nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", clientUserAgent)
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-freebuff-wallet-spend-limit", "0")
 		if strings.TrimSpace(model) != "" {
 			req.Header.Set("x-freebuff-model", strings.TrimSpace(model))
 		}
@@ -158,16 +194,19 @@ func (c *Client) sessionRequest(ctx context.Context, method, token, userID, inst
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return freeSessionResponse{}, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return freeSessionResponse{Status: string(statusDisabled)}, nil
-	}
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return freeSessionResponse{}, err
+		return nil, nil, err
+	}
+	return resp, responseBody, nil
+}
+
+func decodeSessionResponse(method string, resp *http.Response, responseBody []byte) (freeSessionResponse, error) {
+	if resp.StatusCode == http.StatusNotFound {
+		return freeSessionResponse{Status: string(statusNone)}, nil
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var parsed freeSessionResponse
@@ -181,7 +220,7 @@ func (c *Client) sessionRequest(ctx context.Context, method, token, userID, inst
 			case http.StatusConflict, http.StatusTooManyRequests:
 				if method == http.MethodPost {
 					switch sessionStatus(parsed.Status) {
-					case statusModelLocked, statusModelUnavailable, statusRateLimited, statusSpendLimited, statusIPCapped:
+					case statusModelLocked, statusModelUnavailable, statusRateLimited, statusSpendLimited, statusIPCapped, statusConsentRequired, statusSessionLimitReached:
 						parsed.retryAfter = parseRetryAfter(resp.Header)
 						return parsed, nil
 					}

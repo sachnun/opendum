@@ -399,3 +399,114 @@ func TestCooldownIgnoresNonPositiveDuration(t *testing.T) {
 		t.Fatalf("snapshot status = %q, want idle", snap.Status)
 	}
 }
+
+func newSessionTestClient(t *testing.T, handler http.HandlerFunc) *Client {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	return &Client{baseURL: server.URL, http: server.Client()}
+}
+
+func TestSessionPostUsesAdmissionPath(t *testing.T) {
+	var paths, wallet []string
+	client := newSessionTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		wallet = append(wallet, r.Header.Get("x-freebuff-wallet-spend-limit"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"active","instanceId":"inst_1","model":"m"}`))
+	})
+
+	session, err := client.CreateOrRefreshSession(context.Background(), "token", "user", "m")
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	if session.Status != string(statusActive) || session.InstanceID != "inst_1" {
+		t.Fatalf("session = %#v", session)
+	}
+	if len(paths) != 1 || paths[0] != "POST "+admissionPath {
+		t.Fatalf("paths = %v, want POST %s", paths, admissionPath)
+	}
+	if wallet[0] != "0" {
+		t.Fatalf("wallet header = %q, want 0", wallet[0])
+	}
+}
+
+func TestSessionPostFallsBackToLegacyPath(t *testing.T) {
+	var paths []string
+	client := newSessionTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		if r.URL.Path == admissionPath {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"active","instanceId":"inst_2","model":"m"}`))
+	})
+
+	session, err := client.CreateOrRefreshSession(context.Background(), "token", "user", "m")
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	if session.InstanceID != "inst_2" {
+		t.Fatalf("session = %#v", session)
+	}
+	want := []string{"POST " + admissionPath, "POST " + sessionPath}
+	if len(paths) != 2 || paths[0] != want[0] || paths[1] != want[1] {
+		t.Fatalf("paths = %v, want %v", paths, want)
+	}
+}
+
+func TestSessionPostUnsupportedReportsError(t *testing.T) {
+	client := newSessionTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
+
+	_, err := client.CreateOrRefreshSession(context.Background(), "token", "user", "m")
+	var requestErr *sessionRequestError
+	if !errors.As(err, &requestErr) {
+		t.Fatalf("error = %v, want sessionRequestError", err)
+	}
+	if apiErr, ok := Classify(err); !ok || apiErr.Status != http.StatusMethodNotAllowed {
+		t.Fatalf("classify = %#v, ok=%v", apiErr, ok)
+	}
+}
+
+func TestSessionGetNotFoundIsNone(t *testing.T) {
+	client := newSessionTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != sessionPath {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	session, err := client.GetSession(context.Background(), "token", "user", "inst_1")
+	if err != nil {
+		t.Fatalf("get session: %v", err)
+	}
+	if session.Status != string(statusNone) {
+		t.Fatalf("status = %q, want %q", session.Status, statusNone)
+	}
+}
+
+func TestSessionStatusClassification(t *testing.T) {
+	cases := []struct {
+		status   sessionStatus
+		wantCode int
+		wantWait time.Duration
+	}{
+		{statusConsentRequired, http.StatusConflict, 0},
+		{statusSessionLimitReached, http.StatusConflict, dailyQuotaCooldown},
+		{statusModelUnavailable, http.StatusConflict, modelUnavailableCooldown},
+		{statusRateLimited, http.StatusTooManyRequests, rateLimitCooldown},
+		{statusCountryBlocked, http.StatusForbidden, countryBlockedCooldown},
+	}
+	for _, tc := range cases {
+		apiErr, ok := Classify(&sessionBlockedError{status: string(tc.status)})
+		if !ok {
+			t.Fatalf("status %q did not classify", tc.status)
+		}
+		if apiErr.Status != tc.wantCode || apiErr.RetryAfter != tc.wantWait {
+			t.Fatalf("status %q -> %d/%v, want %d/%v", tc.status, apiErr.Status, apiErr.RetryAfter, tc.wantCode, tc.wantWait)
+		}
+	}
+}
