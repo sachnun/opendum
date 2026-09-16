@@ -1,8 +1,6 @@
 {
   "owner": "openai",
-  "providers": [
-    "freebuff"
-  ],
+  "providers": [],
   "modalities": {
     "input": [
       "image",
@@ -24,13 +22,5 @@
   "limit": {
     "context": 1050000,
     "output": 128000
-  },
-  "providerConfig": {
-    "freebuff": {
-      "upstream": "openai/gpt-5.6-luna-es",
-      "contextWindow": 1050000,
-      "maxOutputTokens": 128000,
-      "agent": "base2-free-luna-es"
-    }
   }
 }

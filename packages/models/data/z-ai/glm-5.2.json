@@ -5,8 +5,7 @@
     "workbuddy",
     "perch",
     "kilo_code",
-    "openrouter",
-    "freebuff"
+    "openrouter"
   ],
   "meta": {
     "reasoning": true,
@@ -34,12 +33,6 @@
     "output": 131072
   },
   "providerConfig": {
-    "freebuff": {
-      "upstream": "z-ai/glm-5.2",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072,
-      "agent": "base2-free-glm"
-    },
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 32768

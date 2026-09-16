@@ -66,6 +66,37 @@ function makeResolver({ exprs, members }) {
   return resolveName;
 }
 
+function parseRowIds(source, resolveName) {
+  const rows = new Map();
+  const declaration = /^const ([A-Za-z0-9_]+_MODEL)\s*=\s*\{/gm;
+  let match;
+  while ((match = declaration.exec(source)) !== null) {
+    const end = source.indexOf("\n}", match.index);
+    const block = source.slice(match.index, end === -1 ? source.length : end);
+    const id = block.match(/\bid:\s*([^,\n]+)/);
+    if (!id) continue;
+    const modelId = resolveName(id[1].trim());
+    if (modelId) rows.set(match[1], modelId);
+  }
+  return rows;
+}
+
+function parseArrayBody(source, name) {
+  const start = source.indexOf(`export const ${name}`);
+  if (start === -1) return null;
+  const open = source.indexOf("[", start);
+  if (open === -1) return null;
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === "[") depth++;
+    else if (source[i] === "]") {
+      depth--;
+      if (depth === 0) return source.slice(open + 1, i);
+    }
+  }
+  return null;
+}
+
 function parseRootAgentByModel(source, resolveName) {
   const start = source.indexOf("FREEBUFF_ROOT_AGENT_ID_BY_MODEL");
   if (start === -1) throw new Error("FREEBUFF_ROOT_AGENT_ID_BY_MODEL not found");
@@ -101,13 +132,35 @@ async function main() {
 
   const byModel = parseRootAgentByModel(agentsSource, resolveName);
   if (byModel.size === 0) throw new Error("Codebuff free root agent map is empty");
-  if (byModel.size < MIN_EXPECTED_MODELS) {
-    console.warn(`Freebuff root agent map has only ${byModel.size} models (expected >= ${MIN_EXPECTED_MODELS})`);
+
+  const rows = new Map();
+  for (const source of constantSources) {
+    for (const [name, modelId] of parseRowIds(source, resolveName)) rows.set(name, modelId);
+  }
+  const catalogSource = constantSources.find((source) => source.includes("export const FREEBUFF_MODELS"));
+  const catalogBody = catalogSource ? parseArrayBody(catalogSource, "FREEBUFF_MODELS") : null;
+  const accessible = new Set();
+  if (catalogBody) {
+    for (const match of catalogBody.matchAll(/\b([A-Za-z0-9_]+_MODEL)\b/g)) {
+      const modelId = rows.get(match[1]);
+      if (modelId) accessible.add(modelId);
+    }
+  }
+  if (accessible.size === 0) throw new Error("Codebuff freebuff picker catalog is empty");
+
+  const unsupported = [...byModel.keys()].filter((modelId) => !accessible.has(modelId));
+  if (unsupported.length > 0) {
+    console.log(`Freebuff: skipping ${unsupported.length} models outside the upstream picker catalog (${unsupported.join(", ")}).`);
+  }
+  if (accessible.size < MIN_EXPECTED_MODELS) {
+    console.warn(`Freebuff picker catalog has only ${accessible.size} models (expected >= ${MIN_EXPECTED_MODELS})`);
   }
 
   const modelMap = new Map();
   const providerConfigByModel = new Map();
-  for (const [modelId, agent] of byModel) {
+  for (const modelId of accessible) {
+    const agent = byModel.get(modelId);
+    if (!agent) continue;
     const modelKey = toModelKey(modelId);
     modelMap.set(modelKey, modelId);
     providerConfigByModel.set(modelKey, { upstream: modelId, agent });
