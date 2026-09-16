@@ -15,6 +15,7 @@ import { clearRefreshFailCount } from "../lib/proxy/auth";
 import type { OAuthResult } from "../lib/providers/types";
 import { DEVICE_PROVIDER_KEYS, OAUTH_PROVIDER_KEYS, type DeviceProviderKey, type OAuthProviderKey } from "../../lib/provider-accounts";
 import type { ActionResult } from "../utils/api";
+import { trackProviderEmail } from "./points";
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
@@ -194,11 +195,13 @@ async function upsertOAuthAccount(userId: string, provider: ProviderAccountKey, 
     const resolvedEmail = oauthResult.email && email === oauthResult.email ? oauthResult.email : existingAccount.email || email;
     await db.update(providerAccount).set({ accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email: resolvedEmail, ...(oauthResult.projectId ? { projectId: oauthResult.projectId } : {}), ...(oauthResult.tier ? { tier: oauthResult.tier } : {}), ...(accountId ? { accountId } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
     await clearRefreshFailCount(existingAccount.id);
+    await trackProviderEmail(userId, resolvedEmail);
     return { success: true, data: { email: resolvedEmail, isUpdate: true } };
   }
 
   const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, provider)));
   await db.insert(providerAccount).values({ userId, provider, name: `${label} ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(oauthResult.accessToken), refreshToken: encryptOptionalRefreshToken(oauthResult.refreshToken), expiresAt: oauthResult.expiresAt, email, projectId: oauthResult.projectId, tier: oauthResult.tier, accountId, isActive: true });
+  await trackProviderEmail(userId, email);
   return { success: true, data: { email, isUpdate: false } };
 }
 

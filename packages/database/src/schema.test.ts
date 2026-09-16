@@ -128,6 +128,8 @@ function parseSql(statements: string[]): ParsedSchema {
   const parsed: ParsedSchema = { tables: new Map(), indexes: new Map(), foreignKeys: new Map() };
 
   for (const statement of statements) {
+    if (/^INSERT INTO /.test(statement)) continue;
+
     const createTable = statement.match(/^CREATE TABLE "([^"]+)" \(([\s\S]*)\)$/);
     if (createTable) {
       parseCreateTable(createTable[1], createTable[2], parsed);

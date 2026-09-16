@@ -9,6 +9,8 @@ export const userPointBalance = pgTable("user_point_balance", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   balance: integer("balance").notNull().default(15),
+  rewardsExcluded: boolean("rewardsExcluded").notNull().default(false),
+  rewardsExcludedReason: text("rewardsExcludedReason"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt")
     .notNull()

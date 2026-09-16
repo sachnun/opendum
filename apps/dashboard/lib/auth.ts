@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth, type GenericOAuthConfig } from "better-auth/plugins/generic-oauth";
 import { db as defaultDb, schema, type Database } from "@opendum/database";
+import { ensureUserPointBalance } from "../server/services/points";
 
 const DEV_GITHUB_CLIENT_ID = "opendum-github-dev";
 const DEV_GITHUB_CLIENT_SECRET = "opendum-github-secret";
@@ -89,6 +90,19 @@ export function createAuth(db: Database = defaultDb) {
     advanced: {
       ipAddress: {
         ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (createdUser) => {
+            try {
+              await ensureUserPointBalance(createdUser.id);
+            } catch (error) {
+              console.error("Failed to initialize point balance:", error);
+            }
+          },
+        },
       },
     },
     emailAndPassword: {
