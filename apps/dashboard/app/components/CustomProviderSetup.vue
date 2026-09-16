@@ -52,18 +52,19 @@ const slug = computed(() => host.value
 
 const canCreate = computed(() => name.value.trim() !== "" && baseUrl.value.trim() !== "" && /^[a-z]/.test(slug.value));
 const filledModels = computed(() => models.value.filter((row) => row.model.trim() !== ""));
+const saving = computed(() => busy.value === "create" || busy.value === "connect" || busy.value === "models");
 
 watch(headers, (rows) => {
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].key.trim() === "" && rows[index].value.trim() === "") rows.splice(index, 1);
+    if (rows[index].key.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
-  if (!last || last.key.trim() !== "" || last.value.trim() !== "") rows.push({ key: "", value: "" });
+  if (!last || last.key.trim() !== "") rows.push({ key: "", value: "" });
 }, { deep: true });
 
 watch(models, (rows) => {
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].model.trim() === "" && rows[index].alias.trim() === "") rows.splice(index, 1);
+    if (rows[index].model.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
   if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "" });
@@ -251,7 +252,7 @@ function next() {
         Back
       </UiButton>
       <UiButton type="button" variant="ghost" class="ml-auto" :disabled="busy !== '' || (step === 1 && !canCreate) || (step === 2 && apiKey.trim() === '')" @click="next">
-        {{ step === 1 ? "Next" : busy !== "" ? "Saving…" : "Finish" }}
+        {{ step === 1 ? "Next" : saving ? "Saving…" : "Finish" }}
         <UiIcon name="i-lucide-arrow-right" class="size-4" />
       </UiButton>
     </div>

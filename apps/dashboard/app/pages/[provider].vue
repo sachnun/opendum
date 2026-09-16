@@ -841,16 +841,16 @@ function openSettings() {
 watch(() => settingsForm.value?.headers, (rows) => {
   if (!rows) return;
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].key.trim() === "" && rows[index].value.trim() === "") rows.splice(index, 1);
+    if (rows[index].key.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
-  if (!last || last.key.trim() !== "" || last.value.trim() !== "") rows.push({ key: "", value: "" });
+  if (!last || last.key.trim() !== "") rows.push({ key: "", value: "" });
 }, { deep: true });
 
 watch(() => settingsForm.value?.models, (rows) => {
   if (!rows) return;
   for (let index = rows.length - 2; index >= 0; index--) {
-    if (rows[index].model.trim() === "" && rows[index].alias.trim() === "") rows.splice(index, 1);
+    if (rows[index].model.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
   if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "" });

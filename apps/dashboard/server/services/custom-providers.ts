@@ -2,7 +2,7 @@ import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, customProvider, customProviderModel, providerAccount } from "@opendum/database";
-import { aliasesFromUpstream, stripParamInfoKey } from "@opendum/models/clean-key";
+import { stripParamInfoKey } from "@opendum/models/clean-key";
 import { buildModelIdMap } from "@opendum/models/registry";
 import { decrypt, encrypt, hashString } from "../lib/encryption";
 import { fetchInternalProvider, InternalRelayNotConfiguredError } from "../lib/proxy/internal-relay";
@@ -313,7 +313,8 @@ function toModelKey(upstream: string): string {
   const slug = basename
     .replace(/[:/]/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .replace(/-{2,}/g, "-");
+    .replace(/-{2,}/g, "-")
+    .toLowerCase();
   const cleaned = stripParamInfoKey(slug);
   return cleaned.endsWith("-free") ? cleaned.slice(0, -"-free".length) : cleaned;
 }
@@ -324,14 +325,7 @@ function toModelKey(upstream: string): string {
  * the base key, older ones get a `-<date>` key), matching `@opendum/models`.
  */
 function cleanCustomModels(upstreamIds: string[]): Array<{ modelId: string; upstream: string }> {
-  const byModelId = new Map<string, string>();
-  for (const [modelId, upstream] of buildModelIdMap(upstreamIds, toModelKey)) {
-    if (!byModelId.has(modelId)) byModelId.set(modelId, upstream);
-    for (const alias of aliasesFromUpstream([upstream])) {
-      if (!byModelId.has(alias)) byModelId.set(alias, upstream);
-    }
-  }
-  return [...byModelId].map(([modelId, upstream]) => ({ modelId, upstream }));
+  return [...buildModelIdMap(upstreamIds, toModelKey)].map(([modelId, upstream]) => ({ modelId, upstream }));
 }
 
 export async function connectCustomProviderAccount(userId: string, slug: string, apiKey: string, name?: string): Promise<ActionResult<{ isUpdate: boolean }>> {
