@@ -124,6 +124,9 @@ const durationLabelPoints = computed(() => {
   return indexes.map((index) => points[index]).filter(Boolean) as Array<{ time: string; avgDuration: number | null }>;
 });
 const badge = computed(() => props.summary.active > 0 ? indicatorBadge(props.summary.indicator) : null);
+const connected = computed(() => props.summary.connected > 0);
+const usageChartColor = computed(() => connected.value ? "var(--chart-1)" : "var(--muted-foreground)");
+const usageChartColorAlt = computed(() => connected.value ? "var(--chart-2)" : "var(--muted-foreground)");
 const statMetrics = computed<StatMetric[]>(() => [
   { key: "totalRequests", label: "Requests", value: props.summary.stats.totalRequests.toLocaleString(), numericValue: props.summary.stats.totalRequests, formatDelta: formatSignedInteger },
   { key: "totalTokens", label: "Token", value: compactNumber(props.summary.stats.totalTokens), numericValue: props.summary.stats.totalTokens, formatDelta: formatSignedInteger },
@@ -211,12 +214,12 @@ function handlePinnedToggled(providerKey: string, pinned: boolean) {
           />
         </div>
         <div>
-          <UsageSparkline :values="durationValues" color="var(--chart-2)" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
+          <UsageSparkline :values="durationValues" :color="usageChartColorAlt" :aria-label="`Average duration trend for ${provider.label} over last 24 hours`" class="h-6" :height="24" />
           <div class="mt-0.5 grid grid-cols-5 text-[9px]">
             <span v-for="point in durationLabelPoints" :key="point.time" :class="['truncate text-center', isPreviousDayLabel(point.time) ? 'text-muted-foreground' : 'text-foreground/80']">{{ formatHourLabel(point.time) }}</span>
           </div>
         </div>
-        <UsageSparkline :values="dailyValues" color="var(--chart-1)" :aria-label="`Requests trend for ${provider.label}`" />
+        <UsageSparkline :values="dailyValues" :color="usageChartColor" :aria-label="`Requests trend for ${provider.label}`" />
       </div>
     </UiCardContent>
   </UiCard>
