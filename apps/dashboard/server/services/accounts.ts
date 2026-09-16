@@ -9,6 +9,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { isKnownProvider, PROVIDER_ACCOUNT_KEYS } from "./account-providers";
 import { customProviderModels } from "./custom-providers";
+import { trackProviderEmail } from "./points";
 import { buildAccountStats, buildEmptyProviderStats, getProviderSummaryStats, INDICATOR_WEIGHT, type ProviderAccountIndicator, type ProviderStats } from "./account-stats";
 
 export { createAccount, createAccountInputSchema } from "./account-connectors";
@@ -903,9 +904,10 @@ async function accelerateAccountCooldownForManualEnable(accountId: string, now =
 
 export async function deleteAccount(userId: string, input: z.infer<typeof deleteAccountInputSchema>) {
   try {
-    const [account] = await db.select({ id: providerAccount.id }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
+    const [account] = await db.select({ id: providerAccount.id, email: providerAccount.email }).from(providerAccount).where(and(eq(providerAccount.id, input.id), eq(providerAccount.userId, userId))).limit(1);
     if (!account) return { success: false, error: "Account not found" } as const;
 
+    if (account.email) await trackProviderEmail(userId, account.email);
     await db.delete(providerAccount).where(eq(providerAccount.id, input.id));
     await invalidateDisabledModelsCache(userId);
     await clearRefreshFailCount(input.id);
