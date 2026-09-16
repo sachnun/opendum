@@ -18,9 +18,9 @@ useHead({
 <template>
   <TooltipProvider :delay-duration="300" :skip-delay-duration="300">
     <Suspense>
-      <NuxtLayout>
+      <AuthGate>
         <NuxtPage />
-      </NuxtLayout>
+      </AuthGate>
       <template #fallback>
         <div class="opendum-loading" role="status" aria-label="Loading Opendum">
           <div class="opendum-loading__brand" aria-hidden="true">

@@ -1,19 +1,15 @@
 <script setup lang="ts">
-import { useSession } from "../../lib/auth-client";
 import { PROVIDER_ACCOUNT_DEFINITIONS } from "../../lib/provider-accounts";
 
-definePageMeta({ middleware: "auth", layout: false });
+definePageMeta({ layout: "dashboard" });
 
 const route = useRoute();
-const { data: session } = await useSession(useFetch);
-const isAuthenticated = computed(() => Boolean(session.value?.user));
-
 const redirectTarget = computed(() => {
   const redirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect;
   return typeof redirect === "string" && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
 });
 
-if (import.meta.client && session.value?.user && redirectTarget.value !== "/") {
+if (import.meta.client && redirectTarget.value !== "/") {
   await navigateTo(redirectTarget.value);
 }
 
@@ -77,31 +73,28 @@ function refreshAccountsOverview() {
 </script>
 
 <template>
-  <NuxtLayout v-if="isAuthenticated" name="dashboard">
-    <div class="space-y-6">
-      <div class="dashboard-header-divider">
-        <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
-            Provider Accounts
-          </h2>
-          <div class="flex w-full items-center sm:w-auto">
-            <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" @custom-created="() => refreshCustomProviders()" />
-          </div>
+  <div class="space-y-6">
+    <div class="dashboard-header-divider">
+      <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
+          Provider Accounts
+        </h2>
+        <div class="flex w-full items-center sm:w-auto">
+          <AddAccountDialog :readonly="isAuditMode" trigger-class="flex-1 sm:w-auto sm:flex-none" @connected="refreshAccountsOverview" @custom-created="() => refreshCustomProviders()" />
         </div>
       </div>
-
-      <DataNotice :error="error" />
-      <div v-if="summaries" class="dashboard-card-grid">
-        <ProviderOverviewCard
-          v-for="provider in sortedProviders"
-          :key="provider.key"
-          :provider="provider"
-          :summary="providerSummary(provider.key) ?? emptyProviderSummary"
-          :pinned="pinnedProviders.has(provider.key)"
-          :readonly="isAuditMode"
-        />
-      </div>
     </div>
-  </NuxtLayout>
-  <LoginScreen v-else />
+
+    <DataNotice :error="error" />
+    <div v-if="summaries" class="dashboard-card-grid">
+      <ProviderOverviewCard
+        v-for="provider in sortedProviders"
+        :key="provider.key"
+        :provider="provider"
+        :summary="providerSummary(provider.key) ?? emptyProviderSummary"
+        :pinned="pinnedProviders.has(provider.key)"
+        :readonly="isAuditMode"
+      />
+    </div>
+  </div>
 </template>
