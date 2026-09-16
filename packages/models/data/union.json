@@ -1,0 +1,16 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "limit": {
+    "context": 4096,
+    "output": 4096
+  },
+  "providerConfig": {
+    "opencode": {
+      "upstream": "union-alpha",
+      "contextWindow": 4096,
+      "maxOutputTokens": 4096
+    }
+  }
+}
