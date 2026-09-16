@@ -68,6 +68,7 @@ const QUOTA_PROVIDERS = new Set<string>(QUOTA_PROVIDER_KEYS);
 const ACCOUNT_STATS_BATCH_SIZE = 24;
 const ERROR_HISTORY_BATCH_SIZE = 20;
 const ACCOUNT_STATS_POLL_MS = 30_000;
+const ACCOUNT_STATS_ROOT_MARGIN = "600px 0px";
 const QUOTA_AUTO_LOAD_DELAY_MS = 400;
 const PROVIDER_DETAIL_REFRESH_MS = 30_000;
 const DASHBOARD_CACHE_DB_NAME = "opendum-dashboard";
@@ -86,7 +87,10 @@ const accountDisplayOrder = ref<Record<string, number>>({});
 const highlightedAccountIds = ref<Set<string>>(new Set());
 const promotedAccountIds = ref<Set<string>>(new Set());
 const accountCardRefs = ref<Array<{ accountId?: string; $el?: Element } | Element>>([]);
-const accountStatsById = ref<Record<string, ProviderStats>>({});
+const providerRoot = ref<HTMLElement | null>(null);
+const visibleAccountIds = reactive(new Set<string>());
+const intersectingAccountIds = new Set<string>();
+const accountStatsById = shallowReactive<Record<string, ProviderStats>>({});
 const accountStatsCursorById = ref<Record<string, string>>({});
 const accountStatsDeltaReadyById = ref<Record<string, boolean>>({});
 const accountStatsFetchedById = ref<Record<string, boolean>>({});
@@ -99,6 +103,7 @@ let providerDetailRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let accountStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let errorHistoryQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let accountStatsPollTimer: ReturnType<typeof setInterval> | null = null;
+let accountsObserver: IntersectionObserver | null = null;
 let providerDetailRefreshInFlight: Promise<void> | null = null;
 let providerDetailRefreshQueued = false;
 let providerDetailRefreshQueuedShouldRefreshQuota = false;
@@ -148,7 +153,7 @@ async function refreshProviderDetailOnce(options: { refreshQuota?: boolean } = {
   providerDetailRefreshInFlight = refreshProviderDetail().then(() => undefined).catch(() => undefined);
   try {
     await providerDetailRefreshInFlight;
-    queueAccountStatsLoad(accounts.value.map((account) => account.id), { force: true });
+    queueAccountStatsLoad(Array.from(intersectingAccountIds), { force: true });
     if (shouldRefreshQuota) void refreshProviderQuotaAfterAccountPoll();
   } finally {
     providerDetailRefreshInFlight = null;
@@ -250,7 +255,9 @@ watch(selectedProvider, () => {
   accountDisplayOrder.value = {};
   highlightedAccountIds.value = new Set();
   promotedAccountIds.value = new Set();
-  accountStatsById.value = {};
+  for (const accountId of Object.keys(accountStatsById)) Reflect.deleteProperty(accountStatsById, accountId);
+  visibleAccountIds.clear();
+  intersectingAccountIds.clear();
   accountStatsCursorById.value = {};
   accountStatsDeltaReadyById.value = {};
   accountStatsFetchedById.value = {};
@@ -391,6 +398,8 @@ onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer);
   if (accountStatsQueueTimer) clearTimeout(accountStatsQueueTimer);
   if (errorHistoryQueueTimer) clearTimeout(errorHistoryQueueTimer);
+  accountsObserver?.disconnect();
+  accountsObserver = null;
   stopAccountStatsPolling();
   stopProviderDetailRefresh();
   cancelQuotaQueue();
@@ -401,6 +410,29 @@ onMounted(() => {
   void warmIdbStore(DASHBOARD_CACHE_DB_NAME, ACCOUNT_QUOTA_STORE_NAME);
   startProviderDetailRefresh();
   void hydrateAccountStatsCache();
+  accountsObserver = new IntersectionObserver((entries) => {
+    const visibleIds: string[] = [];
+
+    for (const entry of entries) {
+      const accountId = (entry.target as HTMLElement).dataset.accountId;
+      if (!accountId) continue;
+
+      if (!entry.isIntersecting) {
+        intersectingAccountIds.delete(accountId);
+        continue;
+      }
+
+      visibleAccountIds.add(accountId);
+      intersectingAccountIds.add(accountId);
+      visibleIds.push(accountId);
+    }
+
+    if (visibleIds.length > 0) {
+      queueAccountStatsLoad(visibleIds);
+      queueErrorHistoryLoad(visibleIds);
+    }
+  }, { rootMargin: ACCOUNT_STATS_ROOT_MARGIN });
+  observeAccountCards();
   startAccountStatsPolling();
 });
 const quotaSummaryGroups = computed<QuotaSummaryGroup[]>(() => {
@@ -485,7 +517,7 @@ function quotaBarColor(group: QuotaSummaryGroup): string {
 }
 
 function getAccountWithStats(account: Account): Account {
-  const stats = accountStatsById.value[account.id] ?? account.stats;
+  const stats = accountStatsById[account.id] ?? account.stats;
   return stats === account.stats ? account : { ...account, stats };
 }
 
@@ -496,9 +528,7 @@ async function hydrateAccountStatsCache() {
   if (accountsToHydrate.length === 0) return;
 
   const cachedStats = await readStatsCache(accountsToHydrate.map((account) => account.id));
-  const nextStatsById = { ...accountStatsById.value };
   const nextHydratedIds = { ...hydratedAccountStatsIds.value };
-  let hasStatsChanges = false;
 
   for (const [index, cached] of cachedStats.entries()) {
     const account = accountsToHydrate[index];
@@ -506,17 +536,13 @@ async function hydrateAccountStatsCache() {
 
     nextHydratedIds[account.id] = true;
     if (!cached || cached.accountId !== account.id) continue;
-    if (accountStatsById.value[account.id]) continue;
+    if (accountStatsById[account.id]) continue;
 
-    nextStatsById[account.id] = cached.stats;
-    hasStatsChanges = true;
+    accountStatsById[account.id] = cached.stats;
   }
 
   for (const account of accountsToHydrate) nextHydratedIds[account.id] = true;
   hydratedAccountStatsIds.value = nextHydratedIds;
-  if (hasStatsChanges) {
-    accountStatsById.value = nextStatsById;
-  }
 }
 
 function queueAccountStatsLoad(accountIds: Iterable<string>, options: { force?: boolean } = {}) {
@@ -582,13 +608,27 @@ async function flushQueuedAccountStats() {
   }
 }
 
+function observeAccountCards() {
+  if (!import.meta.client || !accountsObserver) return;
+  const root = providerRoot.value;
+  if (!root) return;
+
+  accountsObserver.disconnect();
+  intersectingAccountIds.clear();
+
+  for (const element of root.querySelectorAll<HTMLElement>("[data-account-id]")) {
+    accountsObserver.observe(element);
+  }
+}
+
 function startAccountStatsPolling() {
   if (!import.meta.client || accountStatsPollTimer) return;
 
   accountStatsPollTimer = setInterval(() => {
     if (document.hidden) return;
-    queueAccountStatsLoad(accounts.value.map((account) => account.id), { force: true });
-    queueErrorHistoryLoad(accounts.value.map((account) => account.id), { force: true });
+    const accountIds = Array.from(intersectingAccountIds);
+    queueAccountStatsLoad(accountIds, { force: true });
+    queueErrorHistoryLoad(accountIds, { force: true });
   }, ACCOUNT_STATS_POLL_MS);
 }
 
@@ -621,11 +661,11 @@ async function loadAccountStats(accountIds: string[], options: { force?: boolean
     const nextCursorById = { ...accountStatsCursorById.value, ...response.cursors };
 
     for (const accountId of requestedAccountIds) {
-      nextDeltaReadyById[accountId] = Boolean(accountStatsById.value[accountId] || accountStatsDeltaReadyById.value[accountId]);
+      nextDeltaReadyById[accountId] = Boolean(accountStatsById[accountId] || accountStatsDeltaReadyById.value[accountId]);
       nextFetchedById[accountId] = true;
     }
 
-    accountStatsById.value = { ...accountStatsById.value, ...stats };
+    for (const [accountId, stat] of Object.entries(stats)) accountStatsById[accountId] = stat;
     accountStatsCursorById.value = nextCursorById;
     accountStatsDeltaReadyById.value = nextDeltaReadyById;
     accountStatsFetchedById.value = nextFetchedById;
@@ -683,13 +723,21 @@ async function loadErrorHistories(accountIds: string[]) {
 
 function pruneAccountStats() {
   const availableAccountIds = new Set(accounts.value.map((account) => account.id));
-  accountStatsById.value = Object.fromEntries(Object.entries(accountStatsById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
+  for (const accountId of Object.keys(accountStatsById)) {
+    if (!availableAccountIds.has(accountId)) Reflect.deleteProperty(accountStatsById, accountId);
+  }
   accountStatsCursorById.value = Object.fromEntries(Object.entries(accountStatsCursorById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   accountStatsDeltaReadyById.value = Object.fromEntries(Object.entries(accountStatsDeltaReadyById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   accountStatsFetchedById.value = Object.fromEntries(Object.entries(accountStatsFetchedById.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   hydratedAccountStatsIds.value = Object.fromEntries(Object.entries(hydratedAccountStatsIds.value).filter(([accountId]) => availableAccountIds.has(accountId)));
   for (const accountId of forceQueuedAccountStatsIds) {
     if (!availableAccountIds.has(accountId)) forceQueuedAccountStatsIds.delete(accountId);
+  }
+  for (const accountId of visibleAccountIds) {
+    if (!availableAccountIds.has(accountId)) visibleAccountIds.delete(accountId);
+  }
+  for (const accountId of intersectingAccountIds) {
+    if (!availableAccountIds.has(accountId)) intersectingAccountIds.delete(accountId);
   }
 }
 
@@ -706,8 +754,15 @@ watch(
     pruneAccountStats();
     pruneErrorHistories();
     void hydrateAccountStatsCache();
-    queueAccountStatsLoad(accounts.value.map((account) => account.id));
-    queueErrorHistoryLoad(accounts.value.map((account) => account.id));
+  },
+  { immediate: true }
+);
+
+watch(
+  () => accounts.value.map((account) => account.id).sort().join("|"),
+  async () => {
+    await nextTick();
+    observeAccountCards();
   },
   { immediate: true }
 );
@@ -968,7 +1023,7 @@ function decodeAccountHash(hash: string): string | null {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div ref="providerRoot" class="space-y-6">
     <div class="dashboard-header-divider">
       <div class="flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="inline-flex min-h-9 items-center gap-2 text-xl font-semibold">
@@ -1043,6 +1098,8 @@ function decodeAccountHash(hash: string): string | null {
           ref="accountCardRefs"
           :account="getAccountWithStats(account)"
           :data-account-id="account.id"
+          class="[contain-intrinsic-size:auto_30rem] [content-visibility:auto]"
+          :visible="visibleAccountIds.has(account.id)"
           :show-tier="providerMeta?.showTier"
           :supported-models="supportedModelsByAccountId[account.id] ?? supportedModels"
           :disabled-models="disabledModelsByAccountId[account.id] ?? []"

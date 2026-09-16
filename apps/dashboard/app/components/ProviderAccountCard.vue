@@ -124,6 +124,7 @@ const props = defineProps<{
   highlight?: boolean;
   animateDeltas?: boolean;
   readonly?: boolean;
+  visible?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -1059,7 +1060,7 @@ function cancelErrorPreviewPointer() {
           <p :title="subtitleDisplay" class="min-w-0 truncate whitespace-nowrap font-mono text-sm text-muted-foreground">{{ subtitleDisplay }}</p>
         </div>
       </UiCardHeader>
-      <UiCardContent class="flex flex-1 flex-col pt-0">
+      <UiCardContent v-if="visible" class="flex flex-1 flex-col pt-0">
         <div class="flex-1 space-y-2 text-sm">
           <div class="mb-3">
             <div class="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
@@ -1219,6 +1220,9 @@ function cancelErrorPreviewPointer() {
             />
           </div>
         </div>
+      </UiCardContent>
+      <UiCardContent v-else class="flex flex-1 flex-col pt-0" aria-hidden="true">
+        <div class="min-h-[26rem]" />
       </UiCardContent>
     </UiCard>
 
