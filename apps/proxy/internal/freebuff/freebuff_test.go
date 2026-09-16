@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -252,5 +253,149 @@ func TestEndIdleSessionsKeepsQueuedSession(t *testing.T) {
 
 	if got := deletes.Load(); got != 0 {
 		t.Fatalf("end session calls = %d, want 0", got)
+	}
+}
+
+func TestIsSessionInvalidCodes(t *testing.T) {
+	valid := []string{
+		"waiting_room_required",
+		"waiting_room_queued",
+		"session_superseded",
+		"session_expired",
+		"session_model_mismatch",
+		"freebuff_update_required",
+		"free_mode_invalid_agent_hierarchy",
+		"free_mode_cli_required",
+	}
+	for _, code := range valid {
+		body, _ := json.Marshal(map[string]any{"error": code, "message": "nope"})
+		if !IsSessionInvalid(http.StatusForbidden, body) {
+			t.Fatalf("code %q must invalidate the session", code)
+		}
+	}
+	if IsSessionInvalid(http.StatusForbidden, []byte(`{"error":"session_limit_reached"}`)) {
+		t.Fatal("session_limit_reached must not invalidate the session")
+	}
+	if IsSessionInvalid(http.StatusOK, nil) {
+		t.Fatal("success status must not invalidate the session")
+	}
+	if !IsSessionInvalid(http.StatusUpgradeRequired, nil) {
+		t.Fatal("426 must invalidate the session")
+	}
+}
+
+func TestIsTurnLimit(t *testing.T) {
+	cases := []struct {
+		status int
+		body   string
+		want   bool
+	}{
+		{http.StatusTooManyRequests, `{"error":"turn_spend_limit"}`, true},
+		{http.StatusTooManyRequests, `{"error":{"message":"turn_spend_limit reached"}}`, true},
+		{http.StatusTooManyRequests, `{"error":"turn_end_limit"}`, true},
+		{http.StatusTooManyRequests, `{"error":"free_mode_rate_limited"}`, false},
+		{http.StatusOK, `{"error":"turn_spend_limit"}`, false},
+	}
+	for _, tc := range cases {
+		if got := IsTurnLimit(tc.status, []byte(tc.body)); got != tc.want {
+			t.Fatalf("IsTurnLimit(%d, %s) = %v, want %v", tc.status, tc.body, got, tc.want)
+		}
+	}
+}
+
+func TestCapacityDeferredRetry(t *testing.T) {
+	header := http.Header{}
+	header.Set("Retry-After", "5")
+	body := []byte(`{"error":"free_mode_capacity_deferred"}`)
+	if delay, ok := CapacityDeferredRetry(http.StatusTooManyRequests, header, body); !ok || delay != 5*time.Second {
+		t.Fatalf("retry-after hint = %v, ok=%v", delay, ok)
+	}
+	if delay, ok := CapacityDeferredRetry(http.StatusTooManyRequests, http.Header{}, body); !ok || delay != capacityDeferredCooldown {
+		t.Fatalf("default cooldown = %v, ok=%v", delay, ok)
+	}
+	if _, ok := CapacityDeferredRetry(http.StatusOK, header, body); ok {
+		t.Fatal("200 must not classify as capacity deferred")
+	}
+	if _, ok := CapacityDeferredRetry(http.StatusTooManyRequests, header, []byte(`{"error":"free_mode_rate_limited"}`)); ok {
+		t.Fatal("other 429 codes must not classify as capacity deferred")
+	}
+}
+
+func TestDailyQuotaCooldown(t *testing.T) {
+	body := []byte(`{"error":{"message":"free-models-per-day-high-balance"}}`)
+	if delay, ok := DailyQuotaCooldown(http.StatusTooManyRequests, body); !ok || delay != dailyQuotaCooldown {
+		t.Fatalf("daily quota cooldown = %v, ok=%v", delay, ok)
+	}
+	if _, ok := DailyQuotaCooldown(http.StatusTooManyRequests, []byte(`{"error":"free_mode_rate_limited"}`)); ok {
+		t.Fatal("rate limit must not classify as daily quota")
+	}
+}
+
+func TestRotateRunFinishesCurrentRun(t *testing.T) {
+	var got []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	manager := NewManager(&Client{baseURL: server.URL, http: server.Client()}, nil)
+	state := manager.state("acc")
+	state.mu.Lock()
+	state.runs["agent1"] = &runState{id: "run_1", steps: 3}
+	state.token = "token"
+	state.userID = "user"
+	state.mu.Unlock()
+
+	manager.RotateRun(context.Background(), "acc", "agent1")
+
+	var payload map[string]any
+	if err := json.Unmarshal(got, &payload); err != nil {
+		t.Fatalf("finish run payload: %v (%s)", err, got)
+	}
+	if payload["action"] != "FINISH" || payload["runId"] != "run_1" || payload["totalSteps"] != float64(3) {
+		t.Fatalf("finish run payload = %#v", payload)
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if len(state.runs) != 0 {
+		t.Fatalf("runs after rotation = %#v", state.runs)
+	}
+}
+
+func TestRotateRunWithoutRunSkipsRequest(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	manager := NewManager(&Client{baseURL: server.URL, http: server.Client()}, nil)
+
+	manager.RotateRun(context.Background(), "acc", "agent1")
+
+	if got := calls.Load(); got != 0 {
+		t.Fatalf("finish run calls = %d, want 0", got)
+	}
+}
+
+func TestCooldownBlocksPrepare(t *testing.T) {
+	manager := NewManager(nil, nil)
+	manager.Cooldown("acc", time.Minute, "parked")
+
+	_, err := manager.Prepare(context.Background(), "acc", "token", "", "agent1", "model-a")
+	var cd *cooldownError
+	if !errors.As(err, &cd) {
+		t.Fatalf("prepare error = %v, want cooldownError", err)
+	}
+	if snap := manager.state("acc").snapshot("acc"); snap.Status != "cooling" || snap.LastError != "parked" {
+		t.Fatalf("snapshot = %#v", snap)
+	}
+}
+
+func TestCooldownIgnoresNonPositiveDuration(t *testing.T) {
+	manager := NewManager(nil, nil)
+	manager.Cooldown("acc", 0, "noop")
+	if snap := manager.state("acc").snapshot("acc"); snap.Status != "idle" {
+		t.Fatalf("snapshot status = %q, want idle", snap.Status)
 	}
 }

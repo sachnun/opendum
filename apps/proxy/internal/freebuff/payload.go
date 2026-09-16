@@ -2,8 +2,10 @@ package freebuff
 
 import (
 	"encoding/json"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const buffySystemPromptOpening = "You are Buffy, the strategic coding assistant."
@@ -163,7 +165,7 @@ func IsSessionInvalid(statusCode int, errorBody []byte) bool {
 	switch strings.TrimSpace(code) {
 	case "freebuff_update_required", "waiting_room_required", "waiting_room_queued",
 		"session_superseded", "session_expired", "session_model_mismatch",
-		"free_mode_invalid_agent_hierarchy":
+		"free_mode_invalid_agent_hierarchy", "free_mode_cli_required":
 		return true
 	default:
 		return false
@@ -179,7 +181,50 @@ func isDailyFreeModelQuotaError(message string) bool {
 
 func isTurnEndLimitError(message, code string) bool {
 	lower := strings.ToLower(message + " " + code)
-	return strings.Contains(lower, "turn_end_limit") || strings.Contains(lower, "turn end limit")
+	return strings.Contains(lower, "turn_spend_limit") || strings.Contains(lower, "turn_end_limit") || strings.Contains(lower, "turn end limit")
+}
+
+// IsTurnLimit reports whether the upstream ended the run's turn budget, in
+// which case rotating the run lets the next request continue.
+func IsTurnLimit(statusCode int, errorBody []byte) bool {
+	if statusCode < 400 {
+		return false
+	}
+	message, _, code := extractUpstreamError(errorBody)
+	return isTurnEndLimitError(message, code)
+}
+
+// CapacityDeferredRetry reports the wait the upstream asked for before retrying
+// a free_mode_capacity_deferred rejection.
+func CapacityDeferredRetry(statusCode int, header http.Header, errorBody []byte) (time.Duration, bool) {
+	if statusCode != http.StatusTooManyRequests {
+		return 0, false
+	}
+	message, _, code := extractUpstreamError(errorBody)
+	if !strings.Contains(strings.ToLower(message+" "+code), "free_mode_capacity_deferred") {
+		return 0, false
+	}
+	delay := parseRetryAfter(header)
+	if delay <= 0 {
+		delay = capacityDeferredCooldown
+	}
+	if delay > retryAfterCap {
+		delay = retryAfterCap
+	}
+	return delay, true
+}
+
+// DailyQuotaCooldown reports how long the account must be parked when its daily
+// free-model quota is exhausted, which retrying or rejoining cannot fix.
+func DailyQuotaCooldown(statusCode int, errorBody []byte) (time.Duration, bool) {
+	if statusCode < 400 {
+		return 0, false
+	}
+	message, _, code := extractUpstreamError(errorBody)
+	if !isDailyFreeModelQuotaError(message + " " + code) {
+		return 0, false
+	}
+	return dailyQuotaCooldown, true
 }
 
 func extractUpstreamError(body []byte) (message, errorType, code string) {

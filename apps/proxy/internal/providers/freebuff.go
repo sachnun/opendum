@@ -79,6 +79,23 @@ func (p freebuffProvider) MakeRequest(ctx context.Context, _ *http.Client, crede
 			p.manager.InvalidateSession(account.ID)
 			continue
 		}
+		if attempt == 0 && freebuff.IsTurnLimit(resp.StatusCode, errorBody) {
+			lease.Release()
+			p.manager.RotateRun(ctx, account.ID, agent)
+			continue
+		}
+		if cooldown, ok := freebuff.CapacityDeferredRetry(resp.StatusCode, resp.Header, errorBody); ok {
+			lease.Release()
+			p.manager.Cooldown(account.ID, cooldown, "freebuff upstream capacity deferred")
+			resp.Body = io.NopCloser(bytes.NewReader(errorBody))
+			return resp, nil
+		}
+		if cooldown, ok := freebuff.DailyQuotaCooldown(resp.StatusCode, errorBody); ok {
+			lease.Release()
+			p.manager.Cooldown(account.ID, cooldown, "freebuff daily free-model quota exhausted")
+			resp.Body = io.NopCloser(bytes.NewReader(errorBody))
+			return resp, nil
+		}
 		lease.Release()
 		resp.Body = io.NopCloser(bytes.NewReader(errorBody))
 		return resp, nil

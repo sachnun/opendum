@@ -150,6 +150,40 @@ func (m *Manager) InvalidateSession(accountID string) {
 	m.store(snap)
 }
 
+func (m *Manager) Cooldown(accountID string, cooldown time.Duration, reason string) {
+	if m == nil || cooldown <= 0 {
+		return
+	}
+	state := m.state(accountID)
+	state.mu.Lock()
+	state.cooldownUntil = time.Now().Add(cooldown)
+	state.lastError = reason
+	snap := state.snapshot(accountID)
+	state.mu.Unlock()
+	m.store(snap)
+}
+
+// RotateRun finishes the account's current run for the agent so the next
+// request starts a fresh run.
+func (m *Manager) RotateRun(ctx context.Context, accountID, agent string) {
+	state := m.state(accountID)
+	state.mu.Lock()
+	run := state.runs[agent]
+	if run == nil {
+		state.mu.Unlock()
+		return
+	}
+	delete(state.runs, agent)
+	token, userID := state.token, state.userID
+	state.mu.Unlock()
+	if token == "" {
+		return
+	}
+	if err := m.client.FinishRun(ctx, token, userID, run.id, run.steps); err != nil {
+		slog.Warn("freebuff run rotation failed", "account", accountID, "error", err)
+	}
+}
+
 // StartIdleReaper ends active free sessions that saw no chat interaction for a
 // jittered 10-15 minute window, releasing the upstream model lock and slot.
 func (m *Manager) StartIdleReaper(ctx context.Context) {
