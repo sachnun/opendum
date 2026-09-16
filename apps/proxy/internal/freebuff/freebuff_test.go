@@ -1,9 +1,12 @@
 package freebuff
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -156,5 +159,98 @@ func TestSnapshotStatus(t *testing.T) {
 	idle := &accountState{}
 	if snap := idle.snapshot("acc"); snap.Status != "idle" {
 		t.Fatalf("idle status = %q", snap.Status)
+	}
+}
+
+func newIdleTestManager(t *testing.T, deletes *atomic.Int32) *Manager {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deletes.Add(1)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+	return NewManager(&Client{baseURL: server.URL, http: server.Client()}, nil)
+}
+
+func seedIdleState(manager *Manager, accountID string, activity time.Time) *accountState {
+	state := manager.state(accountID)
+	state.mu.Lock()
+	state.session = &cachedSession{status: statusActive, instanceID: "inst", model: "model-a"}
+	state.token = "token"
+	state.userID = "user"
+	state.idleTimeout = 12 * time.Minute
+	state.lastActivityAt = activity
+	state.mu.Unlock()
+	return state
+}
+
+func TestEndIdleSessionsEndsIdleActiveSession(t *testing.T) {
+	var deletes atomic.Int32
+	manager := newIdleTestManager(t, &deletes)
+	state := seedIdleState(manager, "acc", time.Now().Add(-16*time.Minute))
+
+	manager.EndIdleSessions(context.Background())
+
+	if got := deletes.Load(); got != 1 {
+		t.Fatalf("end session calls = %d, want 1", got)
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.session != nil {
+		t.Fatal("idle session was not cleared")
+	}
+	if state.idleTimeout < idleSessionTimeoutMin || state.idleTimeout >= idleSessionTimeoutMax {
+		t.Fatalf("idle timeout not re-rolled: %v", state.idleTimeout)
+	}
+	if got := state.snapshot("acc").Status; got != "idle" {
+		t.Fatalf("snapshot status = %q, want idle", got)
+	}
+}
+
+func TestEndIdleSessionsKeepsRecentlyUsedSession(t *testing.T) {
+	var deletes atomic.Int32
+	manager := newIdleTestManager(t, &deletes)
+	state := seedIdleState(manager, "acc", time.Now().Add(-time.Minute))
+
+	manager.EndIdleSessions(context.Background())
+
+	if got := deletes.Load(); got != 0 {
+		t.Fatalf("end session calls = %d, want 0", got)
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.session == nil {
+		t.Fatal("recent session must be kept")
+	}
+}
+
+func TestEndIdleSessionsSkipsInflightRequest(t *testing.T) {
+	var deletes atomic.Int32
+	manager := newIdleTestManager(t, &deletes)
+	state := seedIdleState(manager, "acc", time.Now().Add(-16*time.Minute))
+
+	state.mu.Lock()
+	manager.EndIdleSessions(context.Background())
+	state.mu.Unlock()
+
+	if got := deletes.Load(); got != 0 {
+		t.Fatalf("end session calls = %d, want 0", got)
+	}
+}
+
+func TestEndIdleSessionsKeepsQueuedSession(t *testing.T) {
+	var deletes atomic.Int32
+	manager := newIdleTestManager(t, &deletes)
+	state := seedIdleState(manager, "acc", time.Now().Add(-16*time.Minute))
+	state.mu.Lock()
+	state.session = &cachedSession{status: statusQueued, instanceID: "inst", model: "model-a"}
+	state.mu.Unlock()
+
+	manager.EndIdleSessions(context.Background())
+
+	if got := deletes.Load(); got != 0 {
+		t.Fatalf("end session calls = %d, want 0", got)
 	}
 }

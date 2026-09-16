@@ -36,6 +36,10 @@ const (
 	modelUnavailableCooldown = time.Minute
 	pollInterval             = 5 * time.Second
 	maxWaitingRoomWait       = 60 * time.Second
+
+	idleSessionTimeoutMin = 10 * time.Minute
+	idleSessionTimeoutMax = 15 * time.Minute
+	idleReaperInterval    = time.Minute
 )
 
 type freeSessionRateLimit struct {

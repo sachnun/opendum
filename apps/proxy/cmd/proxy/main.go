@@ -60,6 +60,7 @@ func main() {
 	if cfg.TokenRefreshInterval > 0 {
 		go proxySvc.StartTokenRefresher(refreshCtx, cfg.TokenRefreshInterval)
 	}
+	proxySvc.StartFreebuffIdleReaper(refreshCtx)
 	handler := api.NewServer(registry, authSvc, proxySvc, cfg.BetterAuthSecret)
 
 	server := &http.Server{

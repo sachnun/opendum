@@ -107,6 +107,13 @@ func (s *Service) TorReady() bool {
 	return s.providerRegistry.TorReady()
 }
 
+func (s *Service) StartFreebuffIdleReaper(ctx context.Context) {
+	if s == nil || s.providerRegistry == nil {
+		return
+	}
+	s.providerRegistry.StartFreebuffIdleReaper(ctx)
+}
+
 func (s *Service) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	s.handle(w, r, chatCompletionsConfig(s))
 }

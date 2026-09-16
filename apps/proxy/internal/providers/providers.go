@@ -88,6 +88,17 @@ func (r *Registry) TorReady() bool {
 	return torReady(r.tor, r.torClient)
 }
 
+func (r *Registry) StartFreebuffIdleReaper(ctx context.Context) {
+	if r == nil {
+		return
+	}
+	provider, ok := r.providers["freebuff"].(freebuffProvider)
+	if !ok {
+		return
+	}
+	go provider.manager.StartIdleReaper(ctx)
+}
+
 func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *Registry {
 	fallback := newFallbackRouter(redis)
 	return &Registry{providers: map[string]Provider{

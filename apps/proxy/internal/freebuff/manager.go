@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -19,14 +21,18 @@ type Manager struct {
 }
 
 type accountState struct {
-	id            string
-	mu            sync.Mutex
-	session       *cachedSession
-	runs          map[string]*runState
-	cooldownUntil time.Time
-	disabled      bool
-	lastError     string
-	clientID      string
+	id             string
+	mu             sync.Mutex
+	session        *cachedSession
+	runs           map[string]*runState
+	cooldownUntil  time.Time
+	disabled       bool
+	lastError      string
+	clientID       string
+	lastActivityAt time.Time
+	idleTimeout    time.Duration
+	token          string
+	userID         string
 }
 
 type runState struct {
@@ -61,7 +67,13 @@ func (m *Manager) state(accountID string) *accountState {
 	defer m.mu.Unlock()
 	state, ok := m.accounts[accountID]
 	if !ok {
-		state = &accountState{id: accountID, runs: map[string]*runState{}, clientID: newClientID()}
+		state = &accountState{
+			id:             accountID,
+			runs:           map[string]*runState{},
+			clientID:       newClientID(),
+			lastActivityAt: time.Now(),
+			idleTimeout:    jitteredIdleTimeout(),
+		}
 		m.accounts[accountID] = state
 	}
 	return state
@@ -118,6 +130,10 @@ func (m *Manager) Prepare(ctx context.Context, accountID, token, userID, agent, 
 		return nil, err
 	}
 
+	state.token = token
+	state.userID = userID
+	state.lastActivityAt = time.Now()
+
 	step := run.steps
 	run.steps++
 	snap := state.snapshot(accountID)
@@ -132,6 +148,81 @@ func (m *Manager) InvalidateSession(accountID string) {
 	snap := state.snapshot(accountID)
 	state.mu.Unlock()
 	m.store(snap)
+}
+
+// StartIdleReaper ends active free sessions that saw no chat interaction for a
+// jittered 10-15 minute window, releasing the upstream model lock and slot.
+func (m *Manager) StartIdleReaper(ctx context.Context) {
+	if m == nil {
+		return
+	}
+	slog.Info("freebuff idle reaper started", "interval", idleReaperInterval.String())
+	ticker := time.NewTicker(idleReaperInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("freebuff idle reaper stopped")
+			return
+		case <-ticker.C:
+			m.EndIdleSessions(ctx)
+		}
+	}
+}
+
+func (m *Manager) EndIdleSessions(ctx context.Context) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	states := make([]*accountState, 0, len(m.accounts))
+	for _, state := range m.accounts {
+		states = append(states, state)
+	}
+	m.mu.Unlock()
+	for _, state := range states {
+		m.endIdleSession(ctx, state)
+	}
+}
+
+func (m *Manager) endIdleSession(ctx context.Context, state *accountState) {
+	if state == nil || !state.mu.TryLock() {
+		return
+	}
+	session := state.session
+	idleFor := time.Since(state.lastActivityAt)
+	timeout := state.idleTimeout
+	token := state.token
+	userID := state.userID
+	if session == nil || session.status != statusActive || token == "" || idleFor < timeout {
+		state.mu.Unlock()
+		return
+	}
+	if err := m.client.EndSession(ctx, token, userID); err != nil {
+		state.lastError = err.Error()
+		snap := state.snapshot(state.id)
+		state.mu.Unlock()
+		m.store(snap)
+		return
+	}
+	state.session = nil
+	state.lastActivityAt = time.Now()
+	state.idleTimeout = jitteredIdleTimeout()
+	snap := state.snapshot(state.id)
+	state.mu.Unlock()
+	m.store(snap)
+}
+
+func jitteredIdleTimeout() time.Duration {
+	span := int64(idleSessionTimeoutMax - idleSessionTimeoutMin)
+	if span <= 0 {
+		return idleSessionTimeoutMin
+	}
+	n, err := rand.Int(rand.Reader, big.NewInt(span))
+	if err != nil {
+		return idleSessionTimeoutMin
+	}
+	return idleSessionTimeoutMin + time.Duration(n.Int64())
 }
 
 func (m *Manager) ensureSession(ctx context.Context, state *accountState, token, userID, model string) (string, error) {
