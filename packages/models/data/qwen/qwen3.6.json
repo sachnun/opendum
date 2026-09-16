@@ -24,6 +24,11 @@
     "context": 262144,
     "output": 65536
   },
+  "cost": {
+    "input": 0.5,
+    "output": 4.5,
+    "cacheRead": 0.25
+  },
   "providerConfig": {
     "perch": {
       "upstream": "qwen-3.6",

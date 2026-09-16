@@ -17,6 +17,12 @@
     "context": 1000000,
     "output": 128000
   },
+  "cost": {
+    "input": 10,
+    "output": 50,
+    "cacheRead": 1,
+    "cacheWrite": 12.5
+  },
   "providerConfig": {
     "kiro": {
       "contextWindow": 1000000,

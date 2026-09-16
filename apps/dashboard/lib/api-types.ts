@@ -1,6 +1,7 @@
 import type { ModelStats } from "./model-stats";
 import type { QuotaProviderKey } from "./provider-accounts";
 import type { ModelModalities } from "./model-capabilities";
+import type { ModelCost } from "./model-cost";
 
 export type { QuotaProviderKey };
 
@@ -244,6 +245,7 @@ export interface ModelListItem {
   providers: string[];
   reasoning?: boolean;
   modalities?: ModelModalities;
+  cost?: ModelCost;
   isEnabled: boolean;
   stats?: ModelStats;
 }

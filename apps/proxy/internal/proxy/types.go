@@ -61,6 +61,17 @@ type responseContext struct {
 	UserID                  string
 	APIKeyID                string
 	Model                   string
+	Usage                   *usageCounts
+}
+
+func (ctx responseContext) setUsage(inputTokens, outputTokens, cachedTokens, cacheWriteTokens int) {
+	if ctx.Usage == nil {
+		return
+	}
+	ctx.Usage.inputTokens = inputTokens
+	ctx.Usage.outputTokens = outputTokens
+	ctx.Usage.cachedTokens = cachedTokens
+	ctx.Usage.cacheWriteTokens = cacheWriteTokens
 }
 
 type openAIError struct {

@@ -44,6 +44,23 @@ func (q *Queries) DebitPointBalance(ctx context.Context, arg DebitPointBalancePa
 	return balance, err
 }
 
+const debitPointBalanceAllowNegative = `-- name: DebitPointBalanceAllowNegative :one
+UPDATE user_point_balance SET balance = balance - $1, "updatedAt" = $2 WHERE "userId" = $3 RETURNING balance
+`
+
+type DebitPointBalanceAllowNegativeParams struct {
+	Balance   int
+	UpdatedAt time.Time
+	UserID    string
+}
+
+func (q *Queries) DebitPointBalanceAllowNegative(ctx context.Context, arg DebitPointBalanceAllowNegativeParams) (int, error) {
+	row := q.db.QueryRow(ctx, debitPointBalanceAllowNegative, arg.Balance, arg.UpdatedAt, arg.UserID)
+	var balance int
+	err := row.Scan(&balance)
+	return balance, err
+}
+
 const insertPointBalanceOnConflictDoNothing = `-- name: InsertPointBalanceOnConflictDoNothing :execrows
 INSERT INTO user_point_balance ("userId", balance, "createdAt", "updatedAt")
 VALUES ($1, $2, $3, $4) ON CONFLICT ("userId") DO NOTHING

@@ -24,6 +24,12 @@
     "context": 200000,
     "output": 64000
   },
+  "cost": {
+    "input": 15,
+    "output": 75,
+    "cacheRead": 1.5,
+    "cacheWrite": 18.75
+  },
   "providerConfig": {
     "kiro": {
       "upstream": "claude-sonnet-4.5-1m",

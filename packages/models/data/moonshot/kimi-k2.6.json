@@ -19,6 +19,11 @@
     "context": 262144,
     "output": 262144
   },
+  "cost": {
+    "input": 4.75,
+    "output": 20,
+    "cacheRead": 0.8
+  },
   "providerConfig": {
     "hyper": {
       "contextWindow": 262000,

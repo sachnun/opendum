@@ -16,6 +16,11 @@
     "context": 500000,
     "output": 450000
   },
+  "cost": {
+    "input": 10,
+    "output": 30,
+    "cacheRead": 2.5
+  },
   "providerConfig": {
     "perch": {
       "upstream": "grok-4-6",

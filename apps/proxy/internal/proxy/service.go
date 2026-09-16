@@ -211,10 +211,12 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	}
 	defer providerResp.Body.Close()
 
+	usage := &usageCounts{}
+
 	if parsed.Stream {
-		if err := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+		if err := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model, Usage: usage}); err == nil {
 			if roaming != nil {
-				s.creditSharingPoint(context.Background(), account.UserID, roaming.DebitID, roaming.Amount)
+				s.settleRoamingPoint(context.Background(), account.UserID, roaming, validation.Model, usage)
 			}
 			go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
 		} else {
@@ -226,9 +228,9 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 		return
 	}
 
-	if err := cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model}); err == nil {
+	if err := cfg.HandleNonStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model, Usage: usage}); err == nil {
 		if roaming != nil {
-			s.creditSharingPoint(context.Background(), account.UserID, roaming.DebitID, roaming.Amount)
+			s.settleRoamingPoint(context.Background(), account.UserID, roaming, validation.Model, usage)
 		}
 		go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
 	} else {

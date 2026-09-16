@@ -30,6 +30,10 @@
     "context": 256000,
     "output": 65536
   },
+  "cost": {
+    "input": 2.5,
+    "output": 4.5
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",

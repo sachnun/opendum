@@ -16,10 +16,12 @@ const MODEL_PROPERTY_ORDER = [
   "reasoning",
   "modalities",
   "limit",
+  "cost",
   "providerConfig",
 ];
 
 const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "minTier", "allowedTiers", "aliases"];
+const COST_PROPERTY_ORDER = ["input", "output", "cacheRead", "cacheWrite"];
 const FIRST_PROVIDERS = new Set(["opencode"]);
 
 function isPlainObject(value: unknown): value is Record<string, JsonValue> {
@@ -69,6 +71,7 @@ function orderValue(value: JsonValue, key?: string): JsonValue {
   if (!isPlainObject(value)) return value;
 
   if (key === "providerConfig") return orderProviderMap(value, PROVIDER_CONFIG_PROPERTY_ORDER);
+  if (key === "cost") return orderObject(value, COST_PROPERTY_ORDER);
   return orderObject(value);
 }
 

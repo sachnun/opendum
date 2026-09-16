@@ -19,6 +19,11 @@
     "context": 1048576,
     "output": 943718
   },
+  "cost": {
+    "input": 6.25,
+    "output": 21.25,
+    "cacheRead": 0.75
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "meta/muse-spark-1.3",

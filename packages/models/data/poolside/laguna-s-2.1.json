@@ -17,6 +17,11 @@
     "context": 1048576,
     "output": 131072
   },
+  "cost": {
+    "input": 0.45,
+    "output": 0.9,
+    "cacheRead": 0.045
+  },
   "providerConfig": {
     "cline": {
       "upstream": "poolside/laguna-s-2.1:free",

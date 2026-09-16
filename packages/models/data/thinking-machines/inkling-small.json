@@ -18,6 +18,11 @@
     "context": 1048576,
     "output": 262144
   },
+  "cost": {
+    "input": 2.25,
+    "output": 6,
+    "cacheRead": 0.5
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "thinkingmachines/inkling-small:free",

@@ -2,8 +2,8 @@
  * External model registry clients and metadata extraction.
  *
  * Pulls model metadata from OpenRouter, models.dev, LiteLLM, and NVIDIA NIM so
- * the local registry can be enriched with `owner`, `limit`, and `modalities`
- * without hand-maintaining those fields.
+ * the local registry can be enriched with `owner`, `limit`, `cost`, and
+ * `modalities` without hand-maintaining those fields.
  */
 
 import { fetchJson } from "./http.ts";
@@ -13,6 +13,9 @@ export const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 export const MODELSDEV_URL = "https://models.dev/api.json";
 export const LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 export const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
+
+/** Points granted per USD, mirroring the dashboard points rate (5 points = 1 USD). */
+export const POINTS_PER_USD = 5;
 
 /** Local provider -> models.dev provider id, for provider-scoped matching. */
 export const PROVIDER_TO_MODELSDEV: Readonly<Record<string, string>> = {
@@ -46,6 +49,14 @@ export interface ModelLimit {
   output?: number;
 }
 
+/** Model price in points per million tokens. 5 points = 1 USD. */
+export interface ModelCost {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
+
 export interface RegistryIndex {
   entries: ReadonlyArray<unknown>;
   index: Map<string, IndexedModel<unknown>>;
@@ -77,6 +88,7 @@ export interface ModelMetadataPatch {
   providerLimits: Record<string, ProviderLimits>;
   modalities: Modalities | null;
   limits: ModelLimit;
+  cost: ModelCost | null;
   resolvedProviders: number;
   minimumProviderContext: number | null;
   maximumProviderContext: number | null;
@@ -148,6 +160,94 @@ function limitsFrom(source: RegistryName, entry: unknown): ProviderLimits {
   }
 
   return {};
+}
+
+function roundPoints(value: number): number {
+  return Math.round(value * 1e6) / 1e6;
+}
+
+function scalePoints(value: unknown, factor: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return undefined;
+  return roundPoints(number * factor);
+}
+
+function buildPoints(values: ModelCost): ModelCost | null {
+  const points: ModelCost = {};
+  if (values.input !== undefined) points.input = values.input;
+  if (values.output !== undefined) points.output = values.output;
+  if (values.cacheRead !== undefined) points.cacheRead = values.cacheRead;
+  if (values.cacheWrite !== undefined) points.cacheWrite = values.cacheWrite;
+  return Object.keys(points).length > 0 ? points : null;
+}
+
+/**
+ * Extract per-million-token prices and convert them to points.
+ *
+ * `POINTS_PER_USD` mirrors the dashboard points rate (5 points = 1 USD), so a
+ * stored value is points per million tokens.
+ */
+function pointsFrom(source: RegistryName, entry: unknown): ModelCost | null {
+  const record = asRecord(entry);
+  if (!record) return null;
+  const perMillion = 1_000_000 * POINTS_PER_USD;
+
+  if (source === "openrouter") {
+    const pricing = asRecord(record.pricing);
+    if (!pricing) return null;
+    return buildPoints({
+      input: scalePoints(pricing.prompt, perMillion),
+      output: scalePoints(pricing.completion, perMillion),
+      cacheRead: scalePoints(pricing.input_cache_read, perMillion),
+      cacheWrite: scalePoints(pricing.input_cache_write, perMillion),
+    });
+  }
+
+  if (source === "modelsdev") {
+    const cost = asRecord(record.cost);
+    if (!cost) return null;
+    return buildPoints({
+      input: scalePoints(cost.input, POINTS_PER_USD),
+      output: scalePoints(cost.output, POINTS_PER_USD),
+      cacheRead: scalePoints(cost.cache_read, POINTS_PER_USD),
+      cacheWrite: scalePoints(cost.cache_write, POINTS_PER_USD),
+    });
+  }
+
+  if (source === "litellm") {
+    return buildPoints({
+      input: scalePoints(record.input_cost_per_token, perMillion),
+      output: scalePoints(record.output_cost_per_token, perMillion),
+      cacheRead: scalePoints(record.cache_read_input_token_cost, perMillion),
+      cacheWrite: scalePoints(record.cache_creation_input_token_cost, perMillion),
+    });
+  }
+
+  return null;
+}
+
+function hasProviderLimits(limits: ProviderLimits): boolean {
+  return limits.contextWindow !== undefined || limits.maxOutputTokens !== undefined;
+}
+
+/**
+ * Pick the lowest non-zero price per field across all candidate costs, falling
+ * back to zero when every candidate is free. Zero is ignored so free provider
+ * tiers do not mask the model's paid reference price.
+ */
+function mergeCosts(costs: Array<ModelCost | null>): ModelCost | null {
+  const present = costs.filter((cost): cost is ModelCost => cost !== null);
+  if (present.length === 0) return null;
+
+  const merged: ModelCost = {};
+  for (const key of ["input", "output", "cacheRead", "cacheWrite"] as const) {
+    const values = present.map((cost) => cost[key]);
+    const positive = values.filter((value): value is number => typeof value === "number" && value > 0);
+    if (positive.length > 0) merged[key] = Math.min(...positive);
+    else if (values.some((value) => value === 0)) merged[key] = 0;
+  }
+
+  return Object.keys(merged).length > 0 ? merged : null;
 }
 
 function modalitiesFrom(source: RegistryName, entry: unknown): Modalities | null {
@@ -384,9 +484,7 @@ export function buildModelPatch(
   const providerLimits: Record<string, ProviderLimits> = {};
   for (const [provider, hit] of Object.entries(resolved.perProvider)) {
     const limits = limitsFrom(hit.source, hit.entry);
-    if (limits.contextWindow !== undefined || limits.maxOutputTokens !== undefined) {
-      providerLimits[provider] = limits;
-    }
+    if (hasProviderLimits(limits)) providerLimits[provider] = limits;
   }
 
   const globalFallback = candidates.find((item) => item.scope === "global" && item.source === "modelsdev")
@@ -394,14 +492,14 @@ export function buildModelPatch(
   for (const provider of providerOrder) {
     if (providerLimits[provider] || !globalFallback) continue;
     const limits = limitsFrom(globalFallback.source, globalFallback.entry);
-    if (limits.contextWindow !== undefined || limits.maxOutputTokens !== undefined) {
-      providerLimits[provider] = limits;
-    }
+    if (hasProviderLimits(limits)) providerLimits[provider] = limits;
   }
 
   const modalities = firstDefined(candidates.map((item) => modalitiesFrom(item.source, item.entry)));
 
   const reasoning = firstDefined(candidates.map((item) => reasoningFrom(item.source, item.entry)));
+
+  const cost = mergeCosts(candidates.map((item) => pointsFrom(item.source, item.entry)));
 
   const contexts = Object.values(providerLimits)
     .map((item) => item.contextWindow)
@@ -419,6 +517,7 @@ export function buildModelPatch(
     providerLimits,
     modalities,
     limits,
+    cost,
     resolvedProviders: Object.keys(resolved.perProvider).length,
     minimumProviderContext: contexts.length > 0 ? Math.min(...contexts) : null,
     maximumProviderContext: contexts.length > 0 ? Math.max(...contexts) : null,

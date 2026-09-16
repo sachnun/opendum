@@ -16,6 +16,11 @@
     "context": 1000000,
     "output": 1000000
   },
+  "cost": {
+    "input": 25,
+    "output": 150,
+    "cacheRead": 2.5
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "sakana/fugu-ultra-v2",

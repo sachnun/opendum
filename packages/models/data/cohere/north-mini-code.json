@@ -16,6 +16,10 @@
     "context": 256000,
     "output": 64000
   },
+  "cost": {
+    "input": 0,
+    "output": 0
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "cohere/north-mini-code:free",

@@ -128,6 +128,13 @@ type ProviderAccountModelHealth struct {
 	QuotaLockReason         *string
 }
 
+type ProviderEmailRegistry struct {
+	Email     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	UserID    *string
+}
+
 type ProxyAPIKey struct {
 	ID                string
 	UserID            string
@@ -196,10 +203,12 @@ type User struct {
 }
 
 type UserPointBalance struct {
-	UserID    string
-	Balance   int
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	UserID                string
+	Balance               int
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	RewardsExcluded       bool
+	RewardsExcludedReason *string
 }
 
 type UserSharingSetting struct {

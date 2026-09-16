@@ -15,6 +15,11 @@
     "context": 106000,
     "output": 10600
   },
+  "cost": {
+    "input": 1.5,
+    "output": 5,
+    "cacheRead": 0.5
+  },
   "providerConfig": {
     "hyper": {
       "upstream": "qwen3-coder-480b-a35b-instruct-int4-mixed-ar",

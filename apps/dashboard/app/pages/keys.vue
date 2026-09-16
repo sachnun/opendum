@@ -311,7 +311,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                       <template #content>
                         <div class="space-y-1.5">
                           <p class="font-medium text-foreground">Roaming</p>
-                          <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Each successful roaming request uses points.</p>
+                          <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Roaming points scale with the tokens used and the model's cost.</p>
                         </div>
                       </template>
                     </UiTooltip>
@@ -327,7 +327,7 @@ function updateApiKeyRateLimits(apiKeyId: string, rules: RateLimitRule[]) {
                       <template #content>
                         <div class="space-y-1.5">
                           <p class="font-medium text-foreground">Roaming</p>
-                          <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Each successful roaming request uses points.</p>
+                          <p class="text-muted-foreground">If all accounts fail, this API key can use shared models. Roaming points scale with the tokens used and the model's cost.</p>
                         </div>
                       </template>
                     </UiPopover>

@@ -26,6 +26,12 @@
     "context": 1048576,
     "output": 65536
   },
+  "cost": {
+    "input": 10,
+    "output": 60,
+    "cacheRead": 1,
+    "cacheWrite": 1.875
+  },
   "providerConfig": {
     "antigravity": {
       "upstream": "gemini-3.1-pro",

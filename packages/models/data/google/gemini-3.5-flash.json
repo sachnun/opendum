@@ -25,6 +25,12 @@
     "context": 1048576,
     "output": 65536
   },
+  "cost": {
+    "input": 7.5,
+    "output": 45,
+    "cacheRead": 0.75,
+    "cacheWrite": 0.416665
+  },
   "providerConfig": {
     "antigravity": {
       "upstream": "gemini-3.5-flash-medium",

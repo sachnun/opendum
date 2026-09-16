@@ -25,6 +25,12 @@
     "context": 1000000,
     "output": 64000
   },
+  "cost": {
+    "input": 15,
+    "output": 75,
+    "cacheRead": 1.5,
+    "cacheWrite": 18.75
+  },
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-sonnet-4-6",

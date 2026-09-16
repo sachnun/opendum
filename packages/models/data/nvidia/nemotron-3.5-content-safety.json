@@ -17,6 +17,10 @@
     "context": 131072,
     "output": 117964
   },
+  "cost": {
+    "input": 1,
+    "output": 1
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",

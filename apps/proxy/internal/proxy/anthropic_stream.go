@@ -25,6 +25,7 @@ func (s *Service) anthropicNonStream(ctx responseContext) error {
 	ctx.Writer.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(ctx.Writer).Encode(response)
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	ctx.setUsage(counts.inputTokens, counts.outputTokens, counts.cachedTokens, counts.cacheWriteTokens)
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, counts.inputTokens, counts.outputTokens, counts.cachedTokens, counts.cacheWriteTokens, durationMS, false, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return err
 }
@@ -54,6 +55,7 @@ func (s *Service) anthropicStream(ctx responseContext) error {
 	}
 	tracker.Finish()
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
+	ctx.setUsage(tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens)
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
 }

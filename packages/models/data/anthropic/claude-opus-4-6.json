@@ -26,6 +26,12 @@
     "context": 1000000,
     "output": 128000
   },
+  "cost": {
+    "input": 25,
+    "output": 125,
+    "cacheRead": 2.5,
+    "cacheWrite": 31.25
+  },
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-opus-4-6-thinking",

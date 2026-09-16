@@ -1,5 +1,6 @@
 import "../../../types/model-registry.d.ts";
 import type { ModelModalities } from "../../../lib/model-capabilities";
+import type { ModelCost } from "../../../lib/model-cost";
 /**
  * Model registry consumed by the proxy layer.
  *
@@ -16,6 +17,7 @@ export interface ModelInfo {
   ignored?: boolean;
   reasoning?: boolean;
   modalities?: ModelModalities;
+  cost?: ModelCost;
   providerConfig?: Record<
     string,
     {

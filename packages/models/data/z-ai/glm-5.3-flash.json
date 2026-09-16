@@ -20,6 +20,12 @@
     "context": 1048576,
     "output": 131072
   },
+  "cost": {
+    "input": 0.375,
+    "output": 0.125,
+    "cacheRead": 0.075,
+    "cacheWrite": 0
+  },
   "providerConfig": {
     "cline": {
       "upstream": "z-ai/glm-5.3-flash",

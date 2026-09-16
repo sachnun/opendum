@@ -18,6 +18,12 @@
     "context": 1048576,
     "output": 64000
   },
+  "cost": {
+    "input": 0.5,
+    "output": 2,
+    "cacheRead": 0.05,
+    "cacheWrite": 0.416667
+  },
   "providerConfig": {
     "antigravity": {
       "contextWindow": 1048576,

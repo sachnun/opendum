@@ -23,6 +23,14 @@ type Limit struct {
 	Output  int `json:"output,omitempty"`
 }
 
+// Cost is a model price in points per million tokens (5 points = 1 USD).
+type Cost struct {
+	Input      float64 `json:"input,omitempty"`
+	Output     float64 `json:"output,omitempty"`
+	CacheRead  float64 `json:"cacheRead,omitempty"`
+	CacheWrite float64 `json:"cacheWrite,omitempty"`
+}
+
 type ProviderAccessRule struct {
 	MinTier      string
 	AllowedTiers []string
@@ -112,6 +120,7 @@ type Info struct {
 	Reasoning      *bool                          `json:"reasoning"`
 	Modalities     *Modalities                    `json:"modalities"`
 	Limit          *Limit                         `json:"limit"`
+	Cost           *Cost                          `json:"cost"`
 	ProviderConfig map[string]ProviderModelConfig `json:"providerConfig"`
 }
 
@@ -568,6 +577,14 @@ func (r *Registry) ModelFamily(model string) string {
 		return ""
 	}
 	return info.Family
+}
+
+func (r *Registry) ModelCost(model string) *Cost {
+	info, ok := r.ModelInfo(model)
+	if !ok {
+		return nil
+	}
+	return info.Cost
 }
 
 func (r *Registry) FormatModelsForOpenAI() []map[string]any {

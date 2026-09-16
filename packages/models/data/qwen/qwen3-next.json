@@ -26,6 +26,11 @@
     "context": 262144,
     "output": 26214
   },
+  "cost": {
+    "input": 0.45,
+    "output": 5.5,
+    "cacheRead": 0.29375
+  },
   "providerConfig": {
     "hyper": {
       "upstream": "qwen3-next-80b-a3b-instruct",

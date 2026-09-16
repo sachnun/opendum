@@ -16,6 +16,11 @@
     "context": 1000000,
     "output": 262144
   },
+  "cost": {
+    "input": 2.25,
+    "output": 16,
+    "cacheRead": 0.25
+  },
   "providerConfig": {
     "hyper": {
       "upstream": "qwen3.8-2.4t-a95b",

@@ -15,6 +15,13 @@ interface ModelLimit {
   output?: number;
 }
 
+interface ModelCost {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
+
 interface ProviderModelConfig {
   upstream?: string;
   contextWindow?: number;
@@ -35,6 +42,7 @@ export interface ModelData {
   reasoning?: boolean;
   modalities?: ModelModalities;
   limit?: ModelLimit;
+  cost?: ModelCost;
   providerConfig?: Record<string, ProviderModelConfig>;
   family?: string;
   [key: string]: unknown;

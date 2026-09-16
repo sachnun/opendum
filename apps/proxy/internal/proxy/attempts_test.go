@@ -698,11 +698,11 @@ func (r *testRotationRunner) getNextSharedAccount(_ context.Context, _ string, _
 	return nil, len(r.sharedAccounts) > 0, nil
 }
 
-func (r *testRotationRunner) reserveRoamingPoint(_ context.Context, userID string) (*pointReservation, bool, error) {
+func (r *testRotationRunner) reserveRoamingPoint(_ context.Context, userID, model string) (*pointReservation, bool, error) {
 	if r.insufficientPoints {
 		return nil, false, nil
 	}
-	reservation := pointReservation{UserID: userID, Amount: roamingPointCost, DebitID: "debit_" + strconv.Itoa(len(r.reserved)+1)}
+	reservation := pointReservation{UserID: userID, Model: model, Amount: roamingMinimumPoints, DebitID: "debit_" + strconv.Itoa(len(r.reserved)+1)}
 	r.reserved = append(r.reserved, reservation)
 	return &reservation, true, nil
 }

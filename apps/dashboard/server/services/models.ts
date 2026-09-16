@@ -49,6 +49,7 @@ export async function listModels(userId: string, options: { includeStats?: boole
       providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
       reasoning: MODEL_REGISTRY[model]?.reasoning,
       modalities: MODEL_REGISTRY[model]?.modalities,
+      cost: MODEL_REGISTRY[model]?.cost,
       isEnabled: !disabledModelSet.has(model),
       ...(includeStats ? { stats: statsByModel[model] } : {}),
     }));
@@ -68,6 +69,7 @@ export async function searchModels(userId: string) {
       providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
       reasoning: MODEL_REGISTRY[model]?.reasoning,
       modalities: MODEL_REGISTRY[model]?.modalities,
+      cost: MODEL_REGISTRY[model]?.cost,
       isEnabled: !disabledModelSet.has(model),
     }));
   } catch (error) {

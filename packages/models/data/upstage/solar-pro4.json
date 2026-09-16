@@ -16,6 +16,11 @@
     "context": 524288,
     "output": 131072
   },
+  "cost": {
+    "input": 0.15,
+    "output": 0.6,
+    "cacheRead": 0.03
+  },
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/solar-pro4",
