@@ -59,6 +59,60 @@ func (d *DB) ListCustomProviderModels(ctx context.Context, providerID string) ([
 		return nil, err
 	}
 	defer rows.Close()
+	return scanCustomProviderModels(rows)
+}
+
+func (d *DB) ListSharedCustomProviderModels(ctx context.Context, excludeUserID, slug string) ([]CustomProviderModel, error) {
+	if d == nil || d.Pool == nil {
+		return nil, nil
+	}
+	rows, err := d.Pool.Query(ctx, `
+		SELECT custom_provider_model.id, custom_provider_model."providerId", custom_provider_model."modelId", custom_provider_model.upstream, custom_provider_model.authless, custom_provider_model."minTier", custom_provider_model."allowedTiers", custom_provider_model."customFlags", custom_provider_model."createdAt", custom_provider_model."updatedAt"
+		FROM custom_provider_model
+		JOIN custom_provider ON custom_provider.id = custom_provider_model."providerId"
+		JOIN user_sharing_setting ON user_sharing_setting."userId" = custom_provider."userId"
+		WHERE custom_provider."userId" <> $1
+		  AND user_sharing_setting.enabled
+		  AND custom_provider.enabled
+		  AND custom_provider.slug = $2
+		ORDER BY custom_provider_model."modelId" ASC`, excludeUserID, slug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanCustomProviderModels(rows)
+}
+
+func (d *DB) ListSharedCustomProviderSlugsByModel(ctx context.Context, excludeUserID, model string) ([]string, error) {
+	if d == nil || d.Pool == nil {
+		return nil, nil
+	}
+	rows, err := d.Pool.Query(ctx, `
+		SELECT DISTINCT custom_provider.slug
+		FROM custom_provider
+		JOIN custom_provider_model ON custom_provider_model."providerId" = custom_provider.id
+		JOIN user_sharing_setting ON user_sharing_setting."userId" = custom_provider."userId"
+		WHERE custom_provider."userId" <> $1
+		  AND user_sharing_setting.enabled
+		  AND custom_provider.enabled
+		  AND custom_provider_model."modelId" = $2
+		ORDER BY custom_provider.slug ASC`, excludeUserID, model)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	slugs := []string{}
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, err
+		}
+		slugs = append(slugs, slug)
+	}
+	return slugs, rows.Err()
+}
+
+func scanCustomProviderModels(rows pgx.Rows) ([]CustomProviderModel, error) {
 	models := []CustomProviderModel{}
 	for rows.Next() {
 		var row CustomProviderModel

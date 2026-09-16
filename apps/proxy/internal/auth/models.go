@@ -134,13 +134,31 @@ func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel 
 	if err != nil {
 		return nil, err
 	}
-	if custom == nil {
-		return nil, nil
+	if custom != nil {
+		rows, err := s.customProviders.ListModels(ctx, custom.ID)
+		if err != nil {
+			return nil, err
+		}
+		if result := s.customProviderModelResult(slug, rawModel, rows); result != nil {
+			return result, nil
+		}
+		message := "Model \"" + rawModel + "\" is not registered under your custom provider \"" + slug + "\"."
+		provider := slug
+		return &ModelValidationResult{Valid: false, Provider: &provider, Model: rawModel, Error: message, Param: "model", Code: "invalid_model"}, nil
 	}
-	rows, err := s.customProviders.ListModels(ctx, custom.ID)
-	if err != nil {
-		return nil, err
+	if s.db != nil {
+		rows, err := s.db.ListSharedCustomProviderModels(ctx, userID, slug)
+		if err != nil {
+			return nil, err
+		}
+		if result := s.customProviderModelResult(slug, rawModel, rows); result != nil {
+			return result, nil
+		}
 	}
+	return nil, nil
+}
+
+func (s *Service) customProviderModelResult(slug, rawModel string, rows []appdb.CustomProviderModel) *ModelValidationResult {
 	for _, row := range rows {
 		if row.ModelID != rawModel {
 			continue
@@ -172,11 +190,9 @@ func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel 
 			}
 		}
 		result.Vision = &vision
-		return &result, nil
+		return &result
 	}
-	message := "Model \"" + rawModel + "\" is not registered under your custom provider \"" + slug + "\"."
-	provider := slug
-	return &ModelValidationResult{Valid: false, Provider: &provider, Model: rawModel, Error: message, Param: "model", Code: "invalid_model"}, nil
+	return nil
 }
 
 func (s *Service) invalidModelResult(provider *string, model, modelParam string, candidates []string) ModelValidationResult {

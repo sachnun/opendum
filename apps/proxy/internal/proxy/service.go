@@ -267,6 +267,11 @@ func (s *Service) modelAccountSelector(ctx context.Context, modelParam, userID s
 			return "", "", false
 		}
 	}
+	if s.db != nil {
+		if shared, err := s.db.ListSharedCustomProviderModels(ctx, userID, prefix); err == nil && len(shared) > 0 {
+			return "", "", false
+		}
+	}
 	return prefix, model, true
 }
 

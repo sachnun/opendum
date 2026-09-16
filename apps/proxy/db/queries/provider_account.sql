@@ -19,6 +19,15 @@ WHERE provider_account."userId" <> sqlc.arg(user_id)
   AND provider_account.provider = ANY(sqlc.arg(providers)::text[])
   AND provider_account."isActive"
   AND (provider_account."disabledUntil" IS NULL OR provider_account."disabledUntil" <= sqlc.arg(now))
+  AND NOT EXISTS (
+    SELECT 1 FROM custom_provider
+    WHERE custom_provider."userId" = provider_account."userId"
+      AND custom_provider.slug = provider_account.provider
+      AND (
+        custom_provider."createdAt" > sqlc.arg(now)::timestamptz - interval '3 days'
+        OR (SELECT COALESCE(SUM(pa."successCount"), 0) FROM provider_account pa WHERE pa."userId" = custom_provider."userId" AND pa.provider = custom_provider.slug) < 10
+      )
+  )
   AND (CARDINALITY(sqlc.arg(exclude_ids)::text[]) = 0 OR NOT (provider_account.id = ANY(sqlc.arg(exclude_ids)::text[])))
   AND (CARDINALITY(sqlc.arg(exclude_providers)::text[]) = 0 OR NOT (provider_account.provider = ANY(sqlc.arg(exclude_providers)::text[])))
 ORDER BY provider_account.status ASC, provider_account."lastUsedAt" ASC NULLS FIRST, provider_account."createdAt" ASC;

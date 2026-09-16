@@ -184,6 +184,15 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 	if len(targetProviders) == 0 {
 		return nil, false, nil
 	}
+	if provider == nil && s.db != nil {
+		customSlugs, err := s.db.ListSharedCustomProviderSlugsByModel(ctx, userID, model)
+		if err != nil {
+			return nil, false, err
+		}
+		for _, slug := range customSlugs {
+			targetProviders = appendIfMissing(targetProviders, slug)
+		}
+	}
 	if provider != nil && s.customStore != nil {
 		custom, err := s.customStore.GetProvider(ctx, userID, *provider)
 		if err != nil {
@@ -233,15 +242,40 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 
 	enabled := make([]appdb.ProviderAccount, 0, len(rows))
 	for _, row := range rows {
-		if _, disabled := disabledSet[row.ID]; !disabled && s.canAccountUseModel(row, model) {
-			enabled = append(enabled, row)
+		if _, disabled := disabledSet[row.ID]; disabled || !s.canAccountUseModel(row, model) {
+			continue
 		}
+		if !s.sharedAccountSupportsCustomModel(ctx, row, provider, model) {
+			continue
+		}
+		enabled = append(enabled, row)
 	}
 	if len(enabled) == 0 {
 		return nil, true, nil
 	}
 	prioritized := prioritizeAccounts(enabled, provider == nil, targetProviders)
 	return s.pickHealthyAccount(ctx, prioritized, model)
+}
+
+func (s *Service) sharedAccountSupportsCustomModel(ctx context.Context, account appdb.ProviderAccount, provider *string, model string) bool {
+	if provider == nil || s.customStore == nil || s.isKnownModelProviderPrefix(*provider) {
+		return true
+	}
+	custom, err := s.customStore.GetProvider(ctx, account.UserID, *provider)
+	if err != nil || custom == nil {
+		return false
+	}
+	rows, err := s.customStore.ListModels(ctx, custom.ID)
+	if err != nil {
+		return false
+	}
+	rawModel := strings.TrimPrefix(model, *provider+"/")
+	for _, row := range rows {
+		if row.ModelID == rawModel {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.ProviderAccount, model string) (*appdb.ProviderAccount, bool, error) {

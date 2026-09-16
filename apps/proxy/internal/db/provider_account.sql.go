@@ -330,6 +330,15 @@ WHERE provider_account."userId" <> $1
   AND provider_account.provider = ANY($2::text[])
   AND provider_account."isActive"
   AND (provider_account."disabledUntil" IS NULL OR provider_account."disabledUntil" <= $3)
+  AND NOT EXISTS (
+    SELECT 1 FROM custom_provider
+    WHERE custom_provider."userId" = provider_account."userId"
+      AND custom_provider.slug = provider_account.provider
+      AND (
+        custom_provider."createdAt" > $3::timestamptz - interval '3 days'
+        OR (SELECT COALESCE(SUM(pa."successCount"), 0) FROM provider_account pa WHERE pa."userId" = custom_provider."userId" AND pa.provider = custom_provider.slug) < 10
+      )
+  )
   AND (CARDINALITY($4::text[]) = 0 OR NOT (provider_account.id = ANY($4::text[])))
   AND (CARDINALITY($5::text[]) = 0 OR NOT (provider_account.provider = ANY($5::text[])))
 ORDER BY provider_account.status ASC, provider_account."lastUsedAt" ASC NULLS FIRST, provider_account."createdAt" ASC
