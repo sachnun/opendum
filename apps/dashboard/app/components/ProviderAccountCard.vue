@@ -581,18 +581,6 @@ function getErrorToneClass(entry: ErrorPreviewEntry | null | undefined): string 
   return getRecoveredErrorToneClass(entry, hasRecoveredAfterError);
 }
 
-const latestHistoryEntry = computed<ErrorPreviewEntry | null>(() => {
-  const entry = historyEntries.value?.[0];
-  if (!entry) return null;
-  return {
-    id: entry.id,
-    model: entry.model ?? getErrorMessageModel(entry.errorMessage, entry.errorCode),
-    errorCode: entry.errorCode,
-    errorMessage: entry.errorMessage,
-    createdAt: entry.createdAt,
-  };
-});
-const errorToneClass = computed(() => getErrorToneClass(latestHistoryEntry.value));
 const allErrorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
   return (historyEntries.value ?? [])
     .map((entry) => ({
@@ -603,12 +591,6 @@ const allErrorPreviewEntries = computed<ErrorPreviewEntry[]>(() => {
       createdAt: entry.createdAt,
     }))
     .sort((a, b) => (toTimeMs(b.createdAt) ?? 0) - (toTimeMs(a.createdAt) ?? 0));
-});
-const lastErrorAt = computed(() => {
-  const accountMs = toTimeMs(props.account.lastErrorAt) ?? 0;
-  const newestEntry = allErrorPreviewEntries.value[0];
-  const historyMs = toTimeMs(newestEntry?.createdAt) ?? 0;
-  return historyMs > accountMs ? (newestEntry?.createdAt ?? null) : props.account.lastErrorAt;
 });
 const errorPreviewWindowStart = computed(() => {
   const total = allErrorPreviewEntries.value.length;
@@ -1084,7 +1066,6 @@ function cancelErrorPreviewPointer() {
           </div>
 
           <div class="flex justify-between"><span class="text-muted-foreground">Last used</span><span class="font-medium">{{ account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : '-' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">Last error</span><span :class="['font-medium', lastErrorAt ? errorToneClass : 'text-muted-foreground']">{{ lastErrorAt ? formatRelativeTime(lastErrorAt) : '-' }}</span></div>
 
           <div :class="['min-h-14', activeErrorEntry ? '' : 'hidden sm:block']">
             <div class="space-y-1.5 pt-2">
