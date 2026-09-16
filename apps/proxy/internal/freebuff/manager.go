@@ -228,11 +228,11 @@ func (m *Manager) endIdleSession(ctx context.Context, state *accountState) {
 	timeout := state.idleTimeout
 	token := state.token
 	userID := state.userID
-	if session == nil || session.status != statusActive || token == "" || idleFor < timeout {
+	if session == nil || session.status != statusActive || token == "" || session.instanceID == "" || idleFor < timeout {
 		state.mu.Unlock()
 		return
 	}
-	if err := m.client.EndSession(ctx, token, userID); err != nil {
+	if err := m.client.EndSession(ctx, token, userID, session.instanceID); err != nil {
 		state.lastError = err.Error()
 		snap := state.snapshot(state.id)
 		state.mu.Unlock()
@@ -335,7 +335,7 @@ func (m *Manager) refreshSession(ctx context.Context, state *accountState, token
 				return nil, &sessionBlockedError{status: string(statusModelLocked), retryAfter: stateResponse.retryAfter}
 			}
 			retriedSwitch = true
-			_ = m.client.EndSession(ctx, token, userID)
+			_ = m.client.EndSession(ctx, token, userID, strings.TrimSpace(stateResponse.InstanceID))
 			stateResponse, err = m.client.CreateOrRefreshSession(ctx, token, userID, model)
 			if err != nil {
 				state.lastError = err.Error()

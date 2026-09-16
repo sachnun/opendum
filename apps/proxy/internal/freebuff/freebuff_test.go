@@ -392,6 +392,50 @@ func TestCooldownBlocksPrepare(t *testing.T) {
 	}
 }
 
+func TestEndIdleSessionsSendsInstanceID(t *testing.T) {
+	var instances []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		instances = append(instances, r.Header.Get("x-freebuff-instance-id"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ended"}`))
+	}))
+	defer server.Close()
+	manager := NewManager(&Client{baseURL: server.URL, http: server.Client()}, nil)
+	state := seedIdleState(manager, "acc", time.Now().Add(-16*time.Minute))
+
+	manager.EndIdleSessions(context.Background())
+
+	if len(instances) != 1 || instances[0] != "inst" {
+		t.Fatalf("instance headers = %v, want [inst]", instances)
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.session != nil {
+		t.Fatal("ended session was not cleared")
+	}
+}
+
+func TestEndIdleSessionsKeepsSessionWhenDeleteFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"instance_required"}`))
+	}))
+	defer server.Close()
+	manager := NewManager(&Client{baseURL: server.URL, http: server.Client()}, nil)
+	state := seedIdleState(manager, "acc", time.Now().Add(-16*time.Minute))
+
+	manager.EndIdleSessions(context.Background())
+
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.session == nil {
+		t.Fatal("session must be kept when the upstream refuses the delete")
+	}
+	if snap := state.snapshot("acc"); snap.Status != "active" {
+		t.Fatalf("snapshot status = %q, want active", snap.Status)
+	}
+}
+
 func TestCooldownIgnoresNonPositiveDuration(t *testing.T) {
 	manager := NewManager(nil, nil)
 	manager.Cooldown("acc", 0, "noop")
