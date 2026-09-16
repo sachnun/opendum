@@ -13,7 +13,6 @@ import (
 
 const (
 	actingUserIDHeader = "x-freebuff-acting-user-id"
-	clientUserAgent    = "Freebuff-CLI/dev"
 	chatUserAgent      = "ai-sdk/openai-compatible/3.0.25/codebuff"
 )
 
@@ -118,7 +117,7 @@ func setAuthHeaders(req *http.Request, token, userID string, chat bool) {
 		req.Header.Set("User-Agent", chatUserAgent)
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		req.Header.Set("User-Agent", clientUserAgent)
+		req.Header.Set("User-Agent", ClientUserAgent())
 		req.Header.Set("Accept", "application/json, text/plain, */*")
 		req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 		req.Header.Set("Cache-Control", "no-cache")

@@ -14,6 +14,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
+	"github.com/opendum/opendum/apps/proxy/internal/freebuff"
 	"github.com/opendum/opendum/apps/proxy/internal/models"
 )
 
@@ -88,7 +89,7 @@ func (r *Registry) TorReady() bool {
 	return torReady(r.tor, r.torClient)
 }
 
-func (r *Registry) StartFreebuffIdleReaper(ctx context.Context) {
+func (r *Registry) StartFreebuffMaintenance(ctx context.Context) {
 	if r == nil {
 		return
 	}
@@ -96,6 +97,7 @@ func (r *Registry) StartFreebuffIdleReaper(ctx context.Context) {
 	if !ok {
 		return
 	}
+	freebuff.StartVersionRefresher(ctx)
 	go provider.manager.StartIdleReaper(ctx)
 }
 

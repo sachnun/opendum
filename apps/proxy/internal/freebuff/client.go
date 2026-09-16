@@ -197,7 +197,7 @@ func (c *Client) doSession(ctx context.Context, method, path, token, userID, ins
 	}
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", clientUserAgent)
+	req.Header.Set("User-Agent", ClientUserAgent())
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-freebuff-wallet-spend-limit", "0")

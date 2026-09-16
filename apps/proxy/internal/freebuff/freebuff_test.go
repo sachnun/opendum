@@ -436,6 +436,25 @@ func TestEndIdleSessionsKeepsSessionWhenDeleteFails(t *testing.T) {
 	}
 }
 
+func TestClientUserAgentFollowsPublishedVersion(t *testing.T) {
+	previous, had := clientVersion.Load().(string)
+	t.Cleanup(func() {
+		if had {
+			clientVersion.Store(previous)
+			return
+		}
+		clientVersion.Store("")
+	})
+	clientVersion.Store("")
+	if got := ClientUserAgent(); got != "Freebuff-CLI/"+clientVersionFallback {
+		t.Fatalf("fallback user agent = %q", got)
+	}
+	clientVersion.Store("9.9.9")
+	if got := ClientUserAgent(); got != "Freebuff-CLI/9.9.9" {
+		t.Fatalf("published user agent = %q", got)
+	}
+}
+
 func TestCooldownIgnoresNonPositiveDuration(t *testing.T) {
 	manager := NewManager(nil, nil)
 	manager.Cooldown("acc", 0, "noop")
