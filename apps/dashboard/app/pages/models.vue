@@ -3,6 +3,7 @@ import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-
 import { compareModelEntries } from "../../lib/model-sort";
 import type { ModelFamilyCounts } from "../../lib/navigation";
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
+import { costEntries, formatCostPoints, type ModelCost } from "../../lib/model-cost";
 import { getProviderLabel } from "../../lib/provider-accounts";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
@@ -314,6 +315,10 @@ function updateModelEnabled(modelId: string, enabled: boolean) {
   data.value = data.value.map((model) => (model.id === modelId ? { ...model, isEnabled: enabled } : model));
 }
 
+function modelCostSummary(cost: ModelCost) {
+  return `${formatCostPoints(cost.input ?? 0)}/${formatCostPoints(cost.output ?? 0)}`;
+}
+
 async function setModelEnabled(model: ModelListItem, enabled: boolean) {
   if (isAuditMode.value) return;
   pendingModelId.value = model.id;
@@ -455,18 +460,34 @@ watch(
                   </div>
                 </div>
 
-                <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                  <UiBadge
-                    v-for="provider in model.providers"
-                    :key="provider"
-                    variant="outline"
-                    :class="[
-                      'text-[10px] font-normal',
-                      activeProviders.includes(provider) ? '' : 'border-border/60 text-muted-foreground opacity-70',
-                    ].join(' ')"
-                  >
-                    {{ getProviderLabel(provider) }}
-                  </UiBadge>
+                <div class="mt-1 flex items-start justify-between gap-2">
+                  <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <UiBadge
+                      v-for="provider in model.providers"
+                      :key="provider"
+                      variant="outline"
+                      :class="[
+                        'text-[10px] font-normal',
+                        activeProviders.includes(provider) ? '' : 'border-border/60 text-muted-foreground opacity-70',
+                      ].join(' ')"
+                    >
+                      {{ getProviderLabel(provider) }}
+                    </UiBadge>
+                  </div>
+                  <UiTooltip v-if="model.cost" side="left">
+                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-normal leading-none text-muted-foreground tabular-nums">
+                      <UiIcon name="i-lucide-coins" class="size-3" />
+                      {{ modelCostSummary(model.cost) }}
+                    </span>
+                    <template #content>
+                      <div class="space-y-0.5">
+                        <p class="font-medium">Cost in points per 1M tokens</p>
+                        <p v-for="entry in costEntries(model.cost)" :key="entry.label">
+                          {{ entry.label }}: {{ formatCostPoints(entry.value) }}
+                        </p>
+                      </div>
+                    </template>
+                  </UiTooltip>
                 </div>
               </UiCardHeader>
 
