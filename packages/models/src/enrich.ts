@@ -137,7 +137,7 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
   }
 
   if (stats.divergent.length > 0) {
-    console.log(`[metadata] context differs across providers (${stats.divergent.length}), parent exposes the minimum:`);
+    console.log(`[metadata] context differs across providers (${stats.divergent.length}), parent exposes the maximum:`);
     for (const item of stats.divergent) {
       console.log(`  ${item.id}: ${item.min}..${item.max}`);
     }

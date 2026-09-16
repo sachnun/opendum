@@ -453,8 +453,8 @@ export function buildModelPatch(
     .filter((value): value is number => typeof value === "number");
 
   const limits: ModelLimit = {};
-  if (contexts.length > 0) limits.context = Math.min(...contexts);
-  if (outputs.length > 0) limits.output = Math.min(...outputs);
+  if (contexts.length > 0) limits.context = Math.max(...contexts);
+  if (outputs.length > 0) limits.output = Math.max(...outputs);
 
   return {
     owner,
