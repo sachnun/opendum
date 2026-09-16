@@ -1,7 +1,6 @@
 {
   "owner": "qwen",
   "providers": [
-    "qoder",
     "hyper"
   ],
   "aliases": [
@@ -33,11 +32,6 @@
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 65536
-    },
-    "qoder": {
-      "upstream": "qmodel_preview",
-      "contextWindow": 991000,
-      "maxOutputTokens": 131072
     }
   }
 }

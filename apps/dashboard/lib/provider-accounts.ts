@@ -116,18 +116,6 @@ const PROVIDER_ACCOUNT_DEFINITIONS_SOURCE = [
     navOrder: 10,
   },
   {
-    key: "qoder",
-    slug: "qoder",
-    label: "Qoder",
-    category: "oauth",
-    showTier: false,
-    authMethods: ["device_code", "api_key"],
-    supportsQuota: false,
-    apiKeyPortalUrl: "https://qoder.com/account/integrations",
-    apiKeyPlaceholder: "pt-...",
-    displayOrder: 9,
-  },
-  {
     key: "zenmux",
     slug: "zenmux",
     label: "ZenMux",
@@ -210,9 +198,9 @@ export const PROVIDER_ACCOUNT_DEFINITIONS: readonly ProviderAccountDefinition[] 
 export const PROVIDER_ACCOUNT_KEYS: readonly ProviderAccountKey[] = PROVIDER_ACCOUNT_DEFINITIONS_SOURCE.map((definition) => definition.key);
 
 export const OAUTH_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch"] as const;
-export const DEVICE_PROVIDER_KEYS = ["codex", "qoder", "cline", "workbuddy", "freebuff"] as const;
+export const DEVICE_PROVIDER_KEYS = ["codex", "cline", "workbuddy", "freebuff"] as const;
 export const API_KEY_PROVIDER_KEYS = ["nvidia_nim", "openrouter", "zenmux", "harbor", "hyper"] as const;
-export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch", "openrouter", "zenmux", "hyper", "workbuddy", "qoder"] as const;
+export const QUOTA_PROVIDER_KEYS = ["antigravity", "codex", "kiro", "perch", "openrouter", "zenmux", "hyper", "workbuddy"] as const;
 
 export type OAuthProviderKey = (typeof OAUTH_PROVIDER_KEYS)[number];
 export type DeviceProviderKey = (typeof DEVICE_PROVIDER_KEYS)[number];

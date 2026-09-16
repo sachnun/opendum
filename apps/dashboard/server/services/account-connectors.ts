@@ -103,96 +103,6 @@ async function connectApiKeyProviderAccount(userId: string, provider: ApiKeyProv
   return { success: true, data: { email: identifier, isUpdate: false } };
 }
 
-async function connectQoderPATAccount(userId: string, pat: string, accountName?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
-  const normalizedPAT = pat.trim();
-  if (!normalizedPAT) return { success: false, error: "API key is required" };
-
-  // Qoder PATs cannot authenticate inference directly: they must be exchanged
-  // for a short-lived session token first. The exchange doubles as
-  // validation (200 -> valid PAT, 401 -> rejected).
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_KEY_VALIDATION_TIMEOUT_MS);
-  let exchange: { token?: string; refresh_token?: string; expires_at?: string; expires_in?: number };
-  try {
-    const response = await fetchInternalProvider("https://openapi.qoder.sh/api/v1/jobToken/exchange", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ personal_token: normalizedPAT }),
-      signal: controller.signal,
-    });
-    if (response.headers.get(INTERNAL_RELAY_ERROR_HEADER) === "1") return { success: false, error: "Unable to validate Qoder API key through the proxy. Please try again." };
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => "");
-      if (response.status === 401 || response.status === 403) return { success: false, error: "Qoder API key is invalid, expired, or revoked." };
-      const normalizedBody = responseText.toLowerCase();
-      if (normalizedBody.includes("token is not active") || normalizedBody.includes("invalid api key") || normalizedBody.includes("unauthorized")) return { success: false, error: "Qoder API key is invalid, expired, or revoked." };
-      return { success: false, error: `Unable to validate Qoder API key right now (HTTP ${response.status}). Please try again.` };
-    }
-    exchange = await response.json().catch(() => ({}));
-  } catch (error) {
-    if (error instanceof InternalRelayNotConfiguredError) return { success: false, error: "Proxy URL is required to validate Qoder API keys. Set NUXT_PUBLIC_PROXY_URL to your proxy URL." };
-    if (error instanceof Error && error.name === "AbortError") return { success: false, error: "Qoder API key validation timed out. Please try again." };
-    return { success: false, error: "Unable to validate Qoder API key. Please check your network and try again." };
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  const accessToken = exchange.token;
-  if (!accessToken) return { success: false, error: "Qoder API key exchange returned an empty session token." };
-  const refreshToken = exchange.refresh_token || accessToken;
-
-  // The exchange does not return the user id; resolve it via /userinfo so the
-  // proxy can build COSY-signed inference requests later.
-  let qoderUserId = "";
-  let identityEmail = "";
-  try {
-    const userResponse = await fetchInternalProvider("https://openapi.qoder.sh/api/v1/userinfo", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (userResponse.ok) {
-      const user = await userResponse.json().catch(() => ({})) as { id?: string; email?: string; username?: string };
-      qoderUserId = user.id || "";
-      identityEmail = user.email || user.username || "";
-    }
-  } catch {
-    // userinfo is best-effort; the account identifier keys off the PAT hash
-    // so a missing user id does not prevent persistence.
-  }
-
-  // A per-account machine_id drives COSY request signing. Generate one here
-  // and persist it alongside the user id as "<user_id>|<machine_id>" in
-  // accountId; the proxy unpacks both values when signing.
-  const machineId = qoderUserId ? `${qoderUserId}-${hashString(normalizedPAT).slice(0, 8)}` : hashString(normalizedPAT).slice(0, 16);
-  const packedAccountId = qoderUserId ? `${qoderUserId}|${machineId}` : machineId;
-  const expiresAt = parseApiKeyExpiry(exchange.expires_at, exchange.expires_in);
-  const identifier = identityEmail || `qoder-${hashString(normalizedPAT).slice(0, 16)}`;
-  const normalizedAccountName = accountName?.trim();
-
-  const [existingAccount] = await db.select().from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "qoder"), eq(providerAccount.email, identifier))).limit(1);
-  if (existingAccount) {
-    await db.update(providerAccount).set({ accessToken: encrypt(accessToken), refreshToken: encrypt(refreshToken), expiresAt, accountId: packedAccountId, ...(normalizedAccountName ? { name: normalizedAccountName } : {}), isActive: true, disabledUntil: null }).where(eq(providerAccount.id, existingAccount.id));
-    await clearRefreshFailCount(existingAccount.id);
-    return { success: true, data: { email: identifier, isUpdate: true } };
-  }
-
-  const [countResult] = await db.select({ value: countFn() }).from(providerAccount).where(and(eq(providerAccount.userId, userId), eq(providerAccount.provider, "qoder")));
-  await db.insert(providerAccount).values({ userId, provider: "qoder", name: normalizedAccountName || `Qoder ${(countResult?.value ?? 0) + 1}`, accessToken: encrypt(accessToken), refreshToken: encrypt(refreshToken), expiresAt, email: identifier, accountId: packedAccountId, isActive: true });
-  return { success: true, data: { email: identifier, isUpdate: false } };
-}
-
-function parseApiKeyExpiry(expiresAtISO?: string, expiresInSeconds?: number): Date {
-  if (expiresAtISO) {
-    const parsed = Date.parse(expiresAtISO);
-    if (Number.isFinite(parsed)) return new Date(parsed);
-  }
-  if (typeof expiresInSeconds === "number" && Number.isFinite(expiresInSeconds) && expiresInSeconds > 0) {
-    return new Date(Date.now() + expiresInSeconds * 1000);
-  }
-  return new Date(Date.now() + 60 * 60 * 1000);
-}
-
 async function connectCloudflare(userId: string, apiToken: string, cfAccountId: string, accountName?: string): Promise<ActionResult<{ email: string; isUpdate: boolean }>> {
   const normalizedApiToken = apiToken.trim();
   const normalizedAccountId = cfAccountId.trim();
@@ -234,7 +144,6 @@ async function connectCloudflare(userId: string, apiToken: string, cfAccountId: 
 
 const ACCOUNT_CONNECTORS = {
   ...Object.fromEntries(apiKeyProviderSchema.options.map((provider) => [provider, (userId: string, input: CreateAccountInput) => connectApiKeyProviderAccount(userId, provider, input.token, input.name, input.platformKey)])),
-  qoder: (userId: string, input: CreateAccountInput) => connectQoderPATAccount(userId, input.token, input.name),
   workers_ai: (userId: string, input: CreateAccountInput) => connectCloudflare(userId, input.token, input.cfAccountId ?? "", input.name),
 } as Record<string, (userId: string, input: CreateAccountInput) => Promise<ActionResult<{ email: string; isUpdate: boolean }>>>;
 

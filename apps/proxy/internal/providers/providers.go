@@ -113,7 +113,6 @@ func NewRegistry(registry *models.Registry, db *appdb.DB, redis *redis.Client) *
 		"harbor":      openAICompatibleProvider{name: "harbor", baseURL: "https://tokenharbor.ai/v1", supportedParams: supportedHarbor, registry: registry, trimPrefix: "harbor/"},
 		"codex":       codexProvider{registry: registry, redis: redis, db: db},
 		"antigravity": antigravityProvider{registry: registry, db: db, redis: redis},
-		"qoder":       qoderProvider{registry: registry},
 		"workbuddy":   workbuddyProvider{registry: registry},
 		"zenmux":      openAICompatibleProvider{name: "zenmux", baseURL: "https://zenmux.ai/api/v1", supportedParams: supportedZenmux, registry: registry, trimPrefix: "zenmux/"},
 		"hyper":       openAICompatibleProvider{name: "hyper", baseURL: "https://hyper.charm.land/v1", supportedParams: supportedHyper, registry: registry, trimPrefix: "hyper/"},
@@ -612,8 +611,6 @@ func set(values ...string) map[string]struct{} {
 	}
 	return out
 }
-
-var supportedQoder = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 
 var supportedZenmux = set("model", "messages", "temperature", "top_p", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "presence_penalty", "frequency_penalty", "n", "stop", "seed", "response_format", "reasoning", "reasoning_effort")
 

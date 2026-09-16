@@ -16,7 +16,6 @@ func TestProviderDisplayName(t *testing.T) {
 		{"nvidia_nim", "Nvidia"},
 		{"openrouter", "OpenRouter"},
 		{"workers_ai", "Cloudflare"},
-		{"qoder", "Qoder"},
 		{"zenmux", "ZenMux"},
 		{"opencode", "Opencode"},
 		{"kilo_code", "Kilo Code"},

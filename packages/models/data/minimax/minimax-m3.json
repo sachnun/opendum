@@ -2,7 +2,6 @@
   "owner": "minimax",
   "providers": [
     "zenmux",
-    "qoder",
     "hyper",
     "perch",
     "freebuff"
@@ -41,11 +40,6 @@
       "maxOutputTokens": 512000
     },
     "perch": {
-      "contextWindow": 512000,
-      "maxOutputTokens": 80000
-    },
-    "qoder": {
-      "upstream": "mmodel",
       "contextWindow": 512000,
       "maxOutputTokens": 80000
     },

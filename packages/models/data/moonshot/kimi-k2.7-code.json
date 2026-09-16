@@ -2,7 +2,6 @@
   "owner": "moonshot",
   "providers": [
     "zenmux",
-    "qoder",
     "hyper",
     "perch"
   ],
@@ -40,11 +39,6 @@
     },
     "perch": {
       "upstream": "kimi-k2-7-code",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
-    },
-    "qoder": {
-      "upstream": "kmodel",
       "contextWindow": 262144,
       "maxOutputTokens": 262144
     },

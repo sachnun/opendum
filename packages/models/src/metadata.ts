@@ -24,7 +24,6 @@ export const PROVIDER_TO_MODELSDEV: Readonly<Record<string, string>> = {
   nvidia_nim: "nvidia",
   opencode: "opencode",
   cline: "cline",
-  qoder: "qoder",
   codex: "openai",
   workers_ai: "cloudflare-workers-ai",
 };

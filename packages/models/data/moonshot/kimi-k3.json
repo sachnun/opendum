@@ -2,7 +2,6 @@
   "owner": "moonshot",
   "providers": [
     "nvidia_nim",
-    "qoder",
     "hyper",
     "workbuddy",
     "perch"
@@ -39,11 +38,6 @@
       "maxOutputTokens": 131072
     },
     "perch": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "qoder": {
-      "upstream": "kmodel_latest",
       "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },

@@ -12,7 +12,6 @@ var providerDisplayNames = map[string]string{
 	"nvidia_nim":  "Nvidia",
 	"openrouter":  "OpenRouter",
 	"workers_ai":  "Cloudflare",
-	"qoder":       "Qoder",
 	"workbuddy":   "WorkBuddy",
 	"zenmux":      "ZenMux",
 	"opencode":    "Opencode",

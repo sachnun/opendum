@@ -19,7 +19,6 @@ const refreshScripts = [
   "opencode.ts",
   "openrouter.ts",
   "perch.ts",
-  "qoder.ts",
   "nvidia.ts",
   "cloudflare.ts",
   "zenmux.ts",
@@ -30,7 +29,7 @@ const refreshScripts = [
   "../src/enrich.ts",
 ];
 
-const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "freebuff", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "qoder", "workers_ai", "workbuddy", "zenmux"];
+const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "freebuff", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "workers_ai", "workbuddy", "zenmux"];
 
 // ---------------------------------------------------------------------------
 // Run a child script

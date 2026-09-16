@@ -2,7 +2,6 @@
   "owner": "deepseek",
   "providers": [
     "zenmux",
-    "qoder",
     "hyper",
     "perch",
     "freebuff"
@@ -56,11 +55,6 @@
       "maxOutputTokens": 262144
     },
     "perch": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 384000
-    },
-    "qoder": {
-      "upstream": "dmodel",
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },

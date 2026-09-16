@@ -75,7 +75,7 @@ func TestInternalRouteForwardsAllowedURL(t *testing.T) {
 	}
 }
 
-func TestInternalRouteForwardsQoderValidationRequest(t *testing.T) {
+func TestInternalRouteForwardsProviderValidationRequest(t *testing.T) {
 	previousClient := internalRelayClient
 	defer func() { internalRelayClient = previousClient }()
 
@@ -90,7 +90,7 @@ func TestInternalRouteForwardsQoderValidationRequest(t *testing.T) {
 	})}
 
 	recorder := httptest.NewRecorder()
-	body := `{"url":"https://openapi.qoder.sh/api/v1/models","method":"GET","headers":{"Authorization":"Bearer qod_pat_test","Accept":"application/json"}}`
+	body := `{"url":"https://api.example.com/v1/models","method":"GET","headers":{"Authorization":"Bearer test_token","Accept":"application/json"}}`
 	req := signedInternalRefreshRequest([]byte(body))
 
 	(&Server{secret: "test-secret"}).internalRefreshRoute(recorder, req)
@@ -104,10 +104,10 @@ func TestInternalRouteForwardsQoderValidationRequest(t *testing.T) {
 	if capturedMethod != http.MethodGet {
 		t.Fatalf("method = %q, want %q", capturedMethod, http.MethodGet)
 	}
-	if capturedURL != "https://openapi.qoder.sh/api/v1/models" {
+	if capturedURL != "https://api.example.com/v1/models" {
 		t.Fatalf("url = %q", capturedURL)
 	}
-	if capturedAuth != "Bearer qod_pat_test" {
+	if capturedAuth != "Bearer test_token" {
 		t.Fatalf("authorization = %q", capturedAuth)
 	}
 }

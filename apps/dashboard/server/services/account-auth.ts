@@ -7,7 +7,6 @@ import { antigravityProvider } from "../lib/providers/antigravity";
 import { CLIENT_ID as antigravityClientId, REDIRECT_URI as antigravityRedirectUri, SCOPES as antigravityScopes } from "../lib/providers/antigravity/constants";
 import { AUTHORIZE_ENDPOINT as codexAuthorizeEndpoint, BROWSER_REDIRECT_URI as codexBrowserRedirectUri, CLIENT_ID as codexClientId, ORIGINATOR as codexOriginator, SCOPE as codexScope, buildOAuthResultFromChatGPTSession, codexProvider, generateCodeChallenge as generateCodexCodeChallenge, generateCodeVerifier as generateCodexCodeVerifier, initiateCodexDeviceCodeFlow, pollCodexDeviceCodeAuthorization } from "../lib/providers/codex";
 import { BROWSER_REDIRECT_URI as kiroBrowserRedirectUri, buildKiroAuthUrl, generateCodeVerifier as generateKiroCodeVerifier, kiroProvider } from "../lib/providers/kiro";
-import { initiateQoderDeviceCodeFlow, pollQoderDeviceCodeAuthorization } from "../lib/providers/qoder";
 import { initiateWorkbuddyDeviceCodeFlow, pollWorkbuddyDeviceCodeAuthorization } from "../lib/providers/workbuddy";
 import { exchangePerchOAuthCode, initiatePerchOAuth } from "../lib/providers/perch";
 import { initiateClineDeviceCodeFlow, pollClineDeviceCodeAuthorization } from "../lib/providers/cline";
@@ -103,39 +102,6 @@ const DEVICE_PROVIDERS = {
     emailPrefix: "codex",
     initiate: initiateCodexDeviceCodeFlow,
     poll: (input: z.infer<typeof pollDeviceAuthInputSchema>) => pollCodexDeviceCodeAuthorization(input.deviceCode, input.userCode ?? ""),
-  },
-  qoder: {
-    label: "Qoder",
-    emailPrefix: "qoder",
-    initiate: async (_input?: z.infer<typeof initiateDeviceAuthInputSchema>) => {
-      const result = await initiateQoderDeviceCodeFlow();
-      return {
-        // Qoder has no short user_code; consent happens entirely in the
-        // browser at the authorize URL. The nonce drives the poll and is
-        // carried through the existing deviceCode field.
-        deviceCode: result.nonce,
-        userCode: result.userCode,
-        verificationUrl: result.authUrl,
-        verificationUrlComplete: result.authUrl,
-        // The verifier is carried through the shared codeVerifier field so
-        // the dashboard device-code flow needs no qoder-specific UI state.
-        codeVerifier: result.codeVerifier,
-        machineId: result.machineId,
-        expiresIn: result.expiresIn,
-        interval: result.interval,
-      };
-    },
-    poll: async (input: z.infer<typeof pollDeviceAuthInputSchema>) => {
-      const result = await pollQoderDeviceCodeAuthorization(input.codeVerifier ?? "", input.deviceCode);
-      if ("pending" in result || "error" in result) return result;
-      // Persist both the Qoder user_id (returned by the device poll) and the
-      // machine_id (generated at initiation) on the account record, packed
-      // into accountId as "<user_id>|<machine_id>". The proxy unpacks these
-      // to build COSY-signed inference requests.
-      const userId = result.accountId || "";
-      const machineId = input.machineId || "";
-      return { ...result, accountId: machineId ? `${userId}|${machineId}` : userId };
-    },
   },
   workbuddy: {
     label: "WorkBuddy",

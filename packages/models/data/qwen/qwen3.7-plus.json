@@ -2,7 +2,6 @@
   "owner": "qwen",
   "providers": [
     "zenmux",
-    "qoder",
     "hyper"
   ],
   "modalities": {
@@ -29,11 +28,6 @@
   },
   "providerConfig": {
     "hyper": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 64000
-    },
-    "qoder": {
-      "upstream": "qmodel",
       "contextWindow": 1000000,
       "maxOutputTokens": 64000
     },
