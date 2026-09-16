@@ -172,7 +172,8 @@ func (s *Service) refundRoamingPoint(ctx context.Context, reservation *pointRese
 
 // adjustRoamingPoints settles the difference between the amount held when the
 // roaming request started and the points the request actually cost. A positive
-// delta debits the difference, a negative delta refunds it.
+// delta debits the difference and may push the balance negative; a negative
+// delta refunds it.
 func (s *Service) adjustRoamingPoints(ctx context.Context, reservation *pointReservation, points int) {
 	if reservation == nil || reservation.UserID == "" {
 		return
@@ -220,7 +221,7 @@ func (s *Service) adjustRoamingPoints(ctx context.Context, reservation *pointRes
 
 		var balanceAfter int
 		if delta > 0 {
-			balanceAfter, err = q.DebitPointBalance(ctx, appdb.DebitPointBalanceParams{
+			balanceAfter, err = q.DebitPointBalanceAllowNegative(ctx, appdb.DebitPointBalanceAllowNegativeParams{
 				Balance:   delta,
 				UpdatedAt: now,
 				UserID:    reservation.UserID,
