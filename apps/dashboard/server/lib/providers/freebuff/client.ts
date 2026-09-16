@@ -44,10 +44,10 @@ function generateFingerprintId(): string {
   return `enhanced-${Buffer.from(bytes).toString("base64url")}`;
 }
 
-function expiresAtString(value: string | number | undefined): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
-  return new Date(Date.now() + DEVICE_CODE_EXPIRY_SECONDS * 1000).toISOString();
+function expiresAtValue(value: string | number | undefined): string {
+  if (typeof value === "string" && value.trim() !== "") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return String(Date.now() + DEVICE_CODE_EXPIRY_SECONDS * 1000);
 }
 
 export async function initiateFreebuffDeviceCodeFlow(): Promise<FreebuffInitiateResult> {
@@ -68,7 +68,7 @@ export async function initiateFreebuffDeviceCodeFlow(): Promise<FreebuffInitiate
   const state: FreebuffLoginState = {
     fingerprintId,
     fingerprintHash: data.fingerprintHash ?? fingerprintId,
-    expiresAt: expiresAtString(data.expiresAt),
+    expiresAt: expiresAtValue(data.expiresAt),
   };
   return {
     deviceCode: JSON.stringify(state),
@@ -102,6 +102,10 @@ export async function pollFreebuffDeviceCodeAuthorization(
   });
 
   if (response.status === 401) return { pending: true, retryAfterSeconds: POLLING_INTERVAL_SECONDS };
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    return { error: `Freebuff login status check failed (${response.status}): ${body}` };
+  }
   const data = (await response.json().catch(() => ({}))) as FreebuffStatusResponse;
   const user = data.user;
   if (user?.authToken) {
