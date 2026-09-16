@@ -19,6 +19,8 @@ type usageParams struct {
 	Model             string
 	InputTokens       int
 	OutputTokens      int
+	CachedTokens      int
+	CacheWriteTokens  int
 	StatusCode        int
 	DurationMS        int
 	Provider          string
@@ -47,6 +49,8 @@ func (s *Service) logUsage(ctx context.Context, params usageParams) {
 		Model:             params.Model,
 		InputTokens:       params.InputTokens,
 		OutputTokens:      params.OutputTokens,
+		CachedTokens:      params.CachedTokens,
+		CacheWriteTokens:  params.CacheWriteTokens,
 		StatusCode:        &status,
 		Duration:          &duration,
 		CreatedAt:         now,

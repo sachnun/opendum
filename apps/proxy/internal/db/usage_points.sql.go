@@ -133,8 +133,8 @@ func (q *Queries) InsertPointTransactionOnConflictDoNothing(ctx context.Context,
 }
 
 const insertUsageLog = `-- name: InsertUsageLog :exec
-INSERT INTO usage_log (id, "userId", "providerAccountId", "proxyApiKeyId", model, "inputTokens", "outputTokens", "statusCode", duration, "createdAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO usage_log (id, "userId", "providerAccountId", "proxyApiKeyId", model, "inputTokens", "outputTokens", "cachedTokens", "cacheWriteTokens", "statusCode", duration, "createdAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 `
 
 type InsertUsageLogParams struct {
@@ -145,6 +145,8 @@ type InsertUsageLogParams struct {
 	Model             string
 	InputTokens       int
 	OutputTokens      int
+	CachedTokens      int
+	CacheWriteTokens  int
 	StatusCode        *int
 	Duration          *int
 	CreatedAt         time.Time
@@ -159,6 +161,8 @@ func (q *Queries) InsertUsageLog(ctx context.Context, arg InsertUsageLogParams) 
 		arg.Model,
 		arg.InputTokens,
 		arg.OutputTokens,
+		arg.CachedTokens,
+		arg.CacheWriteTokens,
 		arg.StatusCode,
 		arg.Duration,
 		arg.CreatedAt,

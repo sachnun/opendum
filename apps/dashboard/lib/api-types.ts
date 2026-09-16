@@ -272,7 +272,7 @@ export type AnalyticsFilter = Period | { from: string; to: string };
 
 export interface AnalyticsData {
   requestsOverTime: Array<{ date: string; count: number }>;
-  tokenUsage: Array<{ date: string; input: number; output: number }>;
+  tokenUsage: Array<{ date: string; input: number; output: number; cache: number; cacheWrite: number }>;
   requestsByModel: Array<{ model: string; count: number }>;
   modelDistribution: Array<{ model: string; value: number; percentage: number }>;
   successRate: Array<{ date: string; success: number; error: number; successRate?: number; errorRate?: number }>;
@@ -282,6 +282,8 @@ export interface AnalyticsData {
     totalRequests: number;
     totalInputTokens: number;
     totalOutputTokens: number;
+    totalCachedTokens: number;
+    totalCacheWriteTokens: number;
     avgDuration: number;
     durationPercentiles: { p30: number; p50: number; p60: number; p75: number; p90: number; p95: number; p99: number };
     successRate: number;

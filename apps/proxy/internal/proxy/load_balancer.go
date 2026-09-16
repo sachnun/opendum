@@ -603,12 +603,12 @@ func (s *Service) markAccountSuccess(ctx context.Context, accountID, model strin
 	_, _ = s.refreshAccountHealthFromModels(ctx, accountID, now)
 }
 
-func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, durationMS int, stream bool, requestStartMS, upstreamFirstResponseMS int64) {
+func (s *Service) recordSuccessfulRequest(ctx context.Context, accountID, provider, model, userID, apiKeyID string, inputTokens, outputTokens, cachedTokens, cacheWriteTokens, durationMS int, stream bool, requestStartMS, upstreamFirstResponseMS int64) {
 	s.markAccountSuccess(ctx, accountID, model)
 	if upstreamFirstResponseMS > requestStartMS {
 		s.recordLatency(ctx, provider, model, stream, upstreamFirstResponseMS-requestStartMS)
 	}
-	s.logUsage(ctx, usageParams{UserID: userID, ProviderAccountID: accountID, ProxyAPIKeyID: apiKeyID, Model: model, InputTokens: inputTokens, OutputTokens: outputTokens, StatusCode: http.StatusOK, DurationMS: durationMS, Provider: provider})
+	s.logUsage(ctx, usageParams{UserID: userID, ProviderAccountID: accountID, ProxyAPIKeyID: apiKeyID, Model: model, InputTokens: inputTokens, OutputTokens: outputTokens, CachedTokens: cachedTokens, CacheWriteTokens: cacheWriteTokens, StatusCode: http.StatusOK, DurationMS: durationMS, Provider: provider})
 }
 
 func (s *Service) markAccountFailed(ctx context.Context, accountID, model string, statusCode int, message string) time.Time {

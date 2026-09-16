@@ -14,6 +14,8 @@ type openAIStreamUsageTracker struct {
 	scanner               sseScanner
 	inputTokens           int
 	outputTokens          int
+	cachedTokens          int
+	cacheWriteTokens      int
 	hypercreditsRemaining *float64
 	hypercreditsCost      float64
 }
@@ -31,8 +33,8 @@ func (t *openAIStreamUsageTracker) processEvent(event sseEvent) {
 	if err := json.Unmarshal([]byte(event.Data), &parsed); err != nil {
 		return
 	}
-	usage, ok := parsed["usage"].(map[string]any)
-	if !ok {
+	usage := usageObject(parsed)
+	if len(usage) == 0 {
 		return
 	}
 	if value := numberAsInt(usage["prompt_tokens"]); value > 0 {
@@ -44,6 +46,13 @@ func (t *openAIStreamUsageTracker) processEvent(event sseEvent) {
 		t.outputTokens = value
 	} else if value := numberAsInt(usage["output_tokens"]); value > 0 {
 		t.outputTokens = value
+	}
+	cached, cacheWrite := usageCacheCounts(usage)
+	if cached > 0 {
+		t.cachedTokens = cached
+	}
+	if cacheWrite > 0 {
+		t.cacheWriteTokens = cacheWrite
 	}
 	if remaining, ok := usage["remaining"].(map[string]any); ok {
 		if value := numberAsFloat(remaining["hypercredits"]); value > 0 {
@@ -92,7 +101,7 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 	if ctx.Provider == "hyper" && (tracker.hypercreditsRemaining != nil || tracker.hypercreditsCost > 0) {
 		go s.storeHypercreditsUsage(context.Background(), ctx.AccountID, tracker.hypercreditsRemaining, tracker.hypercreditsCost)
 	}
-	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
 }
 
@@ -103,7 +112,7 @@ func (s *Service) passthroughNonStream(ctx responseContext) error {
 	}
 	var parsed map[string]any
 	_ = json.Unmarshal(body, &parsed)
-	inputTokens, outputTokens := usageFromJSON(parsed)
+	counts := usageFromJSON(parsed)
 	if ctx.Provider == "hyper" {
 		if usage, ok := parsed["usage"].(map[string]any); ok {
 			var remaining *float64
@@ -126,24 +135,75 @@ func (s *Service) passthroughNonStream(ctx responseContext) error {
 	ctx.Writer.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(ctx.Writer, bytes.NewReader(body))
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
-	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, inputTokens, outputTokens, durationMS, false, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, counts.inputTokens, counts.outputTokens, counts.cachedTokens, counts.cacheWriteTokens, durationMS, false, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
 }
 
-func usageFromJSON(parsed map[string]any) (int, int) {
-	usage, ok := parsed["usage"].(map[string]any)
-	if !ok {
-		return 0, 0
+type usageCounts struct {
+	inputTokens      int
+	outputTokens     int
+	cachedTokens     int
+	cacheWriteTokens int
+}
+
+func usageFromJSON(parsed map[string]any) usageCounts {
+	usage := usageObject(parsed)
+	if len(usage) == 0 {
+		return usageCounts{}
 	}
-	input := numberAsInt(usage["prompt_tokens"])
-	if input == 0 {
-		input = numberAsInt(usage["input_tokens"])
+	counts := usageCounts{}
+	if value := numberAsInt(usage["prompt_tokens"]); value > 0 {
+		counts.inputTokens = value
+	} else if value := numberAsInt(usage["input_tokens"]); value > 0 {
+		counts.inputTokens = value
 	}
-	output := numberAsInt(usage["completion_tokens"])
-	if output == 0 {
-		output = numberAsInt(usage["output_tokens"])
+	if value := numberAsInt(usage["completion_tokens"]); value > 0 {
+		counts.outputTokens = value
+	} else if value := numberAsInt(usage["output_tokens"]); value > 0 {
+		counts.outputTokens = value
 	}
-	return input, output
+	counts.cachedTokens, counts.cacheWriteTokens = usageCacheCounts(usage)
+	return counts
+}
+
+// usageObject returns the usage object of a response body. Chat Completions
+// exposes it at the top level while the Responses API nests it under the
+// response object.
+func usageObject(parsed map[string]any) map[string]any {
+	if usage, ok := parsed["usage"].(map[string]any); ok {
+		return usage
+	}
+	if response, ok := parsed["response"].(map[string]any); ok {
+		if usage, ok := response["usage"].(map[string]any); ok {
+			return usage
+		}
+	}
+	return nil
+}
+
+// usageCacheCounts reads cache-read and cache-write token counts using the
+// fields each endpoint exposes: Chat Completions nests them under
+// prompt_tokens_details, Responses nests them under input_tokens_details, and
+// Anthropic Messages exposes cache_read_input_tokens and
+// cache_creation_input_tokens.
+func usageCacheCounts(usage map[string]any) (int, int) {
+	promptDetails, _ := usage["prompt_tokens_details"].(map[string]any)
+	inputDetails, _ := usage["input_tokens_details"].(map[string]any)
+	cached := numberAsInt(promptDetails["cached_tokens"])
+	if cached == 0 {
+		cached = numberAsInt(inputDetails["cached_tokens"])
+	}
+	write := numberAsInt(promptDetails["cache_write_tokens"])
+	if write == 0 {
+		write = numberAsInt(inputDetails["cache_write_tokens"])
+	}
+	if cached == 0 {
+		cached = numberAsInt(usage["cache_read_input_tokens"])
+	}
+	if write == 0 {
+		write = numberAsInt(usage["cache_creation_input_tokens"])
+	}
+	return cached, write
 }
 
 func numberAsInt(value any) int {

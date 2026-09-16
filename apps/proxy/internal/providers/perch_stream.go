@@ -373,7 +373,11 @@ func perchUsageToChatUsage(raw any) map[string]any {
 		return nil
 	}
 	promptTokens := input + cacheRead
-	return map[string]any{"prompt_tokens": promptTokens, "completion_tokens": output, "total_tokens": promptTokens + output}
+	out := map[string]any{"prompt_tokens": promptTokens, "completion_tokens": output, "total_tokens": promptTokens + output}
+	if cacheRead > 0 {
+		out["prompt_tokens_details"] = map[string]any{"cached_tokens": cacheRead}
+	}
+	return out
 }
 
 func perchUsageInt(usage map[string]any, key string) int {

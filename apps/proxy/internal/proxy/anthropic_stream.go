@@ -19,13 +19,13 @@ func (s *Service) anthropicNonStream(ctx responseContext) error {
 	var openAI map[string]any
 	_ = json.Unmarshal(body, &openAI)
 	response := transformOpenAIToAnthropic(openAI, ctx.Model)
-	inputTokens, outputTokens := usageFromJSON(openAI)
+	counts := usageFromJSON(openAI)
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.Header().Set("X-Provider-Account-Id", ctx.AccountID)
 	ctx.Writer.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(ctx.Writer).Encode(response)
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
-	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, inputTokens, outputTokens, durationMS, false, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, counts.inputTokens, counts.outputTokens, counts.cachedTokens, counts.cacheWriteTokens, durationMS, false, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return err
 }
 
@@ -54,7 +54,7 @@ func (s *Service) anthropicStream(ctx responseContext) error {
 	}
 	tracker.Finish()
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
-	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
+	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
 }
 
@@ -75,6 +75,7 @@ type anthropicStreamTracker struct {
 	inputTokens       int
 	outputTokens      int
 	cachedTokens      int
+	cacheWriteTokens  int
 	finishReason      string
 	generatedToolUses int
 }
@@ -97,7 +98,7 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 	if json.Unmarshal([]byte(event.Data), &parsed) != nil {
 		return
 	}
-	if usage, ok := parsed["usage"].(map[string]any); ok {
+	if usage := usageObject(parsed); len(usage) > 0 {
 		if input := numberAsInt(usage["prompt_tokens"]); input > 0 {
 			t.inputTokens = input
 		} else if input := numberAsInt(usage["input_tokens"]); input > 0 {
@@ -108,10 +109,12 @@ func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 		} else if output := numberAsInt(usage["output_tokens"]); output > 0 {
 			t.outputTokens = output
 		}
-		if details, ok := usage["prompt_tokens_details"].(map[string]any); ok {
-			if cached := numberAsInt(details["cached_tokens"]); cached > 0 {
-				t.cachedTokens = cached
-			}
+		cached, cacheWrite := usageCacheCounts(usage)
+		if cached > 0 {
+			t.cachedTokens = cached
+		}
+		if cacheWrite > 0 {
+			t.cacheWriteTokens = cacheWrite
 		}
 	}
 	choices, _ := parsed["choices"].([]any)
@@ -309,6 +312,9 @@ func (t *anthropicStreamTracker) Finish() {
 	deltaUsage := map[string]any{"input_tokens": t.inputTokens, "output_tokens": t.outputTokens}
 	if t.cachedTokens > 0 {
 		deltaUsage["cache_read_input_tokens"] = t.cachedTokens
+	}
+	if t.cacheWriteTokens > 0 {
+		deltaUsage["cache_creation_input_tokens"] = t.cacheWriteTokens
 	}
 	writeAnthropicEvent(t.writer, t.flusher, "message_delta", map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": stopReason, "stop_sequence": nil}, "usage": deltaUsage})
 	writeAnthropicEvent(t.writer, t.flusher, "message_stop", map[string]any{"type": "message_stop"})
