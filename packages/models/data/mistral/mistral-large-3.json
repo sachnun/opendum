@@ -24,6 +24,12 @@
     "context": 256000,
     "output": 131072
   },
+  "cost": {
+    "input": 2.5,
+    "output": 7.5,
+    "cacheRead": 0.25,
+    "cacheWrite": 2.5
+  },
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/mistral-large",

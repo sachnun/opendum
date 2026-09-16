@@ -2,14 +2,29 @@
   "providers": [
     "opencode"
   ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
   "limit": {
-    "context": 4096,
-    "output": 4096
+    "context": 262144,
+    "output": 131072
+  },
+  "cost": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0
   },
   "providerConfig": {
     "opencode": {
-      "contextWindow": 4096,
-      "maxOutputTokens": 4096
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072
     }
   }
 }

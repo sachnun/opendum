@@ -16,6 +16,12 @@
     "context": 200000,
     "output": 131072
   },
+  "cost": {
+    "input": 0.3025,
+    "output": 2,
+    "cacheRead": 0.175,
+    "cacheWrite": 0
+  },
   "providerConfig": {
     "workers_ai": {
       "upstream": "@cf/zai-org/glm-4.7-flash",

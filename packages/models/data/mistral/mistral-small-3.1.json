@@ -25,6 +25,10 @@
     "context": 128000,
     "output": 128000
   },
+  "cost": {
+    "input": 0.5,
+    "output": 1.5
+  },
   "providerConfig": {
     "workers_ai": {
       "upstream": "@cf/mistralai/mistral-small-3.1-24b-instruct",

@@ -17,6 +17,12 @@
     "context": 262144,
     "output": 32768
   },
+  "cost": {
+    "input": 0.3,
+    "output": 0.6,
+    "cacheRead": 0.15,
+    "cacheWrite": 0
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "poolside/laguna-xs-2.1:free",

@@ -21,6 +21,11 @@
     "context": 262144,
     "output": 26214
   },
+  "cost": {
+    "input": 3,
+    "output": 12.5,
+    "cacheRead": 1.5
+  },
   "providerConfig": {
     "hyper": {
       "upstream": "kimi-k2-thinking",

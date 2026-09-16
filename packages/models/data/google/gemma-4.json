@@ -37,6 +37,11 @@
     "context": 262144,
     "output": 235929
   },
+  "cost": {
+    "input": 0.45,
+    "output": 1.5,
+    "cacheRead": 0.18
+  },
   "providerConfig": {
     "hyper": {
       "upstream": "gemma-4-26b-a4b-it",

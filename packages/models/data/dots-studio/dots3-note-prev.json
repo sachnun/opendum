@@ -16,6 +16,10 @@
     "context": 512000,
     "output": 460800
   },
+  "cost": {
+    "input": 0,
+    "output": 0
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "dots-studio/dots3-note-prev",

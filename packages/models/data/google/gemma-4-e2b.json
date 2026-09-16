@@ -17,6 +17,12 @@
     "context": 32768,
     "output": 32768
   },
+  "cost": {
+    "input": 0.2,
+    "output": 0.4,
+    "cacheRead": 0.5,
+    "cacheWrite": 0.5
+  },
   "providerConfig": {
     "perch": {
       "upstream": "gemma-4-e2b",

@@ -16,6 +16,10 @@
     "context": 512000,
     "output": 65536
   },
+  "cost": {
+    "input": 0.15,
+    "output": 0.75
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "sapiens-ai/agnes-2.5-flash",

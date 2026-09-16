@@ -25,6 +25,11 @@
     "context": 131000,
     "output": 16384
   },
+  "cost": {
+    "input": 0.425,
+    "output": 1.5,
+    "cacheRead": 0.2125
+  },
   "providerConfig": {
     "workers_ai": {
       "upstream": "@cf/meta/llama-4-scout-17b-16e-instruct",

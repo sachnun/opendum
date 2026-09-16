@@ -20,6 +20,11 @@
     "context": 1000000,
     "output": 384000
   },
+  "cost": {
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.015
+  },
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/deepseek-v4.1-flash",

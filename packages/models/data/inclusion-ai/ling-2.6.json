@@ -19,6 +19,11 @@
     "context": 262000,
     "output": 65000
   },
+  "cost": {
+    "input": 1.5,
+    "output": 12.5,
+    "cacheRead": 0.3
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "inclusionai/ling-2.6-1t",

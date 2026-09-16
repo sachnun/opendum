@@ -15,6 +15,10 @@
     "context": 262144,
     "output": 32768
   },
+  "cost": {
+    "input": 0,
+    "output": 0
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "inclusionai/ling-3.0-tiny",

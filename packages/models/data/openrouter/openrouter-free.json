@@ -15,6 +15,10 @@
   "limit": {
     "context": 200000
   },
+  "cost": {
+    "input": 0,
+    "output": 0
+  },
   "providerConfig": {
     "openrouter": {
       "upstream": "openrouter/free",

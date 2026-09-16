@@ -15,6 +15,11 @@
     "context": 1048576,
     "output": 64000
   },
+  "cost": {
+    "input": 4.17,
+    "output": 12.505,
+    "cacheRead": 0.21
+  },
   "providerConfig": {
     "workbuddy": {
       "contextWindow": 1048576,

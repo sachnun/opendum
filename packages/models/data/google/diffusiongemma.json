@@ -21,6 +21,12 @@
     "context": 262144,
     "output": 131072
   },
+  "cost": {
+    "input": 2.5,
+    "output": 2.5,
+    "cacheRead": 2.5,
+    "cacheWrite": 2.5
+  },
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "google/diffusiongemma-26b-a4b-it",

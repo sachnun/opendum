@@ -23,6 +23,11 @@
     "context": 430000,
     "output": 43000
   },
+  "cost": {
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.375
+  },
   "providerConfig": {
     "hyper": {
       "upstream": "llama-4-maverick-17b-128e-instruct-fp8",

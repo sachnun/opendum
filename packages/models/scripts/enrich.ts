@@ -4,7 +4,7 @@
  * Enrich the local model registry with external metadata and normalize file
  * placement.
  *
- * Fills `reasoning`, `modalities`, `limit`, and the per-provider
+ * Fills `reasoning`, `modalities`, `limit`, `cost`, and the per-provider
  * `contextWindow` / `maxOutputTokens` by matching local model ids against
  * OpenRouter, models.dev, LiteLLM, and NVIDIA NIM. Also moves root-level model
  * files into their inferred family folder.
@@ -69,6 +69,11 @@ function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
     changed = true;
   }
 
+  if (patch.cost && !sameValue(data.cost, patch.cost)) {
+    data.cost = patch.cost;
+    changed = true;
+  }
+
   for (const provider of data.providers ?? []) {
     const limits = patch.providerLimits[provider];
     if (!limits) continue;
@@ -107,6 +112,7 @@ interface Stats {
   reasoning: number;
   limit: number;
   modalities: number;
+  cost: number;
   providerLimits: number;
   unmatched: string[];
   divergent: Array<{ id: string; min: number; max: number }>;
@@ -123,7 +129,7 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
   console.log(`[metadata] models: ${stats.models}`);
   console.log(
     `[metadata] reasoning: ${stats.reasoning}  limit: ${stats.limit}`
-    + `  modalities: ${stats.modalities}  providerLimits: ${stats.providerLimits}`,
+    + `  modalities: ${stats.modalities}  cost: ${stats.cost}  providerLimits: ${stats.providerLimits}`,
   );
   console.log(`[metadata] updated: ${updatedCount}${dryRun ? " (dry run)" : ""}`);
 
@@ -174,6 +180,7 @@ async function main(): Promise<void> {
     reasoning: 0,
     limit: 0,
     modalities: 0,
+    cost: 0,
     providerLimits: 0,
     unmatched: [],
     divergent: [],
@@ -200,6 +207,7 @@ async function main(): Promise<void> {
 
     const hasAnything = patch.reasoning !== null
       || patch.modalities
+      || patch.cost
       || Object.keys(patch.providerLimits).length > 0;
     if (!hasAnything) {
       stats.unmatched.push(id);
@@ -208,6 +216,7 @@ async function main(): Promise<void> {
 
     if (patch.reasoning !== null) stats.reasoning += 1;
     if (patch.modalities) stats.modalities += 1;
+    if (patch.cost) stats.cost += 1;
     if (Object.keys(patch.limits).length > 0) stats.limit += 1;
     if (Object.keys(patch.providerLimits).length > 0) stats.providerLimits += 1;
 

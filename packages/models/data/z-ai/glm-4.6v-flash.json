@@ -21,6 +21,11 @@
     "context": 200000,
     "output": 64000
   },
+  "cost": {
+    "input": 0.1,
+    "output": 1.05,
+    "cacheRead": 0.0215
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "z-ai/glm-4.6v-flash",

@@ -19,6 +19,11 @@
     "context": 128000,
     "output": 64000
   },
+  "cost": {
+    "input": 1.087,
+    "output": 1.63,
+    "cacheRead": 0.3
+  },
   "providerConfig": {
     "kiro": {
       "upstream": "deepseek-3.2",

@@ -15,6 +15,11 @@
     "context": 1048756,
     "output": 262144
   },
+  "cost": {
+    "input": 1.5,
+    "output": 6,
+    "cacheRead": 0.03
+  },
   "providerConfig": {
     "zenmux": {
       "upstream": "meituan/longcat-2.0",

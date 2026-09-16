@@ -33,6 +33,10 @@
     "context": 32768,
     "output": 32768
   },
+  "cost": {
+    "input": 0.24075,
+    "output": 0.96525
+  },
   "providerConfig": {
     "workers_ai": {
       "upstream": "@cf/qwen/qwen3-30b-a3b-fp8",

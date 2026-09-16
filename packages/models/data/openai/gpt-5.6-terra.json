@@ -20,6 +20,12 @@
     "context": 1050000,
     "output": 128000
   },
+  "cost": {
+    "input": 10,
+    "output": 60,
+    "cacheRead": 1,
+    "cacheWrite": 12.5
+  },
   "providerConfig": {
     "codex": {
       "contextWindow": 1050000,

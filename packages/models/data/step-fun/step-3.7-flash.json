@@ -22,6 +22,12 @@
     "context": 256000,
     "output": 256000
   },
+  "cost": {
+    "input": 0.95,
+    "output": 5.7,
+    "cacheRead": 0.15,
+    "cacheWrite": 0
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "stepfun/step-3.7-flash:free",

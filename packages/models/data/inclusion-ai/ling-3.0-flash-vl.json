@@ -19,6 +19,11 @@
     "context": 262144,
     "output": 32768
   },
+  "cost": {
+    "input": 0.3,
+    "output": 0.9,
+    "cacheRead": 0.06
+  },
   "providerConfig": {
     "kilo_code": {
       "upstream": "inclusionai/ling-3.0-flash-vl:free",
