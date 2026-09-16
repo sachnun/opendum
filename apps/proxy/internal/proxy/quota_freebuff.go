@@ -19,10 +19,9 @@ import (
 const freebuffQuotaPath = "/api/v1/freebuff/session"
 
 type freebuffQuotaSession struct {
-	Status     string `json:"status"`
-	AccessTier string `json:"accessTier"`
-	Message    string `json:"message"`
-	Freebucks  struct {
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+	Freebucks struct {
 		Balance float64 `json:"balance"`
 		Daily   struct {
 			Limit     float64 `json:"limit"`
@@ -31,13 +30,6 @@ type freebuffQuotaSession struct {
 			ResetAt   string  `json:"resetAt"`
 		} `json:"daily"`
 	} `json:"freebucks"`
-	RateLimitsByModel map[string]freebuffModelLimit `json:"rateLimitsByModel"`
-}
-
-type freebuffModelLimit struct {
-	Limit       float64 `json:"limit"`
-	RecentCount float64 `json:"recentCount"`
-	ResetAt     string  `json:"resetAt"`
 }
 
 func (s *Service) fetchFreebuffQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
@@ -81,53 +73,25 @@ func (s *Service) fetchFreebuffQuota(ctx context.Context, account appdb.Provider
 }
 
 func freebuffQuotaGroups(payload freebuffQuotaSession) []quotaGroupDisplay {
-	groups := []quotaGroupDisplay{}
 	daily := payload.Freebucks.Daily
-	if daily.Limit > 0 {
-		remaining := math.Max(0, daily.Remaining)
-		resetISO := freebuffResetISO(daily.ResetAt)
-		groups = append(groups, quotaGroupDisplay{
-			Name:              "freebucks-daily",
-			DisplayName:       "Freebucks",
-			RemainingFraction: clampFraction(remaining / daily.Limit),
-			RemainingRequests: displayNumber(remaining),
-			MaxRequests:       displayNumber(daily.Limit),
-			UsedRequests:      displayNumber(math.Max(0, daily.Spent)),
-			PercentUsed:       int(math.Round(clampFraction(1-remaining/daily.Limit) * 100)),
-			IsExhausted:       remaining <= 0,
-			Confidence:        "high",
-			ResetTimeIso:      resetISO,
-			ResetInHuman:      formatTimeUntilResetISO(resetISO),
-		})
+	if daily.Limit <= 0 {
+		return []quotaGroupDisplay{}
 	}
-
-	models := make([]string, 0, len(payload.RateLimitsByModel))
-	for model := range payload.RateLimitsByModel {
-		models = append(models, model)
-	}
-	for _, model := range uniqueSortedStrings(models) {
-		limit := payload.RateLimitsByModel[model]
-		if limit.Limit <= 0 {
-			continue
-		}
-		used := math.Max(0, limit.RecentCount)
-		remaining := math.Max(0, limit.Limit-used)
-		resetISO := freebuffResetISO(limit.ResetAt)
-		groups = append(groups, quotaGroupDisplay{
-			Name:              "sessions-" + model,
-			DisplayName:       model,
-			RemainingFraction: clampFraction(remaining / limit.Limit),
-			RemainingRequests: displayNumber(remaining),
-			MaxRequests:       displayNumber(limit.Limit),
-			UsedRequests:      displayNumber(used),
-			PercentUsed:       int(math.Round(clampFraction(used/limit.Limit) * 100)),
-			IsExhausted:       remaining <= 0,
-			Confidence:        "high",
-			ResetTimeIso:      resetISO,
-			ResetInHuman:      formatTimeUntilResetISO(resetISO),
-		})
-	}
-	return groups
+	remaining := math.Max(0, daily.Remaining)
+	resetISO := freebuffResetISO(daily.ResetAt)
+	return []quotaGroupDisplay{{
+		Name:              "freebucks-daily",
+		DisplayName:       "Freebucks",
+		RemainingFraction: clampFraction(remaining / daily.Limit),
+		RemainingRequests: displayNumber(remaining),
+		MaxRequests:       displayNumber(daily.Limit),
+		UsedRequests:      displayNumber(math.Max(0, daily.Spent)),
+		PercentUsed:       int(math.Round(clampFraction(1-remaining/daily.Limit) * 100)),
+		IsExhausted:       remaining <= 0,
+		Confidence:        "high",
+		ResetTimeIso:      resetISO,
+		ResetInHuman:      formatTimeUntilResetISO(resetISO),
+	}}
 }
 
 func freebuffResetISO(value string) *string {
