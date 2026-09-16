@@ -1,4 +1,4 @@
-export type ProviderAccountCategory = "oauth" | "api_key";
+type ProviderAccountCategory = "oauth" | "api_key";
 
 export type ProviderAuthMethodKey = "oauth_redirect" | "device_code" | "api_key" | "api_key_with_account_id" | "chatgpt_session";
 

@@ -1,6 +1,6 @@
 // Kiro OAuth and API constants
 
-export const REGION = "us-east-1";
+const REGION = "us-east-1";
 const AUTH_ENDPOINT =
   `https://prod.${REGION}.auth.desktop.kiro.dev`;
 

@@ -388,10 +388,6 @@ func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAcco
 	if record == nil {
 		record = payload
 	}
-	tier := kiroTier(record)
-	if tier == "" {
-		tier = quotaFallbackTier(account)
-	}
 	groups := kiroGroups(record)
 	if len(groups) == 0 {
 		return errorQuotaInfo(account, "Kiro usage limits are unavailable for this account", time.Now().UnixMilli())
@@ -400,43 +396,12 @@ func (s *Service) fetchKiroQuota(ctx context.Context, account appdb.ProviderAcco
 	return baseQuotaInfo(account, "success", groups, time.Now().UnixMilli(), "")
 }
 
-func kiroTier(record map[string]any) string {
-	sub := parseQuotaRecord(record["subscriptionInfo"])
-	return normalizeKiroSubscriptionTier(parseQuotaString(sub["type"]), parseQuotaString(sub["subscriptionTitle"]))
-}
-
-func normalizeKiroSubscriptionTier(rawType, subscriptionTitle string) string {
-	switch strings.ToUpper(strings.TrimSpace(rawType)) {
-	case "Q_DEVELOPER_STANDALONE_FREE":
-		return "free"
-	case "Q_DEVELOPER_STANDALONE_POWER":
-		return "power"
-	case "Q_DEVELOPER_STANDALONE_PRO":
-		return "pro"
-	case "Q_DEVELOPER_STANDALONE_PRO_PLUS":
-		return "pro-plus"
-	case "Q_DEVELOPER_STANDALONE":
-		return "standalone"
+func titleWords(value string) string {
+	words := strings.Fields(value)
+	for i, word := range words {
+		words[i] = strings.ToUpper(word[:1]) + word[1:]
 	}
-
-	title := strings.ToLower(strings.TrimSpace(subscriptionTitle))
-	if title == "" {
-		return ""
-	}
-	if strings.Contains(title, "pro+") || strings.Contains(title, "pro plus") {
-		return "pro-plus"
-	}
-	if strings.Contains(title, "power") {
-		return "power"
-	}
-	if strings.Contains(title, "pro") {
-		return "pro"
-	}
-	if strings.Contains(title, "free") {
-		return "free"
-	}
-	title = strings.NewReplacer("_", " ", "-", " ").Replace(title)
-	return strings.Join(strings.Fields(title), "-")
+	return strings.Join(words, " ")
 }
 
 func kiroGroups(record map[string]any) []quotaGroupDisplay {
@@ -469,7 +434,7 @@ func kiroGroups(record map[string]any) []quotaGroupDisplay {
 		resetISO := parseResetISO(firstNonNil(metric["nextDateReset"], record["nextDateReset"]))
 		display := labels[name]
 		if display == "" {
-			display = strings.Title(strings.ToLower(strings.ReplaceAll(name, "_", " ")))
+			display = titleWords(strings.ToLower(strings.ReplaceAll(name, "_", " ")))
 		}
 		groups = append(groups, quotaGroupDisplay{Name: strings.ToLower(name), DisplayName: display, Models: []string{}, RemainingFraction: fraction, RemainingRequests: displayNumber(remaining), MaxRequests: displayNumber(limit), UsedRequests: displayNumber(current), PercentUsed: percentUsed, IsExhausted: fraction <= 0, IsEstimated: false, Confidence: "high", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO)})
 	}

@@ -37,7 +37,7 @@ const FEATURED_MODEL_FAMILIES = [
   "StepFun",
 ] as const;
 
-export type FeaturedModelFamily = (typeof FEATURED_MODEL_FAMILIES)[number];
+type FeaturedModelFamily = (typeof FEATURED_MODEL_FAMILIES)[number];
 export type ModelFamily = FeaturedModelFamily | "Others";
 
 const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -105,7 +106,7 @@ func TestProviderAliasesUseConfiguredUpstreams(t *testing.T) {
 	for canonical, info := range registry.effective {
 		aliases := registry.LookupKeys(canonical)
 		for provider, cfg := range info.ProviderConfig {
-			if cfg.Upstream == "" || !contains(info.Providers, provider) {
+			if cfg.Upstream == "" || !slices.Contains(info.Providers, provider) {
 				continue
 			}
 			checked++
@@ -146,9 +147,6 @@ func TestDeepSeekV4AliasesResolveToCanonical(t *testing.T) {
 		}
 		if !registry.IsSupported(alias) {
 			t.Fatalf("IsSupported(%q) = false, want true", alias)
-		}
-		if _, ok := registry.ProviderModelMap("nvidia_nim")[alias]; ok {
-			continue
 		}
 	}
 

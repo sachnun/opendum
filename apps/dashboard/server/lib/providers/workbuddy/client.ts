@@ -3,10 +3,8 @@ import { formatProviderHttpError } from "../provider-http-errors.js";
 import type { OAuthResult } from "../types.js";
 import {
   ACCOUNTS_PATH,
-  AUTH_REFRESH_SOURCE,
   AUTH_STATE_PATH,
   AUTH_TOKEN_PATH,
-  AUTH_TOKEN_REFRESH_PATH,
   DEVICE_CODE_EXPIRY_SECONDS,
   LOGIN_ACCOUNT_PATH,
   PENDING_ACCOUNT_CODE,
@@ -225,38 +223,4 @@ async function fetchWorkbuddyAccounts(accessToken: string, uid: string): Promise
   } catch {
     return null;
   }
-}
-
-export async function refreshWorkbuddyToken(accessToken: string, refreshToken: string): Promise<OAuthResult> {
-  const response = await fetchInternalProvider(`${WORKBUDDY_BASE_URL}${AUTH_TOKEN_REFRESH_PATH}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "X-Refresh-Token": refreshToken,
-      "X-Auth-Refresh-Source": AUTH_REFRESH_SOURCE,
-      "X-Domain": WORKBUDDY_DOMAIN,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({}),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(formatProviderHttpError("WorkBuddy", response, body, { endpointLabel: "token refresh endpoint" }));
-  }
-
-  const data = (await response.json().catch(() => ({}))) as WorkbuddyTokenResponse;
-  const nextAccessToken = data.data?.accessToken?.trim() ?? "";
-  if (data.code !== 0 || !nextAccessToken) {
-    throw new Error("WorkBuddy token refresh returned an incomplete session");
-  }
-
-  return {
-    accessToken: nextAccessToken,
-    refreshToken: data.data?.refreshToken?.trim() || refreshToken,
-    expiresAt: calculateExpiresAt(data.data ?? {}, 31536000),
-    email: "",
-  };
 }

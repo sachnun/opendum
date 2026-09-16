@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -445,7 +446,7 @@ func (r *Registry) ProviderModelMap(provider string) map[string]string {
 	}
 	result := map[string]string{}
 	for canonical, info := range r.effective {
-		if contains(info.Providers, provider) {
+		if slices.Contains(info.Providers, provider) {
 			upstream := canonical
 			if info.ProviderConfig[provider].Upstream != "" {
 				upstream = info.ProviderConfig[provider].Upstream
@@ -483,7 +484,7 @@ func (r *Registry) AllModels() []string {
 func (r *Registry) ModelsForProvider(provider string) []string {
 	values := []string{}
 	for model, info := range r.effective {
-		if !contains(info.Providers, provider) {
+		if !slices.Contains(info.Providers, provider) {
 			continue
 		}
 		values = append(values, model)
@@ -687,15 +688,6 @@ func uniqueSortedStable(values []string) []string {
 		result = append(result, value)
 	}
 	return result
-}
-
-func contains(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
 
 func newSuggestionCandidate(value string) suggestionCandidate {

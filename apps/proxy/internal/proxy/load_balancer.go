@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -49,17 +50,8 @@ func syntheticProviderModelAuthlessAccountFromID(id, model string, registry inte
 	return syntheticProviderModelAuthlessAccount(provider), true
 }
 
-func stringSliceContains(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
 func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string, accountAccess auth.AccountAccess) ([]appdb.ProviderAccount, error) {
-	targetProviders := []string{}
+	var targetProviders []string
 	if provider != nil {
 		targetProviders = []string{*provider}
 	} else {
@@ -79,10 +71,10 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 		if !ok {
 			continue
 		}
-		if len(exclude) > 0 && stringSliceContains(exclude, account.ID) {
+		if len(exclude) > 0 && slices.Contains(exclude, account.ID) {
 			continue
 		}
-		if len(excludeProviders) > 0 && stringSliceContains(excludeProviders, account.Provider) {
+		if len(excludeProviders) > 0 && slices.Contains(excludeProviders, account.Provider) {
 			continue
 		}
 		if err := accountAllowed(account.ID, accountAccess); err != nil {
@@ -183,7 +175,7 @@ func (s *Service) rememberAffinityAccount(ctx context.Context, userID, sessionID
 }
 
 func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string, provider *string, exclude, excludeProviders []string) (*appdb.ProviderAccount, bool, error) {
-	targetProviders := []string{}
+	var targetProviders []string
 	if provider != nil {
 		targetProviders = []string{*provider}
 	} else {

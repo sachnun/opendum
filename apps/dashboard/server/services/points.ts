@@ -41,7 +41,7 @@ async function ensureUserPointBalanceWithClient(client: PointDatabase, userId: s
   return existing?.balance ?? INITIAL_POINT_BALANCE;
 }
 
-export async function ensureUserPointBalance(userId: string): Promise<number> {
+async function ensureUserPointBalance(userId: string): Promise<number> {
   return db.transaction((tx) => ensureUserPointBalanceWithClient(tx, userId));
 }
 

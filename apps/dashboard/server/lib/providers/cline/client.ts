@@ -5,7 +5,6 @@ import {
   ACCESS_TOKEN_TTL_SECONDS,
   CLIENT_ID,
   CLINE_BASE_URL,
-  CLINE_REFRESH_PATH,
   CLINE_REGISTER_PATH,
   DEVICE_AUTHENTICATE_PATH,
   DEVICE_AUTHORIZE_PATH,
@@ -131,30 +130,4 @@ async function registerWithCline(
   }
 
   return { accessToken: `workos:${data.data.accessToken}`, refreshToken: data.data.refreshToken };
-}
-
-export async function refreshClineToken(refreshToken: string): Promise<OAuthResult> {
-  const response = await fetchInternalProvider(`${CLINE_BASE_URL}${CLINE_REFRESH_PATH}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken, grantType: "refresh_token" }),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(formatClineError(response, body, "token refresh endpoint"));
-  }
-
-  const data = (await response.json().catch(() => ({}))) as ClineRegisterResponse;
-  if (!data.data?.accessToken || !data.data?.refreshToken) {
-    throw new Error("Cline token refresh returned an incomplete session");
-  }
-
-  return {
-    accessToken: `workos:${data.data.accessToken}`,
-    refreshToken: data.data.refreshToken,
-    expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000),
-    email: "",
-  };
 }

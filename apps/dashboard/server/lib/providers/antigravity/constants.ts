@@ -19,7 +19,6 @@ const CLIENT_METADATA =
   '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}';
 const AUTH_USER_AGENT = "google-api-nodejs-client/10.3.0";
 const AUTH_API_CLIENT = "gl-node/22.18.0";
-const USER_AGENT = `antigravity/1.653.24 linux/amd64`;
 
 // Endpoint fallbacks for account discovery and quota.
 const CODE_ASSIST_ENDPOINT_DAILY =
@@ -44,10 +43,6 @@ export const AUTH_HEADERS = {
   "User-Agent": AUTH_USER_AGENT,
   "X-Goog-Api-Client": AUTH_API_CLIENT,
   "Client-Metadata": CLIENT_METADATA,
-} as const;
-
-export const CODE_ASSIST_HEADERS = {
-  "User-Agent": USER_AGENT,
 } as const;
 
 // Token refresh buffer (1 hour before expiry)
