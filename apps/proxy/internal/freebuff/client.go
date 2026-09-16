@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-const defaultBaseURL = "https://www.codebuff.com"
+// DefaultBaseURL is the upstream Freebuff API host.
+const DefaultBaseURL = "https://www.codebuff.com"
 
 const (
 	sessionPath           = "/api/v1/freebuff/session"
@@ -27,7 +28,7 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if baseURL == "" {
-		baseURL = defaultBaseURL
+		baseURL = DefaultBaseURL
 	}
 	return &Client{
 		baseURL: baseURL,
