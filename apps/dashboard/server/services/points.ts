@@ -3,7 +3,7 @@ import { and, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 import { db, normalizeEmail, pointTransaction, providerEmailRegistry, proxyApiKey, user, userPointBalance, type Database } from "@opendum/database";
 import { roamingUsagePointsByApiKey } from "../lib/roaming-points";
 
-export const API_KEY_UPDATE_POINT_COST = 100;
+export const API_KEY_UPDATE_POINT_COST = 20;
 export const DAILY_ACCESS_POINTS = 5;
 
 const INITIAL_POINT_BALANCE = 15;
