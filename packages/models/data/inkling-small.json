@@ -23,7 +23,7 @@
     "top_p": false
   },
   "limit": {
-    "context": 524288,
+    "context": 1048576,
     "output": 262144
   },
   "providerConfig": {

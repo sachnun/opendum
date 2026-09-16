@@ -25,7 +25,7 @@
     "top_p": false
   },
   "limit": {
-    "context": 991000,
+    "context": 1000000,
     "output": 65536
   },
   "providerConfig": {

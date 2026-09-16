@@ -26,8 +26,8 @@
     "top_p": false
   },
   "limit": {
-    "context": 131072,
-    "output": 64000
+    "context": 200000,
+    "output": 131072
   },
   "providerConfig": {
     "workers_ai": {

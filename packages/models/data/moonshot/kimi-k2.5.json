@@ -26,8 +26,8 @@
     "top_p": false
   },
   "limit": {
-    "context": 256000,
-    "output": 26214
+    "context": 262144,
+    "output": 256000
   },
   "providerConfig": {
     "hyper": {

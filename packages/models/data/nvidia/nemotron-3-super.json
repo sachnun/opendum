@@ -37,8 +37,8 @@
     "top_p": false
   },
   "limit": {
-    "context": 256000,
-    "output": 65536
+    "context": 262144,
+    "output": 256000
   },
   "providerConfig": {
     "kilo_code": {

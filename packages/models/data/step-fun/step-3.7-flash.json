@@ -28,7 +28,7 @@
   },
   "limit": {
     "context": 256000,
-    "output": 230400
+    "output": 256000
   },
   "providerConfig": {
     "kilo_code": {

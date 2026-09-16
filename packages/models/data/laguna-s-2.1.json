@@ -22,8 +22,8 @@
     "top_p": false
   },
   "limit": {
-    "context": 262144,
-    "output": 32768
+    "context": 1048576,
+    "output": 131072
   },
   "providerConfig": {
     "cline": {

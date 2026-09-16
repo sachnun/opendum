@@ -25,8 +25,8 @@
     "top_p": false
   },
   "limit": {
-    "context": 512000,
-    "output": 80000
+    "context": 1048576,
+    "output": 512000
   },
   "providerConfig": {
     "freebuff": {

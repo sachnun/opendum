@@ -12,8 +12,7 @@
     "input": [
       "audio",
       "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
@@ -28,14 +27,14 @@
     "top_p": false
   },
   "limit": {
-    "context": 131072,
-    "output": 16384
+    "context": 32768,
+    "output": 32768
   },
   "providerConfig": {
     "perch": {
       "upstream": "gemma-4-e2b",
-      "contextWindow": 131072,
-      "maxOutputTokens": 16384
+      "contextWindow": 32768,
+      "maxOutputTokens": 32768
     }
   }
 }

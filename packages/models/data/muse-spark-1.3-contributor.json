@@ -28,7 +28,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 131072
+    "output": 943718
   },
   "providerConfig": {
     "cline": {
