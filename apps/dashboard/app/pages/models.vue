@@ -24,18 +24,6 @@ const models = computed<ModelListItem[]>(() => data.value ?? []);
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = shallowReactive<Record<string, ModelStats>>({});
 const modelStatsCursorById = shallowReactive<Record<string, string>>({});
-const availableProviders = computed(() => {
-  const entries = new Map<string, string>();
-
-  for (const model of models.value) {
-    for (const provider of model.providers) {
-      entries.set(provider, getProviderLabel(provider));
-    }
-  }
-
-  return Array.from(entries, ([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
-});
-const activeProviders = ref<string[]>([]);
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
 const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(stateKeys.modelFamilyCountsOverride, () => null);
@@ -51,22 +39,11 @@ let modelStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let modelStatsPollTimer: ReturnType<typeof setInterval> | null = null;
 let statsObserver: IntersectionObserver | null = null;
 
-watchEffect(() => {
-  if (activeProviders.value.length === 0 && availableProviders.value.length > 0) {
-    activeProviders.value = availableProviders.value.map((provider) => provider.id);
-  }
-});
-
-const allSelected = computed(() => activeProviders.value.length === availableProviders.value.length);
-const filteredModels = computed(() => {
-  const active = new Set(activeProviders.value);
-  return models.value.filter((model) => model.providers.some((provider) => active.has(provider)));
-});
 const enabledModelCount = computed(() => models.value.filter((model) => model.isEnabled).length);
 const modelSections = computed(() => {
   const groupedModels = new Map<string, ModelListItem[]>();
 
-  for (const model of filteredModels.value) {
+  for (const model of models.value) {
     const family = categorizeModelFamily(model.family);
     const familyModels = groupedModels.get(family) ?? [];
     familyModels.push(model);
@@ -273,35 +250,6 @@ function getFamilyAnchorId(family: string) {
   return "other-models";
 }
 
-function toggleProvider(providerId: string) {
-  if (providerId === "all") {
-    activeProviders.value = allSelected.value ? [] : availableProviders.value.map((provider) => provider.id);
-
-    if (activeProviders.value.length === 0 && availableProviders.value[0]) {
-      activeProviders.value = [availableProviders.value[0].id];
-    }
-
-    return;
-  }
-
-  if (allSelected.value) {
-    activeProviders.value = [providerId];
-    return;
-  }
-
-  if (activeProviders.value.includes(providerId)) {
-    const next = activeProviders.value.filter((id) => id !== providerId);
-
-    if (next.length > 0) {
-      activeProviders.value = next;
-    }
-
-    return;
-  }
-
-  activeProviders.value = [...activeProviders.value, providerId];
-}
-
 async function copyModelId(modelId: string) {
   await navigator.clipboard.writeText(modelId);
   copiedModelId.value = modelId;
@@ -385,132 +333,102 @@ watch(
     </div>
 
     <DataNotice :error="error" />
-    <div v-if="models.length > 0" class="space-y-4 md:space-y-2">
-      <div class="flex flex-wrap gap-1.5 pb-2">
-        <button
-          type="button"
-          :class="[
-            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium',
-            allSelected ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
-          ]"
-          @click="toggleProvider('all')"
-        >
-          All
-        </button>
-        <button
-          v-for="provider in availableProviders"
-          :key="provider.id"
-          type="button"
-          :class="[
-            'inline-flex h-7 cursor-pointer items-center justify-center rounded-md border px-2.5 text-xs font-medium',
-            activeProviders.includes(provider.id) ? 'border-primary/35 bg-primary/10 text-primary' : 'border-border/70 bg-card/30 text-muted-foreground',
-          ]"
-          @click="toggleProvider(provider.id)"
-        >
-          {{ provider.label }}
-        </button>
-      </div>
-
-      <div class="space-y-6">
-        <section v-for="section in modelSections" :id="section.anchorId" :key="section.name" class="scroll-mt-24 space-y-4 md:space-y-2">
-          <div class="flex items-center gap-2">
-            <h3 class="text-sm font-semibold">{{ section.name }}</h3>
-            <UiBadge variant="outline" class="text-[10px] font-normal">{{ section.models.length }} models</UiBadge>
-          </div>
-          <div class="dashboard-card-grid">
-            <UiCard
-              v-for="model in section.models"
-              :id="`model-${model.id}`"
-              :key="model.id"
-              :data-model-id="model.id"
-              :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${model.isEnabled === false ? ' opacity-65' : ''}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
-            >
-              <UiCardHeader class="pb-1">
-                <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <UiTooltip text="Copy ID" class="max-w-96 break-all font-mono">
-                    <button
-                      type="button"
-                      class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      :aria-label="`Copy model ID ${model.id}`"
-                      @click="copyModelId(model.id)"
-                    >
-                      <span class="flex size-3 shrink-0 items-center justify-center">
-                        <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
-                      </span>
-                      <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
-                        {{ model.id }}
-                      </span>
-                    </button>
-                  </UiTooltip>
-                  <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
-                    <UiTooltip v-if="model.isEnabled" text="Playground">
-                      <NuxtLink :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
-                        <UiIcon name="i-lucide-flask-conical" class="size-3" />
-                      </NuxtLink>
-                    </UiTooltip>
-                    <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
-                      {{ model.isEnabled ? 'On' : 'Off' }}
+    <div v-if="models.length > 0" class="space-y-6">
+      <section v-for="section in modelSections" :id="section.anchorId" :key="section.name" class="scroll-mt-24 space-y-4 md:space-y-2">
+        <div class="flex items-center gap-2">
+          <h3 class="text-sm font-semibold">{{ section.name }}</h3>
+          <UiBadge variant="outline" class="text-[10px] font-normal">{{ section.models.length }} models</UiBadge>
+        </div>
+        <div class="dashboard-card-grid">
+          <UiCard
+            v-for="model in section.models"
+            :id="`model-${model.id}`"
+            :key="model.id"
+            :data-model-id="model.id"
+            :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${model.isEnabled === false ? ' opacity-65' : ''}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
+          >
+            <UiCardHeader class="pb-1">
+              <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                <UiTooltip text="Copy ID" class="max-w-96 break-all font-mono">
+                  <button
+                    type="button"
+                    class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    :aria-label="`Copy model ID ${model.id}`"
+                    @click="copyModelId(model.id)"
+                  >
+                    <span class="flex size-3 shrink-0 items-center justify-center">
+                      <UiIcon :name="copiedModelId === model.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
                     </span>
-                    <UiSwitch
-                      :model-value="model.isEnabled"
-                      :disabled="pendingModelId === model.id || isAuditMode"
-                      :title="model.isEnabled ? 'Disable' : 'Enable'"
-                      @update:model-value="setModelEnabled(model, $event)"
-                    />
-                  </div>
-                </div>
-
-                <div class="mt-1 flex items-start justify-between gap-2">
-                  <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-                    <UiBadge
-                      v-for="provider in model.providers"
-                      :key="provider"
-                      variant="outline"
-                      :class="[
-                        'text-[10px] font-normal',
-                        activeProviders.includes(provider) ? '' : 'border-border/60 text-muted-foreground opacity-70',
-                      ].join(' ')"
-                    >
-                      {{ getProviderLabel(provider) }}
-                    </UiBadge>
-                  </div>
-                  <UiTooltip v-if="model.cost" side="left">
-                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-normal leading-none text-muted-foreground tabular-nums">
-                      <UiIcon name="i-lucide-coins" class="size-3" />
-                      {{ modelCostSummary(model.cost) }}
+                    <span class="min-w-0 flex-1 overflow-hidden break-all font-mono text-sm font-semibold leading-5 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                      {{ model.id }}
                     </span>
-                    <template #content>
-                      <div class="space-y-0.5">
-                        <p class="font-medium">Cost in points per 1M tokens</p>
-                        <p v-for="entry in costEntries(model.cost)" :key="entry.label">
-                          {{ entry.label }}: {{ formatCostPoints(entry.value) }}
-                        </p>
-                      </div>
-                    </template>
+                  </button>
+                </UiTooltip>
+                <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
+                  <UiTooltip v-if="model.isEnabled" text="Playground">
+                    <NuxtLink :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
+                      <UiIcon name="i-lucide-flask-conical" class="size-3" />
+                    </NuxtLink>
                   </UiTooltip>
-                </div>
-              </UiCardHeader>
-
-              <UiCardContent class="flex flex-1 flex-col pt-0">
-                <div class="mt-auto space-y-3">
-                  <ModelFeatureBadges :model="model" />
-                  <ModelStatsPanel
-                    v-if="visibleModelIds.has(model.id)"
-                    :stats="model.stats ?? emptyModelStats"
-                    :stats-map="modelStatsById"
-                    :model-id="model.id"
-                    :label="model.id"
-                    :disabled="!model.isEnabled"
-                    compact
-                    :animate-deltas="false"
+                  <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
+                    {{ model.isEnabled ? 'On' : 'Off' }}
+                  </span>
+                  <UiSwitch
+                    :model-value="model.isEnabled"
+                    :disabled="pendingModelId === model.id || isAuditMode"
+                    :title="model.isEnabled ? 'Disable' : 'Enable'"
+                    @update:model-value="setModelEnabled(model, $event)"
                   />
-                  <div v-else class="min-h-[7.75rem]" aria-hidden="true" />
                 </div>
-              </UiCardContent>
-            </UiCard>
-          </div>
-        </section>
-      </div>
+              </div>
+
+              <div class="mt-1 flex items-start justify-between gap-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <UiBadge
+                    v-for="provider in model.providers"
+                    :key="provider"
+                    variant="outline"
+                    class="text-[10px] font-normal"
+                  >
+                    {{ getProviderLabel(provider) }}
+                  </UiBadge>
+                </div>
+                <UiTooltip v-if="model.cost" side="left">
+                  <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-normal leading-none text-muted-foreground tabular-nums">
+                    <UiIcon name="i-lucide-coins" class="size-3" />
+                    {{ modelCostSummary(model.cost) }}
+                  </span>
+                  <template #content>
+                    <div class="space-y-0.5">
+                      <p class="font-medium">Cost in points per 1M tokens</p>
+                      <p v-for="entry in costEntries(model.cost)" :key="entry.label">
+                        {{ entry.label }}: {{ formatCostPoints(entry.value) }}
+                      </p>
+                    </div>
+                  </template>
+                </UiTooltip>
+              </div>
+            </UiCardHeader>
+
+            <UiCardContent class="flex flex-1 flex-col pt-0">
+              <div class="mt-auto space-y-3">
+                <ModelFeatureBadges :model="model" />
+                <ModelStatsPanel
+                  v-if="visibleModelIds.has(model.id)"
+                  :stats="model.stats ?? emptyModelStats"
+                  :stats-map="modelStatsById"
+                  :model-id="model.id"
+                  :label="model.id"
+                  :disabled="!model.isEnabled"
+                  compact
+                  :animate-deltas="false"
+                />
+                <div v-else class="min-h-[7.75rem]" aria-hidden="true" />
+              </div>
+            </UiCardContent>
+          </UiCard>
+        </div>
+      </section>
     </div>
   </div>
 </template>
