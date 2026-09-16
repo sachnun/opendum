@@ -5,17 +5,17 @@
  * the refresh scripts.
  */
 
-export interface ModelModalities {
+interface ModelModalities {
   input: string[];
   output: string[];
 }
 
-export interface ModelLimit {
+interface ModelLimit {
   context?: number;
   output?: number;
 }
 
-export interface ProviderModelConfig {
+interface ProviderModelConfig {
   upstream?: string;
   contextWindow?: number;
   maxOutputTokens?: number;

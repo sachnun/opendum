@@ -88,9 +88,7 @@ func (p workbuddyProvider) MakeRequest(ctx context.Context, client *http.Client,
 		}
 	}
 	model := stringValue(body["model"])
-	if strings.HasPrefix(model, "workbuddy/") {
-		model = strings.TrimPrefix(model, "workbuddy/")
-	}
+	model = strings.TrimPrefix(model, "workbuddy/")
 	modelName := lastModelSegment(model)
 	if p.registry != nil {
 		modelName = p.registry.UpstreamModelName(modelName, "workbuddy")

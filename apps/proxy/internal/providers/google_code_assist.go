@@ -34,9 +34,6 @@ const minThinkingBudget = 1024
 const antigravitySignatureCachePrefix = "opendum:thought-signature"
 const antigravitySignatureCacheTTL = 24 * time.Hour
 const antigravityClaudeBetaHeader = "interleaved-thinking-2025-05-14"
-const antigravityAuthUserAgent = "google-api-nodejs-client/10.3.0"
-const antigravityAuthAPIClient = "gl-node/22.18.0"
-const antigravityAuthClientMetadata = `{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}`
 const antigravityUserAgent = "antigravity/1.653.24 "
 const geminiToolSchemaSystemInstruction = `<CRITICAL_TOOL_USAGE_INSTRUCTIONS>
 You are operating in a CUSTOM ENVIRONMENT where tool definitions COMPLETELY DIFFER from your training data.
@@ -288,15 +285,6 @@ func randomUUID() string {
 	buf[6] = (buf[6] & 0x0f) | 0x40
 	buf[8] = (buf[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", buf[0:4], buf[4:6], buf[6:8], buf[8:10], buf[10:16])
-}
-
-func isAntigravityProjectContextError(text string) bool {
-	lower := strings.ToLower(text)
-	return strings.Contains(lower, "#3501") ||
-		(strings.Contains(lower, "google cloud project") && strings.Contains(lower, "code assist license")) ||
-		strings.Contains(lower, "invalid project resource name projects/") ||
-		(strings.Contains(lower, "resource projects/") && strings.Contains(lower, "could not be found")) ||
-		(strings.Contains(lower, "project") && strings.Contains(lower, "not found"))
 }
 
 func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Context, payload map[string]any, model, sessionID string) {

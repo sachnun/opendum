@@ -204,4 +204,3 @@ func (f *fakeResponseWriter) WriteHeader(statusCode int) {
 type fakeFlusher struct{}
 
 func (fakeFlusher) Flush() {}
-

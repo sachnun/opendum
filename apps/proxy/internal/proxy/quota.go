@@ -13,7 +13,6 @@ import (
 	mrand "math/rand"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -364,31 +363,6 @@ func readQuotaLimit(r io.Reader, limit int64) string {
 	}
 	data, _ := io.ReadAll(io.LimitReader(r, limit))
 	return string(data)
-}
-
-func lastPathSegment(value string) string {
-	if idx := strings.LastIndex(value, "/"); idx >= 0 {
-		return value[idx+1:]
-	}
-	return value
-}
-
-func uniqueSortedStrings(values []string) []string {
-	seen := map[string]struct{}{}
-	out := []string{}
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	sort.Strings(out)
-	return out
 }
 
 func parseQuotaNumber(value any) (float64, bool) {

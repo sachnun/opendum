@@ -547,9 +547,7 @@ func (p perchProvider) MakeRequest(ctx context.Context, client *http.Client, cre
 
 func perchModelAlias(registry *models.Registry, model string) string {
 	model = strings.TrimSpace(model)
-	if strings.HasPrefix(model, "perch/") {
-		model = strings.TrimPrefix(model, "perch/")
-	}
+	model = strings.TrimPrefix(model, "perch/")
 	if registry != nil {
 		model = registry.UpstreamModelName(model, "perch")
 	}

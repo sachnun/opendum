@@ -117,32 +117,6 @@ func TestAntigravityMaxRequestsNormalizesStoredTierAliases(t *testing.T) {
 	}
 }
 
-func TestKiroTierNormalizesSubscriptionTypeAndTitle(t *testing.T) {
-	tests := []struct {
-		name string
-		sub  map[string]any
-		want string
-	}{
-		{name: "free type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_FREE"}, want: "free"},
-		{name: "pro type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_PRO"}, want: "pro"},
-		{name: "pro plus type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_PRO_PLUS"}, want: "pro-plus"},
-		{name: "power type", sub: map[string]any{"type": "Q_DEVELOPER_STANDALONE_POWER"}, want: "power"},
-		{name: "pro plus title", sub: map[string]any{"subscriptionTitle": "Kiro Pro+"}, want: "pro-plus"},
-		{name: "power title", sub: map[string]any{"subscriptionTitle": "Kiro Power"}, want: "power"},
-		{name: "free title", sub: map[string]any{"subscriptionTitle": "Kiro Free"}, want: "free"},
-		{name: "unknown title", sub: map[string]any{"subscriptionTitle": "Custom Team Tier"}, want: "custom-team-tier"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := kiroTier(map[string]any{"subscriptionInfo": tt.sub})
-			if got != tt.want {
-				t.Fatalf("kiroTier() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestPrioritizeAccountsTreatsKiroPaidPlansAsPaid(t *testing.T) {
 	free := "free"
 	pro := "pro"

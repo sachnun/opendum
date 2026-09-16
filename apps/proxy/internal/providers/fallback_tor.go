@@ -4,26 +4,11 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"time"
 )
 
 type TorEgress interface {
 	DialContext(ctx context.Context, network string, addr string) (net.Conn, error)
 	Ready() bool
-}
-
-func NewTorClient(dial func(ctx context.Context, network string, addr string) (net.Conn, error)) *http.Client {
-	return &http.Client{
-		Timeout: 0,
-		Transport: &http.Transport{
-			DialContext:           dial,
-			ForceAttemptHTTP2:     false,
-			MaxIdleConns:          10,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   15 * time.Second,
-			ResponseHeaderTimeout: 60 * time.Second,
-		},
-	}
 }
 
 func torReady(tor TorEgress, torClient *http.Client) bool {
@@ -71,11 +56,5 @@ func postPrimaryWithClient(ctx context.Context, state fallbackState, provider st
 func postJSONWithTorFallback(ctx context.Context, directClient *http.Client, torClient *http.Client, tor TorEgress, state fallbackState, provider string, primaryURL string, bearer string, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
 	return postWithTorFallback(ctx, state, provider, primaryURL, directClient, torClient, tor, func(client *http.Client, target string) (*http.Response, error) {
 		return postJSONWithHeaders(ctx, client, target, bearer, payload, stream, headers)
-	})
-}
-
-func postJSONWithoutAuthWithTorFallback(ctx context.Context, directClient *http.Client, torClient *http.Client, tor TorEgress, state fallbackState, provider string, primaryURL string, payload map[string]any, stream bool) (*http.Response, error) {
-	return postWithTorFallback(ctx, state, provider, primaryURL, directClient, torClient, tor, func(client *http.Client, target string) (*http.Response, error) {
-		return postJSONWithoutAuth(ctx, client, target, payload, stream)
 	})
 }

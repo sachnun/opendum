@@ -11,9 +11,9 @@ import (
 )
 
 type openAIStreamUsageTracker struct {
-	scanner              sseScanner
-	inputTokens          int
-	outputTokens         int
+	scanner               sseScanner
+	inputTokens           int
+	outputTokens          int
 	hypercreditsRemaining *float64
 	hypercreditsCost      float64
 }

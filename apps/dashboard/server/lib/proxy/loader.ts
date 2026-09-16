@@ -6,8 +6,6 @@ import type { ModelModalities } from "../../../lib/model-capabilities";
  * JSON model files are statically imported by the bundler so the server runtime
  * never needs filesystem access.
  */
-export type { ModelModalities };
-
 export interface ModelInfo {
   id?: string;
   providers: string[];

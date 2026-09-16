@@ -78,9 +78,7 @@ func (p clineProvider) MakeRequest(ctx context.Context, client *http.Client, cre
 		}
 	}
 	model := stringValue(body["model"])
-	if strings.HasPrefix(model, "cline/") {
-		model = strings.TrimPrefix(model, "cline/")
-	}
+	model = strings.TrimPrefix(model, "cline/")
 	if p.registry != nil {
 		model = p.registry.UpstreamModelName(model, "cline")
 	}

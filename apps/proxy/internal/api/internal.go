@@ -127,7 +127,7 @@ func validateInternalRelayMethod(method string) error {
 	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
 		return nil
 	default:
-		return fmt.Errorf("Unsupported internal relay method: %s", method)
+		return fmt.Errorf("unsupported internal relay method: %s", method)
 	}
 }
 
@@ -153,7 +153,7 @@ func copyInternalRelayHeaders(dst http.Header, src map[string]string) {
 		if isBlockedInternalRelayHeader(normalized) || strings.TrimSpace(value) == "" {
 			continue
 		}
-		dst.Set(http.CanonicalHeaderKey(normalized), value)
+		dst.Set(normalized, value)
 	}
 }
 

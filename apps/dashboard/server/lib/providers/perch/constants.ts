@@ -12,9 +12,9 @@ export const PERCH_AUTH_TOKEN_PATH = "/auth/v1/token";
 // The Perch CLI listens on 127.0.0.1 with an arbitrary port and "/callback"
 // path; the Supabase project allowlists localhost redirects, so the dashboard
 // reuses that shape for its browser popup flow.
-export const PERCH_REDIRECT_HOST = "127.0.0.1";
-export const PERCH_REDIRECT_PORT = 47321;
-export const PERCH_REDIRECT_PATH = "/callback";
+const PERCH_REDIRECT_HOST = "127.0.0.1";
+const PERCH_REDIRECT_PORT = 47321;
+const PERCH_REDIRECT_PATH = "/callback";
 export const PERCH_REDIRECT_URI = `http://${PERCH_REDIRECT_HOST}:${PERCH_REDIRECT_PORT}${PERCH_REDIRECT_PATH}`;
 
 // Free Starter plan selected right after login (the CLI does the same).

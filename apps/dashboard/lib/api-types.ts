@@ -8,9 +8,9 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-export type UserRole = "user" | "maintener";
+type UserRole = "user" | "maintener";
 
-export interface UserIdentity {
+interface UserIdentity {
   id: string;
   name: string | null;
   email: string | null;
@@ -64,7 +64,7 @@ export interface ProviderStats {
   durationLast24Hours: Array<{ time: string; avgDuration: number }>;
 }
 
-export interface ProviderAccountItem {
+interface ProviderAccountItem {
   id: string;
   provider: string;
   name: string;
@@ -101,7 +101,7 @@ export interface ProviderAccountModelHealthItem {
   lastSuccessAt: string | Date | null;
 }
 
-export type FreebuffSessionStatus = "active" | "queued" | "cooling" | "blocked" | "disabled" | "idle" | "error";
+type FreebuffSessionStatus = "active" | "queued" | "cooling" | "blocked" | "disabled" | "idle" | "error";
 
 export interface FreebuffSessionInfo {
   accountId: string;
@@ -203,7 +203,7 @@ export interface AccountQuotaBatchRequest {
 
 export type AccountQuotaBatchResult = Record<string, ActionResult<AccountQuotaInfo>>;
 
-export interface ErrorHistoryEntry {
+interface ErrorHistoryEntry {
   id: string;
   model: string | null;
   errorCode: number | null;
@@ -267,7 +267,7 @@ export interface PlaygroundProxyAuth {
   headers: Record<string, string>;
 }
 
-export type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
+type Period = "5m" | "15m" | "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
 export type AnalyticsFilter = Period | { from: string; to: string };
 
 export interface AnalyticsData {

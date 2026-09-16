@@ -405,9 +405,7 @@ func (p opencodeProvider) Authless() bool { return true }
 
 func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, _ string, _ appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	model := stringValue(body["model"])
-	if strings.HasPrefix(model, "opencode/") {
-		model = strings.TrimPrefix(model, "opencode/")
-	}
+	model = strings.TrimPrefix(model, "opencode/")
 	modelName := model
 	if p.registry != nil {
 		modelName = p.registry.UpstreamModelName(model, "opencode")
@@ -451,9 +449,7 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 // ResponsesNative reports whether the upstream already speaks the Responses API
 // for this model, in which case responses must not be converted.
 func (p opencodeProvider) ResponsesNative(model string) bool {
-	if strings.HasPrefix(model, "opencode/") {
-		model = strings.TrimPrefix(model, "opencode/")
-	}
+	model = strings.TrimPrefix(model, "opencode/")
 	return p.requiresResponsesAPI(model)
 }
 

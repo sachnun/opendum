@@ -230,5 +230,3 @@ func ensurePointBalanceTx(ctx context.Context, q *appdb.Queries, userID string, 
 
 	return nil
 }
-
-var errInsufficientPoints = errors.New("insufficient points")
