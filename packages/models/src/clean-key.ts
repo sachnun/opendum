@@ -19,7 +19,7 @@
 //      family identifiers.
 //   5. Drop trailing behavior-descriptor tokens whose meaning is recorded
 //      in `meta`: `instruct`, `it`, `chat`, `base`, `reasoning`,
-//      `thinking`, `completion`, `preview`, `beta`, `alpha`,
+//      `thinking`, `completion`, `preview`, `beta`,
 //      `experimental`, `exp`, `deprecated`, `fast`, `nova`, `express`.
 //
 // Identifier/tier tokens preserved as family names:
@@ -52,7 +52,7 @@ const VERSION = /^v[0-9]+(?:\.[0-9]+)*$/i;
 const DATE_CANDIDATE = /^[0-9]{4,6}$/;
 
 const BEHAVIOR_DESCRIPTOR =
-  /^(?:instruct|it|chat|base|completion|reasoning|thinking|preview|beta|alpha|experimental|exp|deprecated)$/i;
+  /^(?:instruct|it|chat|base|completion|reasoning|thinking|preview|beta|experimental|exp|deprecated)$/i;
 
 const MODALITY_DESCRIPTOR = /^(?:coder|codex|code|vl|vision|omni|multimodal)$/i;
 

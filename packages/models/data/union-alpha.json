@@ -8,7 +8,6 @@
   },
   "providerConfig": {
     "opencode": {
-      "upstream": "union-alpha",
       "contextWindow": 4096,
       "maxOutputTokens": 4096
     }
