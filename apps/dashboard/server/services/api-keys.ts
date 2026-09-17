@@ -5,6 +5,7 @@ import { db, providerAccount, proxyApiKey, proxyApiKeyRateLimit } from "@opendum
 import { decrypt, encrypt, generateApiKey, getKeyPreview, hashString } from "../lib/encryption";
 import { invalidateApiKeyValidationCache } from "../lib/proxy/auth";
 import { getAuthlessProviderAccounts, isSyntheticAuthlessAccount } from "../lib/proxy/authless-providers";
+import { listCustomProviderModels } from "../lib/proxy/custom-providers";
 import { getAllFamilies, getAllModels, getModelFamily, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
 import { roamingUsagePointsByApiKey } from "../lib/roaming-points";
 import { compareModelEntries } from "../../lib/model-sort";
@@ -54,6 +55,15 @@ function normalizeModelList(models: string[]): string[] {
   return Array.from(new Set(models.map((model) => resolveModelAlias(model.trim())).filter((model) => model.length > 0))).sort(compareKnownModelIds);
 }
 
+async function ownedCustomModelIds(userId: string): Promise<Set<string>> {
+  const providers = await listCustomProviderModels(userId, { includeInactiveAccounts: true });
+  const ids = new Set<string>();
+  for (const provider of providers) {
+    for (const modelId of provider.standaloneModels) ids.add(`${provider.slug}/${modelId}`);
+  }
+  return ids;
+}
+
 function compareKnownModelIds(left: string, right: string): number {
   return compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) });
 }
@@ -92,7 +102,7 @@ export async function getApiKeyOptions(userId: string) {
       .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS)))
       .orderBy(asc(providerAccount.provider), asc(providerAccount.name));
 
-    const availableModels = getAllModels().sort(compareKnownModelIds);
+    const availableModels = [...getAllModels(), ...(await ownedCustomModelIds(userId))].sort(compareKnownModelIds);
     const availableFamilies = getAllFamilies();
     const authlessProviderAccounts = getAuthlessProviderAccounts().map(({ disabledModels: _disabledModels, ...account }) => account);
 
@@ -259,7 +269,8 @@ export async function updateApiKeyModelAccess(userId: string, input: UpdateApiKe
   return withOwnedApiKey(userId, input.id, "Failed to update API key model access", async (apiKey) => {
     const normalizedModels = input.mode === "all" ? [] : normalizeModelList(input.models);
     if (input.mode !== "all" && normalizedModels.length === 0) return { success: false, error: "Select at least one model" } as const;
-    const invalidModel = normalizedModels.find((model) => !isModelSupported(model));
+    const customModelIds = await ownedCustomModelIds(userId);
+    const invalidModel = normalizedModels.find((model) => !isModelSupported(model) && !customModelIds.has(model));
     if (invalidModel) return { success: false, error: `Unknown model: ${invalidModel}` } as const;
     const [updated] = await db.update(proxyApiKey).set({ modelAccessMode: input.mode, modelAccessList: normalizedModels }).where(eq(proxyApiKey.id, input.id)).returning({ modelAccessMode: proxyApiKey.modelAccessMode, modelAccessList: proxyApiKey.modelAccessList });
     if (!updated) return { success: false, error: "Failed to update API key model access" } as const;
@@ -288,12 +299,13 @@ export async function updateApiKeyAccountAccess(userId: string, input: UpdateApi
 export async function updateApiKeyRateLimits(userId: string, input: UpdateApiKeyRateLimitsInput) {
   return withOwnedApiKey(userId, input.id, "Failed to update API key rate limits", async (apiKey) => {
     const validFamilies = new Set(getAllFamilies());
+    const customModelIds = await ownedCustomModelIds(userId);
     const seenTargets = new Set<string>();
     for (const rule of input.rules) {
       const key = `${rule.targetType}:${rule.target}`;
       if (seenTargets.has(key)) return { success: false, error: `Duplicate rate limit rule for ${rule.target}` } as const;
       seenTargets.add(key);
-      if (rule.targetType === "model" && !isModelSupported(resolveModelAlias(rule.target.trim()))) return { success: false, error: `Unknown model: ${rule.target}` } as const;
+      if (rule.targetType === "model" && !isModelSupported(resolveModelAlias(rule.target.trim())) && !customModelIds.has(rule.target.trim())) return { success: false, error: `Unknown model: ${rule.target}` } as const;
       if (rule.targetType === "family" && !validFamilies.has(rule.target)) return { success: false, error: `Unknown model family: ${rule.target}` } as const;
       if (rule.perMinute == null && rule.perHour == null && rule.perDay == null) return { success: false, error: `At least one rate limit must be set for ${rule.target}` } as const;
       if ((rule.perMinute != null && rule.perMinute <= 0) || (rule.perHour != null && rule.perHour <= 0) || (rule.perDay != null && rule.perDay <= 0)) return { success: false, error: "Rate limits must be positive numbers" } as const;

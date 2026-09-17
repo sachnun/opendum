@@ -1,0 +1,1 @@
+ALTER TABLE "custom_provider_model" ADD COLUMN "aliased" boolean DEFAULT false NOT NULL;

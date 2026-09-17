@@ -80,13 +80,15 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 			if !custom.Valid {
 				return *custom, nil
 			}
-			if mode == "whitelist" {
-				if _, ok := modelSet[custom.Model]; !ok {
+			if mode == "whitelist" || mode == "blacklist" {
+				_, listed := modelSet[custom.Model]
+				if !listed && custom.Alias != "" {
+					_, listed = modelSet[custom.Alias]
+				}
+				if mode == "whitelist" && !listed {
 					return s.invalidModelResult(custom.Provider, custom.Model, modelParam, nil), nil
 				}
-			}
-			if mode == "blacklist" {
-				if _, ok := modelSet[custom.Model]; ok {
+				if mode == "blacklist" && listed {
 					return s.invalidModelResult(custom.Provider, custom.Model, modelParam, nil), nil
 				}
 			}
@@ -149,6 +151,11 @@ func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel 
 		}
 		provider := slug
 		result := ModelValidationResult{Valid: true, Provider: &provider, Model: slug + "/" + rawModel}
+		if row.Aliased && s.registry != nil {
+			if canonical := s.registry.ResolveAlias(row.ModelID); s.registry.IsSupported(canonical) {
+				result.Alias = canonical
+			}
+		}
 		vision := true
 		if s.registry != nil {
 			candidates := []string{row.ModelID}
@@ -308,6 +315,7 @@ func (s *Service) GetAccountModelAvailabilityWithSharing(ctx context.Context, us
 		ActiveAccountIDsByProvider:         map[string][]string{},
 		AccountTierByID:                    map[string]string{},
 		AuthlessProviderModels:             map[string]map[string]struct{}{},
+		CustomProviderModels:               map[string]map[string]struct{}{},
 		SharedAccountCountByProvider:       map[string]int{},
 		SharedDisabledCountByProviderModel: map[string]int{},
 		SharedAccountTiersByProvider:       map[string][]string{},
@@ -364,6 +372,17 @@ func (s *Service) GetAccountModelAvailabilityWithSharing(ctx context.Context, us
 			key := provider + ":" + s.registry.ResolveAlias(row.Model)
 			availability.DisabledCountByProviderModel[key]++
 		}
+	}
+
+	customModels, _, err := s.customProviderModelSets(ctx, userID)
+	if err != nil {
+		return availability, err
+	}
+	for slug, models := range customModels {
+		if availability.AccountCountByProvider[slug] == 0 {
+			continue
+		}
+		availability.CustomProviderModels[slug] = models
 	}
 
 	if !includeShared {
@@ -433,6 +452,14 @@ func (s *Service) IsModelUsableByAccounts(model string, availability AccountMode
 			return true
 		}
 	}
+	for provider, models := range availability.CustomProviderModels {
+		if _, ok := models[canonical]; !ok {
+			continue
+		}
+		if availability.AccountCountByProvider[provider] > 0 {
+			return true
+		}
+	}
 	return false
 }
 
@@ -473,6 +500,21 @@ func (s *Service) normalizeModelList(values []string) []string {
 		if s.registry.IsSupported(model) {
 			result = append(result, model)
 		}
+	}
+	return uniqueSorted(result)
+}
+
+func (s *Service) normalizeModelAccessList(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if s.registry.IsSupported(trimmed) {
+			trimmed = s.registry.ResolveAlias(trimmed)
+		}
+		result = append(result, trimmed)
 	}
 	return uniqueSorted(result)
 }

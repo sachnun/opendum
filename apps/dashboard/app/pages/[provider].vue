@@ -25,6 +25,7 @@ interface HeaderRow {
 interface ModelRow {
   model: string;
   alias: string;
+  aliased: boolean;
 }
 
 interface SettingsForm {
@@ -876,7 +877,12 @@ const filledSettingsModels = computed(() => (settingsForm.value?.models ?? []).f
 function modelRowFromCustom(model: CustomProviderModelRow): ModelRow {
   const upstream = model.upstream ?? "";
   const source = upstream || model.modelId;
-  return { model: source, alias: model.modelId === source ? "" : model.modelId };
+  return { model: source, alias: model.modelId === source ? "" : model.modelId, aliased: model.aliased };
+}
+
+function setRowAlias(row: ModelRow, value: string) {
+  row.alias = value;
+  row.aliased = value !== "";
 }
 
 function openSettings() {
@@ -908,7 +914,7 @@ watch(() => settingsForm.value?.models, (rows) => {
     if (rows[index].model.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
-  if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "" });
+  if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "", aliased: false });
 }, { deep: true });
 
 function headersPayload(form: SettingsForm): Record<string, string> {
@@ -960,7 +966,7 @@ async function saveSettings() {
 
     const desired = form.models
       .filter((row) => row.model.trim() !== "")
-      .map((row) => ({ modelId: row.alias.trim() || row.model.trim(), upstream: row.model.trim() }));
+      .map((row) => ({ modelId: row.alias.trim() || row.model.trim(), upstream: row.model.trim(), aliased: row.aliased }));
     const desiredIds = new Set(desired.map((row) => row.modelId));
     for (const model of customModels.value.filter((row) => !desiredIds.has(row.modelId))) {
       const removed = await api.customProviders.deleteModel({ slug: key, modelId: model.modelId });
@@ -1162,7 +1168,7 @@ function decodeAccountHash(hash: string): string | null {
           <div v-for="(row, index) in settingsForm.models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="model">
             <div class="min-w-0 flex-1">
-              <ModelAliasSelect v-model="row.alias" :default-id="row.model" />
+              <ModelAliasSelect :model-value="row.alias" :default-id="row.model" @update:model-value="(value: string) => setRowAlias(row, value)" />
             </div>
           </div>
         </div>

@@ -44,8 +44,8 @@ return {1}
 
 var apiKeyRateLimitScript = redis.NewScript(apiKeyRateLimitLua)
 
-func (s *Service) checkAndIncrementAPIKeyRateLimit(ctx context.Context, apiKeyID, model string, rules []auth.RateLimitRule) (apiKeyRateLimitResult, error) {
-	rule, ok := s.matchRateLimitRule(model, rules)
+func (s *Service) checkAndIncrementAPIKeyRateLimit(ctx context.Context, apiKeyID, model, alias string, rules []auth.RateLimitRule) (apiKeyRateLimitResult, error) {
+	rule, ok := s.matchRateLimitRule(model, alias, rules)
 	if !ok {
 		return apiKeyRateLimitResult{Allowed: true}, nil
 	}
@@ -94,13 +94,19 @@ func (s *Service) checkAndIncrementAPIKeyRateLimit(ctx context.Context, apiKeyID
 	return apiKeyRateLimitResult{Allowed: false, RetryAfterSeconds: retryAfter, ExceededWindow: exceeded.label, Limit: exceeded.limit, Current: toInt(res[2])}, nil
 }
 
-func (s *Service) matchRateLimitRule(model string, rules []auth.RateLimitRule) (auth.RateLimitRule, bool) {
+func (s *Service) matchRateLimitRule(model, alias string, rules []auth.RateLimitRule) (auth.RateLimitRule, bool) {
 	for _, rule := range rules {
-		if rule.TargetType == "model" && rule.Target == model {
+		if rule.TargetType != "model" {
+			continue
+		}
+		if rule.Target == model || (alias != "" && rule.Target == alias) {
 			return rule, true
 		}
 	}
 	family := s.registry.ModelFamily(model)
+	if family == "" && alias != "" {
+		family = s.registry.ModelFamily(alias)
+	}
 	if family != "" {
 		for _, rule := range rules {
 			if rule.TargetType == "family" && rule.Target == family {

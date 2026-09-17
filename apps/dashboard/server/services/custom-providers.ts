@@ -17,6 +17,7 @@ const VALIDATION_TIMEOUT_MS = 15000;
 export const customModelInputSchema = z.object({
   modelId: z.string().trim().min(1).max(120),
   upstream: z.string().trim().max(200).optional(),
+  aliased: z.boolean().optional(),
   authless: z.boolean().optional(),
   minTier: z.string().trim().max(60).optional(),
   allowedTiers: z.array(z.string().trim().min(1)).optional(),
@@ -216,6 +217,7 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
         providerId: provider.id,
         modelId: input.modelId,
         upstream: input.upstream ?? input.modelId,
+        aliased: input.aliased ?? false,
         authless: input.authless ?? false,
         minTier: input.minTier ?? null,
         allowedTiers: input.allowedTiers ?? null,
@@ -225,6 +227,7 @@ export async function upsertCustomModels(userId: string, slug: string, models: z
         target: [customProviderModel.providerId, customProviderModel.modelId],
         set: {
           upstream: input.upstream ?? input.modelId,
+          aliased: input.aliased ?? false,
           authless: input.authless ?? false,
           minTier: input.minTier ?? null,
           allowedTiers: input.allowedTiers ?? null,

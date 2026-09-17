@@ -11,6 +11,7 @@ interface HeaderRow {
 interface ModelRow {
   model: string;
   alias: string;
+  aliased: boolean;
 }
 
 const emit = defineEmits<{
@@ -32,7 +33,7 @@ const name = ref("");
 const baseUrl = ref("");
 const headers = ref<HeaderRow[]>([{ key: "", value: "" }]);
 const apiKey = ref("");
-const models = ref<ModelRow[]>([{ model: "", alias: "" }]);
+const models = ref<ModelRow[]>([{ model: "", alias: "", aliased: false }]);
 const synced = ref(false);
 
 const MULTIPART_SUFFIXES = new Set(["ac", "biz", "co", "com", "edu", "go", "gov", "mil", "my", "ne", "net", "or", "org", "sch", "web"]);
@@ -78,8 +79,13 @@ watch(models, (rows) => {
     if (rows[index].model.trim() === "") rows.splice(index, 1);
   }
   const last = rows[rows.length - 1];
-  if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "" });
+  if (!last || last.model.trim() !== "") rows.push({ model: "", alias: "", aliased: false });
 }, { deep: true });
+
+function setRowAlias(row: ModelRow, value: string) {
+  row.alias = value;
+  row.aliased = value !== "";
+}
 
 function run(action: () => Promise<ActionResult<unknown>>, key: string) {
   busy.value = key;
@@ -139,9 +145,9 @@ async function syncModels() {
     models.value = result.data.models.length > 0
       ? result.data.models.map((model) => {
         const source = model.upstream || model.modelId;
-        return { model: source, alias: model.modelId === source ? "" : model.modelId };
+        return { model: source, alias: model.modelId === source ? "" : model.modelId, aliased: false };
       })
-      : [{ model: "", alias: "" }];
+      : [{ model: "", alias: "", aliased: false }];
     synced.value = true;
   } catch (error) {
     errorMessage.value = requestErrorMessage(error);
@@ -160,7 +166,7 @@ async function finish() {
   if (!(await run(() => dashboardApi.customProviders.connect({ slug: slug.value, token }), "connect"))) return;
   const rows = filledModels.value;
   if (rows.length > 0) {
-    const payload = rows.map((row) => ({ modelId: row.alias.trim() || row.model.trim(), upstream: row.model.trim() }));
+    const payload = rows.map((row) => ({ modelId: row.alias.trim() || row.model.trim(), upstream: row.model.trim(), aliased: row.aliased }));
     if (!(await run(() => dashboardApi.customProviders.addModels({ slug: slug.value, models: payload }), "models"))) return;
   }
   emit("created", slug.value);
@@ -251,7 +257,7 @@ function next() {
           <div v-for="(row, index) in models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" :class="inputClass" class="flex-1 font-mono" placeholder="model">
             <div class="min-w-0 flex-1">
-              <ModelAliasSelect v-model="row.alias" :default-id="row.model" />
+              <ModelAliasSelect :model-value="row.alias" :default-id="row.model" @update:model-value="(value: string) => setRowAlias(row, value)" />
             </div>
           </div>
           <p v-if="synced" class="text-xs text-muted-foreground">Synced {{ filledModels.length }} model(s).</p>

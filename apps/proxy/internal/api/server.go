@@ -182,6 +182,16 @@ func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {
 			if availability.AccountCountByProvider[slug] == 0 {
 				continue
 			}
+			if apiKeyModelAccessMode == "whitelist" {
+				if _, ok := apiKeyModelSet[id]; !ok {
+					continue
+				}
+			}
+			if apiKeyModelAccessMode == "blacklist" {
+				if _, ok := apiKeyModelSet[id]; ok {
+					continue
+				}
+			}
 			enabled = append(enabled, item)
 		}
 	}

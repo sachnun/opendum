@@ -175,7 +175,7 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	}
 
 	if authResult.APIKeyID != "" && len(authResult.RateLimitRules) > 0 {
-		rl, err := s.checkAndIncrementAPIKeyRateLimit(ctx, authResult.APIKeyID, validation.Model, authResult.RateLimitRules)
+		rl, err := s.checkAndIncrementAPIKeyRateLimit(ctx, authResult.APIKeyID, validation.Model, validation.Alias, authResult.RateLimitRules)
 		if err != nil {
 			s.writeRouteError(w, cfg, http.StatusInternalServerError, "Internal server error", "api_error", nil, nil, nil, nil)
 			return

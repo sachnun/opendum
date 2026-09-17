@@ -56,6 +56,7 @@ func (s *Service) getEligibleAccounts(ctx context.Context, userID, model string,
 		targetProviders = []string{*provider}
 	} else {
 		targetProviders = s.registry.ProvidersForModel(model)
+		targetProviders = append(targetProviders, s.customProviderSlugsForModel(ctx, userID, model)...)
 	}
 	if len(targetProviders) == 0 {
 		return nil, nil
@@ -554,6 +555,34 @@ func (s *Service) validateSelectedAccountModel(ctx context.Context, account appd
 		return &routeError{Status: http.StatusBadRequest, Message: "Selected provider account tier does not allow model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_tier_mismatch")}
 	}
 	return nil
+}
+
+func (s *Service) customProviderSlugsForModel(ctx context.Context, userID, model string) []string {
+	if s.customStore == nil {
+		return nil
+	}
+	providers, err := s.customStore.ListProviders(ctx, userID)
+	if err != nil {
+		return nil
+	}
+	canonical := s.registry.ResolveAlias(model)
+	slugs := []string{}
+	for _, custom := range providers {
+		rows, err := s.customStore.ListModels(ctx, custom.ID)
+		if err != nil {
+			continue
+		}
+		for _, row := range rows {
+			if !row.Aliased {
+				continue
+			}
+			if s.registry.ResolveAlias(row.ModelID) == canonical {
+				slugs = append(slugs, custom.Slug)
+				break
+			}
+		}
+	}
+	return slugs
 }
 
 func (s *Service) isCustomAccountModel(ctx context.Context, account appdb.ProviderAccount, model string) bool {

@@ -90,7 +90,7 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 	}
 
 	modelMode := normalizeAccessMode(apiKey.ModelAccessMode)
-	modelList := s.normalizeModelList(apiKey.ModelAccessList)
+	modelList := s.normalizeModelAccessList(apiKey.ModelAccessList)
 	accountMode := normalizeAccessMode(apiKey.AccountAccessMode)
 	accountList := normalizeAccountList(apiKey.AccountAccessList)
 
@@ -149,7 +149,7 @@ func (s *Service) resultFromCache(cached cacheValue) Result {
 		UserID:            cached.UserID,
 		APIKeyID:          cached.APIKeyID,
 		ModelAccessMode:   normalizeAccessMode(cached.ModelAccessMode),
-		ModelAccessList:   s.normalizeModelList(cached.ModelAccessList),
+		ModelAccessList:   s.normalizeModelAccessList(cached.ModelAccessList),
 		AccountAccessMode: normalizeAccessMode(cached.AccountAccessMode),
 		AccountAccessList: normalizeAccountList(cached.AccountAccessList),
 		RoamingEnabled:    cached.RoamingEnabled,

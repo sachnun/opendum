@@ -39,6 +39,7 @@ export const customProviderModel = pgTable(
       .references(() => customProvider.id, { onDelete: "cascade" }),
     modelId: text("modelId").notNull(),
     upstream: text("upstream"),
+    aliased: boolean("aliased").notNull().default(false),
     authless: boolean("authless").notNull().default(false),
     minTier: text("minTier"),
     allowedTiers: text("allowedTiers").array(),

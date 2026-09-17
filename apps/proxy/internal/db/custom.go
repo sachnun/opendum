@@ -51,7 +51,7 @@ func (d *DB) ListCustomProviderModels(ctx context.Context, providerID string) ([
 		return nil, nil
 	}
 	rows, err := d.Pool.Query(ctx, `
-		SELECT id, "providerId", "modelId", upstream, authless, "minTier", "allowedTiers", "customFlags", "createdAt", "updatedAt"
+		SELECT id, "providerId", "modelId", upstream, aliased, authless, "minTier", "allowedTiers", "customFlags", "createdAt", "updatedAt"
 		FROM custom_provider_model
 		WHERE "providerId" = $1
 		ORDER BY "modelId" ASC`, providerID)
@@ -64,7 +64,7 @@ func (d *DB) ListCustomProviderModels(ctx context.Context, providerID string) ([
 		var row CustomProviderModel
 		var upstream, minTier *string
 		var flags []byte
-		if err := rows.Scan(&row.ID, &row.ProviderID, &row.ModelID, &upstream, &row.Authless, &minTier, &row.AllowedTiers, &flags, &row.CreatedAt, &row.UpdatedAt); err != nil {
+		if err := rows.Scan(&row.ID, &row.ProviderID, &row.ModelID, &upstream, &row.Aliased, &row.Authless, &minTier, &row.AllowedTiers, &flags, &row.CreatedAt, &row.UpdatedAt); err != nil {
 			return nil, err
 		}
 		row.Upstream = upstream

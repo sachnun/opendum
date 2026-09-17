@@ -37,7 +37,7 @@ export async function listCustomProviderModels(userId: string, options: { includ
 
   const [models, accounts] = await Promise.all([
     db
-      .select({ providerId: customProviderModel.providerId, modelId: customProviderModel.modelId })
+      .select({ providerId: customProviderModel.providerId, modelId: customProviderModel.modelId, aliased: customProviderModel.aliased })
       .from(customProviderModel)
       .where(inArray(customProviderModel.providerId, providerIds)),
     db.select({ id: providerAccount.id, provider: providerAccount.provider }).from(providerAccount).where(accountWhere),
@@ -52,7 +52,8 @@ export async function listCustomProviderModels(userId: string, options: { includ
   const standaloneByProviderId = new Map<string, string[]>();
   for (const model of models) {
     const canonical = resolveModelAlias(model.modelId);
-    const target = isModelSupported(canonical) ? aliasedByProviderId : standaloneByProviderId;
+    const aliased = model.aliased && isModelSupported(canonical);
+    const target = aliased ? aliasedByProviderId : standaloneByProviderId;
     const value = target === aliasedByProviderId ? canonical : model.modelId;
     const current = target.get(model.providerId) ?? [];
     if (!current.includes(value)) current.push(value);

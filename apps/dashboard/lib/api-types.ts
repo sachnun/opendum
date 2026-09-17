@@ -306,6 +306,7 @@ export interface CustomProviderModelRow {
   providerId: string;
   modelId: string;
   upstream: string | null;
+  aliased: boolean;
   authless: boolean;
   minTier: string | null;
   allowedTiers: string[] | null;

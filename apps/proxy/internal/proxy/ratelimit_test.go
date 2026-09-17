@@ -81,7 +81,7 @@ func TestMatchRateLimitRulePrefersModelRule(t *testing.T) {
 		{Target: "mock-family", TargetType: "family", PerMinute: intPtr(1)},
 	}
 
-	rule, ok := service.matchRateLimitRule(mockFamilyModel, rules)
+	rule, ok := service.matchRateLimitRule(mockFamilyModel, "", rules)
 	if !ok {
 		t.Fatal("matchRateLimitRule returned no match for exact model rule")
 	}
@@ -95,7 +95,7 @@ func TestMatchRateLimitRuleFallsBackToFamily(t *testing.T) {
 	service := &Service{registry: mockRegistry(t)}
 	rules := []auth.RateLimitRule{{Target: "mock-family", TargetType: "family", PerHour: intPtr(100)}}
 
-	rule, ok := service.matchRateLimitRule(mockFamilyModel, rules)
+	rule, ok := service.matchRateLimitRule(mockFamilyModel, "", rules)
 	if !ok {
 		t.Fatal("matchRateLimitRule did not match family rule for model in that family")
 	}
@@ -108,11 +108,25 @@ func TestMatchRateLimitRuleNoFalseMatch(t *testing.T) {
 	t.Parallel()
 	service := &Service{registry: mockRegistry(t)}
 	rules := []auth.RateLimitRule{{Target: mockFamilyModel, TargetType: "model", PerMinute: intPtr(5)}}
-	if _, ok := service.matchRateLimitRule(mockPlainModel, rules); ok {
+	if _, ok := service.matchRateLimitRule(mockPlainModel, "", rules); ok {
 		t.Fatal("matchRateLimitRule matched an unrelated model")
 	}
-	if _, ok := service.matchRateLimitRule(mockFamilyModel, nil); ok {
+	if _, ok := service.matchRateLimitRule(mockFamilyModel, "", nil); ok {
 		t.Fatal("matchRateLimitRule matched with no rules")
+	}
+}
+
+func TestMatchRateLimitRuleUsesAlias(t *testing.T) {
+	t.Parallel()
+	service := &Service{registry: mockRegistry(t)}
+	rules := []auth.RateLimitRule{{Target: mockFamilyModel, TargetType: "model", PerMinute: intPtr(5)}}
+
+	rule, ok := service.matchRateLimitRule("custom-slug/"+mockFamilyModel, mockFamilyModel, rules)
+	if !ok {
+		t.Fatal("matchRateLimitRule did not match via alias")
+	}
+	if rule.Target != mockFamilyModel {
+		t.Fatalf("matched rule = %+v, want %s", rule, mockFamilyModel)
 	}
 }
 
@@ -121,7 +135,7 @@ func TestCheckAndIncrementAPIKeyRateLimitWithoutMatchingRule(t *testing.T) {
 	service := &Service{registry: mockRegistry(t)}
 	ctx := context.Background()
 
-	result, err := service.checkAndIncrementAPIKeyRateLimit(ctx, "key_1", mockPlainModel, []auth.RateLimitRule{
+	result, err := service.checkAndIncrementAPIKeyRateLimit(ctx, "key_1", mockPlainModel, "", []auth.RateLimitRule{
 		{Target: mockFamilyModel, TargetType: "model", PerMinute: intPtr(1)},
 	})
 	if err != nil {
@@ -131,7 +145,7 @@ func TestCheckAndIncrementAPIKeyRateLimitWithoutMatchingRule(t *testing.T) {
 		t.Fatal("request with no matching rule should be allowed")
 	}
 
-	result, err = service.checkAndIncrementAPIKeyRateLimit(ctx, "key_1", "anything", nil)
+	result, err = service.checkAndIncrementAPIKeyRateLimit(ctx, "key_1", "anything", "", nil)
 	if err != nil || !result.Allowed {
 		t.Fatalf("empty rules result = %+v, err = %v, want allowed", result, err)
 	}

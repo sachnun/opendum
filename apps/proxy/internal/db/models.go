@@ -47,6 +47,7 @@ type CustomProviderModel struct {
 	CustomFlags  map[string]any
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Aliased      bool
 }
 
 type DisabledModel struct {

@@ -36,6 +36,7 @@ type ModelValidationResult struct {
 	Valid    bool
 	Provider *string
 	Model    string
+	Alias    string
 	Vision   *bool
 	Error    string
 	Param    string
@@ -49,6 +50,7 @@ type AccountModelAvailability struct {
 	ActiveAccountIDsByProvider         map[string][]string
 	AccountTierByID                    map[string]string
 	AuthlessProviderModels             map[string]map[string]struct{}
+	CustomProviderModels               map[string]map[string]struct{}
 	SharedAccountCountByProvider       map[string]int
 	SharedDisabledCountByProviderModel map[string]int
 	SharedAccountTiersByProvider       map[string][]string
