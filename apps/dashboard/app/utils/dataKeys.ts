@@ -6,6 +6,7 @@ export const dataKeys = {
   models: "dashboard-models",
   shellModelFamilyCounts: "dashboard-shell-model-family-counts",
   modelSearch: "layout-model-search",
+  modelCatalog: "dashboard-model-catalog",
   playgroundOptions: "dashboard-playground-options",
   apiKeys: "dashboard-api-keys",
   customProviders: "dashboard-custom-providers",

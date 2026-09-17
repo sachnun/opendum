@@ -94,6 +94,10 @@ export async function listModels(userId: string, options: { includeStats?: boole
   }
 }
 
+export function listKnownModels(): string[] {
+  return getAllModels().sort((left, right) => compareModelEntries({ id: left, family: getModelFamily(left) }, { id: right, family: getModelFamily(right) }));
+}
+
 export async function searchModels(userId: string) {
   try {
     const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);

@@ -1161,7 +1161,9 @@ function decodeAccountHash(hash: string): string | null {
           </div>
           <div v-for="(row, index) in settingsForm.models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="model">
-            <input v-model="row.alias" class="h-9 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" placeholder="alias (optional)">
+            <div class="min-w-0 flex-1">
+              <ModelAliasSelect v-model="row.alias" :default-id="row.model" />
+            </div>
           </div>
         </div>
       </div>
