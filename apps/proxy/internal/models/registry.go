@@ -602,6 +602,7 @@ func (r *Registry) FormatModelsForOpenAI() []map[string]any {
 		if info.Owner != "" {
 			item["owner"] = info.Owner
 		}
+		item["reasoning"] = r.IsReasoningModel(model)
 		if info.Modalities != nil {
 			item["modalities"] = info.Modalities
 		}
