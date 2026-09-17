@@ -250,7 +250,9 @@ function next() {
           </div>
           <div v-for="(row, index) in models" :key="index" class="flex items-center gap-2">
             <input v-model="row.model" :class="inputClass" class="flex-1 font-mono" placeholder="model">
-            <input v-model="row.alias" :class="inputClass" class="flex-1 font-mono" placeholder="alias (optional)">
+            <div class="min-w-0 flex-1">
+              <ModelAliasSelect v-model="row.alias" :default-id="row.model" />
+            </div>
           </div>
           <p v-if="synced" class="text-xs text-muted-foreground">Synced {{ filledModels.length }} model(s).</p>
         </div>

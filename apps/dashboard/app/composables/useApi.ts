@@ -132,6 +132,7 @@ export function useApi() {
     models: {
       list: (query?: { includeStats?: boolean }) => apiFetch<ModelListItem[]>("/api/dashboard/models", query ? { query } : undefined),
       search: () => apiFetch<ModelSearchItem[]>("/api/dashboard/models/search"),
+      catalog: () => apiFetch<string[]>("/api/dashboard/models/catalog"),
       stats: (query: { models: string[]; cursors?: Record<string, string> }) => apiFetch<ModelStatsData>("/api/dashboard/models/stats", { query: cursorQuery(query.models, query.cursors) }),
       familyCounts: () => apiFetch<Record<string, number>>("/api/dashboard/models/families"),
       setEnabled: (body: { modelId: string; enabled: boolean }) => post<ActionResult<{ model: string; enabled: boolean }>>(apiFetch, "/api/dashboard/models/enabled", body),
