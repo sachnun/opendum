@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+	"syscall"
 )
 
 const maxRedirectHops = 10
@@ -56,23 +57,23 @@ func PrivateHost(host string) bool {
 // goes through this hook, it covers literal hosts, DNS rebinding, and
 // redirects in one place instead of only validating the initial URL.
 func GuardedDialContext() func(ctx context.Context, network, address string) (net.Conn, error) {
-	resolver := net.DefaultResolver
-	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		host, _, err := net.SplitHostPort(address)
-		if err != nil {
-			return nil, err
-		}
-		ips, err := resolver.LookupIPAddr(ctx, host)
-		if err != nil {
-			return nil, err
-		}
-		for _, resolved := range ips {
-			if privateIP(resolved.IP) {
-				return nil, fmt.Errorf("refusing to connect to private address %s", resolved.IP)
-			}
-		}
-		return (&net.Dialer{}).DialContext(ctx, network, address)
+	dialer := &net.Dialer{Control: guardDialControl}
+	return dialer.DialContext
+}
+
+func guardDialControl(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
 	}
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return fmt.Errorf("refusing to dial unresolved address %q", host)
+	}
+	if privateIP(net.IP(addr.Unmap().AsSlice())) {
+		return fmt.Errorf("refusing to connect to private address %s", host)
+	}
+	return nil
 }
 
 // GuardedRedirectPolicy rejects redirect hops to private targets and https

@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -37,6 +38,31 @@ func TestPrivateHost(t *testing.T) {
 	for _, host := range public {
 		if PrivateHost(host) {
 			t.Fatalf("PrivateHost(%q) = true, want false", host)
+		}
+	}
+}
+
+func TestGuardedDialRejectsPrivateAddresses(t *testing.T) {
+	dial := GuardedDialContext()
+	for _, address := range []string{"127.0.0.1:443", "10.0.0.1:443", "[::1]:443", "169.254.169.254:80", "100.64.0.1:443"} {
+		if _, err := dial(context.Background(), "tcp", address); err == nil {
+			t.Fatalf("dial %q succeeded, want rejection", address)
+		}
+	}
+}
+
+func TestGuardDialControlAllowsPublicAddresses(t *testing.T) {
+	for _, address := range []string{"8.8.8.8:443", "1.1.1.1:443", "[2606:4700:4700::1111]:443"} {
+		if err := guardDialControl("tcp", address, nil); err != nil {
+			t.Fatalf("guardDialControl(%q) = %v, want nil", address, err)
+		}
+	}
+}
+
+func TestGuardDialControlRejectsPrivateAddresses(t *testing.T) {
+	for _, address := range []string{"127.0.0.1:443", "10.0.0.5:443", "172.16.5.5:443", "192.168.1.1:443", "169.254.169.254:80", "100.64.5.5:443", "0.0.0.0:80", "[::1]:443", "[fe80::1]:443", "[fc00::1]:443"} {
+		if err := guardDialControl("tcp", address, nil); err == nil {
+			t.Fatalf("guardDialControl(%q) = nil, want rejection", address)
 		}
 	}
 }
