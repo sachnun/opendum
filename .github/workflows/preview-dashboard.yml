@@ -1,9 +1,11 @@
 name: Preview Dashboard
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  # Disabled for now, not needed yet. Re-enable by uncommenting below.
+  # workflow_run:
+  #   workflows: [CI]
+  #   types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
