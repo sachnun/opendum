@@ -26,10 +26,6 @@ import { buildModelIndex, syncProviderModels, writeModelJson } from "../src/regi
 import { fetchText } from "../src/http.ts";
 import { stripParamInfoKey } from "../src/clean-key.ts";
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
 const ANTIGRAVITY_MODELS_URL = "https://antigravity.google/docs/models";
 const PROVIDER_NAME = "antigravity";
 
@@ -136,10 +132,6 @@ const MANAGED_PROVIDER_CONFIG_KEYS = [
   "thinking_model",
   "top_p_min_095",
 ];
-
-// ---------------------------------------------------------------------------
-// Antigravity docs parsing
-// ---------------------------------------------------------------------------
 
 function htmlToReasoningModelMarkdown(html) {
   const sectionMatch = html.match(
@@ -375,11 +367,6 @@ function getExistingProviderUpstream(entry, provider) {
   }
   return entry.id || entry.fileId;
 }
-// ---------------------------------------------------------------------------
-// Sync JSON files
-// ---------------------------------------------------------------------------
-// Provider config and metadata
-// ---------------------------------------------------------------------------
 
 function buildProviderConfigByModel(modelMap, thinkingClaudeModelKeys = new Set()) {
   const config = new Map();
@@ -543,9 +530,6 @@ function inferMetadata(modelKey) {
   }
   return null;
 }
-// ---------------------------------------------------------------------------
-// Sync JSON files
-// ---------------------------------------------------------------------------
 
 function syncJson(modelMap, providerConfigByModel, dryRun) {
   if (dryRun) {
@@ -625,10 +609,6 @@ function syncJson(modelMap, providerConfigByModel, dryRun) {
   });
   return { ...result, modelMap };
 }
-
-// ---------------------------------------------------------------------------
-// User-Agent version
-// ---------------------------------------------------------------------------
 
 function parseLatestVersion(html) {
   const versionRegex = /\b(\d+\.\d+\.\d+)\b/g;
@@ -721,10 +701,6 @@ async function syncUserAgent(dryRun) {
     console.log("[antigravity] User-Agent version is already up to date.");
   }
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");

@@ -22,10 +22,6 @@ import { syncProviderModels } from "../src/registry.ts";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
 import { stripParamInfoKey } from "../src/clean-key.ts";
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
 const KIRO_DOCS_URL = "https://kiro.dev/docs/models/";
 const PROVIDER_NAME = "kiro";
 
@@ -49,10 +45,6 @@ const MODELS_WITH_1M_VARIANT = new Set([
   "claude-sonnet-4.5",
 ]);
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Strip HTML tags and decode common HTML entities.
  * @param {string} html
@@ -70,10 +62,6 @@ function stripHtml(html) {
     .replace(/&nbsp;/g, " ")
     .trim();
 }
-
-// ---------------------------------------------------------------------------
-// Fetch & parse official Kiro docs
-// ---------------------------------------------------------------------------
 
 /**
  * Fetch the official Kiro models page and extract model info from the
@@ -127,7 +115,6 @@ async function fetchOfficialModels() {
  * @returns {Array<{name: string, contextWindow: string, region: string}>}
  */
 function parseModelsFromHtml(html) {
-  // Find all <table> elements
   const tables = [];
   const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
   let tableMatch;
@@ -167,13 +154,11 @@ function parseModelsFromHtml(html) {
     );
   }
 
-  // Parse rows from the table
   const rows = parseTableRows(comparisonTable);
   if (rows.length < 2) {
     throw new Error("Models table has fewer than 2 rows (header + data).");
   }
 
-  // Identify columns by header text
   const header = rows[0].map((h) => h.toLowerCase());
   const nameIdx = header.findIndex(
     (h) => h === "model" || h.includes("model")
@@ -249,10 +234,6 @@ function parseTableRows(tableInnerHtml) {
   return rows;
 }
 
-// ---------------------------------------------------------------------------
-// Display name → Kiro API model ID
-// ---------------------------------------------------------------------------
-
 /**
  * Convert a display name from the Kiro docs to a Kiro API model ID.
  *
@@ -298,10 +279,6 @@ function expandVariants(kiroId) {
   return ids;
 }
 
-// ---------------------------------------------------------------------------
-// Kiro model ID -> canonical JSON key
-// ---------------------------------------------------------------------------
-
 /**
   * Convert a Kiro API model ID to a canonical JSON model key.
  *
@@ -331,10 +308,6 @@ function toCanonical(kiroModelId) {
 
   return { key, upstream: kiroModelId };
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");

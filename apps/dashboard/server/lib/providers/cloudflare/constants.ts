@@ -1,5 +1,3 @@
-// Cloudflare Workers AI API constants
-
 const API_BASE_URL = "https://api.cloudflare.com/client/v4/accounts";
 
 export function getCloudflareValidationUrl(accountId: string): string {

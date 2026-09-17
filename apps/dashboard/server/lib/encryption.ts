@@ -63,32 +63,19 @@ function decryptCryptoJsCompatible(ciphertext: string): string {
   return Buffer.concat([decipher.update(payload), decipher.final()]).toString("utf8");
 }
 
-/**
- * Encrypt a string using AES-256
- */
 export function encrypt(text: string): string {
   return encryptCryptoJsCompatible(text);
 }
 
-/**
- * Decrypt an AES-256 encrypted string
- */
 export function decrypt(ciphertext: string): string {
   if (ciphertext.startsWith(`${ENCRYPTION_VERSION}:`)) return decryptV1(ciphertext);
   return decryptCryptoJsCompatible(ciphertext);
 }
 
-/**
- * Hash a string using SHA-256
- */
 export function hashString(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
-/**
- * Generate a random API key
- * Format: sk-[16 random chars]
- */
 export function generateApiKey(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   const bytes = randomBytes(16);
@@ -105,9 +92,6 @@ function getPreviewVisibleLength(keyLength: number): number {
   return 8;
 }
 
-/**
- * Get masked key preview for display.
- */
 export function getKeyPreview(key: string): string {
   const visibleLength = Math.min(getPreviewVisibleLength(key.length), Math.max(0, key.length - 1));
   return `${key.slice(0, visibleLength)}${"*".repeat(Math.max(1, key.length - visibleLength))}`;

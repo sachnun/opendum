@@ -1,5 +1,3 @@
-// Kiro Provider exports
-
 export {
   kiroProvider,
   generateCodeVerifier,

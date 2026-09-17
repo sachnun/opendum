@@ -168,7 +168,6 @@ function buildModelMap(modelIds, existingKeys, llmModelKeys) {
 
   const nextMap = new Map();
 
-  // Retain existing models that are still available
   for (const [modelKey, upstreamModel] of existingKeys.entries()) {
     const resolvedUpstreamModel = availableModelSet.has(upstreamModel)
       ? upstreamModel
@@ -183,7 +182,6 @@ function buildModelMap(modelIds, existingKeys, llmModelKeys) {
 
   const mappedValues = new Set(nextMap.values());
 
-  // Add new chat models
   for (const upstreamModel of allAvailableModels) {
     if (mappedValues.has(upstreamModel)) {
       continue;
@@ -299,7 +297,6 @@ async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
 
-  // Build existing model map from JSON files to preserve existing keys
   const index = buildModelIndex(modelsDir);
   const existingKeys = new Map();
   for (const [modelId, entry] of Object.entries(index)) {

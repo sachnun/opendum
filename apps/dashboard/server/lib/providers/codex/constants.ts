@@ -1,10 +1,7 @@
 import os from "node:os";
 
-// Codex Provider Constants
 // Based on Opencode's codex plugin: https://github.com/anomalyco/opencode
-// Uses OAuth via auth.openai.com
 
-// OAuth Configuration
 export const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const AUTH_ISSUER = "https://auth.openai.com";
 export const AUTHORIZE_ENDPOINT = `${AUTH_ISSUER}/oauth/authorize`;
@@ -17,10 +14,8 @@ export const DEVICE_TOKEN_ENDPOINT = "https://auth.openai.com/api/accounts/devic
 export const DEVICE_REDIRECT_URI = "https://auth.openai.com/deviceauth/callback";
 export const DEVICE_VERIFICATION_URL = "https://auth.openai.com/codex/device";
 
-// Token refresh buffer (5 minutes before expiry)
 export const REFRESH_BUFFER_SECONDS = 5 * 60;
 
-// Originator header value (identifies us to the API)
 export const ORIGINATOR = "opencode";
 
 // Match Opencode's Codex plugin headers.

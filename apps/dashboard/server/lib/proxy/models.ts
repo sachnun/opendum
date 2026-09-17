@@ -23,7 +23,6 @@ function getLegacyNvidiaNimModelAlias(upstreamModel: string): string {
 
 const EFFECTIVE_MODEL_REGISTRY: Record<string, ModelInfo> = { ...MODEL_REGISTRY };
 
-// Filter out ignored models from the effective registry
 for (const model of IGNORED_MODELS) {
   Reflect.deleteProperty(EFFECTIVE_MODEL_REGISTRY, model);
 }
@@ -39,7 +38,6 @@ for (const [canonical, info] of Object.entries(EFFECTIVE_MODEL_REGISTRY)) {
     aliasToCanonical[info.id] = canonical;
   }
 
-  // Register JSON-declared aliases
   if (info.aliases) {
     for (const alias of info.aliases) {
       aliasToCanonical[alias] = canonical;
@@ -108,9 +106,6 @@ export function getProviderModelMap(provider: string): Record<string, string> {
 /** Cached per-provider model set. */
 const modelSetCache = new Map<string, Set<string>>();
 
-/**
- * Get the set of canonical model IDs supported by a provider.
- */
 export function getProviderModelSet(provider: string): Set<string> {
   const cached = modelSetCache.get(provider);
   if (cached) return cached;
@@ -155,25 +150,16 @@ export function getAuthlessProviderModels(): Record<string, string[]> {
   );
 }
 
-/**
- * Resolve model alias to canonical name
- */
 export function resolveModelAlias(model: string): string {
   return aliasToCanonical[model] ?? model;
 }
 
-/**
- * Get canonical model key and known aliases for lookups.
- */
 export function getModelLookupKeys(model: string): string[] {
   const canonical = resolveModelAlias(model);
   const aliases = canonicalToAliases[canonical] ?? [];
   return [canonical, ...aliases];
 }
 
-/**
- * Get providers that support a given model
- */
 export function getProvidersForModel(model: string): string[] {
   const canonical = resolveModelAlias(model);
   const info = EFFECTIVE_MODEL_REGISTRY[canonical];
@@ -184,34 +170,21 @@ export function getProvidersForModel(model: string): string[] {
   return [...info.providers];
 }
 
-/**
- * Check if a model is supported by any provider
- */
 export function isModelSupported(model: string): boolean {
   return getProvidersForModel(model).length > 0;
 }
 
-/**
- * Get all supported models (canonical names only)
- */
 export function getAllModels(): string[] {
   return Object.keys(EFFECTIVE_MODEL_REGISTRY).filter(
     (model) => getProvidersForModel(model).length > 0
   );
 }
 
-/**
- * Get the family of a model from the JSON registry.
- * Returns undefined if the model is not found or has no family set.
- */
 export function getModelFamily(modelId: string): string | undefined {
   const canonical = resolveModelAlias(modelId);
   return EFFECTIVE_MODEL_REGISTRY[canonical]?.family;
 }
 
-/**
- * Get all unique family names present in the registry.
- */
 export function getAllFamilies(): string[] {
   const families = new Set<string>();
   for (const info of Object.values(EFFECTIVE_MODEL_REGISTRY)) {

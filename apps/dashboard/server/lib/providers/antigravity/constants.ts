@@ -1,4 +1,3 @@
-// OAuth Configuration (Google OAuth)
 export const CLIENT_ID =
   "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
 export const CLIENT_SECRET =
@@ -28,8 +27,8 @@ const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 // Endpoint order for loadCodeAssist (project discovery)
 // Production FIRST for better project resolution, then fallback to sandbox
 export const LOAD_CODE_ASSIST_ENDPOINTS = [
-  CODE_ASSIST_ENDPOINT_PROD, // Prod first for discovery
-  CODE_ASSIST_ENDPOINT_DAILY, // Daily fallback
+  CODE_ASSIST_ENDPOINT_PROD,
+  CODE_ASSIST_ENDPOINT_DAILY,
 ] as const;
 
 // Endpoint order for onboardUser (daily first, then prod)
@@ -45,7 +44,6 @@ export const AUTH_HEADERS = {
   "Client-Metadata": CLIENT_METADATA,
 } as const;
 
-// Token refresh buffer (1 hour before expiry)
 export const REFRESH_BUFFER_SECONDS = 60 * 60;
 
 // Default project ID fallback when discovery fails

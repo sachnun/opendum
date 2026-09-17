@@ -38,10 +38,6 @@ const PAID_CHATGPT_MODELS = new Map([
   ["gpt-5.6-sol", PAID_CODEX_TIERS],
 ]);
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Fetch the public models.json from the openai/codex GitHub repo.
  * Returns the parsed array of model entries.
@@ -81,10 +77,6 @@ async function fetchCodexModels() {
     ? lastError
     : new Error("Failed to fetch Codex CLI model list");
 }
-
-// ---------------------------------------------------------------------------
-// Filter & mapping
-// ---------------------------------------------------------------------------
 
 /**
  * Filter models that are visible and supported in API.
@@ -133,10 +125,6 @@ function buildProviderTierConfig(models) {
   return providerConfigByModel;
 }
 
-// ---------------------------------------------------------------------------
-// Metadata enrichment for newly created JSON files
-// ---------------------------------------------------------------------------
-
 /**
  * Build a lookup from slug -> models.json entry for enrichment.
  */
@@ -175,10 +163,6 @@ function enrichNewModels(modelsDir, addedKeys, metadataLookup) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 async function main() {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   const modelsDir = resolve(scriptDir, "../data");
@@ -206,7 +190,6 @@ async function main() {
     managedProviderConfigKeys: ["allowedTiers"],
   });
 
-  // Enrich newly created JSON files with metadata from models.json
   if (result.added.length > 0) {
     enrichNewModels(modelsDir, result.added, metadataLookup);
   }

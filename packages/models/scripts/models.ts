@@ -30,10 +30,6 @@ const refreshScripts = [
 
 const REFRESHED_PROVIDERS = ["antigravity", "cline", "codex", "freebuff", "harbor", "hyper", "kilo_code", "kiro", "nvidia_nim", "opencode", "openrouter", "perch", "workers_ai", "workbuddy", "zenmux"];
 
-// ---------------------------------------------------------------------------
-// Run a child script
-// ---------------------------------------------------------------------------
-
 function runScript(scriptName: string): Promise<void> {
   const scriptPath = resolve(scriptDir, scriptName);
   return new Promise((resolvePromise, rejectPromise) => {
@@ -57,10 +53,6 @@ function runScript(scriptName: string): Promise<void> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Snapshot & diff helpers — used to generate a dynamic PR summary
-// ---------------------------------------------------------------------------
 
 function snapshotProviderModels() {
   const index = buildModelIndex(modelsDir);
@@ -117,10 +109,6 @@ function generateSummary(before, after) {
 
   return sections.length > 0 ? sections.join("\n\n") + "\n" : "_No model changes detected._\n";
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
   const before = snapshotProviderModels();
