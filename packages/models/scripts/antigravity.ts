@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 
 /**
- * Antigravity model discovery script.
+ * Antigravity refresh script.
  *
  * Fetches the public Google Antigravity model documentation and syncs the
  * reasoning models into the JSON model registry. The parser intentionally works
  * from display names instead of a fixed model table so new Gemini/Claude/GPT-OSS
  * versions can flow through without updating a hardcoded list.
  *
+ * It also refreshes the User-Agent version used by the Go proxy and dashboard
+ * Antigravity providers from the Antigravity changelog, so the hardcoded
+ * version does not go stale between releases.
+ *
  * Source: https://antigravity.google/docs/models
  *
  * Usage:
- *   node scripts/antigravity-models.ts
- *   node scripts/antigravity-models.ts --dry-run
+ *   node scripts/antigravity.ts
+ *   node scripts/antigravity.ts --dry-run
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -34,10 +38,25 @@ const packageDir = resolve(scriptDir, "..");
 const repoRoot = resolve(packageDir, "../..");
 const modelsDir = resolve(packageDir, "data");
 
-const QUOTA_TS_PATH = resolve(
+const ANTIGRAVITY_VERSION_SOURCES = [
+  "https://releasebot.io/updates/google/antigravity",
+  "https://antigravity.google/changelog",
+];
+const VERSION_FETCH_TIMEOUT_MS = 15_000;
+
+const PROXY_PROVIDER_PATH = resolve(
   repoRoot,
-  "apps/dashboard/server/lib/providers/antigravity/quota.ts"
+  "apps/proxy/internal/providers/google_code_assist.go"
 );
+const DASHBOARD_CONSTANTS_PATH = resolve(
+  repoRoot,
+  "apps/dashboard/server/lib/providers/antigravity/constants.ts"
+);
+
+const PROXY_USER_AGENT_REGEX =
+  /((?:const\s+antigravityUserAgent\s*=\s*"antigravity\/))(\d+\.\d+\.\d+)(\s+")/;
+const DASHBOARD_USER_AGENT_REGEX =
+  /((?:export\s+)?const USER_AGENT\s*=\s*`antigravity\/)(\d+\.\d+\.\d+)(\s+linux\/amd64`;)/;
 
 const GEMINI_LEVEL_THINKING = {
   high: "high",
@@ -608,79 +627,99 @@ function syncJson(modelMap, providerConfigByModel, dryRun) {
 }
 
 // ---------------------------------------------------------------------------
-// Update quota.ts
+// User-Agent version
 // ---------------------------------------------------------------------------
 
-function updateQuotaTs(modelMap, dryRun) {
-  const source = readFileSync(QUOTA_TS_PATH, "utf-8");
-  let updated = source;
-  const index = buildModelIndex(modelsDir);
+function parseLatestVersion(html) {
+  const versionRegex = /\b(\d+\.\d+\.\d+)\b/g;
+  const versions = [];
+  let match;
 
-  const apiToUser = {};
-  for (const [key, upstream] of modelMap.entries()) {
-    if (key !== upstream) {
-      apiToUser[upstream] = key;
-    }
-
-    const entry = findModelEntry(index, key);
-    for (const alias of entry?.data.aliases || []) {
-      if (alias !== key) {
-        apiToUser[alias] = key;
-      }
-    }
-
-    if (key.startsWith("gemini-") && key.includes("pro") && !isGeminiImageModel(key)) {
-      const base = upstream.replace(/-(low|medium|high)$/, "");
-      apiToUser[`${base}-low`] = key;
-      apiToUser[`${base}-medium`] = key;
-      apiToUser[`${base}-high`] = key;
-    }
-
-    if (key === "gemini-3.5-flash") {
-      const base = upstream.replace(/-(minimal|low|medium|high)$/, "");
-      for (const level of GEMINI_35_FLASH_LEVELS) {
-        apiToUser[`${base}-${level}`] = key;
-      }
+  while ((match = versionRegex.exec(html)) !== null) {
+    const version = match[1];
+    if (version.startsWith("1.") && !version.startsWith("1.0")) {
+      versions.push(version);
     }
   }
 
-  const userToApiBlock = Object.fromEntries(
-    [...modelMap.entries()].filter(([key, upstream]) => key !== upstream)
-  );
+  if (versions.length === 0) {
+    return null;
+  }
 
-  updated = replaceConstRecord(updated, "USER_TO_API_MODEL_MAP", userToApiBlock);
-  updated = replaceConstRecord(updated, "API_TO_USER_MODEL_MAP", apiToUser);
+  versions.sort((a, b) => {
+    const [aMajor, aMinor, aPatch] = a.split(".").map(Number);
+    const [bMajor, bMinor, bPatch] = b.split(".").map(Number);
+    return bMajor - aMajor || bMinor - aMinor || bPatch - aPatch;
+  });
 
-  if (updated !== source) {
+  return versions[0];
+}
+
+function compareSemver(a, b) {
+  const [aMajor, aMinor, aPatch] = a.split(".").map(Number);
+  const [bMajor, bMinor, bPatch] = b.split(".").map(Number);
+  if (aMajor !== bMajor) return aMajor > bMajor ? 1 : -1;
+  if (aMinor !== bMinor) return aMinor > bMinor ? 1 : -1;
+  if (aPatch !== bPatch) return aPatch > bPatch ? 1 : -1;
+  return 0;
+}
+
+function getCurrentVersion() {
+  const source = readFileSync(PROXY_PROVIDER_PATH, "utf-8");
+  const match = source.match(PROXY_USER_AGENT_REGEX);
+  return match ? match[2] : null;
+}
+
+function updateVersion(newVersion) {
+  for (const [filePath, regex] of [
+    [PROXY_PROVIDER_PATH, PROXY_USER_AGENT_REGEX],
+    [DASHBOARD_CONSTANTS_PATH, DASHBOARD_USER_AGENT_REGEX],
+  ]) {
+    const source = readFileSync(filePath, "utf-8");
+    const updated = source.replace(regex, `$1${newVersion}$3`);
+    writeFileSync(filePath, updated);
+  }
+}
+
+async function syncUserAgent(dryRun) {
+  const currentVersion = getCurrentVersion();
+  if (!currentVersion) {
+    console.warn("[antigravity] Could not find User-Agent version in Go proxy provider, skipping.");
+    return;
+  }
+
+  console.log(`[antigravity] Current proxy User-Agent version is ${currentVersion}`);
+
+  let latestVersion;
+  for (const source of ANTIGRAVITY_VERSION_SOURCES) {
+    try {
+      const html = await fetchText(source, { label: source, timeout: VERSION_FETCH_TIMEOUT_MS, headers: { Accept: "text/html" } });
+      latestVersion = parseLatestVersion(html);
+      if (latestVersion) {
+        console.log(`[antigravity] Latest version from ${source} is ${latestVersion}`);
+        break;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[antigravity] Fetch failed for ${source} (${message})`);
+    }
+  }
+
+  if (!latestVersion) {
+    console.warn("[antigravity] Could not parse version from any source, skipping.");
+    return;
+  }
+
+  if (compareSemver(latestVersion, currentVersion) > 0) {
     if (dryRun) {
-      console.log("[antigravity] Would update quota.ts model maps");
+      console.log(`[antigravity] Would update User-Agent version ${currentVersion} -> ${latestVersion}`);
     } else {
-      writeFileSync(QUOTA_TS_PATH, updated);
-      console.log("[antigravity] Updated quota.ts model maps");
+      updateVersion(latestVersion);
+      console.log(`[antigravity] Updated User-Agent version ${currentVersion} -> ${latestVersion}`);
     }
   } else {
-    console.log("[antigravity] quota.ts already up to date.");
+    console.log("[antigravity] User-Agent version is already up to date.");
   }
-}
-
-function replaceConstRecord(source, constName, values) {
-  const entries = Object.entries(values).sort(([a], [b]) => a.localeCompare(b));
-  const body = entries.length === 0
-    ? ""
-    : entries.map(([key, value]) => `  "${key}": "${value}",`).join("\n") + "\n";
-
-  const replacement = `const ${constName}: Record<string, string> = {\n${body}};`;
-  const regex = new RegExp(
-    `const\\s+${escapeRegex(constName)}:\\s*Record<string, string>\\s*=\\s*\\{[\\s\\S]*?\\n\\};`
-  );
-  if (!regex.test(source)) {
-    throw new Error(`Could not find ${constName} in quota.ts`);
-  }
-  return source.replace(regex, replacement);
-}
-
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // ---------------------------------------------------------------------------
@@ -690,6 +729,11 @@ function escapeRegex(str) {
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
+
+  await syncUserAgent(dryRun).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[antigravity] User-Agent sync failed (${message})`);
+  });
 
   console.log("[antigravity] Fetching official Antigravity model docs ...");
   let markdown;
@@ -758,9 +802,6 @@ async function main() {
     if (result.removed.length > 0) console.log(`  Removed: ${result.removed.join(", ")}`);
     if (result.updated.length > 0) console.log(`  Updated: ${result.updated.join(", ")}`);
   }
-
-  console.log();
-  updateQuotaTs(modelMap, dryRun);
 }
 
 main().catch((error) => {

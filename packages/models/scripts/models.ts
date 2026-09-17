@@ -10,8 +10,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const modelsDir = resolve(scriptDir, "../data");
 
 const refreshScripts = [
-  "antigravity-version.ts",
-  "antigravity-models.ts",
+  "antigravity.ts",
   "cline.ts",
   "codex.ts",
   "kilo-code.ts",
