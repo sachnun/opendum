@@ -1,7 +1,9 @@
 {
   "providers": [
     "hyper",
-    "workers_ai"
+    "workers_ai",
+    "kilo_code",
+    "openrouter"
   ],
   "aliases": [
     "qwen3.8-2.4t-a95b"
@@ -21,19 +23,31 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 262144
   },
   "cost": {
     "input": 2.25,
     "output": 16,
-    "cacheRead": 0.25
+    "cacheRead": 0.25,
+    "cacheWrite": 12.5
   },
   "providerConfig": {
     "hyper": {
       "upstream": "qwen3.8-27b",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000
+    },
+    "kilo_code": {
+      "upstream": "qwen/qwen3.8-27b:free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072,
+      "authless": true
+    },
+    "openrouter": {
+      "upstream": "qwen/qwen3.8-27b:free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
     },
     "workers_ai": {
       "upstream": "@cf/qwen/qwen3.8-27b",
