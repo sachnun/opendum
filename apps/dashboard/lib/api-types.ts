@@ -247,6 +247,7 @@ export interface ModelListItem {
   modalities?: ModelModalities;
   cost?: ModelCost;
   isEnabled: boolean;
+  custom?: boolean;
   stats?: ModelStats;
 }
 

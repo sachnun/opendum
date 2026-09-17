@@ -501,7 +501,7 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 			return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 		}
-		if modelErr := s.validateSelectedAccountModel(account, validation, param); modelErr != nil {
+		if modelErr := s.validateSelectedAccountModel(ctx, account, validation, param); modelErr != nil {
 			return nil, modelErr
 		}
 		return &account, nil
@@ -510,7 +510,7 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 		if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 			return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 		}
-		if modelErr := s.validateSelectedAccountModel(account, validation, param); modelErr != nil {
+		if modelErr := s.validateSelectedAccountModel(ctx, account, validation, param); modelErr != nil {
 			return nil, modelErr
 		}
 		return &account, nil
@@ -534,13 +534,16 @@ func (s *Service) validateForcedAccount(ctx context.Context, userID string, vali
 	if message, code, denied := accountAccessDenial(account.ID, accountAccess); denied {
 		return nil, &routeError{Status: http.StatusForbidden, Message: message, Type: "invalid_request_error", Param: &param, Code: strPtr(code)}
 	}
-	if modelErr := s.validateSelectedAccountModel(account, validation, param); modelErr != nil {
+	if modelErr := s.validateSelectedAccountModel(ctx, account, validation, param); modelErr != nil {
 		return nil, modelErr
 	}
 	return &account, nil
 }
 
-func (s *Service) validateSelectedAccountModel(account appdb.ProviderAccount, validation auth.ModelValidationResult, param string) *routeError {
+func (s *Service) validateSelectedAccountModel(ctx context.Context, account appdb.ProviderAccount, validation auth.ModelValidationResult, param string) *routeError {
+	if s.isCustomAccountModel(ctx, account, validation.Model) {
+		return nil
+	}
 	if !s.registry.IsSupportedByProvider(validation.Model, account.Provider) {
 		return &routeError{Status: http.StatusBadRequest, Message: "Selected account provider \"" + account.Provider + "\" does not support model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_model_mismatch")}
 	}
@@ -551,6 +554,27 @@ func (s *Service) validateSelectedAccountModel(account appdb.ProviderAccount, va
 		return &routeError{Status: http.StatusBadRequest, Message: "Selected provider account tier does not allow model \"" + validation.Model + "\"", Type: "invalid_request_error", Param: &param, Code: strPtr("provider_account_tier_mismatch")}
 	}
 	return nil
+}
+
+func (s *Service) isCustomAccountModel(ctx context.Context, account appdb.ProviderAccount, model string) bool {
+	if s.customStore == nil {
+		return false
+	}
+	custom, err := s.customStore.GetProvider(ctx, account.UserID, account.Provider)
+	if err != nil || custom == nil {
+		return false
+	}
+	rows, err := s.customStore.ListModels(ctx, custom.ID)
+	if err != nil {
+		return false
+	}
+	target := strings.TrimPrefix(model, account.Provider+"/")
+	for _, row := range rows {
+		if row.ModelID == model || row.ModelID == target {
+			return true
+		}
+	}
+	return false
 }
 
 func validateForcedAccountAvailability(account appdb.ProviderAccount, allowInactive bool, param string) *routeError {

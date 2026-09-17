@@ -26,6 +26,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
     const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
 
     const authlessProviderAccounts = getAuthlessProviderAccounts();
+    const customSlugs = Array.from(availability.customProviderModels.keys());
     const [accountCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(providerAccount)
@@ -42,7 +43,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         disabledUntil: providerAccount.disabledUntil,
       })
       .from(providerAccount)
-      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS)))
+      .where(and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, [...PROVIDER_ACCOUNT_KEYS, ...customSlugs])))
       .orderBy(asc(providerAccount.provider), asc(providerAccount.createdAt));
 
     const disabledModelsByAccount = new Map<string, string[]>();
@@ -60,25 +61,45 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
       }
     }
 
-    const models = getAllModels()
-      .filter((model) => !disabledModelSet.has(model) && isModelUsableByAccounts(model, availability))
-      .map((model) => {
-        const providerConfigs = MODEL_REGISTRY[model]?.providerConfig ?? {};
-        const topPDeprecatedProviders = Object.entries(providerConfigs)
-          .filter(([, cfg]) => (cfg as Record<string, unknown>).top_p_deprecated === true)
-          .map(([provider]) => provider);
+    const models = [
+      ...getAllModels()
+        .filter((model) => !disabledModelSet.has(model) && isModelUsableByAccounts(model, availability))
+        .map((model) => {
+          const providerConfigs = MODEL_REGISTRY[model]?.providerConfig ?? {};
+          const topPDeprecatedProviders = Object.entries(providerConfigs)
+            .filter(([, cfg]) => (cfg as Record<string, unknown>).top_p_deprecated === true)
+            .map(([provider]) => provider);
 
-        return {
-          id: model,
-          name: model,
-          family: getModelFamily(model),
-          providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
-          reasoning: MODEL_REGISTRY[model]?.reasoning,
-          modalities: MODEL_REGISTRY[model]?.modalities,
-          topPDeprecatedProviders: topPDeprecatedProviders.length > 0 ? topPDeprecatedProviders : undefined,
-        };
-      })
-      .sort(compareModelEntries);
+          return {
+            id: model,
+            name: model,
+            family: getModelFamily(model),
+            providers: [...new Set([
+              ...getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
+              ...customSlugs.filter((slug) => availability.customProviderModels.get(slug)?.has(resolveModelAlias(model))),
+            ])],
+            reasoning: MODEL_REGISTRY[model]?.reasoning,
+            modalities: MODEL_REGISTRY[model]?.modalities,
+            topPDeprecatedProviders: topPDeprecatedProviders.length > 0 ? topPDeprecatedProviders : undefined,
+          };
+        }),
+      ...customSlugs.flatMap((slug) => {
+        if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) return [];
+        return (availability.customProviderStandaloneModels.get(slug) ?? []).map((modelId) => {
+          const id = `${slug}/${modelId}`;
+          const canonical = resolveModelAlias(modelId);
+          return {
+            id,
+            name: id,
+            family: getModelFamily(modelId),
+            providers: [slug],
+            reasoning: MODEL_REGISTRY[canonical]?.reasoning,
+            modalities: MODEL_REGISTRY[canonical]?.modalities,
+            topPDeprecatedProviders: undefined,
+          };
+        });
+      }),
+    ].sort(compareModelEntries);
 
     return {
       proxyBaseUrl,
@@ -89,7 +110,12 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         ...providerAccounts.map((account) => ({
         ...account,
         disabledModels: disabledModelsByAccount.get(account.id) ?? [],
-        supportedModels: getProviderModelsForAccountTier(account.provider, account.tier),
+        supportedModels: availability.customProviderModels.has(account.provider)
+          ? [
+              ...Array.from(availability.customProviderModels.get(account.provider) ?? []),
+              ...(availability.customProviderStandaloneModels.get(account.provider) ?? []).map((modelId) => `${account.provider}/${modelId}`),
+            ]
+          : getProviderModelsForAccountTier(account.provider, account.tier),
         })),
       ],
     };
