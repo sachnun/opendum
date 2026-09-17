@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -202,5 +203,76 @@ func TestSessionAffinityPreferNoOpWhenStickyExcluded(t *testing.T) {
 	reordered := sessionaffinity.Prefer(prioritized, func(a appdb.ProviderAccount) bool { return a.ID == sticky })
 	if reordered[0].ID != "zm-1" || reordered[1].ID != "zm-2" {
 		t.Fatalf("no-match Prefer = %v, want unchanged [zm-1 zm-2]", reordered)
+	}
+}
+
+func TestChooseAccountPicksFirstNonDegradedAndStopsEarly(t *testing.T) {
+	accounts := []appdb.ProviderAccount{{ID: "a"}, {ID: "b"}, {ID: "c"}}
+	statuses := map[string]string{"a": "degraded", "b": "active", "c": "active"}
+	probed := []string{}
+	got, has, err := chooseAccount(accounts, func(a appdb.ProviderAccount) (bool, string, bool, error) {
+		probed = append(probed, a.ID)
+		status, ok := statuses[a.ID]
+		return false, status, ok, nil
+	})
+	if err != nil || !has || got == nil || got.ID != "b" {
+		t.Fatalf("got %v has=%v err=%v, want b", got, has, err)
+	}
+	if !reflect.DeepEqual(probed, []string{"a", "b"}) {
+		t.Fatalf("probed %v, want only [a b] so the walk stops after the first usable account", probed)
+	}
+}
+
+func TestChooseAccountFallsBackToFirstDegraded(t *testing.T) {
+	accounts := []appdb.ProviderAccount{{ID: "a"}, {ID: "b"}}
+	got, has, err := chooseAccount(accounts, func(a appdb.ProviderAccount) (bool, string, bool, error) {
+		return false, "degraded", true, nil
+	})
+	if err != nil || !has || got == nil || got.ID != "a" {
+		t.Fatalf("got %v has=%v err=%v, want a", got, has, err)
+	}
+}
+
+func TestChooseAccountSkipsCoolingDown(t *testing.T) {
+	accounts := []appdb.ProviderAccount{{ID: "a"}, {ID: "b"}}
+	got, has, err := chooseAccount(accounts, func(a appdb.ProviderAccount) (bool, string, bool, error) {
+		if a.ID == "a" {
+			return true, "", false, nil
+		}
+		return false, "active", true, nil
+	})
+	if err != nil || !has || got == nil || got.ID != "b" {
+		t.Fatalf("got %v has=%v err=%v, want b", got, has, err)
+	}
+}
+
+func TestChooseAccountTreatsMissingHealthAsUsable(t *testing.T) {
+	accounts := []appdb.ProviderAccount{{ID: "a"}}
+	got, has, err := chooseAccount(accounts, func(a appdb.ProviderAccount) (bool, string, bool, error) {
+		return false, "", false, nil
+	})
+	if err != nil || !has || got == nil || got.ID != "a" {
+		t.Fatalf("got %v has=%v err=%v, want a", got, has, err)
+	}
+}
+
+func TestChooseAccountReturnsNoneWhenAllCoolingDown(t *testing.T) {
+	accounts := []appdb.ProviderAccount{{ID: "a"}, {ID: "b"}}
+	got, has, err := chooseAccount(accounts, func(a appdb.ProviderAccount) (bool, string, bool, error) {
+		return true, "", false, nil
+	})
+	if err != nil || has || got != nil {
+		t.Fatalf("got %v has=%v err=%v, want nil false nil", got, has, err)
+	}
+}
+
+func TestChooseAccountPropagatesProbeError(t *testing.T) {
+	accounts := []appdb.ProviderAccount{{ID: "a"}}
+	wantErr := errors.New("boom")
+	got, has, err := chooseAccount(accounts, func(a appdb.ProviderAccount) (bool, string, bool, error) {
+		return false, "", false, wantErr
+	})
+	if !errors.Is(err, wantErr) || !has || got != nil {
+		t.Fatalf("got %v has=%v err=%v, want propagated error", got, has, err)
 	}
 }

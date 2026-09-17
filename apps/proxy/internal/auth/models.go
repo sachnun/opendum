@@ -94,39 +94,41 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 		}
 	}
 
-	candidates, err := s.usableModelCandidates(ctx, userID, provider, mode, modelSet, access.RoamingEnabled)
-	if err != nil {
-		return ModelValidationResult{}, err
+	base := s.ValidateModel(modelParam)
+	if !base.Valid && base.Code != "invalid_model" {
+		return base, nil
 	}
 
-	base := s.ValidateModel(modelParam)
-	if !base.Valid {
-		if base.Code == "invalid_model" {
-			return s.invalidModelResult(provider, rawModel, modelParam, candidates), nil
+	invalid := !base.Valid
+	if !invalid && mode == "whitelist" {
+		_, ok := modelSet[base.Model]
+		invalid = !ok
+	}
+	if !invalid && mode == "blacklist" {
+		_, invalid = modelSet[base.Model]
+	}
+	if !invalid {
+		disabled, err := s.IsModelDisabledForUser(ctx, userID, base.Model)
+		if err != nil {
+			return ModelValidationResult{}, err
+		}
+		if disabled {
+			return ModelValidationResult{Valid: false, Provider: base.Provider, Model: base.Model, Error: "Model \"" + base.Model + "\" is disabled. Enable it from Dashboard > Models first.", Param: "model", Code: "model_disabled"}, nil
 		}
 		return base, nil
 	}
 
-	if mode == "whitelist" {
-		if _, ok := modelSet[base.Model]; !ok {
-			return s.invalidModelResult(base.Provider, base.Model, modelParam, candidates), nil
-		}
-	}
-	if mode == "blacklist" {
-		if _, ok := modelSet[base.Model]; ok {
-			return s.invalidModelResult(base.Provider, base.Model, modelParam, candidates), nil
-		}
-	}
-
-	disabled, err := s.IsModelDisabledForUser(ctx, userID, base.Model)
+	candidates, err := s.usableModelCandidates(ctx, userID, provider, mode, modelSet, access.RoamingEnabled)
 	if err != nil {
 		return ModelValidationResult{}, err
 	}
-	if disabled {
-		return ModelValidationResult{Valid: false, Provider: base.Provider, Model: base.Model, Error: "Model \"" + base.Model + "\" is disabled. Enable it from Dashboard > Models first.", Param: "model", Code: "model_disabled"}, nil
+	suggestProvider := provider
+	suggestModel := rawModel
+	if base.Valid {
+		suggestProvider = base.Provider
+		suggestModel = base.Model
 	}
-
-	return base, nil
+	return s.invalidModelResult(suggestProvider, suggestModel, modelParam, candidates), nil
 }
 
 func (s *Service) customModelResult(ctx context.Context, userID, slug, rawModel string) (*ModelValidationResult, error) {

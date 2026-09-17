@@ -246,55 +246,52 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 
 func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.ProviderAccount, model string) (*appdb.ProviderAccount, bool, error) {
 	now := time.Now()
-	ready := make([]appdb.ProviderAccount, 0, len(prioritized))
-	for i := range prioritized {
-		account := prioritized[i]
+	lookupKeys := s.registry.LookupKeys(model)
+	selected, has, err := chooseAccount(prioritized, func(account appdb.ProviderAccount) (bool, string, bool, error) {
 		if isSyntheticProviderAccountID(account.ID) {
-			ready = append(ready, account)
-			continue
+			return false, "", false, nil
 		}
 		coolingDown, err := s.refreshAccountHealthFromModels(ctx, account.ID, now)
+		if err != nil || coolingDown {
+			return coolingDown, "", false, err
+		}
+		health, err := s.getHealthByAccount(ctx, []string{account.ID}, lookupKeys)
+		if err != nil {
+			return false, "", false, err
+		}
+		row, ok := health[account.ID]
+		return false, row.Status, ok, nil
+	})
+	if err != nil || !has || selected == nil {
+		return nil, true, err
+	}
+	go s.bumpAccountRequestCount(context.Background(), selected.ID, now)
+	return selected, true, nil
+}
+
+func chooseAccount(accounts []appdb.ProviderAccount, probe func(appdb.ProviderAccount) (coolingDown bool, status string, hasHealth bool, err error)) (*appdb.ProviderAccount, bool, error) {
+	var degraded *appdb.ProviderAccount
+	for i := range accounts {
+		account := accounts[i]
+		coolingDown, status, hasHealth, err := probe(account)
 		if err != nil {
 			return nil, true, err
 		}
 		if coolingDown {
 			continue
 		}
-		ready = append(ready, account)
-	}
-	if len(ready) == 0 {
-		return nil, true, nil
-	}
-
-	ids := make([]string, 0, len(ready))
-	for _, account := range ready {
-		ids = append(ids, account.ID)
-	}
-	health, err := s.getHealthByAccount(ctx, ids, s.registry.LookupKeys(model))
-	if err != nil {
-		return nil, true, err
-	}
-
-	var selected *appdb.ProviderAccount
-	for i := range ready {
-		account := &ready[i]
-		row, ok := health[account.ID]
-		if ok {
-			if row.Status == "degraded" {
-				if selected == nil {
-					selected = account
-				}
-				continue
+		if hasHealth && status == "degraded" {
+			if degraded == nil {
+				degraded = &account
 			}
+			continue
 		}
-		selected = account
-		break
+		return &account, true, nil
 	}
-	if selected == nil {
-		return nil, true, nil
+	if degraded != nil {
+		return degraded, true, nil
 	}
-	go s.bumpAccountRequestCount(context.Background(), selected.ID, now)
-	return selected, true, nil
+	return nil, false, nil
 }
 
 func (s *Service) bumpAccountRequestCount(ctx context.Context, accountID string, usedAt time.Time) {

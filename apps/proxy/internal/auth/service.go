@@ -53,19 +53,13 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 	keyHash := cryptojs.HashString(token)
 	if cached, ok := s.getCachedAPIKeyValidation(ctx, keyHash); ok {
 		if !cached.Valid {
-			if cached.APIKeyID == "" || s.isCachedAPIKeyValidationCurrent(ctx, cached) {
-				return Result{Valid: false, Error: defaultString(cached.Error, "Invalid API key")}, nil
-			}
-			_ = s.InvalidateAPIKeyValidation(ctx, keyHash, cached.APIKeyID)
-		} else if cached.ExpiresAtMs == nil || *cached.ExpiresAtMs > time.Now().UnixMilli() {
-			if s.isCachedAPIKeyValidationCurrent(ctx, cached) {
-				go s.touchAPIKeyLastUsed(context.Background(), cached.APIKeyID)
-				return s.resultFromCache(cached), nil
-			}
-			_ = s.InvalidateAPIKeyValidation(ctx, keyHash, cached.APIKeyID)
-		} else {
-			_ = s.InvalidateAPIKeyValidation(ctx, keyHash, cached.APIKeyID)
+			return Result{Valid: false, Error: defaultString(cached.Error, "Invalid API key")}, nil
 		}
+		if cached.ExpiresAtMs == nil || *cached.ExpiresAtMs > time.Now().UnixMilli() {
+			go s.touchAPIKeyLastUsed(context.Background(), cached.APIKeyID)
+			return s.resultFromCache(cached), nil
+		}
+		_ = s.InvalidateAPIKeyValidation(ctx, keyHash, cached.APIKeyID)
 	}
 
 	apiKey, err := s.db.GetAPIKeyByHash(ctx, keyHash)
@@ -76,10 +70,9 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 		}
 		return Result{}, err
 	}
-	updatedAtMicros := apiKey.UpdatedAt.UnixMicro()
 
 	if !apiKey.IsActive {
-		_ = s.setCachedAPIKeyValidation(ctx, keyHash, cacheValue{Valid: false, APIKeyID: apiKey.ID, UpdatedAtMicros: &updatedAtMicros, Error: "API key has been revoked"}, invalidTTL)
+		_ = s.setCachedAPIKeyValidation(ctx, keyHash, cacheValue{Valid: false, APIKeyID: apiKey.ID, Error: "API key has been revoked"}, invalidTTL)
 		return Result{Valid: false, Error: "API key has been revoked"}, nil
 	}
 
@@ -87,7 +80,7 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 		go func() {
 			_ = s.db.DeactivateAPIKey(context.Background(), apiKey.ID)
 		}()
-		_ = s.setCachedAPIKeyValidation(ctx, keyHash, cacheValue{Valid: false, APIKeyID: apiKey.ID, UpdatedAtMicros: &updatedAtMicros, Error: "API key has expired"}, invalidTTL)
+		_ = s.setCachedAPIKeyValidation(ctx, keyHash, cacheValue{Valid: false, APIKeyID: apiKey.ID, Error: "API key has expired"}, invalidTTL)
 		return Result{Valid: false, Error: "API key has expired"}, nil
 	}
 
@@ -125,34 +118,12 @@ func (s *Service) ValidateAPIKey(ctx context.Context, authHeader string) (Result
 		AccountAccessList: accountList,
 		RoamingEnabled:    apiKey.RoamingEnabled,
 		ExpiresAtMs:       expiresAtMs,
-		UpdatedAtMicros:   &updatedAtMicros,
 		RateLimitRules:    rules,
 	}
 	_ = s.setCachedAPIKeyValidation(ctx, keyHash, cached, cacheTTL)
 	go s.touchAPIKeyLastUsed(context.Background(), apiKey.ID)
 
 	return s.resultFromCache(cached), nil
-}
-
-func (s *Service) isCachedAPIKeyValidationCurrent(ctx context.Context, cached cacheValue) bool {
-	if cached.APIKeyID == "" || cached.UpdatedAtMicros == nil {
-		return false
-	}
-
-	apiKey, err := s.db.GetAPIKeyFreshnessByID(ctx, cached.APIKeyID)
-	if err != nil {
-		return !errors.Is(err, pgx.ErrNoRows)
-	}
-	if apiKey.UpdatedAt.UnixMicro() != *cached.UpdatedAtMicros {
-		return false
-	}
-	if cached.Valid && (!apiKey.IsActive || (apiKey.ExpiresAt != nil && !apiKey.ExpiresAt.After(time.Now()))) {
-		return false
-	}
-	if !cached.Valid && apiKey.IsActive && (apiKey.ExpiresAt == nil || apiKey.ExpiresAt.After(time.Now())) {
-		return false
-	}
-	return true
 }
 
 func (s *Service) getRateLimitRules(ctx context.Context, apiKeyID string) ([]RateLimitRule, error) {
