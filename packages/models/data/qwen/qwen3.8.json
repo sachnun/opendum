@@ -3,6 +3,9 @@
     "hyper",
     "workers_ai"
   ],
+  "aliases": [
+    "qwen3.8-2.4t-a95b"
+  ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -28,7 +31,7 @@
   },
   "providerConfig": {
     "hyper": {
-      "upstream": "qwen3.8-2.4t-a95b",
+      "upstream": "qwen3.8-27b",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000
     },

@@ -27,7 +27,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 182520
+    "output": 131072
   },
   "cost": {
     "input": 3,
@@ -54,7 +54,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 182520
+      "maxOutputTokens": 32768
     }
   }
 }

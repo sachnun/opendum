@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "hyper"
-  ],
+  "providers": [],
   "aliases": [
     "qwen3-next-80b-a3b-instruct",
     "qwen-qwen3-next-80b-a3b-instruct",
@@ -30,12 +28,5 @@
     "input": 0.45,
     "output": 5.5,
     "cacheRead": 0.29375
-  },
-  "providerConfig": {
-    "hyper": {
-      "upstream": "qwen3-next-80b-a3b-instruct",
-      "contextWindow": 262144,
-      "maxOutputTokens": 26214
-    }
   }
 }

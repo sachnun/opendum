@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "hyper"
-  ],
+  "providers": [],
   "aliases": [
     "qwen3.6-plus-preview"
   ],
@@ -25,11 +23,5 @@
     "output": 9.75,
     "cacheRead": 0.1625,
     "cacheWrite": 2.03125
-  },
-  "providerConfig": {
-    "hyper": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 64000
-    }
   }
 }

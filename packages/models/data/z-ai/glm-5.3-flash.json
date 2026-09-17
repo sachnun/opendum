@@ -4,7 +4,8 @@
     "zenmux",
     "hyper",
     "perch",
-    "freebuff"
+    "freebuff",
+    "nvidia_nim"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -45,6 +46,11 @@
     },
     "hyper": {
       "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "nvidia_nim": {
+      "upstream": "z-ai/glm-5.3-flash",
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     },
     "perch": {

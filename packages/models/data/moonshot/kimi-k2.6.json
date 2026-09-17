@@ -1,7 +1,6 @@
 {
   "providers": [
     "nvidia_nim",
-    "hyper",
     "workbuddy",
     "perch"
   ],
@@ -9,7 +8,8 @@
   "modalities": {
     "input": [
       "image",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
@@ -25,10 +25,6 @@
     "cacheRead": 0.8
   },
   "providerConfig": {
-    "hyper": {
-      "contextWindow": 262000,
-      "maxOutputTokens": 26214
-    },
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6",
       "contextWindow": 262144,

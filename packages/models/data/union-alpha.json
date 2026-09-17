@@ -1,6 +1,8 @@
 {
   "providers": [
-    "opencode"
+    "opencode",
+    "cline",
+    "kilo_code"
   ],
   "reasoning": true,
   "modalities": {
@@ -22,6 +24,17 @@
     "cacheRead": 0
   },
   "providerConfig": {
+    "cline": {
+      "upstream": "stealth/union-alpha",
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072
+    },
+    "kilo_code": {
+      "upstream": "stealth/union-alpha",
+      "contextWindow": 262144,
+      "maxOutputTokens": 131072,
+      "authless": true
+    },
     "opencode": {
       "contextWindow": 262144,
       "maxOutputTokens": 131072,

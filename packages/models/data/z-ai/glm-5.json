@@ -1,8 +1,7 @@
 {
   "providers": [
     "kiro",
-    "perch",
-    "hyper"
+    "perch"
   ],
   "reasoning": true,
   "modalities": {
@@ -24,10 +23,6 @@
     "cacheWrite": 0
   },
   "providerConfig": {
-    "hyper": {
-      "contextWindow": 202752,
-      "maxOutputTokens": 20275
-    },
     "kiro": {
       "contextWindow": 204800,
       "maxOutputTokens": 131072

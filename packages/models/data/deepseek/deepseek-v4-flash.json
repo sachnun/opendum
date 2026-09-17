@@ -55,6 +55,7 @@
       "maxOutputTokens": 384000
     },
     "hyper": {
+      "upstream": "deepseek-v4-flash-0731",
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },

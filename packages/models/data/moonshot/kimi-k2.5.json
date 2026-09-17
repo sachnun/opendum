@@ -1,19 +1,20 @@
 {
   "providers": [
-    "perch",
-    "hyper"
+    "perch"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "modalities": {
     "input": [
-      "text"
+      "image",
+      "text",
+      "video"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 262144,
+    "context": 256000,
     "output": 256000
   },
   "cost": {
@@ -22,10 +23,6 @@
     "cacheRead": 0.35
   },
   "providerConfig": {
-    "hyper": {
-      "contextWindow": 262144,
-      "maxOutputTokens": 26214
-    },
     "perch": {
       "upstream": "kimi-2.5",
       "contextWindow": 256000,

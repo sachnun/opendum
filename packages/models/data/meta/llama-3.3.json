@@ -1,7 +1,6 @@
 {
   "providers": [
-    "workers_ai",
-    "hyper"
+    "workers_ai"
   ],
   "aliases": [
     "llama-3.3-70b-instruct",
@@ -22,20 +21,14 @@
     ]
   },
   "limit": {
-    "context": 128000,
+    "context": 24000,
     "output": 24000
   },
   "cost": {
     "input": 0.5,
-    "output": 1.6,
-    "cacheRead": 1.5165
+    "output": 1.6
   },
   "providerConfig": {
-    "hyper": {
-      "upstream": "llama-3.3-70b-instruct",
-      "contextWindow": 128000,
-      "maxOutputTokens": 12800
-    },
     "workers_ai": {
       "upstream": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
       "contextWindow": 24000,
