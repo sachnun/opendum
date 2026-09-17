@@ -7,7 +7,7 @@ import type { PlaygroundOptions } from "../../lib/api-types";
 
 definePageMeta({ middleware: "auth", layout: "dashboard" });
 
-type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
+type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
 type PlaygroundEndpoint = "chat_completions" | "messages" | "responses";
 type ScenarioMessage = { role: string; content: string | Array<Record<string, unknown>> };
 type ParsedUsageData = { inputTokens: number | null; outputTokens: number | null; totalTokens: number | null };
@@ -151,6 +151,7 @@ const REASONING_OPTIONS: Array<{ value: ReasoningEffort; label: string }> = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
   { value: "xhigh", label: "XHigh" },
+  { value: "max", label: "Max" },
 ];
 
 const { data, error } = useCachedData(dataKeys.playgroundOptions, () => api.playground.options());
@@ -405,7 +406,7 @@ function normalizeQueryBoolean(value: unknown): boolean | null {
 
 function normalizeQueryReasoningEffort(value: unknown): ReasoningEffort | null {
   const effort = normalizeQueryParam(value);
-  return effort === "none" || effort === "low" || effort === "medium" || effort === "high" || effort === "xhigh" ? effort : null;
+  return effort === "none" || effort === "low" || effort === "medium" || effort === "high" || effort === "xhigh" || effort === "max" ? effort : null;
 }
 
 function normalizeQueryAdditionalParameters(value: unknown): string | null {
@@ -1312,6 +1313,7 @@ function mapReasoningEffortToThinkingBudget(effort: ReasoningEffort): number {
   if (effort === "medium") return 8000;
   if (effort === "high") return 16000;
   if (effort === "xhigh") return 32000;
+  if (effort === "max") return 64000;
   return 0;
 }
 
