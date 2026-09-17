@@ -3,7 +3,7 @@
   "installCommand": "true",
   "buildCommand": "pnpm run build",
   "outputDirectory": ".edgeone/assets",
-  "nodeVersion": "22.11.0",
+  "nodeVersion": "24.18.0",
   "cloudFunctions": {
     "regions": {
       "overseas": ["eu-frankfurt"]
