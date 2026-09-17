@@ -110,18 +110,19 @@ func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
 }
 
 type Info struct {
-	ID             string                         `json:"id"`
-	Owner          string                         `json:"owner"`
-	Providers      []string                       `json:"providers"`
-	Aliases        []string                       `json:"aliases"`
-	Description    string                         `json:"description"`
-	Family         string                         `json:"family"`
-	Ignored        bool                           `json:"ignored"`
-	Reasoning      *bool                          `json:"reasoning"`
-	Modalities     *Modalities                    `json:"modalities"`
-	Limit          *Limit                         `json:"limit"`
-	Cost           *Cost                          `json:"cost"`
-	ProviderConfig map[string]ProviderModelConfig `json:"providerConfig"`
+	ID              string                         `json:"id"`
+	Owner           string                         `json:"owner"`
+	Providers       []string                       `json:"providers"`
+	Aliases         []string                       `json:"aliases"`
+	Description     string                         `json:"description"`
+	Family          string                         `json:"family"`
+	Ignored         bool                           `json:"ignored"`
+	Reasoning       *bool                          `json:"reasoning"`
+	ReasoningEffort []string                       `json:"reasoning_effort"`
+	Modalities      *Modalities                    `json:"modalities"`
+	Limit           *Limit                         `json:"limit"`
+	Cost            *Cost                          `json:"cost"`
+	ProviderConfig  map[string]ProviderModelConfig `json:"providerConfig"`
 }
 
 type Registry struct {
@@ -229,6 +230,9 @@ func (r *Registry) mergeModelInfo(modelID, fileID string, info Info) {
 	merged.Ignored = merged.Ignored && info.Ignored
 	if merged.Reasoning == nil {
 		merged.Reasoning = info.Reasoning
+	}
+	if merged.ReasoningEffort == nil {
+		merged.ReasoningEffort = info.ReasoningEffort
 	}
 	if merged.Modalities == nil {
 		merged.Modalities = info.Modalities
@@ -602,7 +606,11 @@ func (r *Registry) FormatModelsForOpenAI() []map[string]any {
 		if info.Owner != "" {
 			item["owner"] = info.Owner
 		}
-		item["reasoning"] = r.IsReasoningModel(model)
+		reasoning := r.IsReasoningModel(model)
+		item["reasoning"] = reasoning
+		if reasoning && len(info.ReasoningEffort) > 0 {
+			item["reasoning_effort"] = info.ReasoningEffort
+		}
 		if info.Modalities != nil {
 			item["modalities"] = info.Modalities
 		}

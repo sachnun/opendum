@@ -6,6 +6,11 @@
     "perch"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high",
+    "max"
+  ],
   "modalities": {
     "input": [
       "image",

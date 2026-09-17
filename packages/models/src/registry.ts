@@ -14,6 +14,7 @@ const MODEL_PROPERTY_ORDER = [
   "description",
   "ignored",
   "reasoning",
+  "reasoning_effort",
   "modalities",
   "limit",
   "cost",

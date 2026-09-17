@@ -4,7 +4,7 @@
  * Enrich the local model registry with external metadata and normalize file
  * placement.
  *
- * Fills `reasoning`, `modalities`, `limit`, `cost`, and the per-provider
+ * Fills `reasoning`, `reasoning_effort`, `modalities`, `limit`, `cost`, and the per-provider
  * `contextWindow` / `maxOutputTokens` by matching local model ids against
  * OpenRouter, models.dev, LiteLLM, and NVIDIA NIM. Also moves root-level model
  * files into their inferred family folder.
@@ -59,6 +59,11 @@ function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
     changed = true;
   }
 
+  if (patch.reasoningEffort && !sameValue(data.reasoning_effort, patch.reasoningEffort)) {
+    data.reasoning_effort = patch.reasoningEffort;
+    changed = true;
+  }
+
   if (patch.modalities && !sameValue(data.modalities, patch.modalities)) {
     data.modalities = patch.modalities;
     changed = true;
@@ -110,6 +115,7 @@ function applyMetadata(data: ModelData, patch: ModelMetadataPatch): boolean {
 interface Stats {
   models: number;
   reasoning: number;
+  reasoningEffort: number;
   limit: number;
   modalities: number;
   cost: number;
@@ -128,7 +134,7 @@ function reportStats(stats: Stats, updatedCount: number, dryRun: boolean): void 
   console.log("");
   console.log(`[metadata] models: ${stats.models}`);
   console.log(
-    `[metadata] reasoning: ${stats.reasoning}  limit: ${stats.limit}`
+    `[metadata] reasoning: ${stats.reasoning}  reasoningEffort: ${stats.reasoningEffort}  limit: ${stats.limit}`
     + `  modalities: ${stats.modalities}  cost: ${stats.cost}  providerLimits: ${stats.providerLimits}`,
   );
   console.log(`[metadata] updated: ${updatedCount}${dryRun ? " (dry run)" : ""}`);
@@ -178,6 +184,7 @@ async function main(): Promise<void> {
   const stats: Stats = {
     models: 0,
     reasoning: 0,
+    reasoningEffort: 0,
     limit: 0,
     modalities: 0,
     cost: 0,
@@ -206,6 +213,7 @@ async function main(): Promise<void> {
     const patch = buildModelPatch(model, resolved);
 
     const hasAnything = patch.reasoning !== null
+      || patch.reasoningEffort
       || patch.modalities
       || patch.cost
       || Object.keys(patch.providerLimits).length > 0;
@@ -215,6 +223,7 @@ async function main(): Promise<void> {
     }
 
     if (patch.reasoning !== null) stats.reasoning += 1;
+    if (patch.reasoningEffort) stats.reasoningEffort += 1;
     if (patch.modalities) stats.modalities += 1;
     if (patch.cost) stats.cost += 1;
     if (Object.keys(patch.limits).length > 0) stats.limit += 1;

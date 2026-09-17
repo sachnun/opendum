@@ -9,6 +9,11 @@
     "gemini-3.8-flash-medium"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
   "modalities": {
     "input": [
       "audio",

@@ -6,6 +6,11 @@
     "nvidia_nim"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high",
+    "max"
+  ],
   "modalities": {
     "input": [
       "text"

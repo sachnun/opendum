@@ -3,6 +3,10 @@
     "workbuddy"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"

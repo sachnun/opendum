@@ -15,6 +15,9 @@
   ],
   "ignored": false,
   "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
   "modalities": {
     "input": [
       "audio",

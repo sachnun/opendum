@@ -7,6 +7,13 @@
     "claude-opus4.7"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
   "modalities": {
     "input": [
       "image",

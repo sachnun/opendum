@@ -85,6 +85,7 @@ export interface ResolvedMetadata {
 
 export interface ModelMetadataPatch {
   reasoning: boolean | null;
+  reasoningEffort: string[] | null;
   providerLimits: Record<string, ProviderLimits>;
   modalities: Modalities | null;
   limits: ModelLimit;
@@ -288,6 +289,35 @@ function reasoningFrom(source: RegistryName, entry: unknown): boolean | null {
 
   if (source === "litellm" && typeof record.supports_reasoning === "boolean") {
     return record.supports_reasoning;
+  }
+
+  return null;
+}
+
+const REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+
+function readEfforts(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const supported = new Set(value.map((item) => String(item).toLowerCase().trim()));
+  const efforts = REASONING_EFFORTS.filter((effort) => supported.has(effort));
+  return efforts.length > 0 ? efforts : null;
+}
+
+function effortsFrom(source: RegistryName, entry: unknown): string[] | null {
+  const record = asRecord(entry);
+  if (!record) return null;
+
+  if (source === "openrouter") {
+    return readEfforts(asRecord(record.reasoning)?.supported_efforts);
+  }
+
+  if (source === "modelsdev" && Array.isArray(record.reasoning_options)) {
+    for (const option of record.reasoning_options) {
+      const optionRecord = asRecord(option);
+      if (optionRecord?.type !== "effort") continue;
+      const efforts = readEfforts(optionRecord.values);
+      if (efforts) return efforts;
+    }
   }
 
   return null;
@@ -499,6 +529,8 @@ export function buildModelPatch(
 
   const reasoning = firstDefined(candidates.map((item) => reasoningFrom(item.source, item.entry)));
 
+  const reasoningEffort = firstDefined(candidates.map((item) => effortsFrom(item.source, item.entry)));
+
   const cost = mergeCosts(candidates.map((item) => pointsFrom(item.source, item.entry)));
 
   const contexts = Object.values(providerLimits)
@@ -514,6 +546,7 @@ export function buildModelPatch(
 
   return {
     reasoning,
+    reasoningEffort,
     providerLimits,
     modalities,
     limits,

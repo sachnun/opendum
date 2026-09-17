@@ -3,6 +3,12 @@
     "freebuff"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh"
+  ],
   "modalities": {
     "input": [
       "audio",

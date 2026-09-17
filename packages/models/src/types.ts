@@ -40,6 +40,7 @@ export interface ModelData {
   description?: string;
   ignored?: boolean;
   reasoning?: boolean;
+  reasoning_effort?: string[];
   modalities?: ModelModalities;
   limit?: ModelLimit;
   cost?: ModelCost;

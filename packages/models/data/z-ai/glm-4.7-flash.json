@@ -4,6 +4,11 @@
     "zenmux"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
   "modalities": {
     "input": [
       "text"

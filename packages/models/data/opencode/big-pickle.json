@@ -3,6 +3,10 @@
     "opencode"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "medium",
+    "xhigh"
+  ],
   "modalities": {
     "input": [
       "text"

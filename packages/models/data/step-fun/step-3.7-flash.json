@@ -8,6 +8,11 @@
     "stepfun/step-3.7-flash-free"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
   "modalities": {
     "input": [
       "image",

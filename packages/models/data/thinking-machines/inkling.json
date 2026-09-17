@@ -5,6 +5,12 @@
     "perch"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "max"
+  ],
   "modalities": {
     "input": [
       "audio",

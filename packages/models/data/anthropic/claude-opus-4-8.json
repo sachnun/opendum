@@ -3,6 +3,13 @@
     "kiro"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
   "modalities": {
     "input": [
       "image",

@@ -3,6 +3,11 @@
     "zenmux"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "high",
+    "xhigh",
+    "max"
+  ],
   "modalities": {
     "input": [
       "image",

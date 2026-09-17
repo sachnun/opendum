@@ -4,6 +4,10 @@
     "openrouter"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "medium",
+    "high"
+  ],
   "modalities": {
     "input": [
       "image",

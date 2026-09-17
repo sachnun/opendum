@@ -15,6 +15,10 @@
   ],
   "ignored": false,
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium"
+  ],
   "modalities": {
     "input": [
       "text"
