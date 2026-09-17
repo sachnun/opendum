@@ -1426,7 +1426,7 @@ function applyRouteSelectorToRequestBody(requestBody: Record<string, unknown>, p
   const selector = accountId ?? provider;
   if (!selector) return;
   const model = typeof requestBody.model === "string" ? requestBody.model.trim() : "";
-  if (model) requestBody.model = `${selector}/${model}`;
+  if (model && !model.startsWith(`${selector}/`)) requestBody.model = `${selector}/${model}`;
 }
 
 function adaptRequestOverridesForEndpoint(overrides: Record<string, unknown> | undefined, endpoint: PlaygroundEndpoint): Record<string, unknown> | null {

@@ -9,6 +9,7 @@ import {
   resolveModelAlias,
 } from "./models.js";
 import { AUTHLESS_PROVIDER_KEYS } from "./authless-providers.js";
+import { listCustomProviderModels } from "./custom-providers.js";
 import { PROVIDER_ACCOUNT_KEYS } from "../../services/account-providers";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
@@ -92,6 +93,8 @@ export interface AccountModelAvailability {
   activeAccountIdsByProvider: Map<string, string[]>;
   accountTierById: Map<string, string>;
   authlessProviderModels: Map<string, Set<string>>;
+  customProviderModels: Map<string, Set<string>>;
+  customProviderStandaloneModels: Map<string, string[]>;
 }
 
 export function isModelUsableByAccounts(
@@ -123,6 +126,11 @@ export function isModelUsableByAccounts(
     if (disabledCount < effectiveTotalAccounts) return true;
   }
 
+  for (const [provider, models] of availability.customProviderModels) {
+    if (!models.has(canonical)) continue;
+    if ((availability.accountCountByProvider.get(provider) ?? 0) > 0) return true;
+  }
+
   return false;
 }
 
@@ -149,6 +157,17 @@ export async function getAccountModelAvailability(
   const activeAccountIdsByProvider = new Map<string, string[]>();
   const accountTierById = new Map<string, string>();
   const authlessProviderModels = new Map<string, Set<string>>();
+  const customProviderModels = new Map<string, Set<string>>();
+  const customProviderStandaloneModels = new Map<string, string[]>();
+
+  const customProviders = await listCustomProviderModels(userId, options);
+  for (const customProvider of customProviders) {
+    activeProviders.add(customProvider.slug);
+    accountCountByProvider.set(customProvider.slug, (accountCountByProvider.get(customProvider.slug) ?? 0) + customProvider.accountIds.length);
+    activeAccountIdsByProvider.set(customProvider.slug, customProvider.accountIds);
+    customProviderModels.set(customProvider.slug, new Set(customProvider.models));
+    customProviderStandaloneModels.set(customProvider.slug, customProvider.standaloneModels);
+  }
 
   for (const provider of AUTHLESS_PROVIDER_KEYS) {
     activeProviders.add(provider);
@@ -205,5 +224,7 @@ export async function getAccountModelAvailability(
     activeAccountIdsByProvider,
     accountTierById,
     authlessProviderModels,
+    customProviderModels,
+    customProviderStandaloneModels,
   };
 }

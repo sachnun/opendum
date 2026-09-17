@@ -21,6 +21,7 @@ const HIGHLIGHT_DURATION_MS = 2500;
 
 const { data, error } = useCachedData(dataKeys.models, () => api.models.list({ includeStats: false }));
 const models = computed<ModelListItem[]>(() => data.value ?? []);
+const customModelIds = computed(() => new Set(models.value.filter((model) => model.custom).map((model) => model.id)));
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = shallowReactive<Record<string, ModelStats>>({});
 const modelStatsCursorById = shallowReactive<Record<string, string>>({});
@@ -145,7 +146,7 @@ async function flushQueuedModelStats() {
 async function loadModelStats(modelIds: string[], options: { force?: boolean } = {}) {
   const availableModelIds = new Set(models.value.map((model) => model.id));
   const requestedModelIds = Array.from(new Set(modelIds))
-    .filter((modelId) => availableModelIds.has(modelId))
+    .filter((modelId) => availableModelIds.has(modelId) && !customModelIds.value.has(modelId))
     .filter((modelId) => !loadingModelStatsIds.has(modelId))
     .filter((modelId) => options.force || !modelStatsById[modelId]);
 
@@ -370,15 +371,20 @@ watch(
                       <UiIcon name="i-lucide-flask-conical" class="size-3" />
                     </NuxtLink>
                   </UiTooltip>
-                  <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
-                    {{ model.isEnabled ? 'On' : 'Off' }}
-                  </span>
-                  <UiSwitch
-                    :model-value="model.isEnabled"
-                    :disabled="pendingModelId === model.id || isAuditMode"
-                    :title="model.isEnabled ? 'Disable' : 'Enable'"
-                    @update:model-value="setModelEnabled(model, $event)"
-                  />
+                  <template v-if="model.custom">
+                    <UiBadge variant="secondary" class="text-[10px] font-normal">Custom</UiBadge>
+                  </template>
+                  <template v-else>
+                    <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
+                      {{ model.isEnabled ? 'On' : 'Off' }}
+                    </span>
+                    <UiSwitch
+                      :model-value="model.isEnabled"
+                      :disabled="pendingModelId === model.id || isAuditMode"
+                      :title="model.isEnabled ? 'Disable' : 'Enable'"
+                      @update:model-value="setModelEnabled(model, $event)"
+                    />
+                  </template>
                 </div>
               </div>
 

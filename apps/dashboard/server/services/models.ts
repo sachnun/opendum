@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { db, disabledModel } from "@opendum/database";
 import { getModelStatsByModel } from "../lib/model-stats";
-import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts } from "../lib/proxy/auth";
+import { getAccountModelAvailability, invalidateDisabledModelsCache, isModelUsableByAccounts, type AccountModelAvailability } from "../lib/proxy/auth";
 import { MODEL_REGISTRY, getAllModels, getModelFamily, getModelLookupKeys, getProvidersForModel, isModelSupported, resolveModelAlias } from "../lib/proxy/models";
 import { compareModelEntries } from "../../lib/model-sort";
 
@@ -36,23 +36,57 @@ async function getAvailableModelsForUser(userId: string) {
   };
 }
 
+function modelProviders(model: string, availability: AccountModelAvailability): string[] {
+  const canonical = resolveModelAlias(model);
+  const providers = getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider));
+  for (const [provider, models] of availability.customProviderModels) {
+    if (models.has(canonical) && (availability.accountCountByProvider.get(provider) ?? 0) > 0) providers.push(provider);
+  }
+  return providers;
+}
+
+function customModelEntries(availability: AccountModelAvailability): Array<{ id: string; slug: string; modelId: string }> {
+  const entries: Array<{ id: string; slug: string; modelId: string }> = [];
+  for (const [slug, modelIds] of availability.customProviderStandaloneModels) {
+    if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) continue;
+    for (const modelId of modelIds) entries.push({ id: `${slug}/${modelId}`, slug, modelId });
+  }
+  return entries;
+}
+
 export async function listModels(userId: string, options: { includeStats?: boolean } = {}) {
   try {
     const includeStats = options.includeStats ?? true;
     const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
     const statsByModel = includeStats ? await getModelStatsByModel(userId, models) : {};
 
-    const result = models.map((model) => ({
-      id: model,
-      name: model,
-      family: getModelFamily(model),
-      providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
-      reasoning: MODEL_REGISTRY[model]?.reasoning,
-      modalities: MODEL_REGISTRY[model]?.modalities,
-      cost: MODEL_REGISTRY[model]?.cost,
-      isEnabled: !disabledModelSet.has(model),
-      ...(includeStats ? { stats: statsByModel[model] } : {}),
-    }));
+    const result = [
+      ...models.map((model) => ({
+        id: model,
+        name: model,
+        family: getModelFamily(model),
+        providers: modelProviders(model, availability),
+        reasoning: MODEL_REGISTRY[model]?.reasoning,
+        modalities: MODEL_REGISTRY[model]?.modalities,
+        cost: MODEL_REGISTRY[model]?.cost,
+        isEnabled: !disabledModelSet.has(model),
+        ...(includeStats ? { stats: statsByModel[model] } : {}),
+      })),
+      ...customModelEntries(availability).map((entry) => {
+        const canonical = resolveModelAlias(entry.modelId);
+        return {
+          id: entry.id,
+          name: entry.id,
+          family: getModelFamily(entry.modelId),
+          providers: [entry.slug],
+          reasoning: MODEL_REGISTRY[canonical]?.reasoning,
+          modalities: MODEL_REGISTRY[canonical]?.modalities,
+          cost: MODEL_REGISTRY[canonical]?.cost,
+          isEnabled: true,
+          custom: true,
+        };
+      }),
+    ];
     return result;
   } catch (error) {
     console.error("Failed to list models:", error);
@@ -64,14 +98,22 @@ export async function searchModels(userId: string) {
   try {
     const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
 
-    return models.map((model) => ({
-      id: model,
-      providers: getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider)),
-      reasoning: MODEL_REGISTRY[model]?.reasoning,
-      modalities: MODEL_REGISTRY[model]?.modalities,
-      cost: MODEL_REGISTRY[model]?.cost,
-      isEnabled: !disabledModelSet.has(model),
-    }));
+    return [
+      ...models.map((model) => ({
+        id: model,
+        providers: modelProviders(model, availability),
+        reasoning: MODEL_REGISTRY[model]?.reasoning,
+        modalities: MODEL_REGISTRY[model]?.modalities,
+        cost: MODEL_REGISTRY[model]?.cost,
+        isEnabled: !disabledModelSet.has(model),
+      })),
+      ...customModelEntries(availability).map((entry) => ({
+        id: entry.id,
+        providers: [entry.slug],
+        isEnabled: true,
+        custom: true,
+      })),
+    ];
   } catch (error) {
     console.error("Failed to search models:", error);
     throw new Error("Failed to search models", { cause: error });
@@ -107,12 +149,17 @@ export async function getModelStats(userId: string, input: z.infer<typeof modelS
 
 export async function getModelFamilyCounts(userId: string) {
   try {
-    const { models } = await getAvailableModelsForUser(userId);
-    return models.reduce<Record<string, number>>((counts, model) => {
+    const { availability, models } = await getAvailableModelsForUser(userId);
+    const counts = models.reduce<Record<string, number>>((accumulator, model) => {
       const family = getModelFamily(model) ?? "Others";
-      counts[family] = (counts[family] ?? 0) + 1;
-      return counts;
+      accumulator[family] = (accumulator[family] ?? 0) + 1;
+      return accumulator;
     }, {});
+    for (const entry of customModelEntries(availability)) {
+      const family = getModelFamily(entry.modelId) ?? "Others";
+      counts[family] = (counts[family] ?? 0) + 1;
+    }
+    return counts;
   } catch (error) {
     console.error("Failed to count model families:", error);
     throw new Error("Failed to count model families", { cause: error });
