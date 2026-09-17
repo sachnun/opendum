@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncProviderModels } from "../src/registry.ts";
@@ -8,6 +9,40 @@ import { stripParamInfoKey } from "../src/clean-key.ts";
 
 const OPENCODE_MODELS_URL = "https://opencode.ai/zen/v1/models";
 const OPENCODE_ZEN_DOCS_URL = "https://raw.githubusercontent.com/anomalyco/opencode/dev/packages/web/src/content/docs/zen.mdx";
+const OPENCODE_NPM_URL = "https://registry.npmjs.org/opencode-ai/latest";
+
+const OPENCODE_UA_REGEX = /(const opencodeUserAgent = "opencode\/)(\d+\.\d+\.\d+)(")/;
+
+function compareSemver(a, b) {
+  const [aMajor, aMinor, aPatch] = a.split(".").map(Number);
+  const [bMajor, bMinor, bPatch] = b.split(".").map(Number);
+  return aMajor - bMajor || aMinor - bMinor || aPatch - bPatch;
+}
+
+async function syncUserAgent() {
+  const providerPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../apps/proxy/internal/providers/providers.go");
+  const source = readFileSync(providerPath, "utf-8");
+  const match = source.match(OPENCODE_UA_REGEX);
+  if (!match) {
+    console.warn("Opencode: could not find User-Agent version in Go proxy provider, skipping.");
+    return;
+  }
+
+  const currentVersion = match[2];
+  const metadata = await fetchJson(OPENCODE_NPM_URL, { label: "opencode-ai npm metadata" });
+  const latestVersion = metadata?.version;
+  if (typeof latestVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(latestVersion)) {
+    console.warn("Opencode: could not determine latest version from npm, skipping.");
+    return;
+  }
+
+  if (compareSemver(latestVersion, currentVersion) > 0) {
+    writeFileSync(providerPath, source.replace(OPENCODE_UA_REGEX, `$1${latestVersion}$3`));
+    console.log(`Opencode: updated User-Agent version ${currentVersion} -> ${latestVersion}`);
+  } else {
+    console.log(`Opencode: User-Agent version is up to date (${currentVersion}).`);
+  }
+}
 
 function toModelKey(modelId) {
   const cleaned = stripParamInfoKey(modelId);
@@ -172,6 +207,11 @@ async function main() {
   } else {
     console.log(`Opencode: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
   }
+
+  await syncUserAgent().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Opencode: User-Agent sync failed (${message})`);
+  });
 }
 
 main().catch((error) => {
