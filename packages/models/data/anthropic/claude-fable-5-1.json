@@ -32,7 +32,7 @@
   },
   "providerConfig": {
     "kiro": {
-      "upstream": "claude-fable-5.1†",
+      "upstream": "claude-fable-5.1",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000
     }

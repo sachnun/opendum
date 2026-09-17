@@ -52,6 +52,7 @@ const MODELS_WITH_1M_VARIANT = new Set([
  */
 function stripHtml(html) {
   return html
+    .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, "")
     .replace(/<[^>]*>/g, "")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -304,7 +305,7 @@ function toCanonical(kiroModelId) {
     key = key.replace(/^deepseek-/, "deepseek-v");
   }
 
-  key = stripParamInfoKey(key);
+  key = stripParamInfoKey(key).replace(/[^a-z0-9.-]/g, "");
 
   return { key, upstream: kiroModelId };
 }
