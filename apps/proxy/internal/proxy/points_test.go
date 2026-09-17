@@ -1,43 +1,33 @@
 package proxy
 
-import (
-	"math"
-	"path/filepath"
-	"testing"
-
-	"github.com/opendum/opendum/apps/proxy/internal/models"
-)
+import "testing"
 
 func TestRoamingPointsScaleWithModelCost(t *testing.T) {
-	registry, err := models.Load(filepath.Join("..", "..", "..", "..", "packages", "models", "data"))
-	if err != nil {
-		t.Fatalf("load registry: %v", err)
-	}
-	cost := registry.ModelCost("claude-sonnet-5")
-	if cost == nil {
-		t.Fatal("claude-sonnet-5 has no cost")
-	}
-	service := &Service{registry: registry}
+	t.Parallel()
+	service := &Service{registry: mockRegistry(t)}
 
 	cases := []struct {
 		name  string
+		model string
 		usage *usageCounts
 		want  int
 	}{
-		{"input", &usageCounts{inputTokens: 1_000_000}, int(math.Ceil(cost.Input))},
-		{"output", &usageCounts{outputTokens: 1_000_000}, int(math.Ceil(cost.Output))},
-		{"cache read", &usageCounts{inputTokens: 1_000_000, cachedTokens: 1_000_000}, int(math.Ceil(cost.CacheRead))},
-		{"cache write", &usageCounts{cacheWriteTokens: 1_000_000}, int(math.Ceil(cost.CacheWrite))},
-		{"minimum", &usageCounts{inputTokens: 1}, roamingMinimumPoints},
-		{"unknown model", &usageCounts{inputTokens: 1_000_000}, roamingMinimumPoints},
+		{"input", mockPricedModel, &usageCounts{inputTokens: 1_000_000}, 10},
+		{"output", mockPricedModel, &usageCounts{outputTokens: 1_000_000}, 50},
+		{"cache read excludes billable input", mockPricedModel, &usageCounts{inputTokens: 1_000_000, cachedTokens: 1_000_000}, 1},
+		{"cache write", mockPricedModel, &usageCounts{cacheWriteTokens: 1_000_000}, 13},
+		{"cached tokens above input never negative", mockPricedModel, &usageCounts{inputTokens: 0, cachedTokens: 1_000_000}, 1},
+		{"minimum charge", mockPricedModel, &usageCounts{inputTokens: 1}, roamingMinimumPoints},
+		{"unknown model uses minimum", "does-not-exist", &usageCounts{inputTokens: 1_000_000}, roamingMinimumPoints},
+		{"nil usage uses minimum", mockPricedModel, nil, roamingMinimumPoints},
 	}
 	for _, tc := range cases {
-		model := "claude-sonnet-5"
-		if tc.name == "unknown model" {
-			model = "does-not-exist"
-		}
-		if got := service.roamingPoints(model, tc.usage); got != tc.want {
-			t.Errorf("%s: roamingPoints = %d, want %d", tc.name, got, tc.want)
-		}
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := service.roamingPoints(tc.model, tc.usage); got != tc.want {
+				t.Errorf("roamingPoints = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
