@@ -235,13 +235,13 @@ func TestOpencodeProviderSendsPublicAuthAndClientHeaders(t *testing.T) {
 	if headers.Get("Authorization") != "Bearer public" {
 		t.Fatalf("Authorization = %q, want Bearer public", headers.Get("Authorization"))
 	}
-	if headers.Get("X-Opencode-Session") != "sess_1" {
-		t.Fatalf("X-Opencode-Session = %q, want sess_1", headers.Get("X-Opencode-Session"))
+	if !opencodeSessionPattern.MatchString(headers.Get("X-Opencode-Session")) {
+		t.Fatalf("X-Opencode-Session = %q, want canonical opencode id", headers.Get("X-Opencode-Session"))
 	}
 	if headers.Get("X-Opencode-Project") != "global" {
 		t.Fatalf("X-Opencode-Project = %q, want global", headers.Get("X-Opencode-Project"))
 	}
-	if headers.Get("X-Opencode-Request") == "" || headers.Get("X-Opencode-Client") != opencodeClient || headers.Get("User-Agent") != opencodeUserAgent {
+	if !opencodeRequestPattern.MatchString(headers.Get("X-Opencode-Request")) || headers.Get("X-Opencode-Client") != opencodeClient || headers.Get("User-Agent") != opencodeUserAgent {
 		t.Fatalf("missing opencode headers: %#v", headers)
 	}
 }

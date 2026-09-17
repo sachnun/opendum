@@ -3,12 +3,17 @@ package providers
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -26,7 +31,17 @@ const opencodeFallbackResponsesEndpoint = "https://unroxy.koyeb.app/opencode.ai/
 const opencodeFallbackMessagesEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/messages"
 const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
-const opencodeUserAgent = "opencode/1.15.8"
+const opencodeUserAgent = "opencode/1.18.31"
+const opencodeIDAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+var opencodeSessionPattern = regexp.MustCompile(`^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$`)
+var opencodeRequestPattern = regexp.MustCompile(`^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$`)
+var opencodeIDState = struct {
+	sync.Mutex
+	last    int64
+	counter uint64
+}{}
+
 const oauthRefreshBuffer = 3 * time.Hour
 
 type Provider interface {
@@ -502,14 +517,8 @@ func (p opencodeProvider) requiresMessagesAPI(model string) bool {
 }
 
 func opencodeHeaders(body map[string]any) map[string]string {
-	sessionID := stringValue(body["_sessionId"])
-	if sessionID == "" {
-		sessionID = randomID("ses")
-	}
-	requestID := stringValue(body["_requestId"])
-	if requestID == "" {
-		requestID = randomID("msg")
-	}
+	sessionID := opencodeSessionID(stringValue(body["_sessionId"]))
+	requestID := opencodeRequestID(stringValue(body["_requestId"]))
 	projectID := stringValue(body["_projectId"])
 	if projectID == "" {
 		projectID = "global"
@@ -521,6 +530,72 @@ func opencodeHeaders(body map[string]any) map[string]string {
 		"X-Opencode-Request": requestID,
 		"X-Opencode-Client":  opencodeClient,
 	}
+}
+
+func opencodeSessionID(seed string) string {
+	if opencodeSessionPattern.MatchString(seed) {
+		return seed
+	}
+	if seed == "" {
+		return opencodeID("ses", true)
+	}
+	return opencodeCanonicalID("ses", seed)
+}
+
+func opencodeRequestID(seed string) string {
+	if opencodeRequestPattern.MatchString(seed) {
+		return seed
+	}
+	if seed == "" {
+		return opencodeID("msg", false)
+	}
+	return opencodeCanonicalID("msg", seed)
+}
+
+func opencodeID(prefix string, descending bool) string {
+	now := time.Now().UnixMilli()
+	opencodeIDState.Lock()
+	if now != opencodeIDState.last {
+		opencodeIDState.last = now
+		opencodeIDState.counter = 0
+	}
+	opencodeIDState.counter++
+	counter := opencodeIDState.counter
+	opencodeIDState.Unlock()
+
+	value := uint64(now)*0x1000 + counter
+	if descending {
+		value = ^value
+	}
+	timeBytes := make([]byte, 6)
+	for index := range timeBytes {
+		timeBytes[index] = byte(value >> uint(40-8*index))
+	}
+	random := make([]byte, 14)
+	if _, err := rand.Read(random); err != nil {
+		return opencodeCanonicalID(prefix, fmt.Sprintf("%d:%d", now, counter))
+	}
+
+	var builder strings.Builder
+	builder.WriteString(prefix)
+	builder.WriteByte('_')
+	builder.WriteString(hex.EncodeToString(timeBytes))
+	for _, byteValue := range random {
+		builder.WriteByte(opencodeIDAlphabet[int(byteValue)%len(opencodeIDAlphabet)])
+	}
+	return builder.String()
+}
+
+func opencodeCanonicalID(prefix, seed string) string {
+	sum := sha256.Sum256([]byte(seed))
+	var builder strings.Builder
+	builder.WriteString(prefix)
+	builder.WriteByte('_')
+	builder.WriteString(hex.EncodeToString(sum[:6]))
+	for _, byteValue := range sum[6:20] {
+		builder.WriteByte(opencodeIDAlphabet[int(byteValue)%len(opencodeIDAlphabet)])
+	}
+	return builder.String()
 }
 
 type workersAIProvider struct {
