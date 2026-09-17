@@ -14,7 +14,12 @@ test("categorizeModelFamily keeps featured families and buckets the rest as Othe
 test("MODEL_FAMILY_SORT_ORDER is benchmark ordered with Others last", () => {
   assert.equal(MODEL_FAMILY_SORT_ORDER[0], "Anthropic");
   assert.equal(MODEL_FAMILY_SORT_ORDER.at(-1), "Others");
-  assert.ok(MODEL_FAMILY_SORT_ORDER.indexOf("OpenAI") < MODEL_FAMILY_SORT_ORDER.indexOf("Mistral"));
+  assert.ok(MODEL_FAMILY_SORT_ORDER.indexOf("OpenAI") < MODEL_FAMILY_SORT_ORDER.indexOf("NVIDIA"));
+});
+
+test("categorizeModelFamily folds families below the top tier into Others", () => {
+  assert.equal(categorizeModelFamily("Mistral"), "Others");
+  assert.equal(categorizeModelFamily("StepFun"), "Others");
 });
 
 test("MODEL_FAMILY_NAV_ITEMS mirrors the sort order", () => {

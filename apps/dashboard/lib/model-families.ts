@@ -1,17 +1,22 @@
 const FAMILY_BENCHMARK_SCORES: Record<string, number> = {
-  Anthropic: 96,
-  OpenAI: 92,
-  "Z.AI": 88,
-  Google: 87,
-  Qwen: 84,
-  DeepSeek: 82,
-  MiniMax: 82,
-  Meta: 81,
-  Moonshot: 81,
-  Xiaomi: 80,
-  xAI: 77,
-  Mistral: 70,
-  StepFun: 70,
+  Anthropic: 53,
+  OpenAI: 53,
+  Meta: 48,
+  "Z.AI": 45,
+  Moonshot: 44,
+  xAI: 44,
+  Google: 41,
+  DeepSeek: 40,
+  Qwen: 40,
+  "Sapiens AI": 36,
+  MiniMax: 30,
+  "Nex AGI": 28,
+  Upstage: 28,
+  Hunyuan: 26,
+  "Thinking Machines": 26,
+  Xiaomi: 26,
+  InclusionAI: 25,
+  NVIDIA: 23,
 };
 
 function compareModelFamilies(a: string, b: string): number {
@@ -26,7 +31,6 @@ const FEATURED_MODEL_FAMILIES = [
   "Anthropic",
   "Google",
   "Meta",
-  "Mistral",
   "Qwen",
   "DeepSeek",
   "Moonshot",
@@ -34,7 +38,13 @@ const FEATURED_MODEL_FAMILIES = [
   "Xiaomi",
   "xAI",
   "Z.AI",
-  "StepFun",
+  "NVIDIA",
+  "InclusionAI",
+  "Hunyuan",
+  "Thinking Machines",
+  "Upstage",
+  "Sapiens AI",
+  "Nex AGI",
 ] as const;
 
 type FeaturedModelFamily = (typeof FEATURED_MODEL_FAMILIES)[number];
@@ -45,7 +55,6 @@ const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   Anthropic: "anthropic-models",
   Google: "google-models",
   Meta: "meta-models",
-  Mistral: "mistral-models",
   Qwen: "qwen-models",
   DeepSeek: "deepseek-models",
   Moonshot: "moonshot-models",
@@ -53,8 +62,18 @@ const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
   Xiaomi: "xiaomi-models",
   xAI: "xai-models",
   "Z.AI": "zai-models",
-  StepFun: "stepfun-models",
+  NVIDIA: "nvidia-models",
+  InclusionAI: "inclusion-ai-models",
+  Hunyuan: "hunyuan-models",
+  "Thinking Machines": "thinking-machines-models",
+  Upstage: "upstage-models",
+  "Sapiens AI": "sapiens-ai-models",
+  "Nex AGI": "nex-agi-models",
 };
+
+export function getModelFamilyAnchorId(family: ModelFamily): string {
+  return family === "Others" ? "other-models" : MODEL_FAMILY_ANCHOR_IDS[family];
+}
 
 const FEATURED_SET: ReadonlySet<string> = new Set<string>(FEATURED_MODEL_FAMILIES);
 

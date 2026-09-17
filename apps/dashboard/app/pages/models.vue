@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily } from "../../lib/model-families";
+import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily, getModelFamilyAnchorId } from "../../lib/model-families";
 import { compareModelEntries } from "../../lib/model-sort";
 import type { ModelFamilyCounts } from "../../lib/navigation";
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
@@ -58,7 +58,7 @@ const modelSections = computed(() => {
   return MODEL_FAMILY_SORT_ORDER
     .map((family) => ({
       name: family,
-      anchorId: getFamilyAnchorId(family),
+      anchorId: getModelFamilyAnchorId(family),
       models: groupedModels.get(family) ?? [],
     }))
     .filter((section) => section.models.length > 0);
@@ -233,23 +233,6 @@ watch(modelSections, async () => {
   await nextTick();
   observeModelCards();
 }, { immediate: true });
-
-function getFamilyAnchorId(family: string) {
-  if (family === "OpenAI") return "openai-models";
-  if (family === "Anthropic") return "anthropic-models";
-  if (family === "Google") return "google-models";
-  if (family === "Meta") return "meta-models";
-  if (family === "Mistral") return "mistral-models";
-  if (family === "Qwen") return "qwen-models";
-  if (family === "DeepSeek") return "deepseek-models";
-  if (family === "Moonshot") return "moonshot-models";
-  if (family === "MiniMax") return "minimax-models";
-  if (family === "Xiaomi") return "xiaomi-models";
-  if (family === "xAI") return "xai-models";
-  if (family === "Z.AI") return "zai-models";
-  if (family === "StepFun") return "stepfun-models";
-  return "other-models";
-}
 
 async function copyModelId(modelId: string) {
   await navigator.clipboard.writeText(modelId);

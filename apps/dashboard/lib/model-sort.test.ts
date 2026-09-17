@@ -24,5 +24,5 @@ test("newer gpt versions sort first", () => {
 });
 
 test("object entries use the declared family for ranking", () => {
-  assert.ok(compareModelEntries({ id: "zzz", family: "Anthropic" }, { id: "aaa", family: "Mistral" }) < 0);
+  assert.ok(compareModelEntries({ id: "zzz", family: "Anthropic" }, { id: "aaa", family: "NVIDIA" }) < 0);
 });
