@@ -16,29 +16,29 @@ test("stripParamInfoKey preserves empty input", () => {
 });
 
 test("stripParamInfoKey strips MoE compound active suffix", () => {
-  assert.equal(stripParamInfoKey("qwen3-235b-a22b"), "qwen3");
-  assert.equal(stripParamInfoKey("mixtral-8x7b-v0.1"), "mixtral-8x7b-v0.1");
+  assert.equal(stripParamInfoKey("mock3-235b-a22b"), "mock3");
+  assert.equal(stripParamInfoKey("mock-8x7b-v0.1"), "mock-8x7b-v0.1");
 });
 
 test("stripParamInfoKey strips MoE expert-count suffix when paired with size", () => {
-  assert.equal(stripParamInfoKey("llama-4-maverick-17b-128e-instruct"), "llama-4-maverick");
-  assert.equal(stripParamInfoKey("llama-4-scout-17b-16e-instruct"), "llama-4-scout");
+  assert.equal(stripParamInfoKey("mock-4-maverick-17b-128e-instruct"), "mock-4-maverick");
+  assert.equal(stripParamInfoKey("mock-4-scout-17b-16e-instruct"), "mock-4-scout");
 });
 
 test("stripParamInfoKey strips standalone size tokens (B/M)", () => {
-  assert.equal(stripParamInfoKey("gemma-3-27b"), "gemma-3");
-  assert.equal(stripParamInfoKey("llama-3.1-70b"), "llama-3.1");
-  assert.equal(stripParamInfoKey("mistral-7b-instruct"), "mistral");
-  assert.equal(stripParamInfoKey("phi-3-medium"), "phi-3-medium");
+  assert.equal(stripParamInfoKey("mock-3-27b"), "mock-3");
+  assert.equal(stripParamInfoKey("mock-3.1-70b"), "mock-3.1");
+  assert.equal(stripParamInfoKey("mockmodel-7b-instruct"), "mockmodel");
+  assert.equal(stripParamInfoKey("mock-3-medium"), "mock-3-medium");
 });
 
 test("stripParamInfoKey strips standalone size tokens (T)", () => {
-  assert.equal(stripParamInfoKey("bloom-176b"), "bloom");
+  assert.equal(stripParamInfoKey("mock-176t"), "mock");
 });
 
 test("stripParamInfoKey strips quantization suffixes", () => {
-  assert.equal(stripParamInfoKey("qwen3-30b-a3b-fp8"), "qwen3");
-  assert.equal(stripParamInfoKey("llama-3.1-8b-instruct-fp8"), "llama-3.1");
+  assert.equal(stripParamInfoKey("mock3-30b-a3b-fp8"), "mock3");
+  assert.equal(stripParamInfoKey("mock-3.1-8b-instruct-fp8"), "mock-3.1");
   assert.equal(stripParamInfoKey("model-awq"), "model");
   assert.equal(stripParamInfoKey("model-gptq"), "model");
   assert.equal(stripParamInfoKey("model-gguf"), "model");
@@ -46,9 +46,9 @@ test("stripParamInfoKey strips quantization suffixes", () => {
 });
 
 test("stripParamInfoKey strips behavior descriptors at trailing pass + forward pass", () => {
-  assert.equal(stripParamInfoKey("claude-opus-4-6-thinking"), "claude-opus-4-6");
-  assert.equal(stripParamInfoKey("mistral-large-3-675b-instruct-2512"), "mistral-large-3");
-  assert.equal(stripParamInfoKey("mistral-large-3-instruct"), "mistral-large-3");
+  assert.equal(stripParamInfoKey("mock-opus-4-6-thinking"), "mock-opus-4-6");
+  assert.equal(stripParamInfoKey("mock-large-3-675b-instruct-2512"), "mock-large-3");
+  assert.equal(stripParamInfoKey("mock-large-3-instruct"), "mock-large-3");
   assert.equal(stripParamInfoKey("model-preview-thinking"), "model");
   assert.equal(stripParamInfoKey("model-experimental"), "model");
   assert.equal(stripParamInfoKey("model-exp"), "model");
@@ -56,38 +56,38 @@ test("stripParamInfoKey strips behavior descriptors at trailing pass + forward p
 });
 
 test("stripParamInfoKey strips date suffixes but not release versions", () => {
-  assert.equal(stripParamInfoKey("mistral-large-3-675b-instruct-2512"), "mistral-large-3");
-  assert.equal(stripParamInfoKey("mistral-small-3.1-24b-instruct-2503"), "mistral-small-3.1");
+  assert.equal(stripParamInfoKey("mock-large-3-675b-instruct-2512"), "mock-large-3");
+  assert.equal(stripParamInfoKey("mock-small-3.1-24b-instruct-2503"), "mock-small-3.1");
   assert.equal(stripParamInfoKey("model-2024"), "model-2024");
-  assert.equal(stripParamInfoKey("codestral-v0.1"), "codestral-v0.1");
-  assert.equal(stripParamInfoKey("mistral-v0.3"), "mistral-v0.3");
-  assert.equal(stripParamInfoKey("mixtral-8x7b-v0.1"), "mixtral-8x7b-v0.1");
-  assert.equal(stripParamInfoKey("nemotron-nano-9b-v2"), "nemotron-nano-v2");
-  assert.equal(stripParamInfoKey("nemotron-nano-v2"), "nemotron-nano-v2");
-  assert.equal(stripParamInfoKey("mimo-v2.5"), "mimo-v2.5");
-  assert.equal(stripParamInfoKey("mimo-v2-flash"), "mimo-v2-flash");
+  assert.equal(stripParamInfoKey("mock-v0.1"), "mock-v0.1");
+  assert.equal(stripParamInfoKey("mock-v0.3"), "mock-v0.3");
+  assert.equal(stripParamInfoKey("mock-8x7b-v0.1"), "mock-8x7b-v0.1");
+  assert.equal(stripParamInfoKey("mock-nano-9b-v2"), "mock-nano-v2");
+  assert.equal(stripParamInfoKey("mock-nano-v2"), "mock-nano-v2");
+  assert.equal(stripParamInfoKey("mock-v2.5"), "mock-v2.5");
+  assert.equal(stripParamInfoKey("mock-v2-flash"), "mock-v2-flash");
 });
 
 test("stripParamInfoKey strips embedded dates inside descriptor chain", () => {
-  assert.equal(stripParamInfoKey("qwen3-235b-a22b-thinking-2507"), "qwen3");
+  assert.equal(stripParamInfoKey("mock3-235b-a22b-thinking-2507"), "mock3");
 });
 
 test("stripParamInfoKey strips MMDD date suffixes", () => {
-  assert.equal(stripParamInfoKey("deepseek-v4-flash-0731"), "deepseek-v4-flash");
-  assert.equal(stripParamInfoKey("deepseek-v4-pro-0813"), "deepseek-v4-pro");
-  assert.equal(stripParamInfoKey("deepseek-v4-flash-0801"), "deepseek-v4-flash");
-  assert.equal(stripParamInfoKey("deepseek-chat-v3-0324"), "deepseek-v3");
-  assert.equal(stripParamInfoKey("gpt-3.5-turbo-0613"), "gpt-3.5-turbo");
+  assert.equal(stripParamInfoKey("mock-v4-flash-0731"), "mock-v4-flash");
+  assert.equal(stripParamInfoKey("mock-v4-pro-0813"), "mock-v4-pro");
+  assert.equal(stripParamInfoKey("mock-v4-flash-0801"), "mock-v4-flash");
+  assert.equal(stripParamInfoKey("mock-chat-v3-0324"), "mock-v3");
+  assert.equal(stripParamInfoKey("mock-3.5-turbo-0613"), "mock-3.5-turbo");
 });
 
 test("stripParamInfoKey strips YYMMDD date suffixes", () => {
-  assert.equal(stripParamInfoKey("qwen3-250731"), "qwen3");
-  assert.equal(stripParamInfoKey("deepseek-v4-flash-260215"), "deepseek-v4-flash");
+  assert.equal(stripParamInfoKey("mock3-250731"), "mock3");
+  assert.equal(stripParamInfoKey("mock-v4-flash-260215"), "mock-v4-flash");
 });
 
 test("stripParamInfoKey keeps date tokens when keepDates is set", () => {
-  assert.equal(stripParamInfoKey("deepseek-v4-flash-0731", { keepDates: true }), "deepseek-v4-flash-0731");
-  assert.equal(stripParamInfoKey("mistral-large-3-675b-instruct-2512", { keepDates: true }), "mistral-large-3-2512");
+  assert.equal(stripParamInfoKey("mock-v4-flash-0731", { keepDates: true }), "mock-v4-flash-0731");
+  assert.equal(stripParamInfoKey("mock-large-3-675b-instruct-2512", { keepDates: true }), "mock-large-3-2512");
 });
 
 test("stripParamInfoKey rejects 4-6 digit dates with month > 12", () => {
@@ -95,12 +95,12 @@ test("stripParamInfoKey rejects 4-6 digit dates with month > 12", () => {
   assert.equal(stripParamInfoKey("model-2024"), "model-2024");
 });
 
-test("stripParamInfoKey preserves family identifiers (claude, gemini, qwen, ...)", () => {
-  assert.equal(stripParamInfoKey("claude-opus-4-6"), "claude-opus-4-6");
-  assert.equal(stripParamInfoKey("gemini-2-flash"), "gemini-2-flash");
-  assert.equal(stripParamInfoKey("qwen3-coder"), "qwen3-coder");
-  assert.equal(stripParamInfoKey("nemotron-3-ultra"), "nemotron-3-ultra");
-  assert.equal(stripParamInfoKey("magistral-medium"), "magistral-medium");
+test("stripParamInfoKey preserves identifier tokens (families, tiers, modalities)", () => {
+  assert.equal(stripParamInfoKey("mock-opus-4-6"), "mock-opus-4-6");
+  assert.equal(stripParamInfoKey("mock-2-flash"), "mock-2-flash");
+  assert.equal(stripParamInfoKey("mock3-coder"), "mock3-coder");
+  assert.equal(stripParamInfoKey("mock-3-ultra"), "mock-3-ultra");
+  assert.equal(stripParamInfoKey("mock-medium"), "mock-medium");
 });
 
 test("stripParamInfoKey preserves tier words", () => {
@@ -116,21 +116,21 @@ test("stripParamInfoKey preserves tier words", () => {
 });
 
 test("stripParamInfoKey preserves modality descriptors", () => {
-  assert.equal(stripParamInfoKey("qwen3-coder"), "qwen3-coder");
-  assert.equal(stripParamInfoKey("qwen3-vl"), "qwen3-vl");
-  assert.equal(stripParamInfoKey("llama-3.2-vision-instruct"), "llama-3.2-vision");
-  assert.equal(stripParamInfoKey("nemotron-nano-vl"), "nemotron-nano-vl");
+  assert.equal(stripParamInfoKey("mock3-coder"), "mock3-coder");
+  assert.equal(stripParamInfoKey("mock3-vl"), "mock3-vl");
+  assert.equal(stripParamInfoKey("mock-3.2-vision-instruct"), "mock-3.2-vision");
+  assert.equal(stripParamInfoKey("mock-nano-vl"), "mock-nano-vl");
 });
 
 test("stripParamInfoKey keeps trailing free token (caller is responsible for :free suffix)", () => {
-  assert.equal(stripParamInfoKey("qwen3-coder-free"), "qwen3-coder-free");
-  assert.equal(stripParamInfoKey("llama-3.2-free"), "llama-3.2-free");
-  assert.equal(stripParamInfoKey("gpt-oss-free"), "gpt-oss-free");
+  assert.equal(stripParamInfoKey("mock3-coder-free"), "mock3-coder-free");
+  assert.equal(stripParamInfoKey("mock-3.2-free"), "mock-3.2-free");
+  assert.equal(stripParamInfoKey("mock-oss-free"), "mock-oss-free");
 });
 
 test("stripParamInfoKey handles underscore separators", () => {
-  assert.equal(stripParamInfoKey("qwen3_coder_30b_a3b_instruct"), "qwen3-coder");
-  assert.equal(stripParamInfoKey("llama_3_70b_instruct"), "llama-3");
+  assert.equal(stripParamInfoKey("mock3_coder_30b_a3b_instruct"), "mock3-coder");
+  assert.equal(stripParamInfoKey("mock_3_70b_instruct"), "mock-3");
 });
 
 test("stripParamInfoKey falls back to input when nothing remains", () => {
@@ -140,12 +140,12 @@ test("stripParamInfoKey falls back to input when nothing remains", () => {
 });
 
 test("extractDescriptors extracts meta updates", () => {
-  assert.deepEqual(extractDescriptors("claude-opus-4-6-thinking"), { reasoning: true });
-  assert.deepEqual(extractDescriptors("qwen3-vl-30b-a3b-thinking"), { reasoning: true });
-  assert.deepEqual(extractDescriptors("qwen3-coder-30b-a3b-instruct"), {});
-  assert.deepEqual(extractDescriptors("mistral-large-3-exp"), {});
-  assert.deepEqual(extractDescriptors("gemini-2-flash-preview"), {});
-  assert.deepEqual(extractDescriptors("mistral-large-3-instruct"), {});
+  assert.deepEqual(extractDescriptors("mock-opus-4-6-thinking"), { reasoning: true });
+  assert.deepEqual(extractDescriptors("mock3-vl-30b-a3b-thinking"), { reasoning: true });
+  assert.deepEqual(extractDescriptors("mock3-coder-30b-a3b-instruct"), {});
+  assert.deepEqual(extractDescriptors("mock-large-3-exp"), {});
+  assert.deepEqual(extractDescriptors("mock-2-flash-preview"), {});
+  assert.deepEqual(extractDescriptors("mock-large-3-instruct"), {});
 });
 
 test("extractDescriptors returns empty object when input empty", () => {
@@ -154,11 +154,11 @@ test("extractDescriptors returns empty object when input empty", () => {
 });
 
 test("aliasesFromUpstream generates kebab fallback for upstream IDs", () => {
-  assert.deepEqual(aliasesFromUpstream(["openai/gpt-4", "Qwen/Qwen3-32B"]), [
-    "openai-gpt-4",
-    "openai/gpt-4",
-    "Qwen-Qwen3-32B",
-    "Qwen/Qwen3-32B",
+  assert.deepEqual(aliasesFromUpstream(["vendor/mock-model", "Vendor/Mock2-32B"]), [
+    "vendor-mock-model",
+    "vendor/mock-model",
+    "Vendor-Mock2-32B",
+    "Vendor/Mock2-32B",
   ]);
 });
 
@@ -186,15 +186,15 @@ test("aliasesFromUpstream preserves single-name upstream without slash", () => {
 
 test("largestSizeValue finds dominant size magnitude", () => {
   assert.equal(largestSizeValue(""), 0);
-  assert.equal(largestSizeValue("llama-3.3-70b-instruct"), 70);
-  assert.equal(largestSizeValue("qwen3-235b-a22b"), 235);
-  assert.equal(largestSizeValue("qwen3-coder-480b-a35b-instruct"), 480);
+  assert.equal(largestSizeValue("mock-3.3-70b-instruct"), 70);
+  assert.equal(largestSizeValue("mock3-235b-a22b"), 235);
+  assert.equal(largestSizeValue("mock3-coder-480b-a35b-instruct"), 480);
   assert.equal(largestSizeValue("no-size-here"), 0);
 });
 
 test("largestSizeValue handles t-scale and decimal sizes", () => {
-  assert.equal(largestSizeValue("bloom-176t"), 0);
-  assert.equal(largestSizeValue("bloom-176b"), 176);
+  assert.equal(largestSizeValue("mock-176t"), 0);
+  assert.equal(largestSizeValue("mock-176b"), 176);
   assert.equal(largestSizeValue("model-1.5b"), 1.5);
 });
 
@@ -232,25 +232,25 @@ test("toModelKey helper (openrouter.mjs) correctly trims trailing -free", () => 
     return cleaned;
   }
 
-  assert.equal(toModelKey("qwen/qwen3-coder:free"), "qwen3-coder");
-  assert.equal(toModelKey("qwen/qwen3-next-80b-a3b-instruct:free"), "qwen3-next");
-  assert.equal(toModelKey("google/gemma-4-26b-a4b-it:free"), "gemma-4");
-  assert.equal(toModelKey("google/gemma-4-31b-it:free"), "gemma-4");
-  assert.equal(toModelKey("openai/gpt-oss-120b:free"), "gpt-oss");
-  assert.equal(toModelKey("openai/gpt-oss-20b:free"), "gpt-oss");
-  assert.equal(toModelKey("meta-llama/llama-3.2-3b-instruct:free"), "llama-3.2");
-  assert.equal(toModelKey("meta-llama/llama-3.3-70b-instruct:free"), "llama-3.3");
-  assert.equal(toModelKey("nex-agi/nex-n2-pro:free"), "nex-n2-pro");
-  assert.equal(toModelKey("liquid/lfm-2.5-1.2b-instruct:free"), "lfm-2.5");
-  assert.equal(toModelKey("liquid/lfm-2.5-1.2b-thinking:free"), "lfm-2.5");
-  assert.equal(toModelKey("nousresearch/hermes-3-llama-3.1-405b:free"), "hermes-3-llama-3.1");
-  assert.equal(toModelKey("cognitivecomputations/dolphin-mistral-24b-venice-edition:free"), "dolphin-mistral-venice-edition");
-  assert.equal(toModelKey("cohere/north-mini-code:free"), "north-mini-code");
-  assert.equal(toModelKey("nvidia/nemotron-3-nano-30b-a3b:free"), "nemotron-3-nano");
-  assert.equal(toModelKey("openai/gpt-oss-120b"), "gpt-oss");
-  assert.equal(toModelKey("qwen/qwen3-coder-480b-a35b-instruct:free"), "qwen3-coder");
-  assert.equal(toModelKey("qwen/qwen3-vl-235b-a22b-thinking"), "qwen3-vl");
-  assert.equal(toModelKey("qwen/qwen3-235b-a22b-thinking-2507"), "qwen3");
+  assert.equal(toModelKey("vendor/mock3-coder:free"), "mock3-coder");
+  assert.equal(toModelKey("vendor/mock3-next-80b-a3b-instruct:free"), "mock3-next");
+  assert.equal(toModelKey("vendor/mock-4-26b-a4b-it:free"), "mock-4");
+  assert.equal(toModelKey("vendor/mock-4-31b-it:free"), "mock-4");
+  assert.equal(toModelKey("vendor/mock-oss-120b:free"), "mock-oss");
+  assert.equal(toModelKey("vendor/mock-oss-20b:free"), "mock-oss");
+  assert.equal(toModelKey("vendor/mock-3.2-3b-instruct:free"), "mock-3.2");
+  assert.equal(toModelKey("vendor/mock-3.3-70b-instruct:free"), "mock-3.3");
+  assert.equal(toModelKey("vendor/mock-n2-pro:free"), "mock-n2-pro");
+  assert.equal(toModelKey("vendor/mock-2.5-1.2b-instruct:free"), "mock-2.5");
+  assert.equal(toModelKey("vendor/mock-2.5-1.2b-thinking:free"), "mock-2.5");
+  assert.equal(toModelKey("vendor/mock-3-other-3.1-405b:free"), "mock-3-other-3.1");
+  assert.equal(toModelKey("vendor/mock-24b-venice-edition:free"), "mock-venice-edition");
+  assert.equal(toModelKey("vendor/mock-mini-code:free"), "mock-mini-code");
+  assert.equal(toModelKey("vendor/mock-3-nano-30b-a3b:free"), "mock-3-nano");
+  assert.equal(toModelKey("vendor/mock-oss-120b"), "mock-oss");
+  assert.equal(toModelKey("vendor/mock3-coder-480b-a35b-instruct:free"), "mock3-coder");
+  assert.equal(toModelKey("vendor/mock3-vl-235b-a22b-thinking"), "mock3-vl");
+  assert.equal(toModelKey("vendor/mock3-235b-a22b-thinking-2507"), "mock3");
 });
 
 test("toModelKey regression: positive slice would have collapsed keys (must NOT happen)", () => {
@@ -258,15 +258,15 @@ test("toModelKey regression: positive slice would have collapsed keys (must NOT 
     return cleaned.slice(0, "-free".length);
   }
 
-  const cleaned = stripParamInfoKey("qwen3-next-80b-a3b-instruct-free");
+  const cleaned = stripParamInfoKey("mock3-next-80b-a3b-instruct-free");
   assert.equal(
     buggyTrim(cleaned),
-    "qwen3",
+    "mock3",
     "positive slice collapse was the historical bug shape",
   );
   assert.equal(
     cleaned.slice(0, -"-free".length),
-    "qwen3-next",
+    "mock3-next",
     "correct trim keeps family identifier",
   );
 });

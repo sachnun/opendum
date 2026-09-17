@@ -3,23 +3,21 @@ import assert from "node:assert/strict";
 
 import { FAMILY_RULES, inferFamilyFromFolder, inferModelFolder } from "./families.ts";
 
-test("inferModelFolder maps known model prefixes to folders", () => {
+test("inferModelFolder maps mocked prefix names to rule folders", () => {
   const cases: Array<[string, string]> = [
-    ["claude-opus-4-6", "anthropic"],
-    ["gpt-5.5", "openai"],
-    ["o3-mini", "openai"],
-    ["gemini-3-pro", "google"],
-    ["gemma-3-27b", "google"],
-    ["grok-4", "xai"],
-    ["llama-4-scout", "meta"],
-    ["qwen3-32b", "qwen"],
-    ["deepseek-v3", "deepseek"],
-    ["kimi-k2", "moonshot"],
-    ["minimax-m2", "minimax"],
-    ["glm-4.6", "z-ai"],
-    ["mistral-large-3", "mistral"],
-    ["nemotron-4", "nvidia"],
-    ["granite-4", "ibm"],
+    ["claude-mock", "anthropic"],
+    ["gpt-mock", "openai"],
+    ["gemini-mock", "google"],
+    ["grok-mock", "xai"],
+    ["llama-mock", "meta"],
+    ["qwen-mock", "qwen"],
+    ["deepseek-mock", "deepseek"],
+    ["kimi-mock", "moonshot"],
+    ["minimax-mock", "minimax"],
+    ["glm-mock", "z-ai"],
+    ["mistral-mock", "mistral"],
+    ["nemotron-mock", "nvidia"],
+    ["granite-mock", "ibm"],
   ];
   for (const [model, folder] of cases) {
     assert.equal(inferModelFolder(model), folder, `inferModelFolder(${model})`);
@@ -27,8 +25,8 @@ test("inferModelFolder maps known model prefixes to folders", () => {
 });
 
 test("inferModelFolder is case-insensitive and returns null when unknown", () => {
-  assert.equal(inferModelFolder("CLAUDE-OPUS-4-6"), "anthropic");
-  assert.equal(inferModelFolder("some-unknown-model"), null);
+  assert.equal(inferModelFolder("CLAUDE-MOCK"), "anthropic");
+  assert.equal(inferModelFolder("mock-unknown-model"), null);
 });
 
 test("inferFamilyFromFolder resolves folders declared by rules", () => {

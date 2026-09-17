@@ -20,11 +20,11 @@ const toKey = (modelId: string) => modelId.replace(/^[^/]*\//, "").toLowerCase()
 
 test("buildModelIdMap lets the undated rolling id own the base key", () => {
   const map = buildModelIdMap(
-    ["deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-flash-0731", "vendor/other-model"],
+    ["vendor/mock-model", "vendor/mock-model-0731", "vendor/other-model"],
     toKey,
   );
-  assert.equal(map.get("deepseek-v4-flash"), "deepseek/deepseek-v4-flash");
-  assert.equal(map.get("deepseek-v4-flash-0731"), "deepseek/deepseek-v4-flash-0731");
+  assert.equal(map.get("mock-model"), "vendor/mock-model");
+  assert.equal(map.get("mock-model-0731"), "vendor/mock-model-0731");
   assert.equal(map.get("other-model"), "vendor/other-model");
 });
 
