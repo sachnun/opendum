@@ -36,8 +36,10 @@ async function getAvailableModelsForUser(userId: string) {
   };
 }
 
-function modelProviders(model: string, availability: AccountModelAvailability): string[] {
+function modelProviders(model: string, availability: AccountModelAvailability, options: { all?: boolean } = {}): string[] {
   const canonical = resolveModelAlias(model);
+  if (options.all) return getProvidersForModel(model);
+
   const providers = getProvidersForModel(model).filter((provider) => availability.activeProviders.has(provider));
   for (const [provider, models] of availability.customProviderModels) {
     if (models.has(canonical) && (availability.accountCountByProvider.get(provider) ?? 0) > 0) providers.push(provider);
@@ -57,21 +59,28 @@ function customModelEntries(availability: AccountModelAvailability): Array<{ id:
 export async function listModels(userId: string, options: { includeStats?: boolean } = {}) {
   try {
     const includeStats = options.includeStats ?? true;
-    const { availability, disabledModelSet, models } = await getAvailableModelsForUser(userId);
-    const statsByModel = includeStats ? await getModelStatsByModel(userId, models) : {};
+    const { availability, disabledModelSet, models: availableModels } = await getAvailableModelsForUser(userId);
+    const availableSet = new Set(availableModels);
+    const statsByModel = includeStats ? await getModelStatsByModel(userId, availableModels) : {};
 
     const result = [
-      ...models.map((model) => ({
-        id: model,
-        name: model,
-        family: getModelFamily(model),
-        providers: modelProviders(model, availability),
-        reasoning: MODEL_REGISTRY[model]?.reasoning,
-        modalities: MODEL_REGISTRY[model]?.modalities,
-        cost: MODEL_REGISTRY[model]?.cost,
-        isEnabled: !disabledModelSet.has(model),
-        ...(includeStats ? { stats: statsByModel[model] } : {}),
-      })),
+      ...getAllModels()
+        .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) }))
+        .map((model) => {
+          const available = availableSet.has(model);
+          return {
+            id: model,
+            name: model,
+            family: getModelFamily(model),
+            providers: modelProviders(model, availability, { all: !available }),
+            reasoning: MODEL_REGISTRY[model]?.reasoning,
+            modalities: MODEL_REGISTRY[model]?.modalities,
+            cost: MODEL_REGISTRY[model]?.cost,
+            isEnabled: !disabledModelSet.has(model),
+            available,
+            ...(includeStats && available ? { stats: statsByModel[model] } : {}),
+          };
+        }),
       ...customModelEntries(availability).map((entry) => {
         const canonical = resolveModelAlias(entry.modelId);
         return {
@@ -83,6 +92,7 @@ export async function listModels(userId: string, options: { includeStats?: boole
           modalities: MODEL_REGISTRY[canonical]?.modalities,
           cost: MODEL_REGISTRY[canonical]?.cost,
           isEnabled: true,
+          available: true,
           custom: true,
         };
       }),
@@ -151,23 +161,12 @@ export async function getModelStats(userId: string, input: z.infer<typeof modelS
   }
 }
 
-export async function getModelFamilyCounts(userId: string) {
-  try {
-    const { availability, models } = await getAvailableModelsForUser(userId);
-    const counts = models.reduce<Record<string, number>>((accumulator, model) => {
-      const family = getModelFamily(model) ?? "Others";
-      accumulator[family] = (accumulator[family] ?? 0) + 1;
-      return accumulator;
-    }, {});
-    for (const entry of customModelEntries(availability)) {
-      const family = getModelFamily(entry.modelId) ?? "Others";
-      counts[family] = (counts[family] ?? 0) + 1;
-    }
+export function getModelFamilyCounts() {
+  return getAllModels().reduce<Record<string, number>>((counts, model) => {
+    const family = getModelFamily(model) ?? "Others";
+    counts[family] = (counts[family] ?? 0) + 1;
     return counts;
-  } catch (error) {
-    console.error("Failed to count model families:", error);
-    throw new Error("Failed to count model families", { cause: error });
-  }
+  }, {});
 }
 
 export async function setModelEnabled(userId: string, input: z.infer<typeof setModelEnabledInputSchema>) {

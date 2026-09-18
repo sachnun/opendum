@@ -63,7 +63,6 @@ const emptyShellAccountSummary: ShellAccountSummary = {
 };
 
 const emptyModelFamilyCounts = Object.fromEntries(MODEL_FAMILY_NAV_ITEMS.map((family) => [family.anchorId, 0])) as ModelFamilyCounts;
-const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(stateKeys.modelFamilyCountsOverride, () => null);
 const cachedPinnedProviders = useState<string[] | null>(stateKeys.pinnedProviders, () => null);
 
 const supportNavigation = computed<NavItem[]>(() => [
@@ -250,7 +249,7 @@ const { data: defaultModelFamilyCounts } = useCachedData(dataKeys.shellModelFami
   default: () => ({ ...emptyModelFamilyCounts }),
 });
 
-const modelFamilyCounts = computed(() => modelFamilyCountsOverride.value ?? defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
+const modelFamilyCounts = computed(() => defaultModelFamilyCounts.value ?? emptyModelFamilyCounts);
 
 const PENDING_NAV_ANCHOR_KEY = "opendum:pending-nav-anchor";
 const HEADER_OFFSET = 112;

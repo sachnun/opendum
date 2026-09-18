@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily, getModelFamilyAnchorId } from "../../lib/model-families";
 import { compareModelEntries } from "../../lib/model-sort";
-import type { ModelFamilyCounts } from "../../lib/navigation";
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
 import { costEntries, formatCostPoints, type ModelCost } from "../../lib/model-cost";
 import { getProviderLabel } from "../../lib/provider-accounts";
@@ -21,13 +20,20 @@ const HIGHLIGHT_DURATION_MS = 2500;
 
 const { data, error } = useCachedData(dataKeys.models, () => api.models.list({ includeStats: false }));
 const models = computed<ModelListItem[]>(() => data.value ?? []);
+
+function isLinked(model: ModelListItem) {
+  return model.available !== false;
+}
+
+function isActiveModel(model: ModelListItem) {
+  return isLinked(model) && model.isEnabled;
+}
 const customModelIds = computed(() => new Set(models.value.filter((model) => model.custom).map((model) => model.id)));
 const emptyModelStats = buildEmptyModelStats(buildDayKeys(MODEL_STATS_DAYS), buildHourKeys(MODEL_DURATION_LOOKBACK_HOURS));
 const modelStatsById = shallowReactive<Record<string, ModelStats>>({});
 const modelStatsCursorById = shallowReactive<Record<string, string>>({});
 const pendingModelId = ref<string | null>(null);
 const copiedModelId = ref<string | null>(null);
-const modelFamilyCountsOverride = useState<ModelFamilyCounts | null>(stateKeys.modelFamilyCountsOverride, () => null);
 const modelsRoot = ref<HTMLElement | null>(null);
 const visibleModelIds = reactive(new Set<string>());
 const intersectingModelIds = new Set<string>();
@@ -40,7 +46,7 @@ let modelStatsQueueTimer: ReturnType<typeof setTimeout> | null = null;
 let modelStatsPollTimer: ReturnType<typeof setInterval> | null = null;
 let statsObserver: IntersectionObserver | null = null;
 
-const enabledModelCount = computed(() => models.value.filter((model) => model.isEnabled).length);
+const enabledModelCount = computed(() => models.value.filter((model) => model.available !== false && model.isEnabled).length);
 const modelSections = computed(() => {
   const groupedModels = new Map<string, ModelListItem[]>();
 
@@ -62,16 +68,6 @@ const modelSections = computed(() => {
       models: groupedModels.get(family) ?? [],
     }))
     .filter((section) => section.models.length > 0);
-});
-
-watchEffect(() => {
-  modelFamilyCountsOverride.value = Object.fromEntries(
-    modelSections.value.map((section) => [section.anchorId, section.models.length])
-  );
-});
-
-onUnmounted(() => {
-  modelFamilyCountsOverride.value = null;
 });
 
 onMounted(() => {
@@ -144,7 +140,7 @@ async function flushQueuedModelStats() {
 }
 
 async function loadModelStats(modelIds: string[], options: { force?: boolean } = {}) {
-  const availableModelIds = new Set(models.value.map((model) => model.id));
+  const availableModelIds = new Set(models.value.filter((model) => model.available !== false).map((model) => model.id));
   const requestedModelIds = Array.from(new Set(modelIds))
     .filter((modelId) => availableModelIds.has(modelId) && !customModelIds.value.has(modelId))
     .filter((modelId) => !loadingModelStatsIds.has(modelId))
@@ -200,7 +196,7 @@ function stopModelStatsPolling() {
 }
 
 function pruneModelStats() {
-  const availableModelIds = new Set(models.value.map((model) => model.id));
+  const availableModelIds = new Set(models.value.filter((model) => model.available !== false).map((model) => model.id));
 
   for (const modelId of Object.keys(modelStatsById)) {
     if (!availableModelIds.has(modelId)) Reflect.deleteProperty(modelStatsById, modelId);
@@ -252,7 +248,7 @@ function modelCostSummary(cost: ModelCost) {
 }
 
 async function setModelEnabled(model: ModelListItem, enabled: boolean) {
-  if (isAuditMode.value) return;
+  if (isAuditMode.value || model.available === false) return;
   pendingModelId.value = model.id;
   const previousValue = model.isEnabled;
   updateModelEnabled(model.id, enabled);
@@ -329,14 +325,15 @@ watch(
             :id="`model-${model.id}`"
             :key="model.id"
             :data-model-id="model.id"
-            :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${model.isEnabled === false ? ' opacity-65' : ''}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
+            :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${isLinked(model) ? '' : ' grayscale'}${isActiveModel(model) ? '' : ' opacity-65'}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
           >
             <UiCardHeader class="pb-1">
               <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                 <UiTooltip text="Copy ID" class="max-w-96 break-all font-mono">
                   <button
                     type="button"
-                    class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    :class="['-m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', isLinked(model) ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default']"
+                    :disabled="!isLinked(model)"
                     :aria-label="`Copy model ID ${model.id}`"
                     @click="copyModelId(model.id)"
                   >
@@ -349,7 +346,7 @@ watch(
                   </button>
                 </UiTooltip>
                 <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
-                  <UiTooltip v-if="model.isEnabled" text="Playground">
+                  <UiTooltip v-if="isActiveModel(model)" text="Playground">
                     <NuxtLink :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
                       <UiIcon name="i-lucide-flask-conical" class="size-3" />
                     </NuxtLink>
@@ -359,12 +356,12 @@ watch(
                   </template>
                   <template v-else>
                     <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
-                      {{ model.isEnabled ? 'On' : 'Off' }}
+                      {{ isActiveModel(model) ? 'On' : 'Off' }}
                     </span>
                     <UiSwitch
-                      :model-value="model.isEnabled"
-                      :disabled="pendingModelId === model.id || isAuditMode"
-                      :title="model.isEnabled ? 'Disable' : 'Enable'"
+                      :model-value="isActiveModel(model)"
+                      :disabled="!isLinked(model) || pendingModelId === model.id || isAuditMode"
+                      :title="isLinked(model) ? (model.isEnabled ? 'Disable' : 'Enable') : undefined"
                       @update:model-value="setModelEnabled(model, $event)"
                     />
                   </template>
@@ -377,7 +374,7 @@ watch(
                     v-for="provider in model.providers"
                     :key="provider"
                     variant="outline"
-                    class="text-[10px] font-normal"
+                    :class="['text-[10px] font-normal', isLinked(model) ? '' : 'border-border/60 text-muted-foreground opacity-70']"
                   >
                     {{ getProviderLabel(provider) }}
                   </UiBadge>
@@ -408,7 +405,7 @@ watch(
                   :stats-map="modelStatsById"
                   :model-id="model.id"
                   :label="model.id"
-                  :disabled="!model.isEnabled"
+                  :disabled="!isActiveModel(model)"
                   compact
                   :animate-deltas="false"
                 />
