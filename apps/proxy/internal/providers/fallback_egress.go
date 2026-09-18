@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"net/http"
 )
@@ -9,7 +10,13 @@ import (
 type Egress interface {
 	DialContext(ctx context.Context, network string, addr string) (net.Conn, error)
 	Ready() bool
+	Rotate(ctx context.Context)
 }
+
+const (
+	egressMaxTries       = 3
+	egressForbiddenTries = 2
+)
 
 func egressReady(egress Egress, egressClient *http.Client) bool {
 	return egress != nil && egressClient != nil && egress.Ready()
@@ -29,7 +36,8 @@ func postWithEgressFallback(ctx context.Context, state fallbackState, provider s
 		return postPrimaryWithClient(ctx, state, provider, primary, directClient, do)
 	}
 	if state.sticky(ctx, provider) {
-		resp, err := do(egressClient, primary)
+		slog.Info("egress preferred", "provider", provider)
+		resp, err := postEgressWithRotation(ctx, provider, primary, egressClient, egress, do)
 		if err != nil || resp == nil || !shouldUseFallbackEndpoint(resp.StatusCode) {
 			return resp, err
 		}
@@ -40,9 +48,36 @@ func postWithEgressFallback(ctx context.Context, state fallbackState, provider s
 	if err != nil || resp == nil || !shouldUseFallbackEndpoint(resp.StatusCode) {
 		return resp, err
 	}
+	slog.Info("egress fallback", "provider", provider, "status", resp.StatusCode)
 	_ = resp.Body.Close()
 	state.recordStrike(ctx, provider)
-	return do(egressClient, primary)
+	return postEgressWithRotation(ctx, provider, primary, egressClient, egress, do)
+}
+
+// postEgressWithRotation retries through the egress, rotating to a fresh
+// tunnel/IP on 429 or transport failure (bounded) and on 403 (once).
+func postEgressWithRotation(ctx context.Context, provider string, primary string, egressClient *http.Client, egress Egress, do func(client *http.Client, url string) (*http.Response, error)) (*http.Response, error) {
+	for attempt := 0; ; attempt++ {
+		resp, err := do(egressClient, primary)
+		if err == nil && resp != nil && !shouldUseFallbackEndpoint(resp.StatusCode) {
+			return resp, nil
+		}
+		maxTries := egressMaxTries
+		if resp != nil && resp.StatusCode == http.StatusForbidden {
+			maxTries = egressForbiddenTries
+		}
+		if attempt+1 >= maxTries {
+			return resp, err
+		}
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		slog.Warn("egress rotate", "provider", provider, "attempt", attempt+1, "status", statusOf(resp), "error", err)
+		egressClient.CloseIdleConnections()
+		if egress != nil {
+			egress.Rotate(ctx)
+		}
+	}
 }
 
 func postPrimaryWithClient(ctx context.Context, state fallbackState, provider string, primary string, client *http.Client, do func(client *http.Client, url string) (*http.Response, error)) (*http.Response, error) {
@@ -57,4 +92,11 @@ func postJSONWithEgressFallback(ctx context.Context, directClient *http.Client, 
 	return postWithEgressFallback(ctx, state, provider, primaryURL, directClient, egressClient, egress, func(client *http.Client, target string) (*http.Response, error) {
 		return postJSONWithHeaders(ctx, client, target, bearer, payload, stream, headers)
 	})
+}
+
+func statusOf(resp *http.Response) int {
+	if resp == nil {
+		return 0
+	}
+	return resp.StatusCode
 }

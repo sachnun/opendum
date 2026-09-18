@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -10,11 +11,14 @@ import (
 )
 
 type stubEgress struct {
-	ready bool
-	dial  func(ctx context.Context, network string, addr string) (net.Conn, error)
+	ready     bool
+	rotations int
+	dial      func(ctx context.Context, network string, addr string) (net.Conn, error)
 }
 
 func (s *stubEgress) Ready() bool { return s.ready }
+
+func (s *stubEgress) Rotate(context.Context) { s.rotations++ }
 
 func (s *stubEgress) DialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
 	if s.dial != nil {
@@ -197,3 +201,150 @@ func TestRegistrySetEgressPropagates(t *testing.T) {
 		t.Fatal("kilo_code provider should carry egress")
 	}
 }
+
+func TestEgressRotatesOnTooManyRequests(t *testing.T) {
+	state := &stubFallbackState{}
+	direct := &http.Client{}
+	egressClient := &http.Client{}
+	egress := &stubEgress{ready: true}
+	egressCalls := 0
+	resp, err := postWithEgressFallback(context.Background(), state, "opencode", "https://primary.test/v1", direct, egressClient, egress, func(c *http.Client, url string) (*http.Response, error) {
+		if c == egressClient {
+			egressCalls++
+			if egressCalls < 3 {
+				return egressTestResponse(http.StatusTooManyRequests), nil
+			}
+			return egressTestResponse(http.StatusOK), nil
+		}
+		return egressTestResponse(http.StatusTooManyRequests), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if egressCalls != 3 {
+		t.Fatalf("egress calls = %d", egressCalls)
+	}
+	if egress.rotations != 2 {
+		t.Fatalf("rotations = %d", egress.rotations)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestEgressRotatesOnForbiddenOnce(t *testing.T) {
+	state := &stubFallbackState{}
+	direct := &http.Client{}
+	egressClient := &http.Client{}
+	egress := &stubEgress{ready: true}
+	egressCalls := 0
+	resp, err := postWithEgressFallback(context.Background(), state, "opencode", "https://primary.test/v1", direct, egressClient, egress, func(c *http.Client, url string) (*http.Response, error) {
+		if c == egressClient {
+			egressCalls++
+		}
+		return egressTestResponse(http.StatusForbidden), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if egressCalls != 2 {
+		t.Fatalf("egress calls = %d", egressCalls)
+	}
+	if egress.rotations != 1 {
+		t.Fatalf("rotations = %d", egress.rotations)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestEgressRotatesAndStopsAtMaxTries(t *testing.T) {
+	state := &stubFallbackState{}
+	direct := &http.Client{}
+	egressClient := &http.Client{}
+	egress := &stubEgress{ready: true}
+	egressCalls := 0
+	resp, err := postWithEgressFallback(context.Background(), state, "opencode", "https://primary.test/v1", direct, egressClient, egress, func(c *http.Client, url string) (*http.Response, error) {
+		if c == egressClient {
+			egressCalls++
+		}
+		return egressTestResponse(http.StatusTooManyRequests), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if egressCalls != 3 {
+		t.Fatalf("egress calls = %d", egressCalls)
+	}
+	if egress.rotations != 2 {
+		t.Fatalf("rotations = %d", egress.rotations)
+	}
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestEgressRetriesTransportErrorOnce(t *testing.T) {
+	state := &stubFallbackState{}
+	direct := &http.Client{}
+	egressClient := &http.Client{}
+	egress := &stubEgress{ready: true}
+	egressCalls := 0
+	resp, err := postWithEgressFallback(context.Background(), state, "opencode", "https://primary.test/v1", direct, egressClient, egress, func(c *http.Client, url string) (*http.Response, error) {
+		if c == egressClient {
+			egressCalls++
+			if egressCalls < 2 {
+				return nil, errEgressBoom
+			}
+			return egressTestResponse(http.StatusOK), nil
+		}
+		return egressTestResponse(http.StatusTooManyRequests), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if egressCalls != 2 {
+		t.Fatalf("egress calls = %d", egressCalls)
+	}
+	if egress.rotations != 1 {
+		t.Fatalf("rotations = %d", egress.rotations)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestEgressStickyFallsBackToDirectAfterRotation(t *testing.T) {
+	state := &stubFallbackState{stickyOn: true}
+	direct := &http.Client{}
+	egressClient := &http.Client{}
+	egress := &stubEgress{ready: true}
+	var got []string
+	resp, err := postWithEgressFallback(context.Background(), state, "opencode", "https://primary.test/v1", direct, egressClient, egress, func(c *http.Client, url string) (*http.Response, error) {
+		if c == egressClient {
+			got = append(got, "egress")
+			return egressTestResponse(http.StatusTooManyRequests), nil
+		}
+		got = append(got, "direct")
+		return egressTestResponse(http.StatusOK), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if len(got) != 4 || got[0] != "egress" || got[3] != "direct" {
+		t.Fatalf("got = %#v", got)
+	}
+	if egress.rotations != 2 {
+		t.Fatalf("rotations = %d", egress.rotations)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+var errEgressBoom = errors.New("egress boom")

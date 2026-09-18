@@ -101,6 +101,19 @@ func (p *Pool) onNotice(notice []byte) {
 
 func (p *Pool) Ready() bool { return p.ready.Load() > 0 }
 
+// Rotate terminates one active tunnel so the next dial egresses from a fresh
+// Psiphon server/IP. Idle HTTP connections must be closed separately so a new
+// tunnel is actually used.
+func (p *Pool) Rotate(context.Context) {
+	p.mu.RLock()
+	controller := p.controller
+	p.mu.RUnlock()
+	if controller == nil {
+		return
+	}
+	controller.TerminateNextActiveTunnel()
+}
+
 func (p *Pool) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	p.mu.RLock()
 	controller := p.controller
