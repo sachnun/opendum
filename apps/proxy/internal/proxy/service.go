@@ -91,20 +91,20 @@ func newUpstreamClient() *http.Client {
 	}
 }
 
-func (s *Service) SetTorEgress(tor providers.TorEgress, torClient *http.Client) {
+func (s *Service) SetEgress(egress providers.Egress, egressClient *http.Client) {
 	if s == nil {
 		return
 	}
 	if s.providerRegistry != nil {
-		s.providerRegistry.SetTorEgress(tor, torClient)
+		s.providerRegistry.SetEgress(egress, egressClient)
 	}
 }
 
-func (s *Service) TorReady() bool {
+func (s *Service) EgressReady() bool {
 	if s == nil || s.providerRegistry == nil {
 		return false
 	}
-	return s.providerRegistry.TorReady()
+	return s.providerRegistry.EgressReady()
 }
 
 func (s *Service) StartFreebuffMaintenance(ctx context.Context) {

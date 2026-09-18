@@ -83,38 +83,38 @@ type RefreshedCredentials struct {
 }
 
 type Registry struct {
-	providers map[string]Provider
-	tor       TorEgress
-	torClient *http.Client
+	providers    map[string]Provider
+	egress       Egress
+	egressClient *http.Client
 }
 
-func (r *Registry) SetTorEgress(tor TorEgress, torClient *http.Client) {
+func (r *Registry) SetEgress(egress Egress, egressClient *http.Client) {
 	if r == nil {
 		return
 	}
-	r.tor = tor
-	r.torClient = torClient
+	r.egress = egress
+	r.egressClient = egressClient
 	if existing, ok := r.providers["opencode"]; ok {
 		if typed, ok := existing.(opencodeProvider); ok {
-			typed.tor = tor
-			typed.torClient = torClient
+			typed.egress = egress
+			typed.egressClient = egressClient
 			r.providers["opencode"] = typed
 		}
 	}
 	if existing, ok := r.providers["kilo_code"]; ok {
 		if typed, ok := existing.(openAICompatibleProvider); ok {
-			typed.tor = tor
-			typed.torClient = torClient
+			typed.egress = egress
+			typed.egressClient = egressClient
 			r.providers["kilo_code"] = typed
 		}
 	}
 }
 
-func (r *Registry) TorReady() bool {
+func (r *Registry) EgressReady() bool {
 	if r == nil {
 		return false
 	}
-	return torReady(r.tor, r.torClient)
+	return egressReady(r.egress, r.egressClient)
 }
 
 func (r *Registry) StartFreebuffMaintenance(ctx context.Context) {
@@ -196,8 +196,8 @@ type openAICompatibleProvider struct {
 	registry        *models.Registry
 	trimPrefix      string
 	fallback        fallbackState
-	tor             TorEgress
-	torClient       *http.Client
+	egress          Egress
+	egressClient    *http.Client
 	extraHeaders    map[string]string
 	upstreamName    func(model string) string
 	modelFlags      func(model string) map[string]any
@@ -264,8 +264,8 @@ func (p openAICompatibleProvider) extraRequestHeaders(account appdb.ProviderAcco
 
 func (p openAICompatibleProvider) post(ctx context.Context, client *http.Client, path, credentials string, payload map[string]any, stream bool, model string, extraHeaders map[string]string) (*http.Response, error) {
 	authless := strings.TrimSpace(credentials) == "" && p.authlessModel(model)
-	if torReady(p.tor, p.torClient) {
-		return postWithTorFallback(ctx, p.fallback, p.name, p.baseURL+path, client, p.torClient, p.tor, func(c *http.Client, url string) (*http.Response, error) {
+	if egressReady(p.egress, p.egressClient) {
+		return postWithEgressFallback(ctx, p.fallback, p.name, p.baseURL+path, client, p.egressClient, p.egress, func(c *http.Client, url string) (*http.Response, error) {
 			return p.postOnce(ctx, c, url, credentials, payload, stream, extraHeaders, authless)
 		})
 	}
@@ -423,10 +423,10 @@ func (p openAICompatibleProvider) authlessModel(model string) bool {
 }
 
 type opencodeProvider struct {
-	registry  *models.Registry
-	fallback  fallbackState
-	tor       TorEgress
-	torClient *http.Client
+	registry     *models.Registry
+	fallback     fallbackState
+	egress       Egress
+	egressClient *http.Client
 }
 
 func (p opencodeProvider) Authless() bool { return true }
@@ -515,22 +515,22 @@ func (p opencodeProvider) ResponsesNative(model string) bool {
 }
 
 func (p opencodeProvider) postOpencodeResponses(ctx context.Context, client *http.Client, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
-	if torReady(p.tor, p.torClient) {
-		return postJSONWithTorFallback(ctx, client, p.torClient, p.tor, p.fallback, "opencode", opencodeResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
+	if egressReady(p.egress, p.egressClient) {
+		return postJSONWithEgressFallback(ctx, client, p.egressClient, p.egress, p.fallback, "opencode", opencodeResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
 	}
 	return postJSONWithFallback(ctx, client, p.fallback, "opencode", opencodeResponsesEndpoint, opencodeFallbackResponsesEndpoint, opencodePublicAPIKey, payload, stream, headers)
 }
 
 func (p opencodeProvider) postOpencodeChat(ctx context.Context, client *http.Client, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
-	if torReady(p.tor, p.torClient) {
-		return postJSONWithTorFallback(ctx, client, p.torClient, p.tor, p.fallback, "opencode", opencodeChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
+	if egressReady(p.egress, p.egressClient) {
+		return postJSONWithEgressFallback(ctx, client, p.egressClient, p.egress, p.fallback, "opencode", opencodeChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
 	}
 	return postJSONWithFallback(ctx, client, p.fallback, "opencode", opencodeChatCompletionsEndpoint, opencodeFallbackChatCompletionsEndpoint, opencodePublicAPIKey, payload, stream, headers)
 }
 
 func (p opencodeProvider) postOpencodeMessages(ctx context.Context, client *http.Client, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
-	if torReady(p.tor, p.torClient) {
-		return postJSONWithTorFallback(ctx, client, p.torClient, p.tor, p.fallback, "opencode", opencodeMessagesEndpoint, opencodePublicAPIKey, payload, stream, headers)
+	if egressReady(p.egress, p.egressClient) {
+		return postJSONWithEgressFallback(ctx, client, p.egressClient, p.egress, p.fallback, "opencode", opencodeMessagesEndpoint, opencodePublicAPIKey, payload, stream, headers)
 	}
 	return postJSONWithFallback(ctx, client, p.fallback, "opencode", opencodeMessagesEndpoint, opencodeFallbackMessagesEndpoint, opencodePublicAPIKey, payload, stream, headers)
 }
