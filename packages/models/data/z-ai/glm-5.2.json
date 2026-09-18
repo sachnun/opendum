@@ -21,12 +21,12 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 131072
+    "output": 163840
   },
   "cost": {
-    "input": 7,
-    "output": 22,
-    "cacheRead": 0.7
+    "input": 2.8125,
+    "output": 9,
+    "cacheRead": 0.525
   },
   "providerConfig": {
     "hyper": {
@@ -36,13 +36,13 @@
     "kilo_code": {
       "upstream": "z-ai/glm-5.2:free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 131072,
+      "maxOutputTokens": 163840,
       "authless": true
     },
     "openrouter": {
       "upstream": "z-ai/glm-5.2:free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 131072
+      "maxOutputTokens": 163840
     },
     "perch": {
       "upstream": "glm-5-2",

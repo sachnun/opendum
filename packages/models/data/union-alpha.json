@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "opencode"
-  ],
+  "providers": [],
   "reasoning": true,
   "modalities": {
     "input": [
@@ -19,12 +17,5 @@
   "cost": {
     "input": 0,
     "output": 0
-  },
-  "providerConfig": {
-    "opencode": {
-      "contextWindow": 262144,
-      "maxOutputTokens": 131072,
-      "messages_api": true
-    }
   }
 }
