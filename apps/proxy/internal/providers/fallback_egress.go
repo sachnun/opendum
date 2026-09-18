@@ -6,22 +6,22 @@ import (
 	"net/http"
 )
 
-type TorEgress interface {
+type Egress interface {
 	DialContext(ctx context.Context, network string, addr string) (net.Conn, error)
 	Ready() bool
 }
 
-func torReady(tor TorEgress, torClient *http.Client) bool {
-	return tor != nil && torClient != nil && tor.Ready()
+func egressReady(egress Egress, egressClient *http.Client) bool {
+	return egress != nil && egressClient != nil && egress.Ready()
 }
 
-func postWithTorFallback(ctx context.Context, state fallbackState, provider string, primary string, directClient *http.Client, torClient *http.Client, tor TorEgress, do func(client *http.Client, url string) (*http.Response, error)) (*http.Response, error) {
+func postWithEgressFallback(ctx context.Context, state fallbackState, provider string, primary string, directClient *http.Client, egressClient *http.Client, egress Egress, do func(client *http.Client, url string) (*http.Response, error)) (*http.Response, error) {
 	if state == nil {
 		state = noFallbackState{}
 	}
-	if !torReady(tor, torClient) || directClient == nil {
+	if !egressReady(egress, egressClient) || directClient == nil {
 		if directClient == nil {
-			directClient = torClient
+			directClient = egressClient
 		}
 		if directClient == nil {
 			return do(directClient, primary)
@@ -29,7 +29,7 @@ func postWithTorFallback(ctx context.Context, state fallbackState, provider stri
 		return postPrimaryWithClient(ctx, state, provider, primary, directClient, do)
 	}
 	if state.sticky(ctx, provider) {
-		resp, err := do(torClient, primary)
+		resp, err := do(egressClient, primary)
 		if err != nil || resp == nil || !shouldUseFallbackEndpoint(resp.StatusCode) {
 			return resp, err
 		}
@@ -42,7 +42,7 @@ func postWithTorFallback(ctx context.Context, state fallbackState, provider stri
 	}
 	_ = resp.Body.Close()
 	state.recordStrike(ctx, provider)
-	return do(torClient, primary)
+	return do(egressClient, primary)
 }
 
 func postPrimaryWithClient(ctx context.Context, state fallbackState, provider string, primary string, client *http.Client, do func(client *http.Client, url string) (*http.Response, error)) (*http.Response, error) {
@@ -53,8 +53,8 @@ func postPrimaryWithClient(ctx context.Context, state fallbackState, provider st
 	return resp, err
 }
 
-func postJSONWithTorFallback(ctx context.Context, directClient *http.Client, torClient *http.Client, tor TorEgress, state fallbackState, provider string, primaryURL string, bearer string, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
-	return postWithTorFallback(ctx, state, provider, primaryURL, directClient, torClient, tor, func(client *http.Client, target string) (*http.Response, error) {
+func postJSONWithEgressFallback(ctx context.Context, directClient *http.Client, egressClient *http.Client, egress Egress, state fallbackState, provider string, primaryURL string, bearer string, payload map[string]any, stream bool, headers map[string]string) (*http.Response, error) {
+	return postWithEgressFallback(ctx, state, provider, primaryURL, directClient, egressClient, egress, func(client *http.Client, target string) (*http.Response, error) {
 		return postJSONWithHeaders(ctx, client, target, bearer, payload, stream, headers)
 	})
 }
