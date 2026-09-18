@@ -13,7 +13,6 @@ export const dataKeys = {
 } as const;
 
 export const stateKeys = {
-  modelFamilyCountsOverride: "dashboard-model-family-counts-override",
   pinnedProviders: "dashboard-shell-pinned-providers",
   me: "dashboard-me-state",
   auditRefreshVersion: "dashboard-audit-refresh-version",
