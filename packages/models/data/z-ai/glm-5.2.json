@@ -24,9 +24,9 @@
     "output": 131072
   },
   "cost": {
-    "input": 2.807,
-    "output": 8.822,
-    "cacheRead": 0.5213
+    "input": 2.772,
+    "output": 8.712,
+    "cacheRead": 0.5148
   },
   "providerConfig": {
     "hyper": {

@@ -4,6 +4,13 @@
     "freebuff"
   ],
   "reasoning": false,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
   "modalities": {
     "input": [
       "text"
