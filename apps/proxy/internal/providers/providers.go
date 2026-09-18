@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -33,6 +34,16 @@ const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
 const opencodeUserAgent = "opencode/1.18.31"
 const opencodeIDAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+// opencodeFingerprintTools is the file-search quartet the Zen free tier
+// requires before it will serve `Authorization: Bearer public` requests. Any
+// request missing one of them is rejected with a 403 FreeTierError.
+var opencodeFingerprintTools = []string{"bash", "glob", "grep", "read"}
+
+// opencodeFingerprintDescription keeps the injected declarations from being
+// invoked: they exist only to satisfy the upstream fingerprint check, so the
+// model is told to ignore them and use the host client's own tools.
+const opencodeFingerprintDescription = "Do not call. Reserved OpenCode fingerprint stub with no implementation; use the host application's own tools instead."
 
 var opencodeSessionPattern = regexp.MustCompile(`^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$`)
 var opencodeRequestPattern = regexp.MustCompile(`^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$`)
@@ -428,42 +439,50 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 		modelName = p.registry.UpstreamModelName(model, "opencode")
 	}
 	headers := opencodeHeaders(body)
+	ensureOpencodeFingerprintTools(body)
 	if p.requiresResponsesAPI(model) {
-		payload := buildResponsesAPIPayload(ctx, client, body, modelName, stream)
-		resp, err := p.postOpencodeResponses(ctx, client, payload, stream, headers)
+		payload := buildResponsesAPIPayload(ctx, client, body, modelName, true)
+		resp, err := p.postOpencodeResponses(ctx, client, payload, true, headers)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
 		}
-		if _, nativeResponses := body["_responsesInput"].([]any); nativeResponses {
-			return resp, nil
-		}
+		_, nativeResponses := body["_responsesInput"].([]any)
 		if stream {
+			if nativeResponses {
+				return resp, nil
+			}
 			return sseResponse(responsesSSEToChatSSEReader(resp.Body, modelName), resp.Body), nil
 		}
-		var data map[string]any
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		if nativeResponses {
+			data, err := responsesSSEToResponsesJSON(resp.Body)
 			_ = resp.Body.Close()
+			if err != nil {
+				return nil, err
+			}
+			return jsonResponse(http.StatusOK, data), nil
+		}
+		data, err := chatSSEToChatCompletion(responsesSSEToChatSSEReader(resp.Body, modelName), modelName)
+		_ = resp.Body.Close()
+		if err != nil {
 			return nil, err
 		}
-		_ = resp.Body.Close()
-		return jsonResponse(http.StatusOK, responsesJSONToChatCompletion(data, modelName)), nil
+		return jsonResponse(http.StatusOK, data), nil
 	}
 	if p.requiresMessagesAPI(model) {
-		payload := buildAnthropicMessagesPayload(ctx, client, body, modelName, stream)
-		resp, err := p.postOpencodeMessages(ctx, client, payload, stream, headers)
+		payload := buildAnthropicMessagesPayload(ctx, client, body, modelName, true)
+		resp, err := p.postOpencodeMessages(ctx, client, payload, true, headers)
 		if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return resp, err
 		}
 		if stream {
 			return sseResponse(anthropicMessagesSSEToChatSSEReader(resp.Body, modelName), resp.Body), nil
 		}
-		var data map[string]any
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			_ = resp.Body.Close()
+		data, err := chatSSEToChatCompletion(anthropicMessagesSSEToChatSSEReader(resp.Body, modelName), modelName)
+		_ = resp.Body.Close()
+		if err != nil {
 			return nil, err
 		}
-		_ = resp.Body.Close()
-		return jsonResponse(http.StatusOK, anthropicMessagesToChatCompletion(data, modelName)), nil
+		return jsonResponse(http.StatusOK, data), nil
 	}
 	payload := map[string]any{}
 	for key, value := range body {
@@ -472,12 +491,20 @@ func (p opencodeProvider) MakeRequest(ctx context.Context, client *http.Client, 
 		}
 	}
 	payload["model"] = modelName
-	payload["stream"] = stream
-	resp, err := p.postOpencodeChat(ctx, client, payload, stream, headers)
+	payload["stream"] = true
+	resp, err := p.postOpencodeChat(ctx, client, payload, true, headers)
 	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, err
 	}
-	return resp, nil
+	if stream {
+		return resp, nil
+	}
+	data, err := chatSSEToChatCompletion(resp.Body, modelName)
+	_ = resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return jsonResponse(http.StatusOK, data), nil
 }
 
 // ResponsesNative reports whether the upstream already speaks the Responses API
@@ -514,6 +541,40 @@ func (p opencodeProvider) requiresResponsesAPI(model string) bool {
 
 func (p opencodeProvider) requiresMessagesAPI(model string) bool {
 	return providerConfigBool(p.registry, model, "opencode", "messages_api")
+}
+
+// ensureOpencodeFingerprintTools merges the file-search quartet into the
+// request tools, preserving caller tools verbatim. Chat, Responses, and
+// Messages payload builders all read body["tools"], so chat-shaped
+// declarations work for every endpoint.
+func ensureOpencodeFingerprintTools(body map[string]any) {
+	tools, _ := body["tools"].([]any)
+	present := map[string]bool{}
+	for _, raw := range tools {
+		tool, _ := raw.(map[string]any)
+		fn, _ := tool["function"].(map[string]any)
+		name := stringValue(fn["name"])
+		if name == "" {
+			name = stringValue(tool["name"])
+		}
+		if name != "" {
+			present[name] = true
+		}
+	}
+	for _, name := range opencodeFingerprintTools {
+		if present[name] {
+			continue
+		}
+		tools = append(tools, map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name":        name,
+				"description": opencodeFingerprintDescription,
+				"parameters":  map[string]any{"type": "object", "properties": map[string]any{}},
+			},
+		})
+	}
+	body["tools"] = tools
 }
 
 func opencodeHeaders(body map[string]any) map[string]string {
@@ -596,6 +657,174 @@ func opencodeCanonicalID(prefix, seed string) string {
 		builder.WriteByte(opencodeIDAlphabet[int(byteValue)%len(opencodeIDAlphabet)])
 	}
 	return builder.String()
+}
+
+func responsesSSEToResponsesJSON(source io.Reader) (map[string]any, error) {
+	raw, err := io.ReadAll(source)
+	if err != nil {
+		return nil, err
+	}
+	raw = bytes.TrimSpace(raw)
+	if len(raw) > 0 && raw[0] == '{' {
+		var data map[string]any
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+	var result map[string]any
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+		var event map[string]any
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			continue
+		}
+		switch stringValue(event["type"]) {
+		case "response.completed", "response.incomplete", "response.failed":
+			if response, ok := event["response"].(map[string]any); ok {
+				result = response
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("opencode: responses stream ended without a terminal event")
+	}
+	return result, nil
+}
+
+func chatSSEToChatCompletion(source io.Reader, model string) (map[string]any, error) {
+	raw, err := io.ReadAll(source)
+	if err != nil {
+		return nil, err
+	}
+	raw = bytes.TrimSpace(raw)
+	if len(raw) > 0 && raw[0] == '{' {
+		var data map[string]any
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+
+	type bufferedTool struct {
+		id   string
+		name string
+		args strings.Builder
+	}
+	var content, reasoning strings.Builder
+	finishReason := "stop"
+	var usage map[string]any
+	tools := []*bufferedTool{}
+	byIndex := map[int]*bufferedTool{}
+	ensureTool := func(index int, id, name string) *bufferedTool {
+		tool, ok := byIndex[index]
+		if !ok {
+			tool = &bufferedTool{id: id, name: name}
+			byIndex[index] = tool
+			tools = append(tools, tool)
+		}
+		if tool.id == "" {
+			tool.id = id
+		}
+		if tool.name == "" {
+			tool.name = name
+		}
+		return tool
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+		var chunk map[string]any
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			continue
+		}
+		if chunkUsage, ok := chunk["usage"].(map[string]any); ok && len(chunkUsage) > 0 {
+			usage = chunkUsage
+		}
+		choices, _ := chunk["choices"].([]any)
+		if len(choices) == 0 {
+			continue
+		}
+		choice, _ := choices[0].(map[string]any)
+		if choice == nil {
+			continue
+		}
+		if delta, ok := choice["delta"].(map[string]any); ok {
+			content.WriteString(stringValue(delta["content"]))
+			reasoning.WriteString(stringValue(delta["reasoning_content"]))
+			calls, _ := delta["tool_calls"].([]any)
+			for _, rawCall := range calls {
+				call, _ := rawCall.(map[string]any)
+				fn, _ := call["function"].(map[string]any)
+				tool := ensureTool(numberFromAny(call["index"]), stringValue(call["id"]), stringValue(fn["name"]))
+				tool.args.WriteString(stringValue(fn["arguments"]))
+			}
+		}
+		if finish := stringValue(choice["finish_reason"]); finish != "" {
+			finishReason = finish
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	message := map[string]any{"role": "assistant", "content": nil}
+	if text := content.String(); text != "" {
+		message["content"] = text
+	}
+	if text := reasoning.String(); text != "" {
+		message["reasoning_content"] = text
+	}
+	if len(tools) > 0 {
+		toolCalls := []any{}
+		for _, tool := range tools {
+			arguments := tool.args.String()
+			if strings.TrimSpace(arguments) == "" {
+				arguments = "{}"
+			}
+			toolCalls = append(toolCalls, map[string]any{
+				"id":       tool.id,
+				"type":     "function",
+				"function": map[string]any{"name": tool.name, "arguments": arguments},
+			})
+		}
+		message["tool_calls"] = toolCalls
+		if finishReason == "stop" {
+			finishReason = "tool_calls"
+		}
+	}
+	if usage == nil {
+		usage = map[string]any{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+	}
+	return map[string]any{
+		"id":      randomID("chatcmpl"),
+		"object":  "chat.completion",
+		"created": time.Now().Unix(),
+		"model":   model,
+		"choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": finishReason}},
+		"usage":   usage,
+	}, nil
 }
 
 type workersAIProvider struct {
