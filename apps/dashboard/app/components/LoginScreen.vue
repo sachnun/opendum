@@ -477,7 +477,7 @@ onMounted(() => {
         Opendum
       </h1>
       <p class="mt-4 font-mono text-sm text-muted-foreground">
-        Your accounts, one proxy.
+        Your dummy, one proxy.
       </p>
 
       <div

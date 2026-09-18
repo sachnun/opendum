@@ -5,7 +5,7 @@ useHead({
   htmlAttrs: { lang: "en" },
   title: "Opendum",
   meta: [
-    { name: "description", content: "Your accounts, one proxy." },
+    { name: "description", content: "Your dummy, one proxy." },
   ],
   link: [
     { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
