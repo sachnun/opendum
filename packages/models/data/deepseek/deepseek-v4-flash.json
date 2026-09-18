@@ -4,7 +4,9 @@
     "hyper",
     "nvidia_nim",
     "harbor",
-    "freebuff"
+    "freebuff",
+    "kilo_code",
+    "openrouter"
   ],
   "aliases": [
     "@cf-deepseek-ai-deepseek-v4-flash-0731",
@@ -34,8 +36,8 @@
     ]
   },
   "limit": {
-    "context": 1000000,
-    "output": 384000
+    "context": 1310720,
+    "output": 943718
   },
   "cost": {
     "input": 0.3,
@@ -59,10 +61,21 @@
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
+    "kilo_code": {
+      "upstream": "deepseek/deepseek-v4-flash-0731:free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 943718,
+      "authless": true
+    },
     "nvidia_nim": {
       "upstream": "deepseek-ai/deepseek-v4-flash-0731",
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
+    },
+    "openrouter": {
+      "upstream": "deepseek/deepseek-v4-flash-0731:free",
+      "contextWindow": 1310720,
+      "maxOutputTokens": 943718
     },
     "zenmux": {
       "upstream": "deepseek/deepseek-v4-flash",
