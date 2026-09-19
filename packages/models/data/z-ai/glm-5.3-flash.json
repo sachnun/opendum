@@ -16,7 +16,9 @@
   "modalities": {
     "input": [
       "image",
-      "text"
+      "pdf",
+      "text",
+      "video"
     ],
     "output": [
       "text"
@@ -61,7 +63,7 @@
     "zenmux": {
       "upstream": "z-ai/glm-5.3-flash",
       "contextWindow": 1000000,
-      "maxOutputTokens": 131072
+      "maxOutputTokens": 128000
     }
   }
 }

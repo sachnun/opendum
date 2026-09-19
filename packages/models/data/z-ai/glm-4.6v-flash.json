@@ -19,18 +19,18 @@
   },
   "limit": {
     "context": 200000,
-    "output": 64000
+    "output": 128000
   },
   "cost": {
-    "input": 0.1,
-    "output": 1.05,
-    "cacheRead": 0.0215
+    "input": 0.109,
+    "output": 1.092,
+    "cacheRead": 0.022
   },
   "providerConfig": {
     "zenmux": {
       "upstream": "z-ai/glm-4.6v-flash",
       "contextWindow": 200000,
-      "maxOutputTokens": 64000
+      "maxOutputTokens": 128000
     }
   }
 }

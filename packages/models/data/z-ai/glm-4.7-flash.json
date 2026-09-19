@@ -36,7 +36,7 @@
     "zenmux": {
       "upstream": "z-ai/glm-4.7-flash-free",
       "contextWindow": 200000,
-      "maxOutputTokens": 64000
+      "maxOutputTokens": 128000
     }
   }
 }
