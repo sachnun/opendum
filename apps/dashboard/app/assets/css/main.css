@@ -181,6 +181,10 @@
     @apply grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))];
   }
 
+  .opendum-marquee {
+    animation: opendum-marquee var(--opendum-marquee-duration, 6s) ease-in-out infinite;
+  }
+
   @media (min-width: 48rem) {
     .dashboard-shell {
       --dashboard-sidebar-width: 15rem;
@@ -218,6 +222,20 @@
   .shiki pre,
   .shiki pre code {
     background-color: var(--muted) !important;
+  }
+}
+
+@keyframes opendum-marquee {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  50%,
+  65% {
+    transform: translateX(var(--opendum-marquee-distance, 0));
+  }
+  100% {
+    transform: translateX(0);
   }
 }
 
