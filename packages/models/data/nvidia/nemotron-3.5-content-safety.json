@@ -21,8 +21,9 @@
     "output": 117964
   },
   "cost": {
-    "input": 1,
-    "output": 1
+    "input": 0.25,
+    "output": 0.75,
+    "cacheRead": 0.125
   },
   "providerConfig": {
     "kilo_code": {
