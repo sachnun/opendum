@@ -47,7 +47,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 131072
+      "maxOutputTokens": 235929
     },
     "perch": {
       "upstream": "nemotron-3-5-lightning",
