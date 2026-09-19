@@ -325,11 +325,11 @@ watch(
             :id="`model-${model.id}`"
             :key="model.id"
             :data-model-id="model.id"
-            :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${isLinked(model) ? '' : ' grayscale'}${isActiveModel(model) ? '' : ' opacity-65'}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
+            :class="`flex h-full flex-col scroll-mt-20 bg-transparent [contain-intrinsic-size:auto_12rem] [content-visibility:auto] transition-[border-color,box-shadow] duration-[1800ms] ease-out${isLinked(model) ? (isActiveModel(model) ? '' : ' opacity-65') : ' grayscale opacity-40'}${highlightedModelId === model.id ? ' border-primary shadow-[0_0_0_3px_var(--primary)]' : ' border-border shadow-none'}`"
           >
             <UiCardHeader class="pb-1">
               <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                <UiTooltip text="Copy ID" class="max-w-96 break-all font-mono">
+                <UiTooltip text="Copy ID" :disabled="!isLinked(model)" class="max-w-96 break-all font-mono">
                   <button
                     type="button"
                     :class="['-m-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', isLinked(model) ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default']"
@@ -346,7 +346,10 @@ watch(
                   </button>
                 </UiTooltip>
                 <div class="mt-0.5 flex shrink-0 items-center gap-1.5">
-                  <UiTooltip v-if="isActiveModel(model)" text="Playground">
+                  <NuxtLink v-if="!isLinked(model)" :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
+                    <UiIcon name="i-lucide-flask-conical" class="size-3" />
+                  </NuxtLink>
+                  <UiTooltip v-else text="Playground">
                     <NuxtLink :to="`/play?model=${encodeURIComponent(model.id)}&compare=auto`" class="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground" aria-label="Try in Playground">
                       <UiIcon name="i-lucide-flask-conical" class="size-3" />
                     </NuxtLink>
