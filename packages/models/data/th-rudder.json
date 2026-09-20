@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "harbor"
+  ],
+  "providerConfig": {
+    "harbor": {
+      "upstream": "th-rudder:free"
+    }
+  }
+}
