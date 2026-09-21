@@ -10,7 +10,7 @@
   "reasoning_effort": [
     "low",
     "high",
-    "max"
+    "xhigh"
   ],
   "modalities": {
     "input": [
@@ -22,7 +22,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 384000
   },
   "cost": {
@@ -42,7 +42,7 @@
       "maxOutputTokens": 384000
     },
     "hyper": {
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 32768
     },
     "workbuddy": {
