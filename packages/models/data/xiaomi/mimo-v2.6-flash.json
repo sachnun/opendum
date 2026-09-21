@@ -1,0 +1,37 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 200000,
+    "output": 32000
+  },
+  "cost": {
+    "input": 0.7,
+    "output": 1.4,
+    "cacheRead": 0.014
+  },
+  "providerConfig": {
+    "opencode": {
+      "upstream": "mimo-v2.6-flash-free",
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  }
+}
