@@ -2,7 +2,6 @@
   "providers": [
     "zenmux",
     "hyper",
-    "nvidia_nim",
     "harbor",
     "freebuff"
   ],
@@ -56,11 +55,6 @@
     },
     "hyper": {
       "upstream": "deepseek-v4-flash-0731",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 384000
-    },
-    "nvidia_nim": {
-      "upstream": "deepseek-ai/deepseek-v4-flash-0731",
       "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
