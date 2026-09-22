@@ -19,24 +19,24 @@
     ]
   },
   "limit": {
-    "context": 262144,
+    "context": 1000000,
     "output": 262144
   },
   "cost": {
     "input": 0.25,
-    "output": 0.9,
+    "output": 1,
     "cacheRead": 0.05
   },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 65536,
       "authless": true
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3.5-lightning-30b-a3b",
-      "contextWindow": 262144,
+      "contextWindow": 1000000,
       "maxOutputTokens": 65536
     },
     "opencode": {
@@ -51,7 +51,7 @@
     },
     "perch": {
       "upstream": "nemotron-3-5-lightning",
-      "contextWindow": 262144,
+      "contextWindow": 1000000,
       "maxOutputTokens": 65536
     }
   }

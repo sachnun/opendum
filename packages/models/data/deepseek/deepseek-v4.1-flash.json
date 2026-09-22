@@ -33,12 +33,12 @@
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/deepseek-v4.1-flash",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
     "harbor": {
       "upstream": "deepseek-v4.1-flash:free",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
     "hyper": {
@@ -46,12 +46,12 @@
       "maxOutputTokens": 32768
     },
     "workbuddy": {
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 384000
     },
     "zenmux": {
       "upstream": "deepseek/deepseek-v4.1-flash",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 384000
     }
   }

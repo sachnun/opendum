@@ -25,9 +25,8 @@
     "output": 24000
   },
   "cost": {
-    "input": 0.25,
-    "output": 1.15,
-    "cacheRead": 0.125
+    "input": 0.5,
+    "output": 1.6
   },
   "providerConfig": {
     "workers_ai": {

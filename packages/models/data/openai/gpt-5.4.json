@@ -7,12 +7,12 @@
     "low",
     "medium",
     "high",
-    "xhigh",
-    "max"
+    "xhigh"
   ],
   "modalities": {
     "input": [
       "image",
+      "pdf",
       "text"
     ],
     "output": [

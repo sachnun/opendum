@@ -12,6 +12,7 @@
   "modalities": {
     "input": [
       "image",
+      "pdf",
       "text"
     ],
     "output": [
@@ -23,9 +24,9 @@
     "output": 128000
   },
   "cost": {
-    "input": 8,
-    "output": 65,
-    "cacheRead": 0.8
+    "input": 8.75,
+    "output": 70,
+    "cacheRead": 0.875
   },
   "providerConfig": {
     "workbuddy": {

@@ -21,19 +21,20 @@
     ]
   },
   "limit": {
-    "context": 262144,
-    "output": 262144
+    "context": 256000,
+    "output": 131072
   },
   "cost": {
     "input": 1.25,
     "output": 3.75,
-    "cacheRead": 0.125
+    "cacheRead": 0.125,
+    "cacheWrite": 2.5
   },
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "mistralai/mistral-large",
-      "contextWindow": 262144,
-      "maxOutputTokens": 262144
+      "contextWindow": 256000,
+      "maxOutputTokens": 131072
     }
   }
 }

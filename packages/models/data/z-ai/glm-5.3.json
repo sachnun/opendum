@@ -20,7 +20,7 @@
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 1000000,
     "output": 131072
   },
   "cost": {
@@ -36,16 +36,16 @@
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "glm-5-3",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     },
     "workbuddy": {
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     }
   }

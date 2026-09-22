@@ -2,7 +2,7 @@
   "providers": [
     "perch"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "modalities": {
     "input": [
       "image",
@@ -14,8 +14,8 @@
     ]
   },
   "limit": {
-    "context": 262144,
-    "output": 32768
+    "context": 256000,
+    "output": 256000
   },
   "cost": {
     "input": 2.25,
@@ -25,8 +25,8 @@
   "providerConfig": {
     "perch": {
       "upstream": "kimi-2.5",
-      "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "contextWindow": 256000,
+      "maxOutputTokens": 256000
     }
   }
 }

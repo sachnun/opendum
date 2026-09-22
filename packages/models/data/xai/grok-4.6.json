@@ -20,7 +20,7 @@
   },
   "limit": {
     "context": 500000,
-    "output": 500000
+    "output": 450000
   },
   "cost": {
     "input": 10,
@@ -31,7 +31,7 @@
     "perch": {
       "upstream": "grok-4-6",
       "contextWindow": 500000,
-      "maxOutputTokens": 500000
+      "maxOutputTokens": 450000
     }
   }
 }

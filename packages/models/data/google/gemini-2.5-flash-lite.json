@@ -2,7 +2,7 @@
   "providers": [
     "antigravity"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "modalities": {
     "input": [
       "audio",
@@ -15,18 +15,18 @@
     ]
   },
   "limit": {
-    "context": 1024000,
+    "context": 1048576,
     "output": 64000
   },
   "cost": {
-    "input": 0.35,
-    "output": 1.4,
+    "input": 0.5,
+    "output": 2,
     "cacheRead": 0.05,
     "cacheWrite": 0.416667
   },
   "providerConfig": {
     "antigravity": {
-      "contextWindow": 1024000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 64000,
       "inject_thought_signature": true,
       "scrub_model_artifacts": true,
