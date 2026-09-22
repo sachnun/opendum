@@ -1,7 +1,8 @@
 {
   "providers": [
     "antigravity",
-    "zenmux"
+    "zenmux",
+    "freebuff"
   ],
   "aliases": [
     "gemini-3.8-flash-high",
@@ -53,6 +54,12 @@
         "none": "minimal",
         "xhigh": "high"
       }
+    },
+    "freebuff": {
+      "upstream": "google/gemini-3.8-flash",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536,
+      "agent": "base2-free-gemini-3-8-flash"
     },
     "zenmux": {
       "upstream": "google/gemini-3.8-flash",

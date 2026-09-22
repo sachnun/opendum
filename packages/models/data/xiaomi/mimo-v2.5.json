@@ -2,7 +2,6 @@
   "id": "mimo-v2.5",
   "providers": [
     "opencode",
-    "harbor",
     "freebuff"
   ],
   "aliases": [
@@ -40,11 +39,6 @@
       "contextWindow": 1048576,
       "maxOutputTokens": 131072,
       "agent": "base2-free-mimo"
-    },
-    "harbor": {
-      "upstream": "mimo-v2.5:free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
     },
     "opencode": {
       "upstream": "mimo-v2.5-free",
