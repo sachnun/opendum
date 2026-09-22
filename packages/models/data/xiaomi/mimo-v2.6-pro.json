@@ -1,0 +1,39 @@
+{
+  "providers": [
+    "freebuff"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 131072
+  },
+  "cost": {
+    "input": 2.175,
+    "output": 4.35,
+    "cacheRead": 0.018
+  },
+  "providerConfig": {
+    "freebuff": {
+      "upstream": "mimo/mimo-v2.6-pro",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072,
+      "agent": "base2-free-mimo-2-6-pro"
+    }
+  }
+}

@@ -4,7 +4,11 @@
   ],
   "reasoning": true,
   "reasoning_effort": [
-    "high"
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
