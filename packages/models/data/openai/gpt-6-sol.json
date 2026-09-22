@@ -1,6 +1,7 @@
 {
   "providers": [
-    "codex"
+    "codex",
+    "perch"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -13,6 +14,7 @@
   "modalities": {
     "input": [
       "image",
+      "pdf",
       "text"
     ],
     "output": [
@@ -31,6 +33,10 @@
   },
   "providerConfig": {
     "codex": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "perch": {
       "contextWindow": 1050000,
       "maxOutputTokens": 128000
     }
