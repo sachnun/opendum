@@ -7,6 +7,13 @@
     "claude-haiku4.5"
   ],
   "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
   "modalities": {
     "input": [
       "image",

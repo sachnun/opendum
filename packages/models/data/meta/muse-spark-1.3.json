@@ -11,9 +11,7 @@
   ],
   "modalities": {
     "input": [
-      "audio",
       "image",
-      "pdf",
       "text",
       "video"
     ],
@@ -23,7 +21,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 943718
+    "output": 131072
   },
   "cost": {
     "input": 6.25,
@@ -34,7 +32,7 @@
     "zenmux": {
       "upstream": "meta/muse-spark-1.3",
       "contextWindow": 1048576,
-      "maxOutputTokens": 943718
+      "maxOutputTokens": 131072
     }
   }
 }

@@ -32,7 +32,7 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "thinkingmachines/inkling-small:free",
-      "contextWindow": 524288,
+      "contextWindow": 1048576,
       "maxOutputTokens": 262144,
       "authless": true
     },

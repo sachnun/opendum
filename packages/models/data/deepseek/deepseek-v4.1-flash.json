@@ -26,19 +26,19 @@
     "output": 384000
   },
   "cost": {
-    "input": 1.27776,
-    "output": 6,
-    "cacheRead": 0.03
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.015
   },
   "providerConfig": {
     "cline": {
       "upstream": "cline-free/deepseek-v4.1-flash",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 384000
     },
     "harbor": {
       "upstream": "deepseek-v4.1-flash:free",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 384000
     },
     "hyper": {
@@ -46,12 +46,12 @@
       "maxOutputTokens": 32768
     },
     "workbuddy": {
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 384000
     },
     "zenmux": {
       "upstream": "deepseek/deepseek-v4.1-flash",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 384000
     }
   }

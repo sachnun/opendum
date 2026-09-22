@@ -21,19 +21,19 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 128000
   },
   "cost": {
-    "input": 25,
-    "output": 125,
+    "input": 21.4645,
+    "output": 107.323,
     "cacheRead": 2.5,
     "cacheWrite": 31.25
   },
   "providerConfig": {
     "kiro": {
       "upstream": "claude-opus-4.8",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 128000,
       "allowedTiers": [
         "pro",

@@ -30,7 +30,7 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "inclusionai/ling-3.0-flash-vl:free",
-      "contextWindow": 262144,
+      "contextWindow": 131072,
       "maxOutputTokens": 32768,
       "authless": true
     },

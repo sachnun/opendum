@@ -16,28 +16,26 @@
   "modalities": {
     "input": [
       "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 256000,
-    "output": 256000
+    "context": 262144,
+    "output": 262144
   },
   "cost": {
-    "input": 0.95,
-    "output": 5.7,
-    "cacheRead": 0.15,
-    "cacheWrite": 0
+    "input": 1,
+    "output": 5.75,
+    "cacheRead": 0.2
   },
   "providerConfig": {
     "kilo_code": {
       "upstream": "stepfun/step-3.7-flash:free",
-      "contextWindow": 256000,
-      "maxOutputTokens": 230400,
+      "contextWindow": 262144,
+      "maxOutputTokens": 262144,
       "authless": true
     },
     "zenmux": {

@@ -14,7 +14,6 @@
     "input": [
       "audio",
       "image",
-      "pdf",
       "text",
       "video"
     ],
@@ -23,7 +22,7 @@
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 1000000,
     "output": 131072
   },
   "cost": {
@@ -34,7 +33,7 @@
   "providerConfig": {
     "freebuff": {
       "upstream": "mimo/mimo-v2.6-pro",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072,
       "agent": "base2-free-mimo-2-6-pro"
     }
