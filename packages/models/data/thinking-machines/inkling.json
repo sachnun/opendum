@@ -23,12 +23,12 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 1048576
+    "output": 471859
   },
   "cost": {
-    "input": 4.75,
+    "input": 5,
     "output": 20.25,
-    "cacheRead": 0.8
+    "cacheRead": 0.85
   },
   "providerConfig": {
     "hyper": {
@@ -41,8 +41,8 @@
       "maxOutputTokens": 471859
     },
     "perch": {
-      "contextWindow": 524288,
-      "maxOutputTokens": 1048576
+      "contextWindow": 1048000,
+      "maxOutputTokens": 32768
     }
   }
 }

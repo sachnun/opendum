@@ -13,8 +13,8 @@
     ]
   },
   "limit": {
-    "context": 202752,
-    "output": 16384
+    "context": 204800,
+    "output": 131072
   },
   "cost": {
     "input": 3,
@@ -24,13 +24,13 @@
   },
   "providerConfig": {
     "kiro": {
-      "contextWindow": 202752,
-      "maxOutputTokens": 16384
+      "contextWindow": 204800,
+      "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "glm-5",
-      "contextWindow": 202752,
-      "maxOutputTokens": 16384
+      "contextWindow": 204800,
+      "maxOutputTokens": 131072
     }
   }
 }

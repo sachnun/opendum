@@ -6,36 +6,31 @@
   "reasoning_effort": [
     "low",
     "medium",
-    "high",
-    "xhigh",
-    "max"
+    "high"
   ],
   "modalities": {
     "input": [
-      "audio",
-      "image",
-      "text",
-      "video"
+      "text"
     ],
     "output": [
       "text"
     ]
   },
   "limit": {
-    "context": 1048576,
+    "context": 524288,
     "output": 131072
   },
   "cost": {
-    "input": 2.175,
-    "output": 4.35,
-    "cacheRead": 0.018
+    "input": 0.25,
+    "output": 1,
+    "cacheRead": 0.025
   },
   "providerConfig": {
     "freebuff": {
-      "upstream": "mimo/mimo-v2.6-pro",
-      "contextWindow": 1048576,
+      "upstream": "upstage/solar-mini4",
+      "contextWindow": 524288,
       "maxOutputTokens": 131072,
-      "agent": "base2-free-mimo-2-6-pro"
+      "agent": "base2-free-solar-mini4"
     }
   }
 }

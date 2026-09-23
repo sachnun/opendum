@@ -2,11 +2,12 @@
   "providers": [
     "perch"
   ],
-  "reasoning": false,
+  "reasoning": true,
   "modalities": {
     "input": [
       "image",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
@@ -14,7 +15,7 @@
   },
   "limit": {
     "context": 262144,
-    "output": 8192
+    "output": 131072
   },
   "cost": {
     "input": 0.45,
@@ -25,7 +26,7 @@
     "perch": {
       "upstream": "gemma-4-31b",
       "contextWindow": 262144,
-      "maxOutputTokens": 8192
+      "maxOutputTokens": 131072
     }
   }
 }

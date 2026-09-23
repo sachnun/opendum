@@ -11,7 +11,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -20,7 +19,7 @@
   },
   "limit": {
     "context": 1000000,
-    "output": 128000
+    "output": 1000000
   },
   "cost": {
     "input": 25,
@@ -31,7 +30,7 @@
     "zenmux": {
       "upstream": "sakana/fugu-ultra-v2",
       "contextWindow": 1000000,
-      "maxOutputTokens": 128000
+      "maxOutputTokens": 1000000
     }
   }
 }

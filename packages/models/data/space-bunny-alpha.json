@@ -1,6 +1,8 @@
 {
   "providers": [
-    "kilo_code"
+    "kilo_code",
+    "cline",
+    "freebuff"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -25,10 +27,21 @@
     "output": 524288
   },
   "cost": {
-    "input": 0,
-    "output": 0
+    "input": 0.25,
+    "output": 0.75
   },
   "providerConfig": {
+    "cline": {
+      "upstream": "stealth/space-bunny-alpha",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288
+    },
+    "freebuff": {
+      "upstream": "stealth/space-bunny-alpha",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288,
+      "agent": "base2-free-space-bunny-alpha"
+    },
     "kilo_code": {
       "upstream": "stealth/space-bunny-alpha",
       "contextWindow": 1000000,
