@@ -1,12 +1,14 @@
 {
   "providers": [
-    "zenmux"
+    "kilo_code"
   ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
@@ -19,19 +21,19 @@
     ]
   },
   "limit": {
-    "context": 262144,
-    "output": 32768
+    "context": 1000000,
+    "output": 524288
   },
   "cost": {
-    "input": 0.3,
-    "output": 0.9,
-    "cacheRead": 0.06
+    "input": 0,
+    "output": 0
   },
   "providerConfig": {
-    "zenmux": {
-      "upstream": "inclusionai/ling-3.0-flash-vl",
-      "contextWindow": 262144,
-      "maxOutputTokens": 32768
+    "kilo_code": {
+      "upstream": "stealth/space-bunny-alpha",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 524288,
+      "authless": true
     }
   }
 }

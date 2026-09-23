@@ -1,8 +1,7 @@
 {
   "providers": [
     "kilo_code",
-    "openrouter",
-    "cline"
+    "openrouter"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -27,11 +26,6 @@
     "cacheWrite": 0
   },
   "providerConfig": {
-    "cline": {
-      "upstream": "poolside/laguna-s-2.1:free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 32768
-    },
     "kilo_code": {
       "upstream": "poolside/laguna-s-2.1:free",
       "contextWindow": 262144,
