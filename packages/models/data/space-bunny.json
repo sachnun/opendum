@@ -1,6 +1,6 @@
 {
   "providers": [
-    "kiro"
+    "opencode"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -13,8 +13,8 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
-      "text"
+      "text",
+      "video"
     ],
     "output": [
       "text"
@@ -22,25 +22,19 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 128000
+    "output": 524288
   },
   "cost": {
-    "input": 21.4645,
-    "output": 107.323,
-    "cacheRead": 2.5,
-    "cacheWrite": 31.25
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
   },
   "providerConfig": {
-    "kiro": {
-      "upstream": "claude-opus-4.8",
+    "opencode": {
+      "upstream": "space-bunny-free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 128000,
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "power",
-        "standalone"
-      ]
+      "maxOutputTokens": 524288
     }
   }
 }

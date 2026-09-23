@@ -2,7 +2,8 @@
   "providers": [
     "codex",
     "perch",
-    "freebuff"
+    "freebuff",
+    "zenmux"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -44,6 +45,11 @@
       "agent": "base2-free-luna-6"
     },
     "perch": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "zenmux": {
+      "upstream": "openai/gpt-6-luna",
       "contextWindow": 1050000,
       "maxOutputTokens": 128000
     }

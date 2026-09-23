@@ -20,13 +20,13 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 131072
   },
   "cost": {
-    "input": 4.2,
-    "output": 13.2,
-    "cacheRead": 0.78,
+    "input": 2.807,
+    "output": 8.822,
+    "cacheRead": 0.5213,
     "cacheWrite": 0
   },
   "providerConfig": {
@@ -36,16 +36,16 @@
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "glm-5-3",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     },
     "workbuddy": {
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 131072
     }
   }

@@ -46,12 +46,12 @@
     },
     "perch": {
       "upstream": "glm-5-2",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
+      "contextWindow": 1048576,
+      "maxOutputTokens": 32768
     },
     "workbuddy": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 131072
+      "contextWindow": 1048576,
+      "maxOutputTokens": 32768
     }
   }
 }

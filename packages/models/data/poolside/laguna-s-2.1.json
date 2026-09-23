@@ -23,13 +23,14 @@
   "cost": {
     "input": 0.45,
     "output": 0.9,
-    "cacheRead": 0.045
+    "cacheRead": 0.045,
+    "cacheWrite": 0
   },
   "providerConfig": {
     "cline": {
       "upstream": "poolside/laguna-s-2.1:free",
       "contextWindow": 1048576,
-      "maxOutputTokens": 131072
+      "maxOutputTokens": 32768
     },
     "kilo_code": {
       "upstream": "poolside/laguna-s-2.1:free",

@@ -2,7 +2,7 @@
   "providers": [
     "kiro"
   ],
-  "reasoning": true,
+  "reasoning": false,
   "reasoning_effort": [
     "low",
     "medium",

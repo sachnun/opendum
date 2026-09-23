@@ -34,8 +34,8 @@
     "output": 65536
   },
   "cost": {
-    "input": 2.5,
-    "output": 4.5
+    "input": 0,
+    "output": 0
   },
   "providerConfig": {
     "kilo_code": {
@@ -46,7 +46,7 @@
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-      "contextWindow": 65536,
+      "contextWindow": 256000,
       "maxOutputTokens": 65536
     },
     "openrouter": {
