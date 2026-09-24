@@ -28,15 +28,15 @@
     "output": 131072
   },
   "cost": {
-    "input": 0.75,
-    "output": 2.5,
-    "cacheRead": 0.15,
+    "input": 0.375,
+    "output": 0.125,
+    "cacheRead": 0.075,
     "cacheWrite": 0
   },
   "providerConfig": {
     "freebuff": {
       "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072,
       "agent": "base2-free-glm-5-3-flash"
     },
@@ -46,12 +46,12 @@
     },
     "nvidia_nim": {
       "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "glm-5-3-flash",
-      "contextWindow": 1048576,
+      "contextWindow": 1000000,
       "maxOutputTokens": 131072
     },
     "zenmux": {

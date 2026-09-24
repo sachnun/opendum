@@ -12,13 +12,16 @@
   "reasoning": true,
   "reasoning_effort": [
     "low",
+    "medium",
     "high"
   ],
   "modalities": {
     "input": [
       "audio",
       "image",
-      "text"
+      "pdf",
+      "text",
+      "video"
     ],
     "output": [
       "text"

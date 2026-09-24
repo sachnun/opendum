@@ -16,18 +16,18 @@
     ]
   },
   "limit": {
-    "context": 163840,
+    "context": 128000,
     "output": 64000
   },
   "cost": {
-    "input": 1.3,
-    "output": 1.9,
-    "cacheRead": 0.65
+    "input": 1.087,
+    "output": 1.63,
+    "cacheRead": 0.3
   },
   "providerConfig": {
     "kiro": {
       "upstream": "deepseek-3.2",
-      "contextWindow": 163840,
+      "contextWindow": 128000,
       "maxOutputTokens": 64000
     }
   }

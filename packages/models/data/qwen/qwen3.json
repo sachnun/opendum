@@ -34,8 +34,8 @@
     "output": 32768
   },
   "cost": {
-    "input": 0.24075,
-    "output": 0.96525
+    "input": 0.2545,
+    "output": 1.5
   },
   "providerConfig": {
     "workers_ai": {

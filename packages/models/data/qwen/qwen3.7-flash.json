@@ -35,7 +35,7 @@
     },
     "zenmux": {
       "upstream": "qwen/qwen3.7-flash",
-      "contextWindow": 1000000,
+      "contextWindow": 983616,
       "maxOutputTokens": 65536
     }
   }
