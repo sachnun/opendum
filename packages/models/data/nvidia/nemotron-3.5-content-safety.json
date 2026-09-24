@@ -28,8 +28,8 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",
-      "contextWindow": 131072,
-      "maxOutputTokens": 117964,
+      "contextWindow": 128000,
+      "maxOutputTokens": 8192,
       "authless": true
     },
     "openrouter": {

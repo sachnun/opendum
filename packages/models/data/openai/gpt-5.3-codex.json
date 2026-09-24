@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "workbuddy"
-  ],
+  "providers": [],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -27,11 +25,5 @@
     "input": 8.75,
     "output": 70,
     "cacheRead": 0.875
-  },
-  "providerConfig": {
-    "workbuddy": {
-      "contextWindow": 400000,
-      "maxOutputTokens": 128000
-    }
   }
 }

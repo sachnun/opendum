@@ -32,18 +32,18 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 384000
   },
   "cost": {
     "input": 0.15,
-    "output": 0.98,
+    "output": 0.9,
     "cacheRead": 0.014
   },
   "providerConfig": {
     "freebuff": {
       "upstream": "deepseek/deepseek-v4-flash",
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 384000,
       "agent": "base2-free-deepseek-flash"
     },

@@ -29,7 +29,7 @@
     "kilo_code": {
       "upstream": "inclusionai/ling-3.0-flash-fin:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 235929,
+      "maxOutputTokens": 32768,
       "authless": true
     },
     "opencode": {

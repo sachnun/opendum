@@ -15,6 +15,7 @@
     "low",
     "medium",
     "high",
+    "xhigh",
     "max"
   ],
   "modalities": {
@@ -28,7 +29,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 200000,
     "output": 64000
   },
   "cost": {
@@ -40,7 +41,7 @@
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-sonnet-4-6",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "anthropic_beta": true,
       "anthropic_beta_thinking": true,
@@ -56,7 +57,7 @@
     },
     "kiro": {
       "upstream": "claude-sonnet-4.6-1m",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "allowedTiers": [
         "pro",

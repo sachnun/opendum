@@ -1,11 +1,10 @@
 {
   "providers": [
-    "kiro"
+    "workbuddy"
   ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
-    "medium",
     "high",
     "xhigh",
     "max"
@@ -13,7 +12,6 @@
   "modalities": {
     "input": [
       "image",
-      "pdf",
       "text"
     ],
     "output": [
@@ -22,25 +20,18 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 128000
+    "output": 384000
   },
   "cost": {
-    "input": 21.4645,
-    "output": 107.323,
-    "cacheRead": 2.5,
-    "cacheWrite": 31.25
+    "input": 0.7,
+    "output": 2.1,
+    "cacheRead": 0.021,
+    "cacheWrite": 0
   },
   "providerConfig": {
-    "kiro": {
-      "upstream": "claude-opus-4.8",
+    "workbuddy": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 128000,
-      "allowedTiers": [
-        "pro",
-        "pro+",
-        "power",
-        "standalone"
-      ]
+      "maxOutputTokens": 384000
     }
   }
 }
