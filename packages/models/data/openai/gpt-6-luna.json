@@ -28,10 +28,10 @@
     "output": 128000
   },
   "cost": {
-    "input": 0.25,
-    "output": 1.25,
-    "cacheRead": 0.025,
-    "cacheWrite": 0.3125
+    "input": 0.5,
+    "output": 2.5,
+    "cacheRead": 0.05,
+    "cacheWrite": 0.625
   },
   "providerConfig": {
     "codex": {

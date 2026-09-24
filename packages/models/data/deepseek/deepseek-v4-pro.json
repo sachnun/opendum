@@ -31,7 +31,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1048576,
     "output": 384000
   },
   "cost": {
@@ -46,7 +46,7 @@
       "maxOutputTokens": 262144
     },
     "perch": {
-      "contextWindow": 1000000,
+      "contextWindow": 1048576,
       "maxOutputTokens": 384000
     },
     "zenmux": {

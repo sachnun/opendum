@@ -17,27 +17,27 @@
   },
   "limit": {
     "context": 262144,
-    "output": 262144
+    "output": 16384
   },
   "cost": {
-    "input": 4.75,
-    "output": 20,
-    "cacheRead": 0.8
+    "input": 3.75,
+    "output": 17.5,
+    "cacheRead": 0.75
   },
   "providerConfig": {
     "nvidia_nim": {
       "upstream": "moonshotai/kimi-k2.6",
       "contextWindow": 262144,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 16384
     },
     "perch": {
       "upstream": "kimi-k2-6",
       "contextWindow": 262144,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 16384
     },
     "workbuddy": {
       "contextWindow": 262144,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 16384
     }
   }
 }
