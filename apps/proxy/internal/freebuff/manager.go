@@ -503,7 +503,14 @@ func queuedPollDelay(state freeSessionResponse) time.Duration {
 
 func isBannedMessage(message string) bool {
 	lower := strings.ToLower(message)
-	return strings.Contains(lower, "banned") || strings.Contains(lower, "account_banned") || strings.Contains(lower, "banned_user")
+	if strings.Contains(lower, "banned") || strings.Contains(lower, "account_banned") || strings.Contains(lower, "banned_user") {
+		return true
+	}
+	// Third-party-client suspension: the upstream refuses every free-mode
+	// request on the account, so the token is dead like a ban rather than
+	// cooling down. The message is plain text (not JSON), so a substring
+	// match is the only signal available.
+	return strings.Contains(lower, "account_suspended")
 }
 
 func newClientID() string {

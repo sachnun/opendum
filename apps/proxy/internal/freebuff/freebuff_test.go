@@ -7,10 +7,31 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// genuineTool builds a tool whose parameter schema matches the canonical one
+// for name: one property per canonical top-level key.
+func genuineTool(name string) map[string]any {
+	properties := map[string]any{}
+	for _, key := range freeTierSignatureToolParams[name] {
+		properties[key] = map[string]any{"type": "string"}
+	}
+	return map[string]any{
+		"type": "function",
+		"function": map[string]any{
+			"name":        name,
+			"description": "d",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": properties,
+			},
+		},
+	}
+}
 
 func TestBuildChatBodyInjectsBuffyAndMetadata(t *testing.T) {
 	input := map[string]any{
@@ -27,16 +48,24 @@ func TestBuildChatBodyInjectsBuffyAndMetadata(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	messages, _ := parsed["messages"].([]any)
-	if len(messages) != 2 {
-		t.Fatalf("messages = %d, want 2", len(messages))
+	if len(messages) != 3 {
+		t.Fatalf("messages = %d, want 3 (marker + override + user)", len(messages))
 	}
 	first, _ := messages[0].(map[string]any)
 	if first["role"] != "system" {
 		t.Fatalf("first role = %v, want system", first["role"])
 	}
 	content, _ := first["content"].(string)
-	if len(content) < len(buffySystemPromptOpening) || content[:len(buffySystemPromptOpening)] != buffySystemPromptOpening {
+	if !strings.HasPrefix(content, buffySystemPromptOpening) {
 		t.Fatalf("system prompt does not open with the Buffy marker: %q", content)
+	}
+	wantDate := "\n\nCurrent date: " + time.Now().Format("January 2, 2006") + "."
+	if !strings.Contains(content, wantDate) {
+		t.Fatalf("system prompt does not carry the required date line %q: %q", wantDate, content)
+	}
+	second, _ := messages[1].(map[string]any)
+	if second["role"] != "system" || second["content"] != personaOverride {
+		t.Fatalf("messages[1] = %#v, want the persona override", second)
 	}
 	metadata, _ := parsed["codebuff_metadata"].(map[string]any)
 	if metadata["run_id"] != "run_1" || metadata["cost_mode"] != "free" || metadata["client_id"] != "client_1" {
@@ -83,13 +112,28 @@ func TestBuildChatBodyAppendsDecoyForCustomTools(t *testing.T) {
 func TestBuildChatBodyKeepsApprovedTools(t *testing.T) {
 	input := map[string]any{
 		"model": "deepseek/deepseek-v4-flash",
-		"tools": []any{map[string]any{"type": "function", "function": map[string]any{"name": "read_files"}}},
+		"tools": []any{genuineTool("read_files")},
 	}
 	body, _ := BuildChatBody(input, "deepseek/deepseek-v4-flash", "run_1", "inst_1", "client_1", 0)
 	var parsed map[string]any
 	_ = json.Unmarshal(body, &parsed)
 	if tools, _ := parsed["tools"].([]any); len(tools) != 1 {
-		t.Fatalf("tools = %d, want 1 (no decoy for approved tools)", len(tools))
+		t.Fatalf("tools = %d, want 1 (no decoy for a genuine approved tool)", len(tools))
+	}
+}
+
+func TestBuildChatBodyDecoysNameOnlyApprovedTool(t *testing.T) {
+	// A signature name with a hollow schema is what the upstream gate reads as
+	// a third-party harness, so the decoy must still be appended.
+	input := map[string]any{
+		"model": "deepseek/deepseek-v4-flash",
+		"tools": []any{map[string]any{"type": "function", "function": map[string]any{"name": "read_files"}}},
+	}
+	body, _ := BuildChatBody(input, "deepseek/deepseek-v4-flash", "run_1", "inst_1", "client_1", 0)
+	var parsed map[string]any
+	_ = json.Unmarshal(body, &parsed)
+	if tools, _ := parsed["tools"].([]any); len(tools) != 2 {
+		t.Fatalf("tools = %d, want 2 (hollow tool + decoy)", len(tools))
 	}
 }
 

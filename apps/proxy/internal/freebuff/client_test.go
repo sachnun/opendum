@@ -55,6 +55,44 @@ func TestStartRun(t *testing.T) {
 	}
 }
 
+func TestFinishRunSendsLedgerSteps(t *testing.T) {
+	t.Parallel()
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+	client := &Client{baseURL: server.URL, http: server.Client()}
+
+	if err := client.FinishRun(context.Background(), "tok", "user_1", "run_1", 2); err != nil {
+		t.Fatalf("FinishRun: %v", err)
+	}
+	if body["action"] != "FINISH" || body["runId"] != "run_1" || body["totalSteps"] != float64(2) {
+		t.Fatalf("body = %v", body)
+	}
+	steps, _ := body["steps"].([]any)
+	if len(steps) != 2 {
+		t.Fatalf("steps = %d, want 2", len(steps))
+	}
+	for i, raw := range steps {
+		step, _ := raw.(map[string]any)
+		if step["stepNumber"] != float64(i+1) || step["status"] != "completed" {
+			t.Fatalf("step %d = %v", i, step)
+		}
+		if id, _ := step["id"].(string); len(id) != 36 {
+			t.Fatalf("step %d id = %q, want a uuid", i, id)
+		}
+	}
+}
+
+func TestBuildPendingStepsEmpty(t *testing.T) {
+	t.Parallel()
+	if steps := buildPendingSteps(0); len(steps) != 0 {
+		t.Fatalf("steps = %d, want 0", len(steps))
+	}
+}
+
 func TestStartRunErrors(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

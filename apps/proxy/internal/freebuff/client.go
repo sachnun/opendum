@@ -3,6 +3,7 @@ package freebuff
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -66,6 +67,53 @@ func (c *Client) StartRun(ctx context.Context, token, userID, agentID string) (s
 	return parsed.RunID, nil
 }
 
+// pendingAgentStep mirrors the ledger entry the real CLI buffers per agent step
+// and sends on FINISH (sdk/src/impl/database.ts pendingAgentStepSchema).
+type pendingAgentStep struct {
+	ID          string   `json:"id"`
+	StepNumber  int      `json:"stepNumber"`
+	Credits     int      `json:"credits"`
+	ChildRunIDs []string `json:"childRunIds"`
+	MessageID   *string  `json:"messageId"`
+	Status      string   `json:"status"`
+	StartTime   string   `json:"startTime"`
+}
+
+// buildPendingSteps synthesizes one ledger step per chat-completions request
+// on the run. The gateway always runs in free cost mode, where credits are
+// zero, and it does not surface per-request message ids, so messageId is null.
+func buildPendingSteps(totalSteps int) []pendingAgentStep {
+	if totalSteps <= 0 {
+		return []pendingAgentStep{}
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	steps := make([]pendingAgentStep, 0, totalSteps)
+	for i := 1; i <= totalSteps; i++ {
+		steps = append(steps, pendingAgentStep{
+			ID:          newStepID(),
+			StepNumber:  i,
+			Credits:     0,
+			ChildRunIDs: []string{},
+			MessageID:   nil,
+			Status:      "completed",
+			StartTime:   now,
+		})
+	}
+	return steps
+}
+
+// newStepID mints a random UUIDv4 (the ledger schema requires a uuid).
+func newStepID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Extremely unlikely; a zero-filled uuid still parses.
+	} else {
+		b[6] = (b[6] & 0x0f) | 0x40
+		b[8] = (b[8] & 0x3f) | 0x80
+	}
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
 func (c *Client) FinishRun(ctx context.Context, token, userID, runID string, totalSteps int) error {
 	payload, err := json.Marshal(map[string]any{
 		"action":        "FINISH",
@@ -74,7 +122,7 @@ func (c *Client) FinishRun(ctx context.Context, token, userID, runID string, tot
 		"totalSteps":    totalSteps,
 		"directCredits": 0,
 		"totalCredits":  0,
-		"steps":         []any{},
+		"steps":         buildPendingSteps(totalSteps),
 	})
 	if err != nil {
 		return err

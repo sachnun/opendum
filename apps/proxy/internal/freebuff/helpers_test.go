@@ -38,10 +38,68 @@ func TestIsBannedMessage(t *testing.T) {
 			t.Errorf("isBannedMessage(%q) = false, want true", message)
 		}
 	}
+	// Third-party-client suspension arrives as a plain-text error body, so it
+	// must be detected by substring rather than by the status marker.
+	suspended := `{"error":"account_suspended","message":"Your account has been suspended for using a third-party client or proxy to access Freebuff."}`
+	if !isBannedMessage(suspended) {
+		t.Errorf("isBannedMessage(account_suspended body) = false, want true")
+	}
 	for _, message := range []string{"", "rate limited", "model unavailable"} {
 		if isBannedMessage(message) {
 			t.Errorf("isBannedMessage(%q) = true, want false", message)
 		}
+	}
+}
+
+func TestHasApprovedFreeTierTool(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		tools []any
+		want  bool
+	}{
+		{"empty", nil, false},
+		{"custom tools only", []any{testTool("bash"), testTool("read")}, false},
+		{"signature name without schema", []any{testTool("read_files")}, false},
+		{"signature name with foreign schema", []any{foreignSchemaTool("read_files", "file_path")}, false},
+		{"genuine among customs", []any{testTool("bash"), genuineTool("read_files")}, true},
+		{"genuine alone", []any{genuineTool("set_output")}, true},
+		{"non-map entry ignored", []any{"junk", genuineTool("read_files")}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hasApprovedFreeTierTool(tt.tools); got != tt.want {
+				t.Fatalf("hasApprovedFreeTierTool() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// testTool is a bare tool with an empty parameter schema.
+func testTool(name string) map[string]any {
+	return map[string]any{
+		"type": "function",
+		"function": map[string]any{
+			"name":        name,
+			"description": "d",
+			"parameters":  map[string]any{"type": "object"},
+		},
+	}
+}
+
+// foreignSchemaTool is a signature name carrying another harness's parameter
+// names, the shape the upstream gate rejects.
+func foreignSchemaTool(name, property string) map[string]any {
+	return map[string]any{
+		"type": "function",
+		"function": map[string]any{
+			"name":        name,
+			"description": "d",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{property: map[string]any{"type": "string"}},
+			},
+		},
 	}
 }
 
