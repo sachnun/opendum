@@ -556,36 +556,15 @@ func (p googleCodeAssistProvider) requestedGemini3ThinkingLevel(model string, bo
 	return ""
 }
 
-const antigravityOpusMaxOutputTokens = 64000
-
 func (p googleCodeAssistProvider) normalizeBodyForModel(body map[string]any, model string) map[string]any {
 	out := cloneAnyMap(body)
 	delete(out, "logit_bias")
-	p.expandAntigravityOpusMaxTokens(out, model)
 	if providerConfigBool(p.registry, model, p.name, "top_p_min_095") {
 		if topP, ok := numberAsFloat(out["top_p"]); ok && topP < 0.95 {
 			delete(out, "top_p")
 		}
 	}
 	return out
-}
-
-// Antigravity counts thinking inside maxOutputTokens. On opus the client's cap is
-// its answer budget, so double it and keep the extra for reasoning: the thinking
-// budget is then clamped to the original cap further down the pipeline.
-func (p googleCodeAssistProvider) expandAntigravityOpusMaxTokens(body map[string]any, model string) {
-	if p.name != "antigravity" || !strings.Contains(strings.ToLower(model), "opus") {
-		return
-	}
-	maxTokens, ok := numberAsFloat(body["max_tokens"])
-	if !ok || maxTokens <= 0 {
-		return
-	}
-	doubled := maxTokens * 2
-	if doubled > antigravityOpusMaxOutputTokens {
-		doubled = antigravityOpusMaxOutputTokens
-	}
-	body["max_tokens"] = doubled
 }
 
 func (p googleCodeAssistProvider) endpointsOrDefault() []string {

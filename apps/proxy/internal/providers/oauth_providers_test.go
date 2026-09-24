@@ -620,44 +620,6 @@ func TestAntigravityGemini3HonorsClientMaxTokens(t *testing.T) {
 	}
 }
 
-func TestAntigravityOpusDoublesClientMaxTokens(t *testing.T) {
-	registry := testModelsRegistry(t)
-	provider := antigravityProvider{registry: registry}.delegate()
-	body := map[string]any{
-		"model":      "claude-opus-4-6",
-		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
-		"max_tokens": 3000,
-	}
-	resolved := provider.resolveModel(stringValue(body["model"]))
-	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
-	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
-	generation, _ := payload["generationConfig"].(map[string]any)
-	if got := numberFromAny(generation["maxOutputTokens"]); got != 6000 {
-		t.Fatalf("maxOutputTokens = %v, want 6000 (client cap doubled): %#v", got, generation)
-	}
-	thinking, _ := generation["thinkingConfig"].(map[string]any)
-	if got := numberFromAny(thinking["thinking_budget"]); got != 3000 {
-		t.Fatalf("thinking_budget = %v, want the original 3000 cap: %#v", got, thinking)
-	}
-}
-
-func TestAntigravityOpusMaxTokensStaysBounded(t *testing.T) {
-	registry := testModelsRegistry(t)
-	provider := antigravityProvider{registry: registry}.delegate()
-	body := map[string]any{
-		"model":      "claude-opus-4-6",
-		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
-		"max_tokens": 64000,
-	}
-	resolved := provider.resolveModel(stringValue(body["model"]))
-	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
-	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
-	generation, _ := payload["generationConfig"].(map[string]any)
-	if got := numberFromAny(generation["maxOutputTokens"]); got != 64000 {
-		t.Fatalf("maxOutputTokens = %v, want 64000 (capped at the upstream limit)", got)
-	}
-}
-
 func TestCodexExtractAccountIDFromJWT(t *testing.T) {
 	token := "x." + base64.RawURLEncoding.EncodeToString([]byte(`{"https://api.openai.com/auth":{"organizations":[{"id":"org_1","is_default":true}]}}`)) + ".y"
 	if got := extractAccountIDFromJWT(token); got != "org_1" {
