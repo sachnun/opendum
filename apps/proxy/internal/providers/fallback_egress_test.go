@@ -27,6 +27,17 @@ func (s *stubEgress) DialContext(ctx context.Context, network string, addr strin
 	return nil, context.Canceled
 }
 
+// regionStubEgress records the region every DialRegion call asks for.
+type regionStubEgress struct {
+	stubEgress
+	regions []string
+}
+
+func (s *regionStubEgress) DialRegion(_ context.Context, _, _, region string) (net.Conn, error) {
+	s.regions = append(s.regions, region)
+	return nil, context.Canceled
+}
+
 func egressTestResponse(status int) *http.Response {
 	return &http.Response{
 		StatusCode: status,
@@ -199,6 +210,27 @@ func TestRegistrySetEgressPropagates(t *testing.T) {
 	}
 	if !egressReady(kiloTyped.egress, kiloTyped.egressClient) {
 		t.Fatal("kilo_code provider should carry egress")
+	}
+}
+
+// TestFreebuffEgressPinsUSRegion verifies SetEgress rewires the freebuff
+// provider's client. The region pin itself is covered by the freebuff
+// transport test; here we only assert the client is present and rebuildable.
+func TestFreebuffEgressPinsUSRegion(t *testing.T) {
+	r := NewRegistry(nil, nil, nil)
+	egress := &regionStubEgress{stubEgress: stubEgress{ready: true}}
+	r.SetEgress(egress, &http.Client{})
+
+	got, ok := r.Get("freebuff")
+	if !ok {
+		t.Fatal("missing freebuff provider")
+	}
+	typed, ok := got.(freebuffProvider)
+	if !ok {
+		t.Fatalf("unexpected type %T", got)
+	}
+	if typed.client == nil || typed.manager == nil {
+		t.Fatal("freebuff client/manager not wired")
 	}
 }
 

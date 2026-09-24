@@ -31,6 +31,14 @@ func newFreebuffProvider(registry *models.Registry, redisClient *redis.Client) f
 	return freebuffProvider{registry: registry, client: client, manager: freebuff.NewManager(client, redisClient)}
 }
 
+// withEgress points the provider's HTTP client at dial so every upstream
+// connection egresses through the psiphon tunnel. Freebuff is only served to
+// US clients, so the provider must not reach upstream from the host's own IP.
+func (p freebuffProvider) withEgress(dial freebuff.DialContextFunc) freebuffProvider {
+	p.client.SetDial(dial)
+	return p
+}
+
 func (p freebuffProvider) MakeRequest(ctx context.Context, _ *http.Client, credentials string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
 	model := strings.TrimPrefix(strings.TrimSpace(stringValue(body["model"])), freebuffProviderName+"/")
 	upstream := model

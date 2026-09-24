@@ -17,6 +17,7 @@ var envKeys = []string{
 	"MODELS_DIR",
 	"REQUEST_TIMEOUT_SECONDS",
 	"TOKEN_REFRESH_INTERVAL_SECONDS",
+	"PSIPHON_REGION",
 }
 
 func setEnv(t *testing.T, values map[string]string) {
@@ -61,6 +62,9 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	}
 	if cfg.ModelsDir != "/tmp/models" {
 		t.Errorf("ModelsDir = %q, want /tmp/models", cfg.ModelsDir)
+	}
+	if cfg.PsiphonRegion != "US" {
+		t.Errorf("PsiphonRegion = %q, want US", cfg.PsiphonRegion)
 	}
 }
 

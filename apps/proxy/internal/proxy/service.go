@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -43,6 +44,7 @@ type Service struct {
 	affinity         *sessionaffinity.Affinity
 	secret           string
 	client           *http.Client
+	freebuffClient   *http.Client
 	requestTimeout   time.Duration
 	quotaFetchers    map[string]quotaFetcher
 }
@@ -94,6 +96,22 @@ func newUpstreamClient() *http.Client {
 func (s *Service) SetEgress(egress providers.Egress, egressClient *http.Client) {
 	if s == nil {
 		return
+	}
+	if regional, ok := egress.(providers.RegionDialer); ok {
+		// Freebuff is US-only, so its quota polling must leave from a US exit
+		// rather than the host's own IP.
+		s.freebuffClient = &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return regional.DialRegion(ctx, network, addr, providers.FreebuffRegion)
+				},
+				ForceAttemptHTTP2:     false,
+				MaxIdleConns:          10,
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   15 * time.Second,
+				ResponseHeaderTimeout: 60 * time.Second,
+			},
+		}
 	}
 	if s.providerRegistry != nil {
 		s.providerRegistry.SetEgress(egress, egressClient)

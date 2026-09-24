@@ -42,7 +42,7 @@ func (s *Service) fetchFreebuffQuota(ctx context.Context, account appdb.Provider
 		"Accept":        "application/json",
 		"User-Agent":    freebuff.ClientUserAgent(),
 	}
-	result, err := s.getQuotaJSON(ctx, account, forceRefresh, "freebuff:session", http.MethodGet, freebuff.DefaultBaseURL+freebuffQuotaPath, headers, nil)
+	result, err := s.getQuotaJSONWithClient(ctx, account, forceRefresh, s.freebuffClient, "freebuff:session", http.MethodGet, freebuff.DefaultBaseURL+freebuffQuotaPath, headers, nil)
 	if err != nil {
 		return errorQuotaInfo(account, err.Error(), time.Now().UnixMilli())
 	}

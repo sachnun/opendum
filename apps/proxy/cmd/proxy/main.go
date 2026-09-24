@@ -50,11 +50,11 @@ func main() {
 
 	authSvc := auth.NewService(database, redisClient, registry)
 	proxySvc := proxy.NewService(database, redisClient, authSvc, registry, cfg.BetterAuthSecret, cfg.RequestTimeout)
-	egressPool := psiphon.NewPool(3)
+	egressPool := psiphon.NewPool(cfg.PsiphonRegion)
 	egressPool.Start(context.Background())
 	proxySvc.SetEgress(egressPool, egressPool.NewClient())
 	defer egressPool.Close()
-	slog.Info("Psiphon egress pool warming", "tunnels", 3)
+	slog.Info("Psiphon egress pool warming", "region", egressPool.Preferred())
 	refreshCtx, stopTokenRefresher := context.WithCancel(context.Background())
 	defer stopTokenRefresher()
 	if cfg.TokenRefreshInterval > 0 {

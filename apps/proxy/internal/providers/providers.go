@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"regexp"
 	"sort"
@@ -106,6 +107,15 @@ func (r *Registry) SetEgress(egress Egress, egressClient *http.Client) {
 			typed.egress = egress
 			typed.egressClient = egressClient
 			r.providers["kilo_code"] = typed
+		}
+	}
+	if existing, ok := r.providers["freebuff"]; ok {
+		if typed, ok := existing.(freebuffProvider); ok {
+			if regional, ok := egress.(RegionDialer); ok {
+				r.providers["freebuff"] = typed.withEgress(func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return regional.DialRegion(ctx, network, addr, FreebuffRegion)
+				})
+			}
 		}
 	}
 }

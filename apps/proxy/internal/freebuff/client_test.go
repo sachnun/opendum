@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -19,6 +21,26 @@ func TestNewClientDefaultsAndTrims(t *testing.T) {
 	}
 	if client := NewClient(" https://example.test/ "); client.baseURL != "https://example.test" {
 		t.Fatalf("baseURL = %q, want trimmed", client.baseURL)
+	}
+}
+
+// TestSetDialRoutesConnections verifies the dialer passed to SetDial opens the
+// TCP connection the TLS handshake runs over, which is how the provider pins
+// freebuff traffic to the US psiphon egress.
+func TestSetDialRoutesConnections(t *testing.T) {
+	t.Parallel()
+	var dialed atomic.Int32
+	client := NewClient("https://example.test")
+	client.SetDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialed.Add(1)
+		return nil, errors.New("dial blocked")
+	})
+	_, err := client.http.Get("https://example.test/")
+	if err == nil {
+		t.Fatal("expected the custom dialer to fail the request")
+	}
+	if dialed.Load() == 0 {
+		t.Fatal("custom dialer was not used")
 	}
 }
 

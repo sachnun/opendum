@@ -16,8 +16,16 @@ const (
 	chatUserAgent      = "ai-sdk/openai-compatible/3.0.25/codebuff"
 )
 
-func newTransport() http.RoundTripper {
-	return &protoDispatchTransport{h1: newH1Transport(), h2: newH2Transport()}
+// DialContextFunc opens the TCP connection the TLS handshake runs over. The
+// freebuff provider supplies one that routes through the psiphon egress so
+// upstream sees a US exit; a nil func dials directly.
+type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+
+func newTransport(dial DialContextFunc) http.RoundTripper {
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	return &protoDispatchTransport{h1: newH1Transport(dial), h2: newH2Transport(dial)}
 }
 
 type protoDispatchTransport struct {
@@ -55,29 +63,28 @@ func retryableH2Request(req *http.Request, err error) bool {
 	}
 }
 
-func newH2Transport() http.RoundTripper {
-	return &http2.Transport{DialTLSContext: utlsDialTLS}
+func newH2Transport(dial DialContextFunc) http.RoundTripper {
+	return &http2.Transport{DialTLSContext: func(ctx context.Context, network, addr string, cfg *cryptoTLS.Config) (net.Conn, error) {
+		return utlsDialConn(ctx, network, addr, cfg, dial)
+	}}
 }
 
-func newH1Transport() *http.Transport {
+func newH1Transport(dial DialContextFunc) *http.Transport {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.Proxy = nil
 	tr.DialContext = nil
-	tr.DialTLSContext = utlsDialTLSH1
+	tr.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return utlsDialConn(ctx, network, addr, nil, dial)
+	}
 	tr.ForceAttemptHTTP2 = false
 	return tr
 }
 
-func utlsDialTLSH1(ctx context.Context, network, addr string) (net.Conn, error) {
-	return utlsDialConn(ctx, network, addr, nil)
-}
-
-func utlsDialTLS(ctx context.Context, network, addr string, cfg *cryptoTLS.Config) (net.Conn, error) {
-	return utlsDialConn(ctx, network, addr, cfg)
-}
-
-func utlsDialConn(ctx context.Context, network, addr string, opt *cryptoTLS.Config) (net.Conn, error) {
-	conn, err := (&net.Dialer{}).DialContext(ctx, network, addr)
+func utlsDialConn(ctx context.Context, network, addr string, opt *cryptoTLS.Config, dial DialContextFunc) (net.Conn, error) {
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	conn, err := dial(ctx, network, addr)
 	if err != nil {
 		return nil, err
 	}

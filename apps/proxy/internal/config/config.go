@@ -23,6 +23,10 @@ type Config struct {
 	IdleTimeout          time.Duration
 	RequestTimeout       time.Duration
 	TokenRefreshInterval time.Duration
+	// PsiphonRegion is the ISO 3166-1 alpha-2 egress region the psiphon pool
+	// prefers. Some upstream providers are only reachable from the US, so it
+	// defaults to US.
+	PsiphonRegion string
 }
 
 func Load() (Config, error) {
@@ -51,6 +55,7 @@ func Load() (Config, error) {
 		IdleTimeout:          120 * time.Second,
 		RequestTimeout:       durationSeconds("REQUEST_TIMEOUT_SECONDS", 90*time.Second),
 		TokenRefreshInterval: durationSeconds("TOKEN_REFRESH_INTERVAL_SECONDS", 10*time.Minute),
+		PsiphonRegion:        getenv("PSIPHON_REGION", "US"),
 	}
 
 	if cfg.DatabaseURL == "" {

@@ -27,14 +27,29 @@ type Client struct {
 }
 
 func NewClient(baseURL string) *Client {
+	return NewClientWithDialer(baseURL, nil)
+}
+
+// NewClientWithDialer builds a client whose TCP connections go through dial
+// before the utls handshake. A nil dialer connects directly; the freebuff
+// provider passes the psiphon egress dialer so upstream sees a US exit.
+func NewClientWithDialer(baseURL string, dial DialContextFunc) *Client {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
-	return &Client{
-		baseURL: baseURL,
-		http:    &http.Client{Transport: newTransport(), Timeout: 0},
+	client := &Client{baseURL: baseURL}
+	client.SetDial(dial)
+	return client
+}
+
+// SetDial swaps the transport so subsequent requests connect through dial.
+// The provider installs the psiphon egress dialer once it is available.
+func (c *Client) SetDial(dial DialContextFunc) {
+	if c == nil {
+		return
 	}
+	c.http = &http.Client{Transport: newTransport(dial), Timeout: 0}
 }
 
 func (c *Client) StartRun(ctx context.Context, token, userID, agentID string) (string, error) {

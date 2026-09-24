@@ -13,6 +13,18 @@ type Egress interface {
 	Rotate(ctx context.Context)
 }
 
+// RegionDialer is an Egress that can dial through a specific egress country.
+// Providers that upstream only serves from one region (freebuff is US-only)
+// require it so their traffic cannot leak out of a different exit.
+type RegionDialer interface {
+	DialRegion(ctx context.Context, network string, addr string, region string) (net.Conn, error)
+}
+
+// FreebuffRegion is the only region the freebuff upstream serves. Providers
+// and quota pollers that talk to freebuff must egress from here so their
+// traffic cannot leak out of a different exit.
+const FreebuffRegion = "US"
+
 const (
 	egressMaxTries       = 3
 	egressForbiddenTries = 2

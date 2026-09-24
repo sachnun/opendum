@@ -252,6 +252,13 @@ func formatTimeUntilResetISO(resetISO *string) *string {
 
 func stringPtr(value string) *string { return &value }
 func (s *Service) getQuotaJSON(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool, cacheName, method, target string, headers map[string]string, body any) (quotaJSONResult, error) {
+	return s.getQuotaJSONWithClient(ctx, account, forceRefresh, s.client, cacheName, method, target, headers, body)
+}
+
+func (s *Service) getQuotaJSONWithClient(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool, client *http.Client, cacheName, method, target string, headers map[string]string, body any) (quotaJSONResult, error) {
+	if client == nil {
+		client = s.client
+	}
 	encodedBody, err := encodeQuotaBody(body)
 	if err != nil {
 		return quotaJSONResult{}, err
@@ -272,7 +279,7 @@ func (s *Service) getQuotaJSON(ctx context.Context, account appdb.ProviderAccoun
 		}
 	}
 
-	resp, raw, err := getJSON(ctx, s.client, method, target, headers, body)
+	resp, raw, err := getJSON(ctx, client, method, target, headers, body)
 	return quotaJSONResult{Response: resp, Raw: raw, CacheKey: cacheKey}, err
 }
 
