@@ -93,3 +93,12 @@ func ProviderAccountFromForced(row GetForcedAccountRow) ProviderAccount {
 		CreatedAt:     row.CreatedAt,
 	}
 }
+
+func AccountHealthStateFromList(row ListAccountHealthStatesRow) GetAccountHealthStateRow {
+	return GetAccountHealthStateRow{
+		ID:                row.ID,
+		Status:            row.Status,
+		DisabledUntil:     row.DisabledUntil,
+		ConsecutiveErrors: row.ConsecutiveErrors,
+	}
+}

@@ -131,8 +131,8 @@ func TestAnthropicStreamTrackerPreservesCachedTokens(t *testing.T) {
 		flusher: fakeFlusher{},
 	}
 
-	tracker.Process("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"}}]}\n\n")
-	tracker.Process("data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":800,\"completion_tokens\":40,\"prompt_tokens_details\":{\"cached_tokens\":650}}}\n\n")
+	tracker.Process([]byte("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"}}]}\n\n"))
+	tracker.Process([]byte("data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":800,\"completion_tokens\":40,\"prompt_tokens_details\":{\"cached_tokens\":650}}}\n\n"))
 	tracker.Finish()
 
 	var deltaUsage map[string]any

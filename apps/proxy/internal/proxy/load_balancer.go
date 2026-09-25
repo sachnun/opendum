@@ -248,21 +248,36 @@ func (s *Service) getNextSharedAccount(ctx context.Context, userID, model string
 func (s *Service) pickHealthyAccount(ctx context.Context, prioritized []appdb.ProviderAccount, model string) (*appdb.ProviderAccount, bool, error) {
 	now := time.Now()
 	lookupKeys := s.registry.LookupKeys(model)
+	states, err := s.loadAccountsHealthStates(ctx, prioritized)
+	if err != nil {
+		return nil, true, err
+	}
+	probed := make([]string, 0, len(prioritized))
 	selected, has, err := chooseAccount(prioritized, func(account appdb.ProviderAccount) (bool, string, bool, error) {
 		if isSyntheticProviderAccountID(account.ID) {
 			return false, "", false, nil
 		}
-		coolingDown, err := s.refreshAccountHealthFromModels(ctx, account.ID, now)
-		if err != nil || coolingDown {
-			return coolingDown, "", false, err
+		state, ok := states[account.ID]
+		if !ok {
+			return false, "", false, nil
 		}
-		health, err := s.getHealthByAccount(ctx, []string{account.ID}, lookupKeys)
-		if err != nil {
-			return false, "", false, err
+		probed = append(probed, account.ID)
+		view := state.view(now, lookupKeys)
+		if view.coolingDown {
+			return true, "", false, nil
 		}
-		row, ok := health[account.ID]
-		return false, row.Status, ok, nil
+		return false, view.status, view.hasHealth, nil
 	})
+	for _, accountID := range probed {
+		state, ok := states[accountID]
+		if !ok {
+			continue
+		}
+		if _, normalizeErr := s.normalizeAccountHealth(ctx, state, now); normalizeErr != nil {
+			err = normalizeErr
+			break
+		}
+	}
 	if err != nil || !has || selected == nil {
 		return nil, true, err
 	}
@@ -302,22 +317,93 @@ func (s *Service) bumpAccountRequestCount(ctx context.Context, accountID string,
 	_ = s.db.BumpAccountRequestCount(ctx, appdb.BumpAccountRequestCountParams{LastUsedAt: &usedAt, ID: accountID})
 }
 
-func (s *Service) getHealthByAccount(ctx context.Context, accountIDs, modelKeys []string) (map[string]appdb.ProviderAccountModelHealth, error) {
-	result := map[string]appdb.ProviderAccountModelHealth{}
-	if len(accountIDs) == 0 || len(modelKeys) == 0 {
-		return result, nil
+// accountHealthState is the account row plus every per-model health row,
+// loaded in two queries so account selection does not issue a query per
+// candidate account.
+type accountHealthState struct {
+	account appdb.GetAccountHealthStateRow
+	rows    []appdb.ProviderAccountModelHealth
+}
+
+func (state accountHealthState) applyCooldownRecovery(now time.Time) bool {
+	return state.account.Status == "failed" && state.account.DisabledUntil != nil && !state.account.DisabledUntil.After(now)
+}
+
+// view normalizes the account's per-model health once and derives both the
+// cooldown state and the status for the requested model keys.
+type accountHealthView struct {
+	coolingDown bool
+	status      string
+	hasHealth   bool
+}
+
+func (state accountHealthState) view(now time.Time, modelKeys []string) accountHealthView {
+	recover := state.applyCooldownRecovery(now)
+	total := 0
+	status := ""
+	hasHealth := false
+	for _, row := range state.rows {
+		count := effectiveUnhealthyCount(row, now)
+		if recover {
+			count = cooldownRecoveryCount(count)
+		}
+		total += count
+		if hasHealth {
+			continue
+		}
+		for _, key := range modelKeys {
+			if key == row.Model {
+				status, hasHealth = modelHealthStatus(count), true
+				break
+			}
+		}
 	}
-	rows, err := s.db.ListModelHealthByAccounts(ctx, appdb.ListModelHealthByAccountsParams{
-		AccountIds: appdb.NonNilStrings(accountIDs),
-		Models:     appdb.NonNilStrings(modelKeys),
-	})
+	coolingDown := total >= accountCooldownUnhealthyThreshold
+	if state.account.DisabledUntil != nil && state.account.DisabledUntil.After(now) {
+		coolingDown = true
+	}
+	return accountHealthView{coolingDown: coolingDown, status: status, hasHealth: hasHealth}
+}
+
+func (s *Service) loadAccountHealthState(ctx context.Context, accountID string) (accountHealthState, error) {
+	account, err := s.db.GetAccountHealthState(ctx, accountID)
 	if err != nil {
-		return result, err
+		return accountHealthState{}, err
 	}
-	for _, row := range rows {
-		result[row.ProviderAccountID] = row
+	rows, err := s.db.ListModelHealthByAccount(ctx, accountID)
+	if err != nil {
+		return accountHealthState{}, err
 	}
-	return result, nil
+	return accountHealthState{account: account, rows: rows}, nil
+}
+
+func (s *Service) loadAccountsHealthStates(ctx context.Context, accounts []appdb.ProviderAccount) (map[string]accountHealthState, error) {
+	states := map[string]accountHealthState{}
+	ids := make([]string, 0, len(accounts))
+	for _, account := range accounts {
+		if !isSyntheticProviderAccountID(account.ID) {
+			ids = append(ids, account.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return states, nil
+	}
+	accountRows, err := s.db.ListAccountHealthStates(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	healthRows, err := s.db.ListModelHealthByAccountIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	rowsByAccount := map[string][]appdb.ProviderAccountModelHealth{}
+	for _, row := range healthRows {
+		rowsByAccount[row.ProviderAccountID] = append(rowsByAccount[row.ProviderAccountID], row)
+	}
+	for _, row := range accountRows {
+		states[row.ID] = accountHealthState{account: appdb.AccountHealthStateFromList(row), rows: rowsByAccount[row.ID]}
+	}
+	return states, nil
 }
 
 func latestHealthRequestAt(row appdb.ProviderAccountModelHealth) *time.Time {
@@ -392,18 +478,19 @@ func successRecoveryCount(row appdb.ProviderAccountModelHealth, now time.Time) i
 	return count
 }
 
-func (s *Service) normalizeModelHealthRows(ctx context.Context, rows []appdb.ProviderAccountModelHealth, now time.Time, applyCooldownRecovery bool) (int, error) {
+func (s *Service) persistAccountHealth(ctx context.Context, state accountHealthState, now time.Time) (int, error) {
+	recover := state.applyCooldownRecovery(now)
 	total := 0
-	for _, row := range rows {
+	for _, row := range state.rows {
 		count := effectiveUnhealthyCount(row, now)
-		if applyCooldownRecovery {
+		if recover {
 			count = cooldownRecoveryCount(count)
 		}
 		status := modelHealthStatus(count)
 		statusChanged := status != row.Status
 		total += count
 
-		if count == row.ConsecutiveErrors && !statusChanged && !applyCooldownRecovery {
+		if count == row.ConsecutiveErrors && !statusChanged && !recover {
 			continue
 		}
 		if row.Status == "failed" || statusChanged {
@@ -430,23 +517,9 @@ func (s *Service) normalizeModelHealthRows(ctx context.Context, rows []appdb.Pro
 	return total, nil
 }
 
-func (s *Service) refreshAccountHealthFromModels(ctx context.Context, accountID string, now time.Time) (bool, error) {
-	if isSyntheticProviderAccountID(accountID) {
-		return false, nil
-	}
-
-	account, err := s.db.GetAccountHealthState(ctx, accountID)
-	if err != nil {
-		return false, err
-	}
-
-	rows, err := s.db.ListModelHealthByAccount(ctx, accountID)
-	if err != nil {
-		return false, err
-	}
-
-	applyCooldownRecovery := account.Status == "failed" && account.DisabledUntil != nil && !account.DisabledUntil.After(now)
-	total, err := s.normalizeModelHealthRows(ctx, rows, now, applyCooldownRecovery)
+func (s *Service) normalizeAccountHealth(ctx context.Context, state accountHealthState, now time.Time) (bool, error) {
+	account := state.account
+	total, err := s.persistAccountHealth(ctx, state, now)
 	if err != nil {
 		return false, err
 	}
@@ -457,7 +530,7 @@ func (s *Service) refreshAccountHealthFromModels(ctx context.Context, accountID 
 				ConsecutiveErrors: total,
 				Status:            "failed",
 				StatusChangedAt:   &now,
-				ID:                accountID,
+				ID:                account.ID,
 			})
 			return true, err
 		}
@@ -471,7 +544,7 @@ func (s *Service) refreshAccountHealthFromModels(ctx context.Context, accountID 
 			StatusChangedAt:   &now,
 			ConsecutiveErrors: total,
 			DisabledUntil:     &cooldownUntil,
-			ID:                accountID,
+			ID:                account.ID,
 		})
 		return true, err
 	}
@@ -481,12 +554,23 @@ func (s *Service) refreshAccountHealthFromModels(ctx context.Context, accountID 
 			Status:            "active",
 			StatusChangedAt:   &now,
 			ConsecutiveErrors: total,
-			ID:                accountID,
+			ID:                account.ID,
 		})
 		return false, err
 	}
 
 	return false, nil
+}
+
+func (s *Service) refreshAccountHealthFromModels(ctx context.Context, accountID string, now time.Time) (bool, error) {
+	if isSyntheticProviderAccountID(accountID) {
+		return false, nil
+	}
+	state, err := s.loadAccountHealthState(ctx, accountID)
+	if err != nil {
+		return false, err
+	}
+	return s.normalizeAccountHealth(ctx, state, now)
 }
 
 func (s *Service) validateForcedAccount(ctx context.Context, userID string, validation auth.ModelValidationResult, forcedAccountID *string, accountAccess auth.AccountAccess, allowInactive bool) (*appdb.ProviderAccount, *routeError) {
@@ -768,27 +852,49 @@ func (s *Service) markAccountsRecoveredByRotation(ctx context.Context, failures 
 }
 
 func sortAccountsByProviderPriority(accounts []appdb.ProviderAccount, priority []string) {
-	order := map[string]int{}
+	if len(accounts) < 2 {
+		return
+	}
+	order := make(map[string]int, len(priority))
 	for i, provider := range priority {
 		order[provider] = i
 	}
-	sort.SliceStable(accounts, func(i, j int) bool {
-		ai, aok := order[accounts[i].Provider]
-		if !aok {
-			ai = 1 << 30
-		}
-		aj, aok := order[accounts[j].Provider]
-		if !aok {
-			aj = 1 << 30
-		}
-		if ai != aj {
-			return ai < aj
-		}
-		if accounts[i].Status != accounts[j].Status {
-			return accounts[i].Status < accounts[j].Status
-		}
-		return nullableTimeBefore(accounts[i].LastUsedAt, accounts[j].LastUsedAt)
-	})
+	// Resolve each provider rank once up front: the comparator then avoids a
+	// map lookup per comparison.
+	ranks := make([]int, len(accounts))
+	for i, account := range accounts {
+		ranks[i] = providerOrder(order, account.Provider)
+	}
+	sort.Stable(rankedAccounts{accounts: accounts, ranks: ranks})
+}
+
+type rankedAccounts struct {
+	accounts []appdb.ProviderAccount
+	ranks    []int
+}
+
+func (r rankedAccounts) Len() int { return len(r.accounts) }
+
+func (r rankedAccounts) Less(i, j int) bool {
+	if r.ranks[i] != r.ranks[j] {
+		return r.ranks[i] < r.ranks[j]
+	}
+	if r.accounts[i].Status != r.accounts[j].Status {
+		return r.accounts[i].Status < r.accounts[j].Status
+	}
+	return nullableTimeBefore(r.accounts[i].LastUsedAt, r.accounts[j].LastUsedAt)
+}
+
+func (r rankedAccounts) Swap(i, j int) {
+	r.accounts[i], r.accounts[j] = r.accounts[j], r.accounts[i]
+	r.ranks[i], r.ranks[j] = r.ranks[j], r.ranks[i]
+}
+
+func providerOrder(order map[string]int, provider string) int {
+	if rank, ok := order[provider]; ok {
+		return rank
+	}
+	return 1 << 30
 }
 
 func prioritizeAccounts(accounts []appdb.ProviderAccount, groupByProvider bool, priority []string) []appdb.ProviderAccount {

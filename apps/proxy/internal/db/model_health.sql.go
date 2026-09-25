@@ -136,6 +136,44 @@ func (q *Queries) InsertModelHealth(ctx context.Context, arg InsertModelHealthPa
 	return err
 }
 
+const listAccountHealthStates = `-- name: ListAccountHealthStates :many
+SELECT id, status, "disabledUntil", "consecutiveErrors"
+FROM provider_account
+WHERE id = ANY($1::text[])
+`
+
+type ListAccountHealthStatesRow struct {
+	ID                string
+	Status            string
+	DisabledUntil     *time.Time
+	ConsecutiveErrors int
+}
+
+func (q *Queries) ListAccountHealthStates(ctx context.Context, accountIds []string) ([]ListAccountHealthStatesRow, error) {
+	rows, err := q.db.Query(ctx, listAccountHealthStates, accountIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAccountHealthStatesRow{}
+	for rows.Next() {
+		var i ListAccountHealthStatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.DisabledUntil,
+			&i.ConsecutiveErrors,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listModelHealthByAccount = `-- name: ListModelHealthByAccount :many
 SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
@@ -177,20 +215,14 @@ func (q *Queries) ListModelHealthByAccount(ctx context.Context, provideraccounti
 	return items, nil
 }
 
-const listModelHealthByAccounts = `-- name: ListModelHealthByAccounts :many
+const listModelHealthByAccountIDs = `-- name: ListModelHealthByAccountIDs :many
 SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = ANY($1::text[])
-  AND model = ANY($2::text[])
 `
 
-type ListModelHealthByAccountsParams struct {
-	AccountIds []string
-	Models     []string
-}
-
-func (q *Queries) ListModelHealthByAccounts(ctx context.Context, arg ListModelHealthByAccountsParams) ([]ProviderAccountModelHealth, error) {
-	rows, err := q.db.Query(ctx, listModelHealthByAccounts, arg.AccountIds, arg.Models)
+func (q *Queries) ListModelHealthByAccountIDs(ctx context.Context, accountIds []string) ([]ProviderAccountModelHealth, error) {
+	rows, err := q.db.Query(ctx, listModelHealthByAccountIDs, accountIds)
 	if err != nil {
 		return nil, err
 	}

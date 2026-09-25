@@ -10,9 +10,19 @@ import (
 	"strings"
 )
 
+var (
+	healerDoneLine   = []byte("data: [DONE]")
+	healerDataPrefix = []byte("data: ")
+	healerChoicesKey = []byte(`"choices"`)
+	healerToolKey    = []byte(`"tool_calls"`)
+)
+
+const maxHealerLineBytes = 1 << 20
+
 type finishReasonHealer struct {
-	scanner           *bufio.Scanner
+	reader            *bufio.Reader
 	pending           []byte
+	offset            int
 	done              bool
 	sawChoices        bool
 	sawFinish         bool
@@ -23,56 +33,98 @@ type finishReasonHealer struct {
 }
 
 func newFinishReasonHealer(body io.Reader) *finishReasonHealer {
-	scanner := bufio.NewScanner(body)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	return &finishReasonHealer{scanner: scanner}
+	return &finishReasonHealer{reader: bufio.NewReaderSize(body, 64*1024)}
 }
 
 func (r *finishReasonHealer) Read(p []byte) (int, error) {
-	doneLine := []byte("data: [DONE]")
-
-	for len(r.pending) == 0 {
-		if r.done {
-			return 0, io.EOF
+	if r.offset == len(r.pending) {
+		if err := r.fill(); err != nil {
+			return 0, err
 		}
-		if !r.scanner.Scan() {
-			if err := r.scanner.Err(); err != nil {
-				return 0, err
-			}
-			r.done = true
-			r.appendMissingFinish(false)
-			if len(r.pending) == 0 {
-				return 0, io.EOF
-			}
-			continue
-		}
-		line := append([]byte(nil), r.scanner.Bytes()...)
-		r.trackLine(line)
-		if bytes.Equal(line, doneLine) && !r.sawFinish {
-			r.appendMissingFinish(true)
-			if len(r.pending) > 0 {
-				r.pending = append(r.pending, line...)
-				r.pending = append(r.pending, '\n')
-				continue
-			}
-		}
-		r.pending = append(r.pending, line...)
-		r.pending = append(r.pending, '\n')
 	}
-	n := copy(p, r.pending)
-	r.pending = r.pending[n:]
+	n := copy(p, r.pending[r.offset:])
+	r.offset += n
+	if r.offset == len(r.pending) {
+		r.pending = r.pending[:0]
+		r.offset = 0
+	}
 	return n, nil
 }
 
-func (r *finishReasonHealer) trackLine(line []byte) {
-	dataPrefix := []byte("data: ")
-	doneLine := []byte("data: [DONE]")
+func (r *finishReasonHealer) fill() error {
+	for r.offset == len(r.pending) {
+		if r.done {
+			return io.EOF
+		}
+		line, err := r.readLine()
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if len(line) > 0 {
+			r.trackLine(line)
+			if bytes.Equal(line, healerDoneLine) && !r.sawFinish {
+				r.appendMissingFinish(true)
+				if len(r.pending) > 0 {
+					r.pending = append(r.pending, line...)
+					r.pending = append(r.pending, '\n')
+					if err == io.EOF {
+						r.done = true
+					}
+					continue
+				}
+			}
+			r.pending = append(r.pending, line...)
+			r.pending = append(r.pending, '\n')
+		}
+		if err == io.EOF {
+			r.done = true
+			r.appendMissingFinish(false)
+			if len(r.pending) == 0 {
+				return io.EOF
+			}
+			return nil
+		}
+	}
+	return nil
+}
 
-	if !bytes.HasPrefix(line, dataPrefix) || bytes.Equal(line, doneLine) {
+// readLine returns one line without its trailing newline (and without a
+// trailing carriage return, matching bufio.ScanLines). The returned slice
+// aliases the reader buffer and is only valid until the next read, so callers
+// must copy anything they keep. A non-empty final line is returned together
+// with io.EOF, matching bufio.Scanner semantics.
+func (r *finishReasonHealer) readLine() ([]byte, error) {
+	line, err := r.reader.ReadSlice('\n')
+	if err == bufio.ErrBufferFull {
+		buffered := append([]byte(nil), line...)
+		for err == bufio.ErrBufferFull {
+			if len(buffered) > maxHealerLineBytes {
+				return nil, fmt.Errorf("finish reason healer: line exceeds %d bytes", maxHealerLineBytes)
+			}
+			line, err = r.reader.ReadSlice('\n')
+			buffered = append(buffered, line...)
+		}
+		return trimLineEnding(buffered), err
+	}
+	return trimLineEnding(line), err
+}
+
+func trimLineEnding(line []byte) []byte {
+	if len(line) > 0 && line[len(line)-1] == '\n' {
+		line = line[:len(line)-1]
+	}
+	if len(line) > 0 && line[len(line)-1] == '\r' {
+		line = line[:len(line)-1]
+	}
+	return line
+}
+
+func (r *finishReasonHealer) trackLine(line []byte) {
+	if !bytes.HasPrefix(line, healerDataPrefix) || bytes.Equal(line, healerDoneLine) {
 		return
 	}
-	jsonBytes := line[len(dataPrefix):]
-	if !bytes.Contains(jsonBytes, []byte(`"choices"`)) {
+	jsonBytes := line[len(healerDataPrefix):]
+	if !bytes.Contains(jsonBytes, healerChoicesKey) {
 		return
 	}
 	r.sawChoices = true
@@ -80,7 +132,7 @@ func (r *finishReasonHealer) trackLine(line []byte) {
 		r.sawFinish = true
 		return
 	}
-	if bytes.Contains(jsonBytes, []byte(`"tool_calls"`)) {
+	if bytes.Contains(jsonBytes, healerToolKey) {
 		r.sawToolCall = true
 		r.accumulateToolCallArgs(jsonBytes)
 	}
@@ -157,7 +209,7 @@ func (r *finishReasonHealer) appendMissingFinish(endedWithDone bool) {
 	r.pending = append(r.pending, fmt.Sprintf(`{"choices":[{"delta":{},"finish_reason":%q,"index":0}]}`, finishReason)...)
 	r.pending = append(r.pending, '\n')
 	if !endedWithDone {
-		r.pending = append(r.pending, `data: [DONE]`...)
+		r.pending = append(r.pending, healerDoneLine...)
 		r.pending = append(r.pending, '\n')
 	}
 	slog.Warn("healed upstream stream without finish_reason", "finish_reason", finishReason)

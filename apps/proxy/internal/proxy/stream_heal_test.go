@@ -94,3 +94,48 @@ func TestHealerLeavesNativeResponsesStreamUntouched(t *testing.T) {
 		t.Fatalf("native Responses stream must pass through untouched, got:\n%s", out)
 	}
 }
+
+func TestHealerHandlesFinalLineWithoutNewline(t *testing.T) {
+	body := "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"done\"},\"finish_reason\":null}]}"
+	out := drainHealer(t, body)
+	if !strings.Contains(out, "\"content\":\"done\"") {
+		t.Fatalf("final line without newline must be preserved, got:\n%s", out)
+	}
+	if !strings.HasSuffix(out, "\n") {
+		t.Fatalf("output must be newline terminated, got:\n%q", out)
+	}
+}
+
+func TestHealerHandlesCRLFStream(t *testing.T) {
+	body := "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\r\n" +
+		"data: [DONE]\r\n"
+	out := drainHealer(t, body)
+	if strings.Contains(out, "\r") {
+		t.Fatalf("carriage returns must be stripped, got:\n%q", out)
+	}
+	if !strings.Contains(out, "\"finish_reason\":\"stop\"") {
+		t.Fatalf("expected synthesized stop before [DONE], got:\n%s", out)
+	}
+}
+
+func TestHealerHandlesLongLineBeyondReaderBuffer(t *testing.T) {
+	content := strings.Repeat("x", 128*1024)
+	body := "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"" + content + "\"},\"finish_reason\":\"stop\"}]}\n"
+	out := drainHealer(t, body)
+	if !strings.Contains(out, content) {
+		t.Fatal("long line must survive the buffered reader")
+	}
+}
+
+func BenchmarkFinishReasonHealerPassthrough(b *testing.B) {
+	event := "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello world\"},\"finish_reason\":\"stop\"}]}\n"
+	body := strings.Repeat(event, 64) + "data: [DONE]\n"
+	b.SetBytes(int64(len(body)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := io.Copy(io.Discard, newFinishReasonHealer(strings.NewReader(body))); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
