@@ -31,6 +31,11 @@ const googleOAuthTokenEndpoint = "https://oauth2.googleapis.com/token"
 // the model cannot both think and answer within the client's output cap, so
 // thinking is disabled instead of silently raising max_tokens.
 const minThinkingBudget = 1024
+
+// defaultMaxOutputTokens is the output cap assumed when the client sends none.
+// Thinking must stay strictly below it or the upstream rejects the request with
+// "max_tokens must be greater than thinking.budget_tokens".
+const defaultMaxOutputTokens = 64000
 const antigravitySignatureCachePrefix = "opendum:thought-signature"
 const antigravitySignatureCacheTTL = 24 * time.Hour
 const antigravityClaudeBetaHeader = "interleaved-thinking-2025-05-14"
@@ -296,9 +301,7 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	p.normalizeCachedContent(payload)
 	delete(payload, "model")
 	ensureToolConfig(payload)
-	stripAntigravityMaxOutputTokens(payload)
 	p.normalizeThinkingConfig(payload, model)
-	stripAntigravityMaxOutputTokens(payload)
 	if providerConfigBool(p.registry, model, p.name, "strict_tool_schema") {
 		normalizeClaudeTools(payload)
 	} else {
@@ -311,21 +314,6 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
 	stripTrailingModelTurns(payload)
 	payload["sessionId"] = sessionID
-}
-
-// Antigravity rejects an explicit max output token cap: its upstream counts
-// thinking against the cap and errors or truncates. Drop the field so the
-// upstream picks its own default.
-func stripAntigravityMaxOutputTokens(payload map[string]any) {
-	generation, _ := payload["generationConfig"].(map[string]any)
-	if generation == nil {
-		return
-	}
-	delete(generation, "maxOutputTokens")
-	delete(generation, "max_output_tokens")
-	if len(generation) == 0 {
-		delete(payload, "generationConfig")
-	}
 }
 
 // Antigravity rejects a request that ends on a model turn: Gemini answers HTTP 400
@@ -435,10 +423,12 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 			maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"]))
 			if maxTokens == 0 {
 				// No client cap: raise the output budget so thinking has room.
-				generation["maxOutputTokens"] = 64000
+				maxTokens = defaultMaxOutputTokens
+				generation["maxOutputTokens"] = maxTokens
 				delete(generation, "max_output_tokens")
-			} else if maxTokens <= budget {
-				// The client capped output below the thinking budget. Never override
+			}
+			if maxTokens <= budget {
+				// The output cap is at or below the thinking budget. Never override
 				// the client's max_tokens; shrink the budget to leave room for the
 				// answer, and drop thinking entirely when the cap cannot fit a
 				// useful budget.
@@ -1543,7 +1533,7 @@ func (p googleCodeAssistProvider) ensureGemini3MaxOutputTokens(generation map[st
 	}
 	maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"]))
 	if maxTokens == 0 {
-		generation["maxOutputTokens"] = 64000
+		generation["maxOutputTokens"] = defaultMaxOutputTokens
 		delete(generation, "max_output_tokens")
 	}
 }

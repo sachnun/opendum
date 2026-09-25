@@ -567,7 +567,7 @@ func TestAntigravityGemini3ThinkingBudgetUsesThinkingLevel(t *testing.T) {
 	}
 }
 
-func TestAntigravityGemini3StripsMaxOutputTokens(t *testing.T) {
+func TestAntigravityGemini3RaisesMaxTokensAboveThinkingBudget(t *testing.T) {
 	registry := testModelsRegistry(t)
 	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
 		return strings.HasPrefix(cfg.Upstream, "gemini-3") && customMap(cfg, "thinking_budgets") != nil
@@ -584,11 +584,8 @@ func TestAntigravityGemini3StripsMaxOutputTokens(t *testing.T) {
 	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
 	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
 	generation := payload["generationConfig"].(map[string]any)
-	if _, ok := generation["maxOutputTokens"]; ok {
-		t.Fatalf("maxOutputTokens leaked: %#v", generation)
-	}
-	if _, ok := generation["max_output_tokens"]; ok {
-		t.Fatalf("max_output_tokens leaked: %#v", generation)
+	if generation["maxOutputTokens"] != 64000 {
+		t.Fatalf("maxOutputTokens = %#v, want 64000: %#v", generation["maxOutputTokens"], generation)
 	}
 	thinking := generation["thinkingConfig"].(map[string]any)
 	if thinking["thinkingLevel"] != "high" {
@@ -596,28 +593,52 @@ func TestAntigravityGemini3StripsMaxOutputTokens(t *testing.T) {
 	}
 }
 
-func TestAntigravityDropsClientMaxTokens(t *testing.T) {
+func TestAntigravityGemini3HonorsClientMaxTokens(t *testing.T) {
+	registry := testModelsRegistry(t)
+	model := firstProviderConfigModel(t, registry, "antigravity", func(cfg models.ProviderModelConfig) bool {
+		return strings.HasPrefix(cfg.Upstream, "gemini-3") && customMap(cfg, "thinking_budgets") != nil
+	})
+	provider := antigravityProvider{registry: registry}.delegate()
+
+	// A client cap below the thinking budget must not be silently overridden.
+	body := map[string]any{
+		"model":      model,
+		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens": 8192,
+	}
+	resolved := provider.resolveAntigravityGemini3ModelVariant(provider.resolveModel(stringValue(body["model"])), body)
+	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
+	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	if generation["maxOutputTokens"] != 8192 {
+		t.Fatalf("maxOutputTokens = %#v, want 8192 (client cap): %#v", generation["maxOutputTokens"], generation)
+	}
+	if thinking, ok := generation["thinkingConfig"].(map[string]any); ok {
+		if level := stringValue(thinking["thinkingLevel"]); level != "" {
+			t.Fatalf("thinkingLevel = %q, want empty because the cap cannot fit a budget", level)
+		}
+	}
+}
+
+func TestAntigravityClaudeKeepsMaxTokensAndClampsBudget(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()
 	body := map[string]any{
-		"model":      "claude-opus-4-6",
-		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
-		"max_tokens": 8192,
+		"model":           "claude-opus-4-6",
+		"messages":        []any{map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens":      64000,
+		"thinking_budget": 64000,
 	}
 	resolved := provider.resolveModel(stringValue(body["model"]))
 	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
 	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
 	generation := payload["generationConfig"].(map[string]any)
-	if _, ok := generation["maxOutputTokens"]; ok {
-		t.Fatalf("maxOutputTokens leaked: %#v", generation)
+	if got := numberFromAny(generation["maxOutputTokens"]); got != 64000 {
+		t.Fatalf("maxOutputTokens = %v, want the client's 64000 cap", got)
 	}
-	if _, ok := generation["max_output_tokens"]; ok {
-		t.Fatalf("max_output_tokens leaked: %#v", generation)
-	}
-	// The dropped cap must not clamp the thinking budget either.
 	thinking, ok := generation["thinkingConfig"].(map[string]any)
-	if !ok || numberFromAny(thinking["thinking_budget"]) != 16384 {
-		t.Fatalf("thinking = %#v, want the 16384 default budget", generation["thinkingConfig"])
+	if !ok || numberFromAny(thinking["thinking_budget"]) != 32000 {
+		t.Fatalf("thinking = %#v, want a 32000 budget below the cap", generation["thinkingConfig"])
 	}
 }
 
