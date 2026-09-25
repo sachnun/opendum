@@ -77,7 +77,7 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 
 	flusher, _ := w.(http.Flusher)
 	tracker := &openAIStreamUsageTracker{}
-	reader := bufio.NewReader(ctx.Response.Body)
+	reader := bufio.NewReader(newFinishReasonHealer(ctx.Response.Body))
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := reader.Read(buf)
