@@ -620,6 +620,26 @@ func TestAntigravityGemini3HonorsClientMaxTokens(t *testing.T) {
 	}
 }
 
+func TestAntigravityClaudeSkipsThinkingWhenNotRequested(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	body := map[string]any{
+		"model":      "claude-opus-4-6",
+		"messages":   []any{map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens": 8192,
+	}
+	resolved := provider.resolveModel(stringValue(body["model"]))
+	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
+	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	if _, ok := generation["thinkingConfig"]; ok {
+		t.Fatalf("thinkingConfig must not be injected: %#v", generation)
+	}
+	if got := numberFromAny(generation["maxOutputTokens"]); got != 8192 {
+		t.Fatalf("maxOutputTokens = %v, want the client's 8192 cap", got)
+	}
+}
+
 func TestAntigravityClaudeAddsBudgetToMaxTokens(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()

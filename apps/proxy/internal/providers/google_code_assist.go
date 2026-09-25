@@ -402,7 +402,15 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 	thinking := normalizedThinkingMap(rawThinking)
 	if providerConfigBool(p.registry, model, p.name, "thinking_model") {
 		if thinking == nil {
-			thinking = map[string]any{"thinkingBudget": 16384, "include_thoughts": true}
+			// Thinking is off unless the client asks for it: the "*-thinking"
+			// upstream name does not turn it on, and forcing a budget would make
+			// thinking share the client's max_tokens and truncate the answer.
+			delete(generation, "thinkingConfig")
+			if numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"])) == 0 {
+				generation["maxOutputTokens"] = defaultMaxOutputTokens
+				delete(generation, "max_output_tokens")
+			}
+			return
 		}
 		if thinking["include_thoughts"] == nil && thinking["includeThoughts"] == nil {
 			thinking["include_thoughts"] = true
