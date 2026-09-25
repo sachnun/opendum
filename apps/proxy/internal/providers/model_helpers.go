@@ -60,9 +60,9 @@ func providerConfigIntMap(registry *models.Registry, model, provider, key string
 	return out
 }
 
-func providerConfigValue(registry *models.Registry, model, provider, key string) (any, bool) {
+func providerModelConfig(registry *models.Registry, model, provider string) (models.ProviderModelConfig, bool) {
 	if registry == nil {
-		return nil, false
+		return models.ProviderModelConfig{}, false
 	}
 	cfg, ok := registry.ProviderModelConfig(model, provider)
 	if !ok && provider == "antigravity" {
@@ -70,6 +70,19 @@ func providerConfigValue(registry *models.Registry, model, provider, key string)
 			cfg, ok = registry.ProviderModelConfig(normalized, provider)
 		}
 	}
+	return cfg, ok
+}
+
+func providerMaxOutputTokens(registry *models.Registry, model, provider string) int {
+	cfg, ok := providerModelConfig(registry, model, provider)
+	if !ok {
+		return 0
+	}
+	return cfg.MaxOutputTokens
+}
+
+func providerConfigValue(registry *models.Registry, model, provider, key string) (any, bool) {
+	cfg, ok := providerModelConfig(registry, model, provider)
 	if !ok || cfg.Custom == nil {
 		return nil, false
 	}

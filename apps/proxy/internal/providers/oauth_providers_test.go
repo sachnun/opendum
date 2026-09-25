@@ -620,7 +620,29 @@ func TestAntigravityGemini3HonorsClientMaxTokens(t *testing.T) {
 	}
 }
 
-func TestAntigravityClaudeKeepsMaxTokensAndClampsBudget(t *testing.T) {
+func TestAntigravityClaudeAddsBudgetToMaxTokens(t *testing.T) {
+	registry := testModelsRegistry(t)
+	provider := antigravityProvider{registry: registry}.delegate()
+	body := map[string]any{
+		"model":           "claude-opus-4-6",
+		"messages":        []any{map[string]any{"role": "user", "content": "hi"}},
+		"max_tokens":      32000,
+		"thinking_budget": 30400,
+	}
+	resolved := provider.resolveModel(stringValue(body["model"]))
+	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
+	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
+	generation := payload["generationConfig"].(map[string]any)
+	if got := numberFromAny(generation["maxOutputTokens"]); got != 62400 {
+		t.Fatalf("maxOutputTokens = %v, want 62400 (answer cap plus thinking budget)", got)
+	}
+	thinking, ok := generation["thinkingConfig"].(map[string]any)
+	if !ok || numberFromAny(thinking["thinking_budget"]) != 30400 {
+		t.Fatalf("thinking = %#v, want the 30400 budget", generation["thinkingConfig"])
+	}
+}
+
+func TestAntigravityClaudeClampsMaxTokensToModelLimit(t *testing.T) {
 	registry := testModelsRegistry(t)
 	provider := antigravityProvider{registry: registry}.delegate()
 	body := map[string]any{
@@ -633,12 +655,12 @@ func TestAntigravityClaudeKeepsMaxTokensAndClampsBudget(t *testing.T) {
 	payload := openAIToGemini(provider.normalizeBodyForModel(body, resolved))
 	provider.transformAntigravityPayload(t.Context(), payload, resolved, "sess")
 	generation := payload["generationConfig"].(map[string]any)
-	if got := numberFromAny(generation["maxOutputTokens"]); got != 64000 {
-		t.Fatalf("maxOutputTokens = %v, want the client's 64000 cap", got)
+	if got := numberFromAny(generation["maxOutputTokens"]); got != 128000 {
+		t.Fatalf("maxOutputTokens = %v, want the 128000 model limit", got)
 	}
 	thinking, ok := generation["thinkingConfig"].(map[string]any)
-	if !ok || numberFromAny(thinking["thinking_budget"]) != 32000 {
-		t.Fatalf("thinking = %#v, want a 32000 budget below the cap", generation["thinkingConfig"])
+	if !ok || numberFromAny(thinking["thinking_budget"]) != 64000 {
+		t.Fatalf("thinking = %#v, want the 64000 budget", generation["thinkingConfig"])
 	}
 }
 

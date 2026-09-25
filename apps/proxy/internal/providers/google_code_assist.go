@@ -420,16 +420,21 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 		generation["thinkingConfig"] = finalThinking
 		budget := numberFromAny(defaultAny(thinking["thinkingBudget"], thinking["thinking_budget"]))
 		if budget > 0 {
-			maxTokens := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"]))
-			if maxTokens == 0 {
-				// No client cap: raise the output budget so thinking has room.
-				maxTokens = defaultMaxOutputTokens
-				generation["maxOutputTokens"] = maxTokens
-				delete(generation, "max_output_tokens")
+			// The upstream counts thinking inside maxOutputTokens, so keep the
+			// client's answer cap and add the thinking budget on top. Without the
+			// extra room a thinking-heavy request leaves almost no output budget
+			// and the stream stops early.
+			answer := numberFromAny(defaultAny(generation["maxOutputTokens"], generation["max_output_tokens"]))
+			if answer <= 0 {
+				answer = defaultMaxOutputTokens
+			}
+			maxTokens := answer + budget
+			if limit := providerMaxOutputTokens(p.registry, model, p.name); limit > 0 && maxTokens > limit {
+				maxTokens = limit
 			}
 			if maxTokens <= budget {
-				// The output cap is at or below the thinking budget. Never override
-				// the client's max_tokens; shrink the budget to leave room for the
+				// The cap cannot fit the thinking budget. Never override the
+				// client's max_tokens; shrink the budget to leave room for the
 				// answer, and drop thinking entirely when the cap cannot fit a
 				// useful budget.
 				clamped := maxTokens / 2
@@ -444,6 +449,8 @@ func (p googleCodeAssistProvider) normalizeThinkingConfig(payload map[string]any
 					finalThinking["thinking_budget"] = clamped
 				}
 			}
+			generation["maxOutputTokens"] = maxTokens
+			delete(generation, "max_output_tokens")
 		}
 		return
 	}
