@@ -45,22 +45,6 @@ func stripImageContent(payload map[string]any) {
 }
 
 func filterImageParts(content []any) []any {
-	firstImage := -1
-	for i, part := range content {
-		partMap, ok := part.(map[string]any)
-		if !ok {
-			continue
-		}
-		switch partMap["type"] {
-		case "image_url", "image", "input_image":
-			if firstImage < 0 {
-				firstImage = i
-			}
-		}
-	}
-	if firstImage < 0 {
-		return content
-	}
 	filtered := make([]any, 0, len(content))
 	for _, part := range content {
 		partMap, ok := part.(map[string]any)
@@ -68,8 +52,8 @@ func filterImageParts(content []any) []any {
 			filtered = append(filtered, part)
 			continue
 		}
-		switch partMap["type"] {
-		case "image_url", "image", "input_image":
+		typeValue, _ := partMap["type"].(string)
+		if typeValue == "image_url" || typeValue == "image" || typeValue == "input_image" {
 			continue
 		}
 		filtered = append(filtered, part)

@@ -94,7 +94,7 @@ func cloneMapExcept(input map[string]any, excluded ...string) map[string]any {
 	for _, key := range excluded {
 		exclude[key] = struct{}{}
 	}
-	out := make(map[string]any, len(input))
+	out := map[string]any{}
 	for key, value := range input {
 		if _, skip := exclude[key]; !skip {
 			out[key] = value
@@ -104,7 +104,7 @@ func cloneMapExcept(input map[string]any, excluded ...string) map[string]any {
 }
 
 func cloneMap(input map[string]any) map[string]any {
-	out := make(map[string]any, len(input))
+	out := map[string]any{}
 	for key, value := range input {
 		out[key] = value
 	}

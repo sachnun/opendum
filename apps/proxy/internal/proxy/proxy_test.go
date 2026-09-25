@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -585,7 +584,7 @@ func TestUsageReadsResponsesAPINestedUsage(t *testing.T) {
 	event := map[string]any{"type": "response.completed", "response": map[string]any{"usage": map[string]any{"input_tokens": 100, "output_tokens": 20, "input_tokens_details": map[string]any{"cached_tokens": 80, "cache_write_tokens": 10}}}}
 
 	tracker := &openAIStreamUsageTracker{}
-	tracker.Process(openAIStreamEvent(t, event))
+	tracker.Process([]byte(openAIStreamEvent(t, event)))
 	tracker.Flush()
 	if tracker.inputTokens != 100 || tracker.outputTokens != 20 || tracker.cachedTokens != 80 || tracker.cacheWriteTokens != 10 {
 		t.Fatalf("stream usage = (%d, %d, %d, %d), want (100, 20, 80, 10)", tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens)
@@ -728,7 +727,7 @@ func TestAnthropicStreamTrackerFinishReasonMappingAndFlush(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			tracker := &anthropicStreamTracker{writer: recorder}
 			chunk := openAIStreamEvent(t, map[string]any{"choices": []any{map[string]any{"delta": map[string]any{"content": "ok"}, "finish_reason": tt.finish}}})
-			tracker.Process(bytes.TrimSuffix(chunk, []byte("\n\n")))
+			tracker.Process(strings.TrimSuffix(chunk, "\n\n"))
 			tracker.Finish()
 
 			events := parseRecordedSSE(t, recorder.Body.String())
@@ -904,13 +903,13 @@ type recordedSSEEvent struct {
 	data  map[string]any
 }
 
-func openAIStreamEvent(t *testing.T, payload map[string]any) []byte {
+func openAIStreamEvent(t *testing.T, payload map[string]any) string {
 	t.Helper()
 	data, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatalf("marshal stream payload: %v", err)
 	}
-	return []byte("data: " + string(data) + "\n\n")
+	return "data: " + string(data) + "\n\n"
 }
 
 func parseRecordedSSE(t *testing.T, body string) []recordedSSEEvent {

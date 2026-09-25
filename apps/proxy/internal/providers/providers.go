@@ -302,7 +302,7 @@ func (p openAICompatibleProvider) postOnce(ctx context.Context, client *http.Cli
 }
 
 func (p openAICompatibleProvider) buildPayload(body map[string]any, model string, modelName string, stream bool) map[string]any {
-	payload := make(map[string]any, len(body)+2)
+	payload := map[string]any{}
 	for key, value := range body {
 		if _, ok := p.supportedParams[key]; ok && value != nil {
 			payload[key] = value

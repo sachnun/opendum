@@ -21,7 +21,7 @@ type openAIStreamUsageTracker struct {
 }
 
 func (t *openAIStreamUsageTracker) Process(chunk []byte) {
-	t.scanner.Process(chunk, t.processEvent)
+	t.scanner.Process(string(chunk), t.processEvent)
 }
 
 func (t *openAIStreamUsageTracker) Flush() {
@@ -30,7 +30,7 @@ func (t *openAIStreamUsageTracker) Flush() {
 
 func (t *openAIStreamUsageTracker) processEvent(event sseEvent) {
 	var parsed map[string]any
-	if err := json.Unmarshal(event.Data, &parsed); err != nil {
+	if err := json.Unmarshal([]byte(event.Data), &parsed); err != nil {
 		return
 	}
 	usage := usageObject(parsed)
