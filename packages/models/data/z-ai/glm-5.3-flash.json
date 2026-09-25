@@ -30,8 +30,8 @@
   },
   "cost": {
     "input": 0.225,
-    "output": 2.5,
-    "cacheRead": 0.1425,
+    "output": 0.7,
+    "cacheRead": 0.05,
     "cacheWrite": 0
   },
   "providerConfig": {
