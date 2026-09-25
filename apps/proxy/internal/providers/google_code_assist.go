@@ -296,7 +296,9 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	p.normalizeCachedContent(payload)
 	delete(payload, "model")
 	ensureToolConfig(payload)
+	stripAntigravityMaxOutputTokens(payload)
 	p.normalizeThinkingConfig(payload, model)
+	stripAntigravityMaxOutputTokens(payload)
 	if providerConfigBool(p.registry, model, p.name, "strict_tool_schema") {
 		normalizeClaudeTools(payload)
 	} else {
@@ -309,6 +311,21 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 	p.normalizeAntigravityContents(ctx, payload, model, sessionID)
 	stripTrailingModelTurns(payload)
 	payload["sessionId"] = sessionID
+}
+
+// Antigravity rejects an explicit max output token cap: its upstream counts
+// thinking against the cap and errors or truncates. Drop the field so the
+// upstream picks its own default.
+func stripAntigravityMaxOutputTokens(payload map[string]any) {
+	generation, _ := payload["generationConfig"].(map[string]any)
+	if generation == nil {
+		return
+	}
+	delete(generation, "maxOutputTokens")
+	delete(generation, "max_output_tokens")
+	if len(generation) == 0 {
+		delete(payload, "generationConfig")
+	}
 }
 
 // Antigravity rejects a request that ends on a model turn: Gemini answers HTTP 400
