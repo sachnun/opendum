@@ -2,9 +2,7 @@
   "providers": [
     "hyper",
     "workbuddy",
-    "perch",
-    "kilo_code",
-    "openrouter"
+    "perch"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -21,7 +19,7 @@
   },
   "limit": {
     "context": 1048576,
-    "output": 131072
+    "output": 32768
   },
   "cost": {
     "input": 3.248,
@@ -32,17 +30,6 @@
     "hyper": {
       "contextWindow": 1000000,
       "maxOutputTokens": 32768
-    },
-    "kilo_code": {
-      "upstream": "z-ai/glm-5.2:free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072,
-      "authless": true
-    },
-    "openrouter": {
-      "upstream": "z-ai/glm-5.2:free",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "glm-5-2",

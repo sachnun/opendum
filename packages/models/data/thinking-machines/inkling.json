@@ -33,7 +33,7 @@
   "providerConfig": {
     "hyper": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 65536
     },
     "openrouter": {
       "upstream": "thinkingmachines/inkling:free",

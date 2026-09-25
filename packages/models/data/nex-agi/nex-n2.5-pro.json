@@ -1,8 +1,5 @@
 {
-  "providers": [
-    "kilo_code",
-    "openrouter"
-  ],
+  "providers": [],
   "reasoning": true,
   "reasoning_effort": [
     "medium",
@@ -24,18 +21,5 @@
   "cost": {
     "input": 0,
     "output": 0
-  },
-  "providerConfig": {
-    "kilo_code": {
-      "upstream": "nex-agi/nex-n2.5-pro:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929,
-      "authless": true
-    },
-    "openrouter": {
-      "upstream": "nex-agi/nex-n2.5-pro:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929
-    }
   }
 }
