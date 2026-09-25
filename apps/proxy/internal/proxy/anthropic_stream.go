@@ -47,7 +47,7 @@ func (s *Service) anthropicStream(ctx responseContext) error {
 	for {
 		n, err := reader.Read(buf)
 		if n > 0 {
-			tracker.Process(string(buf[:n]))
+			tracker.Process(buf[:n])
 		}
 		if err != nil {
 			break
@@ -87,7 +87,7 @@ type anthropicToolBlock struct {
 	id    string
 }
 
-func (t *anthropicStreamTracker) Process(chunk string) {
+func (t *anthropicStreamTracker) Process(chunk []byte) {
 	t.scanner.Process(chunk, t.processEvent)
 }
 
@@ -97,7 +97,7 @@ func (t *anthropicStreamTracker) Flush() {
 
 func (t *anthropicStreamTracker) processEvent(event sseEvent) {
 	var parsed map[string]any
-	if json.Unmarshal([]byte(event.Data), &parsed) != nil {
+	if json.Unmarshal(event.Data, &parsed) != nil {
 		return
 	}
 	if usage := usageObject(parsed); len(usage) > 0 {

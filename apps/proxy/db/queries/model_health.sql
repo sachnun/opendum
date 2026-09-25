@@ -9,6 +9,11 @@ FROM provider_account
 WHERE id = $1
 LIMIT 1;
 
+-- name: ListAccountHealthStates :many
+SELECT id, status, "disabledUntil", "consecutiveErrors"
+FROM provider_account
+WHERE id = ANY(sqlc.arg(account_ids)::text[]);
+
 -- name: SetAccountHealthFailed :exec
 UPDATE provider_account
 SET "consecutiveErrors" = $1, status = $2, "statusChangedAt" = $3
@@ -44,16 +49,15 @@ UPDATE provider_account
 SET "lastRecoveredByRotationAt" = $1
 WHERE id = $2 AND "lastErrorAt" <= $3;
 
--- name: ListModelHealthByAccounts :many
-SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
-FROM provider_account_model_health
-WHERE "providerAccountId" = ANY(sqlc.arg(account_ids)::text[])
-  AND model = ANY(sqlc.arg(models)::text[]);
-
 -- name: ListModelHealthByAccount :many
 SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
 FROM provider_account_model_health
 WHERE "providerAccountId" = $1;
+
+-- name: ListModelHealthByAccountIDs :many
+SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"
+FROM provider_account_model_health
+WHERE "providerAccountId" = ANY(sqlc.arg(account_ids)::text[]);
 
 -- name: GetModelHealth :one
 SELECT id, "providerAccountId", model, "consecutiveErrors", status, "statusChangedAt", "lastErrorAt", "lastErrorCode", "lastSuccessAt", "unhealthyCountUpdatedAt", "createdAt", "updatedAt", "quotaLockedUntil", "quotaLockReason"

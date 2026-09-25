@@ -22,9 +22,8 @@ func parseStreamParam(body map[string]any) bool {
 }
 
 func buildParamsForError(params map[string]any, stream bool) map[string]any {
-	out := cloneMap(params)
-	out["stream"] = stream
-	return out
+	params["stream"] = stream
+	return params
 }
 
 func addSessionID(payload map[string]any, sessionID string) {
