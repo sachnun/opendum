@@ -31,7 +31,7 @@
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 235929,
+      "maxOutputTokens": 131072,
       "authless": true
     },
     "nvidia_nim": {
@@ -47,7 +47,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 1000000,
-      "maxOutputTokens": 235929
+      "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "nemotron-3-5-lightning",

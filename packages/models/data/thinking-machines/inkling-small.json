@@ -38,7 +38,7 @@
     },
     "openrouter": {
       "upstream": "thinkingmachines/inkling-small:free",
-      "contextWindow": 1048576,
+      "contextWindow": 524288,
       "maxOutputTokens": 262144
     }
   }

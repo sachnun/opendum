@@ -1,0 +1,10 @@
+{
+  "providers": [
+    "cline"
+  ],
+  "providerConfig": {
+    "cline": {
+      "upstream": "stealth/pixel-canary"
+    }
+  }
+}
