@@ -25,9 +25,9 @@
     "output": 65536
   },
   "cost": {
-    "input": 0.75,
-    "output": 5,
-    "cacheRead": 0.25
+    "input": 0.25,
+    "output": 2,
+    "cacheRead": 0.1
   },
   "providerConfig": {
     "perch": {
