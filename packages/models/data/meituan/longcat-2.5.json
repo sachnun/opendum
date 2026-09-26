@@ -1,0 +1,31 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 131072
+  },
+  "cost": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0
+  },
+  "providerConfig": {
+    "opencode": {
+      "upstream": "longcat-2.5-preview-free",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 131072
+    }
+  }
+}
