@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -79,6 +80,7 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 	tracker := &openAIStreamUsageTracker{}
 	reader := bufio.NewReader(ctx.Response.Body)
 	buf := make([]byte, 32*1024)
+	var readErr error
 	for {
 		n, err := reader.Read(buf)
 		if n > 0 {
@@ -90,8 +92,8 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 			}
 		}
 		if err != nil {
-			if err != io.EOF {
-				break
+			if !errors.Is(err, io.EOF) {
+				readErr = streamReadError(ctx, err)
 			}
 			break
 		}
@@ -102,8 +104,23 @@ func (s *Service) passthroughStream(ctx responseContext) error {
 	if ctx.Provider == "hyper" && (tracker.hypercreditsRemaining != nil || tracker.hypercreditsCost > 0) {
 		go s.storeHypercreditsUsage(context.Background(), ctx.AccountID, tracker.hypercreditsRemaining, tracker.hypercreditsCost)
 	}
+	if readErr != nil {
+		return readErr
+	}
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
+}
+
+// streamReadError surfaces the request context error when the stream was cut by
+// the request deadline or a client disconnect, so callers can tell a timeout or
+// abort apart from an upstream read failure.
+func streamReadError(ctx responseContext, err error) error {
+	if ctx.Request != nil {
+		if ctxErr := ctx.Request.Context().Err(); ctxErr != nil {
+			return ctxErr
+		}
+	}
+	return err
 }
 
 func (s *Service) passthroughNonStream(ctx responseContext) error {

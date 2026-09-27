@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -147,15 +148,6 @@ func (s *Service) Messages(w http.ResponseWriter, r *http.Request) {
 func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAdapter) {
 	startMS := time.Now().UnixMilli()
 	ctx := r.Context()
-	// Bound the whole request, including provider rotation and streamed reads.
-	// The edge proxy cuts the connection at roughly 100s, so a deadline keeps the
-	// failure inside the origin where it can be reported and the account rotated.
-	if s.requestTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.requestTimeout)
-		defer cancel()
-		r = r.WithContext(ctx)
-	}
 
 	authResult, playgroundAuth, err := s.authenticateRequest(ctx, r)
 	if err != nil {
@@ -177,6 +169,14 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	if routeErr != nil {
 		s.writeRouteError(w, cfg, routeErr.Status, routeErr.Message, routeErr.Type, routeErr.Param, routeErr.Code, routeErr.RetryAfter, routeErr.RetryAfterMS)
 		return
+	}
+	// Non-streaming requests stay bounded so a stalled provider fails inside the
+	// origin. Streams are left unbounded so a model keeps generating for as long
+	// as the client holds the connection open.
+	if s.requestTimeout > 0 && !parsed.Stream {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.requestTimeout)
+		defer cancel()
 	}
 	parsed = s.applyModelAccountSelector(parsed, ctx, authResult.UserID)
 	r = r.WithContext(context.WithValue(ctx, requestBodyContextKey{}, body))
@@ -232,17 +232,25 @@ func (s *Service) handle(w http.ResponseWriter, r *http.Request, cfg endpointAda
 	usage := &usageCounts{}
 
 	if parsed.Stream {
-		if err := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model, Usage: usage}); err == nil {
+		streamErr := cfg.HandleStream(responseContext{Response: providerResp, AccountID: account.ID, Provider: account.Provider, Writer: w, Request: r, RequestStartMS: requestStartMS, UpstreamFirstResponseMS: upstreamFirstResponseMS, StartMS: startMS, UserID: authResult.UserID, APIKeyID: authResult.APIKeyID, Model: validation.Model, Usage: usage})
+		if streamErr == nil {
 			if roaming != nil {
 				s.settleRoamingPoint(context.Background(), account.UserID, roaming, validation.Model, usage)
 			}
 			go s.markAccountsRecoveredByRotation(context.Background(), rotationFailures)
-		} else {
-			if roaming != nil {
-				s.refundRoamingPoint(context.Background(), roaming)
-			}
-			s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, err, startMS)
+			return
 		}
+		if roaming != nil {
+			s.refundRoamingPoint(context.Background(), roaming)
+		}
+		if errors.Is(streamErr, context.Canceled) {
+			return
+		}
+		if errors.Is(streamErr, context.DeadlineExceeded) {
+			s.logUsage(context.Background(), usageParams{UserID: authResult.UserID, ProviderAccountID: account.ID, ProxyAPIKeyID: authResult.APIKeyID, Model: validation.Model, StatusCode: http.StatusRequestTimeout, DurationMS: int(time.Now().UnixMilli() - startMS), Provider: account.Provider})
+			return
+		}
+		s.recordResponseHandlerFailure(context.Background(), account, validation.Model, authResult.UserID, authResult.APIKeyID, streamErr, startMS)
 		return
 	}
 

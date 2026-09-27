@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"sort"
@@ -44,18 +45,25 @@ func (s *Service) anthropicStream(ctx responseContext) error {
 	tracker := &anthropicStreamTracker{writer: w, flusher: flusher, keepThinkingOpen: ctx.Provider == "kiro"}
 	reader := bufio.NewReader(ctx.Response.Body)
 	buf := make([]byte, 32*1024)
+	var readErr error
 	for {
 		n, err := reader.Read(buf)
 		if n > 0 {
 			tracker.Process(string(buf[:n]))
 		}
 		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				readErr = streamReadError(ctx, err)
+			}
 			break
 		}
 	}
 	tracker.Finish()
 	durationMS := int(time.Now().UnixMilli() - ctx.StartMS)
 	ctx.setUsage(tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens)
+	if readErr != nil {
+		return readErr
+	}
 	go s.recordSuccessfulRequest(context.Background(), ctx.AccountID, ctx.Provider, ctx.Model, ctx.UserID, ctx.APIKeyID, tracker.inputTokens, tracker.outputTokens, tracker.cachedTokens, tracker.cacheWriteTokens, durationMS, true, ctx.RequestStartMS, ctx.UpstreamFirstResponseMS)
 	return nil
 }
