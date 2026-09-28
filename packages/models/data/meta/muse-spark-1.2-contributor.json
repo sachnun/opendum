@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "freebuff"
-  ],
+  "providers": [],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -29,13 +27,5 @@
     "input": 0.5,
     "output": 1,
     "cacheRead": 0.01
-  },
-  "providerConfig": {
-    "freebuff": {
-      "upstream": "meta/muse-spark-1.2-contributor",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 65536,
-      "agent": "base2-free-muse-spark"
-    }
   }
 }

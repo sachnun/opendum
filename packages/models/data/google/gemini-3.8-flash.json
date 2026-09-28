@@ -2,8 +2,7 @@
   "providers": [
     "antigravity",
     "zenmux",
-    "freebuff",
-    "cline"
+    "freebuff"
   ],
   "aliases": [
     "gemini-3.8-flash-high",
@@ -55,11 +54,6 @@
         "none": "minimal",
         "xhigh": "high"
       }
-    },
-    "cline": {
-      "upstream": "cline-free/gemini-3.8-flash",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 65536
     },
     "freebuff": {
       "upstream": "google/gemini-3.8-flash",

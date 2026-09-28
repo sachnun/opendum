@@ -2,6 +2,9 @@
   "providers": [
     "kiro"
   ],
+  "aliases": [
+    "claude-opus-5.5"
+  ],
   "reasoning": true,
   "reasoning_effort": [
     "low",

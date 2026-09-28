@@ -1,8 +1,6 @@
 {
   "providers": [
-    "opencode",
-    "kilo_code",
-    "openrouter"
+    "opencode"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -18,7 +16,7 @@
   },
   "limit": {
     "context": 262144,
-    "output": 235929
+    "output": 32768
   },
   "cost": {
     "input": 0.3,
@@ -26,21 +24,10 @@
     "cacheRead": 0.06
   },
   "providerConfig": {
-    "kilo_code": {
-      "upstream": "inclusionai/ling-3.0-flash-fin:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 32768,
-      "authless": true
-    },
     "opencode": {
       "upstream": "ling-3.0-flash-fin-free",
       "contextWindow": 262144,
       "maxOutputTokens": 32768
-    },
-    "openrouter": {
-      "upstream": "inclusionai/ling-3.0-flash-fin:free",
-      "contextWindow": 262144,
-      "maxOutputTokens": 235929
     }
   }
 }

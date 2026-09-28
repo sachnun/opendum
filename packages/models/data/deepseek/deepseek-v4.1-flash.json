@@ -26,9 +26,9 @@
     "output": 384000
   },
   "cost": {
-    "input": 0.175,
-    "output": 1.45,
-    "cacheRead": 0.005
+    "input": 0.75,
+    "output": 3,
+    "cacheRead": 0.015
   },
   "providerConfig": {
     "cline": {
