@@ -1,11 +1,4 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
-  "ignored": true,
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "mistralai/mistral-nemotron"
-    }
-  }
+  "providers": [],
+  "ignored": true
 }
