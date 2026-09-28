@@ -22,7 +22,7 @@
   "cost": {
     "input": 1.3,
     "output": 1.9,
-    "cacheRead": 0.65
+    "cacheRead": 0.14
   },
   "providerConfig": {
     "kiro": {

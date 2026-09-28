@@ -30,7 +30,7 @@
   "cost": {
     "input": 0.7,
     "output": 1.4,
-    "cacheRead": 0.014
+    "cacheRead": 0.0135
   },
   "providerConfig": {
     "cline": {
