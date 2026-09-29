@@ -19,7 +19,7 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 262144,
     "output": 262144
   },
   "cost": {
@@ -46,7 +46,7 @@
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
-      "contextWindow": 1000000,
+      "contextWindow": 262144,
       "maxOutputTokens": 32768
     },
     "perch": {

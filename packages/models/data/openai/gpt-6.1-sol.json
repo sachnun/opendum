@@ -1,16 +1,19 @@
 {
   "providers": [
-    "hyper"
+    "codex"
   ],
   "reasoning": true,
   "reasoning_effort": [
     "low",
     "medium",
-    "high"
+    "high",
+    "xhigh",
+    "max"
   ],
   "modalities": {
     "input": [
       "image",
+      "pdf",
       "text"
     ],
     "output": [
@@ -18,17 +21,18 @@
     ]
   },
   "limit": {
-    "context": 1000000,
+    "context": 1050000,
     "output": 128000
   },
   "cost": {
-    "input": 0.1245,
-    "output": 7.45,
-    "cacheRead": 0.0995
+    "input": 10,
+    "output": 50,
+    "cacheRead": 0.5,
+    "cacheWrite": 12.5
   },
   "providerConfig": {
-    "hyper": {
-      "contextWindow": 1000000,
+    "codex": {
+      "contextWindow": 1050000,
       "maxOutputTokens": 128000
     }
   }
