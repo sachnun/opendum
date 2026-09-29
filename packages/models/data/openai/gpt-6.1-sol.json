@@ -1,6 +1,8 @@
 {
   "providers": [
-    "codex"
+    "codex",
+    "perch",
+    "freebuff"
   ],
   "reasoning": true,
   "reasoning_effort": [
@@ -32,6 +34,17 @@
   },
   "providerConfig": {
     "codex": {
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000
+    },
+    "freebuff": {
+      "upstream": "openai/gpt-6.1-sol",
+      "contextWindow": 1050000,
+      "maxOutputTokens": 128000,
+      "agent": "base2-free-gpt-6-1-sol"
+    },
+    "perch": {
+      "upstream": "gpt-6-1-sol",
       "contextWindow": 1050000,
       "maxOutputTokens": 128000
     }
