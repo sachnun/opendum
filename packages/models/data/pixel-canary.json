@@ -1,7 +1,5 @@
 {
-  "providers": [
-    "cline"
-  ],
+  "providers": [],
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -24,12 +22,5 @@
   "cost": {
     "input": 0,
     "output": 0
-  },
-  "providerConfig": {
-    "cline": {
-      "upstream": "stealth/pixel-canary",
-      "contextWindow": 262144,
-      "maxOutputTokens": 131072
-    }
   }
 }
