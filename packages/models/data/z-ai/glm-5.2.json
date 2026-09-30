@@ -22,7 +22,7 @@
     "output": 32768
   },
   "cost": {
-    "input": 1.0435,
+    "input": 2.05,
     "output": 12,
     "cacheRead": 0.7
   },
