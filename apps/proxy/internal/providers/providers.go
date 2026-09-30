@@ -33,7 +33,7 @@ const opencodeFallbackResponsesEndpoint = "https://unroxy.koyeb.app/opencode.ai/
 const opencodeFallbackMessagesEndpoint = "https://unroxy.koyeb.app/opencode.ai/zen/v1/messages"
 const opencodePublicAPIKey = "public"
 const opencodeClient = "cli"
-const opencodeUserAgent = "opencode/1.18.33"
+const opencodeUserAgent = "opencode/1.18.34"
 const opencodeIDAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 // opencodeFingerprintTools is the file-search quartet the Zen free tier
