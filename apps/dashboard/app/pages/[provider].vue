@@ -877,7 +877,7 @@ const filledSettingsModels = computed(() => (settingsForm.value?.models ?? []).f
 function modelRowFromCustom(model: CustomProviderModelRow): ModelRow {
   const upstream = model.upstream ?? "";
   const source = upstream || model.modelId;
-  return { model: source, alias: model.modelId === source ? "" : model.modelId, aliased: model.aliased };
+  return { model: source, alias: model.modelId === source ? "" : model.modelId, aliased: model.aliased || model.modelId !== source };
 }
 
 function setRowAlias(row: ModelRow, value: string) {

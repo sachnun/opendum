@@ -191,6 +191,20 @@ func TestValidateModelForUserAllowsWhitelistedStandaloneCustomModel(t *testing.T
 	}
 }
 
+func TestNormalizeDisabledModelListKeepsStandaloneModelIDs(t *testing.T) {
+	service := customValidationService(t)
+	got := service.normalizeDisabledModelList([]string{"my-vllm/my-local-vlm", "qwen3-32b"})
+	want := []string{"my-vllm/my-local-vlm", service.registry.ResolveAlias("qwen3-32b")}
+	if len(got) != len(want) {
+		t.Fatalf("normalizeModelList = %v, want %v", got, want)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("normalizeModelList = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestNormalizeModelAccessListKeepsCustomIDs(t *testing.T) {
 	service := customValidationService(t)
 	got := service.normalizeModelAccessList([]string{" claude-sonnet-4-6 ", "my-vllm/my-local-vlm", ""})

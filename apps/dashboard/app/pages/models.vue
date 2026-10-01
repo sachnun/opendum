@@ -350,20 +350,15 @@ watch(
                       <UiIcon name="i-lucide-flask-conical" class="size-3" />
                     </NuxtLink>
                   </UiTooltip>
-                  <template v-if="model.custom">
-                    <UiBadge variant="secondary" class="text-[10px] font-normal">Custom</UiBadge>
-                  </template>
-                  <template v-else>
-                    <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
-                      {{ isActiveModel(model) ? 'On' : 'Off' }}
-                    </span>
-                    <UiSwitch
-                      :model-value="isActiveModel(model)"
-                      :disabled="!isLinked(model) || pendingModelId === model.id || isAuditMode"
-                      :title="isLinked(model) ? (model.isEnabled ? 'Disable' : 'Enable') : undefined"
-                      @update:model-value="setModelEnabled(model, $event)"
-                    />
-                  </template>
+                  <span class="w-5 text-right text-[11px] leading-none text-muted-foreground">
+                    {{ isActiveModel(model) ? 'On' : 'Off' }}
+                  </span>
+                  <UiSwitch
+                    :model-value="isActiveModel(model)"
+                    :disabled="!isLinked(model) || pendingModelId === model.id || isAuditMode"
+                    :title="isLinked(model) ? (model.isEnabled ? 'Disable' : 'Enable') : undefined"
+                    @update:model-value="setModelEnabled(model, $event)"
+                  />
                 </div>
               </div>
 

@@ -23,7 +23,11 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
       db.select({ model: disabledModel.model }).from(disabledModel).where(eq(disabledModel.userId, userId)),
       getAccountModelAvailability(userId, { includeInactiveAccounts: true }),
     ]);
-    const disabledModelSet = new Set(disabledModels.map((entry) => resolveModelAlias(entry.model)));
+    const disabledModelSet = new Set(disabledModels.map((entry) => {
+      const model = entry.model.trim();
+      const canonical = resolveModelAlias(model);
+      return getAllModels().includes(canonical) ? canonical : model;
+    }));
 
     const authlessProviderAccounts = getAuthlessProviderAccounts();
     const customSlugs = Array.from(availability.customProviderModels.keys());
@@ -85,10 +89,11 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
         }),
       ...customSlugs.flatMap((slug) => {
         if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) return [];
-        return (availability.customProviderStandaloneModels.get(slug) ?? []).map((modelId) => {
+        return (availability.customProviderStandaloneModels.get(slug) ?? []).flatMap((modelId) => {
           const id = `${slug}/${modelId}`;
+          if (disabledModelSet.has(id)) return [];
           const canonical = resolveModelAlias(modelId);
-          return {
+          return [{
             id,
             name: id,
             family: getModelFamily(modelId),
@@ -96,7 +101,7 @@ export async function getPlaygroundOptions(userId: string, proxyUrl?: string) {
             reasoning: MODEL_REGISTRY[canonical]?.reasoning,
             modalities: MODEL_REGISTRY[canonical]?.modalities,
             topPDeprecatedProviders: undefined,
-          };
+          }];
         });
       }),
     ].sort(compareModelEntries);

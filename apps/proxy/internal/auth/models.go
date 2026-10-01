@@ -92,6 +92,19 @@ func (s *Service) ValidateModelForUser(ctx context.Context, userID, modelParam s
 					return s.invalidModelResult(custom.Provider, custom.Model, modelParam, nil), nil
 				}
 			}
+			if s.db != nil {
+				modelToCheck := custom.Model
+				if custom.Alias != "" {
+					modelToCheck = custom.Alias
+				}
+				disabled, err := s.IsModelDisabledForUser(ctx, userID, modelToCheck)
+				if err != nil {
+					return ModelValidationResult{}, err
+				}
+				if disabled {
+					return ModelValidationResult{Valid: false, Provider: custom.Provider, Model: custom.Model, Error: "Model \"" + custom.Model + "\" is disabled. Enable it from Dashboard > Models first.", Param: "model", Code: "model_disabled"}, nil
+				}
+			}
 			return *custom, nil
 		}
 	}
@@ -291,9 +304,9 @@ func (s *Service) DisabledModelSetForUser(ctx context.Context, userID string) (m
 	}
 	modelList := make([]string, 0, len(rows))
 	for _, row := range rows {
-		modelList = append(modelList, s.registry.ResolveAlias(row))
+		modelList = append(modelList, strings.TrimSpace(row))
 	}
-	modelList = s.normalizeModelList(modelList)
+	modelList = s.normalizeDisabledModelList(modelList)
 	_ = s.setCachedDisabledModels(ctx, userID, modelList)
 	return toSet(modelList), nil
 }
@@ -499,6 +512,23 @@ func (s *Service) normalizeModelList(values []string) []string {
 		model := s.registry.ResolveAlias(trimmed)
 		if s.registry.IsSupported(model) {
 			result = append(result, model)
+		}
+	}
+	return uniqueSorted(result)
+}
+
+func (s *Service) normalizeDisabledModelList(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		model := s.registry.ResolveAlias(trimmed)
+		if s.registry.IsSupported(model) {
+			result = append(result, model)
+		} else {
+			result = append(result, trimmed)
 		}
 	}
 	return uniqueSorted(result)

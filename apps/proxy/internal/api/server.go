@@ -175,6 +175,13 @@ func (s *Server) modelsRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, item := range customModels {
 			id, _ := item["id"].(string)
+			canonical := s.registry.ResolveAlias(id)
+			if _, disabled := disabledSet[id]; disabled {
+				continue
+			}
+			if _, disabled := disabledSet[canonical]; disabled {
+				continue
+			}
 			slug := id
 			if index := strings.Index(slug, "/"); index > 0 {
 				slug = slug[:index]

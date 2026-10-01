@@ -64,11 +64,11 @@ func (s *Service) getCachedDisabledModels(ctx context.Context, userID string) ([
 	if err := json.Unmarshal([]byte(raw), &value); err != nil {
 		return nil, false
 	}
-	return s.normalizeModelList(value.Models), true
+	return s.normalizeDisabledModelList(value.Models), true
 }
 
 func (s *Service) setCachedDisabledModels(ctx context.Context, userID string, modelList []string) error {
-	data, err := json.Marshal(disabledModelsCacheValue{Models: s.normalizeModelList(modelList)})
+	data, err := json.Marshal(disabledModelsCacheValue{Models: s.normalizeDisabledModelList(modelList)})
 	if err != nil {
 		return err
 	}

@@ -145,7 +145,7 @@ async function syncModels() {
     models.value = result.data.models.length > 0
       ? result.data.models.map((model) => {
         const source = model.upstream || model.modelId;
-        return { model: source, alias: model.modelId === source ? "" : model.modelId, aliased: false };
+        return { model: source, alias: model.modelId === source ? "" : model.modelId, aliased: model.modelId !== source };
       })
       : [{ model: "", alias: "", aliased: false }];
     synced.value = true;

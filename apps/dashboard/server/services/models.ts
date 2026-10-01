@@ -29,7 +29,11 @@ async function getAvailableModelsForUser(userId: string) {
 
   return {
     availability,
-    disabledModelSet: new Set(disabledModels.map((entry) => resolveModelAlias(entry.model))),
+    disabledModelSet: new Set(disabledModels.map((entry) => {
+      const model = entry.model.trim();
+      const canonical = resolveModelAlias(model);
+      return isModelSupported(canonical) ? canonical : model;
+    })),
     models: getAllModels()
       .filter((model) => isModelUsableByAccounts(model, availability))
       .sort((a, b) => compareModelEntries({ id: a, family: getModelFamily(a) }, { id: b, family: getModelFamily(b) })),
@@ -91,7 +95,7 @@ export async function listModels(userId: string, options: { includeStats?: boole
           reasoning: MODEL_REGISTRY[canonical]?.reasoning,
           modalities: MODEL_REGISTRY[canonical]?.modalities,
           cost: MODEL_REGISTRY[canonical]?.cost,
-          isEnabled: true,
+          isEnabled: !disabledModelSet.has(entry.id),
           available: true,
           custom: true,
         };
@@ -124,7 +128,7 @@ export async function searchModels(userId: string) {
       ...customModelEntries(availability).map((entry) => ({
         id: entry.id,
         providers: [entry.slug],
-        isEnabled: true,
+        isEnabled: !disabledModelSet.has(entry.id),
         custom: true,
       })),
     ];
@@ -170,14 +174,17 @@ export function getModelFamilyCounts() {
 }
 
 export async function setModelEnabled(userId: string, input: z.infer<typeof setModelEnabledInputSchema>) {
-  const normalizedModel = resolveModelAlias(input.modelId.trim());
-
-  if (!normalizedModel || !isModelSupported(normalizedModel)) {
-    return { success: false, error: "Model not found" } as const;
-  }
+  const modelId = input.modelId.trim();
 
   try {
-    await db.delete(disabledModel).where(and(eq(disabledModel.userId, userId), inArray(disabledModel.model, getModelLookupKeys(normalizedModel))));
+    const canonical = resolveModelAlias(modelId);
+    const normalizedModel = isModelSupported(canonical)
+      ? canonical
+      : customModelEntries((await getAccountModelAvailability(userId))).find((entry) => entry.id === modelId)?.id;
+    if (!normalizedModel) return { success: false, error: "Model not found" } as const;
+
+    const lookupKeys = isModelSupported(canonical) ? getModelLookupKeys(normalizedModel) : [normalizedModel];
+    await db.delete(disabledModel).where(and(eq(disabledModel.userId, userId), inArray(disabledModel.model, lookupKeys)));
     if (!input.enabled) await db.insert(disabledModel).values({ userId, model: normalizedModel }).onConflictDoNothing({ target: [disabledModel.userId, disabledModel.model] });
 
     await invalidateDisabledModelsCache(userId);
