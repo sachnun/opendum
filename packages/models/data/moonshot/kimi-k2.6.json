@@ -20,9 +20,9 @@
     "output": 16384
   },
   "cost": {
-    "input": 3.25,
-    "output": 17.05,
-    "cacheRead": 0.75
+    "input": 2.17075,
+    "output": 9.14,
+    "cacheRead": 0.3656
   },
   "providerConfig": {
     "nvidia_nim": {
