@@ -54,6 +54,10 @@ const providerMeta = computed<ProviderMeta | null>(() => {
 const providerSlug = computed(() => providerMeta.value?.slug ?? selectedProvider.value);
 const providerNotFound = computed(() => !providerMeta.value && customProvidersData.value !== undefined);
 
+watch(providerNotFound, (value) => {
+  if (value) void navigateTo("/", { replace: true });
+}, { immediate: true });
+
 type Account = ProviderDetailData["accounts"][number];
 type ErrorHistoryEntry = Extract<ErrorHistoryResult, { success: true }>["data"]["entries"][number];
 type QuotaSummaryGroup = Pick<QuotaGroupDisplay, "name" | "displayName"> & {
@@ -1059,12 +1063,7 @@ function decodeAccountHash(hash: string): string | null {
 
     <DataNotice :error="error" />
 
-    <div v-if="providerNotFound" class="rounded-xl border border-dashed border-border p-10 text-center">
-      <p class="text-sm font-medium text-foreground">Provider not found</p>
-      <UiButton variant="outline" class="mt-4" @click="navigateTo('/')">Back to providers</UiButton>
-    </div>
-
-    <section v-else-if="!isLoadingAccounts && accounts.length === 0 && supportedModels.length" class="scroll-mt-24 space-y-4 md:space-y-2">
+    <section v-if="!isLoadingAccounts && accounts.length === 0 && supportedModels.length" class="scroll-mt-24 space-y-4 md:space-y-2">
       <div class="pt-1">
         <div class="flex flex-wrap gap-1.5">
           <UiBadge
