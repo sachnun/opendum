@@ -27,7 +27,7 @@
   },
   "cost": {
     "input": 0.15,
-    "output": 2.5,
+    "output": 3,
     "cacheRead": 0.015
   },
   "providerConfig": {
@@ -43,7 +43,7 @@
     },
     "hyper": {
       "contextWindow": 1048576,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 262144
     },
     "workbuddy": {
       "contextWindow": 1048576,
