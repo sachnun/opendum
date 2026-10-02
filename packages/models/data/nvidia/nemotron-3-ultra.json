@@ -54,7 +54,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 16384
+      "maxOutputTokens": 182520
     }
   }
 }
