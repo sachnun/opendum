@@ -21,9 +21,9 @@
     "output": 384000
   },
   "cost": {
-    "input": 0.094,
+    "input": 0.076,
     "output": 0.9,
-    "cacheRead": 0.075
+    "cacheRead": 0.0685
   },
   "providerConfig": {
     "freebuff": {
