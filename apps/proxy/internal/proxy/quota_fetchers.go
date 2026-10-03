@@ -15,12 +15,6 @@ import (
 	appdb "github.com/opendum/opendum/apps/proxy/internal/db"
 )
 
-var antigravityQuotaMaxRequests = map[string]map[string]float64{
-	"standard-tier": {"claude-opus-4-6": 150, "claude-sonnet-4-6": 150, "gemini-3.1-pro-preview": 320, "gemini-3.5-flash": 400, "gpt-oss-120b": 100},
-	"free-tier":     {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150, "gemini-3.5-flash": 500, "gpt-oss-120b": 100},
-	"legacy-tier":   {"claude-opus-4-6": 50, "claude-sonnet-4-6": 50, "gemini-3.1-pro-preview": 150, "gemini-3.5-flash": 500, "gpt-oss-120b": 100},
-}
-
 func (s *Service) fetchOpenRouterQuota(ctx context.Context, account appdb.ProviderAccount, forceRefresh bool) accountQuotaInfo {
 	apiKey, err := cryptojs.Decrypt(s.secret, account.AccessToken)
 	if err != nil {
@@ -87,7 +81,6 @@ func openRouterGroups(keyData, creditsData map[string]any) []quotaGroupDisplay {
 }
 
 func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.ProviderAccount, accessToken string, forceRefresh bool) accountQuotaInfo {
-	tier := quotaFallbackTier(account)
 	projectID := ""
 	if account.ProjectID != nil {
 		projectID = strings.TrimSpace(*account.ProjectID)
@@ -95,10 +88,10 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 	if projectID == "" {
 		return errorQuotaInfo(account, "Antigravity account is missing projectId. Re-authenticate this account.", time.Now().UnixMilli())
 	}
-	endpoints := []string{"https://cloudcode-pa.googleapis.com", "https://daily-cloudcode-pa.googleapis.com"}
+	endpoints := []string{"https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"}
 	var lastErr string
 	for _, endpoint := range endpoints {
-		result, err := s.getQuotaJSON(ctx, account, forceRefresh, "antigravity:fetchAvailableModels", http.MethodPost, endpoint+"/v1internal:fetchAvailableModels", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "User-Agent": "antigravity/1.23.2 linux/amd64"}, map[string]any{"project": projectID})
+		result, err := s.getQuotaJSON(ctx, account, forceRefresh, "antigravity:fetchAvailableModels", http.MethodPost, endpoint+"/v1internal:fetchAvailableModels", map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": "application/json", "User-Agent": "antigravity/2.19.1 linux/amd64"}, map[string]any{"project": projectID})
 		if err != nil {
 			lastErr = err.Error()
 			continue
@@ -113,31 +106,30 @@ func (s *Service) fetchAntigravityQuota(ctx context.Context, account appdb.Provi
 			continue
 		}
 		s.putQuotaJSONCache(ctx, result)
-		return baseQuotaInfo(account, "success", antigravityGroups(payload, tier), time.Now().UnixMilli(), "")
+		return baseQuotaInfo(account, "success", antigravityGroups(payload), time.Now().UnixMilli(), "")
 	}
 	return errorQuotaInfo(account, "Failed to fetch Antigravity quota data: "+lastErr, time.Now().UnixMilli())
 }
 
-func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay {
+var antigravityClaudeAPI = []string{"claude-opus-5-5-high", "claude-opus-5-5-medium", "claude-opus-5-5-low", "claude-sonnet-5-5-high", "claude-sonnet-5-5-medium", "claude-sonnet-5-5-low", "claude-opus-4-6-thinking", "claude-sonnet-4-6", "gpt-oss-120b-medium"}
+
+var antigravityGeminiAPI = []string{"gemini-3.8-flash-high", "gemini-3.1-pro-high", "gemini-3.5-flash-medium", "gemini-2.5-flash-thinking", "gemini-2.5-flash-lite"}
+
+func antigravityGroups(payload map[string]any) []quotaGroupDisplay {
 	models := parseQuotaRecord(payload["models"])
-	apiNames := map[string]string{"claude-opus-4-6": "claude-opus-4-6-thinking", "gemini-2.5-flash": "gemini-2.5-flash-thinking", "gemini-3.1-pro-preview": "gemini-3.1-pro-high", "gemini-3.5-flash": "gemini-3.5-flash-medium", "gpt-oss-120b": "gpt-oss-120b-medium"}
 	configs := []struct {
 		name    string
 		display string
 		models  []string
 	}{
-		{name: "claude", display: "Claude", models: []string{"claude-opus-4-6", "claude-sonnet-4-6", "gpt-oss-120b"}},
-		{name: "gemini", display: "Gemini", models: []string{"gemini-3.1-pro-preview", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"}},
+		{name: "claude", display: "Claude", models: antigravityClaudeAPI},
+		{name: "gemini", display: "Gemini", models: antigravityGeminiAPI},
 	}
 	groups := []quotaGroupDisplay{}
 	for _, cfg := range configs {
 		remainingFraction := 1.0
 		var resetISO *string
-		for _, model := range cfg.models {
-			apiModel := apiNames[model]
-			if apiModel == "" {
-				apiModel = model
-			}
+		for _, apiModel := range cfg.models {
 			modelRecord := parseQuotaRecord(models[apiModel])
 			quotaInfo := parseQuotaRecord(modelRecord["quotaInfo"])
 			if quotaInfo == nil {
@@ -153,39 +145,9 @@ func antigravityGroups(payload map[string]any, tier string) []quotaGroupDisplay 
 			}
 			break
 		}
-		maxRequests := antigravityMaxRequests(cfg.models[0], tier)
-		remaining := math.Max(0, math.Floor(remainingFraction*maxRequests))
-		percentUsed := int(math.Round(clampFraction((maxRequests-remaining)/maxRequests) * 100))
-		groups = append(groups, quotaGroupDisplay{Name: cfg.name, DisplayName: cfg.display, Models: cfg.models, RemainingFraction: remainingFraction, RemainingRequests: remaining, MaxRequests: maxRequests, UsedRequests: maxRequests - remaining, PercentUsed: percentUsed, IsExhausted: remainingFraction <= 0, IsEstimated: true, Confidence: "medium", ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO), RemainingLabel: stringPtr(fmt.Sprintf("%d%%", int(math.Round(remainingFraction*100))))})
+		groups = append(groups, quotaGroupDisplay{Name: cfg.name, DisplayName: cfg.display, RemainingFraction: remainingFraction, IsExhausted: remainingFraction <= 0, ResetTimeIso: resetISO, ResetInHuman: formatTimeUntilResetISO(resetISO)})
 	}
 	return groups
-}
-
-func antigravityMaxRequests(model, tier string) float64 {
-	if tierMap := antigravityQuotaMaxRequests[normalizeAntigravityQuotaTier(tier)]; tierMap != nil {
-		if value := tierMap[model]; value > 0 {
-			return value
-		}
-	}
-	if tierMap := antigravityQuotaMaxRequests["free-tier"]; tierMap != nil {
-		if value := tierMap[model]; value > 0 {
-			return value
-		}
-	}
-	return 100
-}
-
-func normalizeAntigravityQuotaTier(tier string) string {
-	switch strings.ToLower(strings.TrimSpace(tier)) {
-	case "standard-tier", "paid":
-		return "standard-tier"
-	case "legacy-tier":
-		return "legacy-tier"
-	case "free-tier", "free":
-		return "free-tier"
-	default:
-		return strings.ToLower(strings.TrimSpace(tier))
-	}
 }
 
 func parseResetISO(value any) *string {

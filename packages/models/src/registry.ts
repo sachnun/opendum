@@ -87,6 +87,11 @@ function readModelJson(content: string): ModelData {
   return JSON.parse(content) as ModelData;
 }
 
+function hasMinorVersionSuffix(base: string | undefined, numericSuffix: string | undefined): boolean {
+  if (!base || !numericSuffix) return false;
+  return /-(?:\d+)$/.test(base) || /-v\d+(?:\.\d+)*$/.test(base);
+}
+
 function getModelPublicId(data: ModelData, fileId: string): string {
   const id = typeof data.id === "string" ? data.id.trim() : "";
   return id || fileId;
@@ -232,12 +237,13 @@ export function syncProviderModels(
     const entries = Object.values(index);
     if (index[modelKey]) return null;
 
-    const suffixMatch = modelKey.match(/^(.+?)(?:-(\d+)|-v(\d+(?:\.\d+)*))$/);
+    const suffixMatch = modelKey.match(/^(.+?)(?:-v(\d+(?:\.\d+)*)|-(\d+))$/);
     if (suffixMatch) {
-      const [, base, numericSuffix, versionSuffix] = suffixMatch;
+      const [, base, versionSuffix, numericSuffix] = suffixMatch;
       const isMeaningfulSuffix =
-        (numericSuffix && Number.parseInt(numericSuffix, 10) >= 2) || versionSuffix;
-      if (isMeaningfulSuffix) {
+        Boolean(versionSuffix) ||
+        (numericSuffix && Number.parseInt(numericSuffix, 10) >= 2);
+      if (isMeaningfulSuffix && !hasMinorVersionSuffix(base, numericSuffix)) {
         const parent =
           index[base] ||
           entries.find((entry) => entry.id === base) ||

@@ -271,6 +271,9 @@ func (s *Service) persistRefreshedCredentials(ctx context.Context, account appdb
 	if refreshed.Tier != "" {
 		tier = strPtr(refreshed.Tier)
 	}
+	if refreshed.PaidTier != "" {
+		tier = strPtr(refreshed.PaidTier)
+	}
 	email := account.Email
 	if refreshed.Email != "" {
 		email = strPtr(refreshed.Email)

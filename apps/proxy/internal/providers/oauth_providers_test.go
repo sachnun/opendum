@@ -720,8 +720,11 @@ func TestAntigravityTransformsToolPayload(t *testing.T) {
 		t.Fatalf("tool mode = %#v", calling)
 	}
 	decl := payload["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
-	if decl["name"] != "t_1bad" || !strings.Contains(decl["description"].(string), "STRICT PARAMETERS") {
+	if decl["name"] != "t_1bad" {
 		t.Fatalf("decl = %#v", decl)
+	}
+	if decl["description"] != "lookup" {
+		t.Fatalf("description must be forwarded verbatim: %#v", decl["description"])
 	}
 }
 
@@ -1037,16 +1040,6 @@ func TestAntigravityScrubsToolTranscriptArtifacts(t *testing.T) {
 	cleaned := scrubToolTranscriptArtifacts(text)
 	if strings.Contains(cleaned, "Tool:") || strings.Contains(cleaned, "thought:") {
 		t.Fatalf("artifact not scrubbed: %q", cleaned)
-	}
-}
-
-func TestAntigravityInjectsGeminiToolInstruction(t *testing.T) {
-	payload := map[string]any{"tools": []any{map[string]any{"functionDeclarations": []any{map[string]any{"name": "lookup"}}}}}
-	injectGeminiToolInstruction(payload)
-	system := payload["systemInstruction"].(map[string]any)
-	text := system["parts"].([]any)[0].(map[string]any)["text"].(string)
-	if !strings.Contains(text, "CRITICAL_TOOL_USAGE_INSTRUCTIONS") {
-		t.Fatalf("tool instruction missing: %q", text)
 	}
 }
 

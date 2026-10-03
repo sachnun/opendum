@@ -1,15 +1,14 @@
 {
+  "id": "claude-opus-5-5",
   "providers": [
     "antigravity",
     "kiro"
   ],
   "aliases": [
-    "claude-sonnet-4-6-1m",
-    "claude-sonnet-4.6-1m",
-    "claude-sonnet-4.6",
-    "claude-sonnet4.6"
+    "claude-opus-5-5-high",
+    "claude-opus-5-5-low",
+    "claude-opus-5-5-medium"
   ],
-  "ignored": false,
   "reasoning": true,
   "reasoning_effort": [
     "low",
@@ -29,20 +28,20 @@
     ]
   },
   "limit": {
-    "context": 200000,
-    "output": 64000
+    "context": 1000000,
+    "output": 128000
   },
   "cost": {
-    "input": 15,
-    "output": 75,
-    "cacheRead": 1.5,
-    "cacheWrite": 18.75
+    "input": 25,
+    "output": 125,
+    "cacheRead": 2.5,
+    "cacheWrite": 31.25
   },
   "providerConfig": {
     "antigravity": {
-      "upstream": "claude-sonnet-4-6",
-      "contextWindow": 200000,
-      "maxOutputTokens": 64000,
+      "upstream": "claude-opus-5-5-medium",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
       "anthropic_beta": true,
       "anthropic_beta_thinking": true,
       "convert_external_images": true,
@@ -53,12 +52,17 @@
       "strict_tool_schema": true,
       "system_instruction": true,
       "thinking_model": true,
-      "top_p_min_095": true
+      "top_p_min_095": true,
+      "allowedTiers": [
+        "g1-pro-tier",
+        "g1-ultra-tier",
+        "standard-tier",
+        "paid"
+      ]
     },
     "kiro": {
-      "upstream": "claude-sonnet-4.6-1m",
-      "contextWindow": 200000,
-      "maxOutputTokens": 64000,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
       "allowedTiers": [
         "pro",
         "pro+",

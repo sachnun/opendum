@@ -457,7 +457,7 @@ function isPreviousDayLabel(time: string): boolean {
 
 function isPaidTierValue(tier: string, provider?: string): boolean {
   const value = tier.trim().toLowerCase();
-  if (provider === "antigravity") return ["paid", "standard-tier"].includes(value);
+  if (provider === "antigravity") return ["paid", "standard-tier"].includes(value) || value.startsWith("g1-");
   if (provider === "kiro") return ["pro", "pro-plus", "pro+", "power"].includes(value);
   return ["paid", "standard-tier", "plus", "pro", "pro-plus", "pro+", "prolite", "power", "team", "go", "self_serve_business_usage_based", "business", "enterprise_cbp_usage_based", "enterprise", "student", "edu", "education", "hc"].includes(value);
 }
@@ -471,7 +471,6 @@ function formatTierBadgeLabel(tier: string, provider?: string): "Paid" | "Free" 
   if (isFreeTierValue(tier)) return "Free";
   return "";
 }
-
 function maskSensitiveText(value: string): string {
   return value.replace(/\S/g, "•");
 }

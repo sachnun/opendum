@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "agi-nova-beta"
-  ],
-  "ignored": false,
-  "reasoning": true,
-  "providerConfig": {}
-}

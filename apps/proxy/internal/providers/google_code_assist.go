@@ -39,28 +39,13 @@ const defaultMaxOutputTokens = 64000
 const antigravitySignatureCachePrefix = "opendum:thought-signature"
 const antigravitySignatureCacheTTL = 24 * time.Hour
 const antigravityClaudeBetaHeader = "interleaved-thinking-2025-05-14"
-const antigravityUserAgent = "antigravity/1.653.24 "
-const geminiToolSchemaSystemInstruction = `<CRITICAL_TOOL_USAGE_INSTRUCTIONS>
-You are operating in a CUSTOM ENVIRONMENT where tool definitions COMPLETELY DIFFER from your training data.
-VIOLATION OF THESE RULES WILL CAUSE IMMEDIATE SYSTEM FAILURE.
+const antigravityUserAgent = "antigravity/2.19.1 "
 
-## ABSOLUTE RULES - NO EXCEPTIONS
+var antigravityRetiredModelPattern = regexp.MustCompile(`(?i)\bis no longer available\.?\s*Please switch to\b`)
 
-1. **SCHEMA IS LAW**: The JSON schema in each tool definition is the ONLY source of truth.
-2. **PARAMETER NAMES ARE EXACT**: Use ONLY the parameter names from the schema.
-3. **ARRAY PARAMETERS**: When a parameter has "type": "array", check the 'items' field.
-4. **NESTED OBJECTS**: When items.type is "object", include exact required nested fields.
-5. **STRICT PARAMETERS HINT**: Tool descriptions contain "STRICT PARAMETERS: ...".
-6. **BEFORE EVERY TOOL CALL**: Read tool schema and verify exact required params.
-</CRITICAL_TOOL_USAGE_INSTRUCTIONS>
-
-## GEMINI 3 RESPONSE RULES
-- Default to a direct, concise answer; add detail only when asked or required for correctness.
-- For multi-part tasks, use a short numbered list or labeled sections.
-- For long provided context, answer only from that context and avoid assumptions.
-- For multimodal inputs, explicitly reference each modality used and synthesize across them; do not invent details from absent modalities.
-- For complex tasks, outline a short plan and verify constraints before acting.
-`
+func antigravityRetiredModelNotice(text string) bool {
+	return antigravityRetiredModelPattern.MatchString(text)
+}
 
 type googleCodeAssistProvider struct {
 	name             string
@@ -139,7 +124,7 @@ func (p googleCodeAssistProvider) RefreshCredentials(ctx context.Context, client
 		token.ExpiresIn = 3600
 	}
 	info := p.fetchAccountInfo(ctx, client, token.AccessToken)
-	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), ProjectID: info.projectID, Tier: info.tier, Email: info.email}, nil
+	return RefreshedCredentials{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second), ProjectID: info.projectID, Tier: info.tier, PaidTier: info.paidTier, Email: info.email}, nil
 }
 
 func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.Client, accessToken string, account appdb.ProviderAccount, body map[string]any, stream bool) (*http.Response, error) {
@@ -157,7 +142,11 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 			projectID = p.defaultProject
 		}
 		if projectID != "" && p.db != nil {
-			_ = p.db.UpdateAntigravityAccountInfo(ctx, appdb.UpdateAntigravityAccountInfoParams{ProjectID: &projectID, Tier: &info.tier, Email: &info.email, ID: account.ID})
+			tier := info.tier
+			if info.paidTier != "" {
+				tier = info.paidTier
+			}
+			_ = p.db.UpdateAntigravityAccountInfo(ctx, appdb.UpdateAntigravityAccountInfoParams{ProjectID: &projectID, Tier: &tier, Email: &info.email, ID: account.ID})
 		}
 	}
 	if projectID == "" {
@@ -245,12 +234,23 @@ func (p googleCodeAssistProvider) MakeRequest(ctx context.Context, client *http.
 	if lastErr != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp, lastErr
 	}
+	if stream || actualStream {
+		body, notice, retired := peekAntigravityRetiredNotice(resp.Body)
+		if retired {
+			_ = resp.Body.Close()
+			return antigravityRetiredResponse(resp, notice), nil
+		}
+		resp.Body = body
+	}
 	if stream {
 		return sseResponse(p.geminiSSEToOpenAISSEReader(ctx, resp.Body, modelName, sessionID, toolSchemas), resp.Body), nil
 	}
 	if actualStream {
-		completion := p.geminiStreamToOpenAICompletion(ctx, resp.Body, modelName, sessionID, toolSchemas)
+		completion, err := p.geminiStreamToOpenAICompletion(ctx, resp.Body, modelName, sessionID, toolSchemas)
 		_ = resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
 		return jsonResponse(http.StatusOK, completion), nil
 	}
 	var data any
@@ -306,8 +306,6 @@ func (p googleCodeAssistProvider) transformAntigravityPayload(ctx context.Contex
 		normalizeClaudeTools(payload)
 	} else {
 		sanitizeGeminiToolNames(payload)
-		augmentToolDescriptions(payload)
-		injectGeminiToolInstruction(payload)
 	}
 	sortFunctionDeclarations(payload)
 	p.applyAntigravitySystemInstruction(payload, model)
@@ -752,201 +750,6 @@ func sanitizeGeminiToolNames(payload map[string]any) {
 	}
 }
 
-func augmentToolDescriptions(payload map[string]any) {
-	tools, _ := payload["tools"].([]any)
-	for _, rawTool := range tools {
-		tool, _ := rawTool.(map[string]any)
-		decls, _ := tool["functionDeclarations"].([]any)
-		for _, rawDecl := range decls {
-			decl, _ := rawDecl.(map[string]any)
-			description := stringValue(decl["description"])
-			if strings.Contains(description, "STRICT PARAMETERS:") {
-				continue
-			}
-			params, _ := decl["parameters"].(map[string]any)
-			if params == nil {
-				params, _ = decl["parametersJsonSchema"].(map[string]any)
-			}
-			if params == nil {
-				continue
-			}
-			summary := strictParamsSummary(params)
-			if summary == "" {
-				continue
-			}
-			if description != "" {
-				decl["description"] = strings.TrimSpace(description) + "\n\nSTRICT PARAMETERS: " + summary
-			} else {
-				decl["description"] = "STRICT PARAMETERS: " + summary
-			}
-		}
-	}
-}
-
-func injectGeminiToolInstruction(payload map[string]any) {
-	if !hasFunctionTools(payload) {
-		return
-	}
-	if strings.Contains(systemInstructionText(payload["systemInstruction"]), "<CRITICAL_TOOL_USAGE_INSTRUCTIONS>") {
-		return
-	}
-	existing := payload["systemInstruction"]
-	if text, ok := existing.(string); ok {
-		if strings.TrimSpace(text) != "" {
-			payload["systemInstruction"] = map[string]any{"parts": []any{map[string]any{"text": geminiToolSchemaSystemInstruction + "\n\n" + text}}}
-		} else {
-			payload["systemInstruction"] = map[string]any{"parts": []any{map[string]any{"text": geminiToolSchemaSystemInstruction}}}
-		}
-		return
-	}
-	if record, ok := existing.(map[string]any); ok {
-		parts := []any{map[string]any{"text": geminiToolSchemaSystemInstruction}}
-		parts = append(parts, anySlice(record["parts"])...)
-		record["parts"] = parts
-		payload["systemInstruction"] = record
-		return
-	}
-	payload["systemInstruction"] = map[string]any{"parts": []any{map[string]any{"text": geminiToolSchemaSystemInstruction}}}
-}
-
-func hasFunctionTools(payload map[string]any) bool {
-	for _, rawTool := range anySlice(payload["tools"]) {
-		tool, _ := rawTool.(map[string]any)
-		if len(anySlice(tool["functionDeclarations"])) > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func systemInstructionText(value any) string {
-	if text, ok := value.(string); ok {
-		return text
-	}
-	record, _ := value.(map[string]any)
-	parts := []string{}
-	for _, rawPart := range anySlice(record["parts"]) {
-		part, _ := rawPart.(map[string]any)
-		if text := stringValue(part["text"]); text != "" {
-			parts = append(parts, text)
-		}
-	}
-	return strings.Join(parts, "\n")
-}
-
-func strictParamsSummary(schema map[string]any) string {
-	props, _ := schema["properties"].(map[string]any)
-	if stringValue(schema["type"]) != "object" || len(props) == 0 {
-		return "(schema missing top-level object properties)"
-	}
-	required := map[string]struct{}{}
-	for _, raw := range anySlice(schema["required"]) {
-		if key := stringValue(raw); key != "" {
-			required[key] = struct{}{}
-		}
-	}
-	requiredKeys := []string{}
-	optionalKeys := []string{}
-	for key := range props {
-		if _, ok := required[key]; ok {
-			requiredKeys = append(requiredKeys, key)
-		} else {
-			optionalKeys = append(optionalKeys, key)
-		}
-	}
-	sort.Strings(requiredKeys)
-	sort.Strings(optionalKeys)
-	ordered := append(requiredKeys, optionalKeys...)
-	parts := []string{}
-	for _, key := range ordered {
-		rawProp := props[key]
-		prop, _ := rawProp.(map[string]any)
-		typ := summarizeSchema(prop, 2)
-		if _, ok := required[key]; ok {
-			typ += " REQUIRED"
-		}
-		parts = append(parts, key+": "+typ)
-	}
-	summary := strings.Join(parts, ", ")
-	if len(summary) > 900 {
-		return summary[:900] + "..."
-	}
-	return summary
-}
-
-func summarizeSchema(schema map[string]any, depth int) string {
-	if schema == nil {
-		return "unknown"
-	}
-	typ := normalizeSchemaType(schema["type"])
-	if typ == "" {
-		typ = "unknown"
-	}
-	if typ == "array" {
-		items, _ := schema["items"].(map[string]any)
-		itemSummary := "unknown"
-		if depth > 0 {
-			itemSummary = summarizeSchema(items, depth-1)
-		}
-		return "array[" + itemSummary + "]"
-	}
-	if typ == "object" {
-		props, _ := schema["properties"].(map[string]any)
-		if len(props) == 0 || depth <= 0 {
-			return "object"
-		}
-		required := map[string]bool{}
-		for _, raw := range anySlice(schema["required"]) {
-			if key := stringValue(raw); key != "" {
-				required[key] = true
-			}
-		}
-		keys := make([]string, 0, len(props))
-		for key := range props {
-			keys = append(keys, key)
-		}
-		sort.SliceStable(keys, func(i, j int) bool {
-			if required[keys[i]] != required[keys[j]] {
-				return required[keys[i]]
-			}
-			return keys[i] < keys[j]
-		})
-		shown := keys
-		if len(shown) > 8 {
-			shown = shown[:8]
-		}
-		parts := []string{}
-		for _, key := range shown {
-			prop, _ := props[key].(map[string]any)
-			text := key + ": " + summarizeSchema(prop, depth-1)
-			if required[key] {
-				text += " REQUIRED"
-			}
-			parts = append(parts, text)
-		}
-		extra := ""
-		if len(keys) > len(shown) {
-			extra = fmt.Sprintf(", ...+%d", len(keys)-len(shown))
-		}
-		return "{" + strings.Join(parts, ", ") + extra + "}"
-	}
-	if enumValues := anySlice(schema["enum"]); len(enumValues) > 0 {
-		preview := []string{}
-		for idx, value := range enumValues {
-			if idx >= 6 {
-				break
-			}
-			preview = append(preview, fmt.Sprint(value))
-		}
-		suffix := ""
-		if len(enumValues) > 6 {
-			suffix = "|..."
-		}
-		return typ + " enum(" + strings.Join(preview, "|") + suffix + ")"
-	}
-	return typ
-}
-
 func normalizeSchemaType(value any) string {
 	if text := stringValue(value); text != "" {
 		return text
@@ -1185,6 +988,7 @@ func sanitizeToolBlocks(contents []any) []any {
 type googleCodeAssistAccountInfo struct {
 	projectID string
 	tier      string
+	paidTier  string
 	email     string
 }
 
@@ -1238,6 +1042,9 @@ func (p googleCodeAssistProvider) fetchAccountInfo(ctx context.Context, client *
 			if tier := detectAntigravityTier(data); tier != "" {
 				info.tier = tier
 			}
+		}
+		if paidTier := extractPaidGoogleTier(data); paidTier != "" {
+			info.paidTier = paidTier
 		}
 		if info.projectID != "" {
 			break
@@ -1369,6 +1176,17 @@ func extractGoogleTier(data map[string]any) string {
 			return normalizeGoogleTierID(id)
 		}
 		return normalizeGoogleTierID(stringValue(tier["name"]))
+	}
+	return ""
+}
+
+func extractPaidGoogleTier(data map[string]any) string {
+	paidTier, ok := data["paidTier"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if id := normalizeGoogleTierID(stringValue(paidTier["id"])); id != "" && id != "free-tier" {
+		return id
 	}
 	return ""
 }
@@ -2618,6 +2436,62 @@ func unwrapGeminiResponse(data any) map[string]any {
 	return obj
 }
 
+func peekAntigravityRetiredNotice(source io.Reader) (io.ReadCloser, string, bool) {
+	reader := bufio.NewReader(source)
+	consumed := &bytes.Buffer{}
+	for {
+		line, err := reader.ReadString('\n')
+		consumed.WriteString(line)
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "data:") {
+			dataText := strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
+			var parsed any
+			if dataText != "" && dataText != "[DONE]" && json.Unmarshal([]byte(dataText), &parsed) == nil {
+				if notice, retired := geminiRetiredModelResponse(unwrapGeminiResponse(parsed)); retired {
+					return nil, notice, true
+				}
+			}
+			return io.NopCloser(io.MultiReader(bytes.NewReader(consumed.Bytes()), reader)), "", false
+		}
+		if err != nil {
+			return io.NopCloser(io.MultiReader(bytes.NewReader(consumed.Bytes()), reader)), "", false
+		}
+	}
+}
+
+func antigravityRetiredResponse(upstream *http.Response, notice string) *http.Response {
+	payload, _ := json.Marshal(map[string]any{"error": map[string]any{"code": http.StatusNotFound, "message": notice, "status": "NOT_FOUND"}})
+	response := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Status:     "404 Not Found",
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader(payload)),
+	}
+	if upstream != nil {
+		response.Request = upstream.Request
+	}
+	return response
+}
+
+func geminiRetiredModelResponse(response map[string]any) (string, bool) {
+	candidates := anySlice(response["candidates"])
+	if len(candidates) != 1 {
+		return "", false
+	}
+	candidate, _ := candidates[0].(map[string]any)
+	content, _ := candidate["content"].(map[string]any)
+	parts := anySlice(content["parts"])
+	if len(parts) != 1 {
+		return "", false
+	}
+	part, _ := parts[0].(map[string]any)
+	text := strings.TrimSpace(stringValue(part["text"]))
+	if text == "" || !antigravityRetiredModelNotice(text) {
+		return "", false
+	}
+	return text, true
+}
+
 func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context, source io.Reader, model string, sessionID string, schemas toolSchemaMap) io.Reader {
 	reader, writer := io.Pipe()
 	go func() {
@@ -2652,6 +2526,11 @@ func (p googleCodeAssistProvider) geminiSSEToOpenAISSEReader(ctx context.Context
 			}
 			response := unwrapGeminiResponse(parsed)
 			p.cacheSignaturesFromResponse(ctx, response, model, sessionID)
+			if notice, retired := geminiRetiredModelResponse(response); retired {
+				writeChunk(map[string]any{"content": notice}, "stop", nil)
+				sentFinal = true
+				continue
+			}
 			if usage := geminiUsage(response); usage != nil {
 				trackedUsage = usage
 			}
@@ -2715,7 +2594,7 @@ func geminiToOpenAICompletion(response map[string]any, model string, schemas too
 	return map[string]any{"id": randomID("chatcmpl"), "object": "chat.completion", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": finish}}, "usage": usage}
 }
 
-func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Context, source io.Reader, model string, sessionID string, schemas toolSchemaMap) map[string]any {
+func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Context, source io.Reader, model string, sessionID string, schemas toolSchemaMap) (map[string]any, error) {
 	content := ""
 	reasoning := ""
 	toolCalls := []any{}
@@ -2739,6 +2618,9 @@ func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Con
 		}
 		response := unwrapGeminiResponse(parsed)
 		p.cacheSignaturesFromResponse(ctx, response, model, sessionID)
+		if notice, retired := geminiRetiredModelResponse(response); retired {
+			return nil, fmt.Errorf("antigravity model %s is retired: %s", model, notice)
+		}
 		for _, delta := range geminiDeltas(response, schemas, &toolIndex) {
 			content += stringValue(delta["content"])
 			reasoning += stringValue(delta["reasoning_content"])
@@ -2767,7 +2649,7 @@ func (p googleCodeAssistProvider) geminiStreamToOpenAICompletion(ctx context.Con
 	if usage == nil {
 		usage = map[string]any{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 	}
-	return map[string]any{"id": randomID("chatcmpl"), "object": "chat.completion", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": finish}}, "usage": usage}
+	return map[string]any{"id": randomID("chatcmpl"), "object": "chat.completion", "created": time.Now().Unix(), "model": model, "choices": []any{map[string]any{"index": 0, "message": message, "finish_reason": finish}}, "usage": usage}, nil
 }
 
 func (p googleCodeAssistProvider) cacheSignaturesFromResponse(ctx context.Context, response map[string]any, model, sessionID string) {

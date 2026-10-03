@@ -7,58 +7,31 @@ import (
 	"testing"
 )
 
-func TestNormalizeAntigravityQuotaTier(t *testing.T) {
-	t.Parallel()
-	cases := map[string]string{
-		"standard-tier": "standard-tier",
-		"paid":          "standard-tier",
-		"legacy-tier":   "legacy-tier",
-		"free-tier":     "free-tier",
-		"FREE":          "free-tier",
-		"  Pro  ":       "pro",
-	}
-	for input, want := range cases {
-		if got := normalizeAntigravityQuotaTier(input); got != want {
-			t.Errorf("normalizeAntigravityQuotaTier(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
-func TestAntigravityMaxRequests(t *testing.T) {
-	t.Parallel()
-	if got := antigravityMaxRequests("claude-opus-4-6", "standard-tier"); got != 150 {
-		t.Fatalf("standard claude = %v, want 150", got)
-	}
-	if got := antigravityMaxRequests("claude-opus-4-6", "free-tier"); got != 50 {
-		t.Fatalf("free claude = %v, want 50", got)
-	}
-	if got := antigravityMaxRequests("unknown-model", "standard-tier"); got != 100 {
-		t.Fatalf("unknown model = %v, want 100", got)
-	}
-}
-
 func TestAntigravityGroups(t *testing.T) {
 	t.Parallel()
 	payload := map[string]any{"models": map[string]any{
-		"claude-opus-4-6-thinking": map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.5}},
-		"gemini-3.1-pro-high":      map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.25}},
+		"claude-opus-5-5-medium": map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.5, "resetTime": "2026-10-06T19:05:37Z"}},
+		"gemini-3.8-flash-high":  map[string]any{"quotaInfo": map[string]any{"remainingFraction": 0.25}},
 	}}
-	groups := antigravityGroups(payload, "free-tier")
+	groups := antigravityGroups(payload)
 	if len(groups) != 2 {
 		t.Fatalf("groups = %d, want 2", len(groups))
 	}
 	claude := findQuotaGroup(groups, "claude")
-	if claude == nil || claude.RemainingLabel == nil || *claude.RemainingLabel != "50%" {
+	if claude == nil || claude.RemainingFraction != 0.5 || claude.ResetTimeIso == nil {
 		t.Fatalf("claude = %+v", claude)
 	}
 	gemini := findQuotaGroup(groups, "gemini")
-	if gemini == nil || gemini.RemainingLabel == nil || *gemini.RemainingLabel != "25%" {
+	if gemini == nil || gemini.RemainingFraction != 0.25 {
 		t.Fatalf("gemini = %+v", gemini)
 	}
+	if claude.IsExhausted || gemini.IsExhausted {
+		t.Fatalf("partial quota must not be exhausted: %+v / %+v", claude, gemini)
+	}
 
-	empty := antigravityGroups(map[string]any{}, "free-tier")
+	empty := antigravityGroups(map[string]any{})
 	for _, group := range empty {
-		if group.RemainingLabel == nil || *group.RemainingLabel != "100%" {
+		if group.RemainingFraction != 1 || group.IsExhausted {
 			t.Fatalf("missing quota info should default to full: %+v", group)
 		}
 	}
