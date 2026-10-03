@@ -24,14 +24,14 @@
   },
   "cost": {
     "input": 0.195,
-    "output": 0.8,
+    "output": 0.85,
     "cacheRead": 0.05
   },
   "providerConfig": {
     "kilo_code": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768,
+      "maxOutputTokens": 131072,
       "authless": true
     },
     "nvidia_nim": {
@@ -47,7 +47,7 @@
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
-      "maxOutputTokens": 32768
+      "maxOutputTokens": 131072
     },
     "perch": {
       "upstream": "nemotron-3-5-lightning",

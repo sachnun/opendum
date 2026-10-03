@@ -2,6 +2,9 @@
   "providers": [
     "kiro"
   ],
+  "aliases": [
+    "claude-sonnet-5.5"
+  ],
   "reasoning": false,
   "reasoning_effort": [
     "low",
