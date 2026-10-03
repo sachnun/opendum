@@ -32,16 +32,22 @@
     "output": 128000
   },
   "cost": {
-    "input": 25,
-    "output": 125,
-    "cacheRead": 2.5,
-    "cacheWrite": 31.25
+    "input": 20,
+    "output": 100,
+    "cacheRead": 1,
+    "cacheWrite": 25
   },
   "providerConfig": {
     "antigravity": {
       "upstream": "claude-opus-5-5-medium",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000,
+      "allowedTiers": [
+        "g1-pro-tier",
+        "g1-ultra-tier",
+        "standard-tier",
+        "paid"
+      ],
       "anthropic_beta": true,
       "anthropic_beta_thinking": true,
       "convert_external_images": true,
@@ -52,15 +58,10 @@
       "strict_tool_schema": true,
       "system_instruction": true,
       "thinking_model": true,
-      "top_p_min_095": true,
-      "allowedTiers": [
-        "g1-pro-tier",
-        "g1-ultra-tier",
-        "standard-tier",
-        "paid"
-      ]
+      "top_p_min_095": true
     },
     "kiro": {
+      "upstream": "claude-opus-5.5",
       "contextWindow": 1000000,
       "maxOutputTokens": 128000,
       "allowedTiers": [
