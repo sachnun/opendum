@@ -34,7 +34,8 @@
       "upstream": "thinkingmachines/inkling-small:free",
       "contextWindow": 1048576,
       "maxOutputTokens": 262144,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "thinkingmachines/inkling-small:free",

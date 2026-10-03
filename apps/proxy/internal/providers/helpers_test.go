@@ -332,3 +332,30 @@ func TestUniqueStringsAndStringSlice(t *testing.T) {
 		t.Fatalf("stringSlice(non-slice) = %v, want empty", got)
 	}
 }
+
+func TestExtractPaidGoogleTier(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		payload map[string]any
+		want    string
+	}{
+		"google ai pro plan": {
+			payload: map[string]any{"paidTier": map[string]any{"id": "g1-pro-tier"}},
+			want:    "g1-pro-tier",
+		},
+		"free plan is ignored": {
+			payload: map[string]any{"paidTier": map[string]any{"id": "free-tier"}},
+			want:    "",
+		},
+		"missing paid tier": {payload: map[string]any{}, want: ""},
+	}
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := extractPaidGoogleTier(tc.payload); got != tc.want {
+				t.Fatalf("extractPaidGoogleTier(%v) = %q, want %q", tc.payload, got, tc.want)
+			}
+		})
+	}
+}

@@ -2,6 +2,8 @@ package providers
 
 import (
 	"encoding/json"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/opendum/opendum/apps/proxy/internal/models"
@@ -201,4 +203,81 @@ func antigravityModelMatching(t *testing.T, registry *models.Registry, match fun
 func jsonify(value any) string {
 	data, _ := json.Marshal(value)
 	return string(data)
+}
+
+func TestAntigravityRetiredModelNoticeIsDetected(t *testing.T) {
+	t.Parallel()
+	retired := `{"candidates":[{"content":{"parts":[{"text":"Claude Opus 4.6 is no longer available. Please switch to Claude Opus 5.5."}]}}]}`
+	var response map[string]any
+	if err := json.Unmarshal([]byte(retired), &response); err != nil {
+		t.Fatal(err)
+	}
+	notice, ok := geminiRetiredModelResponse(response)
+	if !ok {
+		t.Fatal("retired notice was not detected")
+	}
+	if !strings.Contains(notice, "Opus 5.5") {
+		t.Fatalf("notice = %q, want it to mention the replacement model", notice)
+	}
+
+	healthy := `{"candidates":[{"content":{"parts":[{"text":"pong"}]}}],"usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":1,"totalTokenCount":7}}`
+	response = map[string]any{}
+	if err := json.Unmarshal([]byte(healthy), &response); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := geminiRetiredModelResponse(response); ok {
+		t.Fatal("normal answer must not be treated as a retired notice")
+	}
+}
+
+func TestAntigravityStreamReportsRetiredModelAsError(t *testing.T) {
+	t.Parallel()
+	provider := antigravityProvider{}.delegate()
+	body := "data: {\"response\": {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"Claude Sonnet 4.6 is no longer available. Please switch to Claude Sonnet 5.5.\"}]}}]}}\n\n"
+	_, err := provider.geminiStreamToOpenAICompletion(t.Context(), strings.NewReader(body), "claude-sonnet-4-6", "sess", toolSchemaMap{})
+	if err == nil {
+		t.Fatal("retired model must return an error so the account is not marked healthy")
+	}
+	if !strings.Contains(err.Error(), "retired") {
+		t.Fatalf("err = %v, want retired model error", err)
+	}
+}
+
+func TestAntigravityRetiredNoticeBecomesNotFound(t *testing.T) {
+	t.Parallel()
+	body := "data: {\"response\": {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"Claude Opus 4.6 is no longer available. Please switch to Claude Opus 5.5.\"}]}}]}}\n\n"
+	reader, notice, retired := peekAntigravityRetiredNotice(strings.NewReader(body))
+	if !retired {
+		t.Fatal("retired notice must be detected before streaming starts")
+	}
+	if !strings.Contains(notice, "Opus 5.5") {
+		t.Fatalf("notice = %q, want the replacement model", notice)
+	}
+	if reader != nil {
+		t.Fatal("reader must be nil for a retired notice")
+	}
+
+	response := antigravityRetiredResponse(nil, notice)
+	if response.StatusCode != 404 {
+		t.Fatalf("status = %d, want 404 so the account rotates", response.StatusCode)
+	}
+	payload, _ := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if !strings.Contains(string(payload), "no longer available") {
+		t.Fatalf("body = %s, want the upstream notice preserved", payload)
+	}
+}
+
+func TestAntigravityPeekReplaysNormalStream(t *testing.T) {
+	t.Parallel()
+	body := "data: {\"response\": {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"pong\"}]}}]}}\n\n"
+	reader, _, retired := peekAntigravityRetiredNotice(strings.NewReader(body))
+	if retired {
+		t.Fatal("normal stream must not be treated as retired")
+	}
+	replayed, _ := io.ReadAll(reader)
+	_ = reader.Close()
+	if string(replayed) != body {
+		t.Fatalf("replayed = %q, want the full stream back", replayed)
+	}
 }

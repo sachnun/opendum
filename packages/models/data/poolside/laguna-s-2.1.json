@@ -30,7 +30,8 @@
       "upstream": "poolside/laguna-s-2.1:free",
       "contextWindow": 262144,
       "maxOutputTokens": 32768,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "poolside/laguna-s-2.1:free",

@@ -39,7 +39,8 @@
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b:free",
       "contextWindow": 1000000,
       "maxOutputTokens": 65536,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-ultra-550b-a55b",

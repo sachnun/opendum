@@ -28,7 +28,8 @@
       "upstream": "inclusionai/ling-3.0-flash-sante:free",
       "contextWindow": 262144,
       "maxOutputTokens": 32768,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "inclusionai/ling-3.0-flash-sante:free",

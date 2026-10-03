@@ -43,6 +43,7 @@ type ProviderModelConfig struct {
 	MinTier         string
 	AllowedTiers    []string
 	Authless        bool
+	Free            bool
 	Aliases         []string
 	Custom          map[string]any
 }
@@ -87,6 +88,10 @@ func (cfg *ProviderModelConfig) UnmarshalJSON(data []byte) error {
 			cfg.AllowedTiers = compactStrings(cfg.AllowedTiers)
 		case "authless":
 			if err := json.Unmarshal(value, &cfg.Authless); err != nil {
+				return err
+			}
+		case "free":
+			if err := json.Unmarshal(value, &cfg.Free); err != nil {
 				return err
 			}
 		case "aliases":
@@ -436,6 +441,11 @@ func (r *Registry) ProviderModelConfig(model, provider string) (ProviderModelCon
 func (r *Registry) IsAuthlessProviderModel(model, provider string) bool {
 	cfg, ok := r.ProviderModelConfig(model, provider)
 	return ok && cfg.Authless
+}
+
+func (r *Registry) IsFreeProviderModel(model, provider string) bool {
+	cfg, ok := r.ProviderModelConfig(model, provider)
+	return ok && cfg.Free
 }
 
 func (r *Registry) AuthlessProviderModels() map[string][]string {

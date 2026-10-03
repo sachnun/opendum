@@ -36,7 +36,8 @@
       "upstream": "stepfun/step-3.7-flash:free",
       "contextWindow": 262144,
       "maxOutputTokens": 262144,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "zenmux": {
       "upstream": "stepfun/step-3.7-flash",

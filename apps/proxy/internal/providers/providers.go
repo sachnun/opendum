@@ -78,6 +78,7 @@ type RefreshedCredentials struct {
 	ExpiresAt        time.Time
 	ProjectID        string
 	Tier             string
+	PaidTier         string
 	Email            string
 	AccountID        string
 	StoreAccessToken string

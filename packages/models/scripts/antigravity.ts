@@ -85,6 +85,8 @@ const GEMINI_31_PRO_LEVELS = ["low", "medium", "high"];
 const DOCUMENTED_BACKEND_OVERRIDES = new Map([
   ["Claude Sonnet 4.6 (thinking)", { key: "claude-sonnet-4-6", upstream: "claude-sonnet-4-6" }],
   ["Claude Opus 4.6 (thinking)", { key: "claude-opus-4-6", upstream: "claude-opus-4-6-thinking" }],
+  ["Claude Sonnet 5.5 (thinking)", { key: "claude-sonnet-5-5", upstream: "claude-sonnet-5-5-medium" }],
+  ["Claude Opus 5.5 (thinking)", { key: "claude-opus-5-5", upstream: "claude-opus-5-5-medium" }],
   ["GPT-OSS-120b", { key: "gpt-oss-120b", upstream: "gpt-oss-120b-medium" }],
 ]);
 
@@ -198,9 +200,9 @@ function parseReasoningModelNames(markdown) {
 
 function stripMarkdown(value) {
   return value
-    .replace(/\*\*/g, "")
+    .replace(/\*+/g, "")
     .replace(/`/g, "")
-    .replace(/\\\s*$/g, "")
+    .replace(/\\(?=\s|$)/g, "")
     .trim();
 }
 

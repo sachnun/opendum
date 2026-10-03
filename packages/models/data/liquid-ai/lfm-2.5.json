@@ -17,7 +17,8 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "liquid/lfm-2.5-2.6b:free",
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "liquid/lfm-2.5-2.6b:free"

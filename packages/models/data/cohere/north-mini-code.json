@@ -28,7 +28,8 @@
       "upstream": "cohere/north-mini-code:free",
       "contextWindow": 256000,
       "maxOutputTokens": 64000,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "cohere/north-mini-code:free",

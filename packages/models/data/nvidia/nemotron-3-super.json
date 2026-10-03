@@ -40,7 +40,8 @@
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free",
       "contextWindow": 262144,
       "maxOutputTokens": 235929,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3-super-120b-a12b:free",

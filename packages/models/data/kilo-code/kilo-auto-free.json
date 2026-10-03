@@ -6,7 +6,8 @@
   "providerConfig": {
     "kilo_code": {
       "upstream": "kilo-auto/free",
-      "authless": true
+      "authless": true,
+      "free": true
     }
   }
 }

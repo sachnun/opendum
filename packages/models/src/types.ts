@@ -27,6 +27,7 @@ interface ProviderModelConfig {
   contextWindow?: number;
   maxOutputTokens?: number;
   authless?: boolean;
+  free?: boolean;
   minTier?: string;
   allowedTiers?: string[];
   aliases?: string[];

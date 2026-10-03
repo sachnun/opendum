@@ -828,7 +828,7 @@ func isPaidAccountTier(provider string, tier *string) bool {
 	value := strings.ToLower(strings.TrimSpace(*tier))
 	switch provider {
 	case "antigravity":
-		return value == "paid" || value == "standard-tier"
+		return value == "paid" || value == "standard-tier" || strings.HasPrefix(value, "g1-")
 	case "kiro":
 		return value == "pro" || value == "pro+" || value == "pro-plus" || value == "power"
 	}

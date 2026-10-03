@@ -26,7 +26,8 @@ function normalizeAntigravityTierId(value: unknown): string {
 
 function isPaidAntigravityTierId(value: string): boolean {
   const normalized = normalizeAntigravityTierId(value);
-  return normalized === "paid" || normalized === "standard-tier";
+  if (!normalized || normalized === "free-tier") return false;
+  return normalized === "paid" || normalized === "standard-tier" || normalized.startsWith("g1-");
 }
 
 type CredentialAccount = Pick<ProviderAccount, "id" | "accessToken" | "refreshToken" | "expiresAt" | "email">;
@@ -206,7 +207,7 @@ async function fetchAccountInfo(
 
       const paidTier = data.paidTier as Record<string, unknown> | undefined;
       const paidTierId = extractTierId(paidTier ?? null);
-      if (!currentTierId && paidTierId && isPaidAntigravityTierId(paidTierId)) {
+      if (paidTierId && isPaidAntigravityTierId(paidTierId)) {
         detectedTier = paidTierId;
       }
 

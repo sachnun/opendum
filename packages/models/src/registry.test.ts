@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildModelIdMap, getProviderUpstream, syncProviderModels, writeModelJson } from "./registry.ts";
+import { buildModelIdMap, buildModelIndex, getProviderUpstream, syncProviderModels, writeModelJson } from "./registry.ts";
 import type { ModelData } from "./types.ts";
 
 function withTempDir<T>(run: (dir: string) => T): T {
@@ -96,5 +96,29 @@ test("syncProviderModels adds aliases to a colliding parent", () => {
     const parent = JSON.parse(readFileSync(join(dir, "base-model.json"), "utf-8")) as ModelData;
     assert.deepEqual(result.added, [], "collision should merge instead of adding a new file");
     assert.ok((parent.aliases ?? []).length > 0, "parent should gain aliases");
+  });
+});
+
+test("syncProviderModels keeps minor versions as separate models", () => {
+  withTempDir((dir) => {
+    writeModelJson(join(dir, "claude-opus-5.json"), { id: "claude-opus-5", providers: ["kiro"] });
+    const result = syncProviderModels(dir, "antigravity", new Map([["claude-opus-5-5", "claude-opus-5-5-medium"]]));
+
+    assert.deepEqual(result.added, ["claude-opus-5-5"]);
+    const base = JSON.parse(readFileSync(join(dir, "claude-opus-5.json"), "utf-8")) as ModelData;
+    assert.deepEqual(base.providers, ["kiro"], "base model must stay untouched");
+
+    const newerEntry = Object.values(buildModelIndex(dir)).find((entry) => entry.id === "claude-opus-5-5");
+    assert.ok(newerEntry, "newer minor version must exist as its own model");
+    assert.deepEqual(newerEntry.data.providers, ["antigravity"]);
+    assert.equal(newerEntry.data.providerConfig?.antigravity?.upstream, "claude-opus-5-5-medium");
+  });
+});
+
+test("syncProviderModels still folds real revision suffixes into the parent", () => {
+  withTempDir((dir) => {
+    writeModelJson(join(dir, "mock-model.json"), { id: "mock-model", providers: ["openrouter"] });
+    const result = syncProviderModels(dir, "openrouter", new Map([["mock-model-2", "vendor/mock-model-2"]]));
+    assert.deepEqual(result.added, [], "revision suffix should merge into the parent");
   });
 });

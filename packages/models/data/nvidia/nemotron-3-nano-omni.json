@@ -42,7 +42,8 @@
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
       "contextWindow": 256000,
       "maxOutputTokens": 65536,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",

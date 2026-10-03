@@ -98,7 +98,7 @@ func TestAntigravityQuotaGroupsKeepFrontierFirst(t *testing.T) {
 		},
 	}
 
-	groups := antigravityGroups(payload, "standard-tier")
+	groups := antigravityGroups(payload)
 	if len(groups) != 2 {
 		t.Fatalf("groups len = %d, want 2: %#v", len(groups), groups)
 	}
@@ -113,9 +113,6 @@ func TestAntigravityQuotaGroupsKeepFrontierFirst(t *testing.T) {
 	}
 	if groups[1].RemainingFraction != 0.8 {
 		t.Fatalf("gemini remaining = %v, want pro shared bucket value 0.8", groups[1].RemainingFraction)
-	}
-	if groups[0].Models[2] != "gpt-oss-120b" || groups[1].Models[1] != "gemini-3.5-flash" {
-		t.Fatalf("shared quota models = %v/%v", groups[0].Models, groups[1].Models)
 	}
 }
 

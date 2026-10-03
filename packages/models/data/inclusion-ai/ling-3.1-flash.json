@@ -29,7 +29,8 @@
       "upstream": "inclusionai/ling-3.1-flash",
       "contextWindow": 262144,
       "maxOutputTokens": 32768,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "opencode": {
       "upstream": "ling-3.1-flash-free",
