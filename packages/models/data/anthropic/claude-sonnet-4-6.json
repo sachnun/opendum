@@ -40,7 +40,7 @@
   },
   "providerConfig": {
     "antigravity": {
-      "upstream": "claude-sonnet-4-6",
+      "upstream": "claude-sonnet-4-6-thinking",
       "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "anthropic_beta": true,

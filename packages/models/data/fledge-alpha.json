@@ -1,0 +1,35 @@
+{
+  "providers": [
+    "opencode"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 131072
+  },
+  "cost": {
+    "input": 0,
+    "output": 0
+  },
+  "providerConfig": {
+    "opencode": {
+      "upstream": "fledge-alpha-free",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    }
+  }
+}
