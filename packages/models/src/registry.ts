@@ -21,7 +21,7 @@ const MODEL_PROPERTY_ORDER = [
   "providerConfig",
 ];
 
-const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "minTier", "allowedTiers", "aliases"];
+const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "free", "minTier", "allowedTiers", "aliases"];
 const COST_PROPERTY_ORDER = ["input", "output", "cacheRead", "cacheWrite"];
 const FIRST_PROVIDERS = new Set(["opencode"]);
 

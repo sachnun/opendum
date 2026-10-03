@@ -32,7 +32,8 @@
       "upstream": "nvidia/nemotron-3.5-lightning:free",
       "contextWindow": 262144,
       "maxOutputTokens": 131072,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "nvidia_nim": {
       "upstream": "nvidia/nemotron-3.5-lightning-30b-a3b",

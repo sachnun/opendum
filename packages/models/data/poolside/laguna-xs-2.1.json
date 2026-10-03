@@ -31,7 +31,8 @@
       "upstream": "poolside/laguna-xs-2.1:free",
       "contextWindow": 262144,
       "maxOutputTokens": 32768,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "nvidia_nim": {
       "upstream": "poolside/laguna-xs-2.1",

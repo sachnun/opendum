@@ -29,7 +29,8 @@
       "upstream": "dots-studio/dots-3-note-preview:free",
       "contextWindow": 512000,
       "maxOutputTokens": 460800,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "dots-studio/dots-3-note-preview:free",

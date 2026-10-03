@@ -28,7 +28,8 @@
       "upstream": "apodex/apodex-1.1-mini:free",
       "contextWindow": 262144,
       "maxOutputTokens": 235929,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "apodex/apodex-1.1-mini:free",

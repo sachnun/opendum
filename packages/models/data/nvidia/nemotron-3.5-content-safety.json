@@ -30,7 +30,8 @@
       "upstream": "nvidia/nemotron-3.5-content-safety:free",
       "contextWindow": 128000,
       "maxOutputTokens": 8192,
-      "authless": true
+      "authless": true,
+      "free": true
     },
     "openrouter": {
       "upstream": "nvidia/nemotron-3.5-content-safety:free",

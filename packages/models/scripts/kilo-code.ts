@@ -2,7 +2,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildModelIdMap, buildModelIndex, syncProviderModels, writeModelJson } from "../src/registry.ts";
+import { buildModelIdMap, syncProviderModels } from "../src/registry.ts";
 import { sleep, MAX_FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from "../src/http.ts";
 import { stripParamInfoKey } from "../src/clean-key.ts";
 
@@ -91,33 +91,20 @@ async function main() {
 
   const models = await fetchKiloCodeModels();
   const modelMap = buildModelMap(models);
+  const providerConfigByModel = new Map(
+    [...modelMap.keys()].map((modelKey) => [modelKey, { authless: true, free: true }])
+  );
 
-  const result = syncProviderModels(modelsDir, "kilo_code", modelMap);
-  const metadataUpdates = applyAuthlessMetadata(modelsDir, modelMap);
+  const result = syncProviderModels(modelsDir, "kilo_code", modelMap, {
+    providerConfigByModel,
+    managedProviderConfigKeys: ["authless", "free"],
+  });
 
-  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0 && metadataUpdates === 0) {
+  if (result.added.length === 0 && result.removed.length === 0 && result.updated.length === 0) {
     console.log(`Kilo Code models are already up to date (${modelMap.size} models).`);
   } else {
-    console.log(`Kilo Code: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}, metadata ${metadataUpdates}).`);
+    console.log(`Kilo Code: ${modelMap.size} free models (added ${result.added.length}, removed ${result.removed.length}, updated ${result.updated.length}).`);
   }
-}
-
-function applyAuthlessMetadata(modelsDir, modelMap) {
-  const index = buildModelIndex(modelsDir);
-  let updated = 0;
-
-  for (const entry of Object.values(index)) {
-    if (!entry.data.providers?.includes("kilo_code")) continue;
-    if (!entry.data.providerConfig?.kilo_code) continue;
-
-    if (entry.data.providerConfig.kilo_code.authless !== true) {
-      entry.data.providerConfig.kilo_code.authless = true;
-      writeModelJson(entry.path, entry.data);
-      updated += 1;
-    }
-  }
-
-  return updated;
 }
 
 main().catch((error) => {

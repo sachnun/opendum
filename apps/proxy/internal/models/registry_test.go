@@ -66,9 +66,9 @@ func TestKiloCodeOnlyExposesFreeAuthlessModels(t *testing.T) {
 		}
 	}
 
-	for model, upstream := range registry.ProviderModelMap("kilo_code") {
-		if !strings.HasSuffix(upstream, ":free") && upstream != "openrouter/free" && !strings.HasPrefix(upstream, "stealth/") {
-			t.Fatalf("kilo_code model %q must use free upstream, got %q", model, upstream)
+	for model := range registry.ProviderModelMap("kilo_code") {
+		if !registry.IsFreeProviderModel(model, "kilo_code") {
+			t.Fatalf("kilo_code model %q must be flagged free by the provider catalogue", model)
 		}
 		if !registry.IsAuthlessProviderModel(model, "kilo_code") {
 			t.Fatalf("kilo_code model %q must be authless", model)
