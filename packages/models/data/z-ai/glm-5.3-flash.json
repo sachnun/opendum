@@ -1,68 +1,7 @@
 {
-  "providers": [
-    "zenmux",
-    "hyper",
-    "perch",
-    "freebuff",
-    "nvidia_nim",
-    "workbuddy"
-  ],
-  "reasoning": true,
-  "reasoning_effort": [
-    "low",
-    "high",
-    "max"
-  ],
-  "modalities": {
-    "input": [
-      "image",
-      "pdf",
-      "text",
-      "video"
-    ],
-    "output": [
-      "text"
-    ]
-  },
-  "limit": {
-    "context": 1048576,
-    "output": 131072
-  },
-  "cost": {
-    "input": 0.75,
-    "output": 2.5,
-    "cacheRead": 0.15,
-    "cacheWrite": 0
-  },
   "providerConfig": {
     "freebuff": {
-      "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072,
       "agent": "base2-free-glm-5-3-flash"
-    },
-    "hyper": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "nvidia_nim": {
-      "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "perch": {
-      "upstream": "glm-5-3-flash",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "workbuddy": {
-      "contextWindow": 1048576,
-      "maxOutputTokens": 131072
-    },
-    "zenmux": {
-      "upstream": "z-ai/glm-5.3-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 128000
     }
   }
 }

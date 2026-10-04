@@ -1,0 +1,14 @@
+{
+  "providers": [],
+  "aliases": [
+    "mistral-medium-3-instruct"
+  ],
+  "reasoning": false,
+  "scores": {
+    "artificialAnalysis": {
+      "index": 9,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

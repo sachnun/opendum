@@ -1,0 +1,33 @@
+{
+  "id": "qwen3.6-max-preview",
+  "providers": [],
+  "aliases": [
+    "qwen3.6-max"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 256000,
+    "output": 64000
+  },
+  "cost": {
+    "input": 5.135,
+    "output": 30.81,
+    "cacheRead": 0.634,
+    "cacheWrite": 6.41875
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 28.4,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

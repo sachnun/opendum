@@ -1,11 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "phi-3-medium-4k-instruct",
-    "microsoft-phi-3-medium-4k-instruct",
-    "microsoft/phi-3-medium-4k-instruct"
-  ],
-  "ignored": true,
-  "reasoning": false,
-  "providerConfig": {}
+  "ignored": true
 }

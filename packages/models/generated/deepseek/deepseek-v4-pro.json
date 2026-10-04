@@ -1,0 +1,64 @@
+{
+  "providers": [
+    "zenmux",
+    "hyper",
+    "perch"
+  ],
+  "aliases": [
+    "@cf-deepseek-ai-deepseek-v4-pro-0813",
+    "@cf/deepseek-ai/deepseek-v4-pro-0813",
+    "deepseek-ai-deepseek-v4-pro-0813",
+    "deepseek-ai/DeepSeek-V4-Pro",
+    "deepseek-ai/deepseek-v4-pro",
+    "deepseek-ai/deepseek-v4-pro-0813",
+    "deepseek-pro",
+    "deepseek-v4-pro",
+    "deepseek-v4-pro-0813"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 384000
+  },
+  "cost": {
+    "input": 0.85,
+    "output": 4.35,
+    "cacheRead": 0.018125
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 36,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "deepseek-v4-pro-0813",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 262144
+    },
+    "perch": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 384000
+    },
+    "zenmux": {
+      "upstream": "deepseek/deepseek-v4-pro",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 384000
+    }
+  }
+}

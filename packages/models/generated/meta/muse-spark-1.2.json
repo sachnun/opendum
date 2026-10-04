@@ -1,0 +1,42 @@
+{
+  "id": "muse-spark-1.2",
+  "providers": [],
+  "aliases": [
+    "muse-spark-1.2-contributor"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 65536
+  },
+  "cost": {
+    "input": 0.5,
+    "output": 1,
+    "cacheRead": 0.01
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 39.6,
+      "estimated": false,
+      "version": "4.3"
+    }
+  }
+}

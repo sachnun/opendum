@@ -1,11 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "codegemma-1.1-7b",
-    "google-codegemma-1.1-7b",
-    "google/codegemma-1.1-7b"
-  ],
-  "ignored": true,
-  "reasoning": false,
-  "providerConfig": {}
+  "ignored": true
 }

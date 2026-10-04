@@ -1,0 +1,14 @@
+{
+  "id": "mimo-v2-omni",
+  "providers": [],
+  "aliases": [
+    "mimo-omni"
+  ],
+  "scores": {
+    "artificialAnalysis": {
+      "index": 23.9,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

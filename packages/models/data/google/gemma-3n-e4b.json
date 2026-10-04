@@ -1,10 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "gemma-3n-e4b-it",
-    "google-gemma-3n-e4b-it",
-    "google/gemma-3n-e4b-it"
-  ],
-  "ignored": true,
-  "reasoning": false
+  "ignored": true
 }

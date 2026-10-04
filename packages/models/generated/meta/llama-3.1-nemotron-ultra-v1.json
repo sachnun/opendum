@@ -1,0 +1,13 @@
+{
+  "id": "llama-3.1-nemotron-ultra-253b",
+  "providers": [],
+  "aliases": [
+    "llama-3.1-nemotron-ultra",
+    "llama-3.1-nemotron-ultra-253b-v1",
+    "llama-3.1-nemotron-ultra-v1",
+    "nvidia-llama-3.1-nemotron-ultra-253b-v1",
+    "nvidia-llama-3.1-nemotron-ultra-v1",
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+  ],
+  "reasoning": true
+}

@@ -1,0 +1,9 @@
+{
+  "providers": [],
+  "aliases": [
+    "microsoft-phi-3-medium-128k-instruct",
+    "microsoft/phi-3-medium-128k-instruct",
+    "phi-3-medium-128k-instruct"
+  ],
+  "reasoning": false
+}

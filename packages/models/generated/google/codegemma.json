@@ -1,0 +1,16 @@
+{
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "codegemma-7b",
+    "google-codegemma-7b",
+    "google/codegemma-7b"
+  ],
+  "reasoning": false,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/codegemma-7b"
+    }
+  }
+}

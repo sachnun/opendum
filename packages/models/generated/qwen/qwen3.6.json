@@ -1,0 +1,53 @@
+{
+  "id": "qwen3.6-27b",
+  "providers": [
+    "perch"
+  ],
+  "aliases": [
+    "Qwen-Qwen3.6-35B-A3B",
+    "Qwen/Qwen3.6-27B",
+    "Qwen/Qwen3.6-35B-A3B",
+    "qwen3.6",
+    "qwen3.6-35b-a3b"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 65536
+  },
+  "cost": {
+    "input": 0.75,
+    "output": 2.5
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 21.4,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "perch": {
+      "upstream": "qwen-3.6",
+      "contextWindow": 262144,
+      "maxOutputTokens": 65536
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "providers": [],
+  "aliases": [
+    "devstral-2-123b-instruct-2512",
+    "devstral-2-instruct"
+  ],
+  "scores": {
+    "artificialAnalysis": {
+      "index": 8.6,
+      "estimated": false,
+      "version": "4.3"
+    }
+  }
+}

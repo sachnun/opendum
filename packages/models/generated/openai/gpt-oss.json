@@ -1,0 +1,51 @@
+{
+  "id": "gpt-oss-120b",
+  "providers": [
+    "hyper",
+    "nvidia_nim",
+    "workers_ai"
+  ],
+  "aliases": [
+    "@cf-openai-gpt-oss-120b",
+    "@cf-openai-gpt-oss-20b",
+    "@cf/openai/gpt-oss-120b",
+    "@cf/openai/gpt-oss-20b",
+    "gpt-oss",
+    "gpt-oss-120b-medium",
+    "gpt-oss-20b",
+    "gpt-oss-medium",
+    "openai-gpt-oss-120b",
+    "openai-gpt-oss-20b",
+    "openai-gpt-oss-20b:free",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-20b:free"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 11.6,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "gpt-oss-120b"
+    },
+    "nvidia_nim": {
+      "upstream": "openai/gpt-oss-20b"
+    },
+    "workers_ai": {
+      "upstream": "@cf/openai/gpt-oss-20b"
+    }
+  }
+}

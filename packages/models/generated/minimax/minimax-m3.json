@@ -1,0 +1,60 @@
+{
+  "id": "MiniMax-M3",
+  "providers": [
+    "hyper",
+    "perch",
+    "zenmux"
+  ],
+  "aliases": [
+    "minimax-m3",
+    "minimax-m3-free"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 512000
+  },
+  "cost": {
+    "input": 1.4,
+    "output": 5.5,
+    "cacheRead": 0.28
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 29.2,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "minimax-m3",
+      "contextWindow": 512000,
+      "maxOutputTokens": 512000
+    },
+    "perch": {
+      "upstream": "minimax-m3",
+      "contextWindow": 524288,
+      "maxOutputTokens": 512000
+    },
+    "zenmux": {
+      "upstream": "minimax/minimax-m3",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 512000
+    }
+  }
+}

@@ -1,9 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "nemotron-4-mini-hindi-4b-instruct",
-    "nemotron-4-mini-hindi-instruct"
-  ],
-  "ignored": true,
-  "providerConfig": {}
+  "ignored": true
 }

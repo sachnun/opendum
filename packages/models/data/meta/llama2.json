@@ -1,15 +1,3 @@
 {
-  "providers": [
-    "nvidia_nim"
-  ],
-  "aliases": [
-    "llama2-70b",
-    "meta/llama2-70b"
-  ],
-  "ignored": true,
-  "providerConfig": {
-    "nvidia_nim": {
-      "upstream": "meta/llama2-70b"
-    }
-  }
+  "ignored": true
 }

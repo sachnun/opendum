@@ -1,0 +1,9 @@
+{
+  "id": "nemotron-mini-4b-instruct",
+  "providers": [],
+  "aliases": [
+    "nemotron-mini",
+    "nemotron-mini-instruct",
+    "nvidia/nemotron-mini-4b-instruct"
+  ]
+}

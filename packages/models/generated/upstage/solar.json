@@ -1,0 +1,8 @@
+{
+  "providers": [],
+  "aliases": [
+    "solar-10.7b-instruct",
+    "solar-instruct",
+    "upstage/solar-10.7b-instruct"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "providers": [],
+  "aliases": [
+    "mixtral-8x22b-instruct",
+    "mixtral-8x22b-instruct-v0.1"
+  ]
+}

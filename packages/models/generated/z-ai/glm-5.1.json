@@ -1,0 +1,28 @@
+{
+  "providers": [],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 202750,
+    "output": 3276
+  },
+  "cost": {
+    "input": 4.83,
+    "output": 15.18,
+    "cacheRead": 0.897
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 26.1,
+      "estimated": false,
+      "version": "4.3"
+    }
+  }
+}

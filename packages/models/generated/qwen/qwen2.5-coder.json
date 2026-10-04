@@ -1,0 +1,21 @@
+{
+  "id": "qwen2.5-coder-32b-instruct",
+  "providers": [],
+  "aliases": [
+    "qwen-qwen2.5-coder-32b-instruct",
+    "qwen-qwen2.5-coder-7b-instruct",
+    "qwen/qwen2.5-coder-32b-instruct",
+    "qwen/qwen2.5-coder-7b-instruct",
+    "qwen2.5-coder",
+    "qwen2.5-coder-32b",
+    "qwen2.5-coder-7b"
+  ],
+  "reasoning": false,
+  "scores": {
+    "artificialAnalysis": {
+      "index": 6.7,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

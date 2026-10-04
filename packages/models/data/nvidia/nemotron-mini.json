@@ -1,9 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "nemotron-mini-4b-instruct",
-    "nvidia/nemotron-mini-4b-instruct",
-    "nemotron-mini-instruct"
-  ],
   "ignored": true
 }

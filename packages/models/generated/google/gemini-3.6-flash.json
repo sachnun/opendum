@@ -1,0 +1,52 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "aliases": [
+    "gemini-3.6-flash-high",
+    "gemini-3.6-flash-low",
+    "gemini-3.6-flash-medium"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "pdf",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 65536
+  },
+  "cost": {
+    "input": 3.75,
+    "output": 18.75,
+    "cacheRead": 0.375,
+    "cacheWrite": 0.208333
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 34,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-3.6-flash-medium",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536
+    }
+  }
+}

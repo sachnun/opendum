@@ -1,0 +1,18 @@
+{
+  "id": "claude-3-7-sonnet-20250219",
+  "providers": [],
+  "aliases": [
+    "claude-3-7-sonnet",
+    "claude-3-7-sonnet-latest",
+    "claude-3.7-sonnet",
+    "claude-3.7-sonnet-latest"
+  ],
+  "reasoning": true,
+  "scores": {
+    "artificialAnalysis": {
+      "index": 15.3,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

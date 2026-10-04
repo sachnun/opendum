@@ -1,0 +1,21 @@
+{
+  "id": "llama-3.1-nemotron-70b-instruct",
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "llama-3.1-nemotron",
+    "llama-3.1-nemotron-51b-instruct",
+    "llama-3.1-nemotron-instruct",
+    "nvidia-llama-3.1-nemotron-51b-instruct",
+    "nvidia-llama-3.1-nemotron-70b-instruct",
+    "nvidia/llama-3.1-nemotron-51b-instruct",
+    "nvidia/llama-3.1-nemotron-70b-instruct"
+  ],
+  "reasoning": false,
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "nvidia/llama-3.1-nemotron-70b-instruct"
+    }
+  }
+}

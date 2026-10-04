@@ -1,0 +1,49 @@
+{
+  "providers": [
+    "workers_ai",
+    "zenmux"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 200000,
+    "output": 131072
+  },
+  "cost": {
+    "input": 0.3,
+    "output": 2,
+    "cacheRead": 0.05,
+    "cacheWrite": 0
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 14.9,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "workers_ai": {
+      "upstream": "@cf/zai-org/glm-4.7-flash",
+      "contextWindow": 131072,
+      "maxOutputTokens": 131072
+    },
+    "zenmux": {
+      "upstream": "z-ai/glm-4.7-flash-free",
+      "contextWindow": 200000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

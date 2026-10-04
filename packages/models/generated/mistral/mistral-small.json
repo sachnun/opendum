@@ -1,0 +1,15 @@
+{
+  "providers": [],
+  "aliases": [
+    "mistral-small-24b-instruct",
+    "mistral-small-instruct"
+  ],
+  "reasoning": false,
+  "scores": {
+    "artificialAnalysis": {
+      "index": 5.8,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

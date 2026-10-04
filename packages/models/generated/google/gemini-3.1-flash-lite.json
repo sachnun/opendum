@@ -1,0 +1,38 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 65536
+  },
+  "cost": {
+    "input": 1.25,
+    "output": 7.5,
+    "cacheRead": 0.125,
+    "cacheWrite": 0.416667
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "gemini-3.1-flash-lite",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 65536
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "qwq-32b",
+  "providers": [],
+  "aliases": [
+    "qwen-qwq-32b",
+    "qwen/qwq-32b",
+    "qwq"
+  ],
+  "reasoning": false
+}

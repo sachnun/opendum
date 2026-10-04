@@ -1,0 +1,38 @@
+{
+  "providers": [
+    "kilo_code",
+    "openrouter"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "high"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262144,
+    "output": 32768
+  },
+  "cost": {
+    "input": 0,
+    "output": 0
+  },
+  "providerConfig": {
+    "kilo_code": {
+      "upstream": "inclusionai/ling-3.0-flash-sante:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
+    },
+    "openrouter": {
+      "upstream": "inclusionai/ling-3.0-flash-sante:free",
+      "contextWindow": 262144,
+      "maxOutputTokens": 32768
+    }
+  }
+}

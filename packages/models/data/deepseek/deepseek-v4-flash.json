@@ -1,61 +1,7 @@
 {
-  "providers": [
-    "zenmux",
-    "hyper",
-    "freebuff"
-  ],
-  "aliases": [
-    "@cf-deepseek-ai-deepseek-v4-flash-0731",
-    "@cf/deepseek-ai/deepseek-v4-flash-0731",
-    "deepseek-ai-deepseek-v4-flash-0731",
-    "deepseek-ai/DeepSeek-V4-Flash",
-    "deepseek-ai/deepseek-v4-flash",
-    "deepseek-ai/deepseek-v4-flash-0731",
-    "deepseek-flash",
-    "deepseek-v4-flash",
-    "deepseek-v4-flash-0731",
-    "deepseek-v4-flash-free"
-  ],
-  "ignored": false,
-  "reasoning": true,
-  "reasoning_effort": [
-    "low",
-    "medium",
-    "high"
-  ],
-  "modalities": {
-    "input": [
-      "text"
-    ],
-    "output": [
-      "text"
-    ]
-  },
-  "limit": {
-    "context": 1048576,
-    "output": 384000
-  },
-  "cost": {
-    "input": 0.076,
-    "output": 0.9,
-    "cacheRead": 0.014
-  },
   "providerConfig": {
     "freebuff": {
-      "upstream": "deepseek/deepseek-v4-flash",
-      "contextWindow": 1048576,
-      "maxOutputTokens": 384000,
       "agent": "base2-free-deepseek-flash"
-    },
-    "hyper": {
-      "upstream": "deepseek-v4-flash-0731",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 384000
-    },
-    "zenmux": {
-      "upstream": "deepseek/deepseek-v4-flash",
-      "contextWindow": 1000000,
-      "maxOutputTokens": 384000
     }
   }
 }

@@ -1,0 +1,16 @@
+{
+  "id": "gemini-3-flash-preview",
+  "providers": [],
+  "aliases": [
+    "gemini-3-flash",
+    "gemini-3-flash-preview-latest"
+  ],
+  "reasoning": true,
+  "scores": {
+    "artificialAnalysis": {
+      "index": 17.9,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

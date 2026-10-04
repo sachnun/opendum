@@ -1,9 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "phi-4-multimodal-instruct",
-    "microsoft/phi-4-multimodal-instruct"
-  ],
-  "ignored": true,
-  "reasoning": false
+  "ignored": true
 }

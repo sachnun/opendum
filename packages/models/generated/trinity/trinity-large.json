@@ -1,0 +1,16 @@
+{
+  "id": "trinity-large-preview",
+  "providers": [],
+  "aliases": [
+    "trinity-large",
+    "trinity-large-thinking"
+  ],
+  "reasoning": true,
+  "scores": {
+    "artificialAnalysis": {
+      "index": 10.8,
+      "estimated": false,
+      "version": "4.3"
+    }
+  }
+}

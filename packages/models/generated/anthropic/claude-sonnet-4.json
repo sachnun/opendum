@@ -1,0 +1,17 @@
+{
+  "id": "claude-sonnet-4-0",
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-4",
+    "claude-sonnet-4.0",
+    "claude-sonnet4.0"
+  ],
+  "reasoning": true,
+  "providerConfig": {
+    "kiro": {
+      "upstream": "claude-sonnet-4"
+    }
+  }
+}

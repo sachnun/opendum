@@ -1,0 +1,52 @@
+{
+  "id": "diffusiongemma-26b-a4b-it",
+  "providers": [
+    "nvidia_nim"
+  ],
+  "aliases": [
+    "diffusiongemma",
+    "diffusiongemma-it",
+    "google-diffusiongemma-26b-a4b-it",
+    "google/diffusiongemma-26b-a4b-it"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 250000,
+    "output": 32768
+  },
+  "cost": {
+    "input": 0.3375,
+    "output": 1.125,
+    "cacheRead": 0.1875
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 9.5,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "nvidia_nim": {
+      "upstream": "google/diffusiongemma-26b-a4b-it",
+      "contextWindow": 250000,
+      "maxOutputTokens": 32768
+    }
+  }
+}

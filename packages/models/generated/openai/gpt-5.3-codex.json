@@ -1,0 +1,36 @@
+{
+  "providers": [],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 400000,
+    "output": 128000
+  },
+  "cost": {
+    "input": 8.75,
+    "output": 70,
+    "cacheRead": 0.875
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 32.5,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

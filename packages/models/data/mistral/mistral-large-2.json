@@ -1,10 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "mistral-large-2-instruct",
-    "mistralai-mistral-large-2-instruct",
-    "mistralai/mistral-large-2-instruct"
-  ],
-  "ignored": true,
-  "reasoning": false
+  "ignored": true
 }

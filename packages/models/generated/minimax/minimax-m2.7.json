@@ -1,0 +1,42 @@
+{
+  "id": "MiniMax-M2.7",
+  "providers": [
+    "hyper"
+  ],
+  "aliases": [
+    "minimax-m2.7",
+    "minimax-m2.7-free"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 262100,
+    "output": 6553
+  },
+  "cost": {
+    "input": 1.05,
+    "output": 4.2,
+    "cacheRead": 0.21
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 22.8,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "hyper": {
+      "upstream": "minimax-m2.7",
+      "contextWindow": 262100,
+      "maxOutputTokens": 6553
+    }
+  }
+}

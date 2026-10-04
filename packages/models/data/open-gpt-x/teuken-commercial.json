@@ -1,9 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "teuken-7b-instruct-commercial-v0.4",
-    "teuken-instruct-commercial"
-  ],
-  "ignored": true,
-  "providerConfig": {}
+  "ignored": true
 }

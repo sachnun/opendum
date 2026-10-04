@@ -1,0 +1,11 @@
+{
+  "providers": [],
+  "reasoning": true,
+  "scores": {
+    "artificialAnalysis": {
+      "index": 14.1,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

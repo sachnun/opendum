@@ -1,9 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "dolphin-mistral-24b-venice-edition",
-    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
-  ],
-  "ignored": true,
-  "reasoning": false
+  "ignored": true
 }

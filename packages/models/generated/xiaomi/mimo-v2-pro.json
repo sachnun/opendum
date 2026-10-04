@@ -1,0 +1,14 @@
+{
+  "id": "mimo-v2-pro",
+  "providers": [],
+  "aliases": [
+    "mimo-pro"
+  ],
+  "scores": {
+    "artificialAnalysis": {
+      "index": 28.6,
+      "estimated": true,
+      "version": "4.3"
+    }
+  }
+}

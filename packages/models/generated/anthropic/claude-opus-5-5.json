@@ -1,0 +1,59 @@
+{
+  "id": "claude-opus-5-5",
+  "providers": [
+    "antigravity",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-opus-5-5-high",
+    "claude-opus-5-5-low",
+    "claude-opus-5-5-medium"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 128000
+  },
+  "cost": {
+    "input": 20,
+    "output": 100,
+    "cacheRead": 1,
+    "cacheWrite": 25
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 57.6,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "claude-opus-5-5-medium",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    },
+    "kiro": {
+      "upstream": "claude-opus-5.5",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

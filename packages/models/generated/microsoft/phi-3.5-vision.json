@@ -1,0 +1,9 @@
+{
+  "providers": [],
+  "aliases": [
+    "microsoft-phi-3.5-vision-instruct",
+    "microsoft/phi-3.5-vision-instruct",
+    "phi-3.5-vision-instruct"
+  ],
+  "reasoning": false
+}

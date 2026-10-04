@@ -1,7 +1,3 @@
 {
-  "providers": [
-    "workbuddy"
-  ],
-  "ignored": true,
-  "reasoning": true
+  "ignored": true
 }

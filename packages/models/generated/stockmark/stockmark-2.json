@@ -1,0 +1,8 @@
+{
+  "providers": [],
+  "aliases": [
+    "stockmark-2-100b-instruct",
+    "stockmark-2-instruct",
+    "stockmark/stockmark-2-100b-instruct"
+  ]
+}

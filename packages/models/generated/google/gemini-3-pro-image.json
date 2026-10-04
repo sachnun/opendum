@@ -1,0 +1,8 @@
+{
+  "providers": [],
+  "aliases": [
+    "gemini-3-pro-image",
+    "gemini-3-pro-image-preview"
+  ],
+  "reasoning": false
+}

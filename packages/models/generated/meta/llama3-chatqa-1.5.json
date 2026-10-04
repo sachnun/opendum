@@ -1,0 +1,9 @@
+{
+  "providers": [],
+  "aliases": [
+    "llama3-chatqa-1.5-70b",
+    "nvidia-llama3-chatqa-1.5-70b",
+    "nvidia/llama3-chatqa-1.5-70b"
+  ],
+  "reasoning": false
+}

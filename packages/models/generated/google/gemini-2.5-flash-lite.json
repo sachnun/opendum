@@ -1,0 +1,40 @@
+{
+  "providers": [
+    "antigravity"
+  ],
+  "reasoning": true,
+  "modalities": {
+    "input": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1024000,
+    "output": 64000
+  },
+  "cost": {
+    "input": 0.35,
+    "output": 1.4,
+    "cacheRead": 0.05,
+    "cacheWrite": 0.416667
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 6.7,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "contextWindow": 1024000,
+      "maxOutputTokens": 64000
+    }
+  }
+}

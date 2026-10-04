@@ -1,0 +1,59 @@
+{
+  "providers": [
+    "hyper",
+    "workbuddy",
+    "perch",
+    "nvidia_nim"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "high",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1048576,
+    "output": 131072
+  },
+  "cost": {
+    "input": 4.5,
+    "output": 20,
+    "cacheRead": 0.7,
+    "cacheWrite": 0
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 44.8,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "hyper": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    },
+    "nvidia_nim": {
+      "upstream": "z-ai/glm-5.3",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "perch": {
+      "upstream": "glm-5-3",
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "workbuddy": {
+      "contextWindow": 1048576,
+      "maxOutputTokens": 131072
+    }
+  }
+}

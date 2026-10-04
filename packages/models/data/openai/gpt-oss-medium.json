@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "gpt-oss-120b-medium"
-  ],
-  "ignored": true,
-  "reasoning": true,
-  "providerConfig": {}
-}

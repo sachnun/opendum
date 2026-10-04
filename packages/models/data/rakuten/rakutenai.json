@@ -1,11 +1,3 @@
 {
-  "providers": [],
-  "aliases": [
-    "rakutenai-7b-chat",
-    "rakutenai-7b-instruct",
-    "rakutenai-chat",
-    "rakutenai-instruct"
-  ],
-  "ignored": true,
-  "providerConfig": {}
+  "ignored": true
 }

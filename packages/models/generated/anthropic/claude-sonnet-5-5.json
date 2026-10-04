@@ -1,0 +1,59 @@
+{
+  "id": "claude-sonnet-5-5",
+  "providers": [
+    "antigravity",
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-5-5-high",
+    "claude-sonnet-5-5-low",
+    "claude-sonnet-5-5-medium"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 1000000,
+    "output": 128000
+  },
+  "cost": {
+    "input": 10,
+    "output": 50,
+    "cacheRead": 1,
+    "cacheWrite": 12.5
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 56,
+      "estimated": false,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "antigravity": {
+      "upstream": "claude-sonnet-5-5-medium",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    },
+    "kiro": {
+      "upstream": "claude-sonnet-5.5",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    }
+  }
+}

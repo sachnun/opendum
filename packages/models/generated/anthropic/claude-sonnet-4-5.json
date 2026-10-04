@@ -1,0 +1,53 @@
+{
+  "providers": [
+    "kiro"
+  ],
+  "aliases": [
+    "claude-sonnet-4-5-1m",
+    "claude-sonnet-4.5",
+    "claude-sonnet-4.5-1m",
+    "claude-sonnet4.5"
+  ],
+  "reasoning": true,
+  "reasoning_effort": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "modalities": {
+    "input": [
+      "image",
+      "pdf",
+      "text"
+    ],
+    "output": [
+      "text"
+    ]
+  },
+  "limit": {
+    "context": 200000,
+    "output": 64000
+  },
+  "cost": {
+    "input": 15,
+    "output": 75,
+    "cacheRead": 1.5,
+    "cacheWrite": 18.75
+  },
+  "scores": {
+    "artificialAnalysis": {
+      "index": 19.3,
+      "estimated": true,
+      "version": "4.3"
+    }
+  },
+  "providerConfig": {
+    "kiro": {
+      "upstream": "claude-sonnet-4.5-1m",
+      "contextWindow": 200000,
+      "maxOutputTokens": 64000
+    }
+  }
+}

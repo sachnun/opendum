@@ -1,0 +1,7 @@
+{
+  "providers": [],
+  "aliases": [
+    "falcon3-7b-instruct",
+    "falcon3-instruct"
+  ]
+}
