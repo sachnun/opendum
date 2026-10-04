@@ -152,6 +152,74 @@ function isPaidGoogleTierId(id: string): boolean {
   return lower === "paid" || lower === "standard-tier";
 }
 
+const ANTIGRAVITY_CLAUDE_FLAGS = new Set([
+  "anthropic_beta",
+  "anthropic_beta_thinking",
+  "convert_external_images",
+  "force_stream_non_stream",
+  "sanitize_tool_blocks",
+  "strict_thought_signatures",
+  "strict_tool_schema",
+  "system_instruction",
+  "thinking_model",
+  "top_p_min_095",
+]);
+
+const GEMINI_THINKING_LEVELS: Json = {
+  high: "high",
+  low: "low",
+  medium: "medium",
+  none: "minimal",
+  xhigh: "high",
+};
+
+const GEMINI_FLASH_THINKING_BUDGETS: Json = { high: 24576, low: 6144, medium: 12288, xhigh: 24576 };
+const GEMINI_PRO_THINKING_BUDGETS: Json = { high: 32768, low: 8192, medium: 16384, xhigh: 32768 };
+
+function normalizeAntigravityTieredModel(model: string): string {
+  const value = model.trim().toLowerCase();
+  for (const suffix of ["-minimal", "-low", "-medium", "-high"]) {
+    if (value.endsWith(suffix)) return value.slice(0, -suffix.length);
+  }
+  return value;
+}
+
+// Antigravity request shaping is fixed per model family, so it is derived from
+// the model name rather than stored in the registry. Registry values still win
+// when an authored model config provides them.
+function antigravityConfigValue(model: string, key: string): { found: boolean; value: unknown } {
+  const name = normalizeAntigravityTieredModel(model);
+  if (name.startsWith("gemini-")) {
+    const image = name.includes("image");
+    const pro = name.includes("pro");
+    const levelThinking = name.startsWith("gemini-3") && !pro && !image;
+    switch (key) {
+      case "inject_thought_signature":
+      case "scrub_model_artifacts":
+        return { found: true, value: true };
+      case "signature_family":
+        return { found: true, value: "gemini-flash" };
+      case "system_instruction":
+        return { found: true, value: name.startsWith("gemini-3") && !image };
+      case "thinking_format":
+        if (image) return { found: false, value: undefined };
+        return { found: true, value: levelThinking ? "level" : "budget" };
+      case "thinking_levels":
+        return levelThinking ? { found: true, value: GEMINI_THINKING_LEVELS } : { found: false, value: undefined };
+      case "thinking_budgets":
+        if (image || levelThinking) return { found: false, value: undefined };
+        return { found: true, value: pro ? GEMINI_PRO_THINKING_BUDGETS : GEMINI_FLASH_THINKING_BUDGETS };
+      default:
+        return { found: false, value: undefined };
+    }
+  }
+  if (name.startsWith("claude-")) {
+    if (ANTIGRAVITY_CLAUDE_FLAGS.has(key)) return { found: true, value: true };
+    if (key === "signature_family") return { found: true, value: "claude" };
+  }
+  return { found: false, value: undefined };
+}
+
 export type AntigravityOptions = {
   registry: Registry;
   transport: UpstreamTransport;
@@ -408,7 +476,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     if (!sessionId) sessionId = toNumericSessionId(randomUuid());
 
     const geminiPayload = openAiToGemini(normalizedBody);
-    this.transformAntigravityPayload(geminiPayload, modelName, sessionId);
+    await this.transformAntigravityPayload(geminiPayload, modelName, sessionId);
     const toolSchemas = buildToolSchemaMap(geminiPayload.tools);
     if (!this.configBool(modelName, "strict_tool_schema")) sanitizeToolSchemaKeys(toolSchemas);
 
@@ -459,13 +527,13 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
       return resp as Response;
     }
 
+    let streamBody: ReadableStream<Uint8Array> | null = resp.body;
     if (request.stream || actualStream) {
-      const { retired, notice } = await peekRetiredNotice(resp);
+      const { retired, notice, body } = await peekRetiredNotice(resp);
       if (retired) return retiredResponse(notice);
-      void notice;
+      streamBody = body ?? resp.body;
     }
-    if (!resp.body) throw new Error("antigravity response stream is empty");
-    const streamBody = resp.body;
+    if (!streamBody) throw new Error("antigravity response stream is empty");
 
     if (request.stream) {
       return new Response(geminiSseToOpenAiStream(this, streamBody, modelName, sessionId, toolSchemas), {
@@ -489,11 +557,13 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
 
   private configValue(model: string, key: string): unknown {
     const cfg = this.registry.providerModelConfig(model, this.name);
-    if (!cfg) return undefined;
-    if (key in cfg) return cfg[key];
-    const custom = cfg.custom;
-    if (custom && typeof custom === "object" && key in custom) return custom[key];
-    return undefined;
+    if (cfg) {
+      if (key in cfg) return cfg[key];
+      const custom = cfg.custom;
+      if (custom && typeof custom === "object" && key in custom) return custom[key];
+    }
+    const derived = antigravityConfigValue(model, key);
+    return derived.found ? derived.value : undefined;
   }
 
   private configBool(model: string, key: string): boolean {
@@ -848,7 +918,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     }
   }
 
-  transformAntigravityPayload(payload: Json, model: string, sessionId: string): void {
+  async transformAntigravityPayload(payload: Json, model: string, sessionId: string): Promise<void> {
     delete payload.safetySettings;
     if (payload.system_instruction !== undefined) {
       payload.systemInstruction = payload.system_instruction;
@@ -862,7 +932,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     else sanitizeGeminiToolNames(payload);
     sortFunctionDeclarations(payload);
     this.applyAntigravitySystemInstruction(payload, model);
-    this.normalizeAntigravityContentsSync(payload, model, sessionId);
+    await this.normalizeAntigravityContents(payload, model, sessionId);
     stripTrailingModelTurns(payload);
     payload.sessionId = sessionId;
   }
@@ -888,7 +958,7 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     payload.systemInstruction = existingRecord;
   }
 
-  private normalizeAntigravityContentsSync(payload: Json, model: string, sessionId: string): void {
+  private async normalizeAntigravityContents(payload: Json, model: string, sessionId: string): Promise<void> {
     const contents = anySlice(payload.contents);
     const strict = this.configBool(model, "strict_tool_schema");
     const functionCallIdQueues: Record<string, string[]> = {};
@@ -908,20 +978,20 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
           let signature = stringValue(part.thoughtSignature);
           if (strict) {
             if (!signature || signature.length < 50) {
-              const cached = CACHE_SYNC.get(this.signatureCacheKey(model, sessionId, thoughtText)) ?? "";
+              const cached = await this.getCachedSignature(model, sessionId, thoughtText);
               if (cached) {
                 signature = cached;
                 part.thoughtSignature = cached;
               }
             }
             if (signature.length > 50) {
-              CACHE_SYNC.set(this.signatureCacheKey(model, sessionId, thoughtText), signature);
+              await this.cacheSignature(model, sessionId, thoughtText, signature);
               currentThoughtSignature = signature;
             } else {
               continue;
             }
           } else {
-            const cached = CACHE_SYNC.get(this.signatureCacheKey(model, sessionId, thoughtText)) ?? "";
+            const cached = await this.getCachedSignature(model, sessionId, thoughtText);
             if (cached) {
               part.thoughtSignature = cached;
               currentThoughtSignature = cached;
@@ -974,8 +1044,6 @@ export class AntigravityProvider implements Provider, CredentialRefresher, Refre
     payload.contents = kept;
   }
 }
-
-const CACHE_SYNC = new Map<string, string>();
 
 function normalizedThinkingMap(value: unknown): Json | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;

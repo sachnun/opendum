@@ -390,36 +390,69 @@ export function retiredResponse(notice: string | null): Response {
   });
 }
 
-export async function peekRetiredNotice(resp: Response): Promise<{ retired: boolean; notice: string | null }> {
-  if (!resp.body) return { retired: false, notice: null };
+export async function peekRetiredNotice(
+  resp: Response
+): Promise<{ retired: boolean; notice: string | null; body: ReadableStream<Uint8Array> | null }> {
+  if (!resp.body) return { retired: false, notice: null, body: null };
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
+  const prefix: Uint8Array[] = [];
   let buffered = "";
+  let sawData = false;
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffered += decoder.decode(value, { stream: true });
+      if (value) {
+        prefix.push(value);
+        buffered += decoder.decode(value, { stream: true });
+      }
       const lines = buffered.split("\n");
       buffered = lines.pop() ?? "";
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed.startsWith("data:")) continue;
+        sawData = true;
         const dataText = trimmed.slice("data:".length).trim();
         if (!dataText || dataText === "[DONE]") continue;
+        let parsed: unknown;
         try {
-          const parsed = JSON.parse(dataText) as unknown;
-          const notice = geminiRetiredModelResponse(unwrapGeminiResponse(parsed));
-          if (notice) return { retired: true, notice };
+          parsed = JSON.parse(dataText) as unknown;
         } catch {
           continue;
         }
+        const notice = geminiRetiredModelResponse(unwrapGeminiResponse(parsed));
+        if (notice) {
+          await reader.cancel().catch(() => undefined);
+          return { retired: true, notice, body: null };
+        }
       }
+      if (sawData) break;
     }
   } finally {
     reader.releaseLock();
   }
-  return { retired: false, notice: null };
+  const remaining = resp.body.getReader();
+  let prefixIndex = 0;
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (prefixIndex < prefix.length) {
+        controller.enqueue(prefix[prefixIndex]);
+        prefixIndex += 1;
+        return;
+      }
+      const { done, value } = await remaining.read();
+      if (done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(value);
+    },
+    async cancel(reason) {
+      await remaining.cancel(reason);
+    },
+  });
+  return { retired: false, notice: null, body };
 }
 
 export function geminiDeltas(response: Json, schemas: ToolSchemaMap, toolIndex: { value: number }): Json[] {
