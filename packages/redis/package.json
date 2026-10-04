@@ -1,0 +1,25 @@
+{
+  "name": "@opendum/redis",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./keys": "./src/keys.ts",
+    "./client": "./src/client.ts",
+    "./session-affinity": "./src/session-affinity.ts"
+  },
+  "scripts": {
+    "test": "tsx --test ./src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opendum/config": "workspace:*",
+    "redis": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3"
+  }
+}

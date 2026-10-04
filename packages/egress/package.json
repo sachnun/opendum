@@ -1,0 +1,24 @@
+{
+  "name": "@opendum/egress",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./unroxy": "./src/unroxy.ts",
+    "./ssrf": "./src/ssrf.ts"
+  },
+  "scripts": {
+    "test": "tsx --test ./src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opendum/config": "workspace:*",
+    "undici": "^8.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3"
+  }
+}

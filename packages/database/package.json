@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./relations": "./src/relations.ts"
+    "./relations": "./src/relations.ts",
+    "./queries": "./src/queries/index.ts"
   },
   "scripts": {
     "db:push": "drizzle-kit push",
