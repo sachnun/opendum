@@ -1,94 +1,49 @@
-const FAMILY_BENCHMARK_SCORES: Record<string, number> = {
-  Anthropic: 53,
-  OpenAI: 53,
-  Meta: 48,
-  "Z.AI": 45,
-  Moonshot: 44,
-  xAI: 44,
-  Google: 41,
-  DeepSeek: 40,
-  Mistral: 39,
-  Qwen: 40,
-  "Sapiens AI": 36,
-  MiniMax: 30,
-  "Nex AGI": 28,
-  Upstage: 28,
-  Hunyuan: 26,
-  "Thinking Machines": 26,
-  Xiaomi: 26,
-  InclusionAI: 25,
-  NVIDIA: 23,
-};
+import { MODEL_FAMILY_RANKING } from "./model-family-ranking.generated";
+
+type ModelFamilyRankingEntry = (typeof MODEL_FAMILY_RANKING)[number];
+export type ModelFamily = ModelFamilyRankingEntry["name"] | "Others";
+
+const FAMILY_BENCHMARK_SCORES: ReadonlyMap<string, number> = new Map(
+  MODEL_FAMILY_RANKING.map((entry) => [entry.name, entry.score]),
+);
+
+const MODEL_FAMILY_ANCHOR_IDS: ReadonlyMap<string, string> = new Map(
+  MODEL_FAMILY_RANKING.map((entry) => [entry.name, entry.anchorId]),
+);
+
+const FEATURED_SET: ReadonlySet<string> = new Set(MODEL_FAMILY_RANKING.map((entry) => entry.name));
+
+function slugifyModelFamily(family: string): string {
+  return family
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function compareModelFamilies(a: string, b: string): number {
-  const aScore = FAMILY_BENCHMARK_SCORES[a] ?? 0;
-  const bScore = FAMILY_BENCHMARK_SCORES[b] ?? 0;
+  const aScore = FAMILY_BENCHMARK_SCORES.get(a) ?? 0;
+  const bScore = FAMILY_BENCHMARK_SCORES.get(b) ?? 0;
   if (aScore !== bScore) return bScore - aScore;
   return a.localeCompare(b);
 }
 
-const FEATURED_MODEL_FAMILIES = [
-  "OpenAI",
-  "Anthropic",
-  "Google",
-  "Meta",
-  "Qwen",
-  "DeepSeek",
-  "Mistral",
-  "Moonshot",
-  "MiniMax",
-  "Xiaomi",
-  "xAI",
-  "Z.AI",
-  "NVIDIA",
-  "InclusionAI",
-  "Hunyuan",
-  "Thinking Machines",
-  "Upstage",
-  "Sapiens AI",
-  "Nex AGI",
-] as const;
-
-type FeaturedModelFamily = (typeof FEATURED_MODEL_FAMILIES)[number];
-export type ModelFamily = FeaturedModelFamily | "Others";
-
-const MODEL_FAMILY_ANCHOR_IDS: Record<FeaturedModelFamily, string> = {
-  OpenAI: "openai-models",
-  Anthropic: "anthropic-models",
-  Google: "google-models",
-  Meta: "meta-models",
-  Qwen: "qwen-models",
-  DeepSeek: "deepseek-models",
-  Mistral: "mistral-models",
-  Moonshot: "moonshot-models",
-  MiniMax: "minimax-models",
-  Xiaomi: "xiaomi-models",
-  xAI: "xai-models",
-  "Z.AI": "zai-models",
-  NVIDIA: "nvidia-models",
-  InclusionAI: "inclusion-ai-models",
-  Hunyuan: "hunyuan-models",
-  "Thinking Machines": "thinking-machines-models",
-  Upstage: "upstage-models",
-  "Sapiens AI": "sapiens-ai-models",
-  "Nex AGI": "nex-agi-models",
-};
-
 export function getModelFamilyAnchorId(family: ModelFamily): string {
-  return family === "Others" ? "other-models" : MODEL_FAMILY_ANCHOR_IDS[family];
+  if (family === "Others") return "other-models";
+  return MODEL_FAMILY_ANCHOR_IDS.get(family) ?? `${slugifyModelFamily(family)}-models`;
 }
-
-const FEATURED_SET: ReadonlySet<string> = new Set<string>(FEATURED_MODEL_FAMILIES);
 
 export function categorizeModelFamily(family: string | undefined): ModelFamily {
   if (family && FEATURED_SET.has(family)) {
-    return family as FeaturedModelFamily;
+    return family;
   }
 
   return "Others";
 }
 
-const SORTED_FEATURED_FAMILIES: readonly FeaturedModelFamily[] = [...FEATURED_MODEL_FAMILIES].sort(compareModelFamilies);
+const SORTED_FEATURED_FAMILIES: readonly string[] = [...MODEL_FAMILY_RANKING]
+  .sort((a, b) => compareModelFamilies(a.name, b.name))
+  .map((entry) => entry.name);
 
 export const MODEL_FAMILY_SORT_ORDER: readonly ModelFamily[] = [
   ...SORTED_FEATURED_FAMILIES,
@@ -96,9 +51,9 @@ export const MODEL_FAMILY_SORT_ORDER: readonly ModelFamily[] = [
 ];
 
 export const MODEL_FAMILY_NAV_ITEMS: Array<{ name: ModelFamily; anchorId: string }> = [
-  ...SORTED_FEATURED_FAMILIES.map((family) => ({
-    name: family,
-    anchorId: MODEL_FAMILY_ANCHOR_IDS[family],
+  ...SORTED_FEATURED_FAMILIES.map((name) => ({
+    name,
+    anchorId: getModelFamilyAnchorId(name),
   })),
   { name: "Others", anchorId: "other-models" },
 ];

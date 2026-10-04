@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MODEL_FAMILY_SORT_ORDER, categorizeModelFamily, getModelFamilyAnchorId } from "../../lib/model-families";
+import { MODEL_FAMILY_SORT_ORDER, getModelFamilyAnchorId } from "../../lib/model-families";
 import { compareModelEntries } from "../../lib/model-sort";
 import { buildDayKeys, buildEmptyModelStats, buildHourKeys, MODEL_DURATION_LOOKBACK_HOURS, MODEL_STATS_DAYS, type ModelStats } from "../../lib/model-stats";
 import { costEntries, formatCostPoints, type ModelCost } from "../../lib/model-cost";
@@ -51,7 +51,7 @@ const modelSections = computed(() => {
   const groupedModels = new Map<string, ModelListItem[]>();
 
   for (const model of models.value) {
-    const family = categorizeModelFamily(model.family);
+    const family = model.family && model.family.trim().length > 0 ? model.family : "Others";
     const familyModels = groupedModels.get(family) ?? [];
     familyModels.push(model);
     groupedModels.set(family, familyModels);
@@ -61,13 +61,40 @@ const modelSections = computed(() => {
     familyModels.sort(compareModelEntries);
   }
 
-  return MODEL_FAMILY_SORT_ORDER
+  const rankedFamilies = MODEL_FAMILY_SORT_ORDER.filter((family) => family !== "Others");
+  const rankedSet = new Set<string>(rankedFamilies);
+
+  const sections = rankedFamilies
     .map((family) => ({
       name: family,
       anchorId: getModelFamilyAnchorId(family),
       models: groupedModels.get(family) ?? [],
     }))
     .filter((section) => section.models.length > 0);
+
+  const tailSections = [...groupedModels.keys()]
+    .filter((family) => family !== "Others" && !rankedSet.has(family))
+    .sort((a, b) => a.localeCompare(b))
+    .map((family) => ({
+      name: family,
+      anchorId: getModelFamilyAnchorId(family),
+      models: groupedModels.get(family) ?? [],
+    }));
+
+  const otherModels = groupedModels.get("Others") ?? [];
+  if (otherModels.length > 0) {
+    tailSections.push({ name: "Others", anchorId: "other-models-misc", models: otherModels });
+  }
+
+  if (tailSections.length > 0) {
+    const firstTail = tailSections[0];
+    if (firstTail) {
+      sections.push({ ...firstTail, anchorId: "other-models" });
+    }
+    sections.push(...tailSections.slice(1));
+  }
+
+  return sections;
 });
 
 onMounted(() => {

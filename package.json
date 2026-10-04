@@ -8,7 +8,7 @@
     "db:push": "pnpm --filter @opendum/database db:push",
     "db:generate": "pnpm --filter @opendum/database db:generate",
     "db:migrate": "pnpm --filter @opendum/database db:migrate",
-    "models:refresh": "pnpm --filter @opendum/models refresh"
+    "models:refresh": "pnpm --filter @opendum/models refresh && pnpm --filter @opendum/web family-ranking"
   },
   "devDependencies": {
     "edgeone": "^1.6.34"

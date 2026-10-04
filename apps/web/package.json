@@ -5,6 +5,11 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
+    "predev": "pnpm family-ranking",
+    "prebuild": "pnpm family-ranking",
+    "pretest": "pnpm family-ranking",
+    "pretest:unit": "pnpm family-ranking",
+    "family-ranking": "tsx ./scripts/family-ranking.ts",
     "test": "tsx --test ./lib/*.test.ts && vitest run",
     "test:unit": "tsx --test ./lib/*.test.ts",
     "test:nuxt": "vitest run",

@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
+import { inferFamilyFromFolder } from "./families.ts";
+
 export type ModelModalities = {
   input?: string[];
   output?: string[];
@@ -36,6 +38,14 @@ export type ProviderModelConfig = {
   [key: string]: unknown;
 };
 
+export type ModelScores = {
+  artificialAnalysis?: {
+    index?: number;
+    estimated?: boolean;
+    version?: string;
+  };
+};
+
 export type ModelInfo = {
   id?: string;
   providers: string[];
@@ -49,6 +59,7 @@ export type ModelInfo = {
   modalities?: ModelModalities | null;
   limit?: ModelLimit | null;
   cost?: ModelCost | null;
+  scores?: ModelScores | null;
   providerConfig?: Record<string, ProviderModelConfig>;
 };
 
@@ -149,6 +160,7 @@ function mergeGeneratedInfo(authored: ModelEntry, generated: ModelEntry): void {
   if (authored.info.modalities == null) authored.info.modalities = generated.info.modalities;
   if (authored.info.limit == null) authored.info.limit = generated.info.limit;
   if (authored.info.cost == null) authored.info.cost = generated.info.cost;
+  if (authored.info.scores == null) authored.info.scores = generated.info.scores;
   const generatedConfig = generated.info.providerConfig ?? {};
   if (Object.keys(generatedConfig).length > 0) {
     authored.info.providerConfig = authored.info.providerConfig ?? {};
@@ -228,6 +240,25 @@ export function loadModelEntries(dir: string): ModelEntry[] {
   return collectModelEntries(dir, resolveGeneratedDir(dir));
 }
 
+export type FlagshipFamily = {
+  family: string;
+  folder: string;
+  score: number;
+};
+
+export function flagshipFamilyRanking(entries: ModelEntry[]): FlagshipFamily[] {
+  const best = new Map<string, FlagshipFamily>();
+  for (const entry of entries) {
+    const index = entry.info.scores?.artificialAnalysis?.index;
+    if (typeof index !== "number" || !Number.isFinite(index)) continue;
+    const family = entry.info.family || inferFamilyFromFolder(entry.owner);
+    if (!family) continue;
+    const current = best.get(family);
+    if (!current || index > current.score) best.set(family, { family, folder: entry.owner || "", score: index });
+  }
+  return [...best.values()].sort((a, b) => b.score - a.score || a.family.localeCompare(b.family));
+}
+
 function isReasoning(model: string, info: ModelInfo): boolean {
   if (info.reasoning == null) return true;
   return info.reasoning;
@@ -257,7 +288,9 @@ export class Registry {
       info.providers = compactStrings(info.providers);
       info.aliases = compactStrings(info.aliases);
       if (entry.owner) info.owner = entry.owner;
-      if (options.familyFromFolder && !info.family && entry.owner) info.family = entry.owner;
+      if (options.familyFromFolder && !info.family && entry.owner) {
+        info.family = inferFamilyFromFolder(entry.owner) ?? entry.owner;
+      }
       const modelId = info.id ? info.id : entry.fileId;
       this.mergeModelInfo(modelId, entry.fileId, info);
       if (info.ignored) this.ignored.add(modelId);
