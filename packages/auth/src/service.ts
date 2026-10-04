@@ -1,28 +1,10 @@
 import { hashString } from "@opendum/crypto";
+import type { CacheValue } from "#auth/cache.ts";
+import * as authCache from "#auth/cache.ts";
 import type { Registry } from "@opendum/models/runtime";
-import {
-  analyticsVersionBumpKey,
-  analyticsVersionKey,
-  apiKeyLastUsedKey,
-  apiKeyValidationKey,
-  disabledModelsKey,
-  type OpendumRedis,
-} from "@opendum/redis";
-import {
-  deactivateAPIKey,
-  getAPIKeyByHash,
-  listAPIKeyRateLimits,
-  listActiveAccountTiers,
-  listDisabledModelsByAccounts,
-  listDisabledModelsByUser,
-  listSharedAccounts,
-  touchAPIKeyLastUsed,
-} from "@opendum/database/queries";
-import {
-  type CustomProviderModelRecord,
-  type CustomProviderReader,
-  createCustomStore,
-} from "#auth/custom-store.ts";
+import { apiKeyLastUsedKey, apiKeyValidationKey, type OpendumRedis } from "@opendum/redis";
+import { deactivateAPIKey, getAPIKeyByHash, listDisabledModelsByUser } from "@opendum/database/queries";
+import { type CustomProviderReader, createCustomStore } from "#auth/custom-store.ts";
 import {
   type AccountModelAvailability,
   type AuthResult,
@@ -30,31 +12,30 @@ import {
   type ModelValidationResult,
   type RateLimitRule,
   emptyAuthResult,
-  emptyAvailability,
 } from "#auth/types.ts";
+import {
+  computeAccountModelAvailability,
+  isModelUsableByAccounts as isModelUsableByAccountsImpl,
+  isModelUsableBySharedAccounts as isModelUsableBySharedAccountsImpl,
+} from "#auth/availability.ts";
+import {
+  bearerToken,
+  defaultString,
+  disabled,
+  invalid,
+  normalizeAccessMode,
+  normalizeAccountList,
+  parseModelParam,
+  normalizeDisabledModelList,
+  uniqueSorted,
+  valid,
+  visionForCustomModel,
+} from "#auth/helpers.ts";
+
+export { isAuthlessProvider, isAuthlessProviderAccountId, parseModelParam } from "#auth/helpers.ts";
 
 const VALID_TTL_SECONDS = 45;
 const INVALID_TTL_SECONDS = 10;
-const LAST_USED_TTL_SECONDS = 60;
-const DISABLED_MODELS_TTL_SECONDS = 60;
-const ANALYTICS_VERSION_TTL_SECONDS = 30 * 24 * 60 * 60;
-const ANALYTICS_BUMP_TTL_SECONDS = 15;
-
-const AUTHLESS_PROVIDER_NAMES = ["opencode"];
-
-type CacheValue = {
-  valid: boolean;
-  userId?: string;
-  apiKeyId?: string;
-  modelAccessMode?: string;
-  modelAccessList?: string[];
-  accountAccessMode?: string;
-  accountAccessList?: string[];
-  roamingEnabled?: boolean;
-  expiresAtMs?: number;
-  rateLimitRules?: RateLimitRule[];
-  error?: string;
-};
 
 export class AuthService {
   private readonly registry: Registry;
@@ -168,7 +149,7 @@ export class AuthService {
     const cached = await this.getCachedDisabledModels(userId);
     if (cached) return new Set(cached);
     const rows = await listDisabledModelsByUser(userId);
-    const modelList = this.normalizeDisabledModelList(rows.map((row) => row.trim()));
+    const modelList = normalizeDisabledModelList(this.registry, rows.map((row) => row.trim()));
     await this.setCachedDisabledModels(userId, modelList);
     return new Set(modelList);
   }
@@ -183,157 +164,24 @@ export class AuthService {
     includeShared: boolean,
     options: { includeInactiveAccounts?: boolean } = {}
   ): Promise<AccountModelAvailability> {
-    const availability = emptyAvailability();
-
-    for (const provider of AUTHLESS_PROVIDER_NAMES) {
-      availability.activeProviders.add(provider);
-      availability.accountCountByProvider.set(provider, 1);
-      availability.activeAccountIdsByProvider.set(provider, [provider]);
-    }
-    for (const [provider, models] of this.registry.authlessProviderModels()) {
-      if (models.length === 0) continue;
-      availability.activeProviders.add(provider);
-      availability.accountCountByProvider.set(
-        provider,
-        (availability.accountCountByProvider.get(provider) ?? 0) + 1
-      );
-      availability.activeAccountIdsByProvider.set(provider, [
-        ...(availability.activeAccountIdsByProvider.get(provider) ?? []),
-        provider,
-      ]);
-      const set = availability.authlessProviderModels.get(provider) ?? new Set<string>();
-      for (const model of models) set.add(model);
-      availability.authlessProviderModels.set(provider, set);
-    }
-
-    const now = new Date();
-    const accounts = await listActiveAccountTiers(userId, now, options.includeInactiveAccounts === true);
-    const accountProvider = new Map<string, string>();
-    const accountIds: string[] = [];
-    for (const account of accounts) {
-      availability.activeProviders.add(account.provider);
-      availability.accountCountByProvider.set(
-        account.provider,
-        (availability.accountCountByProvider.get(account.provider) ?? 0) + 1
-      );
-      const list = availability.activeAccountIdsByProvider.get(account.provider) ?? [];
-      list.push(account.id);
-      availability.activeAccountIdsByProvider.set(account.provider, list);
-      accountProvider.set(account.id, account.provider);
-      accountIds.push(account.id);
-      if (account.tier && account.tier.trim()) {
-        availability.accountTierById.set(account.id, account.tier.trim().toLowerCase());
-      }
-    }
-
-    if (accountIds.length > 0) {
-      const disabledRows = await listDisabledModelsByAccounts(accountIds);
-      for (const row of disabledRows) {
-        const provider = accountProvider.get(row.providerAccountId);
-        if (!provider) continue;
-        const key = `${provider}:${this.registry.resolveAlias(row.model)}`;
-        availability.disabledCountByProviderModel.set(
-          key,
-          (availability.disabledCountByProviderModel.get(key) ?? 0) + 1
-        );
-      }
-    }
-
-    const { aliased, standalone } = await this.customProviderModelSets(userId);
-    for (const [slug, models] of aliased) {
-      if ((availability.accountCountByProvider.get(slug) ?? 0) === 0) continue;
-      availability.customProviderModels.set(slug, models);
-    }
-    for (const [slug, models] of standalone) {
-      availability.customProviderStandaloneModels.set(slug, models);
-    }
-
-    if (!includeShared) return availability;
-
-    const sharedAccounts = await listSharedAccounts(userId, now);
-    const sharedAccountProvider = new Map<string, string>();
-    const sharedAccountIds: string[] = [];
-    for (const account of sharedAccounts) {
-      availability.sharedAccountCountByProvider.set(
-        account.provider,
-        (availability.sharedAccountCountByProvider.get(account.provider) ?? 0) + 1
-      );
-      sharedAccountProvider.set(account.id, account.provider);
-      sharedAccountIds.push(account.id);
-      if (account.tier && account.tier.trim()) {
-        const list = availability.sharedAccountTiersByProvider.get(account.provider) ?? [];
-        list.push(account.tier.trim().toLowerCase());
-        availability.sharedAccountTiersByProvider.set(account.provider, list);
-      }
-    }
-    if (sharedAccountIds.length > 0) {
-      const disabledRows = await listDisabledModelsByAccounts(sharedAccountIds);
-      for (const row of disabledRows) {
-        const provider = sharedAccountProvider.get(row.providerAccountId);
-        if (!provider) continue;
-        const key = `${provider}:${this.registry.resolveAlias(row.model)}`;
-        availability.sharedDisabledCountByProviderModel.set(
-          key,
-          (availability.sharedDisabledCountByProviderModel.get(key) ?? 0) + 1
-        );
-      }
-    }
-
-    return availability;
+    return computeAccountModelAvailability(
+      this.registry,
+      (id) => this.customProviderModelSets(id),
+      userId,
+      includeShared,
+      options
+    );
   }
 
   isModelUsableByAccounts(model: string, availability: AccountModelAvailability): boolean {
-    const canonical = this.registry.resolveAlias(model);
-    for (const provider of this.registry.providersForModel(canonical)) {
-      let total = availability.accountCountByProvider.get(provider) ?? 0;
-      if (total === 0) continue;
-      const authlessModels = availability.authlessProviderModels.get(provider);
-      if (authlessModels && !authlessModels.has(canonical)) {
-        if (total === 1) continue;
-        total -= 1;
-      }
-      const rule = this.registry.providerAccessRule(canonical, provider);
-      if (rule && accessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) {
-        const accountIds = availability.activeAccountIdsByProvider.get(provider) ?? [];
-        const eligible = accountIds.some((accountId) =>
-          tierSatisfiesRule(
-            availability.accountTierById.get(accountId) ?? "",
-            rule.minTier,
-            rule.allowedTiers
-          )
-        );
-        if (!eligible) continue;
-      }
-      const disabled = availability.disabledCountByProviderModel.get(`${provider}:${canonical}`) ?? 0;
-      if (disabled < total) return true;
-    }
-    for (const [provider, models] of availability.customProviderModels) {
-      if (!models.has(canonical)) continue;
-      if ((availability.accountCountByProvider.get(provider) ?? 0) > 0) return true;
-    }
-    return false;
+    return isModelUsableByAccountsImpl(this.registry, model, availability);
   }
 
   isModelUsableBySharedAccounts(
     model: string,
     availability: AccountModelAvailability
   ): boolean {
-    const canonical = this.registry.resolveAlias(model);
-    for (const provider of this.registry.providersForModel(canonical)) {
-      const total = availability.sharedAccountCountByProvider.get(provider) ?? 0;
-      if (total === 0) continue;
-      const rule = this.registry.providerAccessRule(canonical, provider);
-      if (rule && accessRuleRestrictsTier(rule.minTier, rule.allowedTiers)) {
-        const tiers = availability.sharedAccountTiersByProvider.get(provider) ?? [];
-        const eligible = tiers.some((tier) =>
-          tierSatisfiesRule(tier, rule.minTier, rule.allowedTiers)
-        );
-        if (!eligible) continue;
-      }
-      const disabled = availability.sharedDisabledCountByProviderModel.get(`${provider}:${canonical}`) ?? 0;
-      if (disabled < total) return true;
-    }
-    return false;
+    return isModelUsableBySharedAccountsImpl(this.registry, model, availability);
   }
 
   validateModel(modelParam: string): ModelValidationResult {
@@ -438,20 +286,7 @@ export class AuthService {
   }
 
   async bumpAnalyticsCacheVersionThrottled(userId: string): Promise<void> {
-    if (!userId) return;
-    try {
-      const updated = await this.redis.set(analyticsVersionBumpKey(userId), "1", {
-        NX: true,
-        EX: ANALYTICS_BUMP_TTL_SECONDS,
-      });
-      if (!updated) return;
-      const version = await this.redis.incr(analyticsVersionKey(userId));
-      if (version === 1) {
-        await this.redis.expire(analyticsVersionKey(userId), ANALYTICS_VERSION_TTL_SECONDS);
-      }
-    } catch {
-      return;
-    }
+    await authCache.bumpAnalyticsCacheVersionThrottled(this.redis, userId);
   }
 
   private isCodexChatGPTModel(model: string): boolean {
@@ -471,91 +306,32 @@ export class AuthService {
     return [...values].sort((a, b) => a.localeCompare(b));
   }
 
-  private async getRateLimitRules(apiKeyId: string): Promise<RateLimitRule[]> {
-    const rows = await listAPIKeyRateLimits(apiKeyId);
-    return rows.map((row) => ({
-      target: row.target,
-      targetType: row.targetType === "family" ? "family" : "model",
-      perMinute: row.perMinute,
-      perHour: row.perHour,
-      perDay: row.perDay,
-    }));
+  private getRateLimitRules(apiKeyId: string): Promise<RateLimitRule[]> {
+    return authCache.getRateLimitRules(apiKeyId);
   }
 
   private resultFromCache(cached: CacheValue): AuthResult {
-    return {
-      valid: true,
-      userId: cached.userId ?? "",
-      apiKeyId: cached.apiKeyId ?? "",
-      modelAccessMode: normalizeAccessMode(cached.modelAccessMode ?? ""),
-      modelAccessList: this.normalizeModelAccessList(cached.modelAccessList ?? []),
-      accountAccessMode: normalizeAccessMode(cached.accountAccessMode ?? ""),
-      accountAccessList: normalizeAccountList(cached.accountAccessList ?? []),
-      roamingEnabled: Boolean(cached.roamingEnabled),
-      rateLimitRules: cached.rateLimitRules ?? [],
-      error: "",
-    };
+    return authCache.resultFromCache(cached);
   }
 
-  private async getCachedAPIKeyValidation(keyHash: string): Promise<CacheValue | null> {
-    try {
-      const raw = await this.redis.get(apiKeyValidationKey(keyHash));
-      if (!raw) return null;
-      return JSON.parse(raw) as CacheValue;
-    } catch {
-      return null;
-    }
+  private getCachedAPIKeyValidation(keyHash: string): Promise<CacheValue | null> {
+    return authCache.getCachedAPIKeyValidation(this.redis, keyHash);
   }
 
-  private async setCachedAPIKeyValidation(
-    keyHash: string,
-    value: CacheValue,
-    ttlSeconds: number
-  ): Promise<void> {
-    try {
-      await this.redis.set(apiKeyValidationKey(keyHash), JSON.stringify(value), {
-        EX: Math.max(1, Math.round(ttlSeconds)),
-      });
-    } catch {
-      return;
-    }
+  private setCachedAPIKeyValidation(keyHash: string, value: CacheValue, ttlSeconds: number): Promise<void> {
+    return authCache.setCachedAPIKeyValidation(this.redis, keyHash, value, ttlSeconds);
   }
 
-  private async touchAPIKeyLastUsed(apiKeyId: string): Promise<void> {
-    if (!apiKeyId) return;
-    try {
-      const updated = await this.redis.set(apiKeyLastUsedKey(apiKeyId), "1", {
-        NX: true,
-        EX: LAST_USED_TTL_SECONDS,
-      });
-      if (!updated) return;
-      await touchAPIKeyLastUsed(apiKeyId);
-    } catch {
-      return;
-    }
+  private touchAPIKeyLastUsed(apiKeyId: string): Promise<void> {
+    return authCache.touchAPIKeyLastUsedThrottled(this.redis, apiKeyId);
   }
 
-  private async getCachedDisabledModels(userId: string): Promise<string[] | null> {
-    try {
-      const raw = await this.redis.get(disabledModelsKey(userId));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { models?: string[] };
-      return this.normalizeDisabledModelList(parsed.models ?? []);
-    } catch {
-      return null;
-    }
+  private getCachedDisabledModels(userId: string): Promise<string[] | null> {
+    return authCache.getCachedDisabledModels(this.redis, this.registry, userId);
   }
 
-  private async setCachedDisabledModels(userId: string, models: string[]): Promise<void> {
-    try {
-      await this.redis.set(
-        disabledModelsKey(userId),
-        JSON.stringify({ models: this.normalizeDisabledModelList(models) }),
-        { EX: DISABLED_MODELS_TTL_SECONDS }
-      );
-    } catch {
-      return;
-    }
+  private setCachedDisabledModels(userId: string, models: string[]): Promise<void> {
+    return authCache.setCachedDisabledModels(this.redis, this.registry, userId, models);
   }
 
   private async customModelResult(
@@ -662,17 +438,6 @@ export class AuthService {
     return provider !== null && modelSet.has(`${provider}/${model}`);
   }
 
-  private normalizeDisabledModelList(values: string[]): string[] {
-    const result: string[] = [];
-    for (const value of values) {
-      const trimmed = value.trim();
-      if (!trimmed) continue;
-      const model = this.registry.resolveAlias(trimmed);
-      result.push(this.registry.isSupported(model) ? model : trimmed);
-    }
-    return uniqueSorted(result);
-  }
-
   private normalizeModelAccessList(values: string[]): string[] {
     const result: string[] = [];
     for (const value of values) {
@@ -683,141 +448,4 @@ export class AuthService {
     }
     return uniqueSorted(result);
   }
-}
-
-export function isAuthlessProvider(provider: string): boolean {
-  return AUTHLESS_PROVIDER_NAMES.includes(provider);
-}
-
-export function parseModelParam(modelParam: string): [string | null, string] {
-  const index = modelParam.indexOf("/");
-  if (index < 0) return [null, modelParam];
-  return [normalizeProviderAlias(modelParam.slice(0, index)), modelParam.slice(index + 1)];
-}
-
-export function isAuthlessProviderAccountId(accountId: string): boolean {
-  return AUTHLESS_PROVIDER_NAMES.includes(accountId) || accountId.startsWith("authless:");
-}
-
-function normalizeProviderAlias(provider: string): string {
-  return provider.trim().toLowerCase();
-}
-
-function normalizeAccessMode(mode: string): string {
-  return mode === "whitelist" || mode === "blacklist" ? mode : "all";
-}
-
-function normalizeAccountList(values: string[]): string[] {
-  return uniqueSorted(values.map((value) => value.trim()).filter((value) => value.length > 0));
-}
-
-function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.filter((value) => value.length > 0))].sort((a, b) => a.localeCompare(b));
-}
-
-function bearerToken(authHeader: string): string {
-  const trimmed = authHeader.trim();
-  if (trimmed.length >= 7 && trimmed.slice(0, 7).toLowerCase() === "bearer ") {
-    return trimmed.slice(7).trim();
-  }
-  return trimmed;
-}
-
-function defaultString(value: string, fallback: string): string {
-  return value || fallback;
-}
-
-function normalizeTierAlias(tier: string): string {
-  const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
-  if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
-  if (normalized === "free-tier") return "free";
-  if (
-    normalized === "education" ||
-    normalized === "educational" ||
-    normalized === "edu" ||
-    normalized === "free-educational-quota"
-  ) {
-    return "student";
-  }
-  return normalized;
-}
-
-function tierSatisfiesRule(
-  accountTier: string,
-  minTier: string | undefined,
-  allowedTiers: string[] | undefined
-): boolean {
-  const normalizedAccountTier = normalizeTierAlias(accountTier);
-  if (allowedTiers && allowedTiers.length > 0) {
-    return allowedTiers.some((tier) => normalizeTierAlias(tier) === normalizedAccountTier);
-  }
-  const required = (minTier ?? "").trim().toLowerCase();
-  if (!required || required === "free") return true;
-  return normalizedAccountTier === normalizeTierAlias(required);
-}
-
-function accessRuleRestrictsTier(
-  minTier: string | undefined,
-  allowedTiers: string[] | undefined
-): boolean {
-  if (allowedTiers && allowedTiers.length > 0) return true;
-  const required = normalizeTierAlias(minTier ?? "");
-  return required !== "" && required !== "free";
-}
-
-function visionForCustomModel(
-  registry: Registry,
-  row: CustomProviderModelRecord
-): boolean {
-  const candidates = [row.upstream, row.modelId].filter(
-    (value): value is string => Boolean(value && value.length > 0)
-  );
-  for (const candidate of candidates) {
-    const info = registry.modelInfo(candidate);
-    if (!info || info.modalities == null) continue;
-    return (info.modalities.input ?? []).includes("image");
-  }
-  return true;
-}
-
-function valid(provider: string | null, model: string): ModelValidationResult {
-  return {
-    valid: true,
-    provider,
-    model,
-    alias: "",
-    vision: null,
-    error: "",
-    param: "",
-    code: "",
-  };
-}
-
-function invalid(
-  provider: string | null,
-  model: string,
-  error: string,
-  param: string,
-  code: string
-): ModelValidationResult {
-  return {
-    valid: false,
-    provider,
-    model,
-    alias: "",
-    vision: null,
-    error,
-    param,
-    code,
-  };
-}
-
-function disabled(provider: string | null, model: string): ModelValidationResult {
-  return invalid(
-    provider,
-    model,
-    `Model "${model}" is disabled. Enable it from Web > Models first.`,
-    "model",
-    "model_disabled"
-  );
 }

@@ -1,96 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { aliasesFromUpstream, isDateToken } from "#models/model/clean-key.ts";
+import { aliasesFromUpstream } from "#models/model/clean-key.ts";
 import { inferModelFolder } from "#models/model/families.ts";
 import { mergeModelData, splitModelData } from "#models/model/merge.ts";
 import type { JsonValue, ModelData, ModelIndex, ModelIndexEntry } from "#models/model/types.ts";
+import { readModelJson, writeGeneratedModelJson, writeModelJson } from "#models/registry/serialize.ts";
+
+export { buildModelIdMap } from "#models/registry/model-id.ts";
+export { readModelJson, writeGeneratedModelJson, writeModelJson };
 
 const MODEL_FILE_EXTENSION = ".json";
-
-const MODEL_PROPERTY_ORDER = [
-  "id",
-  "providers",
-  "aliases",
-  "description",
-  "ignored",
-  "reasoning",
-  "reasoning_effort",
-  "modalities",
-  "limit",
-  "cost",
-  "scores",
-  "providerConfig",
-];
-
-const PROVIDER_CONFIG_PROPERTY_ORDER = ["upstream", "contextWindow", "maxOutputTokens", "authless", "free", "minTier", "allowedTiers", "aliases"];
-const COST_PROPERTY_ORDER = ["input", "output", "cacheRead", "cacheWrite"];
-const SCORE_PROPERTY_ORDER = ["index", "estimated", "version"];
-
-function isPlainObject(value: unknown): value is Record<string, JsonValue> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function orderObject(value: Record<string, JsonValue>, preferredKeys: string[] = []): Record<string, JsonValue> {
-  const result: Record<string, JsonValue> = {};
-  const preferred = new Set(preferredKeys);
-
-  for (const key of preferredKeys) {
-    if (value[key] !== undefined) {
-      result[key] = orderValue(value[key], key);
-    }
-  }
-
-  for (const key of Object.keys(value).filter((key) => !preferred.has(key)).sort()) {
-    if (value[key] !== undefined) {
-      result[key] = orderValue(value[key], key);
-    }
-  }
-
-  return result;
-}
-
-function orderProviderMap(value: Record<string, JsonValue>, preferredKeys: string[]): Record<string, JsonValue> {
-  const result: Record<string, JsonValue> = {};
-  for (const provider of Object.keys(value).sort()) {
-    const entry = value[provider];
-    result[provider] = isPlainObject(entry)
-      ? orderObject(entry, preferredKeys)
-      : orderValue(entry!, provider);
-  }
-  return result;
-}
-
-function orderValue(value: JsonValue, key?: string): JsonValue {
-  if (key === "aliases" && Array.isArray(value)) return [...(value as string[])].sort();
-  if (Array.isArray(value)) return value.map((item) => orderValue(item));
-  if (!isPlainObject(value)) return value;
-
-  if (key === "providerConfig") return orderProviderMap(value, PROVIDER_CONFIG_PROPERTY_ORDER);
-  if (key === "cost") return orderObject(value, COST_PROPERTY_ORDER);
-  if (key === "scores") return orderScores(value);
-  return orderObject(value);
-}
-
-function orderScores(value: JsonValue): JsonValue {
-  if (!isPlainObject(value)) return value;
-  const result: Record<string, JsonValue> = {};
-  for (const key of Object.keys(value).sort()) {
-    result[key] = orderObject(value[key] as Record<string, JsonValue>, SCORE_PROPERTY_ORDER);
-  }
-  return result;
-}
-
-function normalizeModelData(data: ModelData): Record<string, JsonValue> {
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    delete data.family;
-  }
-  return orderObject(data as Record<string, JsonValue>, MODEL_PROPERTY_ORDER);
-}
-
-export function readModelJson(content: string): ModelData {
-  return JSON.parse(content) as ModelData;
-}
 
 function hasMinorVersionSuffix(base: string | undefined, numericSuffix: string | undefined): boolean {
   if (!base || !numericSuffix) return false;
@@ -100,16 +20,6 @@ function hasMinorVersionSuffix(base: string | undefined, numericSuffix: string |
 function getModelPublicId(data: ModelData, fileId: string): string {
   const id = typeof data.id === "string" ? data.id.trim() : "";
   return id || fileId;
-}
-
-export function writeModelJson(filePath: string, data: ModelData): void {
-  const content = JSON.stringify(normalizeModelData(data), null, 2);
-  writeFileSync(filePath, `${content}\n`);
-}
-
-export function writeGeneratedModelJson(filePath: string, data: ModelData): void {
-  mkdirSync(dirname(filePath), { recursive: true });
-  writeModelJson(filePath, data);
 }
 
 export function writeSplitModel(
@@ -213,72 +123,6 @@ export function buildModelIndex(modelsDir: string, options: { generatedDir?: str
 
 export function generatedModelPath(generatedDir: string, relativeId: string): string {
   return join(generatedDir, relativeId + MODEL_FILE_EXTENSION);
-}
-
-function trailingDateToken(modelId: string): string | null {
-  const segment = modelId.slice(modelId.lastIndexOf("/") + 1);
-  const tokens = segment.split(/[-_]/);
-  const tail = (tokens[tokens.length - 1] ?? "").split(":")[0] ?? "";
-  return isDateToken(tail) ? tail : null;
-}
-
-function compareCandidatesNewestFirst(left: { dateToken: string | null }, right: { dateToken: string | null }): number {
-  if (left.dateToken === null && right.dateToken === null) return 0;
-  if (left.dateToken === null) return -1;
-  if (right.dateToken === null) return 1;
-  return Number.parseInt(right.dateToken, 10) - Number.parseInt(left.dateToken, 10);
-}
-
-/**
- * Build a modelKey -> upstreamId map from a raw provider model id list.
- *
- * Provider feeds often carry both a rolling base id and date-pinned variants
- * of the same model (e.g. `deepseek/deepseek-v4-flash` next to
- * `deepseek/deepseek-v4-flash-0731` or `-0813`). All of them normalize to the
- * same base key via `toModelKey`; this helper makes the newest variant own
- * the base key (an undated rolling id counts as the newest) and re-keys
- * older date-pinned variants under `base-<date>` so the registry merge turns
- * them into aliases instead of separate models.
- */
-export function buildModelIdMap(modelIds: string[], toModelKey: (modelId: string) => string): Map<string, string> {
-  const groups = new Map<string, Array<{ modelId: string; key: string; dateToken: string | null }>>();
-
-  for (const modelId of modelIds) {
-    const key = toModelKey(modelId);
-    if (!key) continue;
-
-    const dateToken = trailingDateToken(modelId);
-    const baseKey =
-      dateToken && key.endsWith(`-${dateToken}`)
-        ? key.slice(0, key.length - dateToken.length - 1)
-        : key;
-
-    const group = groups.get(baseKey);
-    if (group) group.push({ modelId, key, dateToken });
-    else groups.set(baseKey, [{ modelId, key, dateToken }]);
-  }
-
-  const map = new Map<string, string>();
-  for (const [baseKey, candidates] of groups) {
-    candidates.sort(compareCandidatesNewestFirst);
-
-    const [winner, ...losers] = candidates;
-    if (winner === undefined) continue;
-    map.set(baseKey, winner.modelId);
-
-    for (const loser of losers) {
-      const stem = loser.dateToken ? `${baseKey}-${loser.dateToken}` : loser.key;
-      let key = stem;
-      let suffix = 2;
-      while (map.has(key) && map.get(key) !== loser.modelId) {
-        key = `${stem}-${suffix}`;
-        suffix += 1;
-      }
-      map.set(key, loser.modelId);
-    }
-  }
-
-  return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
 export function persistModel(entry: Pick<ModelIndexEntry, "modelsDir" | "relativeId">, data: ModelData): void {

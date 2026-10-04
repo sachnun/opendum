@@ -1,7 +1,9 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-
 import { inferFamilyFromFolder } from "#models/model/families.ts";
+import { loadModelEntries } from "#models/registry/load.ts";
+import { makeCandidate, suggestionScore, type SuggestionCandidate } from "#models/registry/suggest.ts";
+
+export { loadModelEntries } from "#models/registry/load.ts";
+export { suggestionScoreFor } from "#models/registry/suggest.ts";
 
 export type ModelModalities = {
   input?: string[];
@@ -71,12 +73,6 @@ export type ModelEntry = {
   info: ModelInfo;
 };
 
-type SuggestionCandidate = {
-  value: string;
-  normalized: string;
-  tokens: string[];
-};
-
 function compactStrings(values: string[] | undefined): string[] {
   if (!values) return [];
   return values.map((value) => value.trim()).filter((value) => value.length > 0);
@@ -105,139 +101,6 @@ export function legacyNvidiaAlias(upstream: string): string {
   const stripped = upstream.startsWith("library/") ? upstream.slice("library/".length) : upstream;
   const replaced = stripped.replace(/[:/]/g, "-").replace(/[^a-zA-Z0-9._-]/g, "-");
   return replaced.replace(/-{2,}/g, "-");
-}
-
-function resolveGeneratedDir(dir: string): string {
-  const configured = process.env.MODELS_GENERATED_DIR?.trim();
-  if (configured) return configured;
-  return join(dirname(dir), "generated");
-}
-
-function readModelEntries(dir: string, required: boolean): ModelEntry[] {
-  let stat;
-  try {
-    stat = statSync(dir);
-  } catch {
-    if (required) throw new Error(`models directory not found: ${dir}`);
-    return [];
-  }
-  if (!stat.isDirectory()) {
-    if (required) throw new Error(`models path is not a directory: ${dir}`);
-    return [];
-  }
-
-  const entries: ModelEntry[] = [];
-  const walk = (current: string): void => {
-    for (const name of readdirSync(current)) {
-      const fullPath = join(current, name);
-      const entryStat = statSync(fullPath);
-      if (entryStat.isDirectory()) {
-        walk(fullPath);
-        continue;
-      }
-      if (!name.endsWith(".json")) continue;
-      const parsed = JSON.parse(readFileSync(fullPath, "utf8")) as ModelInfo;
-      const parent = dirname(fullPath);
-      entries.push({
-        fileId: basename(name, ".json"),
-        owner: parent === dir ? "" : basename(parent),
-        info: parsed,
-      });
-    }
-  };
-  walk(dir);
-  return entries;
-}
-
-function mergeGeneratedInfo(authored: ModelEntry, generated: ModelEntry): void {
-  if (!authored.info.id) authored.info.id = generated.info.id;
-  if ((authored.info.providers ?? []).length === 0) authored.info.providers = generated.info.providers;
-  if ((generated.info.aliases ?? []).length > 0) {
-    authored.info.aliases = [...(authored.info.aliases ?? []), ...(generated.info.aliases ?? [])];
-  }
-  if (authored.info.reasoning === undefined) authored.info.reasoning = generated.info.reasoning;
-  if (!authored.info.reasoning_effort) authored.info.reasoning_effort = generated.info.reasoning_effort;
-  if (authored.info.modalities == null) authored.info.modalities = generated.info.modalities;
-  if (authored.info.limit == null) authored.info.limit = generated.info.limit;
-  if (authored.info.cost == null) authored.info.cost = generated.info.cost;
-  if (authored.info.scores == null) authored.info.scores = generated.info.scores;
-  const generatedConfig = generated.info.providerConfig ?? {};
-  if (Object.keys(generatedConfig).length > 0) {
-    authored.info.providerConfig = authored.info.providerConfig ?? {};
-    for (const [provider, config] of Object.entries(generatedConfig)) {
-      const existing = authored.info.providerConfig[provider];
-      authored.info.providerConfig[provider] = existing
-        ? mergeProviderConfig(config, existing)
-        : config;
-    }
-  }
-}
-
-const KNOWN_PROVIDER_CONFIG_KEYS = new Set([
-  "upstream",
-  "contextWindow",
-  "maxOutputTokens",
-  "minTier",
-  "allowedTiers",
-  "authless",
-  "free",
-  "aliases",
-  "custom",
-]);
-
-function mergeProviderConfig(
-  generated: ProviderModelConfig,
-  authored: ProviderModelConfig
-): ProviderModelConfig {
-  const merged: ProviderModelConfig = { ...generated };
-  if (authored.upstream) merged.upstream = authored.upstream;
-  if (authored.contextWindow) merged.contextWindow = authored.contextWindow;
-  if (authored.maxOutputTokens) merged.maxOutputTokens = authored.maxOutputTokens;
-  if (authored.minTier) merged.minTier = authored.minTier;
-  if ((authored.allowedTiers ?? []).length > 0) merged.allowedTiers = authored.allowedTiers;
-  if (authored.authless) merged.authless = true;
-  if (authored.free) merged.free = true;
-  if ((authored.aliases ?? []).length > 0) merged.aliases = authored.aliases;
-
-  // Provider flags outside the known fields (for example opencode's
-  // responses_api) are preserved under `custom`, matching the Go registry.
-  const custom: Record<string, unknown> = { ...(merged.custom ?? {}) };
-  for (const [key, value] of Object.entries(authored)) {
-    if (KNOWN_PROVIDER_CONFIG_KEYS.has(key)) continue;
-    delete merged[key];
-    custom[key] = value;
-  }
-  if (authored.custom && Object.keys(authored.custom).length > 0) {
-    for (const [key, value] of Object.entries(authored.custom)) custom[key] = value;
-  }
-  if (Object.keys(custom).length > 0) merged.custom = custom;
-  return merged;
-}
-
-function collectModelEntries(authoredDir: string, generatedDir: string): ModelEntry[] {
-  const authored = readModelEntries(authoredDir, true);
-  const generated = readModelEntries(generatedDir, false);
-
-  const byFileId = new Map<string, ModelEntry>();
-  const order: string[] = [];
-  for (const entry of authored) {
-    if (!byFileId.has(entry.fileId)) order.push(entry.fileId);
-    byFileId.set(entry.fileId, { ...entry, info: { ...entry.info } });
-  }
-  for (const entry of generated) {
-    const existing = byFileId.get(entry.fileId);
-    if (existing) {
-      mergeGeneratedInfo(existing, entry);
-      continue;
-    }
-    order.push(entry.fileId);
-    byFileId.set(entry.fileId, { ...entry, info: { ...entry.info } });
-  }
-  return order.map((fileId) => byFileId.get(fileId) as ModelEntry);
-}
-
-export function loadModelEntries(dir: string): ModelEntry[] {
-  return collectModelEntries(dir, resolveGeneratedDir(dir));
 }
 
 export type FlagshipFamily = {
@@ -650,107 +513,4 @@ export class Registry {
     if (!info) return false;
     return isVision(info);
   }
-}
-
-function makeCandidate(value: string): SuggestionCandidate {
-  const normalized = normalizeSuggestionValue(value);
-  return { value, normalized, tokens: normalized.split(/\s+/).filter((token) => token.length > 0) };
-}
-
-export function suggestionScoreFor(term: string, candidate: string): number {
-  return suggestionScore(makeCandidate(term), makeCandidate(candidate));
-}
-
-function normalizeSuggestionValue(value: string): string {
-  let out = "";
-  let lastSeparator = false;
-  for (const ch of value.trim().toLowerCase()) {
-    if (/[\p{L}\p{N}]/u.test(ch)) {
-      out += ch;
-      lastSeparator = false;
-      continue;
-    }
-    if (!lastSeparator) {
-      out += " ";
-      lastSeparator = true;
-    }
-  }
-  return out.trim();
-}
-
-function runeLength(value: string): number {
-  return Array.from(value).length;
-}
-
-function levenshteinDistance(a: string, b: string): number {
-  const left = Array.from(a);
-  const right = Array.from(b);
-  if (left.length === 0) return right.length;
-  if (right.length === 0) return left.length;
-  let previous = new Array<number>(right.length + 1);
-  let current = new Array<number>(right.length + 1);
-  for (let j = 0; j <= right.length; j += 1) previous[j] = j;
-  for (let i = 0; i < left.length; i += 1) {
-    current[0] = i + 1;
-    for (let j = 0; j < right.length; j += 1) {
-      const cost = left[i] === right[j] ? 0 : 1;
-      current[j + 1] = Math.min(current[j]! + 1, previous[j + 1]! + 1, previous[j]! + cost);
-    }
-    const swap = previous;
-    previous = current;
-    current = swap;
-  }
-  return previous[right.length]!;
-}
-
-function compactTokenScore(term: string, candidate: string): number {
-  if (term === candidate) return 1;
-  if (candidate.includes(term) || term.includes(candidate)) {
-    let shorter = runeLength(term);
-    let longer = runeLength(candidate);
-    if (runeLength(candidate) < shorter) {
-      shorter = runeLength(candidate);
-      longer = runeLength(term);
-    }
-    return 0.82 + 0.18 * (shorter / longer);
-  }
-  const maxLen = Math.max(runeLength(term), runeLength(candidate));
-  if (maxLen === 0) return 0;
-  const score = 1 - levenshteinDistance(term, candidate) / maxLen;
-  return score < 0 ? 0 : score;
-}
-
-function tokenSuggestionScore(termTokens: string[], candidateTokens: string[]): number {
-  if (termTokens.length === 0 || candidateTokens.length === 0) return 0;
-  let total = 0;
-  for (const token of termTokens) {
-    let best = 0;
-    for (const candidateToken of candidateTokens) {
-      const score = compactTokenScore(token, candidateToken);
-      if (score > best) best = score;
-    }
-    total += best;
-  }
-  return total / termTokens.length;
-}
-
-function suggestionScore(term: SuggestionCandidate, candidate: SuggestionCandidate): number {
-  const left = term.normalized;
-  const right = candidate.normalized;
-  if (!left || !right) return 0;
-  if (left === right) return 1;
-  if (right.includes(left) || left.includes(right)) {
-    let shorter = runeLength(left);
-    let longer = runeLength(right);
-    if (runeLength(right) < shorter) {
-      shorter = runeLength(right);
-      longer = runeLength(left);
-    }
-    return 0.8 + 0.2 * (shorter / longer);
-  }
-  const tokenScore = tokenSuggestionScore(term.tokens, candidate.tokens);
-  if (tokenScore > 0) return tokenScore;
-  const maxLen = Math.max(runeLength(left), runeLength(right));
-  if (maxLen === 0) return 0;
-  return 1 - levenshteinDistance(left, right) / maxLen;
 }

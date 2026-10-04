@@ -1,5 +1,6 @@
 import { assert, describe, it } from "vitest";
-import { chatCompletionsConfig, messagesConfig, responsesConfig, transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../src/core/endpoints.js";
+import { chatCompletionsConfig, messagesConfig, responsesConfig } from "../src/core/endpoints.js";
+import { transformAnthropicToOpenAI, transformOpenAIToAnthropic } from "../src/core/anthropic-format.js";
 import { SseScanner } from "../src/core/sse.js";
 import { isRouteError } from "../src/core/types.js";
 import { retryMetadata, sanitizedProxyError, shouldRotate } from "../src/core/errors.js";
