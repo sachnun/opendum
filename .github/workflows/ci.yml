@@ -52,6 +52,32 @@ jobs:
       - name: Build dashboard
         run: pnpm --filter @opendum/dashboard build
 
+  packages:
+    name: Packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck packages
+        run: pnpm --filter "./packages/*" -r --if-present typecheck
+
+      - name: Test packages
+        run: pnpm --filter "./packages/*" -r --if-present test
+
   proxy:
     name: Proxy
     runs-on: ubuntu-latest
