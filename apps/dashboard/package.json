@@ -4,8 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "nuxt dev",
-    "dev:emulate": "AUTH_OAUTH_EMULATOR=1 nuxt dev",
-    "emulate": "node scripts/emulate-oauth.mjs",
     "build": "nuxt build",
     "test": "tsx --test ./lib/*.test.ts",
     "lint": "nuxt prepare && eslint .",
@@ -15,8 +13,10 @@
     "@internationalized/date": "^3.12.2",
     "@lucide/vue": "^1.43.0",
     "@nuxt/fonts": "^0.14.0",
+    "@opendum/auth": "workspace:*",
     "@opendum/database": "workspace:*",
     "@opendum/models": "workspace:*",
+    "@opendum/redis": "workspace:*",
     "better-auth": "^1.6.23",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
@@ -31,9 +31,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@emulators/core": "^0.11.2",
-    "@emulators/github": "^0.11.2",
-    "@emulators/google": "^0.11.2",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "^1.16.0",
     "@tailwindcss/postcss": "^4.3.2",

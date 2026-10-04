@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { signIn } from "../../lib/auth-client";
-import { authProvider, type SocialProvider } from "../../lib/oauth-emulator";
+
+type SocialProvider = "github" | "google";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -34,7 +35,6 @@ const tetrisPieces = [
 ];
 
 const route = useRoute();
-const useOAuthEmulator = useRuntimeConfig().public.authOauthEmulator;
 
 useHead({
   meta: [
@@ -66,7 +66,7 @@ async function continueWithProvider(provider: SocialProvider) {
 
   try {
     await signIn.social({
-      provider: authProvider(provider, useOAuthEmulator),
+      provider,
       callbackURL: redirectTarget.value,
     });
   } finally {

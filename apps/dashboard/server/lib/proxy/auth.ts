@@ -1,16 +1,8 @@
-import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
-
-import { db, providerAccount, providerAccountDisabledModel } from "@opendum/database";
+import { AuthService } from "@opendum/auth";
+import type { AccountModelAvailability } from "@opendum/auth";
+import type { OpendumRedis } from "@opendum/redis";
 import { getRedisClient } from "../redis.js";
-import {
-  getAuthlessProviderModels,
-  getProviderAccessRule,
-  getProvidersForModel,
-  resolveModelAlias,
-} from "./models.js";
-import { AUTHLESS_PROVIDER_KEYS } from "./authless-providers.js";
-import { listCustomProviderModels } from "./custom-providers.js";
-import { PROVIDER_ACCOUNT_KEYS } from "../../services/account-providers";
+import { registry } from "./models.js";
 
 const VALIDATION_PREFIX = "opendum:api-key:validation";
 const LAST_USED_PREFIX = "opendum:api-key:last-used";
@@ -29,36 +21,16 @@ function getDisabledModelsCacheKey(userId: string): string {
   return `${DISABLED_MODELS_PREFIX}:${userId}`;
 }
 
-function normalizeTierForProvider(tier: string | null | undefined): string | null {
-  if (!tier) return null;
-  const normalized = tier.trim().toLowerCase().replace(/_/g, "-");
-  if (normalized === "pro-plus" || normalized === "proplus") return "pro+";
-  if (normalized === "free-tier") return "free";
-  if (normalized === "education" || normalized === "educational" || normalized === "edu" || normalized === "free-educational-quota") return "student";
-  return normalized || null;
-}
+export type { AccountModelAvailability };
 
-function doesAccountTierSatisfyRule(
-  accountTier: string | null | undefined,
-  minTier: string | null | undefined,
-  allowedTiers: string[] | undefined = undefined
-): boolean {
-  const normalizedAccountTier = normalizeTierForProvider(accountTier);
-  if (allowedTiers?.length) {
-    return allowedTiers.some((tier) => normalizeTierForProvider(tier) === normalizedAccountTier);
-  }
-
-  const normalizedRequiredTier = normalizeTierForProvider(minTier);
-  if (!normalizedRequiredTier || normalizedRequiredTier === "free") return true;
-  return normalizedAccountTier === normalizedRequiredTier;
-}
+const dummyRedis = {} as OpendumRedis;
 
 export async function invalidateDisabledModelsCache(userId: string): Promise<void> {
   try {
     const redis = await getRedisClient();
     await redis.del(getDisabledModelsCacheKey(userId));
   } catch {
-    // Ignore cache invalidation failures.
+    return;
   }
 }
 
@@ -77,154 +49,26 @@ export async function invalidateApiKeyValidationCache(
 ): Promise<void> {
   try {
     const redis = await getRedisClient();
-    await redis.del(getApiKeyValidationCacheKey(keyHash));
-    if (apiKeyId) {
-      await redis.del(getApiKeyLastUsedThrottleKey(apiKeyId));
-    }
+    const keys = [getApiKeyValidationCacheKey(keyHash)];
+    if (apiKeyId) keys.push(getApiKeyLastUsedThrottleKey(apiKeyId));
+    await redis.del(keys);
   } catch {
-    // Ignore cache invalidation failures.
+    return;
   }
-}
-
-export interface AccountModelAvailability {
-  activeProviders: Set<string>;
-  accountCountByProvider: Map<string, number>;
-  disabledCountByProviderModel: Map<string, number>;
-  activeAccountIdsByProvider: Map<string, string[]>;
-  accountTierById: Map<string, string>;
-  authlessProviderModels: Map<string, Set<string>>;
-  customProviderModels: Map<string, Set<string>>;
-  customProviderStandaloneModels: Map<string, string[]>;
-}
-
-export function isModelUsableByAccounts(
-  model: string,
-  availability: AccountModelAvailability
-): boolean {
-  const canonical = resolveModelAlias(model);
-
-  for (const provider of getProvidersForModel(canonical)) {
-    const totalAccounts = availability.accountCountByProvider.get(provider) ?? 0;
-    if (totalAccounts === 0) continue;
-    let effectiveTotalAccounts = totalAccounts;
-    const authlessModels = availability.authlessProviderModels.get(provider);
-    if (authlessModels && !authlessModels.has(canonical)) {
-      effectiveTotalAccounts -= 1;
-      if (effectiveTotalAccounts === 0) continue;
-    }
-
-    const accessRule = getProviderAccessRule(canonical, provider);
-    if (accessRule?.minTier || accessRule?.allowedTiers?.length) {
-      const accountIds = availability.activeAccountIdsByProvider.get(provider) ?? [];
-      const hasEligibleTierAccount = accountIds.some((accountId) =>
-        doesAccountTierSatisfyRule(availability.accountTierById.get(accountId), accessRule.minTier, accessRule.allowedTiers)
-      );
-      if (!hasEligibleTierAccount) continue;
-    }
-
-    const disabledCount = availability.disabledCountByProviderModel.get(`${provider}:${canonical}`) ?? 0;
-    if (disabledCount < effectiveTotalAccounts) return true;
-  }
-
-  for (const [provider, models] of availability.customProviderModels) {
-    if (!models.has(canonical)) continue;
-    if ((availability.accountCountByProvider.get(provider) ?? 0) > 0) return true;
-  }
-
-  return false;
 }
 
 export async function getAccountModelAvailability(
   userId: string,
   options: { includeInactiveAccounts?: boolean } = {}
 ): Promise<AccountModelAvailability> {
-  const accountWhere = options.includeInactiveAccounts
-    ? and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS))
-    : and(eq(providerAccount.userId, userId), inArray(providerAccount.provider, PROVIDER_ACCOUNT_KEYS), eq(providerAccount.isActive, true), or(isNull(providerAccount.disabledUntil), lte(providerAccount.disabledUntil, new Date())));
+  const service = new AuthService(registry, dummyRedis);
+  return service.getAccountModelAvailabilityWithSharing(userId, false, options);
+}
 
-  const activeAccounts = await db
-    .select({
-      id: providerAccount.id,
-      provider: providerAccount.provider,
-      tier: providerAccount.tier,
-    })
-    .from(providerAccount)
-    .where(accountWhere);
-
-  const activeProviders = new Set<string>();
-  const accountCountByProvider = new Map<string, number>();
-  const accountIdToProvider = new Map<string, string>();
-  const activeAccountIdsByProvider = new Map<string, string[]>();
-  const accountTierById = new Map<string, string>();
-  const authlessProviderModels = new Map<string, Set<string>>();
-  const customProviderModels = new Map<string, Set<string>>();
-  const customProviderStandaloneModels = new Map<string, string[]>();
-
-  const customProviders = await listCustomProviderModels(userId, options);
-  for (const customProvider of customProviders) {
-    activeProviders.add(customProvider.slug);
-    accountCountByProvider.set(customProvider.slug, (accountCountByProvider.get(customProvider.slug) ?? 0) + customProvider.accountIds.length);
-    activeAccountIdsByProvider.set(customProvider.slug, customProvider.accountIds);
-    customProviderModels.set(customProvider.slug, new Set(customProvider.models));
-    customProviderStandaloneModels.set(customProvider.slug, customProvider.standaloneModels);
-  }
-
-  for (const provider of AUTHLESS_PROVIDER_KEYS) {
-    activeProviders.add(provider);
-    accountCountByProvider.set(provider, 1);
-    activeAccountIdsByProvider.set(provider, [provider]);
-  }
-
-  for (const [provider, models] of Object.entries(getAuthlessProviderModels())) {
-    activeProviders.add(provider);
-    accountCountByProvider.set(provider, (accountCountByProvider.get(provider) ?? 0) + 1);
-    activeAccountIdsByProvider.set(provider, [...(activeAccountIdsByProvider.get(provider) ?? []), `authless:${provider}`]);
-    authlessProviderModels.set(provider, new Set(models));
-  }
-
-  for (const account of activeAccounts) {
-    activeProviders.add(account.provider);
-    accountCountByProvider.set(account.provider, (accountCountByProvider.get(account.provider) ?? 0) + 1);
-    accountIdToProvider.set(account.id, account.provider);
-
-    const providerAccountIds = activeAccountIdsByProvider.get(account.provider);
-    if (providerAccountIds) {
-      providerAccountIds.push(account.id);
-    } else {
-      activeAccountIdsByProvider.set(account.provider, [account.id]);
-    }
-
-    const normalizedTier = normalizeTierForProvider(account.tier);
-    if (normalizedTier) accountTierById.set(account.id, normalizedTier);
-  }
-
-  const disabledCountByProviderModel = new Map<string, number>();
-  if (activeAccounts.length > 0) {
-    const disabledEntries = await db
-      .select({
-        providerAccountId: providerAccountDisabledModel.providerAccountId,
-        model: providerAccountDisabledModel.model,
-      })
-      .from(providerAccountDisabledModel)
-      .where(inArray(providerAccountDisabledModel.providerAccountId, activeAccounts.map((account) => account.id)));
-
-    for (const entry of disabledEntries) {
-      const provider = accountIdToProvider.get(entry.providerAccountId);
-      if (!provider) continue;
-
-      const key = `${provider}:${resolveModelAlias(entry.model)}`;
-      disabledCountByProviderModel.set(key, (disabledCountByProviderModel.get(key) ?? 0) + 1);
-    }
-  }
-
-  return {
-    activeProviders,
-    accountCountByProvider,
-    disabledCountByProviderModel,
-    activeAccountIdsByProvider,
-    accountTierById,
-    authlessProviderModels,
-    customProviderModels,
-    customProviderStandaloneModels,
-  };
+export function isModelUsableByAccounts(
+  model: string,
+  availability: AccountModelAvailability
+): boolean {
+  const service = new AuthService(registry, dummyRedis);
+  return service.isModelUsableByAccounts(model, availability);
 }
