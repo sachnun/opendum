@@ -5,8 +5,10 @@
   "reasoning": true,
   "modalities": {
     "input": [
+      "audio",
+      "image",
       "text",
-      "image"
+      "video"
     ],
     "output": [
       "text"

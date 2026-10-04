@@ -45,7 +45,7 @@
       "upstream": "openai/gpt-oss-20b"
     },
     "workers_ai": {
-      "upstream": "@cf/openai/gpt-oss-20b"
+      "upstream": "@cf/openai/gpt-oss-120b"
     }
   }
 }

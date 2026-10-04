@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "microsoft-phi-4-mini-instruct",
-    "microsoft/phi-4-mini-instruct",
-    "phi-4-mini-instruct"
-  ],
-  "reasoning": false
-}

@@ -23,7 +23,7 @@
   "cost": {
     "input": 0.076,
     "output": 0.9,
-    "cacheRead": 0.0685
+    "cacheRead": 0.075
   },
   "providerConfig": {
     "freebuff": {

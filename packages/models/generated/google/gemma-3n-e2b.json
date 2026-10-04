@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "gemma-3n-e2b-it",
-    "google-gemma-3n-e2b-it",
-    "google/gemma-3n-e2b-it"
-  ],
-  "reasoning": false
-}

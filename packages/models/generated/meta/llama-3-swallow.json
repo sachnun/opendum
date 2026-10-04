@@ -1,7 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "llama-3-swallow-70b-instruct-v0.1",
-    "llama-3-swallow-instruct"
-  ]
-}

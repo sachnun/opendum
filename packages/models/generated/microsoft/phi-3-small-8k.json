@@ -1,9 +1,0 @@
-{
-  "providers": [],
-  "aliases": [
-    "microsoft-phi-3-small-8k-instruct",
-    "microsoft/phi-3-small-8k-instruct",
-    "phi-3-small-8k-instruct"
-  ],
-  "reasoning": false
-}
